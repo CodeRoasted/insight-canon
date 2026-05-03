@@ -1,0 +1,125 @@
+// src/1_tokenization/strategies/spark_hdfs.cpp
+//
+// SparkHDFSStrategy — parses Spark and HDFS log formats.
+//
+// Spark:  "17/06/09 20:10:40 INFO executor.CoarseGrainedExecutorBackend: msg"
+// HDFS:   "081109 203615 148 INFO dfs.DataNode$PacketResponder: msg"
+//
+// Hand-written scanner: zero RE2, zero string copies.
+
+#include "insight/tokenization/strategies/spark_hdfs.hpp"
+
+#include <cstddef>
+#include <string_view>
+
+#include "insight/core/types.hpp"
+#include "insight/tokenization/arena_allocator.hpp"
+#include "insight/tokenization/parsed_line.hpp"
+#include "insight/tokenization/strategies/detail/fast_gates.hpp"
+#include "insight/utils/logger.hpp"
+#include "insight/utils/result.hpp"
+#include "insight/utils/time_utils.hpp"
+
+namespace insight::tokenization
+{
+
+namespace
+{
+
+    constexpr std::size_t kMinimumCandidateLength{17};
+    constexpr double kNoConfidence{0.0};
+    constexpr double kSparkHdfsConfidence{0.85};
+    constexpr std::size_t kSparkTimestampLen{17U}; // "YY/MM/DD HH:MM:SS"
+    constexpr std::size_t kHdfsMinLen{14U};
+    constexpr std::size_t kHdfsTimestampEndOffset{13U}; // YYMMDD + space + HHMMSS
+
+} // namespace
+
+insight::Result<ParsedLine> SparkHDFSStrategy::parse(std::string_view line,
+                                                     ArenaAllocator& /*arena*/) const
+{
+    // ── Spark: "YY/MM/DD HH:MM:SS LEVEL component: msg" ────────────────────
+    if (detail::is_spark_prefix(line))
+    {
+        if (line.size() < kSparkTimestampLen)
+        {
+            INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=SparkHDFS parse miss (short)");
+            return insight::Result<ParsedLine>{
+                std::string("SparkHDFSStrategy: line too short for Spark format")};
+        }
+        // "YY/MM/DD HH:MM:SS" — 17 contiguous chars; directly sliceable.
+        const std::string_view ts_str{line.substr(0, kSparkTimestampLen)};
+        std::string_view rest{line.substr(kSparkTimestampLen)};
+        detail::sv_skip_ws(rest);
+
+        const std::string_view level_sv{detail::sv_take_token(rest)};
+        const std::string_view component{detail::sv_take_until(rest, ':')};
+        detail::sv_skip_ws(rest);
+
+        ParsedLine parsed_line;
+        parsed_line.raw_line = line;
+        parsed_line.timestamp = utils::parse_short_year_slash(ts_str);
+        parsed_line.level = utils::parse_log_level(level_sv);
+        parsed_line.component = component;
+        parsed_line.content = rest;
+        INSIGHT_LOG_DEBUG(logging::strategy_logger(),
+                          "strategy=SparkHDFS parsed component={} level={} has_timestamp={}",
+                          parsed_line.component, to_string(parsed_line.level),
+                          parsed_line.timestamp.has_value());
+        return insight::Result<ParsedLine>{parsed_line};
+    }
+
+    // ── HDFS: "YYMMDD HHMMSS N LEVEL component: msg" ──────────────────────
+    if (detail::is_hdfs_prefix(line))
+    {
+        if (line.size() < kHdfsMinLen)
+        {
+            INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=SparkHDFS parse miss (short)");
+            return insight::Result<ParsedLine>{
+                std::string("SparkHDFSStrategy: line too short for HDFS format")};
+        }
+        const std::string_view date{line.substr(0, 6U)};
+        const std::string_view time_str{line.substr(7, 6U)};
+        std::string_view rest{line.substr(kHdfsTimestampEndOffset)};
+        detail::sv_skip_ws(rest);
+
+        (void)detail::sv_take_token(rest); // skip record count / thread id
+        const std::string_view level_sv{detail::sv_take_token(rest)};
+        const std::string_view component{detail::sv_take_until(rest, ':')};
+        detail::sv_skip_ws(rest);
+
+        ParsedLine parsed_line;
+        parsed_line.raw_line = line;
+        parsed_line.timestamp = utils::parse_compact_date_time(date, time_str);
+        parsed_line.level = utils::parse_log_level(level_sv);
+        parsed_line.component = component;
+        parsed_line.content = rest;
+        INSIGHT_LOG_DEBUG(logging::strategy_logger(),
+                          "strategy=SparkHDFS parsed component={} level={} has_timestamp={}",
+                          parsed_line.component, to_string(parsed_line.level),
+                          parsed_line.timestamp.has_value());
+        return insight::Result<ParsedLine>{parsed_line};
+    }
+
+    INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=SparkHDFS parse miss");
+    return insight::Result<ParsedLine>{
+        std::string("SparkHDFSStrategy: line does not match Spark or HDFS format")};
+}
+
+LogFormat SparkHDFSStrategy::format() const noexcept
+{
+    return LogFormat::SparkHDFS;
+}
+
+double SparkHDFSStrategy::confidence(std::string_view line) const noexcept
+{
+    if (line.size() < kMinimumCandidateLength)
+        return kNoConfidence;
+    if (detail::is_spark_prefix(line))
+        return kSparkHdfsConfidence;
+    if (detail::is_hdfs_prefix(line))
+        return kSparkHdfsConfidence;
+    return kNoConfidence;
+}
+
+} // namespace insight::tokenization

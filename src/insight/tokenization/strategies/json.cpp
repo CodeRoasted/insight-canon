@@ -1,0 +1,137 @@
+// src/1_tokenization/strategies/json.cpp
+//
+// JsonStrategy — parses structured JSON log lines using simdjson on-demand.
+// See detail/simdjson_scratch.hpp for the thread-local zero-alloc scaffolding.
+
+#include "insight/tokenization/strategies/json.hpp"
+
+#include <simdjson.h>
+#include <string>
+#include <string_view>
+
+#include "insight/core/types.hpp"
+#include "insight/tokenization/arena_allocator.hpp"
+#include "insight/tokenization/parsed_line.hpp"
+#include "insight/tokenization/strategies/detail/simdjson_scratch.hpp"
+#include "insight/utils/logger.hpp"
+#include "insight/utils/result.hpp"
+#include "insight/utils/time_utils.hpp"
+
+namespace insight::tokenization
+{
+
+namespace
+{
+    constexpr double kNoConfidence{0.0};
+    constexpr double kJsonObjectConfidence{1.0};
+} // namespace
+
+insight::Result<ParsedLine> JsonStrategy::parse(std::string_view line, ArenaAllocator& arena) const
+{
+    if (line.empty())
+        return insight::Result<ParsedLine>{std::string("JsonStrategy: empty line")};
+
+    // ── Fast path ─────────────────────────────────────────────────────────────
+    // For escape-free JSON objects bypass simdjson entirely: single-pass byte
+    // scan with no heap allocation. Falls back to simdjson on any anomaly.
+    {
+        const auto fast{detail::try_fast_json(line)};
+        if (fast.has_result)
+        {
+            ParsedLine parsed_line;
+            parsed_line.raw_line = line;
+            if (!fast.timestamp_str.empty())
+            {
+                parsed_line.timestamp = utils::parse_iso8601(fast.timestamp_str);
+                if (!parsed_line.timestamp)
+                    parsed_line.timestamp = utils::parse_bsd_syslog_ts(fast.timestamp_str);
+            }
+            if (!fast.level_str.empty())
+                parsed_line.level = utils::parse_log_level(fast.level_str);
+            if (!fast.component_str.empty())
+                parsed_line.component = arena.store_string(fast.component_str);
+            parsed_line.content = fast.message_str.empty() ? arena.store_string(line)
+                                                           : arena.store_string(fast.message_str);
+            INSIGHT_LOG_DEBUG(logging::strategy_logger(),
+                              "strategy=JSON fast_path component={} level={} has_timestamp={}",
+                              parsed_line.component, to_string(parsed_line.level),
+                              parsed_line.timestamp.has_value());
+            return insight::Result<ParsedLine>{parsed_line};
+        }
+    }
+    // ── Slow path: full simdjson (handles escapes, nested objects, etc.) ──────
+
+    auto& scratch{detail::json_scratch()};
+    const auto padded{detail::load_padded(scratch, line)};
+
+    simdjson::ondemand::document doc;
+    if (auto err = scratch.parser.iterate(padded).get(doc); err != simdjson::SUCCESS)
+    {
+        INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=JSON simdjson_iterate_error={}",
+                          simdjson::error_message(err));
+        return insight::Result<ParsedLine>{std::string("JsonStrategy: invalid JSON")};
+    }
+
+    simdjson::ondemand::object root;
+    if (doc.get_object().get(root) != simdjson::SUCCESS)
+    {
+        INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=JSON not_an_object");
+        return insight::Result<ParsedLine>{std::string("JsonStrategy: top-level not an object")};
+    }
+
+    ParsedLine parsed_line;
+    parsed_line.raw_line = line;
+
+    std::string_view scratch_view;
+
+    if (detail::try_get_string(root, kTimestampKeys, scratch_view))
+    {
+        parsed_line.timestamp = utils::parse_iso8601(scratch_view);
+        if (!parsed_line.timestamp)
+            parsed_line.timestamp = utils::parse_bsd_syslog_ts(scratch_view);
+    }
+
+    if (detail::try_get_string(root, kLevelKeys, scratch_view))
+        parsed_line.level = utils::parse_log_level(scratch_view);
+
+    if (detail::try_get_string(root, kComponentKeys, scratch_view))
+        parsed_line.component = arena.store_string(scratch_view);
+
+    if (detail::try_get_string(root, kMessageKeys, scratch_view))
+    {
+        parsed_line.content = arena.store_string(scratch_view);
+    }
+    else
+    {
+        // Fallback: arena-store the original line. We avoid re-serialising the
+        // document (which would be a heap allocation in nlohmann); the raw
+        // bytes are already stable when the caller is LogParser.
+        parsed_line.content = arena.store_string(line);
+    }
+
+    INSIGHT_LOG_DEBUG(
+        logging::strategy_logger(), "strategy=JSON parsed component={} level={} has_timestamp={}",
+        parsed_line.component, to_string(parsed_line.level), parsed_line.timestamp.has_value());
+    return insight::Result<ParsedLine>{parsed_line};
+}
+
+LogFormat JsonStrategy::format() const noexcept
+{
+    return LogFormat::JSON;
+}
+
+// Cheap layout check: first non-space character must be '{'. The actual JSON
+// parse happens once, in parse(); the detector pipeline gates parse() behind
+// this O(1) check, so the line is never traversed twice.
+double JsonStrategy::confidence(std::string_view line) const noexcept
+{
+    for (const char current_char : line)
+    {
+        if (current_char == ' ' || current_char == '\t')
+            continue;
+        return (current_char == '{') ? kJsonObjectConfidence : kNoConfidence;
+    }
+    return kNoConfidence;
+}
+
+} // namespace insight::tokenization

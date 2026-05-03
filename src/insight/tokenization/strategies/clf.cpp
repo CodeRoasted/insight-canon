@@ -1,0 +1,163 @@
+// src/1_tokenization/strategies/clf.cpp
+//
+// CLFStrategy — parses Apache/Nginx Common Log Format and Combined Log Format.
+//
+// CLF:      host ident user [timestamp] "method url proto" status bytes
+// Combined: … "referer" "user-agent"
+//
+// The Drain input content is constructed as: "METHOD URL STATUS" — a compact
+// form useful for template extraction of HTTP access patterns.
+//
+// Hand-written scanner: zero RE2, zero string copies except for the
+// three-part content construction ("METHOD URL STATUS").
+
+#include "insight/tokenization/strategies/clf.hpp"
+
+#include <charconv>
+#include <cstring>
+#include <optional>
+#include <span>
+#include <string_view>
+
+#include "insight/core/types.hpp"
+#include "insight/tokenization/arena_allocator.hpp"
+#include "insight/tokenization/parsed_line.hpp"
+#include "insight/tokenization/strategies/detail/fast_gates.hpp"
+#include "insight/utils/logger.hpp"
+#include "insight/utils/result.hpp"
+#include "insight/utils/time_utils.hpp"
+
+namespace insight::tokenization
+{
+
+namespace
+{
+
+    constexpr int kDefaultSuccessStatusCode{200};
+    constexpr int kRedirectStatusStart{300};
+    constexpr int kClientErrorStatusStart{400};
+    constexpr int kServerErrorStatusStart{500};
+    constexpr double kNoConfidence{0.0};
+    constexpr double kStrongConfidence{0.95};
+
+} // namespace
+
+// Group 1: client IP / hostname
+// Group 2: CLF timestamp (content of the [...] brackets)
+// Group 3: request string "GET /path HTTP/1.0"  — quotes stripped by capture
+// Group 4: HTTP status code (3 digits)
+// Group 5: response bytes (number or "-")
+// Groups 6,7 (optional): referer, user-agent (Combined Log Format)
+//
+insight::Result<ParsedLine> CLFStrategy::parse(std::string_view line, ArenaAllocator& arena) const
+{
+    std::string_view rest{line};
+
+    const std::string_view host{detail::sv_take_token(rest)};
+    (void)detail::sv_take_token(rest); // skip ident
+    (void)detail::sv_take_token(rest); // skip user
+
+    detail::sv_skip_ws(rest);
+    const std::string_view raw_ts{detail::sv_take_bracketed(rest)};
+    if (raw_ts.empty())
+    {
+        INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=CLF parse miss (no timestamp)");
+        return insight::Result<ParsedLine>{
+            std::string("CLFStrategy: line does not match CLF/Combined format")};
+    }
+
+    detail::sv_skip_ws(rest);
+    if (rest.empty() || rest[0] != '"')
+    {
+        INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=CLF parse miss (no request)");
+        return insight::Result<ParsedLine>{
+            std::string("CLFStrategy: line does not match CLF/Combined format")};
+    }
+    const std::string_view request{detail::sv_take_quoted(rest)};
+    const std::string_view status_str{detail::sv_take_token(rest)};
+    (void)detail::sv_take_token(rest); // skip bytes
+
+    if (host.empty() || status_str.size() != 3U)
+    {
+        INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=CLF parse miss (bad fields)");
+        return insight::Result<ParsedLine>{
+            std::string("CLFStrategy: line does not match CLF/Combined format")};
+    }
+
+    int status_code{kDefaultSuccessStatusCode};
+    std::from_chars(status_str.begin(), status_str.end(), status_code);
+
+    // Build content: "METHOD URL STATUS" — extracted from request string.
+    // request already points into the arena-stable `line`.
+    std::string_view req{request};
+    const std::string_view method{detail::sv_take_token(req)};
+    const std::string_view url{detail::sv_take_token(req)};
+
+    // Allocate directly in arena — one bump-pointer advance, no heap.
+    const std::size_t clen{method.size() + 1U + url.size() + 1U + status_str.size()};
+    auto* const cbuf{static_cast<char*>(arena.allocate(clen, 1U))};
+    const auto buf{std::span<char>{cbuf, clen}};
+    std::size_t off{0};
+    std::memcpy(buf.data(), method.data(), method.size());
+    off += method.size();
+    buf[off] = ' ';
+    off += 1U;
+    std::memcpy(&buf[off], url.data(), url.size());
+    off += url.size();
+    buf[off] = ' ';
+    off += 1U;
+    std::memcpy(&buf[off], status_str.data(), status_str.size());
+
+    ParsedLine parsed_line;
+    parsed_line.raw_line = line;
+    parsed_line.timestamp = parse_clf_timestamp(raw_ts);
+    parsed_line.level = status_code_to_level(status_code);
+    parsed_line.component = host;
+    parsed_line.content = {buf.data(), clen};
+
+    INSIGHT_LOG_DEBUG(
+        logging::strategy_logger(), "strategy=CLF parsed component={} level={} has_timestamp={}",
+        parsed_line.component, to_string(parsed_line.level), parsed_line.timestamp.has_value());
+    return insight::Result<ParsedLine>{parsed_line};
+}
+
+LogFormat CLFStrategy::format() const noexcept
+{
+    return LogFormat::CLF;
+}
+
+double CLFStrategy::confidence(std::string_view line) const noexcept
+{
+    // Manual gate: locate "[DD/Mon/YYYY:HH:MM:SS". Strong vs weak distinction
+    // (the strong path also requires `"GET / HTTP/1.x`) is left to parse() —
+    // the cost difference between strong and weak confidences here was a
+    // tie-break only, and parse() will catch malformed lines anyway.
+    if (detail::has_clf_timestamp(line))
+        return kStrongConfidence;
+    return kNoConfidence;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Private helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+std::optional<Timestamp> CLFStrategy::parse_clf_timestamp(std::string_view timestamp_str)
+{
+    return utils::parse_clf_timestamp(timestamp_str);
+}
+
+// Map HTTP status codes to LogLevel for downstream anomaly detection.
+LogLevel CLFStrategy::status_code_to_level(int status)
+{
+    if (status >= kServerErrorStatusStart)
+        return LogLevel::Error;
+    if (status >= kClientErrorStatusStart)
+        return LogLevel::Warn;
+    if (status >= kRedirectStatusStart)
+        return LogLevel::Info;
+    if (status >= kDefaultSuccessStatusCode)
+        return LogLevel::Info;
+    return LogLevel::Unknown;
+}
+
+} // namespace insight::tokenization
