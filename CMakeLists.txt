@@ -3,9 +3,9 @@
 #
 #  Provides insight::canon, a single self-contained static library
 #  that bundles:
-#    • insight_core   – shared types, Result<T>, logging, time utilities
-#    • insight_tokenization – Phase 1: format detection + Drain + arena
-#    • insight_sequence     – Phase 2: streaming transitions and n-grams
+#    • core         – shared types, Result<T>, logging, time utilities
+#    • tokenization – format detection + Drain + arena → CanonicalEvent
+#    • sequence     – streaming transitions and n-grams
 ###########################################################
 cmake_minimum_required(VERSION 3.28)
 

@@ -10,7 +10,7 @@ class InsightCanonConan(ConanFile):
     url = "https://github.com/coderoast-dev/insight-canon"
     description = (
         "InSight Canon: shared types, log tokenization, and streaming sequence model. "
-        "Bundles insight_core, insight_tokenization, and insight_sequence into a single "
+        "Bundles core types, tokenization, and sequence into a single "
         "self-contained Conan package exposed as insight::canon."
     )
     settings = "os", "arch", "compiler", "build_type"
