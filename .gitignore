@@ -37,17 +37,15 @@ test_package/deactivate_conanbuildenv-*.sh
 test_package/deactivate_conanrunenv-*.sh
 test_package/metadata/
 
-# Conan local cache
-.conan2/extensions
-.conan2/migrations
-.conan2/p
-.conan2/.conan.db
-.conan2/remotes.json
-.conan2/settings.yml
-.conan2/version.txt
+# Conan local cache (only profiles/ and global.conf are tracked)
+.conan2/**
+!.conan2/profiles/
+!.conan2/profiles/**
+!.conan2/global.conf
 
-# Bench timestamped runs
-bench_results/bench_*.json
+# Bench results (only baseline.json is tracked)
+bench_results/**
+!bench_results/baseline.json
 
 # VS Code / qtcreator
 /.vscode/
