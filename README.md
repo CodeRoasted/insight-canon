@@ -36,8 +36,8 @@ from Conan Center Index — nothing needs to be installed manually.
 conan install . \
   --output-folder=build \
   --build=missing \
-  --profile:host=<your-profile> \
-  --profile:build=<your-profile>
+  --profile:host=linux-gcc13-release \
+  --profile:build=linux-gcc13-release
 ```
 
 A `build/CMakePresets.json` will be generated. The repo root
@@ -47,14 +47,14 @@ presets without extra configuration.
 ### 2. Configure and build
 
 ```bash
-cmake --preset <preset-name>       # e.g. conan-release
-cmake --build --preset <preset-name>
+cmake --preset conan-release
+cmake --build --preset conan-release
 ```
 
 ### 3. Run tests
 
 ```bash
-ctest --preset <preset-name> --output-on-failure
+ctest --preset conan-release --output-on-failure
 ```
 
 ---
@@ -81,7 +81,7 @@ conan cache restore /tmp/insight_canon-X.Y.Z.tgz
 ```bash
 git clone https://github.com/coderoast-dev/insight-canon.git
 cd insight-canon
-conan create . --profile:host=<profile> --profile:build=<profile> --build=missing
+conan create . --profile:host=linux-gcc13-release --profile:build=linux-gcc13-release --build=missing
 ```
 
 ### CMake usage in your project
