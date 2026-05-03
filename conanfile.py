@@ -4,7 +4,7 @@ from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain
 
 class InsightCanonConan(ConanFile):
     name = "insight_canon"
-    version = "0.1.0"
+    version = "1.2.8"
     package_type = "library"
     license = "Apache-2.0"
     url = "https://github.com/coderoast-dev/insight-canon"
