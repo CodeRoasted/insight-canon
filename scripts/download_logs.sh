@@ -26,7 +26,11 @@ extract_zip() {
         local dir
         dir="$(dirname "$target")"
 
-        if command -v unzip >/dev/null 2>&1; then
+        if command -v python3 >/dev/null 2>&1; then
+            python3 -m zipfile -e "$target" "$dir"
+        elif command -v 7z >/dev/null 2>&1; then
+            7z x -y -o"$dir" "$target"
+        elif command -v unzip >/dev/null 2>&1; then
             unzip -o "$target" -d "$dir"
         elif command -v bsdtar >/dev/null 2>&1; then
             bsdtar -xf "$target" -C "$dir"
@@ -90,7 +94,7 @@ echo "📦 Downloading Zenodo archive..."
 ZENODO_ARCHIVE_URL="https://zenodo.org/api/records/18522101/files-archive"
 ARCHIVE_PATH="$ZENODO_DIR/zenodo_logs.zip"
 
-curl -L -o "$ARCHIVE_PATH" "$ZENODO_ARCHIVE_URL"
+curl -L --retry 5 --retry-delay 5 --retry-all-errors -o "$ARCHIVE_PATH" "$ZENODO_ARCHIVE_URL"
 
 echo "👉 Extracting archive..."
 
