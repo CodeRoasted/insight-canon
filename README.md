@@ -1,19 +1,18 @@
 # insight-canon
 
-**Phases 1 & 2 of the InSight pipeline** — canonical event and sequence.
+**insight-canon** — tokenization and sequence: the foundational log-analysis pipeline.
 
 **insight_canon** is a self-contained C++23 static library that provides the foundational
 pipeline for structured log analysis:
 
-| Layer | Phase | What it does |
-|---|---|---|
-| **core** | — | Shared types (`LogLevel`, `EventID`), `Result<T>`, logging façade (spdlog), ISO-8601 time utilities |
-| **tokenization** | Phase 1 — Canonical event | Format detection, Drain template clustering, arena allocator, `CanonicalEvent` output |
-| **sequence** | Phase 2 — Sequence | Streaming flat history, sparse transition matrix, bounded n-gram counters, dominant-path reconstruction |
+| Layer | What it does |
+|---|---|
+| **core** | Shared types (`LogLevel`, `EventID`), `Result<T>`, logging façade (spdlog), ISO-8601 time utilities |
+| **tokenization** | Format detection, Drain template clustering, arena allocator, `CanonicalEvent` output |
+| **sequence** | Streaming flat history, sparse transition matrix, bounded n-gram counters, dominant-path reconstruction |
 
-> **Phase 1 — Canonical event**: A _canonical event_ is the normalized, format-agnostic
-> representation of a log line. Tokenization produces this representation; all downstream
-> phases consume it.
+> A _canonical event_ is the normalized, format-agnostic representation of a log line.
+> Tokenization produces it; sequence, insight-metalog, and insight-eidos all consume it.
 
 All three layers are built as one library and consumed via a single CMake target: `insight::canon`.
 
@@ -23,11 +22,9 @@ All three layers are built as one library and consumed via a single CMake target
 
 ```text
 Raw logs
-  -> Phase 1: tokenization -> CanonicalEvent         (this repo)
-  -> Phase 2: sequence     -> event stream            (this repo)
-  -> Phase 3: MetaLog      -> bounded fingerprint     (insight-metalog)
-  -> Phase 4: detection    -> precision-first reports (insight-eidos)
-  -> Phase 5: explain      -> human explanation layer (insight-eidos)
+  insight-canon   ->  CanonicalEvent  ->  event stream
+  insight-metalog ->  bounded behavioral fingerprint
+  insight-eidos   ->  detection reports + explain packets
 ```
 
 ---
