@@ -15,7 +15,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(INSIGHT_CANON_BUILD_TESTS  "Build unit and regression tests"                      ${PROJECT_IS_TOP_LEVEL})
+option(INSIGHT_CANON_BUILD_TESTS  "Build unit and regression tests" ${PROJECT_IS_TOP_LEVEL})
 option(INSIGHT_CANON_ENABLE_NUMA  "Enable optional NUMA-aware arena allocation (libnuma)" OFF)
 
 ###########################################################
