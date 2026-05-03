@@ -120,6 +120,8 @@ insight-canon/
 ├── tests/
 │   ├── unit/               GTest unit tests for all layers
 │   └── regression/         Loghub-dataset regression tests
+├── scripts/
+│   └── download_logs.sh    Download Loghub 2k + Zenodo datasets for regression
 ├── CMakeLists.txt          Single root CMake file
 ├── conanfile.py            Single Conan recipe
 └── .github/workflows/      ci.yml  release-publish.yml  workflow-lint.yml
@@ -164,6 +166,56 @@ clang-format -i $(find api src tests test_package -name '*.cpp' -o -name '*.hpp'
 
 # Lint (requires compile_commands.json in build/)
 clang-tidy -p build $(find src -name '*.cpp')
+```
+
+---
+
+## Regression tests (Loghub datasets)
+
+The regression suite in `tests/regression/` tokenizes 16 real-world log files from the
+[Loghub 2k](https://github.com/logpai/loghub) benchmark and asserts minimum per-dataset
+parse-success rates. The test binary auto-skips if the data directory is absent, so a
+normal `conan create` or `ctest` run is always clean without them.
+
+### 1. Download the datasets
+
+```bash
+bash scripts/download_logs.sh
+```
+
+This populates:
+```
+data/logs/loghub/   ← 16 × *_2k.log files from the logpai/loghub GitHub repo
+data/logs/zenodo/   ← extended archive from Zenodo record 18522101
+```
+
+Requires `curl` and either `unzip` or `bsdtar`.
+
+### 2. Run the regression tests
+
+The test binary looks for `data/logs/loghub/` relative to its working directory.
+When running via CTest the working directory is the build folder, so symlink or
+copy the data directory there, or set the working directory explicitly:
+
+```bash
+# Conan workflow — run from the build output directory
+cd build/<preset-dir>
+ln -s ../../data data       # or: cp -r ../../data data
+ctest --output-on-failure -R regression
+```
+
+```bash
+# CMake direct workflow
+cmake --build build -j$(nproc)
+cd build
+ln -s ../data data
+ctest --output-on-failure -R regression
+```
+
+To override the minimum success threshold for all datasets:
+
+```bash
+INSIGHT_TOKENIZER_REGRESSION_MIN_SUCCESS_RATE=0.90 ctest --output-on-failure -R regression
 ```
 
 ---
