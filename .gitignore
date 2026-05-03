@@ -1,3 +1,6 @@
+# Log datasets (downloaded by scripts/download_logs.sh)
+/data/
+
 # Build outputs
 /build*/
 *.a
