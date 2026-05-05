@@ -112,8 +112,17 @@ In your `conanfile.py`:
 
 ```python
 def requirements(self):
-    self.requires("insight_canon/0.1.0")
+  self.requires("insight_canon/1.2.8")
 ```
+
+For local CodeRoast workspace iteration you can also use the parent [malf](../malf/README.md) helper:
+
+```bash
+export PATH="../malf:$PATH"
+malf package .
+```
+
+Cross-repo package pins are tracked in [../technical_docs/compatibility_matrix.md](../technical_docs/compatibility_matrix.md), and planning lives in [../technical_docs/ROADMAP.md](../technical_docs/ROADMAP.md).
 
 ---
 
@@ -246,6 +255,12 @@ INSIGHT_TOKENIZER_REGRESSION_MIN_SUCCESS_RATE=0.90 ctest --output-on-failure -R 
 
 ---
 
+## Technical Docs
+
+Pipeline reference for tokenization and sequence lives in [technical_docs/](technical_docs/README.md).
+
+---
+
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE).
+Apache-2.0 — see [LICENSE](LICENSE).
