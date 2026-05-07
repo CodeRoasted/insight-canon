@@ -84,6 +84,11 @@ jobs:
             exit 1
           fi
 
+      - name: Setup Conan profile
+        run: |
+          mkdir -p "$CONAN_HOME/profiles"
+          cp linux-gcc13-release "$CONAN_HOME/profiles/$CONAN_PROFILE"
+
       - name: Build package
         run: |
           conan create . \

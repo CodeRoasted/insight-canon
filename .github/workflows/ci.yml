@@ -36,6 +36,11 @@ jobs:
           cache_packages: true
           profile_detect: false
 
+      - name: Setup Conan profile
+        run: |
+          mkdir -p "$CONAN_HOME/profiles"
+          cp linux-gcc13-release "$CONAN_HOME/profiles/linux-gcc13-release"
+
       - name: Build and test
         run: |
           conan create . \

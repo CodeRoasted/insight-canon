@@ -112,7 +112,7 @@ In your `conanfile.py`:
 
 ```python
 def requirements(self):
-  self.requires("insight_canon/1.3.0")
+  self.requires("insight_canon/1.3.1")
 ```
 
 For local CodeRoast workspace iteration you can also use the parent [malf](../malf/README.md) helper:
