@@ -35,6 +35,10 @@ class InsightCanonConan(ConanFile):
         if self.options.get_safe("shared"):
             self.options.rm_safe("fPIC")
 
+    def layout(self):
+        self.cpp.source.includedirs = ["api"]
+        self.cpp.build.libdirs = ["build"]
+
     def requirements(self):
         # spdlog/fmt appear in the public logging API header; consumers must
         # see their includes and link against them.

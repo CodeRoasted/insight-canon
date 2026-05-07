@@ -2,7 +2,7 @@
 /data/
 
 # Build outputs
-/build*/
+**/build*/
 *.a
 *.o
 *.so
