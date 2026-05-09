@@ -109,7 +109,7 @@ insight::Result<ParsedLine> JsonStrategy::parse(std::string_view line, ArenaAllo
         parsed_line.content = arena.store_string(line);
     }
 
-    INSIGHT_LOG_DEBUG(
+    INSIGHT_LOG_TRACE(
         logging::strategy_logger(), "strategy=JSON parsed component={} level={} has_timestamp={}",
         parsed_line.component, to_string(parsed_line.level), parsed_line.timestamp.has_value());
     return insight::Result<ParsedLine>{parsed_line};
