@@ -43,7 +43,17 @@ from Conan Center Index — nothing needs to be installed manually.
 
 ---
 
-## Quick start (Conan workflow)
+## Quick start
+
+For local CodeRoast workspace iteration, use the parent `malf` helper from the
+repo root:
+
+```bash
+malf build .
+malf test .
+```
+
+## Conan workflow
 
 ### 1. Install dependencies and configure
 
@@ -112,14 +122,7 @@ In your `conanfile.py`:
 
 ```python
 def requirements(self):
-  self.requires("insight_canon/1.3.1")
-```
-
-For local CodeRoast workspace iteration you can also use the parent [malf](../malf/README.md) helper:
-
-```bash
-export PATH="../malf:$PATH"
-malf package .
+  self.requires("insight_canon/1.3.2")
 ```
 
 Cross-repo package pins are tracked in [../technical_docs/compatibility_matrix.md](../technical_docs/compatibility_matrix.md), and planning lives in [../technical_docs/ROADMAP.md](../technical_docs/ROADMAP.md).
