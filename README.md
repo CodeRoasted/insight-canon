@@ -122,7 +122,7 @@ In your `conanfile.py`:
 
 ```python
 def requirements(self):
-  self.requires("insight_canon/1.3.2")
+  self.requires("insight_canon/1.3.3")
 ```
 
 Cross-repo package pins are tracked in [../technical_docs/compatibility_matrix.md](../technical_docs/compatibility_matrix.md), and planning lives in [../technical_docs/ROADMAP.md](../technical_docs/ROADMAP.md).
