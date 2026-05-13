@@ -25,11 +25,12 @@ Raw log line
 |---|---|---|
 | insight-canon | This repo: tokenization, sequence, shared core types | This folder |
 | insight-metalog | MetaLog producer — consumes `CanonicalEvent` and sequence summaries | [../../insight-metalog/README.md](../../insight-metalog/README.md) |
-| insight-eidos | Detection, explain, engine, CLI, and full product reference | [../../insight-eidos/technical_docs/README.md](../../insight-eidos/technical_docs/README.md) |
-| CodeRoast parent docs | Cross-repo status, compatibility matrix, and roadmap | [../../technical_docs/README.md](../../technical_docs/README.md) |
+| insight-eidos | Detection, explain, engine, CLI, and phase-level implementation docs | [../../insight-eidos/technical_docs/README.md](../../insight-eidos/technical_docs/README.md) |
+| CodeRoast parent docs | Product strategy, cross-repo status, compatibility matrix, and roadmap | [../../technical_docs/README.md](../../technical_docs/README.md) |
 
 ## Key Cross-References
 
 - Parent compatibility matrix: [../../technical_docs/compatibility_matrix.md](../../technical_docs/compatibility_matrix.md)
 - insight-metalog phase reference: [../../insight-metalog/technical_docs/phases/metalog.md](../../insight-metalog/technical_docs/phases/metalog.md)
-- InSight full pipeline: [../../insight-eidos/technical_docs/README.md](../../insight-eidos/technical_docs/README.md)
+- InSight product strategy: [../../technical_docs/product/strategy.md](../../technical_docs/product/strategy.md)
+- InSight implementation pipeline: [../../insight-eidos/technical_docs/README.md](../../insight-eidos/technical_docs/README.md)
