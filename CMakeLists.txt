@@ -1,11 +1,10 @@
 ###########################################################
-#  insight_canon — core types · tokenization · sequence model
+#  insight_canon — core types · tokenization
 #
 #  Provides insight::canon, a single self-contained static library
 #  that bundles:
 #    • core         – shared types, logging, time utilities
 #    • tokenization – format detection + Drain + arena → CanonicalEvent
-#    • sequence     – streaming transitions and n-grams
 ###########################################################
 cmake_minimum_required(VERSION 3.28)
 

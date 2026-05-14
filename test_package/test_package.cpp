@@ -3,7 +3,6 @@
 #include <string_view>
 
 #include "insight/core/types.hpp"
-#include "insight/sequence/sequence_engine.hpp"
 #include "insight/tokenization/arena_allocator.hpp"
 #include "insight/tokenization/canonical_event.hpp"
 #include "insight/tokenization/tokenizer_engine.hpp"
@@ -14,13 +13,6 @@ namespace
 {
 
 constexpr std::size_t kArenaCapacity{16 * 1024};
-
-insight::tokenization::CanonicalEvent make_event(insight::EventID id)
-{
-    insight::tokenization::CanonicalEvent ev;
-    ev.id = id;
-    return ev;
-}
 
 } // namespace
 
@@ -80,32 +72,5 @@ TEST(InsightCanonPackage, TokenizesSyslogLine)
 
     const auto& event{result.value()};
     EXPECT_FALSE(event.component.empty());
-}
-
-// ── sequence ──────────────────────────────────────────────────────────────────
-
-TEST(InsightCanonPackage, SequenceIngestsEventsAndExposesFlatView)
-{
-    insight::sequence::SequenceEngine engine;
-    engine.ingest(make_event(7));
-    engine.ingest(make_event(7));
-    EXPECT_EQ(engine.size(), 2U);
-    EXPECT_EQ(engine.unique_events(), 1U);
-}
-
-TEST(InsightCanonPackage, SequenceBuildsTransitionMatrix)
-{
-    insight::sequence::SequenceEngine engine;
-    // Pattern: 1->2->3->1->2->3->1->2->4
-    for (auto id : {1U, 2U, 3U, 1U, 2U, 3U, 1U, 2U, 4U})
-        engine.ingest(make_event(id));
-
-    EXPECT_EQ(engine.unique_events(), 4U);
-
-    const auto edges{engine.transitions()};
-    ASSERT_GE(edges.size(), 4U);
-    EXPECT_EQ(edges.front().from, 1U);
-    EXPECT_EQ(edges.front().to, 2U);
-    EXPECT_EQ(edges.front().count, 3U);
 }
 // NOLINTEND
