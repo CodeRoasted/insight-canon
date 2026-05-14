@@ -3,7 +3,7 @@
 #
 #  Provides insight::canon, a single self-contained static library
 #  that bundles:
-#    • core         – shared types, Result<T>, logging, time utilities
+#    • core         – shared types, logging, time utilities
 #    • tokenization – format detection + Drain + arena → CanonicalEvent
 #    • sequence     – streaming transitions and n-grams
 ###########################################################
