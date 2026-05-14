@@ -31,7 +31,7 @@ TEST(InsightCanonPackage, CoreResultCarriesValueAndError)
     EXPECT_TRUE(static_cast<bool>(ok));
     EXPECT_EQ(ok.value(), 42);
 
-    std::expected<int, std::string> err{std::string{"boom"}};
+    std::expected<int, std::string> err{std::unexpected{"boom"}};
     EXPECT_FALSE(static_cast<bool>(err));
     EXPECT_EQ(err.error(), "boom");
 }

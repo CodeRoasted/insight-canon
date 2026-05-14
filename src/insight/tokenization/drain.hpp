@@ -6,7 +6,6 @@
 #include <span>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 
 #include "insight/core/types.hpp"
 #include "insight/tokenization/drain_config.hpp"
