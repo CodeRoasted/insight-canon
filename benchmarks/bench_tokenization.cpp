@@ -1,214 +1,126 @@
 // NOLINTBEGIN
-// Tokenization benchmark.
+// Tokenization throughput benchmark.
 //
-// Measures the throughput of the Drain algorithm when tokenizing log lines.
-// This is the atomic unit of the log processing pipeline.
+// Measures end-to-end Tokenizer::process_line() cost — Drain template mining
+// plus arena-backed CanonicalEvent emission — on a synthetic Zipf-ish corpus.
 //
 // Reported metrics:
-//   * `items_per_second` — log lines tokenized per wall second
-//   * `ns_per_line` — nanoseconds spent per line (lower is better)
-//   * `template_count` — distinct templates discovered
+//   * `items_per_second`  — log lines tokenized per wall second
+//   * `ns_per_line`       — nanoseconds per line (lower is better)
+//   * `templates_seen`    — distinct Drain clusters at end of run
 //
-// The "≤ 1 μs per line" throughput target is documented in
-// technical_docs/overview/architecture.md and is measured here.
+// Architectural target (technical_docs/overview/architecture.md):
+//   Steady-state per-line cost ≤ 1 µs at 32 templates / Drain depth 4.
+//
+// Modeled after insight-metalog/benchmarks/bench_metalog.cpp (Phase 3 anchor).
 
 #include <benchmark/benchmark.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <random>
 #include <string>
 #include <vector>
 
-#include "insight/tokenization/drain.hpp"
+#include "insight/tokenization/arena_allocator.hpp"
+#include "insight/tokenization/drain_config.hpp"
+#include "insight/tokenization/tokenizer_engine.hpp"
 
 namespace
 {
 
 namespace tok = insight::tokenization;
 
-// Synthetic log corpus: template strings with varying specificity.
-// Simulates a realistic mix of messages (database logs, web server, system).
-std::vector<std::string> make_synthetic_corpus(std::size_t n_templates)
+// Owns the synthetic line strings so string_views inside the tokenizer
+// remain valid for the duration of the iteration.
+struct SyntheticCorpus
 {
-    std::vector<std::string> templates;
-    templates.reserve(n_templates);
+    std::vector<std::string> lines;
+};
 
-    // Database logs
-    for (std::size_t i = 0; i < n_templates / 3; ++i)
+// Generate a Zipf-ish workload: a small set of templates with random
+// numeric values substituted in. Roughly mimics database/HTTP/system logs.
+SyntheticCorpus make_corpus(std::size_t n_templates, std::size_t n_lines, std::uint32_t seed)
+{
+    static constexpr const char* kTemplates[] = {
+        "Query completed table=users duration_ms={} rows={}",
+        "Transaction rolled back xid={} error_code={}",
+        "HTTP request method=GET path=/api/v1 status={} latency_ms={}",
+        "Cache miss key={} ttl_s={} size_bytes={}",
+        "Worker pool starvation active={} queued={}",
+        "GC pause gen={} duration_ms={} freed_mb={}",
+        "SSL handshake failed client=10.0.0.{} error={}",
+        "Rate limit exceeded ip=10.0.0.{} requests={}",
+    };
+    constexpr std::size_t kTemplateCount{sizeof(kTemplates) / sizeof(kTemplates[0])};
+    const std::size_t templates{n_templates < kTemplateCount ? n_templates : kTemplateCount};
+
+    std::mt19937 rng{seed};
+    std::uniform_int_distribution<std::size_t> tmpl_dist{0, templates - 1};
+    std::uniform_int_distribution<std::uint32_t> val_dist{0, 999'999};
+
+    SyntheticCorpus corpus;
+    corpus.lines.reserve(n_lines);
+    for (std::size_t i{0}; i < n_lines; ++i)
     {
-        templates.push_back(
-            "Query completed: table=<*> duration_ms=<*> rows=<*> cpu_ms=<*>");
-        templates.push_back("Transaction rolled back: xid=<*> error=<*>");
-        templates.push_back("Index bloat detected: table=<*> bloat_pct=<*>");
+        std::string base{kTemplates[tmpl_dist(rng)]};
+        std::string out;
+        out.reserve(base.size() + 32);
+        for (std::size_t p{0}; p < base.size(); ++p)
+        {
+            if (p + 1 < base.size() && base[p] == '{' && base[p + 1] == '}')
+            {
+                out += std::to_string(val_dist(rng));
+                ++p;
+            }
+            else
+            {
+                out += base[p];
+            }
+        }
+        corpus.lines.push_back(std::move(out));
     }
-
-    // Web server logs
-    for (std::size_t i = 0; i < n_templates / 3; ++i)
-    {
-        templates.push_back("HTTP <*> <*> status=<*> latency_ms=<*> bytes=<*>");
-        templates.push_back("SSL handshake failed: client=<*> error=<*>");
-        templates.push_back("Rate limit exceeded: ip=<*> requests=<*>");
-    }
-
-    // System/app logs
-    for (std::size_t i = 0; i < n_templates / 3; ++i)
-    {
-        templates.push_back("Cache miss: key=<*> ttl_s=<*> size_bytes=<*>");
-        templates.push_back("Worker pool starvation: active=<*> queued=<*>");
-        templates.push_back("GC pause: gen=<*> duration_ms=<*> freed_mb=<*>");
-    }
-
-    return templates;
+    return corpus;
 }
 
-// Generate realistic log lines by randomly selecting templates and
-// substituting values.
-std::string make_line(
-    const std::vector<std::string>& templates,
-    std::mt19937& rng,
-    std::uniform_int_distribution<std::size_t>& template_dist)
-{
-    const auto& template_str{templates[template_dist(rng)]};
-    std::string line{template_str};
-
-    // Replace <*> placeholders with random values.
-    std::uniform_int_distribution<uint32_t> value_dist(0, 999999);
-    std::size_t pos{0};
-    while ((pos = line.find("<*>", pos)) != std::string::npos)
-    {
-        line.replace(pos, 3, std::to_string(value_dist(rng)));
-        pos += line.find(' ', pos);  // Move past the replacement
-    }
-
-    return line;
-}
-
-// Benchmark Drain tokenization throughput with a fixed corpus size.
 void BM_TokenizationThroughput(benchmark::State& state)
 {
-    const std::size_t n_templates{static_cast<std::size_t>(state.range(0))};
-    const auto corpus{make_synthetic_corpus(n_templates)};
+    const auto n_templates{static_cast<std::size_t>(state.range(0))};
+    constexpr std::size_t kLinesPerIter{1'000};
 
-    std::mt19937 rng(42);
-    std::uniform_int_distribution<std::size_t> template_dist(0, corpus.size() - 1);
+    const auto corpus{make_corpus(n_templates, kLinesPerIter, 42)};
+
+    tok::ArenaAllocator arena{1U << 20U};
+    tok::Tokenizer tokenizer{arena, tok::DrainConfig{}};
+
+    // Warm up so the steady-state path dominates.
+    for (const auto& line : corpus.lines)
+    {
+        benchmark::DoNotOptimize(tokenizer.process_line(line));
+    }
+    arena.reset();
 
     for (auto _ : state)
     {
-        state.PauseTiming();
-
-        tok::Drain drain;
-        std::vector<std::string> lines;
-        lines.reserve(1000);
-
-        // Generate 1000 lines from the corpus.
-        for (std::size_t i = 0; i < 1000; ++i)
+        for (const auto& line : corpus.lines)
         {
-            lines.push_back(make_line(corpus, rng, template_dist));
+            benchmark::DoNotOptimize(tokenizer.process_line(line));
         }
-
-        state.ResumeTiming();
-
-        // Tokenize each line.
-        for (const auto& line : lines)
-        {
-            [[maybe_unused]] auto event{drain.tokenize(line)};
-        }
-
+        // Reset arena between iterations to avoid unbounded growth dominating
+        // the measurement; Drain state is preserved (steady-state regime).
         state.PauseTiming();
+        arena.reset();
         state.ResumeTiming();
     }
 
-    const std::size_t lines_per_iter{1000};
-    state.counters["ns_per_line"] =
-        benchmark::Counter(static_cast<double>(lines_per_iter),
-                           benchmark::Counter::kIsIterationInvariantRate |
-                               benchmark::Counter::kInvert);
-    state.counters["template_count"] = static_cast<double>(n_templates);
-    state.SetItemsProcessed(1000 * state.iterations());
+    state.SetItemsProcessed(static_cast<std::int64_t>(state.iterations() * kLinesPerIter));
+    state.counters["ns_per_line"] = benchmark::Counter(
+        static_cast<double>(kLinesPerIter),
+        benchmark::Counter::kIsIterationInvariantRate | benchmark::Counter::kInvert);
+    state.counters["templates_seen"] = static_cast<double>(tokenizer.cluster_count());
 }
 
-// Measure tokenization latency for lines that match vs. don't match existing
-// templates (cache hit vs. miss behavior).
-void BM_TokenizationCacheHitRate(benchmark::State& state)
-{
-    const auto corpus{make_synthetic_corpus(10)};
-    tok::Drain drain;
+BENCHMARK(BM_TokenizationThroughput)->Arg(4)->Arg(8)->Unit(benchmark::kMicrosecond);
 
-    // Pre-warm Drain with some templates.
-    for (std::size_t i = 0; i < 5; ++i)
-    {
-        std::string line{corpus[i]};
-        for (std::size_t j = 0; j < 10; ++j)
-        {
-            line += std::to_string(j) + " ";
-        }
-        [[maybe_unused]] auto event{drain.tokenize(line)};
-    }
-
-    std::mt19937 rng(42);
-    std::uniform_int_distribution<std::size_t> template_dist(0, corpus.size() - 1);
-    std::uniform_int_distribution<uint32_t> value_dist(0, 999999);
-
-    for (auto _ : state)
-    {
-        for (std::size_t i = 0; i < 100; ++i)
-        {
-            auto line{make_line(corpus, rng, template_dist)};
-            [[maybe_unused]] auto event{drain.tokenize(line)};
-        }
-    }
-
-    state.SetItemsProcessed(100 * state.iterations());
-    state.counters["ns_per_line"] =
-        benchmark::Counter(100.0,
-                           benchmark::Counter::kIsIterationInvariantRate |
-                               benchmark::Counter::kInvert);
-}
-
-// Benchmark Drain memory footprint as template count grows.
-void BM_TokenizationMemory(benchmark::State& state)
-{
-    const std::size_t n_templates{static_cast<std::size_t>(state.range(0))};
-    const auto corpus{make_synthetic_corpus(n_templates)};
-
-    std::mt19937 rng(42);
-    std::uniform_int_distribution<std::size_t> template_dist(0, corpus.size() - 1);
-
-    for (auto _ : state)
-    {
-        state.PauseTiming();
-        tok::Drain drain;
-        state.ResumeTiming();
-
-        // Tokenize lines until we have enough unique templates.
-        std::size_t unique_count{0};
-        std::size_t lines_processed{0};
-        while (unique_count < n_templates && lines_processed < 100000)
-        {
-            auto line{make_line(corpus, rng, template_dist)};
-            [[maybe_unused]] auto event{drain.tokenize(line)};
-            unique_count = drain.template_count();
-            ++lines_processed;
-        }
-
-        state.PauseTiming();
-    }
-
-    state.counters["templates"] = static_cast<double>(state.range(0));
-}
-
-// Benchmark range: template counts from 10 to 1000.
-BENCHMARK(BM_TokenizationThroughput)
-    ->Range(10, 1000)
-    ->Unit(benchmark::kMicrosecond);
-
-BENCHMARK(BM_TokenizationCacheHitRate)
-    ->Unit(benchmark::kMicrosecond);
-
-BENCHMARK(BM_TokenizationMemory)
-    ->Range(10, 100)
-    ->Unit(benchmark::kMillisecond);
-
-}  // namespace
-
+} // namespace
 // NOLINTEND

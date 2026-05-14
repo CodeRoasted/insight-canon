@@ -145,6 +145,7 @@ if(INSIGHT_CANON_BUILD_BENCHMARKS)
         target_link_libraries(insight_canon_bench PRIVATE
             insight_canon
             benchmark::benchmark
+            spdlog::spdlog
         )
         target_include_directories(insight_canon_bench PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/src"

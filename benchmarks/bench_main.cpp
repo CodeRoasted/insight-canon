@@ -1,13 +1,19 @@
-// NOLINTBEGIN
-#include <benchmark/benchmark.h>
+// Custom benchmark entry point for insight_canon.
 
-// Entry point for Google Benchmark.
-// Individual benchmark functions are defined in bench_*.cpp files.
+#include <benchmark/benchmark.h>
+#include <spdlog/spdlog.h>
+
 int main(int argc, char** argv)
 {
+    spdlog::set_level(spdlog::level::off);
+    spdlog::default_logger()->set_level(spdlog::level::off);
+
     benchmark::Initialize(&argc, argv);
+    if (benchmark::ReportUnrecognizedArguments(argc, argv))
+    {
+        return 1;
+    }
     benchmark::RunSpecifiedBenchmarks();
     benchmark::Shutdown();
     return 0;
 }
-// NOLINTEND
