@@ -17,7 +17,7 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include "insight/utils/result.hpp"
+#include <expected>
 #include "insight/utils/time_utils.hpp"
 
 namespace insight::tokenization
@@ -35,7 +35,7 @@ namespace
 
 } // namespace
 
-insight::Result<ParsedLine> SparkHDFSStrategy::parse(std::string_view line,
+std::expected<ParsedLine, std::string> SparkHDFSStrategy::parse(std::string_view line,
                                                      ArenaAllocator& /*arena*/) const
 {
     // ── Spark: "YY/MM/DD HH:MM:SS LEVEL component: msg" ────────────────────
@@ -44,8 +44,7 @@ insight::Result<ParsedLine> SparkHDFSStrategy::parse(std::string_view line,
         if (line.size() < kSparkTimestampLen)
         {
             INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=SparkHDFS parse miss (short)");
-            return insight::Result<ParsedLine>{
-                std::string("SparkHDFSStrategy: line too short for Spark format")};
+            return std::unexpected(std::string("SparkHDFSStrategy: line too short for Spark format"));
         }
         // "YY/MM/DD HH:MM:SS" — 17 contiguous chars; directly sliceable.
         const std::string_view ts_str{line.substr(0, kSparkTimestampLen)};
@@ -66,7 +65,7 @@ insight::Result<ParsedLine> SparkHDFSStrategy::parse(std::string_view line,
                           "strategy=SparkHDFS parsed component={} level={} has_timestamp={}",
                           parsed_line.component, to_string(parsed_line.level),
                           parsed_line.timestamp.has_value());
-        return insight::Result<ParsedLine>{parsed_line};
+        return std::expected<ParsedLine, std::string>{parsed_line};
     }
 
     // ── HDFS: "YYMMDD HHMMSS N LEVEL component: msg" ──────────────────────
@@ -75,8 +74,7 @@ insight::Result<ParsedLine> SparkHDFSStrategy::parse(std::string_view line,
         if (line.size() < kHdfsMinLen)
         {
             INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=SparkHDFS parse miss (short)");
-            return insight::Result<ParsedLine>{
-                std::string("SparkHDFSStrategy: line too short for HDFS format")};
+            return std::unexpected(std::string("SparkHDFSStrategy: line too short for HDFS format"));
         }
         const std::string_view date{line.substr(0, 6U)};
         const std::string_view time_str{line.substr(7, 6U)};
@@ -98,12 +96,11 @@ insight::Result<ParsedLine> SparkHDFSStrategy::parse(std::string_view line,
                           "strategy=SparkHDFS parsed component={} level={} has_timestamp={}",
                           parsed_line.component, to_string(parsed_line.level),
                           parsed_line.timestamp.has_value());
-        return insight::Result<ParsedLine>{parsed_line};
+        return std::expected<ParsedLine, std::string>{parsed_line};
     }
 
     INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=SparkHDFS parse miss");
-    return insight::Result<ParsedLine>{
-        std::string("SparkHDFSStrategy: line does not match Spark or HDFS format")};
+    return std::unexpected(std::string("SparkHDFSStrategy: line does not match Spark or HDFS format"));
 }
 
 LogFormat SparkHDFSStrategy::format() const noexcept

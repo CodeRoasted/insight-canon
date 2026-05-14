@@ -20,7 +20,7 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include "insight/utils/result.hpp"
+#include <expected>
 #include "insight/utils/time_utils.hpp"
 
 namespace insight::tokenization
@@ -84,21 +84,20 @@ namespace
 
 } // namespace
 
-insight::Result<ParsedLine> IISW3CStrategy::parse(std::string_view line,
+std::expected<ParsedLine, std::string> IISW3CStrategy::parse(std::string_view line,
                                                   ArenaAllocator& arena) const
 {
     // Skip comment/directive lines.
     if (!line.empty() && line[0] == '#')
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=IISW3C comment_or_directive");
-        return insight::Result<ParsedLine>{std::string("IISW3CStrategy: comment/directive line")};
+        return std::unexpected(std::string("IISW3CStrategy: comment/directive line"));
     }
 
     if (line.size() < kTimestampPrefixLen + 1U)
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=IISW3C parse miss (short)");
-        return insight::Result<ParsedLine>{
-            std::string("IISW3CStrategy: line does not match IIS W3C format")};
+        return std::unexpected(std::string("IISW3CStrategy: line does not match IIS W3C format"));
     }
 
     // Timestamp: "YYYY-MM-DD HH:MM:SS" = first 19 chars (validated by confidence).
@@ -121,8 +120,7 @@ insight::Result<ParsedLine> IISW3CStrategy::parse(std::string_view line,
         if (method.empty() || uri.empty() || !is_http_method(method))
         {
             INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=IISW3C parse miss (no method)");
-            return insight::Result<ParsedLine>{
-                std::string("IISW3CStrategy: line does not match IIS W3C format")};
+            return std::unexpected(std::string("IISW3CStrategy: line does not match IIS W3C format"));
         }
         ParsedLine parsed;
         parsed.raw_line = line;
@@ -133,7 +131,7 @@ insight::Result<ParsedLine> IISW3CStrategy::parse(std::string_view line,
         INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                           "strategy=IISW3C parsed component={} level={} has_timestamp={}",
                           parsed.component, to_string(parsed.level), parsed.timestamp.has_value());
-        return insight::Result<ParsedLine>{parsed};
+        return std::expected<ParsedLine, std::string>{parsed};
     }
 
     // Short format: tok1 is already the HTTP method.
@@ -147,7 +145,7 @@ insight::Result<ParsedLine> IISW3CStrategy::parse(std::string_view line,
     INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                       "strategy=IISW3C parsed component={} level={} has_timestamp={}",
                       parsed.component, to_string(parsed.level), parsed.timestamp.has_value());
-    return insight::Result<ParsedLine>{parsed};
+    return std::expected<ParsedLine, std::string>{parsed};
 }
 
 LogFormat IISW3CStrategy::format() const noexcept

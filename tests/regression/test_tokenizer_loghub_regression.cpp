@@ -17,12 +17,11 @@
 #include "insight/tokenization/arena_allocator.hpp"
 #include "insight/tokenization/canonical_event.hpp"
 #include "insight/tokenization/tokenizer_engine.hpp"
-#include "insight/utils/result.hpp"
+#include <expected>
 
 namespace fs = std::filesystem;
 
 using insight::LogLevel;
-using insight::Result;
 using insight::tokenization::ArenaAllocator;
 using insight::tokenization::CanonicalEvent;
 using insight::tokenization::Tokenizer;
@@ -164,9 +163,9 @@ constexpr std::array<DatasetExpectation, 16> kDatasetExpectations{{
     return out.str();
 }
 
-[[nodiscard]] std::string format_result(const Result<CanonicalEvent>& result)
+[[nodiscard]] std::string format_result(const std::expected<CanonicalEvent, std::string>& result)
 {
-    if (result.is_ok())
+    if (result.has_value())
     {
         return format_event(result.value());
     }
@@ -261,7 +260,7 @@ struct DatasetRunSummary
         const auto result{tokenizer.process_line(line)};
         const std::string formatted{format_result(result)};
 
-        if (result.is_ok())
+        if (result.has_value())
         {
             ++summary.ok_lines;
             if (summary.sample_outputs.size() < kMaxDiagnosticSamples)

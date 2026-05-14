@@ -21,7 +21,7 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include "insight/utils/result.hpp"
+#include <expected>
 #include "insight/utils/time_utils.hpp"
 
 namespace insight::tokenization
@@ -66,14 +66,13 @@ namespace
 
 } // namespace
 
-insight::Result<ParsedLine> RFC5424Strategy::parse(std::string_view line,
+std::expected<ParsedLine, std::string> RFC5424Strategy::parse(std::string_view line,
                                                    ArenaAllocator& /*arena*/) const
 {
     if (!detail::is_rfc5424_prefix(line))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=RFC5424 parse miss");
-        return insight::Result<ParsedLine>{
-            std::string("RFC5424Strategy: line does not match RFC 5424 format")};
+        return std::unexpected(std::string("RFC5424Strategy: line does not match RFC 5424 format"));
     }
 
     std::string_view rest{line};
@@ -111,7 +110,7 @@ insight::Result<ParsedLine> RFC5424Strategy::parse(std::string_view line,
     INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                       "strategy=RFC5424 parsed component={} level={} has_timestamp={}",
                       parsed.component, to_string(parsed.level), parsed.timestamp.has_value());
-    return insight::Result<ParsedLine>{parsed};
+    return std::expected<ParsedLine, std::string>{parsed};
 }
 
 LogFormat RFC5424Strategy::format() const noexcept

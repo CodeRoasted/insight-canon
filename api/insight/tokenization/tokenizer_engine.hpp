@@ -9,7 +9,8 @@
 #include "arena_allocator.hpp"
 #include "canonical_event.hpp"
 #include "drain_config.hpp"
-#include "insight/utils/result.hpp"
+#include <expected>
+#include <string>
 
 namespace insight::tokenization
 {
@@ -27,15 +28,15 @@ class Tokenizer
     Tokenizer(Tokenizer&&) noexcept;
     Tokenizer& operator=(Tokenizer&&) noexcept;
 
-    [[nodiscard]] insight::Result<CanonicalEvent> process_line(std::string_view raw_line);
+    [[nodiscard]] std::expected<CanonicalEvent, std::string> process_line(std::string_view raw_line);
 
     // Like process_line() but skips the arena copy of the raw line.
     // The caller guarantees that stable_line (and all string_views sliced from
     // it by the format strategy) remain valid for the arena's lifetime, e.g.
     // lines from a mmap'd file or a pre-stored arena buffer.
-    [[nodiscard]] insight::Result<CanonicalEvent> process_stable_line(std::string_view stable_line);
+    [[nodiscard]] std::expected<CanonicalEvent, std::string> process_stable_line(std::string_view stable_line);
 
-    [[nodiscard]] std::vector<insight::Result<CanonicalEvent>>
+    [[nodiscard]] std::vector<std::expected<CanonicalEvent, std::string>>
     process_batch(std::span<const std::string_view> lines);
 
     [[nodiscard]] std::size_t events_produced() const noexcept;

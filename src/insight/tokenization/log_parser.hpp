@@ -10,7 +10,7 @@
 #include "insight/tokenization/format_detector.hpp"
 #include "insight/tokenization/format_strategy.hpp"
 #include "insight/tokenization/parsed_line.hpp"
-#include "insight/utils/result.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -30,14 +30,14 @@ class LogParser
 
     // Parse a single line. Once a strategy is selected, the line is copied into
     // the arena so string_views inside the returned ParsedLine are stable.
-    [[nodiscard]] insight::Result<ParsedLine> parse_line(std::string_view line);
+    [[nodiscard]] std::expected<ParsedLine, std::string> parse_line(std::string_view line);
 
     // Like parse_line() but skips the arena store_string() copy.
     // The caller guarantees that `stable_line` and all string_views sliced from
     // it remain valid for the arena's lifetime (e.g. mmap'd or pre-stored buffers).
-    [[nodiscard]] insight::Result<ParsedLine> parse_stable(std::string_view stable_line);
+    [[nodiscard]] std::expected<ParsedLine, std::string> parse_stable(std::string_view stable_line);
 
-    [[nodiscard]] std::vector<insight::Result<ParsedLine>>
+    [[nodiscard]] std::vector<std::expected<ParsedLine, std::string>>
     parse_batch(std::span<const std::string_view> lines);
 
     [[nodiscard]] std::size_t lines_parsed() const noexcept;

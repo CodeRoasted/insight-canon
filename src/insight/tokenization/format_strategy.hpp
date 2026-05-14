@@ -5,7 +5,7 @@
 #include "insight/core/types.hpp"
 #include "insight/tokenization/arena_allocator.hpp"
 #include "insight/tokenization/parsed_line.hpp"
-#include "insight/utils/result.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -27,7 +27,7 @@ class IFormatStrategy
     // (component, content) are copied into the supplied arena via
     // ArenaAllocator::store_string(); their string_views remain valid until
     // the arena is reset or destroyed.
-    [[nodiscard]] virtual insight::Result<ParsedLine> parse(std::string_view line,
+    [[nodiscard]] virtual std::expected<ParsedLine, std::string> parse(std::string_view line,
                                                             ArenaAllocator& arena) const = 0;
 
     [[nodiscard]] virtual LogFormat format() const noexcept = 0;

@@ -24,7 +24,7 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/simdjson_scratch.hpp"
 #include "insight/utils/logger.hpp"
-#include "insight/utils/result.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -87,7 +87,7 @@ namespace
 
 } // namespace
 
-insight::Result<ParsedLine> SystemdJournalStrategy::parse(std::string_view line,
+std::expected<ParsedLine, std::string> SystemdJournalStrategy::parse(std::string_view line,
                                                           ArenaAllocator& arena) const
 {
     // Cheap substring gate: production-shape journal lines always contain one
@@ -96,8 +96,7 @@ insight::Result<ParsedLine> SystemdJournalStrategy::parse(std::string_view line,
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(),
                           "strategy=SystemdJournal missing_indicator_keys");
-        return insight::Result<ParsedLine>{
-            std::string("SystemdJournalStrategy: no journal indicator keys found")};
+        return std::unexpected(std::string("SystemdJournalStrategy: no journal indicator keys found"));
     }
 
     auto& scratch{detail::json_scratch()};
@@ -108,14 +107,14 @@ insight::Result<ParsedLine> SystemdJournalStrategy::parse(std::string_view line,
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=SystemdJournal invalid_json={}",
                           simdjson::error_message(err));
-        return insight::Result<ParsedLine>{std::string("SystemdJournalStrategy: invalid JSON")};
+        return std::unexpected(std::string("SystemdJournalStrategy: invalid JSON"));
     }
 
     simdjson::ondemand::object root;
     if (doc.get_object().get(root) != simdjson::SUCCESS)
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=SystemdJournal not_an_object");
-        return insight::Result<ParsedLine>{std::string("SystemdJournalStrategy: not an object")};
+        return std::unexpected(std::string("SystemdJournalStrategy: not an object"));
     }
 
     ParsedLine parsed;
@@ -158,7 +157,7 @@ insight::Result<ParsedLine> SystemdJournalStrategy::parse(std::string_view line,
     INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                       "strategy=SystemdJournal parsed component={} level={} has_timestamp={}",
                       parsed.component, to_string(parsed.level), parsed.timestamp.has_value());
-    return insight::Result<ParsedLine>{parsed};
+    return std::expected<ParsedLine, std::string>{parsed};
 }
 
 LogFormat SystemdJournalStrategy::format() const noexcept

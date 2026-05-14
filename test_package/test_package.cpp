@@ -7,7 +7,7 @@
 #include "insight/tokenization/arena_allocator.hpp"
 #include "insight/tokenization/canonical_event.hpp"
 #include "insight/tokenization/tokenizer_engine.hpp"
-#include "insight/utils/result.hpp"
+#include <expected>
 #include "insight/utils/time_utils.hpp"
 
 namespace
@@ -35,11 +35,11 @@ TEST(InsightCanonPackage, CoreLogLevelRoundtrip)
 
 TEST(InsightCanonPackage, CoreResultCarriesValueAndError)
 {
-    insight::Result<int> ok{42};
+    std::expected<int, std::string> ok{42};
     EXPECT_TRUE(static_cast<bool>(ok));
     EXPECT_EQ(ok.value(), 42);
 
-    insight::Result<int> err{std::string{"boom"}};
+    std::expected<int, std::string> err{std::string{"boom"}};
     EXPECT_FALSE(static_cast<bool>(err));
     EXPECT_EQ(err.error(), "boom");
 }

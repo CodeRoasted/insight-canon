@@ -87,7 +87,7 @@ TEST_F(SyslogStrategyTest, FormatReturnsSyslog)
 TEST_F(SyslogStrategyTest, ParsesBSDLine)
 {
     auto result{strategy.parse(kBSDLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     const auto& pl{result.value()};
     EXPECT_FALSE(pl.content.empty());
     EXPECT_EQ(pl.component, "sshd");
@@ -97,14 +97,14 @@ TEST_F(SyslogStrategyTest, ParsesBSDLine)
 TEST_F(SyslogStrategyTest, ParsesBSDLineTimestamp)
 {
     auto result{strategy.parse(kBSDLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result.value().timestamp.has_value());
 }
 
 TEST_F(SyslogStrategyTest, ParsesRFC3339Line)
 {
     auto result{strategy.parse(kRFC3339Line, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.component, "app");
@@ -114,13 +114,13 @@ TEST_F(SyslogStrategyTest, ParsesRFC3339Line)
 TEST_F(SyslogStrategyTest, RejectsJSONLine)
 {
     auto result{strategy.parse(kJSONLine, arena)};
-    EXPECT_FALSE(result.is_ok());
+    EXPECT_FALSE(result.has_value());
 }
 
 TEST_F(SyslogStrategyTest, RejectsKVLine)
 {
     auto result{strategy.parse(kKVLine, arena)};
-    EXPECT_FALSE(result.is_ok());
+    EXPECT_FALSE(result.has_value());
 }
 
 TEST_F(SyslogStrategyTest, ConfidenceHighForBSD)
@@ -146,7 +146,7 @@ TEST_F(SyslogStrategyTest, ConfidenceZeroForCLF)
 TEST_F(SyslogStrategyTest, RawLinePreserved)
 {
     auto result{strategy.parse(kBSDLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().raw_line, kBSDLine);
 }
 
@@ -169,11 +169,11 @@ TEST_F(JsonStrategyTest, FormatReturnsJSON)
 TEST_F(JsonStrategyTest, ParsesAllFields)
 {
     auto result{strategy.parse(kJSONLine, arena)};
-    if (!result.is_ok())
+    if (!result.has_value())
     {
         std::cerr << "DIAG error: " << result.error() << "\n";
     }
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.level, LogLevel::Info);
@@ -184,14 +184,14 @@ TEST_F(JsonStrategyTest, ParsesAllFields)
 TEST_F(JsonStrategyTest, ParsesMinimalJSON)
 {
     auto result{strategy.parse(kJSONMinimal, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().content, "hello world");
 }
 
 TEST_F(JsonStrategyTest, FallsBackToJSONDumpWhenNoMessageKey)
 {
     auto result{strategy.parse(kJSONNoMsg, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     // Content should be the re-serialised JSON (non-empty).
     EXPECT_FALSE(result.value().content.empty());
 }
@@ -199,13 +199,13 @@ TEST_F(JsonStrategyTest, FallsBackToJSONDumpWhenNoMessageKey)
 TEST_F(JsonStrategyTest, RejectsNonJSONLine)
 {
     auto result{strategy.parse(kBSDLine, arena)};
-    EXPECT_FALSE(result.is_ok());
+    EXPECT_FALSE(result.has_value());
 }
 
 TEST_F(JsonStrategyTest, RejectsPlainText)
 {
     auto result{strategy.parse("this is not json at all", arena)};
-    EXPECT_FALSE(result.is_ok());
+    EXPECT_FALSE(result.has_value());
 }
 
 TEST_F(JsonStrategyTest, ConfidenceOneForJSON)
@@ -221,21 +221,21 @@ TEST_F(JsonStrategyTest, ConfidenceZeroForSyslog)
 TEST_F(JsonStrategyTest, LevelDebugParsed)
 {
     auto result{strategy.parse(R"({"level":"debug","message":"trace event"})", arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().level, LogLevel::Debug);
 }
 
 TEST_F(JsonStrategyTest, LevelErrorParsed)
 {
     auto result{strategy.parse(R"({"severity":"ERROR","msg":"something failed"})", arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().level, LogLevel::Error);
 }
 
 TEST_F(JsonStrategyTest, RawLinePreserved)
 {
     auto result{strategy.parse(kJSONLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().raw_line, kJSONLine);
 }
 
@@ -258,7 +258,7 @@ TEST_F(KVStrategyTest, FormatReturnsKeyValue)
 TEST_F(KVStrategyTest, ParsesAllFields)
 {
     auto result{strategy.parse(kKVLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.level, LogLevel::Info);
@@ -269,7 +269,7 @@ TEST_F(KVStrategyTest, ParsesAllFields)
 TEST_F(KVStrategyTest, ParsesMinimalKV)
 {
     auto result{strategy.parse(kKVMinimal, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     const auto& pl{result.value()};
     EXPECT_EQ(pl.level, LogLevel::Warn);
     EXPECT_FALSE(pl.content.empty());
@@ -278,14 +278,14 @@ TEST_F(KVStrategyTest, ParsesMinimalKV)
 TEST_F(KVStrategyTest, QuotedValueUnquoted)
 {
     auto result{strategy.parse(R"(component=db msg="connection timeout after 30s")", arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_NE(result.value().content.find("connection timeout"), std::string::npos);
 }
 
 TEST_F(KVStrategyTest, RejectsLineWithNoPairs)
 {
     auto result{strategy.parse("plain log line with no equals signs", arena)};
-    EXPECT_FALSE(result.is_ok());
+    EXPECT_FALSE(result.has_value());
 }
 
 TEST_F(KVStrategyTest, ConfidenceHighWithManyPairs)
@@ -306,7 +306,7 @@ TEST_F(KVStrategyTest, ConfidenceZeroForJSON)
 TEST_F(KVStrategyTest, RawLinePreserved)
 {
     auto result{strategy.parse(kKVLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().raw_line, kKVLine);
 }
 
@@ -329,7 +329,7 @@ TEST_F(CLFStrategyTest, FormatReturnsCLF)
 TEST_F(CLFStrategyTest, ParsesCommonLogFormat)
 {
     auto result{strategy.parse(kCLFLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.level, LogLevel::Info);
@@ -341,7 +341,7 @@ TEST_F(CLFStrategyTest, ParsesCommonLogFormat)
 TEST_F(CLFStrategyTest, ParsesCombinedLogFormat)
 {
     auto result{strategy.parse(kCombinedLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     const auto& pl{result.value()};
     // 401 Unauthorized → Warn
     EXPECT_EQ(pl.level, LogLevel::Warn);
@@ -352,20 +352,20 @@ TEST_F(CLFStrategyTest, ParsesCombinedLogFormat)
 TEST_F(CLFStrategyTest, Status5xxMapsToError)
 {
     auto result{strategy.parse(kCLF5xx, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().level, LogLevel::Error);
 }
 
 TEST_F(CLFStrategyTest, RejectsNonCLFLine)
 {
     auto result{strategy.parse(kBSDLine, arena)};
-    EXPECT_FALSE(result.is_ok());
+    EXPECT_FALSE(result.has_value());
 }
 
 TEST_F(CLFStrategyTest, RejectsJSONLine)
 {
     auto result{strategy.parse(kJSONLine, arena)};
-    EXPECT_FALSE(result.is_ok());
+    EXPECT_FALSE(result.has_value());
 }
 
 TEST_F(CLFStrategyTest, ConfidenceHighForCLF)
@@ -381,7 +381,7 @@ TEST_F(CLFStrategyTest, ConfidenceZeroForSyslog)
 TEST_F(CLFStrategyTest, ContentContainsMethodAndStatus)
 {
     auto result{strategy.parse(kCLFLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     const std::string_view content = result.value().content;
     EXPECT_NE(content.find("GET"), std::string::npos);
     EXPECT_NE(content.find("200"), std::string::npos);
@@ -390,14 +390,14 @@ TEST_F(CLFStrategyTest, ContentContainsMethodAndStatus)
 TEST_F(CLFStrategyTest, TimestampParsed)
 {
     auto result{strategy.parse(kCLFLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result.value().timestamp.has_value());
 }
 
 TEST_F(CLFStrategyTest, RawLinePreserved)
 {
     auto result{strategy.parse(kCLFLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().raw_line, kCLFLine);
 }
 
@@ -420,7 +420,7 @@ TEST_F(CLFStrategyTest, Status3xxMapsToInfo)
 {
     auto result{strategy.parse(
         R"(127.0.0.1 - - [15/Jan/2024:10:30:00 +0000] "GET /old-path HTTP/1.1" 301 0)", arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().level, LogLevel::Info);
 }
 
@@ -429,7 +429,7 @@ TEST_F(CLFStrategyTest, DashBodySizeIsParsed)
     // "-" is valid for response body size (no body sent, e.g. HEAD or 204).
     auto result{strategy.parse(
         R"(127.0.0.1 - - [15/Jan/2024:10:30:00 +0000] "HEAD /api/ping HTTP/1.1" 204 -)", arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().level, LogLevel::Info); // 2xx → Info
 }
 
@@ -441,7 +441,7 @@ TEST_F(SyslogStrategyTest, ParsesBSDLineWithSingleDigitDay)
 {
     // BSD syslog uses space-padded single-digit days: "Jan  1" (two spaces).
     auto result{strategy.parse("Jan  1 08:03:22 host sshd[1]: service started", arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result.value().timestamp.has_value());
     EXPECT_EQ(result.value().component, "sshd");
     EXPECT_EQ(result.value().content, "service started");
@@ -451,7 +451,7 @@ TEST_F(SyslogStrategyTest, TruncatedSyslogReturnsError)
 {
     // A line that only starts with a month abbreviation but has no host/message.
     auto result{strategy.parse("Jan 15", arena)};
-    EXPECT_FALSE(result.is_ok());
+    EXPECT_FALSE(result.has_value());
 }
 
 TEST_F(SyslogStrategyTest, ConfidenceZeroForKVLine)
@@ -467,14 +467,14 @@ TEST_F(JsonStrategyTest, MalformedJSONReturnsError)
 {
     // Truncated object — nlohmann::json parse-no-throw returns discarded.
     auto result{strategy.parse(R"({"level":"INFO","message":"not closed)", arena)};
-    EXPECT_FALSE(result.is_ok());
+    EXPECT_FALSE(result.has_value());
 }
 
 TEST_F(JsonStrategyTest, EmptyObjectFallbackDump)
 {
     // Valid JSON, but no known keys — falls back to j.dump() which is "{}".
     auto result{strategy.parse("{}", arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result.value().content.empty());
 }
 
@@ -483,7 +483,7 @@ TEST_F(JsonStrategyTest, UTF8ContentPreserved)
     // UTF-8 text including a multibyte sequence and an emoji should pass through
     // nlohmann::json and end up verbatim in the content field.
     auto result{strategy.parse(R"({"msg":"Connexion \u00e9tablie \ud83d\ude80"})", arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result.value().content.empty());
 }
 
@@ -523,7 +523,7 @@ TEST_F(KVStrategyTest, ConfidenceOnePairIsLow)
 TEST_F(KVStrategyTest, QuotedValuePreservesInternalSpaces)
 {
     auto result{strategy.parse(R"(level=ERROR msg="failed to connect to host port 443")", arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     // The message content should include the full quoted sentence (minus quotes).
     EXPECT_NE(result.value().content.find("failed to connect"), std::string::npos);
 }
@@ -532,7 +532,7 @@ TEST_F(KVStrategyTest, UTF8ValuePreserved)
 {
     // Accented characters in a quoted KV value must pass through unchanged.
     auto result{strategy.parse(R"(level=INFO msg="connexion \u00e9tablie" component=auth)", arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result.value().content.empty());
     EXPECT_EQ(result.value().component, "auth");
 }
@@ -543,7 +543,7 @@ TEST_F(KVStrategyTest, MultiLineInputHandled)
     // unquoted value at the newline (\s) and resumes on the second "line".
     // Both pairs must be extracted → parse succeeds.
     auto result{strategy.parse("key1=val1\nkey2=val2", arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     EXPECT_FALSE(result.value().content.empty());
 }
 
@@ -552,7 +552,7 @@ TEST_F(KVStrategyTest, EmptyValueReturnsError)
     // "key=" has no value chars — the pattern [^\s,;]+ requires ≥1 character.
     // 0 pairs → parse must return an error, not crash.
     auto result{strategy.parse("key=", arena)};
-    EXPECT_FALSE(result.is_ok());
+    EXPECT_FALSE(result.has_value());
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -565,7 +565,7 @@ TEST_F(SyslogStrategyTest, InvalidDayLineDoesNotCrash)
     // shape of the field, not calendar validity); utc_mktime normalises the
     // date. Parse must succeed without crashing.
     auto result{strategy.parse("Feb 30 12:00:00 myhost proc[1]: msg after invalid day", arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().content, "msg after invalid day");
     // Timestamp should be populated (normalised date).
     EXPECT_TRUE(result.value().timestamp.has_value());
@@ -579,7 +579,7 @@ TEST_F(JsonStrategyTest, NestedObjectMessageExtracted)
 {
     // Deep nesting in other keys must not prevent "msg" from being found.
     auto result{strategy.parse(R"({"outer":{"inner":123},"msg":"nested test"})", arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().content, "nested test");
 }
 
@@ -590,7 +590,7 @@ TEST_F(JsonStrategyTest, TopLevelArrayReturnsError)
     // Confidence is also 0 (first char is '[').
     EXPECT_EQ(strategy.confidence(R"([{"msg":"a"}])"), 0.0);
     auto result{strategy.parse(R"([{"msg":"a"},{"msg":"b"}])", arena)};
-    EXPECT_FALSE(result.is_ok());
+    EXPECT_FALSE(result.has_value());
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -611,7 +611,7 @@ TEST_F(CLFStrategyTest, NonStandardVerbPatchParsed)
     constexpr std::string_view line{
         R"(127.0.0.1 - alice [15/Jan/2024:10:30:00 +0000] "PATCH /api/resource HTTP/1.1" 200 512)"};
     auto result{strategy.parse(line, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().level, LogLevel::Info); // 200 → Info
     EXPECT_NE(result.value().content.find("PATCH"), std::string::npos);
     EXPECT_NE(result.value().content.find("/api/resource"), std::string::npos);
@@ -655,7 +655,7 @@ TEST_F(Log4jStrategyTest, FormatReturnsLog4j)
 TEST_F(Log4jStrategyTest, ParsesHadoopLine)
 {
     auto result{strategy.parse(kLog4jHadoopLine, arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.level, LogLevel::Info);
@@ -666,7 +666,7 @@ TEST_F(Log4jStrategyTest, ParsesHadoopLine)
 TEST_F(Log4jStrategyTest, ParsesZookeeperLine)
 {
     auto result{strategy.parse(kLog4jZookeeperLine, arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.level, LogLevel::Info);
@@ -676,7 +676,7 @@ TEST_F(Log4jStrategyTest, ParsesZookeeperLine)
 TEST_F(Log4jStrategyTest, ParsesOpenStackLine)
 {
     auto result{strategy.parse(kLog4jOpenStackLine, arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.level, LogLevel::Info);
@@ -685,8 +685,8 @@ TEST_F(Log4jStrategyTest, ParsesOpenStackLine)
 
 TEST_F(Log4jStrategyTest, RejectsNonLog4jLine)
 {
-    EXPECT_FALSE(strategy.parse(kBSDLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kJSONLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kBSDLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kJSONLine, arena).has_value());
 }
 
 TEST_F(Log4jStrategyTest, ConfidenceHighForLog4j)
@@ -704,7 +704,7 @@ TEST_F(Log4jStrategyTest, ConfidenceZeroForSyslog)
 TEST_F(Log4jStrategyTest, RawLinePreserved)
 {
     auto result{strategy.parse(kLog4jHadoopLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().raw_line, kLog4jHadoopLine);
 }
 
@@ -735,7 +735,7 @@ TEST_F(SparkHDFSStrategyTest, FormatReturnsSparkHDFS)
 TEST_F(SparkHDFSStrategyTest, ParsesSparkLine)
 {
     auto result{strategy.parse(kSparkLine, arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.level, LogLevel::Info);
@@ -746,7 +746,7 @@ TEST_F(SparkHDFSStrategyTest, ParsesSparkLine)
 TEST_F(SparkHDFSStrategyTest, ParsesHDFSLine)
 {
     auto result{strategy.parse(kHDFSLine, arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.level, LogLevel::Info);
@@ -756,8 +756,8 @@ TEST_F(SparkHDFSStrategyTest, ParsesHDFSLine)
 
 TEST_F(SparkHDFSStrategyTest, RejectsNonMatchingLines)
 {
-    EXPECT_FALSE(strategy.parse(kBSDLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kJSONLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kBSDLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kJSONLine, arena).has_value());
 }
 
 TEST_F(SparkHDFSStrategyTest, ConfidenceHighForSpark)
@@ -778,7 +778,7 @@ TEST_F(SparkHDFSStrategyTest, ConfidenceZeroForSyslog)
 TEST_F(SparkHDFSStrategyTest, RawLinePreserved)
 {
     auto result{strategy.parse(kSparkLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().raw_line, kSparkLine);
 }
 
@@ -810,7 +810,7 @@ TEST_F(BGLStrategyTest, FormatReturnsBGL)
 TEST_F(BGLStrategyTest, ParsesBGLLine)
 {
     auto result{strategy.parse(kBGLLine, arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.level, LogLevel::Info);
@@ -820,7 +820,7 @@ TEST_F(BGLStrategyTest, ParsesBGLLine)
 TEST_F(BGLStrategyTest, ParsesThunderbirdLine)
 {
     auto result{strategy.parse(kThunderbirdLine, arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.component, "dn228");
@@ -829,8 +829,8 @@ TEST_F(BGLStrategyTest, ParsesThunderbirdLine)
 
 TEST_F(BGLStrategyTest, RejectsNonMatchingLines)
 {
-    EXPECT_FALSE(strategy.parse(kBSDLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kJSONLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kBSDLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kJSONLine, arena).has_value());
 }
 
 TEST_F(BGLStrategyTest, ConfidenceHighForBGL)
@@ -847,7 +847,7 @@ TEST_F(BGLStrategyTest, ConfidenceZeroForSyslog)
 TEST_F(BGLStrategyTest, RawLinePreserved)
 {
     auto result{strategy.parse(kBGLLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().raw_line, kBGLLine);
 }
 
@@ -874,7 +874,7 @@ TEST_F(AndroidLogcatStrategyTest, FormatReturnsAndroidLogcat)
 TEST_F(AndroidLogcatStrategyTest, ParsesLogcatLine)
 {
     auto result{strategy.parse(kAndroidLine, arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     const auto& pl{result.value()};
     EXPECT_EQ(pl.level, LogLevel::Debug);
     EXPECT_EQ(pl.component, "TextView");
@@ -885,7 +885,7 @@ TEST_F(AndroidLogcatStrategyTest, ParsesInfoLevel)
 {
     auto result{strategy.parse(
         "03-17 16:13:38.811  1702  2395 I ActivityManager: Starting activity", arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().level, LogLevel::Info);
 }
 
@@ -893,14 +893,14 @@ TEST_F(AndroidLogcatStrategyTest, ParsesErrorLevel)
 {
     auto result{
         strategy.parse("03-17 16:13:38.811  1702  2395 E System: Uncaught exception", arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().level, LogLevel::Error);
 }
 
 TEST_F(AndroidLogcatStrategyTest, RejectsNonMatchingLines)
 {
-    EXPECT_FALSE(strategy.parse(kBSDLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kJSONLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kBSDLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kJSONLine, arena).has_value());
 }
 
 TEST_F(AndroidLogcatStrategyTest, ConfidenceHighForLogcat)
@@ -916,7 +916,7 @@ TEST_F(AndroidLogcatStrategyTest, ConfidenceZeroForSyslog)
 TEST_F(AndroidLogcatStrategyTest, RawLinePreserved)
 {
     auto result{strategy.parse(kAndroidLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().raw_line, kAndroidLine);
 }
 
@@ -947,7 +947,7 @@ TEST_F(ApacheErrorLogStrategyTest, FormatReturnsApacheError)
 TEST_F(ApacheErrorLogStrategyTest, ParsesNoticeLevel)
 {
     auto result{strategy.parse(kApacheErrorLine, arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_NE(pl.content.find("workerEnv.init()"), std::string::npos);
@@ -956,14 +956,14 @@ TEST_F(ApacheErrorLogStrategyTest, ParsesNoticeLevel)
 TEST_F(ApacheErrorLogStrategyTest, ParsesErrorLevel)
 {
     auto result{strategy.parse(kApacheErrorLine2, arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     EXPECT_EQ(result.value().level, LogLevel::Error);
 }
 
 TEST_F(ApacheErrorLogStrategyTest, RejectsNonMatchingLines)
 {
-    EXPECT_FALSE(strategy.parse(kBSDLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kJSONLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kBSDLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kJSONLine, arena).has_value());
 }
 
 TEST_F(ApacheErrorLogStrategyTest, ConfidenceHighForApache)
@@ -979,7 +979,7 @@ TEST_F(ApacheErrorLogStrategyTest, ConfidenceZeroForSyslog)
 TEST_F(ApacheErrorLogStrategyTest, RawLinePreserved)
 {
     auto result{strategy.parse(kApacheErrorLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().raw_line, kApacheErrorLine);
 }
 
@@ -1007,7 +1007,7 @@ TEST_F(WindowsCBSStrategyTest, FormatReturnsWindowsCBS)
 TEST_F(WindowsCBSStrategyTest, ParsesWindowsLine)
 {
     auto result{strategy.parse(kWindowsCBSLine, arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.level, LogLevel::Info);
@@ -1017,8 +1017,8 @@ TEST_F(WindowsCBSStrategyTest, ParsesWindowsLine)
 
 TEST_F(WindowsCBSStrategyTest, RejectsNonMatchingLines)
 {
-    EXPECT_FALSE(strategy.parse(kBSDLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kJSONLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kBSDLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kJSONLine, arena).has_value());
 }
 
 TEST_F(WindowsCBSStrategyTest, ConfidenceHighForWindows)
@@ -1034,7 +1034,7 @@ TEST_F(WindowsCBSStrategyTest, ConfidenceZeroForSyslog)
 TEST_F(WindowsCBSStrategyTest, RawLinePreserved)
 {
     auto result{strategy.parse(kWindowsCBSLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().raw_line, kWindowsCBSLine);
 }
 
@@ -1060,7 +1060,7 @@ TEST_F(HealthAppStrategyTest, FormatReturnsHealthApp)
 TEST_F(HealthAppStrategyTest, ParsesHealthAppLine)
 {
     auto result{strategy.parse(kHealthAppLine, arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.component, "Step_LSC");
@@ -1069,8 +1069,8 @@ TEST_F(HealthAppStrategyTest, ParsesHealthAppLine)
 
 TEST_F(HealthAppStrategyTest, RejectsNonMatchingLines)
 {
-    EXPECT_FALSE(strategy.parse(kBSDLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kJSONLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kBSDLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kJSONLine, arena).has_value());
 }
 
 TEST_F(HealthAppStrategyTest, ConfidenceHighForHealthApp)
@@ -1086,7 +1086,7 @@ TEST_F(HealthAppStrategyTest, ConfidenceZeroForSyslog)
 TEST_F(HealthAppStrategyTest, RawLinePreserved)
 {
     auto result{strategy.parse(kHealthAppLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().raw_line, kHealthAppLine);
 }
 
@@ -1114,7 +1114,7 @@ TEST_F(ProxifierStrategyTest, FormatReturnsProxifier)
 TEST_F(ProxifierStrategyTest, ParsesProxifierLine)
 {
     auto result{strategy.parse(kProxifierLine, arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     const auto& pl{result.value()};
     EXPECT_EQ(pl.component, "chrome.exe");
     EXPECT_NE(pl.content.find("proxy.cse.cuhk.edu.hk"), std::string::npos);
@@ -1125,14 +1125,14 @@ TEST_F(ProxifierStrategyTest, ParsesCloseMessage)
     auto result{strategy.parse("[10.30 16:49:07] chrome.exe *64 close, 0 bytes "
                                "sent, 0 bytes received, lifetime 00:01",
                                arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     EXPECT_NE(result.value().content.find("close"), std::string::npos);
 }
 
 TEST_F(ProxifierStrategyTest, RejectsNonMatchingLines)
 {
-    EXPECT_FALSE(strategy.parse(kBSDLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kJSONLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kBSDLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kJSONLine, arena).has_value());
 }
 
 TEST_F(ProxifierStrategyTest, ConfidenceHighForProxifier)
@@ -1148,7 +1148,7 @@ TEST_F(ProxifierStrategyTest, ConfidenceZeroForSyslog)
 TEST_F(ProxifierStrategyTest, RawLinePreserved)
 {
     auto result{strategy.parse(kProxifierLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().raw_line, kProxifierLine);
 }
 
@@ -1175,7 +1175,7 @@ TEST_F(HPCStrategyTest, FormatReturnsHPC)
 TEST_F(HPCStrategyTest, ParsesHPCLine)
 {
     auto result{strategy.parse(kHPCLine, arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_NE(pl.component.find("unix.hw"), std::string::npos);
@@ -1184,8 +1184,8 @@ TEST_F(HPCStrategyTest, ParsesHPCLine)
 
 TEST_F(HPCStrategyTest, RejectsNonMatchingLines)
 {
-    EXPECT_FALSE(strategy.parse(kBSDLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kJSONLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kBSDLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kJSONLine, arena).has_value());
 }
 
 TEST_F(HPCStrategyTest, ConfidenceHighForHPC)
@@ -1201,7 +1201,7 @@ TEST_F(HPCStrategyTest, ConfidenceZeroForSyslog)
 TEST_F(HPCStrategyTest, RawLinePreserved)
 {
     auto result{strategy.parse(kHPCLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().raw_line, kHPCLine);
 }
 
@@ -1210,7 +1210,7 @@ TEST_F(HPCStrategyTest, ParsesNonDottedFacility)
     // HPC lines where facility has no dot (e.g. "action", "node", "gige")
     auto result{
         strategy.parse("437261 node-10 action start 1096995263 1 boot  (command 3169)", arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.component, "action.start");
@@ -1221,13 +1221,13 @@ TEST_F(HPCStrategyTest, ParsesNonStandardNodeName)
 {
     // Node names without dash pattern (e.g. "gige7", "full")
     auto result{strategy.parse("44937 gige7 gige temperature 1105776193 1 warning", arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     EXPECT_EQ(result.value().component, "gige.temperature");
 }
 
 TEST_F(HPCStrategyTest, RejectsTooFewFields)
 {
-    EXPECT_FALSE(strategy.parse("134681 node-246 unix.hw", arena).is_ok());
+    EXPECT_FALSE(strategy.parse("134681 node-246 unix.hw", arena).has_value());
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1239,7 +1239,7 @@ TEST_F(HealthAppStrategyTest, ParsesSingleDigitHour)
     auto result{strategy.parse("20171224-0:32:28:806|HiH_|30002312|"
                                "initUserPrivacy the userPrivacy is true",
                                arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.component, "HiH_");
@@ -1250,7 +1250,7 @@ TEST_F(HealthAppStrategyTest, ParsesSingleDigitHourAndSecond)
 {
     auto result{strategy.parse("20171224-0:51:1:747|Step_LSC|30002312|processHandleBroadcastAction",
                                arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     EXPECT_TRUE(result.value().timestamp.has_value());
 }
 
@@ -1267,7 +1267,7 @@ TEST_F(AndroidLogcatStrategyTest, ParsesSilentLevel)
 {
     auto result{
         strategy.parse("03-17 16:13:38.811  1702  2395 S SilentTag: silent message", arena)};
-    ASSERT_TRUE(result.is_ok()) << result.error();
+    ASSERT_TRUE(result.has_value()) << result.error();
     EXPECT_EQ(result.value().level, LogLevel::Trace);
 }
 
@@ -1277,8 +1277,8 @@ TEST_F(AndroidLogcatStrategyTest, ParsesSilentLevel)
 
 TEST_F(Log4jStrategyTest, RejectsCLFAndKV)
 {
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
 }
 
 TEST_F(Log4jStrategyTest, ConfidenceZeroForJSON)
@@ -1288,50 +1288,50 @@ TEST_F(Log4jStrategyTest, ConfidenceZeroForJSON)
 
 TEST_F(SparkHDFSStrategyTest, RejectsCLFAndKV)
 {
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
 }
 
 TEST_F(BGLStrategyTest, RejectsCLFAndKV)
 {
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
 }
 
 TEST_F(AndroidLogcatStrategyTest, RejectsCLFAndKV)
 {
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
 }
 
 TEST_F(ApacheErrorLogStrategyTest, RejectsCLFAndKV)
 {
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
 }
 
 TEST_F(WindowsCBSStrategyTest, RejectsCLFAndKV)
 {
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
 }
 
 TEST_F(HealthAppStrategyTest, RejectsCLFAndKV)
 {
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
 }
 
 TEST_F(ProxifierStrategyTest, RejectsCLFAndKV)
 {
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
 }
 
 TEST_F(HPCStrategyTest, RejectsCLFAndKV)
 {
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1363,7 +1363,7 @@ TEST_F(NginxErrorStrategyTest, FormatReturnsNginxError)
 TEST_F(NginxErrorStrategyTest, ParsesErrorLine)
 {
     auto result{strategy.parse(kNginxErrorLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.level, LogLevel::Error);
@@ -1374,14 +1374,14 @@ TEST_F(NginxErrorStrategyTest, ParsesErrorLine)
 TEST_F(NginxErrorStrategyTest, ParsesWarnLine)
 {
     auto result{strategy.parse(kNginxWarnLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().level, LogLevel::Warn);
 }
 
 TEST_F(NginxErrorStrategyTest, ParsesCritLine)
 {
     auto result{strategy.parse(kNginxCritLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result.value().timestamp.has_value());
     EXPECT_NE(result.value().content.find("SSL"), std::string::npos);
 }
@@ -1398,13 +1398,13 @@ TEST_F(NginxErrorStrategyTest, ConfidenceZeroForCLF)
 
 TEST_F(NginxErrorStrategyTest, RejectsJSONLine)
 {
-    EXPECT_FALSE(strategy.parse(kJSONLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kJSONLine, arena).has_value());
 }
 
 TEST_F(NginxErrorStrategyTest, RejectsCLFAndKV)
 {
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1436,7 +1436,7 @@ TEST_F(RFC5424StrategyTest, FormatReturnsRFC5424)
 TEST_F(RFC5424StrategyTest, ParsesStandardLine)
 {
     auto result{strategy.parse(kRFC5424Line, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.component, "sshd");
@@ -1447,19 +1447,19 @@ TEST_F(RFC5424StrategyTest, SeverityMappedFromPRI)
 {
     // PRI=134 → facility=16, severity=6 → Info
     auto r1{strategy.parse(kRFC5424Line, arena)};
-    ASSERT_TRUE(r1.is_ok());
+    ASSERT_TRUE(r1.has_value());
     EXPECT_EQ(r1.value().level, LogLevel::Info);
 
     // PRI=132 → severity=4 → Warn
     auto r2{strategy.parse(kRFC5424WarnLine, arena)};
-    ASSERT_TRUE(r2.is_ok());
+    ASSERT_TRUE(r2.has_value());
     EXPECT_EQ(r2.value().level, LogLevel::Warn);
 }
 
 TEST_F(RFC5424StrategyTest, ParsesStructuredData)
 {
     auto result{strategy.parse(kRFC5424NilFields, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_NE(result.value().content.find("application event"), std::string::npos);
 }
 
@@ -1475,8 +1475,8 @@ TEST_F(RFC5424StrategyTest, ConfidenceZeroForBSD)
 
 TEST_F(RFC5424StrategyTest, RejectsCLFAndKV)
 {
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1512,7 +1512,7 @@ TEST_F(IISW3CStrategyTest, FormatReturnsIISW3C)
 TEST_F(IISW3CStrategyTest, ParsesFullLine)
 {
     auto result{strategy.parse(kIISW3CLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.component, "SERVER01");
@@ -1523,20 +1523,20 @@ TEST_F(IISW3CStrategyTest, ParsesFullLine)
 TEST_F(IISW3CStrategyTest, ParsesShortLine)
 {
     auto result{strategy.parse(kIISW3CShortLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().component, "IIS");
 }
 
 TEST_F(IISW3CStrategyTest, Detects401AsWarn)
 {
     auto result{strategy.parse(kIISW3CPostLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().level, LogLevel::Warn);
 }
 
 TEST_F(IISW3CStrategyTest, RejectsCommentLines)
 {
-    EXPECT_FALSE(strategy.parse(kIISComment, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kIISComment, arena).has_value());
 }
 
 TEST_F(IISW3CStrategyTest, ConfidenceHighForIIS)
@@ -1551,8 +1551,8 @@ TEST_F(IISW3CStrategyTest, ConfidenceZeroForComment)
 
 TEST_F(IISW3CStrategyTest, RejectsCLFAndKV)
 {
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1580,7 +1580,7 @@ TEST_F(CloudWatchStrategyTest, FormatReturnsCloudWatch)
 TEST_F(CloudWatchStrategyTest, ParsesFullLine)
 {
     auto result{strategy.parse(kCloudWatchLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.component, "/aws/lambda/myFunc");
@@ -1590,14 +1590,14 @@ TEST_F(CloudWatchStrategyTest, ParsesFullLine)
 TEST_F(CloudWatchStrategyTest, ParsesMinimalLine)
 {
     auto result{strategy.parse(kCloudWatchMinimal, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().content, "timeout");
     EXPECT_EQ(result.value().component, "/aws/ecs/myService");
 }
 
 TEST_F(CloudWatchStrategyTest, RejectsGenericJSON)
 {
-    EXPECT_FALSE(strategy.parse(kJSONLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kJSONLine, arena).has_value());
 }
 
 TEST_F(CloudWatchStrategyTest, ConfidenceHigherThanGenericJSON)
@@ -1612,8 +1612,8 @@ TEST_F(CloudWatchStrategyTest, ConfidenceZeroForPlainJSON)
 
 TEST_F(CloudWatchStrategyTest, RejectsCLFAndKV)
 {
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1644,7 +1644,7 @@ TEST_F(SystemdJournalStrategyTest, FormatReturnsSystemdJournal)
 TEST_F(SystemdJournalStrategyTest, ParsesFullLine)
 {
     auto result{strategy.parse(kSystemdJournalLine, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.level, LogLevel::Info);
@@ -1655,7 +1655,7 @@ TEST_F(SystemdJournalStrategyTest, ParsesFullLine)
 TEST_F(SystemdJournalStrategyTest, MapsWarningPriority)
 {
     auto result{strategy.parse(kSystemdJournalWarn, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().level, LogLevel::Warn);
     EXPECT_EQ(result.value().component, "sshd");
 }
@@ -1663,7 +1663,7 @@ TEST_F(SystemdJournalStrategyTest, MapsWarningPriority)
 TEST_F(SystemdJournalStrategyTest, FallsBackToSyslogIdentifier)
 {
     auto result{strategy.parse(kSystemdJournalUnit, arena)};
-    ASSERT_TRUE(result.is_ok());
+    ASSERT_TRUE(result.has_value());
     // No _COMM, but has SYSLOG_IDENTIFIER
     EXPECT_EQ(result.value().component, "dockerd");
     EXPECT_EQ(result.value().level, LogLevel::Error);
@@ -1671,7 +1671,7 @@ TEST_F(SystemdJournalStrategyTest, FallsBackToSyslogIdentifier)
 
 TEST_F(SystemdJournalStrategyTest, RejectsGenericJSON)
 {
-    EXPECT_FALSE(strategy.parse(kJSONLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kJSONLine, arena).has_value());
 }
 
 TEST_F(SystemdJournalStrategyTest, ConfidenceHigherThanCloudWatch)
@@ -1686,8 +1686,8 @@ TEST_F(SystemdJournalStrategyTest, ConfidenceZeroForPlainJSON)
 
 TEST_F(SystemdJournalStrategyTest, RejectsCLFAndKV)
 {
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).is_ok());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).is_ok());
+    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
 }
 
 // NOLINTEND : Unit tests may intentionally violate some style rules for clarity or simplicity.
