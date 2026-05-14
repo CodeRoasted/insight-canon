@@ -24,8 +24,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include <expected>
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -49,7 +49,8 @@ namespace
 // Group 5: response bytes (number or "-")
 // Groups 6,7 (optional): referer, user-agent (Combined Log Format)
 //
-std::expected<ParsedLine, std::string> CLFStrategy::parse(std::string_view line, ArenaAllocator& arena) const
+std::expected<ParsedLine, std::string> CLFStrategy::parse(std::string_view line,
+                                                          ArenaAllocator& arena) const
 {
     std::string_view rest{line};
 

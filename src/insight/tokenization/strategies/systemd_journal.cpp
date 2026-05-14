@@ -88,7 +88,7 @@ namespace
 } // namespace
 
 std::expected<ParsedLine, std::string> SystemdJournalStrategy::parse(std::string_view line,
-                                                          ArenaAllocator& arena) const
+                                                                     ArenaAllocator& arena) const
 {
     // Cheap substring gate: production-shape journal lines always contain one
     // of these markers. Avoids a full simdjson parse on generic JSON.
@@ -96,7 +96,8 @@ std::expected<ParsedLine, std::string> SystemdJournalStrategy::parse(std::string
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(),
                           "strategy=SystemdJournal missing_indicator_keys");
-        return std::unexpected(std::string("SystemdJournalStrategy: no journal indicator keys found"));
+        return std::unexpected(
+            std::string("SystemdJournalStrategy: no journal indicator keys found"));
     }
 
     auto& scratch{detail::json_scratch()};

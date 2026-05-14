@@ -30,12 +30,13 @@ namespace
 } // namespace
 
 std::expected<ParsedLine, std::string> ProxifierStrategy::parse(std::string_view line,
-                                                     ArenaAllocator& /*arena*/) const
+                                                                ArenaAllocator& /*arena*/) const
 {
     if (!detail::is_proxifier_prefix(line))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=Proxifier parse miss");
-        return std::unexpected(std::string("ProxifierStrategy: line does not match Proxifier format"));
+        return std::unexpected(
+            std::string("ProxifierStrategy: line does not match Proxifier format"));
     }
 
     // "[DD.MM HH:MM:SS] process [-|*N] message"

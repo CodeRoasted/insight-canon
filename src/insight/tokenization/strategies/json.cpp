@@ -14,8 +14,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/simdjson_scratch.hpp"
 #include "insight/utils/logger.hpp"
-#include <expected>
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -26,7 +26,8 @@ namespace
     constexpr double kJsonObjectConfidence{1.0};
 } // namespace
 
-std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line, ArenaAllocator& arena) const
+std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line,
+                                                           ArenaAllocator& arena) const
 {
     if (line.empty())
         return std::unexpected(std::string("JsonStrategy: empty line"));

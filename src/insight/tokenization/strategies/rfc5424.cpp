@@ -21,8 +21,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include <expected>
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -67,7 +67,7 @@ namespace
 } // namespace
 
 std::expected<ParsedLine, std::string> RFC5424Strategy::parse(std::string_view line,
-                                                   ArenaAllocator& /*arena*/) const
+                                                              ArenaAllocator& /*arena*/) const
 {
     if (!detail::is_rfc5424_prefix(line))
     {

@@ -19,8 +19,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include <expected>
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -69,7 +69,7 @@ namespace
 // ─────────────────────────────────────────────────────────────────────────────
 
 std::expected<ParsedLine, std::string> SyslogStrategy::parse(std::string_view line,
-                                                  ArenaAllocator& /*arena*/) const
+                                                             ArenaAllocator& /*arena*/) const
 {
     if (line.size() < kBsdMinLen)
     {
@@ -131,7 +131,8 @@ std::expected<ParsedLine, std::string> SyslogStrategy::parse(std::string_view li
     }
 
     INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=Syslog parse miss");
-    return std::unexpected(std::string("SyslogStrategy: line does not match BSD or RFC3339 syslog format"));
+    return std::unexpected(
+        std::string("SyslogStrategy: line does not match BSD or RFC3339 syslog format"));
 }
 
 LogFormat SyslogStrategy::format() const noexcept

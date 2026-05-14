@@ -22,8 +22,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include <expected>
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -63,13 +63,14 @@ namespace
 } // namespace
 
 std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view line,
-                                                 ArenaAllocator& /*arena*/) const
+                                                            ArenaAllocator& /*arena*/) const
 {
     std::size_t ts_start{0};
     if (!find_log4j_ts_start(line, ts_start))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=Log4j parse miss (no ts)");
-        return std::unexpected(std::string("Log4jStrategy: line does not match any Log4j/Python logging format"));
+        return std::unexpected(
+            std::string("Log4jStrategy: line does not match any Log4j/Python logging format"));
     }
 
     // ── Extract 23-char timestamp "YYYY-MM-DD HH:MM:SS,mmm" ───────────────
@@ -82,7 +83,8 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
     if (rest.empty())
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=Log4j parse miss (no fields)");
-        return std::unexpected(std::string("Log4jStrategy: line does not match any Log4j/Python logging format"));
+        return std::unexpected(
+            std::string("Log4jStrategy: line does not match any Log4j/Python logging format"));
     }
 
     ParsedLine parsed_line;

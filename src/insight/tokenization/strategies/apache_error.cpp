@@ -15,8 +15,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include <expected>
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -42,13 +42,14 @@ namespace
 
 } // namespace
 
-std::expected<ParsedLine, std::string> ApacheErrorLogStrategy::parse(std::string_view line,
-                                                          ArenaAllocator& /*arena*/) const
+std::expected<ParsedLine, std::string>
+ApacheErrorLogStrategy::parse(std::string_view line, ArenaAllocator& /*arena*/) const
 {
     if (!detail::is_apache_error_prefix(line))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=ApacheError parse miss");
-        return std::unexpected(std::string("ApacheErrorLogStrategy: line does not match Apache error-log format"));
+        return std::unexpected(
+            std::string("ApacheErrorLogStrategy: line does not match Apache error-log format"));
     }
 
     std::string_view rest{line};
@@ -57,7 +58,8 @@ std::expected<ParsedLine, std::string> ApacheErrorLogStrategy::parse(std::string
     if (raw_ts.empty())
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=ApacheError parse miss (no ts)");
-        return std::unexpected(std::string("ApacheErrorLogStrategy: line does not match Apache error-log format"));
+        return std::unexpected(
+            std::string("ApacheErrorLogStrategy: line does not match Apache error-log format"));
     }
 
     detail::sv_skip_ws(rest);

@@ -17,8 +17,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include <expected>
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -35,7 +35,7 @@ namespace
 } // namespace
 
 std::expected<ParsedLine, std::string> WindowsCBSStrategy::parse(std::string_view line,
-                                                      ArenaAllocator& /*arena*/) const
+                                                                 ArenaAllocator& /*arena*/) const
 {
     // Confidence already validates "YYYY-MM-DD HH:MM:SS, Level".
     // Minimum: 19 chars timestamp + comma + space + level.
@@ -43,7 +43,8 @@ std::expected<ParsedLine, std::string> WindowsCBSStrategy::parse(std::string_vie
         !detail::is_space(line[kRestOffset]))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=WindowsCBS parse miss");
-        return std::unexpected(std::string("WindowsCBSStrategy: line does not match Windows CBS/CSI format"));
+        return std::unexpected(
+            std::string("WindowsCBSStrategy: line does not match Windows CBS/CSI format"));
     }
 
     // Timestamp is first 19 chars: "YYYY-MM-DD HH:MM:SS"
@@ -58,7 +59,8 @@ std::expected<ParsedLine, std::string> WindowsCBSStrategy::parse(std::string_vie
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(),
                           "strategy=WindowsCBS parse miss (bad fields)");
-        return std::unexpected(std::string("WindowsCBSStrategy: line does not match Windows CBS/CSI format"));
+        return std::unexpected(
+            std::string("WindowsCBSStrategy: line does not match Windows CBS/CSI format"));
     }
 
     ParsedLine parsed_line;

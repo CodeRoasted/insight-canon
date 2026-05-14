@@ -22,8 +22,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/simdjson_scratch.hpp"
 #include "insight/utils/logger.hpp"
-#include <expected>
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -52,14 +52,15 @@ namespace
 } // namespace
 
 std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_view line,
-                                                      ArenaAllocator& arena) const
+                                                                 ArenaAllocator& arena) const
 {
     // Cheap substring gate: production-shape CloudWatch lines always contain
     // one of these markers. Avoids a full simdjson parse on generic JSON.
     if (!has_cloudwatch_indicators(line))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=CloudWatch missing_indicator_keys");
-        return std::unexpected(std::string("CloudWatchStrategy: no CloudWatch indicator keys found"));
+        return std::unexpected(
+            std::string("CloudWatchStrategy: no CloudWatch indicator keys found"));
     }
 
     // ── Fast path ─────────────────────────────────────────────────────────────

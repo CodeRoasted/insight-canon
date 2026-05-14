@@ -27,8 +27,8 @@ class IFormatStrategy
     // (component, content) are copied into the supplied arena via
     // ArenaAllocator::store_string(); their string_views remain valid until
     // the arena is reset or destroyed.
-    [[nodiscard]] virtual std::expected<ParsedLine, std::string> parse(std::string_view line,
-                                                            ArenaAllocator& arena) const = 0;
+    [[nodiscard]] virtual std::expected<ParsedLine, std::string>
+    parse(std::string_view line, ArenaAllocator& arena) const = 0;
 
     [[nodiscard]] virtual LogFormat format() const noexcept = 0;
 

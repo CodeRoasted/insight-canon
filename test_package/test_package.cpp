@@ -6,8 +6,8 @@
 #include "insight/tokenization/arena_allocator.hpp"
 #include "insight/tokenization/canonical_event.hpp"
 #include "insight/tokenization/tokenizer_engine.hpp"
-#include <expected>
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace
 {

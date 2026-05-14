@@ -55,7 +55,8 @@ struct Tokenizer::Impl
     {
     }
 
-    [[nodiscard]] std::expected<CanonicalEvent, std::string> make_event(std::expected<ParsedLine, std::string> parsed)
+    [[nodiscard]] std::expected<CanonicalEvent, std::string>
+    make_event(std::expected<ParsedLine, std::string> parsed)
     {
         if (!parsed)
         {
@@ -107,7 +108,8 @@ std::expected<CanonicalEvent, std::string> Tokenizer::process_line(std::string_v
     return impl_->make_event(impl_->parser.parse_line(raw_line));
 }
 
-std::expected<CanonicalEvent, std::string> Tokenizer::process_stable_line(std::string_view stable_line)
+std::expected<CanonicalEvent, std::string>
+Tokenizer::process_stable_line(std::string_view stable_line)
 {
     return impl_->make_event(impl_->parser.parse_stable(stable_line));
 }

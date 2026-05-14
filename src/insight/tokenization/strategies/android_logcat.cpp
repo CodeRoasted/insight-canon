@@ -184,7 +184,7 @@ namespace
 } // namespace
 
 std::expected<ParsedLine, std::string> AndroidLogcatStrategy::parse(std::string_view line,
-                                                         ArenaAllocator& /*arena*/) const
+                                                                    ArenaAllocator& /*arena*/) const
 {
     LogLevel level{LogLevel::Unknown};
     std::string_view tag;
@@ -193,7 +193,8 @@ std::expected<ParsedLine, std::string> AndroidLogcatStrategy::parse(std::string_
     if (!parse_fast(line, level, tag, message)) [[unlikely]]
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=AndroidLogcat parse miss");
-        return std::unexpected(std::string("AndroidLogcatStrategy: line does not match logcat format"));
+        return std::unexpected(
+            std::string("AndroidLogcatStrategy: line does not match logcat format"));
     }
 
     // tag/message are views into `line`, which was arena-stored by the engine

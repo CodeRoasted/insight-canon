@@ -17,8 +17,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include <expected>
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -31,7 +31,8 @@ namespace
 
 } // namespace
 
-std::expected<ParsedLine, std::string> HPCStrategy::parse(std::string_view line, ArenaAllocator& arena) const
+std::expected<ParsedLine, std::string> HPCStrategy::parse(std::string_view line,
+                                                          ArenaAllocator& arena) const
 {
     if (!detail::is_hpc_prefix(line))
     {

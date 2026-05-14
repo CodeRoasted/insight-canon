@@ -16,8 +16,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include <expected>
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -31,12 +31,13 @@ namespace
 } // namespace
 
 std::expected<ParsedLine, std::string> BGLStrategy::parse(std::string_view line,
-                                               ArenaAllocator& /*arena*/) const
+                                                          ArenaAllocator& /*arena*/) const
 {
     if (!detail::is_bgl_prefix(line))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=BGL parse miss");
-        return std::unexpected(std::string("BGLStrategy: line does not match BGL or Thunderbird format"));
+        return std::unexpected(
+            std::string("BGLStrategy: line does not match BGL or Thunderbird format"));
     }
 
     // Common prefix: "- epoch date node"

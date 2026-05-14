@@ -14,8 +14,8 @@ namespace insight::tokenization
 class JsonStrategy final : public IFormatStrategy
 {
   public:
-    [[nodiscard]] std::expected<ParsedLine, std::string> parse(std::string_view line,
-                                                    ArenaAllocator& arena) const override;
+    [[nodiscard]] std::expected<ParsedLine, std::string>
+    parse(std::string_view line, ArenaAllocator& arena) const override;
     [[nodiscard]] LogFormat format() const noexcept override;
     [[nodiscard]] double confidence(std::string_view line) const noexcept override;
 

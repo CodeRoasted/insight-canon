@@ -14,8 +14,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include <expected>
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -29,12 +29,13 @@ namespace
 } // namespace
 
 std::expected<ParsedLine, std::string> HealthAppStrategy::parse(std::string_view line,
-                                                     ArenaAllocator& /*arena*/) const
+                                                                ArenaAllocator& /*arena*/) const
 {
     if (!detail::is_health_app_prefix(line))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=HealthApp parse miss");
-        return std::unexpected(std::string("HealthAppStrategy: line does not match HealthApp format"));
+        return std::unexpected(
+            std::string("HealthAppStrategy: line does not match HealthApp format"));
     }
 
     // Format: "YYYYMMDD-HH:MM:SS:mmm|component|process_id|message"
@@ -47,7 +48,8 @@ std::expected<ParsedLine, std::string> HealthAppStrategy::parse(std::string_view
     if (ts_str.empty() || component.empty())
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=HealthApp parse miss (bad fields)");
-        return std::unexpected(std::string("HealthAppStrategy: line does not match HealthApp format"));
+        return std::unexpected(
+            std::string("HealthAppStrategy: line does not match HealthApp format"));
     }
 
     ParsedLine parsed_line;

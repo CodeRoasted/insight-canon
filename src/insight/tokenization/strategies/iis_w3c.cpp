@@ -20,8 +20,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include <expected>
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -85,7 +85,7 @@ namespace
 } // namespace
 
 std::expected<ParsedLine, std::string> IISW3CStrategy::parse(std::string_view line,
-                                                  ArenaAllocator& arena) const
+                                                             ArenaAllocator& arena) const
 {
     // Skip comment/directive lines.
     if (!line.empty() && line[0] == '#')
@@ -120,7 +120,8 @@ std::expected<ParsedLine, std::string> IISW3CStrategy::parse(std::string_view li
         if (method.empty() || uri.empty() || !is_http_method(method))
         {
             INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=IISW3C parse miss (no method)");
-            return std::unexpected(std::string("IISW3CStrategy: line does not match IIS W3C format"));
+            return std::unexpected(
+                std::string("IISW3CStrategy: line does not match IIS W3C format"));
         }
         ParsedLine parsed;
         parsed.raw_line = line;
