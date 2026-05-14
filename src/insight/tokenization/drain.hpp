@@ -1,5 +1,6 @@
 #pragma once
 #include <cstddef>
+#include <map>
 #include <memory>
 #include <optional>
 #include <span>
@@ -59,7 +60,7 @@ class Drain
     void reset();
 
     // Dump all templates (for debugging/serialization)
-    [[nodiscard]] std::unordered_map<TemplateID, std::string> all_templates() const;
+    [[nodiscard]] std::map<TemplateID, std::string> all_templates() const;
 
   private:
     struct Impl;
