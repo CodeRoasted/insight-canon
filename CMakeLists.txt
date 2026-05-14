@@ -1,11 +1,10 @@
 ###########################################################
-#  insight_canon — core types · tokenization · sequence model
+#  insight_canon — core types · tokenization
 #
 #  Provides insight::canon, a single self-contained static library
 #  that bundles:
-#    • core         – shared types, Result<T>, logging, time utilities
+#    • core         – shared types, logging, time utilities
 #    • tokenization – format detection + Drain + arena → CanonicalEvent
-#    • sequence     – streaming transitions and n-grams
 ###########################################################
 cmake_minimum_required(VERSION 3.28)
 
@@ -16,6 +15,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(INSIGHT_CANON_BUILD_TESTS  "Build unit and regression tests" ${PROJECT_IS_TOP_LEVEL})
+option(INSIGHT_CANON_BUILD_BENCHMARKS "Build micro-benchmarks" ${PROJECT_IS_TOP_LEVEL})
 option(INSIGHT_CANON_ENABLE_NUMA  "Enable optional NUMA-aware arena allocation (libnuma)" OFF)
 
 ###########################################################
@@ -127,5 +127,27 @@ if(INSIGHT_CANON_BUILD_TESTS)
         )
         include(GoogleTest)
         gtest_discover_tests(insight_canon_tests)
+    endif()
+endif()
+
+###########################################################
+#  Benchmarks
+###########################################################
+if(INSIGHT_CANON_BUILD_BENCHMARKS)
+    file(GLOB_RECURSE BENCH_SOURCES CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/*.cpp"
+    )
+
+    if(BENCH_SOURCES)
+        find_package(benchmark REQUIRED CONFIG)
+        add_executable(insight_canon_bench ${BENCH_SOURCES})
+        target_link_libraries(insight_canon_bench PRIVATE
+            insight_canon
+            benchmark::benchmark
+            spdlog::spdlog
+        )
+        target_include_directories(insight_canon_bench PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/src"
+        )
     endif()
 endif()

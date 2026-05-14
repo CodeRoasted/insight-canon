@@ -22,8 +22,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include "insight/utils/result.hpp"
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -62,15 +62,15 @@ namespace
 
 } // namespace
 
-insight::Result<ParsedLine> Log4jStrategy::parse(std::string_view line,
-                                                 ArenaAllocator& /*arena*/) const
+std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view line,
+                                                            ArenaAllocator& /*arena*/) const
 {
     std::size_t ts_start{0};
     if (!find_log4j_ts_start(line, ts_start))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=Log4j parse miss (no ts)");
-        return insight::Result<ParsedLine>{
-            std::string("Log4jStrategy: line does not match any Log4j/Python logging format")};
+        return std::unexpected(
+            std::string("Log4jStrategy: line does not match any Log4j/Python logging format"));
     }
 
     // ── Extract 23-char timestamp "YYYY-MM-DD HH:MM:SS,mmm" ───────────────
@@ -83,8 +83,8 @@ insight::Result<ParsedLine> Log4jStrategy::parse(std::string_view line,
     if (rest.empty())
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=Log4j parse miss (no fields)");
-        return insight::Result<ParsedLine>{
-            std::string("Log4jStrategy: line does not match any Log4j/Python logging format")};
+        return std::unexpected(
+            std::string("Log4jStrategy: line does not match any Log4j/Python logging format"));
     }
 
     ParsedLine parsed_line;
@@ -108,7 +108,7 @@ insight::Result<ParsedLine> Log4jStrategy::parse(std::string_view line,
                           "strategy=Log4j dash component={} level={} has_timestamp={}",
                           parsed_line.component, to_string(parsed_line.level),
                           parsed_line.timestamp.has_value());
-        return insight::Result<ParsedLine>{parsed_line};
+        return std::expected<ParsedLine, std::string>{parsed_line};
     }
 
     // ── OpenStack variant: "prefix ts PID LEVEL component [req-id] msg" ───
@@ -143,7 +143,7 @@ insight::Result<ParsedLine> Log4jStrategy::parse(std::string_view line,
                           "strategy=Log4j openstack component={} level={} has_timestamp={}",
                           parsed_line.component, to_string(parsed_line.level),
                           parsed_line.timestamp.has_value());
-        return insight::Result<ParsedLine>{parsed_line};
+        return std::expected<ParsedLine, std::string>{parsed_line};
     }
 
     // ── Standard variant: "ts LEVEL [thread] component: msg" ──────────────
@@ -165,7 +165,7 @@ insight::Result<ParsedLine> Log4jStrategy::parse(std::string_view line,
                       "strategy=Log4j standard component={} level={} has_timestamp={}",
                       parsed_line.component, to_string(parsed_line.level),
                       parsed_line.timestamp.has_value());
-    return insight::Result<ParsedLine>{parsed_line};
+    return std::expected<ParsedLine, std::string>{parsed_line};
 }
 
 LogFormat Log4jStrategy::format() const noexcept

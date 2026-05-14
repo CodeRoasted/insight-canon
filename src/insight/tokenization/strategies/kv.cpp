@@ -24,8 +24,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include "insight/utils/result.hpp"
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -61,13 +61,14 @@ namespace
 
 // Mapping well-known keys to structured fields is inherently branch-heavy.
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-insight::Result<ParsedLine> KVStrategy::parse(std::string_view line, ArenaAllocator& arena) const
+std::expected<ParsedLine, std::string> KVStrategy::parse(std::string_view line,
+                                                         ArenaAllocator& arena) const
 {
     const auto pairs{extract_pairs(line)};
     if (pairs.empty())
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=KeyValue no_pairs");
-        return insight::Result<ParsedLine>{std::string("KVStrategy: no key=value pairs found")};
+        return std::unexpected(std::string("KVStrategy: no key=value pairs found"));
     }
 
     ParsedLine parsed_line;
@@ -146,7 +147,7 @@ insight::Result<ParsedLine> KVStrategy::parse(std::string_view line, ArenaAlloca
                       "strategy=KeyValue parsed component={} level={} has_timestamp={}",
                       parsed_line.component, to_string(parsed_line.level),
                       parsed_line.timestamp.has_value());
-    return insight::Result<ParsedLine>{parsed_line};
+    return std::expected<ParsedLine, std::string>{parsed_line};
 }
 
 LogFormat KVStrategy::format() const noexcept

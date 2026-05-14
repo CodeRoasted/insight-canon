@@ -29,7 +29,7 @@
 #include "insight/tokenization/log_parser.hpp"
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/utils/logger.hpp"
-#include "insight/utils/result.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -55,12 +55,13 @@ struct Tokenizer::Impl
     {
     }
 
-    [[nodiscard]] insight::Result<CanonicalEvent> make_event(insight::Result<ParsedLine> parsed)
+    [[nodiscard]] std::expected<CanonicalEvent, std::string>
+    make_event(std::expected<ParsedLine, std::string> parsed)
     {
         if (!parsed)
         {
             INSIGHT_LOG_WARN(logging::tokenizer_logger(), "parse failed: {}", parsed.error());
-            return insight::Result<CanonicalEvent>{parsed.error()};
+            return std::unexpected(parsed.error());
         }
         const ParsedLine& parsed_line = parsed.value();
 
@@ -88,7 +89,7 @@ struct Tokenizer::Impl
                                   produced, drain.cluster_count());
             }
         }
-        return insight::Result<CanonicalEvent>{event};
+        return std::expected<CanonicalEvent, std::string>{event};
     }
 };
 
@@ -102,20 +103,21 @@ Tokenizer::~Tokenizer() = default;
 Tokenizer::Tokenizer(Tokenizer&&) noexcept = default;
 Tokenizer& Tokenizer::operator=(Tokenizer&&) noexcept = default;
 
-insight::Result<CanonicalEvent> Tokenizer::process_line(std::string_view raw_line)
+std::expected<CanonicalEvent, std::string> Tokenizer::process_line(std::string_view raw_line)
 {
     return impl_->make_event(impl_->parser.parse_line(raw_line));
 }
 
-insight::Result<CanonicalEvent> Tokenizer::process_stable_line(std::string_view stable_line)
+std::expected<CanonicalEvent, std::string>
+Tokenizer::process_stable_line(std::string_view stable_line)
 {
     return impl_->make_event(impl_->parser.parse_stable(stable_line));
 }
 
-std::vector<insight::Result<CanonicalEvent>>
+std::vector<std::expected<CanonicalEvent, std::string>>
 Tokenizer::process_batch(std::span<const std::string_view> lines)
 {
-    std::vector<insight::Result<CanonicalEvent>> out;
+    std::vector<std::expected<CanonicalEvent, std::string>> out;
     out.reserve(lines.size());
     for (auto line : lines)
         out.push_back(process_line(line));

@@ -15,8 +15,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include "insight/utils/result.hpp"
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -42,14 +42,14 @@ namespace
 
 } // namespace
 
-insight::Result<ParsedLine> ApacheErrorLogStrategy::parse(std::string_view line,
-                                                          ArenaAllocator& /*arena*/) const
+std::expected<ParsedLine, std::string>
+ApacheErrorLogStrategy::parse(std::string_view line, ArenaAllocator& /*arena*/) const
 {
     if (!detail::is_apache_error_prefix(line))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=ApacheError parse miss");
-        return insight::Result<ParsedLine>{
-            std::string("ApacheErrorLogStrategy: line does not match Apache error-log format")};
+        return std::unexpected(
+            std::string("ApacheErrorLogStrategy: line does not match Apache error-log format"));
     }
 
     std::string_view rest{line};
@@ -58,8 +58,8 @@ insight::Result<ParsedLine> ApacheErrorLogStrategy::parse(std::string_view line,
     if (raw_ts.empty())
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=ApacheError parse miss (no ts)");
-        return insight::Result<ParsedLine>{
-            std::string("ApacheErrorLogStrategy: line does not match Apache error-log format")};
+        return std::unexpected(
+            std::string("ApacheErrorLogStrategy: line does not match Apache error-log format"));
     }
 
     detail::sv_skip_ws(rest);
@@ -86,7 +86,7 @@ insight::Result<ParsedLine> ApacheErrorLogStrategy::parse(std::string_view line,
                       "strategy=ApacheError parsed component={} level={} has_timestamp={}",
                       parsed_line.component, to_string(parsed_line.level),
                       parsed_line.timestamp.has_value());
-    return insight::Result<ParsedLine>{parsed_line};
+    return std::expected<ParsedLine, std::string>{parsed_line};
 }
 
 LogFormat ApacheErrorLogStrategy::format() const noexcept

@@ -1,0 +1,74 @@
+{
+  "context": {
+    "date": "2026-05-14T11:40:32+02:00",
+    "host_name": "DESKTOP-F7PPTO6",
+    "executable": "/home/windows/workspace/coderoast/insight-canon/build/insight_canon_bench",
+    "num_cpus": 8,
+    "mhz_per_cpu": 4192,
+    "cpu_scaling_enabled": false,
+    "caches": [
+      {
+        "type": "Data",
+        "level": 1,
+        "size": 32768,
+        "num_sharing": 1
+      },
+      {
+        "type": "Instruction",
+        "level": 1,
+        "size": 32768,
+        "num_sharing": 1
+      },
+      {
+        "type": "Unified",
+        "level": 2,
+        "size": 1048576,
+        "num_sharing": 1
+      },
+      {
+        "type": "Unified",
+        "level": 3,
+        "size": 100663296,
+        "num_sharing": 8
+      }
+    ],
+    "load_avg": [1.89648,1.06201,0.979492],
+    "library_build_type": "release"
+  },
+  "benchmarks": [
+    {
+      "name": "BM_TokenizationThroughput/4",
+      "family_index": 0,
+      "per_family_instance_index": 0,
+      "run_name": "BM_TokenizationThroughput/4",
+      "run_type": "iteration",
+      "repetitions": 1,
+      "repetition_index": 0,
+      "threads": 1,
+      "iterations": 586,
+      "real_time": 2.3760022557779206e+02,
+      "cpu_time": 2.2048320307167234e+02,
+      "time_unit": "us",
+      "items_per_second": 4.5354928904717090e+06,
+      "ns_per_line": 2.2048320307167235e-07,
+      "templates_seen": 4.8800000000000000e+02
+    },
+    {
+      "name": "BM_TokenizationThroughput/8",
+      "family_index": 0,
+      "per_family_instance_index": 1,
+      "run_name": "BM_TokenizationThroughput/8",
+      "run_type": "iteration",
+      "repetitions": 1,
+      "repetition_index": 0,
+      "threads": 1,
+      "iterations": 634,
+      "real_time": 2.2325314661177251e+02,
+      "cpu_time": 2.0719241482649991e+02,
+      "time_unit": "us",
+      "items_per_second": 4.8264315121641215e+06,
+      "ns_per_line": 2.0719241482649993e-07,
+      "templates_seen": 7.2900000000000000e+02
+    }
+  ]
+}

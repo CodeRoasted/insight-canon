@@ -5,7 +5,7 @@
 #include "insight/core/types.hpp"
 #include "insight/tokenization/format_strategy.hpp"
 #include "insight/tokenization/parsed_line.hpp"
-#include "insight/utils/result.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -17,8 +17,8 @@ namespace insight::tokenization
 class BGLStrategy final : public IFormatStrategy
 {
   public:
-    [[nodiscard]] insight::Result<ParsedLine> parse(std::string_view line,
-                                                    ArenaAllocator& arena) const override;
+    [[nodiscard]] std::expected<ParsedLine, std::string>
+    parse(std::string_view line, ArenaAllocator& arena) const override;
     [[nodiscard]] LogFormat format() const noexcept override;
     [[nodiscard]] double confidence(std::string_view line) const noexcept override;
 };

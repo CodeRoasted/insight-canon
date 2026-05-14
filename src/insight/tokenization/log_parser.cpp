@@ -21,7 +21,7 @@
 #include "insight/tokenization/arena_allocator.hpp"
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/utils/logger.hpp"
-#include "insight/utils/result.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -90,13 +90,13 @@ void LogParser::set_auto_detect(bool enabled)
 
 // Successful parses are O(line.size()) for the arena copy + strategy parsing.
 // Rejected lines skip the arena copy.
-insight::Result<ParsedLine> LogParser::parse_line(std::string_view line)
+std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view line)
 {
     if (line.empty())
     {
         ++failed_count_;
         INSIGHT_LOG_TRACE(logging::parser_logger(), "parse: empty line skipped");
-        return insight::Result<ParsedLine>{std::string("LogParser: empty line")};
+        return std::unexpected(std::string("LogParser: empty line"));
     }
 
     IFormatStrategy* strategy = active_strategy_;
@@ -113,8 +113,7 @@ insight::Result<ParsedLine> LogParser::parse_line(std::string_view line)
             INSIGHT_LOG_WARN(logging::parser_logger(), "no strategy matched (total failures={})",
                              failed_count_);
         }
-        return insight::Result<ParsedLine>{
-            std::string("LogParser: no strategy matched the line format")};
+        return std::unexpected(std::string("LogParser: no strategy matched the line format"));
     }
 
     // Persist raw bytes only after a strategy is known. Failed detection
@@ -122,7 +121,7 @@ insight::Result<ParsedLine> LogParser::parse_line(std::string_view line)
     const std::string_view stable{arena_.store_string(line)};
 
     auto result{strategy->parse(stable, arena_)};
-    if (result.is_ok())
+    if (result.has_value())
     {
         ++parsed_count_;
         INSIGHT_LOG_TRACE(logging::parser_logger(), "parse ok: strategy={}",
@@ -158,13 +157,13 @@ insight::Result<ParsedLine> LogParser::parse_line(std::string_view line)
 // Fast variant: skips arena store_string(). Caller guarantees stable_line is
 // valid for the arena's lifetime. All string_views returned from parse() will
 // alias stable_line's storage directly (no extra copy).
-insight::Result<ParsedLine> LogParser::parse_stable(std::string_view stable_line)
+std::expected<ParsedLine, std::string> LogParser::parse_stable(std::string_view stable_line)
 {
     if (stable_line.empty())
     {
         ++failed_count_;
         INSIGHT_LOG_TRACE(logging::parser_logger(), "parse_stable: empty line skipped");
-        return insight::Result<ParsedLine>{std::string("LogParser: empty line")};
+        return std::unexpected(std::string("LogParser: empty line"));
     }
 
     IFormatStrategy* strategy = active_strategy_;
@@ -180,13 +179,12 @@ insight::Result<ParsedLine> LogParser::parse_stable(std::string_view stable_line
             INSIGHT_LOG_WARN(logging::parser_logger(), "no strategy matched (total failures={})",
                              failed_count_);
         }
-        return insight::Result<ParsedLine>{
-            std::string("LogParser: no strategy matched the line format")};
+        return std::unexpected(std::string("LogParser: no strategy matched the line format"));
     }
 
     // Caller guarantees stable_line is arena-stable: no store_string() needed.
     auto result{strategy->parse(stable_line, arena_)};
-    if (result.is_ok())
+    if (result.has_value())
     {
         ++parsed_count_;
         INSIGHT_LOG_TRACE(logging::parser_logger(), "parse_stable ok: strategy={}",
@@ -205,10 +203,10 @@ insight::Result<ParsedLine> LogParser::parse_stable(std::string_view stable_line
     return result;
 }
 
-std::vector<insight::Result<ParsedLine>>
+std::vector<std::expected<ParsedLine, std::string>>
 LogParser::parse_batch(std::span<const std::string_view> lines)
 {
-    std::vector<insight::Result<ParsedLine>> out;
+    std::vector<std::expected<ParsedLine, std::string>> out;
     out.reserve(lines.size());
     for (auto line : lines)
         out.push_back(parse_line(line));

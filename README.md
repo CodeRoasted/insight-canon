@@ -7,7 +7,7 @@ pipeline for structured log analysis:
 
 | Layer | What it does |
 |---|---|
-| **core** | Shared types (`LogLevel`, `EventID`), `Result<T>`, logging façade (spdlog), ISO-8601 time utilities |
+| **core** | Shared types (`LogLevel`, `EventID`), logging façade (spdlog), ISO-8601 time utilities |
 | **tokenization** | Format detection, Drain template clustering, arena allocator, `CanonicalEvent` output |
 | **sequence** | Streaming flat history, sparse transition matrix, bounded n-gram counters, dominant-path reconstruction |
 
@@ -122,7 +122,7 @@ In your `conanfile.py`:
 
 ```python
 def requirements(self):
-  self.requires("insight_canon/1.3.3")
+  self.requires("insight_canon/1.3.4")
 ```
 
 Cross-repo package pins are tracked in [../technical_docs/compatibility_matrix.md](../technical_docs/compatibility_matrix.md), and planning lives in [../technical_docs/ROADMAP.md](../technical_docs/ROADMAP.md).
@@ -136,7 +136,7 @@ insight-canon/
 ├── api/                    Public headers (install interface)
 │   └── insight/
 │       ├── core/           types.hpp
-│       ├── utils/          result.hpp  logger.hpp  time_utils.hpp
+│       ├── utils/          logger.hpp  time_utils.hpp
 │       ├── tokenization/   tokenizer_engine.hpp  canonical_event.hpp  …
 │       └── sequence/       sequence_engine.hpp
 ├── src/                    Private implementation sources

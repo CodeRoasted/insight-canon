@@ -1,11 +1,11 @@
 #pragma once
 #include <cstddef>
+#include <map>
 #include <memory>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 
 #include "insight/core/types.hpp"
 #include "insight/tokenization/drain_config.hpp"
@@ -59,7 +59,7 @@ class Drain
     void reset();
 
     // Dump all templates (for debugging/serialization)
-    [[nodiscard]] std::unordered_map<TemplateID, std::string> all_templates() const;
+    [[nodiscard]] std::map<TemplateID, std::string> all_templates() const;
 
   private:
     struct Impl;

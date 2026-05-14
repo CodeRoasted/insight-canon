@@ -14,8 +14,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include "insight/utils/result.hpp"
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -28,14 +28,14 @@ namespace
 
 } // namespace
 
-insight::Result<ParsedLine> NginxErrorStrategy::parse(std::string_view line,
-                                                      ArenaAllocator& /*arena*/) const
+std::expected<ParsedLine, std::string> NginxErrorStrategy::parse(std::string_view line,
+                                                                 ArenaAllocator& /*arena*/) const
 {
     if (!detail::is_nginx_error_prefix(line))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=NginxError parse miss");
-        return insight::Result<ParsedLine>{
-            std::string("NginxErrorStrategy: line does not match Nginx error format")};
+        return std::unexpected(
+            std::string("NginxErrorStrategy: line does not match Nginx error format"));
     }
 
     // "YYYY/MM/DD HH:MM:SS [level] PID#TID: msg"
@@ -48,8 +48,8 @@ insight::Result<ParsedLine> NginxErrorStrategy::parse(std::string_view line,
     if (level_sv.empty())
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=NginxError parse miss (no level)");
-        return insight::Result<ParsedLine>{
-            std::string("NginxErrorStrategy: line does not match Nginx error format")};
+        return std::unexpected(
+            std::string("NginxErrorStrategy: line does not match Nginx error format"));
     }
 
     (void)detail::sv_take_token(rest); // skip "PID#TID:"
@@ -65,7 +65,7 @@ insight::Result<ParsedLine> NginxErrorStrategy::parse(std::string_view line,
     INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                       "strategy=NginxError parsed component={} level={} has_timestamp={}",
                       parsed.component, to_string(parsed.level), parsed.timestamp.has_value());
-    return insight::Result<ParsedLine>{parsed};
+    return std::expected<ParsedLine, std::string>{parsed};
 }
 
 LogFormat NginxErrorStrategy::format() const noexcept

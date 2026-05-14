@@ -24,8 +24,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include "insight/utils/result.hpp"
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -49,7 +49,8 @@ namespace
 // Group 5: response bytes (number or "-")
 // Groups 6,7 (optional): referer, user-agent (Combined Log Format)
 //
-insight::Result<ParsedLine> CLFStrategy::parse(std::string_view line, ArenaAllocator& arena) const
+std::expected<ParsedLine, std::string> CLFStrategy::parse(std::string_view line,
+                                                          ArenaAllocator& arena) const
 {
     std::string_view rest{line};
 
@@ -62,16 +63,14 @@ insight::Result<ParsedLine> CLFStrategy::parse(std::string_view line, ArenaAlloc
     if (raw_ts.empty())
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=CLF parse miss (no timestamp)");
-        return insight::Result<ParsedLine>{
-            std::string("CLFStrategy: line does not match CLF/Combined format")};
+        return std::unexpected(std::string("CLFStrategy: line does not match CLF/Combined format"));
     }
 
     detail::sv_skip_ws(rest);
     if (rest.empty() || rest[0] != '"')
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=CLF parse miss (no request)");
-        return insight::Result<ParsedLine>{
-            std::string("CLFStrategy: line does not match CLF/Combined format")};
+        return std::unexpected(std::string("CLFStrategy: line does not match CLF/Combined format"));
     }
     const std::string_view request{detail::sv_take_quoted(rest)};
     const std::string_view status_str{detail::sv_take_token(rest)};
@@ -80,8 +79,7 @@ insight::Result<ParsedLine> CLFStrategy::parse(std::string_view line, ArenaAlloc
     if (host.empty() || status_str.size() != 3U)
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=CLF parse miss (bad fields)");
-        return insight::Result<ParsedLine>{
-            std::string("CLFStrategy: line does not match CLF/Combined format")};
+        return std::unexpected(std::string("CLFStrategy: line does not match CLF/Combined format"));
     }
 
     int status_code{kDefaultSuccessStatusCode};
@@ -118,7 +116,7 @@ insight::Result<ParsedLine> CLFStrategy::parse(std::string_view line, ArenaAlloc
     INSIGHT_LOG_DEBUG(
         logging::strategy_logger(), "strategy=CLF parsed component={} level={} has_timestamp={}",
         parsed_line.component, to_string(parsed_line.level), parsed_line.timestamp.has_value());
-    return insight::Result<ParsedLine>{parsed_line};
+    return std::expected<ParsedLine, std::string>{parsed_line};
 }
 
 LogFormat CLFStrategy::format() const noexcept

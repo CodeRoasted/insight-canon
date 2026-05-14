@@ -39,6 +39,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <map>
 #include <memory>
 #include <optional>
 #include <span>
@@ -813,10 +814,9 @@ void Drain::reset()
     impl_->config = saved;
 }
 
-std::unordered_map<TemplateID, std::string> Drain::all_templates() const
+std::map<TemplateID, std::string> Drain::all_templates() const
 {
-    std::unordered_map<TemplateID, std::string> out;
-    out.reserve(impl_->cluster_count_);
+    std::map<TemplateID, std::string> out;
     for (std::size_t tid{0}; tid < impl_->id_by_tid.size(); ++tid)
     {
         const std::uint32_t cluster_idx{impl_->id_by_tid[tid]};

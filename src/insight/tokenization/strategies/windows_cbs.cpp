@@ -17,8 +17,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include "insight/utils/result.hpp"
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -34,8 +34,8 @@ namespace
 
 } // namespace
 
-insight::Result<ParsedLine> WindowsCBSStrategy::parse(std::string_view line,
-                                                      ArenaAllocator& /*arena*/) const
+std::expected<ParsedLine, std::string> WindowsCBSStrategy::parse(std::string_view line,
+                                                                 ArenaAllocator& /*arena*/) const
 {
     // Confidence already validates "YYYY-MM-DD HH:MM:SS, Level".
     // Minimum: 19 chars timestamp + comma + space + level.
@@ -43,8 +43,8 @@ insight::Result<ParsedLine> WindowsCBSStrategy::parse(std::string_view line,
         !detail::is_space(line[kRestOffset]))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=WindowsCBS parse miss");
-        return insight::Result<ParsedLine>{
-            std::string("WindowsCBSStrategy: line does not match Windows CBS/CSI format")};
+        return std::unexpected(
+            std::string("WindowsCBSStrategy: line does not match Windows CBS/CSI format"));
     }
 
     // Timestamp is first 19 chars: "YYYY-MM-DD HH:MM:SS"
@@ -59,8 +59,8 @@ insight::Result<ParsedLine> WindowsCBSStrategy::parse(std::string_view line,
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(),
                           "strategy=WindowsCBS parse miss (bad fields)");
-        return insight::Result<ParsedLine>{
-            std::string("WindowsCBSStrategy: line does not match Windows CBS/CSI format")};
+        return std::unexpected(
+            std::string("WindowsCBSStrategy: line does not match Windows CBS/CSI format"));
     }
 
     ParsedLine parsed_line;
@@ -74,7 +74,7 @@ insight::Result<ParsedLine> WindowsCBSStrategy::parse(std::string_view line,
                       "strategy=WindowsCBS parsed component={} level={} has_timestamp={}",
                       parsed_line.component, to_string(parsed_line.level),
                       parsed_line.timestamp.has_value());
-    return insight::Result<ParsedLine>{parsed_line};
+    return std::expected<ParsedLine, std::string>{parsed_line};
 }
 
 LogFormat WindowsCBSStrategy::format() const noexcept

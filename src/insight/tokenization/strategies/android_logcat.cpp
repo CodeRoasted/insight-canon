@@ -17,7 +17,7 @@
 #include "insight/tokenization/arena_allocator.hpp"
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/utils/logger.hpp"
-#include "insight/utils/result.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -183,8 +183,8 @@ namespace
 
 } // namespace
 
-insight::Result<ParsedLine> AndroidLogcatStrategy::parse(std::string_view line,
-                                                         ArenaAllocator& /*arena*/) const
+std::expected<ParsedLine, std::string> AndroidLogcatStrategy::parse(std::string_view line,
+                                                                    ArenaAllocator& /*arena*/) const
 {
     LogLevel level{LogLevel::Unknown};
     std::string_view tag;
@@ -193,8 +193,8 @@ insight::Result<ParsedLine> AndroidLogcatStrategy::parse(std::string_view line,
     if (!parse_fast(line, level, tag, message)) [[unlikely]]
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=AndroidLogcat parse miss");
-        return insight::Result<ParsedLine>{
-            std::string("AndroidLogcatStrategy: line does not match logcat format")};
+        return std::unexpected(
+            std::string("AndroidLogcatStrategy: line does not match logcat format"));
     }
 
     // tag/message are views into `line`, which was arena-stored by the engine
@@ -210,7 +210,7 @@ insight::Result<ParsedLine> AndroidLogcatStrategy::parse(std::string_view line,
                       "strategy=AndroidLogcat parsed component={} level={} has_timestamp={}",
                       parsed_line.component, to_string(parsed_line.level),
                       parsed_line.timestamp.has_value());
-    return insight::Result<ParsedLine>{parsed_line};
+    return std::expected<ParsedLine, std::string>{parsed_line};
 }
 
 LogFormat AndroidLogcatStrategy::format() const noexcept

@@ -14,8 +14,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/simdjson_scratch.hpp"
 #include "insight/utils/logger.hpp"
-#include "insight/utils/result.hpp"
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -26,10 +26,11 @@ namespace
     constexpr double kJsonObjectConfidence{1.0};
 } // namespace
 
-insight::Result<ParsedLine> JsonStrategy::parse(std::string_view line, ArenaAllocator& arena) const
+std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line,
+                                                           ArenaAllocator& arena) const
 {
     if (line.empty())
-        return insight::Result<ParsedLine>{std::string("JsonStrategy: empty line")};
+        return std::unexpected(std::string("JsonStrategy: empty line"));
 
     // ── Fast path ─────────────────────────────────────────────────────────────
     // For escape-free JSON objects bypass simdjson entirely: single-pass byte
@@ -56,7 +57,7 @@ insight::Result<ParsedLine> JsonStrategy::parse(std::string_view line, ArenaAllo
                               "strategy=JSON fast_path component={} level={} has_timestamp={}",
                               parsed_line.component, to_string(parsed_line.level),
                               parsed_line.timestamp.has_value());
-            return insight::Result<ParsedLine>{parsed_line};
+            return std::expected<ParsedLine, std::string>{parsed_line};
         }
     }
     // ── Slow path: full simdjson (handles escapes, nested objects, etc.) ──────
@@ -69,14 +70,14 @@ insight::Result<ParsedLine> JsonStrategy::parse(std::string_view line, ArenaAllo
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=JSON simdjson_iterate_error={}",
                           simdjson::error_message(err));
-        return insight::Result<ParsedLine>{std::string("JsonStrategy: invalid JSON")};
+        return std::unexpected(std::string("JsonStrategy: invalid JSON"));
     }
 
     simdjson::ondemand::object root;
     if (doc.get_object().get(root) != simdjson::SUCCESS)
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=JSON not_an_object");
-        return insight::Result<ParsedLine>{std::string("JsonStrategy: top-level not an object")};
+        return std::unexpected(std::string("JsonStrategy: top-level not an object"));
     }
 
     ParsedLine parsed_line;
@@ -112,7 +113,7 @@ insight::Result<ParsedLine> JsonStrategy::parse(std::string_view line, ArenaAllo
     INSIGHT_LOG_TRACE(
         logging::strategy_logger(), "strategy=JSON parsed component={} level={} has_timestamp={}",
         parsed_line.component, to_string(parsed_line.level), parsed_line.timestamp.has_value());
-    return insight::Result<ParsedLine>{parsed_line};
+    return std::expected<ParsedLine, std::string>{parsed_line};
 }
 
 LogFormat JsonStrategy::format() const noexcept

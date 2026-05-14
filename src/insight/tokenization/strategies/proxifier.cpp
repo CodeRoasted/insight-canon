@@ -16,7 +16,7 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include "insight/utils/result.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -29,14 +29,14 @@ namespace
 
 } // namespace
 
-insight::Result<ParsedLine> ProxifierStrategy::parse(std::string_view line,
-                                                     ArenaAllocator& /*arena*/) const
+std::expected<ParsedLine, std::string> ProxifierStrategy::parse(std::string_view line,
+                                                                ArenaAllocator& /*arena*/) const
 {
     if (!detail::is_proxifier_prefix(line))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=Proxifier parse miss");
-        return insight::Result<ParsedLine>{
-            std::string("ProxifierStrategy: line does not match Proxifier format")};
+        return std::unexpected(
+            std::string("ProxifierStrategy: line does not match Proxifier format"));
     }
 
     // "[DD.MM HH:MM:SS] process [-|*N] message"
@@ -60,7 +60,7 @@ insight::Result<ParsedLine> ProxifierStrategy::parse(std::string_view line,
                       "strategy=Proxifier parsed component={} level={} has_timestamp={}",
                       parsed_line.component, to_string(parsed_line.level),
                       parsed_line.timestamp.has_value());
-    return insight::Result<ParsedLine>{parsed_line};
+    return std::expected<ParsedLine, std::string>{parsed_line};
 }
 
 LogFormat ProxifierStrategy::format() const noexcept

@@ -16,8 +16,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include "insight/utils/result.hpp"
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -30,14 +30,14 @@ namespace
 
 } // namespace
 
-insight::Result<ParsedLine> BGLStrategy::parse(std::string_view line,
-                                               ArenaAllocator& /*arena*/) const
+std::expected<ParsedLine, std::string> BGLStrategy::parse(std::string_view line,
+                                                          ArenaAllocator& /*arena*/) const
 {
     if (!detail::is_bgl_prefix(line))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=BGL parse miss");
-        return insight::Result<ParsedLine>{
-            std::string("BGLStrategy: line does not match BGL or Thunderbird format")};
+        return std::unexpected(
+            std::string("BGLStrategy: line does not match BGL or Thunderbird format"));
     }
 
     // Common prefix: "- epoch date node"
@@ -74,7 +74,7 @@ insight::Result<ParsedLine> BGLStrategy::parse(std::string_view line,
                           "strategy=BGL parsed component={} level={} has_timestamp={}",
                           parsed_line.component, to_string(parsed_line.level),
                           parsed_line.timestamp.has_value());
-        return insight::Result<ParsedLine>{parsed_line};
+        return std::expected<ParsedLine, std::string>{parsed_line};
     }
 
     // Thunderbird / generic BGL: rest after node is the message.
@@ -87,7 +87,7 @@ insight::Result<ParsedLine> BGLStrategy::parse(std::string_view line,
     INSIGHT_LOG_DEBUG(
         logging::strategy_logger(), "strategy=BGL parsed component={} level={} has_timestamp={}",
         parsed_line.component, to_string(parsed_line.level), parsed_line.timestamp.has_value());
-    return insight::Result<ParsedLine>{parsed_line};
+    return std::expected<ParsedLine, std::string>{parsed_line};
 }
 
 LogFormat BGLStrategy::format() const noexcept

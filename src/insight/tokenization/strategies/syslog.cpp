@@ -19,8 +19,8 @@
 #include "insight/tokenization/parsed_line.hpp"
 #include "insight/tokenization/strategies/detail/fast_gates.hpp"
 #include "insight/utils/logger.hpp"
-#include "insight/utils/result.hpp"
 #include "insight/utils/time_utils.hpp"
+#include <expected>
 
 namespace insight::tokenization
 {
@@ -68,13 +68,13 @@ namespace
 // IFormatStrategy interface
 // ─────────────────────────────────────────────────────────────────────────────
 
-insight::Result<ParsedLine> SyslogStrategy::parse(std::string_view line,
-                                                  ArenaAllocator& /*arena*/) const
+std::expected<ParsedLine, std::string> SyslogStrategy::parse(std::string_view line,
+                                                             ArenaAllocator& /*arena*/) const
 {
     if (line.size() < kBsdMinLen)
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=Syslog parse miss (too short)");
-        return insight::Result<ParsedLine>{std::string("SyslogStrategy: line too short")};
+        return std::unexpected(std::string("SyslogStrategy: line too short"));
     }
 
     // ── BSD syslog: "Mon DD HH:MM:SS hostname process[pid]: message" ──────
@@ -106,7 +106,7 @@ insight::Result<ParsedLine> SyslogStrategy::parse(std::string_view line,
                           "strategy=Syslog parsed component={} level={} has_timestamp={}",
                           parsed_line.component, to_string(parsed_line.level),
                           parsed_line.timestamp.has_value());
-        return insight::Result<ParsedLine>{parsed_line};
+        return std::expected<ParsedLine, std::string>{parsed_line};
     }
 
     // ── RFC 3339: "YYYY-MM-DDTHH:MM:SS[Z|±HH:MM] hostname process[pid]: msg"
@@ -127,12 +127,12 @@ insight::Result<ParsedLine> SyslogStrategy::parse(std::string_view line,
                           "strategy=Syslog parsed component={} level={} has_timestamp={}",
                           parsed_line.component, to_string(parsed_line.level),
                           parsed_line.timestamp.has_value());
-        return insight::Result<ParsedLine>{parsed_line};
+        return std::expected<ParsedLine, std::string>{parsed_line};
     }
 
     INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=Syslog parse miss");
-    return insight::Result<ParsedLine>{
-        std::string("SyslogStrategy: line does not match BSD or RFC3339 syslog format")};
+    return std::unexpected(
+        std::string("SyslogStrategy: line does not match BSD or RFC3339 syslog format"));
 }
 
 LogFormat SyslogStrategy::format() const noexcept
