@@ -40,10 +40,9 @@ class InsightCanonConan(ConanFile):
         self.cpp.build.libdirs = ["build"]
 
     def requirements(self):
-        # spdlog/fmt appear in the public logging API header; consumers must
-        # see their includes. Both are header-only.
-        self.requires("spdlog/1.13.0", transitive_headers=True)
-        self.requires("fmt/10.2.1",    transitive_headers=True)
+        # spdlog/fmt are actual libraries that appear in public API headers
+        self.requires("spdlog/1.13.0", transitive_headers=True, transitive_libs=True)
+        self.requires("fmt/10.2.1",    transitive_headers=True, transitive_libs=True)
         self.requires("simdjson/3.13.0")
 
     def build_requirements(self):
