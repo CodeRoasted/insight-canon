@@ -72,8 +72,7 @@ class InsightCanonConan(ConanFile):
         self.cpp_info.libs = ["insight_canon"]
         self.cpp_info.set_property("cmake_file_name", "insight_canon")
         self.cpp_info.set_property("cmake_target_name", "insight::canon")
-        # spdlog/fmt are internal header-only deps. Include them but mark as consumed so
-        # CMakeDeps doesn't try to find them transitively.
+        # Explicitly declare all consumed dependencies; spdlog/fmt are header-only
         self.cpp_info.requires = [
             "spdlog::spdlog",
             "fmt::fmt",  
