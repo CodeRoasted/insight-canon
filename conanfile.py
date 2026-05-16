@@ -41,9 +41,9 @@ class InsightCanonConan(ConanFile):
 
     def requirements(self):
         # spdlog/fmt appear in the public logging API header; consumers must
-        # see their includes and link against them.
-        self.requires("spdlog/1.13.0", transitive_headers=True, transitive_libs=True)
-        self.requires("fmt/10.2.1",    transitive_headers=True, transitive_libs=True)
+        # see their includes. Both are header-only.
+        self.requires("spdlog/1.13.0", transitive_headers=True)
+        self.requires("fmt/10.2.1",    transitive_headers=True)
         self.requires("simdjson/3.13.0")
 
     def build_requirements(self):
@@ -72,3 +72,10 @@ class InsightCanonConan(ConanFile):
         self.cpp_info.libs = ["insight_canon"]
         self.cpp_info.set_property("cmake_file_name", "insight_canon")
         self.cpp_info.set_property("cmake_target_name", "insight::canon")
+        # spdlog/fmt are internal header-only deps. Include them but mark as consumed so
+        # CMakeDeps doesn't try to find them transitively.
+        self.cpp_info.requires = [
+            "spdlog::spdlog",
+            "fmt::fmt",  
+            "simdjson::simdjson"
+        ]
