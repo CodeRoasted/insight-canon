@@ -4,7 +4,7 @@ from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain
 
 class InsightCanonConan(ConanFile):
     name = "insight_canon"
-    version = "1.3.4"
+    version = "1.3.5"
     package_type = "library"
     license = "Apache-2.0"
     url = "https://github.com/coderoast-dev/insight-canon"
@@ -40,8 +40,7 @@ class InsightCanonConan(ConanFile):
         self.cpp.build.libdirs = ["build"]
 
     def requirements(self):
-        # spdlog/fmt appear in the public logging API header; consumers must
-        # see their includes and link against them.
+        # spdlog/fmt are actual libraries that appear in public API headers
         self.requires("spdlog/1.13.0", transitive_headers=True, transitive_libs=True)
         self.requires("fmt/10.2.1",    transitive_headers=True, transitive_libs=True)
         self.requires("simdjson/3.13.0")
@@ -72,3 +71,9 @@ class InsightCanonConan(ConanFile):
         self.cpp_info.libs = ["insight_canon"]
         self.cpp_info.set_property("cmake_file_name", "insight_canon")
         self.cpp_info.set_property("cmake_target_name", "insight::canon")
+        # Explicitly declare all consumed dependencies; spdlog/fmt are header-only
+        self.cpp_info.requires = [
+            "spdlog::spdlog",
+            "fmt::fmt",  
+            "simdjson::simdjson"
+        ]
