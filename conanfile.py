@@ -7,7 +7,7 @@ class InsightCanonConan(ConanFile):
     version = "1.3.5"
     package_type = "library"
     license = "Apache-2.0"
-    url = "https://github.com/coderoast-dev/insight-canon"
+    url = "https://github.com/CodeRoasted/insight-canon"
     description = (
         "InSight Canon: shared types, log tokenization, and streaming sequence model. "
         "Bundles core types, tokenization, and sequence into a single "
