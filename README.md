@@ -95,7 +95,7 @@ Each tagged release attaches a `insight_canon-X.Y.Z.tgz` produced by
 ```bash
 # Download (requires gh CLI or manual download)
 gh release download vX.Y.Z \
-  --repo coderoast-dev/insight-canon \
+  --repo CodeRoasted/insight-canon \
   --pattern 'insight_canon-*.tgz' \
   --dir /tmp/
 
@@ -105,7 +105,7 @@ conan cache restore /tmp/insight_canon-X.Y.Z.tgz
 ### Option B — build from source
 
 ```bash
-git clone https://github.com/coderoast-dev/insight-canon.git
+git clone https://github.com/CodeRoasted/insight-canon.git
 cd insight-canon
 conan create . --profile:host=linux-gcc13-release --profile:build=linux-gcc13-release --build=missing
 ```
