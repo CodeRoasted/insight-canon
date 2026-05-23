@@ -90,6 +90,12 @@ std::shared_ptr<spdlog::logger> drain_logger()
     return logger ? logger : spdlog::default_logger();
 }
 
+std::shared_ptr<spdlog::logger> pipeline_logger()
+{
+    auto logger{spdlog::get(std::string{kPipelineLogger})};
+    return logger ? logger : spdlog::default_logger();
+}
+
 std::shared_ptr<spdlog::logger> detector_logger()
 {
     auto logger{spdlog::get(std::string{kDetectorLogger})};

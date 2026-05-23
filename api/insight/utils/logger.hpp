@@ -62,6 +62,7 @@ namespace detail
 // ── Module logger names ──────────────────────────────────────────────────────
 inline constexpr std::string_view kArenaLogger{"insight.arena"};
 inline constexpr std::string_view kDrainLogger{"insight.drain"};
+inline constexpr std::string_view kPipelineLogger{"insight.pipeline"};
 inline constexpr std::string_view kDetectorLogger{"insight.detector"};
 inline constexpr std::string_view kParserLogger{"insight.parser"};
 inline constexpr std::string_view kStrategyLogger{"insight.strategy"};
@@ -80,6 +81,7 @@ void init_logging(spdlog::level::level_enum default_level = spdlog::level::info)
 // logger. This keeps unit tests safe even if init_logging() is not called.
 std::shared_ptr<spdlog::logger> arena_logger();
 std::shared_ptr<spdlog::logger> drain_logger();
+std::shared_ptr<spdlog::logger> pipeline_logger();
 std::shared_ptr<spdlog::logger> detector_logger();
 std::shared_ptr<spdlog::logger> parser_logger();
 std::shared_ptr<spdlog::logger> strategy_logger();
