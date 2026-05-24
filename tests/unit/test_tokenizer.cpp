@@ -236,13 +236,15 @@ TEST_F(TokenizerTest, ReportsClusterCount)
 // Edge cases / robustness
 // ─────────────────────────────────────────────────────────────────────────────
 
-TEST_F(TokenizerTest, ShortGarbageLineReturnsError)
+TEST_F(TokenizerTest, ShortGarbageLineParsesAsRawText)
 {
-    // "xyz" matches no strategy with confidence > 0.
-    const std::size_t used_before = arena.used();
+    // "xyz" matches no structured strategy, so the raw-text fallback templates
+    // it rather than dropping it (the wedge ingests unstructured CI logs).
     auto result{tokenizer.process_line("xyz")};
-    EXPECT_FALSE(result.has_value());
-    EXPECT_EQ(arena.used(), used_before);
+    ASSERT_TRUE(result.has_value());
+    const auto& ev{result.value()};
+    EXPECT_EQ(ev.level, LogLevel::Unknown);
+    EXPECT_FALSE(ev.template_str.empty());
 }
 
 TEST_F(TokenizerTest, WhitespaceOnlyLineReturnsError)
