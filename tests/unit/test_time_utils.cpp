@@ -235,4 +235,45 @@ TEST(ParseLogLevel, UnknownReturnsUnknown)
     EXPECT_EQ(parse_log_level("42"), LogLevel::Unknown);
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// infer_leading_log_level — raw-text fallback level recovery (leading token)
+// ───────────────────────────────────────────────────────────────────────────
+TEST(InferLeadingLogLevel, LeadingErrorToken)
+{
+    EXPECT_EQ(infer_leading_log_level("ERROR connection refused to db host 10.0.0.7"),
+              LogLevel::Error);
+}
+TEST(InferLeadingLogLevel, LeadingWarnToken)
+{
+    EXPECT_EQ(infer_leading_log_level("WARN db.pool exhausted, waiting 5000ms"), LogLevel::Warn);
+}
+TEST(InferLeadingLogLevel, LeadingInfoToken)
+{
+    EXPECT_EQ(infer_leading_log_level("INFO request GET /healthz 200 1ms"), LogLevel::Info);
+}
+TEST(InferLeadingLogLevel, FailedTestResultIsError)
+{
+    EXPECT_EQ(infer_leading_log_level("FAILED tests/orders.spec.ts"), LogLevel::Error);
+}
+TEST(InferLeadingLogLevel, BracketedGithubActionsMarkerIsError)
+{
+    EXPECT_EQ(infer_leading_log_level("##[error]Process completed with exit code 1"),
+              LogLevel::Error);
+}
+TEST(InferLeadingLogLevel, MidLineErrorWordDoesNotMisclassify)
+{
+    // "error rate" sits mid-line on an INFO line — must stay Info, never Error.
+    EXPECT_EQ(infer_leading_log_level("INFO [t=30s] 4200 req/s, error rate 0/10000"),
+              LogLevel::Info);
+}
+TEST(InferLeadingLogLevel, NoLeadingLevelIsUnknown)
+{
+    EXPECT_EQ(infer_leading_log_level("request GET /api/orders 200 14ms"), LogLevel::Unknown);
+    EXPECT_EQ(infer_leading_log_level("PASS tests/auth.spec.ts"), LogLevel::Unknown);
+}
+TEST(InferLeadingLogLevel, EmptyIsUnknown)
+{
+    EXPECT_EQ(infer_leading_log_level(""), LogLevel::Unknown);
+}
+
 // NOLINTEND

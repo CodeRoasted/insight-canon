@@ -745,6 +745,41 @@ LogLevel parse_log_level(std::string_view level_str) noexcept
     }
 }
 
+LogLevel infer_leading_log_level(std::string_view line) noexcept
+{
+    // Level markers ("ERROR ", "##[error]", "[WARN]", "FAILED ") sit at the very
+    // start of real logs, so scan only the head and only the FIRST alphabetic
+    // token — a benign mid-line word like "error rate" on an INFO line must
+    // never misclassify it. Bounded + alloc-free for the hot path.
+    constexpr std::size_t kHeadScan{24};
+    const auto is_alpha{[](char chr) noexcept
+                        {
+                            return ((static_cast<unsigned>(static_cast<unsigned char>(chr)) |
+                                     0x20U) -
+                                    'a') < 26U;
+                        }};
+    const std::size_t limit{line.size() < kHeadScan ? line.size() : kHeadScan};
+    std::size_t begin{0};
+    while (begin < limit && !is_alpha(line[begin]))
+        ++begin;
+    std::size_t end{begin};
+    while (end < line.size() && is_alpha(line[end]))
+        ++end;
+    if (end == begin)
+        return LogLevel::Unknown;
+
+    const std::string_view token{line.substr(begin, end - begin)};
+    if (const LogLevel level{parse_log_level(token)}; level != LogLevel::Unknown)
+        return level;
+    // CI / test / crash vocabulary outside parse_log_level's strict level family
+    // but unambiguously error-class as a LEADING token.
+    if (iequals(token, "fail") || iequals(token, "failed") || iequals(token, "failure") ||
+        iequals(token, "panic") || iequals(token, "exception") || iequals(token, "traceback") ||
+        iequals(token, "unhandled"))
+        return LogLevel::Error;
+    return LogLevel::Unknown;
+}
+
 // Parse Nginx error-log timestamp: "YYYY/MM/DD HH:MM:SS"
 // Minimum length: 19 characters.
 std::optional<Timestamp> parse_nginx_error_ts(std::string_view timestamp_str) noexcept

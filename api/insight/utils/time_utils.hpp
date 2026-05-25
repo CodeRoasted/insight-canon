@@ -53,6 +53,13 @@ parse_log4j_timestamp(std::string_view timestamp_str) noexcept;
 // Recognises: trace, debug, info, warn/warning, error/err, fatal/critical/crit.
 [[nodiscard]] LogLevel parse_log_level(std::string_view level_str) noexcept;
 
+// Infer a log level from the HEAD of an unstructured line (the leading token
+// only), for the raw-text fallback where no structured field carries one.
+// Markers like "ERROR", "##[error]", "[WARN]", "FAILED" sit at the start of
+// real logs; a benign mid-line word ("error rate" on an INFO line) must not
+// misclassify it. Bounded + alloc-free — safe on the tokenizer hot path.
+[[nodiscard]] LogLevel infer_leading_log_level(std::string_view line) noexcept;
+
 // Parse Nginx error-log timestamp (same format as Apache error logs).
 [[nodiscard]] std::optional<Timestamp>
 parse_nginx_error_ts(std::string_view timestamp_str) noexcept;

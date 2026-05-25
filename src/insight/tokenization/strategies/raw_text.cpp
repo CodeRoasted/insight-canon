@@ -15,6 +15,7 @@
 #include "insight/core/types.hpp"
 #include "insight/tokenization/arena_allocator.hpp"
 #include "insight/tokenization/parsed_line.hpp"
+#include "insight/utils/time_utils.hpp"
 
 namespace insight::tokenization
 {
@@ -31,10 +32,13 @@ std::expected<ParsedLine, std::string> RawTextStrategy::parse(std::string_view l
     ParsedLine parsed;
     parsed.raw_line = line;
     parsed.timestamp = std::nullopt;
-    parsed.level = LogLevel::Unknown;
     parsed.component = {};
     // Subview of the arena-stable input: no store_string(), no allocation.
     parsed.content = line.substr(start);
+    // Even unstructured lines usually lead with a level / marker (ERROR, WARN,
+    // FAILED, ##[error]); recover it so the dominant-level signal survives into
+    // MetaLog for downstream severity-aware ranking (Sift) and detection (Eidos).
+    parsed.level = utils::infer_leading_log_level(parsed.content);
     return parsed;
 }
 
