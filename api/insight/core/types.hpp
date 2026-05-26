@@ -77,6 +77,10 @@ enum class LogFormat : uint8_t
     IISW3C,
     RFC5424,
     NginxError,
+    // Catch-all for unstructured text (CI / pytest / build logs). Selected only
+    // when no structured strategy matches a non-empty line, so the tokenizer
+    // never silently drops a line. Keep immediately before Unknown.
+    RawText,
     Unknown
 };
 
@@ -122,6 +126,8 @@ enum class LogFormat : uint8_t
         return "RFC5424"sv;
     case LogFormat::NginxError:
         return "NginxError"sv;
+    case LogFormat::RawText:
+        return "RawText"sv;
     default:
         return "Unknown"sv;
     }

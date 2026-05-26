@@ -57,6 +57,27 @@ namespace
         return !detail::is_space(chr) && chr != ',' && chr != ';';
     }
 
+    // True iff `line` opens (after leading whitespace) with a `key=value` token.
+    // Genuine logfmt lines lead with a pair (`ts=`, `level=`, `key=`); a lone
+    // trailing pair inside otherwise free text (e.g. "INFO checkout completed
+    // order=42") does NOT — and must NOT be claimed by KV, which keeps only the
+    // pairs as content and would drop the human-readable message, fragmenting
+    // the template per value. Such lines belong to the raw-text fallback, which
+    // preserves the full line and infers the leading level.
+    [[nodiscard]] constexpr bool leads_with_kv_pair(std::string_view line) noexcept
+    {
+        std::size_t pos{0};
+        const std::size_t len{line.size()};
+        while (pos < len && detail::is_space(line[pos]))
+            ++pos;
+        if (pos >= len || !is_kv_key_start(line[pos]))
+            return false;
+        while (pos < len && is_kv_key_char(line[pos]))
+            ++pos;
+        return pos + 1U < len && line[pos] == '=' && is_bare_value_char(line[pos + 1U]) &&
+               line[pos + 1U] != '=';
+    }
+
 } // namespace
 
 // Mapping well-known keys to structured fields is inherently branch-heavy.
@@ -157,6 +178,11 @@ LogFormat KVStrategy::format() const noexcept
 
 double KVStrategy::confidence(std::string_view line) const noexcept
 {
+    // A line that does not OPEN with a key=value pair is free text with at most
+    // an embedded assignment — not logfmt. Defer to the raw-text fallback so the
+    // message and leading level survive.
+    if (!leads_with_kv_pair(line))
+        return kNoConfidence;
     const std::size_t count{detail::count_kv_pair_signatures(line, kHighConfidencePairCount)};
     if (count >= kHighConfidencePairCount)
         return kHighConfidence;

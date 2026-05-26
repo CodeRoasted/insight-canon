@@ -32,6 +32,7 @@
 #include "insight/tokenization/strategies/log4j.hpp"
 #include "insight/tokenization/strategies/nginx_error.hpp"
 #include "insight/tokenization/strategies/proxifier.hpp"
+#include "insight/tokenization/strategies/raw_text.hpp"
 #include "insight/tokenization/strategies/rfc5424.hpp"
 #include "insight/tokenization/strategies/spark_hdfs.hpp"
 #include "insight/tokenization/strategies/syslog.hpp"
@@ -267,7 +268,9 @@ FormatDetector::FormatDetector()
     add_builtin(std::make_unique<IISW3CStrategy>());
     add_builtin(std::make_unique<RFC5424Strategy>());
     add_builtin(std::make_unique<SystemdJournalStrategy>());
-    INSIGHT_LOG_INFO(logging::detector_logger(), "format detector init: {} strategies registered",
+    fallback_ = std::make_unique<RawTextStrategy>();
+    INSIGHT_LOG_INFO(logging::detector_logger(),
+                     "format detector init: {} strategies registered (+ raw-text fallback)",
                      strategies_.size());
 }
 
@@ -331,9 +334,13 @@ IFormatStrategy* FormatDetector::detect(std::string_view line) const
     {
         INSIGHT_LOG_DEBUG(logging::detector_logger(), "detect: winner={} confidence={:.3f}",
                           to_string(best->format()), best_score);
+        return best;
     }
 
-    return (best_score > 0.0) ? best : nullptr;
+    // No structured strategy matched: template the line as raw text rather than
+    // dropping it (empty lines stay dropped). The fallback never enters the
+    // sticky fast-path because its confidence is a constant 0.0.
+    return trim_left(line).empty() ? nullptr : fallback_.get();
 }
 
 // Weighted-sum detection across a sample batch.
@@ -375,7 +382,13 @@ IFormatStrategy* FormatDetector::detect_from_batch(std::span<const std::string_v
 
     auto* const max_score_it{std::ranges::max_element(scores)};
     if (*max_score_it == 0.0)
-        return nullptr;
+    {
+        // No structured format dominates the sample — fall back to raw text so a
+        // batch of unstructured CI output is templated rather than dropped.
+        const bool any_content{std::ranges::any_of(sample, [](std::string_view line)
+                                                   { return !trim_left(line).empty(); })};
+        return any_content ? fallback_.get() : nullptr;
+    }
 
     const auto winning_index{static_cast<std::size_t>(std::distance(scores.begin(), max_score_it))};
     IFormatStrategy* winner = by_format_[winning_index]; // NOLINT

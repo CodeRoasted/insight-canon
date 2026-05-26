@@ -745,6 +745,53 @@ LogLevel parse_log_level(std::string_view level_str) noexcept
     }
 }
 
+LogLevel infer_leading_log_level(std::string_view line) noexcept
+{
+    // Two bounded, alloc-free stages for the raw-text fallback:
+    //  1) A LEADING explicit level token (INFO/ERROR/WARN/…) is authoritative —
+    //     so "INFO … error rate" stays Info and never misreads the mid-line word.
+    //  2) Otherwise, scan the line HEAD for an error/warning cue. This catches
+    //     pytest "E   …OperationalError", tracebacks, and bare "connection
+    //     refused" lines whose level word is not the first token.
+    constexpr std::size_t kTokenHead{24}; // a leading marker like "##[error]" sits here
+    constexpr std::size_t kKeywordHead{64};
+    const auto is_alpha{[](char chr) noexcept
+                        {
+                            return ((static_cast<unsigned>(static_cast<unsigned char>(chr)) |
+                                     0x20U) -
+                                    'a') < 26U;
+                        }};
+
+    // Stage 1 — leading level token.
+    const std::size_t token_limit{line.size() < kTokenHead ? line.size() : kTokenHead};
+    std::size_t begin{0};
+    while (begin < token_limit && !is_alpha(line[begin]))
+        ++begin;
+    std::size_t end{begin};
+    while (end < line.size() && is_alpha(line[end]))
+        ++end;
+    if (end > begin)
+        if (const LogLevel level{parse_log_level(line.substr(begin, end - begin))};
+            level != LogLevel::Unknown)
+            return level;
+
+    // Stage 2 — error/warning keyword in the head (rough ASCII-lowercase into a
+    // stack buffer; non-letters can't spuriously form a letter-only needle).
+    const std::size_t scan{line.size() < kKeywordHead ? line.size() : kKeywordHead};
+    std::array<char, kKeywordHead> lowered{};
+    for (std::size_t i{0}; i < scan; ++i)
+        lowered[i] = static_cast<char>(static_cast<unsigned char>(line[i]) | 0x20U);
+    const std::string_view head{lowered.data(), scan};
+    const auto has{[head](std::string_view needle) noexcept { return head.contains(needle); }};
+    if (has("error") || has("exception") || has("fatal") || has("panic") || has("refused") ||
+        has("timeout") || has("traceback") || has("fail") || has("segfault") || has("denied") ||
+        has("unhandled") || has("abort") || has("crash"))
+        return LogLevel::Error;
+    if (has("warn"))
+        return LogLevel::Warn;
+    return LogLevel::Unknown;
+}
+
 // Parse Nginx error-log timestamp: "YYYY/MM/DD HH:MM:SS"
 // Minimum length: 19 characters.
 std::optional<Timestamp> parse_nginx_error_ts(std::string_view timestamp_str) noexcept

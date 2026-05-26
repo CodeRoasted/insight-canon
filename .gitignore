@@ -27,6 +27,9 @@ compile_commands.json
 lint_output.txt
 .lint_cache
 
+# CTest run artifacts (TAG / LastTest logs)
+/Testing/
+
 # test_package — Conan regenerates these on every `conan create`
 test_package/build/
 test_package/conanbuild.sh

@@ -74,16 +74,19 @@ TEST_F(FormatDetectorTest, DetectsKV)
     EXPECT_EQ(s->format(), LogFormat::KeyValue);
 }
 
-TEST_F(FormatDetectorTest, ReturnsNullForGarbageLine)
+TEST_F(FormatDetectorTest, ReturnsRawTextForGarbageLine)
 {
+    // Non-empty unstructured text is templated as raw, never dropped.
     auto* s{detector.detect("???")};
-    EXPECT_EQ(s, nullptr);
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->format(), LogFormat::RawText);
 }
 
 TEST_F(FormatDetectorTest, ReturnsNullForEmptyLine)
 {
-    auto* s{detector.detect("")};
-    EXPECT_EQ(s, nullptr);
+    // Empty / whitespace-only lines stay dropped (the raw fallback skips them).
+    EXPECT_EQ(detector.detect(""), nullptr);
+    EXPECT_EQ(detector.detect("   "), nullptr);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

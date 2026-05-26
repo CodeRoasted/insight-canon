@@ -34,6 +34,10 @@ class FormatDetector
     std::vector<std::unique_ptr<IFormatStrategy>> strategies_;
     std::vector<IFormatStrategy*> custom_strategies_;
     std::array<IFormatStrategy*, kFormatSlotCount> by_format_{};
+
+    // Last-resort catch-all. Used only when no structured strategy scores on a
+    // non-empty line, so unstructured text is templated rather than dropped.
+    std::unique_ptr<IFormatStrategy> fallback_;
 };
 
 } // namespace insight::tokenization
