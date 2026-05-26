@@ -15,6 +15,8 @@
 //   - reset() teardown
 //   - Edge cases: empty content, max_clusters cap
 
+#include <string>
+
 #include <gtest/gtest.h>
 
 #include "insight/tokenization/arena_allocator.hpp"
@@ -139,6 +141,41 @@ TEST(Drain_Template, MultipleWildcardsYieldMultipleParams)
     static_cast<void>(do_match(drain, "User alice connected from 192.168.0.1"));
     auto r{do_match(drain, "User bob connected from 10.0.0.5")};
     EXPECT_EQ(r.params.size(), 2u);
+}
+
+// Distinct families must NOT over-merge into one all-wildcard mega-template.
+// A cluster that accumulated wildcards must not absorb a line sharing none of
+// its fixed skeleton: stable "request" traffic and surging "retrying" lines
+// (same length + lead token, different skeleton) stay separate clusters, each
+// keeping its identifying fixed token. Regression for the runaway-
+// generalisation bug that collapsed both into "INFO <*> <*> <*> <*> <*>" and
+// buried the real signal.
+TEST(Drain_Template, DistinctFamiliesDoNotOverMerge)
+{
+    Drain drain{DrainConfig{}}; // pipeline default (sim 0.40)
+    const char* const routes[]{"GET /api/orders",       "GET /api/products", "GET /api/cart",
+                               "GET /api/user/profile", "GET /api/search",   "GET /healthz",
+                               "POST /api/login"};
+    for (int i{0}; i < 80; ++i)
+        static_cast<void>(do_match(drain, std::string{"INFO request "} + routes[i % 7] + " 200 " +
+                                              std::to_string(i) + "ms"));
+    for (int i{0}; i < 27; ++i)
+        static_cast<void>(do_match(drain, std::string{"INFO retrying payment gateway (attempt "} +
+                                              std::to_string(1 + i % 5) + ")"));
+
+    bool has_request{false};
+    bool has_retry{false};
+    std::string rendered;
+    for (std::uint32_t id{1}; id <= 16; ++id)
+        if (const auto tmpl{drain.get_template(id)})
+        {
+            rendered += "\n  [" + std::to_string(id) + "] " + *tmpl;
+            has_request |= tmpl->find("request") != std::string::npos;
+            has_retry |= tmpl->find("retrying") != std::string::npos;
+        }
+    EXPECT_GE(drain.cluster_count(), 2u) << "families collapsed into one cluster:" << rendered;
+    EXPECT_TRUE(has_request) << "request skeleton lost to over-generalisation:" << rendered;
+    EXPECT_TRUE(has_retry) << "retry family absorbed into another cluster:" << rendered;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -21,9 +21,10 @@
 //    Average bucket size is small (1–4 in real workloads); we walk it
 //    linearly with int-only compares.
 //
-//  - **Similarity** between line-ids and cluster-ids is two ops on `uint32_t`
-//    arrays plus a `std::popcount(wildcards)`. Auto-vectorises into AVX2
-//    for clusters whose token count fits in registers.
+//  - **Similarity** between line-ids and cluster-ids is a u32-equality reduce.
+//    Only genuine token equality scores (a real token on a template `<*>` does
+//    not), which bounds generalisation. Auto-vectorises into AVX2 for clusters
+//    whose token count fits in registers.
 //
 //  - **No per-line heap allocation** on the fast path: tokenisation writes
 //    into a reusable `std::vector<TokenID>`; cluster creation amortises into
@@ -35,7 +36,6 @@
 #include "insight/tokenization/drain.hpp"
 
 #include <algorithm>
-#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -329,28 +329,29 @@ namespace
         }
     }
 
-    // Count positions where line[i] == cluster[i]; wildcards counted via popcount.
+    // Count positions where the line token EQUALS the template token. A template
+    // wildcard (kWildcardId) credits a match ONLY when the line token is itself
+    // variable there (also kWildcardId — a masked number/IP) — i.e. the equality
+    // 0==0 holds. A real token landing on a `<*>` does NOT count.
+    //
+    // Crediting every wildcard unconditionally (the old `+= popcount`) let a
+    // cluster that had accumulated a few wildcards match almost anything: with
+    // K wildcards it scored K "free" hits, so a line sharing none of the FIXED
+    // skeleton still cleared the threshold and got absorbed — runaway
+    // generalisation that collapses unrelated families into one all-wildcard
+    // mega-template ("INFO <*> <*> <*> <*> <*>"). Scoring only genuine token
+    // equality forces a join to match the cluster's stable skeleton, keeping
+    // distinct families (e.g. request vs retry lines) distinct.
     [[nodiscard]] inline std::size_t similarity_matches(std::span<const TokenID> line_ids,
-                                                        std::span<const TokenID> cluster_ids,
-                                                        std::uint64_t wildcards) noexcept
+                                                        std::span<const TokenID> cluster_ids) noexcept
     {
         const std::size_t len{line_ids.size()};
         std::size_t matches{0};
-        if (len <= kBitsetCapacity) [[likely]]
-        {
-            // Auto-vectorisable: u32-equality reduce.
-            for (std::size_t i{0}; i < len; ++i)
-                matches += static_cast<std::size_t>(line_ids[i] == cluster_ids[i]);
-            // Wildcards stored as kWildcardId never equal any user id, so
-            // their match credit comes from the bitset alone.
-            matches += static_cast<std::size_t>(std::popcount(wildcards));
-        }
-        else
-        {
-            for (std::size_t i{0}; i < len; ++i)
-                matches += static_cast<std::size_t>(line_ids[i] == cluster_ids[i] ||
-                                                    cluster_ids[i] == kWildcardId);
-        }
+        // Auto-vectorisable: u32-equality reduce. Both-wildcard positions
+        // (line and template each kWildcardId) match via 0==0; a real token on
+        // a template wildcard does not, which is what bounds generalisation.
+        for (std::size_t i{0}; i < len; ++i)
+            matches += static_cast<std::size_t>(line_ids[i] == cluster_ids[i]);
         return matches;
     }
 
@@ -471,7 +472,7 @@ struct Drain::Impl
             const auto cand_span{
                 std::span<const TokenID>(template_token_ids).subspan(cand.token_offset, length)};
             const std::size_t match_count{
-                similarity_matches(std::span<const TokenID>(line_ids), cand_span, cand.wildcards)};
+                similarity_matches(std::span<const TokenID>(line_ids), cand_span)};
             if (match_count > best_matches)
             {
                 best_matches = match_count;
