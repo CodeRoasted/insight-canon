@@ -520,6 +520,27 @@ TEST_F(KVStrategyTest, ConfidenceOnePairIsLow)
     EXPECT_LT(c, 0.5);
 }
 
+// Free text with a lone TRAILING pair is not logfmt: KV must decline it (0
+// confidence) so the raw-text fallback keeps the whole message and infers the
+// leading level. Otherwise KV keeps only "order=42" / "host=db" as content,
+// dropping the human-readable text and fragmenting the template per value —
+// which buried the vanished-success signal in Sift's silent-regression demo.
+TEST_F(KVStrategyTest, ConfidenceZeroForFreeTextWithTrailingPair)
+{
+    EXPECT_EQ(strategy.confidence("INFO checkout completed order=42"), 0.0);
+    EXPECT_EQ(strategy.confidence("ERROR connection refused host=db"), 0.0);
+    EXPECT_EQ(strategy.confidence("retrying payment gateway attempt=3"), 0.0);
+}
+
+// The flip side: a genuine logfmt line OPENS with a pair (here `ts=`) and must
+// still be claimed by KV at high confidence — the gate keys on the lead token,
+// not on the mere presence of free-text-looking values.
+TEST_F(KVStrategyTest, ConfidenceHighWhenLeadingPairPresent)
+{
+    EXPECT_GT(strategy.confidence(kKVLine), 0.5);
+    EXPECT_GT(strategy.confidence("level=INFO checkout completed order=42"), 0.0);
+}
+
 TEST_F(KVStrategyTest, QuotedValuePreservesInternalSpaces)
 {
     auto result{strategy.parse(R"(level=ERROR msg="failed to connect to host port 443")", arena)};
