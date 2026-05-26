@@ -342,8 +342,9 @@ namespace
     // mega-template ("INFO <*> <*> <*> <*> <*>"). Scoring only genuine token
     // equality forces a join to match the cluster's stable skeleton, keeping
     // distinct families (e.g. request vs retry lines) distinct.
-    [[nodiscard]] inline std::size_t similarity_matches(std::span<const TokenID> line_ids,
-                                                        std::span<const TokenID> cluster_ids) noexcept
+    [[nodiscard]] inline std::size_t
+    similarity_matches(std::span<const TokenID> line_ids,
+                       std::span<const TokenID> cluster_ids) noexcept
     {
         const std::size_t len{line_ids.size()};
         std::size_t matches{0};
