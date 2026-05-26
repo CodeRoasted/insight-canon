@@ -278,9 +278,9 @@ TEST(InferLeadingLogLevel, EmptyIsUnknown)
 TEST(InferLeadingLogLevel, PytestErrorBodyInferredFromHead)
 {
     // pytest leads failure detail with "E   "; the error word is mid-line.
-    EXPECT_EQ(infer_leading_log_level(
-                  "E   sqlalchemy.exc.OperationalError: connection to server failed"),
-              LogLevel::Error);
+    EXPECT_EQ(
+        infer_leading_log_level("E   sqlalchemy.exc.OperationalError: connection to server failed"),
+        LogLevel::Error);
 }
 TEST(InferLeadingLogLevel, BareErrorBodyWithoutLevelPrefix)
 {

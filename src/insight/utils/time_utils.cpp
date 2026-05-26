@@ -755,12 +755,9 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
     //     refused" lines whose level word is not the first token.
     constexpr std::size_t kTokenHead{24}; // a leading marker like "##[error]" sits here
     constexpr std::size_t kKeywordHead{64};
-    const auto is_alpha{[](char chr) noexcept
-                        {
-                            return ((static_cast<unsigned>(static_cast<unsigned char>(chr)) |
-                                     0x20U) -
-                                    'a') < 26U;
-                        }};
+    const auto is_alpha{
+        [](char chr) noexcept
+        { return ((static_cast<unsigned>(static_cast<unsigned char>(chr)) | 0x20U) - 'a') < 26U; }};
 
     // Stage 1 — leading level token.
     const std::size_t token_limit{line.size() < kTokenHead ? line.size() : kTokenHead};
