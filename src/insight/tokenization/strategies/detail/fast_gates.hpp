@@ -55,6 +55,16 @@ constexpr std::size_t kBsdMinLen{15U};
 constexpr std::size_t kRfc3339TAt{10U};    // position of 'T' separator
 constexpr std::size_t kRfc3339TimeAt{11U}; // time field start
 
+// ── GitHub Actions "YYYY-MM-DDTHH:MM:SS.fffffffZ" ───────────────────────
+// RFC 3339 + .NET 100-ns ticks: exactly 7 fractional digits then 'Z'. This
+// precise sub-second shape is GHA's signature and distinguishes it from
+// syslog's whole-second / millisecond RFC 3339.
+constexpr std::size_t kGhaDotAt{19U};     // '.' immediately after HH:MM:SS
+constexpr std::size_t kGhaFracAt{20U};    // first of the 7 fractional digits
+constexpr std::size_t kGhaFracLen{7U};    // exactly 7 digits (100-ns ticks)
+constexpr std::size_t kGhaZAt{27U};       // trailing 'Z'
+constexpr std::size_t kGhaPrefixLen{28U}; // full "...Z" timestamp length
+
 // ── Nginx error "YYYY/MM/DD HH:MM:SS [" ─────────────────────────────────
 constexpr std::size_t kNginxMinLen{22U};
 constexpr std::size_t kNginxMon1{5U};
@@ -232,6 +242,27 @@ constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
 {
     return match_iso_date_at(str, 0) && str.size() > kRfc3339TAt && str[kRfc3339TAt] == 'T' &&
            match_time_at(str, kRfc3339TimeAt);
+}
+
+// "YYYY-MM-DDTHH:MM:SS.fffffffZ" — GitHub Actions / Azure Pipelines line prefix.
+// A *strict subset* of is_rfc3339_prefix (exactly 7 fractional digits + 'Z'),
+// so GitHubActionsStrategy can outrank SyslogStrategy only on genuine GHA lines
+// while leaving real RFC 3339 syslog to Syslog.
+[[nodiscard]] constexpr bool is_github_actions_prefix(std::string_view str) noexcept
+{
+    if (str.size() < kGhaPrefixLen)
+        return false;
+    if (!is_rfc3339_prefix(str))
+        return false;
+    if (str[kGhaDotAt] != '.')
+        return false;
+    for (std::size_t pos{kGhaFracAt}; pos < kGhaFracAt + kGhaFracLen; ++pos)
+        if (!is_digit(str[pos]))
+            return false;
+    if (str[kGhaZAt] != 'Z')
+        return false;
+    // Timestamp is the whole line (a blank GHA line) or is followed by a space.
+    return str.size() == kGhaPrefixLen || is_space(str[kGhaPrefixLen]);
 }
 
 // "YYYY-MM-DD HH:MM:SS" — log4j / windows_cbs / iis_w3c shape.

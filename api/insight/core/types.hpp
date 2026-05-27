@@ -77,6 +77,12 @@ enum class LogFormat : uint8_t
     IISW3C,
     RFC5424,
     NginxError,
+    // GitHub Actions / Azure Pipelines logs: every line prefixed with an
+    // RFC3339 UTC timestamp at 100-ns (7-fraction-digit) precision + 'Z', then
+    // the raw message (which may carry ##[group]/##[error]/##[warning] workflow
+    // commands). A first-class CI input — without it these lines are mis-claimed
+    // by Syslog (RFC3339 prefix) and shredded into empty templates.
+    GitHubActions,
     // Catch-all for unstructured text (CI / pytest / build logs). Selected only
     // when no structured strategy matches a non-empty line, so the tokenizer
     // never silently drops a line. Keep immediately before Unknown.
@@ -126,6 +132,8 @@ enum class LogFormat : uint8_t
         return "RFC5424"sv;
     case LogFormat::NginxError:
         return "NginxError"sv;
+    case LogFormat::GitHubActions:
+        return "GitHubActions"sv;
     case LogFormat::RawText:
         return "RawText"sv;
     default:

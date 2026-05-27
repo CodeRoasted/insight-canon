@@ -29,9 +29,9 @@ class FormatDetectorTest : public ::testing::Test
 // Strategy registration
 // ─────────────────────────────────────────────────────────────────────────────
 
-TEST_F(FormatDetectorTest, HasEighteenBuiltInStrategies)
+TEST_F(FormatDetectorTest, HasNineteenBuiltInStrategies)
 {
-    EXPECT_EQ(detector.strategies().size(), 18u);
+    EXPECT_EQ(detector.strategies().size(), 19u);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -54,6 +54,24 @@ TEST_F(FormatDetectorTest, DetectsBSDSyslog)
 
 TEST_F(FormatDetectorTest, DetectsRFC3339Syslog)
 {
+    auto* s{detector.detect("2024-01-15T10:30:00Z myhost app[42]: User logged in")};
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->format(), LogFormat::Syslog);
+}
+
+TEST_F(FormatDetectorTest, DetectsGitHubActions)
+{
+    // GHA stamps an RFC3339 + 7-digit-fractional 'Z' prefix on every line. It
+    // must win over Syslog (which shares the bare RFC3339 prefix) on this shape.
+    auto* s{detector.detect(
+        "2026-05-27T15:26:41.7842152Z   CODEROAST_IPC_REPO: CodeRoasted/coderoast-ipc")};
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->format(), LogFormat::GitHubActions);
+}
+
+TEST_F(FormatDetectorTest, GitHubActionsDoesNotStealRFC3339Syslog)
+{
+    // Whole-second RFC3339 (no 7-digit fraction) is real syslog, not GHA.
     auto* s{detector.detect("2024-01-15T10:30:00Z myhost app[42]: User logged in")};
     ASSERT_NE(s, nullptr);
     EXPECT_EQ(s->format(), LogFormat::Syslog);

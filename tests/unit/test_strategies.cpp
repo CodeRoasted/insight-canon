@@ -19,6 +19,7 @@
 #include "insight/tokenization/strategies/bgl.hpp"
 #include "insight/tokenization/strategies/clf.hpp"
 #include "insight/tokenization/strategies/cloudwatch.hpp"
+#include "insight/tokenization/strategies/github_actions.hpp"
 #include "insight/tokenization/strategies/health_app.hpp"
 #include "insight/tokenization/strategies/hpc.hpp"
 #include "insight/tokenization/strategies/iis_w3c.hpp"
@@ -148,6 +149,92 @@ TEST_F(SyslogStrategyTest, RawLinePreserved)
     auto result{strategy.parse(kBSDLine, arena)};
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().raw_line, kBSDLine);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GitHubActionsStrategy
+// ─────────────────────────────────────────────────────────────────────────────
+
+static constexpr std::string_view kGHALine{
+    "2026-05-27T15:26:41.7842152Z   CODEROAST_IPC_REPO: CodeRoasted/coderoast-ipc"};
+
+static constexpr std::string_view kGHAError{
+    "2026-05-27T15:26:41.7842152Z ##[error]connection refused to db host 10.0.0.5"};
+
+// GHA stamps a timestamp on blank output lines too — with and without a
+// trailing separator space. Both are blank lines and must be declined.
+static constexpr std::string_view kGHABlankWithSpace{"2026-05-27T15:26:41.7842152Z "};
+static constexpr std::string_view kGHABlankNoSpace{"2026-05-27T15:26:41.7842152Z"};
+
+class GitHubActionsStrategyTest : public ::testing::Test
+{
+  protected:
+    GitHubActionsStrategy strategy;
+    ArenaAllocator arena{4096};
+};
+
+TEST_F(GitHubActionsStrategyTest, FormatReturnsGitHubActions)
+{
+    EXPECT_EQ(strategy.format(), LogFormat::GitHubActions);
+}
+
+TEST_F(GitHubActionsStrategyTest, StripsTimestampAndTemplatesRealContent)
+{
+    auto result{strategy.parse(kGHALine, arena)};
+    ASSERT_TRUE(result.has_value());
+    const auto& pl{result.value()};
+    EXPECT_TRUE(pl.timestamp.has_value());
+    // The whole message survives (no token eaten as a fake hostname), leading
+    // GHA indentation stripped.
+    EXPECT_EQ(pl.content, "CODEROAST_IPC_REPO: CodeRoasted/coderoast-ipc");
+}
+
+TEST_F(GitHubActionsStrategyTest, LiftsErrorLevelFromWorkflowCommand)
+{
+    auto result{strategy.parse(kGHAError, arena)};
+    ASSERT_TRUE(result.has_value());
+    const auto& pl{result.value()};
+    EXPECT_EQ(pl.level, LogLevel::Error);
+    // The marker stays in the templated content (it is part of the line shape).
+    EXPECT_TRUE(pl.content.starts_with("##[error]"));
+}
+
+TEST_F(GitHubActionsStrategyTest, DeclinesTimestampOnlyBlankLines)
+{
+    // A timestamp with no message is a blank line: decline so it is dropped,
+    // never collapsing into an empty "" template (the bug this strategy fixes).
+    EXPECT_FALSE(strategy.parse(kGHABlankWithSpace, arena).has_value());
+    EXPECT_FALSE(strategy.parse(kGHABlankNoSpace, arena).has_value());
+}
+
+TEST_F(GitHubActionsStrategyTest, ConfidenceHighForGHAShape)
+{
+    EXPECT_GT(strategy.confidence(kGHALine), 0.85);
+}
+
+TEST_F(GitHubActionsStrategyTest, ConfidenceZeroForWholeSecondRFC3339)
+{
+    // Real RFC3339 syslog (no 7-digit fraction) is NOT GHA.
+    EXPECT_EQ(strategy.confidence(kRFC3339Line), 0.0);
+}
+
+TEST_F(GitHubActionsStrategyTest, ConfidenceZeroForJSON)
+{
+    EXPECT_EQ(strategy.confidence(kJSONLine), 0.0);
+}
+
+TEST_F(GitHubActionsStrategyTest, OutranksSyslogOnGHALines)
+{
+    // The crux of the fix: GHA must beat Syslog's RFC3339 claim on its own lines.
+    const SyslogStrategy syslog;
+    EXPECT_GT(strategy.confidence(kGHALine), syslog.confidence(kGHALine));
+}
+
+TEST_F(GitHubActionsStrategyTest, RawLinePreserved)
+{
+    auto result{strategy.parse(kGHALine, arena)};
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result.value().raw_line, kGHALine);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
