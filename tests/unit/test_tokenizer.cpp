@@ -365,7 +365,7 @@ TEST_F(TokenizerTest, HighVolumeTemplateStabilisesParams)
 TEST_F(TokenizerTest, NonLatinUnicodeEndToEnd)
 {
     // Arabic, Cyrillic and CJK codepoints are valid UTF-8 and must pass through
-    // nlohmann::json and Drain without corruption or crash.
+    // simdjson and Drain without corruption or crash.
     // \u062a\u0633\u062c\u064a\u0644  = Arabic "tasjiil" (registration)
     // \u0432\u0445\u043e\u0434        = Cyrillic "vkhod" (login)
     // \u767b\u5f55                    = CJK "denglu" (login)
@@ -387,7 +387,7 @@ TEST_F(TokenizerTest, NonLatinUnicodeEndToEnd)
 TEST_F(TokenizerTest, EmojiContentEndToEnd)
 {
     // Emoji codepoints (encoded as JSON \uXXXX surrogate pairs or direct
-    // UTF-8) must survive nlohmann::json → Drain without crashing.
+    // UTF-8) must survive simdjson → Drain without crashing.
     // \ud83d\ude80 = U+1F680 ROCKET (surrogate pair)
     // \u2705      = U+2705  WHITE HEAVY CHECK MARK
     auto r1{tokenizer.process_line(

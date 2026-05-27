@@ -51,7 +51,6 @@ class InsightCanonConan(ConanFile):
     def build_requirements(self):
         self.test_requires("gtest/1.17.0")
         self.test_requires("benchmark/1.9.5")
-        self.test_requires("nlohmann_json/3.12.0")
 
     def generate(self):
         tc = CMakeToolchain(self)

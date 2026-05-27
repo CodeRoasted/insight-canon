@@ -111,14 +111,12 @@ if(INSIGHT_CANON_BUILD_TESTS)
 
     if(TEST_SOURCES)
         include(CTest)
-        find_package(GTest         REQUIRED CONFIG)
-        find_package(nlohmann_json REQUIRED CONFIG)
+        find_package(GTest REQUIRED CONFIG)
         enable_testing()
 
         add_executable(insight_canon_tests ${TEST_SOURCES})
         target_link_libraries(insight_canon_tests PRIVATE
             insight_canon
-            nlohmann_json::nlohmann_json
             GTest::gtest
             GTest::gtest_main
         )
