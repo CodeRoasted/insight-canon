@@ -2,9 +2,12 @@ from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain
 
 
+required_conan_version = ">=2.28"
+
+
 class InsightCanonConan(ConanFile):
     name = "insight_canon"
-    version = "1.3.7"
+    version = "1.3.8"
     package_type = "library"
     license = "Apache-2.0"
     url = "https://github.com/CodeRoasted/insight-canon"
@@ -41,14 +44,13 @@ class InsightCanonConan(ConanFile):
 
     def requirements(self):
         # spdlog/fmt are actual libraries that appear in public API headers
-        self.requires("spdlog/1.13.0", transitive_headers=True, transitive_libs=True)
-        self.requires("fmt/10.2.1",    transitive_headers=True, transitive_libs=True)
-        self.requires("simdjson/3.13.0")
+        self.requires("spdlog/1.17.0", transitive_headers=True, transitive_libs=True)
+        self.requires("fmt/12.1.0",    transitive_headers=True, transitive_libs=True)
+        self.requires("simdjson/4.6.3")
 
     def build_requirements(self):
         self.test_requires("gtest/1.17.0")
-        self.test_requires("benchmark/1.8.3")
-        self.test_requires("nlohmann_json/3.11.3")
+        self.test_requires("benchmark/1.9.5")
 
     def generate(self):
         tc = CMakeToolchain(self)

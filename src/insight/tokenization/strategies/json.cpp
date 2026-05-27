@@ -105,8 +105,8 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     else
     {
         // Fallback: arena-store the original line. We avoid re-serialising the
-        // document (which would be a heap allocation in nlohmann); the raw
-        // bytes are already stable when the caller is LogParser.
+        // document (which would force a heap allocation); the raw bytes are
+        // already stable when the caller is LogParser.
         parsed_line.content = arena.store_string(line);
     }
 

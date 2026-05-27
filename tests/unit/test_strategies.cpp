@@ -465,7 +465,7 @@ TEST_F(SyslogStrategyTest, ConfidenceZeroForKVLine)
 
 TEST_F(JsonStrategyTest, MalformedJSONReturnsError)
 {
-    // Truncated object — nlohmann::json parse-no-throw returns discarded.
+    // Truncated object — simdjson rejects the unterminated document.
     auto result{strategy.parse(R"({"level":"INFO","message":"not closed)", arena)};
     EXPECT_FALSE(result.has_value());
 }
@@ -481,7 +481,7 @@ TEST_F(JsonStrategyTest, EmptyObjectFallbackDump)
 TEST_F(JsonStrategyTest, UTF8ContentPreserved)
 {
     // UTF-8 text including a multibyte sequence and an emoji should pass through
-    // nlohmann::json and end up verbatim in the content field.
+    // simdjson and end up verbatim in the content field.
     auto result{strategy.parse(R"({"msg":"Connexion \u00e9tablie \ud83d\ude80"})", arena)};
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result.value().content.empty());
