@@ -586,4 +586,52 @@ TEST(Drain_Masking, LargeValueAfterKeywordMasked)
     EXPECT_NE(r2.template_str.find("<*>"), std::string::npos);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// F13 — VERSIONED_REF and BRACKET_INDEX composites. Package versions ("zlib/3")
+// and bracketed indices ("make[2]") otherwise template per value; normalize the
+// numeric part while keeping the name/word.
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST(Drain_Masking, VersionedRefVersionMaskedKeepsName)
+{
+    Drain drain{tight_config()};
+    const auto id1{do_match(drain, "zlib/3 resolved from cache").template_id};
+    auto r2{do_match(drain, "zlib/7 resolved from cache")};
+    EXPECT_EQ(id1, r2.template_id) << "version variants of one package share a template";
+    EXPECT_NE(r2.template_str.find("zlib/<*>"), std::string::npos)
+        << "name kept, version masked; got: " << r2.template_str;
+    // A different package name stays distinct.
+    const auto id3{do_match(drain, "boost/3 resolved from cache").template_id};
+    EXPECT_NE(id1, id3) << "different package names are different templates";
+}
+
+TEST(Drain_Masking, VersionedRefHandlesTrailingPunctAndDottedVersion)
+{
+    Drain drain{tight_config()};
+    const auto id1{do_match(drain, "boost/1.83.0: already installed").template_id};
+    auto r2{do_match(drain, "boost/1.84.0: already installed")};
+    EXPECT_EQ(id1, r2.template_id) << "dotted versions collapse; trailing ':' preserved";
+    EXPECT_NE(r2.template_str.find("boost/<*>:"), std::string::npos)
+        << "got: " << r2.template_str;
+}
+
+// A path with an alpha suffix after '/' is NOT a versioned ref — left literal.
+TEST(Drain_Masking, VersionedRefNotTriggeredForPaths)
+{
+    Drain drain{tight_config()};
+    auto r{do_match(drain, "loaded src/foo.cpp ok")};
+    EXPECT_NE(r.template_str.find("src/foo.cpp"), std::string::npos)
+        << "a path (alpha suffix) must stay literal; got: " << r.template_str;
+}
+
+TEST(Drain_Masking, BracketIndexMasked)
+{
+    Drain drain{tight_config()};
+    const auto id1{do_match(drain, "make[1]: Entering build").template_id};
+    auto r2{do_match(drain, "make[4]: Entering build")};
+    EXPECT_EQ(id1, r2.template_id) << "bracketed index variants share a template";
+    EXPECT_NE(r2.template_str.find("make[<*>]:"), std::string::npos)
+        << "index masked, word + brackets kept; got: " << r2.template_str;
+}
+
 // NOLINTEND

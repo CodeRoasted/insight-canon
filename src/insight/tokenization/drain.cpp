@@ -414,6 +414,70 @@ namespace
         return true;
     }
 
+    // F13 — VERSIONED_REF composite: `<name>/<numeric-version>[trailing punct]`.
+    // Conan/cmake/package output ("zlib/3", "boost/1.83.0:") keeps a literal token
+    // per (name,version), so a bumped version is a phantom new template. Normalize
+    // by KEEPing the name and masking the numeric version → `zlib/<*>`, `boost/<*>:`.
+    // Requires: a '/' whose suffix is a numeric (digits/dots) version run, then only
+    // punctuation to end (so paths like "src/foo.cpp" — alpha suffix — are NOT hit).
+    [[nodiscard]] inline bool normalize_versioned_ref(std::string_view tok, std::string& out)
+    {
+        const std::size_t slash{tok.rfind('/')};
+        if (slash == std::string_view::npos || slash + 1 >= tok.size())
+            return false;
+        if (!is_ascii_digit(tok[slash + 1]))
+            return false; // version must start with a digit
+
+        std::size_t cursor{slash + 1};
+        bool saw_digit{false};
+        while (cursor < tok.size() && (is_ascii_digit(tok[cursor]) || tok[cursor] == '.'))
+        {
+            saw_digit = saw_digit || is_ascii_digit(tok[cursor]);
+            ++cursor;
+        }
+        if (!saw_digit)
+            return false;
+        // Anything after the version run must be non-alphanumeric (punctuation),
+        // else this is a path segment ("v1/2x") not a terminal version.
+        for (std::size_t pos{cursor}; pos < tok.size(); ++pos)
+        {
+            const char chr{tok[pos]};
+            if (is_ascii_digit(chr) || (chr >= 'a' && chr <= 'z') || (chr >= 'A' && chr <= 'Z'))
+                return false;
+        }
+
+        out.clear();
+        out.append(tok.substr(0, slash + 1)); // "zlib/"
+        out.append("<*>");
+        out.append(tok.substr(cursor)); // trailing punctuation, e.g. ":"
+        return true;
+    }
+
+    // F13 — BRACKET_INDEX composite: `<word>[<digits>]<rest>`. Recursion depth and
+    // worker indices ("make[2]:", "thread[15]") otherwise template per index.
+    // Normalize the first bracketed digit run → `make[<*>]:`.
+    [[nodiscard]] inline bool normalize_bracket_index(std::string_view tok, std::string& out)
+    {
+        const std::size_t open{tok.find('[')};
+        if (open == std::string_view::npos || open + 1 >= tok.size())
+            return false;
+        std::size_t cursor{open + 1};
+        bool saw_digit{false};
+        while (cursor < tok.size() && is_ascii_digit(tok[cursor]))
+        {
+            saw_digit = true;
+            ++cursor;
+        }
+        if (!saw_digit || cursor >= tok.size() || tok[cursor] != ']')
+            return false;
+
+        out.clear();
+        out.append(tok.substr(0, open + 1)); // "make["
+        out.append("<*>");
+        out.append(tok.substr(cursor)); // "]:" and anything after
+        return true;
+    }
+
     template <typename Cb> inline void for_each_token(std::string_view content, Cb&& callback)
     {
         std::size_t cursor{0};
@@ -579,14 +643,17 @@ struct Drain::Impl
         if (tok.empty() || is_all_digits(tok))
             return kWildcardId;
 
-        // F13: normalize a SOURCE_LOCATION composite (path:line[:col]) before
-        // interning, so all (line,col) variants of one file share a template.
-        // Only matching tokens build the scratch; every other token uses its raw
-        // bytes and the unchanged fast path. The interned identity is the
-        // NORMALIZED form, so the raw variants are never cached individually — a
-        // matched composite re-normalizes per occurrence (a cheap bounded scan).
+        // F13: normalize a composite token (source location / versioned ref /
+        // bracket index) before interning, so noisy variants share a template.
+        // Recognizers are tried in order; the first match wins and writes the
+        // scratch. Only matching tokens build the scratch; every other token uses
+        // its raw bytes and the unchanged fast path. The interned identity is the
+        // NORMALIZED form, so raw variants are never cached individually — a matched
+        // composite re-normalizes per occurrence (a cheap bounded scan).
         std::string_view key{tok};
-        if (normalize_source_location(tok, composite_scratch))
+        if (normalize_source_location(tok, composite_scratch) ||
+            normalize_versioned_ref(tok, composite_scratch) ||
+            normalize_bracket_index(tok, composite_scratch))
             key = composite_scratch;
 
         // Hash lookup FIRST: steady-state hot path has zero RE2 calls.
