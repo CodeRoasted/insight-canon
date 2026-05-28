@@ -317,6 +317,40 @@ namespace
         return static_cast<unsigned>(chr) - '0' < kDecimalBase;
     }
 
+    // F2 — value-aware KEEP of low-cardinality status integers.
+    //
+    // A bare integer is masked to `<*>` (all-digit rule), which collapses
+    // `exit code 0` and `exit code 1` into one template — a green→red flip then
+    // vanishes at the template level. To keep such values DISTINCT we KEEP an
+    // integer literal when it immediately follows a status keyword AND is small
+    // (≤ kMaxStatusDigits). Size-gating bounds cardinality (exit codes ≤ 255,
+    // HTTP status ≤ 599 — both ≤ 3 digits); the keyword gate keeps bare counts
+    // ("port 8080", "took 200 ms") masked. The lexicon is a seed and will grow
+    // during calibration (Salience epic §10 value-aware masking heuristic).
+    constexpr std::size_t kMaxStatusDigits{3};
+
+    [[nodiscard]] inline bool equals_ascii_lower(std::string_view tok,
+                                                 std::string_view lower) noexcept
+    {
+        if (tok.size() != lower.size())
+            return false;
+        for (std::size_t pos{0}; pos < tok.size(); ++pos)
+        {
+            char chr{tok[pos]};
+            if (chr >= 'A' && chr <= 'Z')
+                chr = static_cast<char>(chr - 'A' + 'a');
+            if (chr != lower[pos])
+                return false;
+        }
+        return true;
+    }
+
+    [[nodiscard]] inline bool is_status_keyword(std::string_view tok) noexcept
+    {
+        return equals_ascii_lower(tok, "code") || equals_ascii_lower(tok, "status") ||
+               equals_ascii_lower(tok, "exit") || equals_ascii_lower(tok, "signal");
+    }
+
     // F13 — composite-token masking, SOURCE_LOCATION class.
     //
     // Drain masks only WHOLE tokens that are all-digit / IPv4 / hex. A compiler
@@ -460,6 +494,39 @@ struct Drain::Impl
     // in steady state; non-composite tokens never touch it.
     std::string composite_scratch;
 
+    // F2 — identity (KEEP) token ids. identity_id[id] is true for a status value
+    // kept distinct (exit code / status / signal). A difference at an identity
+    // position disqualifies a cluster (forces a new template) so a green→red flip
+    // does not get merged + re-wildcarded. `any_identity` gates the matcher check
+    // so logs without status values pay zero cost.
+    std::vector<std::uint8_t> identity_id;
+    bool any_identity{false};
+
+    void mark_identity(TokenID tok_id)
+    {
+        if (tok_id >= identity_id.size())
+            identity_id.resize(static_cast<std::size_t>(tok_id) + 1U, 0U);
+        identity_id[tok_id] = 1U;
+        any_identity = true;
+    }
+
+    [[nodiscard]] bool is_identity(TokenID tok_id) const noexcept
+    {
+        return tok_id < identity_id.size() && identity_id[tok_id] != 0U;
+    }
+
+    // True if line and candidate disagree at any IDENTITY position — i.e. a KEEP
+    // status value differs. Such a cluster is not the same template (F2).
+    [[nodiscard]] bool identity_mismatch(std::span<const TokenID> line,
+                                         std::span<const TokenID> cand) const noexcept
+    {
+        const std::size_t len{line.size()};
+        for (std::size_t pos{0}; pos < len; ++pos)
+            if (line[pos] != cand[pos] && (is_identity(line[pos]) || is_identity(cand[pos])))
+                return true;
+        return false;
+    }
+
     void reset_state()
     {
         arena = std::make_unique<ArenaAllocator>(kArenaDefaultBytes);
@@ -472,6 +539,8 @@ struct Drain::Impl
         next_id = 1;
         total_matched = 0;
         generation = 0;
+        identity_id.clear();
+        any_identity = false;
     }
 
     [[nodiscard]] bool is_masked(std::string_view tok) const noexcept
@@ -483,8 +552,30 @@ struct Drain::Impl
         return false;
     }
 
-    [[nodiscard]] TokenID intern_token(std::string_view tok)
+    // Lookup-or-insert a token as a LITERAL (never masked). Used by the F2
+    // status-value KEEP path, which must bypass the all-digit mask.
+    [[nodiscard]] TokenID intern_literal(std::string_view tok)
     {
+        const std::uint32_t hash_val{fnv1a32(tok)};
+        const TokenID existing{intern.lookup(tok, hash_val)};
+        if (existing != kInvalidId) [[likely]]
+            return existing;
+        return intern.insert(arena->store_string(tok), hash_val);
+    }
+
+    [[nodiscard]] TokenID intern_token(std::string_view tok, std::string_view prev)
+    {
+        // F2: KEEP a low-cardinality status value distinct (exit code / status /
+        // signal). Context- and size-gated, so bare numbers elsewhere still mask
+        // and cardinality stays bounded. This is what makes a green→red flip
+        // (exit 0→1) two templates instead of one collapsed `exit code <*>`.
+        if (is_all_digits(tok) && tok.size() <= kMaxStatusDigits && is_status_keyword(prev))
+        {
+            const TokenID kept{intern_literal(tok)};
+            mark_identity(kept);
+            return kept;
+        }
+
         if (tok.empty() || is_all_digits(tok))
             return kWildcardId;
 
@@ -519,11 +610,13 @@ struct Drain::Impl
     {
         line_ids.clear();
         line_raw_tokens.clear();
+        std::string_view prev{}; // raw previous token — context for F2 status KEEP
         for_each_token(content,
                        [&](std::string_view tok)
                        {
                            line_raw_tokens.push_back(tok);
-                           line_ids.push_back(intern_token(tok));
+                           line_ids.push_back(intern_token(tok, prev));
+                           prev = tok;
                        });
     }
 
@@ -554,6 +647,11 @@ struct Drain::Impl
             const Cluster& cand{clusters[cand_idx]};
             const auto cand_span{
                 std::span<const TokenID>(template_token_ids).subspan(cand.token_offset, length)};
+            // F2: a cluster whose KEEP/identity value differs is a different
+            // template — skip it so the line forms its own cluster. Gated by
+            // any_identity, so streams without status values are unaffected.
+            if (any_identity && identity_mismatch(std::span<const TokenID>(line_ids), cand_span))
+                continue;
             const std::size_t match_count{
                 similarity_matches(std::span<const TokenID>(line_ids), cand_span)};
             if (match_count > best_matches)

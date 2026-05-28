@@ -332,20 +332,22 @@ TEST_F(TokenizerTest, JSONWithKVContentClustersCorrectly)
 
 TEST_F(TokenizerTest, HighVolumeTemplateStabilisesParams)
 {
-    // Send 8 lines in the pattern "HTTP status NNN returned" with varying NNN.
-    // After several iterations the numeric position becomes <*> and a param is
-    // extracted.
+    // Send 8 lines in the pattern "fetched NNN rows returned" with varying NNN.
+    // The numeric position is a VARIABLE count (not a status value), so it masks
+    // to <*> and a param is extracted. (A status value behind code/status/exit/
+    // signal would instead be KEPT distinct — F2; see test_drain SourceLocation /
+    // StatusValue tests. "rows" is not a status keyword, so masking applies.)
     const std::vector<std::string_view> lines = {
-        R"({"msg":"HTTP status 200 returned"})", R"({"msg":"HTTP status 201 returned"})",
-        R"({"msg":"HTTP status 400 returned"})", R"({"msg":"HTTP status 404 returned"})",
-        R"({"msg":"HTTP status 500 returned"})", R"({"msg":"HTTP status 503 returned"})",
-        R"({"msg":"HTTP status 301 returned"})", R"({"msg":"HTTP status 204 returned"})",
+        R"({"msg":"fetched 200 rows returned"})", R"({"msg":"fetched 201 rows returned"})",
+        R"({"msg":"fetched 400 rows returned"})", R"({"msg":"fetched 404 rows returned"})",
+        R"({"msg":"fetched 500 rows returned"})", R"({"msg":"fetched 503 rows returned"})",
+        R"({"msg":"fetched 301 rows returned"})", R"({"msg":"fetched 204 rows returned"})",
     };
     auto results{tokenizer.process_batch(lines)};
     ASSERT_EQ(results.size(), 8u);
 
-    // After stabilisation the last few results should have a non-empty param
-    // for the status code position.
+    // After stabilisation the results should have a non-empty param for the
+    // variable-count position.
     bool any_param_found{false};
     for (auto& r : results)
     {
