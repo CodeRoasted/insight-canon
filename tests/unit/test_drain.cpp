@@ -481,4 +481,52 @@ TEST(Drain_Masking, EmptyMaskListPreservesLiteralTokens)
     EXPECT_NE(r2.template_str.find("<*>"), std::string::npos);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// F13 — SOURCE_LOCATION composite masking. A compiler location token
+// `file:line:col` is masked to `file:<*>:<*>` (path kept, line/col masked), so
+// every (line,col) variant of one file shares a template instead of exploding
+// into singletons (the dominant cardinality driver on real CI logs).
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST(Drain_Masking, SourceLocationLineColCollapseToOneTemplate)
+{
+    Drain drain{tight_config()};
+    const auto id1{do_match(drain, "main.cpp:10:5: warning unused variable").template_id};
+    auto r2{do_match(drain, "main.cpp:200:8: warning unused variable")};
+    EXPECT_EQ(id1, r2.template_id) << "line/col variants of one file must share a template";
+    EXPECT_NE(r2.template_str.find("main.cpp:<*>:<*>:"), std::string::npos)
+        << "path kept, line:col masked; got: " << r2.template_str;
+    EXPECT_EQ(drain.cluster_count(), 1u);
+}
+
+TEST(Drain_Masking, SourceLocationKeepsFileIdentityDistinct)
+{
+    Drain drain{tight_config()};
+    const auto id1{do_match(drain, "main.cpp:10:5: warning unused variable").template_id};
+    const auto id2{do_match(drain, "other.cpp:10:5: warning unused variable").template_id};
+    EXPECT_NE(id1, id2) << "different files are different templates (the path is semantic, kept)";
+    EXPECT_EQ(drain.cluster_count(), 2u);
+}
+
+TEST(Drain_Masking, SourceLocationSingleLineNumberMasked)
+{
+    Drain drain{tight_config()};
+    const auto id1{do_match(drain, "config.yaml:42: parse error here").template_id};
+    auto r2{do_match(drain, "config.yaml:99: parse error here")};
+    EXPECT_EQ(id1, r2.template_id);
+    EXPECT_NE(r2.template_str.find("config.yaml:<*>:"), std::string::npos)
+        << "single line number masked, path kept; got: " << r2.template_str;
+}
+
+// A path-like prefix is REQUIRED: a bare clock time has none, so it is left
+// literal rather than rewritten to "12:<*>:<*>". Guards against masking
+// non-source-location colon-digit tokens.
+TEST(Drain_Masking, ClockTimeNotTreatedAsSourceLocation)
+{
+    Drain drain{tight_config()};
+    auto r{do_match(drain, "job finished at 12:30:45 ok")};
+    EXPECT_NE(r.template_str.find("12:30:45"), std::string::npos)
+        << "clock time must stay literal; got: " << r.template_str;
+}
+
 // NOLINTEND

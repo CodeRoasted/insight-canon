@@ -312,6 +312,74 @@ namespace
                                    { return static_cast<unsigned>(chr) - '0' < kDecimalBase; });
     }
 
+    [[nodiscard]] constexpr bool is_ascii_digit(char chr) noexcept
+    {
+        return static_cast<unsigned>(chr) - '0' < kDecimalBase;
+    }
+
+    // F13 — composite-token masking, SOURCE_LOCATION class.
+    //
+    // Drain masks only WHOLE tokens that are all-digit / IPv4 / hex. A compiler
+    // source location like `tokenizer.cpp:4500:30:` is one whitespace token that
+    // is none of those, so it stays literal and every (file,line,col) becomes its
+    // own template — the dominant cardinality blow-up (≈2160 singletons on the
+    // multi-format mix; most of the 2373). See the Salience epic flaw F13.
+    //
+    // Recognize `<path>:<digits>[:<digits>]…[:]` where the prefix before the first
+    // `:<digits>` is path-like (contains '.' or '/'), and normalize by masking each
+    // numeric `:<digits>` run to `:<*>` while KEEPING the path (the semantic part:
+    // which file). So `tokenizer.cpp:4500:30:` and `tokenizer.cpp:12:5:` collapse
+    // to one template `tokenizer.cpp:<*>:<*>:`, but a different file stays distinct.
+    //
+    // Pure and deterministic (a function of the token bytes only — I5). Returns
+    // true and fills `out` with the normalized form; returns false (leaving `out`
+    // untouched) when `tok` is not a source location. The path-like requirement
+    // keeps clock times (`12:30:45`) and bare ratios out — only `:<digits>` runs
+    // behind a path prefix are masked.
+    [[nodiscard]] inline bool normalize_source_location(std::string_view tok, std::string& out)
+    {
+        // Locate the first ':' that is immediately followed by a digit.
+        std::size_t first{std::string_view::npos};
+        for (std::size_t pos{0}; pos + 1 < tok.size(); ++pos)
+        {
+            if (tok[pos] == ':' && is_ascii_digit(tok[pos + 1]))
+            {
+                first = pos;
+                break;
+            }
+        }
+        if (first == std::string_view::npos)
+            return false;
+
+        const std::string_view prefix{tok.substr(0, first)};
+        if (prefix.empty())
+            return false;
+        const bool path_like{
+            std::ranges::any_of(prefix, [](char chr) { return chr == '.' || chr == '/'; })};
+        if (!path_like)
+            return false;
+
+        out.clear();
+        out.append(prefix);
+        std::size_t cursor{first};
+        while (cursor < tok.size())
+        {
+            if (tok[cursor] == ':' && cursor + 1 < tok.size() && is_ascii_digit(tok[cursor + 1]))
+            {
+                out.append(":<*>");
+                ++cursor; // consume ':'
+                while (cursor < tok.size() && is_ascii_digit(tok[cursor]))
+                    ++cursor; // consume the digit run
+            }
+            else
+            {
+                out.push_back(tok[cursor]);
+                ++cursor;
+            }
+        }
+        return true;
+    }
+
     template <typename Cb> inline void for_each_token(std::string_view content, Cb&& callback)
     {
         std::size_t cursor{0};
@@ -387,6 +455,10 @@ struct Drain::Impl
     // Reusable per-line scratch.
     std::vector<TokenID> line_ids;
     std::vector<std::string_view> line_raw_tokens;
+    // Reusable scratch for composite-token normalization (F13). Capacity is
+    // retained across calls, so a matched composite costs no per-line heap alloc
+    // in steady state; non-composite tokens never touch it.
+    std::string composite_scratch;
 
     void reset_state()
     {
@@ -416,16 +488,26 @@ struct Drain::Impl
         if (tok.empty() || is_all_digits(tok))
             return kWildcardId;
 
+        // F13: normalize a SOURCE_LOCATION composite (path:line[:col]) before
+        // interning, so all (line,col) variants of one file share a template.
+        // Only matching tokens build the scratch; every other token uses its raw
+        // bytes and the unchanged fast path. The interned identity is the
+        // NORMALIZED form, so the raw variants are never cached individually — a
+        // matched composite re-normalizes per occurrence (a cheap bounded scan).
+        std::string_view key{tok};
+        if (normalize_source_location(tok, composite_scratch))
+            key = composite_scratch;
+
         // Hash lookup FIRST: steady-state hot path has zero RE2 calls.
         // kWildcardId (0) is a valid cached result for previously-masked tokens.
-        const std::uint32_t hash_val{fnv1a32(tok)};
-        const TokenID existing{intern.lookup(tok, hash_val)};
+        const std::uint32_t hash_val{fnv1a32(key)};
+        const TokenID existing{intern.lookup(key, hash_val)};
         if (existing != kInvalidId) [[likely]]
             return existing; // includes cached kWildcardId for masked tokens
 
         // Novel token: run masks once and cache result.
-        const std::string_view stable{arena->store_string(tok)};
-        if (is_masked(tok))
+        const std::string_view stable{arena->store_string(key)};
+        if (is_masked(key))
         {
             intern.insert_masked(stable, hash_val);
             return kWildcardId;
