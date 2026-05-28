@@ -141,6 +141,38 @@ enum class LogFormat : uint8_t
     }
 }
 
+// What a LINE does in the sequence (its structural role), as opposed to what a
+// token inside it MEANS (its SemanticClass). Two orthogonal ontologies, two
+// registries — keeping them separate is what avoids the value-vs-line-role
+// conflation (Salience epic flaw F12, §4.2). These roles are ANNOUNCED — the line
+// declares itself via a marker (`##[group]`, `##[error]`, a non-zero exit) — never
+// derived from graph position (that is a structural-layer output, not a role).
+// A seed catalog; designed to grow during calibration.
+enum class StructuralRole : uint8_t
+{
+    None = 0,    ///< no announced role (the common case)
+    GroupBegin,  ///< a section/group opens (`##[group]`)
+    GroupEnd,    ///< a section/group closes (`##[endgroup]`)
+    Terminator   ///< an outcome/failure marker (`##[error]`, error/fatal level, non-zero exit)
+};
+
+[[nodiscard]] constexpr std::string_view to_string(StructuralRole role) noexcept
+{
+    using namespace std::literals;
+
+    switch (role)
+    {
+    case StructuralRole::GroupBegin:
+        return "GroupBegin"sv;
+    case StructuralRole::GroupEnd:
+        return "GroupEnd"sv;
+    case StructuralRole::Terminator:
+        return "Terminator"sv;
+    default:
+        return "None"sv;
+    }
+}
+
 enum class ParseError : uint8_t
 {
     EmptyLine,
