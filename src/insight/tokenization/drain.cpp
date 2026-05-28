@@ -480,17 +480,22 @@ namespace
 
     template <typename Cb> inline void for_each_token(std::string_view content, Cb&& callback)
     {
+        const char* const base{content.data()};
         std::size_t cursor{0};
         const std::size_t len{content.size()};
         while (cursor < len)
         {
-            while (cursor < len && content[cursor] == ' ')
+            while (cursor < len && base[cursor] == ' ')
                 ++cursor;
             if (cursor >= len)
                 break;
             const std::size_t start{cursor};
-            while (cursor < len && content[cursor] != ' ')
-                ++cursor;
+            // Scan to the next space with memchr (vectorised in libc) — token bodies
+            // (paths, ids, JSON) are the long runs; bit-identical boundaries to the
+            // byte loop. memchr is never asymptotically worse for the short tokens.
+            const void* const space{std::memchr(base + cursor, ' ', len - cursor)};
+            cursor = space != nullptr ? static_cast<std::size_t>(static_cast<const char*>(space) - base)
+                                      : len;
             std::forward<Cb>(callback)(content.substr(start, cursor - start));
         }
     }
@@ -629,31 +634,38 @@ struct Drain::Impl
 
     [[nodiscard]] TokenID intern_token(std::string_view tok, std::string_view prev)
     {
+        // Classify the token's digit-ness ONCE (the predicate is used by both the
+        // F2 KEEP gate and the all-digit mask).
+        const bool all_digits{is_all_digits(tok)};
+
         // F2: KEEP a low-cardinality status value distinct (exit code / status /
         // signal). Context- and size-gated, so bare numbers elsewhere still mask
         // and cardinality stays bounded. This is what makes a green→red flip
         // (exit 0→1) two templates instead of one collapsed `exit code <*>`.
-        if (is_all_digits(tok) && tok.size() <= kMaxStatusDigits && is_status_keyword(prev))
+        if (all_digits && tok.size() <= kMaxStatusDigits && is_status_keyword(prev))
         {
             const TokenID kept{intern_literal(tok)};
             mark_identity(kept);
             return kept;
         }
 
-        if (tok.empty() || is_all_digits(tok))
+        if (tok.empty() || all_digits)
             return kWildcardId;
 
         // F13: normalize a composite token (source location / versioned ref /
         // bracket index) before interning, so noisy variants share a template.
-        // Recognizers are tried in order; the first match wins and writes the
-        // scratch. Only matching tokens build the scratch; every other token uses
-        // its raw bytes and the unchanged fast path. The interned identity is the
-        // NORMALIZED form, so raw variants are never cached individually — a matched
-        // composite re-normalizes per occurrence (a cheap bounded scan).
+        // Single cheap pre-gate first: every composite needs a ':' '/' or '[', so
+        // a token with none (the common case) skips all three recognizers — one
+        // scan instead of three. Matching tokens build the scratch; the interned
+        // identity is the NORMALIZED form, so raw variants are never cached
+        // individually (a matched composite re-normalizes per occurrence).
         std::string_view key{tok};
-        if (normalize_source_location(tok, composite_scratch) ||
-            normalize_versioned_ref(tok, composite_scratch) ||
-            normalize_bracket_index(tok, composite_scratch))
+        const bool maybe_composite{std::ranges::any_of(
+            tok, [](char chr) { return chr == ':' || chr == '/' || chr == '['; })};
+        if (maybe_composite &&
+            (normalize_source_location(tok, composite_scratch) ||
+             normalize_versioned_ref(tok, composite_scratch) ||
+             normalize_bracket_index(tok, composite_scratch)))
             key = composite_scratch;
 
         // Hash lookup FIRST: steady-state hot path has zero RE2 calls.
