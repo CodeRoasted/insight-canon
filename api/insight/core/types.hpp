@@ -16,7 +16,6 @@ using Duration = std::chrono::system_clock::duration;
 // ── Identifiers ──
 using EventID = uint64_t;
 using TemplateID = uint64_t;
-using SessionID = uint64_t;
 using WindowID = uint64_t;
 
 // ── Sequences ──

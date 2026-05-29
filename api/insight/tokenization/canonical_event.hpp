@@ -15,13 +15,6 @@ namespace insight::tokenization
 // keeps the event a fixed-size POD with zero per-event heap allocations
 // on the tokenizer hot path. Downstream consumers iterate or index it
 // the same way they would a vector.
-//
-// `session_key` is an opaque producer-defined session identifier
-// (request id, trace id, user session, partition key, etc). When 0
-// the event is treated as session-agnostic (the historical behaviour
-// before MetaLog spec v0.2.0) and downstream stages keep their fast
-// global-stream path. Non-zero values opt in to per-session sequence
-// scoping (MetaLog SPEC §14).
 struct CanonicalEvent
 {
     EventID id{};
@@ -31,7 +24,6 @@ struct CanonicalEvent
     std::string_view component;
     std::string_view template_str;            // "Connection from <*> port <*>"
     std::span<const std::string_view> params; // ["192.168.1.1", "22"]
-    SessionID session_key{0};                 // 0 = session-agnostic (default)
     // What this line DOES in the sequence (announced role; F12 StructuralRole
     // registry). Orthogonal to template_id (what the line IS) and to the semantic
     // class of tokens inside it. Consumers: phase alignment + structural surprise
