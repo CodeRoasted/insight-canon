@@ -288,4 +288,54 @@ TEST(InferLeadingLogLevel, BareErrorBodyWithoutLevelPrefix)
     EXPECT_EQ(infer_leading_log_level("connection refused to db host 10.0.0.7"), LogLevel::Error);
 }
 
+// The level commonly sits right after a leading timestamp — the dominant raw
+// app-log shape ("<ts> LEVEL message"). Stage 1 must skip the timestamp (incl.
+// the ISO "T"/"Z" date artifacts) and recover the level, not stop at the first
+// alpha run. Regression: ts-led INFO/WARN/DEBUG lines were silently Unknown, so
+// the severity-salience axis never saw an INFO→ERROR deployment flip.
+TEST(InferLeadingLogLevel, IsoTimestampThenLevelTokenRecovered)
+{
+    EXPECT_EQ(infer_leading_log_level(
+                  "2026-05-29T10:00:00 INFO request id=1 path=/api/users status=200 latency_ms=12"),
+              LogLevel::Info)
+        << "ISO ts + INFO";
+    EXPECT_EQ(infer_leading_log_level(
+                  "2026-05-29T11:00:01 ERROR request id=2 status=500 error=\"db timeout\""),
+              LogLevel::Error)
+        << "ISO ts + ERROR";
+    EXPECT_EQ(infer_leading_log_level("2026-05-29T10:00:00 WARN db.pool exhausted"), LogLevel::Warn)
+        << "ISO ts + WARN";
+    EXPECT_EQ(infer_leading_log_level("2026-05-29T10:00:00.123456Z DEBUG cache miss key=user:42"),
+              LogLevel::Debug)
+        << "fractional ISO ts + DEBUG";
+}
+TEST(InferLeadingLogLevel, SpaceSeparatedDateTimeThenLevel)
+{
+    // "<date> <time>,<millis> LEVEL …" (e.g. Python logging default).
+    EXPECT_EQ(infer_leading_log_level("2026-05-29 10:00:00,123 WARN slow query 4200ms"),
+              LogLevel::Warn)
+        << "space-separated date+time prefix";
+}
+TEST(InferLeadingLogLevel, BracketedTimestampThenLevel)
+{
+    EXPECT_EQ(infer_leading_log_level("[2026-05-29T10:00:00Z] DEBUG connecting to db"),
+              LogLevel::Debug)
+        << "bracketed ISO timestamp prefix";
+}
+TEST(InferLeadingLogLevel, LeadingTraceTokenSurvivesTimestampSkip)
+{
+    // Guard: the fix must not treat the ISO "T" as a skippable char and shear the
+    // leading "TRACE"/"T…" tokens. The level vocabulary is matched whole.
+    EXPECT_EQ(infer_leading_log_level("TRACE startup complete in 12ms"), LogLevel::Trace)
+        << "leading TRACE must not be mangled";
+}
+TEST(InferLeadingLogLevel, TimestampThenNoLevelIsUnknown)
+{
+    // A ts-led line with no level word stays Unknown — the timestamp skip must
+    // not manufacture a level, and no error/warn keyword is present for stage 2.
+    EXPECT_EQ(infer_leading_log_level("2026-05-29T10:00:00 request GET /api/orders 200 14ms"),
+              LogLevel::Unknown)
+        << "ts-led, no level token";
+}
+
 // NOLINTEND

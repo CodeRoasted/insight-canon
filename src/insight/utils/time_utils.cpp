@@ -748,29 +748,41 @@ LogLevel parse_log_level(std::string_view level_str) noexcept
 LogLevel infer_leading_log_level(std::string_view line) noexcept
 {
     // Two bounded, alloc-free stages for the raw-text fallback:
-    //  1) A LEADING explicit level token (INFO/ERROR/WARN/…) is authoritative —
-    //     so "INFO … error rate" stays Info and never misreads the mid-line word.
+    //  1) A LEADING explicit level token (INFO/ERROR/WARN/…) is authoritative.
+    //     The level is the first token ("ERROR …") or sits right after a leading
+    //     timestamp ("2026-05-29T10:00:00 INFO …" — the dominant raw-log shape),
+    //     so we scan the first few alpha runs of the head and take the first that
+    //     is an exact level word. parse_log_level matches only the closed level
+    //     vocabulary, so timestamp artifacts (the ISO "T"/"Z"), hostnames and
+    //     other non-level words are skipped, never misread; and the first match
+    //     wins, so a mid-line "error" after a leading "INFO" can't override it.
     //  2) Otherwise, scan the line HEAD for an error/warning cue. This catches
     //     pytest "E   …OperationalError", tracebacks, and bare "connection
     //     refused" lines whose level word is not the first token.
-    constexpr std::size_t kTokenHead{24}; // a leading marker like "##[error]" sits here
+    constexpr std::size_t kLeadingScanHead{40}; // covers an ISO-8601 timestamp + the level start
     constexpr std::size_t kKeywordHead{64};
     const auto is_alpha{
         [](char chr) noexcept
         { return ((static_cast<unsigned>(static_cast<unsigned char>(chr)) | 0x20U) - 'a') < 26U; }};
 
-    // Stage 1 — leading level token.
-    const std::size_t token_limit{line.size() < kTokenHead ? line.size() : kTokenHead};
-    std::size_t begin{0};
-    while (begin < token_limit && !is_alpha(line[begin]))
-        ++begin;
-    std::size_t end{begin};
-    while (end < line.size() && is_alpha(line[end]))
-        ++end;
-    if (end > begin)
-        if (const LogLevel level{parse_log_level(line.substr(begin, end - begin))};
+    // Stage 1 — first exact level token in the head (skips a leading timestamp).
+    // A run may extend past the window (full word captured), but must START
+    // within it, so the level stays genuinely leading rather than mid-message.
+    const std::size_t lead_limit{line.size() < kLeadingScanHead ? line.size() : kLeadingScanHead};
+    std::size_t pos{0};
+    while (pos < lead_limit)
+    {
+        while (pos < lead_limit && !is_alpha(line[pos]))
+            ++pos;
+        if (pos >= lead_limit)
+            break;
+        const std::size_t run_begin{pos};
+        while (pos < line.size() && is_alpha(line[pos]))
+            ++pos;
+        if (const LogLevel level{parse_log_level(line.substr(run_begin, pos - run_begin))};
             level != LogLevel::Unknown)
             return level;
+    }
 
     // Stage 2 — error/warning keyword in the head (rough ASCII-lowercase into a
     // stack buffer; non-letters can't spuriously form a letter-only needle).
