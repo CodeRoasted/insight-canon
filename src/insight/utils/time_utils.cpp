@@ -4,6 +4,9 @@
 
 #include "insight/utils/time_utils.hpp"
 
+#include "insight/utils/failure_lexicon.hpp"
+#include "insight/utils/token_scan.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -747,56 +750,44 @@ LogLevel parse_log_level(std::string_view level_str) noexcept
 
 LogLevel infer_leading_log_level(std::string_view line) noexcept
 {
-    // Two bounded, alloc-free stages for the raw-text fallback:
+    // Two bounded, alloc-free stages over a SHARED tokenisation (token_scan.hpp):
+    // tokens split on whitespace + structural punctuation, but identifier/path
+    // chars (`-_./`) stay inside a token — so "tsc-error-report.json" is one atom
+    // (never a level, never a cue) while "##[error]" / `level=error` / pytest
+    // "…OperationalError:" still expose the inner word. Both stages agree on what
+    // a standalone word is; the old per-stage scans diverged and over-matched.
     //  1) A LEADING explicit level token (INFO/ERROR/WARN/…) is authoritative.
-    //     The level is the first token ("ERROR …") or sits right after a leading
-    //     timestamp ("2026-05-29T10:00:00 INFO …" — the dominant raw-log shape),
-    //     so we scan the first few alpha runs of the head and take the first that
-    //     is an exact level word. parse_log_level matches only the closed level
-    //     vocabulary, so timestamp artifacts (the ISO "T"/"Z"), hostnames and
-    //     other non-level words are skipped, never misread; and the first match
-    //     wins, so a mid-line "error" after a leading "INFO" can't override it.
-    //  2) Otherwise, scan the line HEAD for an error/warning cue. This catches
-    //     pytest "E   …OperationalError", tracebacks, and bare "connection
-    //     refused" lines whose level word is not the first token.
+    //     The level is the first token, or sits right after a leading timestamp
+    //     ("2026-05-29T10:00:00 INFO …"). parse_log_level matches only the closed
+    //     level vocabulary, so timestamp/hostname tokens are skipped, never
+    //     misread; the first match wins, so a mid-line "error" after a leading
+    //     "INFO" can't override it.
+    //  2) Otherwise, scan the head for an error/warning CUE as a standalone token
+    //     (pytest "…OperationalError", tracebacks, bare "connection refused").
     constexpr std::size_t kLeadingScanHead{40}; // covers an ISO-8601 timestamp + the level start
-    constexpr std::size_t kKeywordHead{64};
-    const auto is_alpha{
-        [](char chr) noexcept
-        { return ((static_cast<unsigned>(static_cast<unsigned char>(chr)) | 0x20U) - 'a') < 26U; }};
+    constexpr std::size_t kKeywordHead{64};     // head scanned for a failure/warning cue
 
-    // Stage 1 — first exact level token in the head (skips a leading timestamp).
-    // A run may extend past the window (full word captured), but must START
-    // within it, so the level stays genuinely leading rather than mid-message.
-    const std::size_t lead_limit{line.size() < kLeadingScanHead ? line.size() : kLeadingScanHead};
-    std::size_t pos{0};
-    while (pos < lead_limit)
-    {
-        while (pos < lead_limit && !is_alpha(line[pos]))
-            ++pos;
-        if (pos >= lead_limit)
-            break;
-        const std::size_t run_begin{pos};
-        while (pos < line.size() && is_alpha(line[pos]))
-            ++pos;
-        if (const LogLevel level{parse_log_level(line.substr(run_begin, pos - run_begin))};
-            level != LogLevel::Unknown)
-            return level;
-    }
+    // Stage 1 — first exact level token whose start lies within the head.
+    LogLevel leading{LogLevel::Unknown};
+    if (for_each_token(line, kLeadingScanHead,
+                       [&leading](std::string_view token) noexcept
+                       {
+                           const LogLevel level{parse_log_level(token)};
+                           if (level == LogLevel::Unknown)
+                               return false;
+                           leading = level;
+                           return true; // first level token wins
+                       }))
+        return leading;
 
-    // Stage 2 — error/warning keyword in the head (rough ASCII-lowercase into a
-    // stack buffer; non-letters can't spuriously form a letter-only needle).
-    const std::size_t scan{line.size() < kKeywordHead ? line.size() : kKeywordHead};
-    std::array<char, kKeywordHead> lowered{};
-    for (std::size_t i{0}; i < scan; ++i)
-        lowered[i] = static_cast<char>(static_cast<unsigned char>(line[i]) | 0x20U);
-    const std::string_view head{lowered.data(), scan};
-    const auto has{[head](std::string_view needle) noexcept { return head.contains(needle); }};
-    if (has("error") || has("exception") || has("fatal") || has("panic") || has("refused") ||
-        has("timeout") || has("traceback") || has("fail") || has("segfault") || has("denied") ||
-        has("unhandled") || has("abort") || has("crash"))
+    // Stage 2 — a failure/warning cue as a standalone word in the head. The match
+    // is TOKEN-aware (see failure_lexicon.hpp), not a raw substring: a benign line
+    // whose path or identifier merely contains "error" (`Writing
+    // tsc-error-report.json`) is not misread as Error — that substring over-match
+    // spuriously promoted new templates to HIGH "New error" downstream in the diff.
+    if (contains_failure_cue(line, kKeywordHead))
         return LogLevel::Error;
-    if (has("warn"))
+    if (contains_warning_cue(line, kKeywordHead))
         return LogLevel::Warn;
     return LogLevel::Unknown;
 }
