@@ -67,6 +67,20 @@ else()
 endif()
 
 ###########################################################
+#  Float determinism (F5-M3)
+###########################################################
+# Deterministic-content / significance-gate paths require cross-machine
+# bit-identity (technical_docs/architecture/insight_determinism_model.md, "Float
+# Hardening"). Disable FMA contraction so the compiler never fuses `a*b+c` —
+# fusion differs across compilers/CPUs and would break bit-identity. PUBLIC so
+# consumers that compile det_math's header-only fixed-point math inherit the
+# guarantee. SSE (not x87 80-bit) is the x86-64 ABI default and arm has no x87,
+# so the register-width hazard needs no extra flag.
+target_compile_options(insight_canon PUBLIC
+    $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-ffp-contract=off>
+)
+
+###########################################################
 #  Optional NUMA support (arena allocator)
 ###########################################################
 if(INSIGHT_CANON_ENABLE_NUMA)
