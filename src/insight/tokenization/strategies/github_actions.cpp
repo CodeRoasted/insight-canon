@@ -68,7 +68,17 @@ GitHubActionsStrategy::parse(std::string_view line, ArenaAllocator& arena) const
     ParsedLine parsed;
     parsed.raw_line = line;
     parsed.timestamp = utils::parse_iso8601(line.substr(0U, detail::kGhaPrefixLen));
+    // A workflow-command marker (##[error]/##[warning]/…) is authoritative when
+    // present. Without one, the body is effectively raw stdout — a crashing
+    // subprocess prints "Segmentation fault (core dumped)" with no marker and no
+    // level word — so fall back to the same leading-level / failure-cue inference
+    // RawTextStrategy uses (token-aware, alloc-free; see infer_leading_log_level).
+    // Without this, a bare OS/shell crash in a CI log stays Unknown and the failure
+    // lexicon never reaches it — losing the dominant-level → NewErrorPattern signal
+    // the diff ranks on.
     parsed.level = level_from_message(content);
+    if (parsed.level == LogLevel::Unknown)
+        parsed.level = utils::infer_leading_log_level(content);
     parsed.component = {}; // GHA lines carry no component / tag
     parsed.content = arena.store_string(content);
     return std::expected<ParsedLine, std::string>{parsed};

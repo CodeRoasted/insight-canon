@@ -161,6 +161,17 @@ static constexpr std::string_view kGHALine{
 static constexpr std::string_view kGHAError{
     "2026-05-27T15:26:41.7842152Z ##[error]connection refused to db host 10.0.0.5"};
 
+// Bare, UNMARKED bodies (an INFO line carries no ##[…] marker). The strategy must
+// infer the level from the body's leading-level / failure cue — the level-escaping
+// crash path. Only the 2-token "segmentation fault" adjacency is a cue; the two
+// distractors carry "segmentation"/"fault" as NON-adjacent words and stay benign.
+static constexpr std::string_view kGHASegfault{
+    "2026-05-27T15:26:41.7842152Z Segmentation fault (core dumped)"};
+static constexpr std::string_view kGHASegPipe{
+    "2026-05-27T15:26:41.7842152Z image segmentation pipeline complete"};
+static constexpr std::string_view kGHAPageFault{
+    "2026-05-27T15:26:41.7842152Z page fault handler registered"};
+
 // GHA stamps a timestamp on blank output lines too — with and without a
 // trailing separator space. Both are blank lines and must be declined.
 static constexpr std::string_view kGHABlankWithSpace{"2026-05-27T15:26:41.7842152Z "};
@@ -197,6 +208,30 @@ TEST_F(GitHubActionsStrategyTest, LiftsErrorLevelFromWorkflowCommand)
     EXPECT_EQ(pl.level, LogLevel::Error);
     // The marker stays in the templated content (it is part of the line shape).
     EXPECT_TRUE(pl.content.starts_with("##[error]"));
+}
+
+// A bare, UNMARKED GHA body is effectively raw stdout. The strategy must fall back
+// to failure-cue inference so a level-escaping OS/shell crash is still recovered as
+// Error — while benign lines that merely contain "segmentation"/"fault" as NON-
+// adjacent words stay Unknown (the 2-token "segmentation fault" lexicon adjacency).
+TEST_F(GitHubActionsStrategyTest, InfersErrorFromBodyCueWhenUnmarked)
+{
+    auto crash{strategy.parse(kGHASegfault, arena)};
+    ASSERT_TRUE(crash.has_value());
+    EXPECT_EQ(crash.value().level, LogLevel::Error)
+        << "bare 'Segmentation fault (core dumped)' (no ##[error] marker) escalates via the lexicon";
+    EXPECT_EQ(crash.value().content, "Segmentation fault (core dumped)")
+        << "body templated bare (no marker), timestamp stripped";
+
+    auto seg_pipe{strategy.parse(kGHASegPipe, arena)};
+    ASSERT_TRUE(seg_pipe.has_value());
+    EXPECT_EQ(seg_pipe.value().level, LogLevel::Unknown)
+        << "'image segmentation pipeline complete' — 'segmentation' is not adjacent to 'fault'";
+
+    auto page_fault{strategy.parse(kGHAPageFault, arena)};
+    ASSERT_TRUE(page_fault.has_value());
+    EXPECT_EQ(page_fault.value().level, LogLevel::Unknown)
+        << "'page fault handler registered' — bare 'fault' / 'page fault' is not the cue phrase";
 }
 
 TEST_F(GitHubActionsStrategyTest, DeclinesTimestampOnlyBlankLines)
