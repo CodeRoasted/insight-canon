@@ -1,10 +1,10 @@
-// NOLINTBEGIN — Unit tests for the F5 deterministic math primitive.
+// NOLINTBEGIN — Unit tests for the deterministic math primitive.
 //
 // Two kinds of assertion:
 //   * REFERENCE VECTOR (exact ==): the bit-exact int64 outputs of det_log2_fixed
 //     for a fixed input set. These are the cross-machine determinism pin — if any
 //     compiler/architecture computes a different bit, `==` fails. (The same fixture
-//     is also compiled across the F5 gcc×clang×-O×-ffp-contract matrix.)
+//     is also compiled across the gcc×clang×-O×-ffp-contract matrix.)
 //   * ACCURACY (near): the fixed-point result is close to libm, proving the
 //     primitive is not just deterministic but correct. libm is used ONLY here in
 //     the test oracle, never in the primitive.
@@ -123,7 +123,7 @@ TEST(DetMath, ReducerConstantDistributionEntropyIsZero)
 TEST(DetMath, ReducerOrderIndependenceIsExact)
 {
     // Integer accumulation is associative/exact: summing the same terms in two
-    // different orders must give the BIT-IDENTICAL double (the F5-M2 guarantee).
+    // different orders must give the BIT-IDENTICAL double (the order-independence guarantee).
     const std::uint64_t counts[]{7, 3, 50, 1, 39};
     constexpr std::int64_t total{100};
     const std::int64_t l2n{det_log2_fixed(static_cast<std::uint64_t>(total))};

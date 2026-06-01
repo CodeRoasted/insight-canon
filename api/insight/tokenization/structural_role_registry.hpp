@@ -10,7 +10,7 @@ namespace insight::tokenization
 // StructuralRoleRegistry — classifies a LINE's role in the sequence (what the line
 // DOES), as opposed to the SemanticClass of a token inside it (what a value MEANS).
 // Two orthogonal ontologies kept in two separate registries — that separation is
-// the F12 countermeasure to value-vs-line-role conflation (Salience epic §4.2).
+// the countermeasure to value-vs-line-role conflation.
 //
 // Roles here are ANNOUNCED only: the line declares itself with a marker
 // (`##[group]`, `##[error]`). Positional roles ("is on the dominant path") are

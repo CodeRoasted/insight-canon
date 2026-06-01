@@ -317,7 +317,7 @@ namespace
         return static_cast<unsigned>(chr) - '0' < kDecimalBase;
     }
 
-    // F2 — value-aware KEEP of low-cardinality status integers.
+    // Value-aware KEEP of low-cardinality status integers.
     //
     // A bare integer is masked to `<*>` (all-digit rule), which collapses
     // `exit code 0` and `exit code 1` into one template — a green→red flip then
@@ -326,7 +326,7 @@ namespace
     // (≤ kMaxStatusDigits). Size-gating bounds cardinality (exit codes ≤ 255,
     // HTTP status ≤ 599 — both ≤ 3 digits); the keyword gate keeps bare counts
     // ("port 8080", "took 200 ms") masked. The lexicon is a seed and will grow
-    // during calibration (Salience epic §10 value-aware masking heuristic).
+    // during calibration.
     constexpr std::size_t kMaxStatusDigits{3};
 
     [[nodiscard]] inline bool equals_ascii_lower(std::string_view tok,
@@ -351,13 +351,13 @@ namespace
                equals_ascii_lower(tok, "exit") || equals_ascii_lower(tok, "signal");
     }
 
-    // F13 — composite-token masking, SOURCE_LOCATION class.
+    // Composite-token masking, SOURCE_LOCATION class.
     //
     // Drain masks only WHOLE tokens that are all-digit / IPv4 / hex. A compiler
     // source location like `tokenizer.cpp:4500:30:` is one whitespace token that
     // is none of those, so it stays literal and every (file,line,col) becomes its
     // own template — the dominant cardinality blow-up (≈2160 singletons on the
-    // multi-format mix; most of the 2373). See the Salience epic flaw F13.
+    // multi-format mix; most of the 2373).
     //
     // Recognize `<path>:<digits>[:<digits>]…[:]` where the prefix before the first
     // `:<digits>` is path-like (contains '.' or '/'), and normalize by masking each
@@ -414,7 +414,7 @@ namespace
         return true;
     }
 
-    // F13 — VERSIONED_REF composite: `<name>/<numeric-version>[trailing punct]`.
+    // VERSIONED_REF composite: `<name>/<numeric-version>[trailing punct]`.
     // Conan/cmake/package output ("zlib/3", "boost/1.83.0:") keeps a literal token
     // per (name,version), so a bumped version is a phantom new template. Normalize
     // by KEEPing the name and masking the numeric version → `zlib/<*>`, `boost/<*>:`.
@@ -453,7 +453,7 @@ namespace
         return true;
     }
 
-    // F13 — BRACKET_INDEX composite: `<word>[<digits>]<rest>`. Recursion depth and
+    // BRACKET_INDEX composite: `<word>[<digits>]<rest>`. Recursion depth and
     // worker indices ("make[2]:", "thread[15]") otherwise template per index.
     // Normalize the first bracketed digit run → `make[<*>]:`.
     [[nodiscard]] inline bool normalize_bracket_index(std::string_view tok, std::string& out)
@@ -559,12 +559,12 @@ struct Drain::Impl
     // Reusable per-line scratch.
     std::vector<TokenID> line_ids;
     std::vector<std::string_view> line_raw_tokens;
-    // Reusable scratch for composite-token normalization (F13). Capacity is
+    // Reusable scratch for composite-token normalization. Capacity is
     // retained across calls, so a matched composite costs no per-line heap alloc
     // in steady state; non-composite tokens never touch it.
     std::string composite_scratch;
 
-    // F2 — identity (KEEP) token ids. identity_id[id] is true for a status value
+    // Identity (KEEP) token ids. identity_id[id] is true for a status value
     // kept distinct (exit code / status / signal). A difference at an identity
     // position disqualifies a cluster (forces a new template) so a green→red flip
     // does not get merged + re-wildcarded. `any_identity` gates the matcher check
@@ -586,7 +586,7 @@ struct Drain::Impl
     }
 
     // True if line and candidate disagree at any IDENTITY position — i.e. a KEEP
-    // status value differs. Such a cluster is not the same template (F2).
+    // status value differs. Such a cluster is not the same template.
     [[nodiscard]] bool identity_mismatch(std::span<const TokenID> line,
                                          std::span<const TokenID> cand) const noexcept
     {
@@ -622,7 +622,7 @@ struct Drain::Impl
         return false;
     }
 
-    // Lookup-or-insert a token as a LITERAL (never masked). Used by the F2
+    // Lookup-or-insert a token as a LITERAL (never masked). Used by the
     // status-value KEEP path, which must bypass the all-digit mask.
     [[nodiscard]] TokenID intern_literal(std::string_view tok)
     {
@@ -636,10 +636,10 @@ struct Drain::Impl
     [[nodiscard]] TokenID intern_token(std::string_view tok, std::string_view prev)
     {
         // Classify the token's digit-ness ONCE (the predicate is used by both the
-        // F2 KEEP gate and the all-digit mask).
+        // KEEP gate and the all-digit mask).
         const bool all_digits{is_all_digits(tok)};
 
-        // F2: KEEP a low-cardinality status value distinct (exit code / status /
+        // KEEP a low-cardinality status value distinct (exit code / status /
         // signal). Context- and size-gated, so bare numbers elsewhere still mask
         // and cardinality stays bounded. This is what makes a green→red flip
         // (exit 0→1) two templates instead of one collapsed `exit code <*>`.
@@ -653,7 +653,7 @@ struct Drain::Impl
         if (tok.empty() || all_digits)
             return kWildcardId;
 
-        // F13: normalize a composite token (source location / versioned ref /
+        // Normalize a composite token (source location / versioned ref /
         // bracket index) before interning, so noisy variants share a template.
         // Single cheap pre-gate first: every composite needs a ':' '/' or '[', so
         // a token with none (the common case) skips all three recognizers — one
@@ -689,7 +689,7 @@ struct Drain::Impl
     {
         line_ids.clear();
         line_raw_tokens.clear();
-        std::string_view prev{}; // raw previous token — context for F2 status KEEP
+        std::string_view prev{}; // raw previous token — context for status KEEP
         for_each_token(content,
                        [&](std::string_view tok)
                        {
@@ -726,7 +726,7 @@ struct Drain::Impl
             const Cluster& cand{clusters[cand_idx]};
             const auto cand_span{
                 std::span<const TokenID>(template_token_ids).subspan(cand.token_offset, length)};
-            // F2: a cluster whose KEEP/identity value differs is a different
+            // A cluster whose KEEP/identity value differs is a different
             // template — skip it so the line forms its own cluster. Gated by
             // any_identity, so streams without status values are unaffected.
             if (any_identity && identity_mismatch(std::span<const TokenID>(line_ids), cand_span))

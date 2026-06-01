@@ -29,6 +29,19 @@ Raw logs
 
 ---
 
+## Determinism
+
+insight-canon is the **content-determinism** layer of the pipeline: the same input bytes always produce the same canonical events and the same numbers — on any compiler, architecture, or machine. That reproducibility is what makes everything built downstream benchmarkable and verifiable, run after run.
+
+Two guarantees combine:
+
+- **Deterministic tokenization** — a line's template is a pure function of its bytes: `same bytes ⇒ same tokens ⇒ same template id`, versioned by a `canonicalization_version`. `EventID`s are monotonic (never wall-clock or hash-seeded), `CanonicalEvent` string views are arena-stable, Drain clustering is a pure function of (template prefix, parameter mask), and no `unordered_map` iteration order ever reaches output.
+- **Bit-identical math** (`det_math`) — every logarithm / entropy / divergence on the deterministic path is computed in integer fixed-point with **no libm** and accumulated in a 128-bit integer reducer (order-independent by construction). IEEE `+ − × ÷` are already cross-machine deterministic; removing libm transcendentals and float-sum ordering removes the only two divergence sources. Consuming code builds with `-ffp-contract=off`.
+
+The result: identical logs yield an identical fingerprint *input* everywhere — the foundation the transport (`coderoast-ipc`) and the format (`insight-metalog`) build a fully reproducible pipeline on.
+
+---
+
 ## Requirements
 
 | Tool | Minimum version |
@@ -125,7 +138,7 @@ def requirements(self):
   self.requires("insight_canon/1.4.0")
 ```
 
-Cross-repo package pins are tracked in [../technical_docs/compatibility_matrix.md](../technical_docs/compatibility_matrix.md), and planning lives in [../technical_docs/ROADMAP.md](../technical_docs/ROADMAP.md).
+insight-canon is the upstream tokenization and sequence layer of the [MetaLog](https://github.com/CodeRoasted/metalog-spec) pipeline.
 
 ---
 

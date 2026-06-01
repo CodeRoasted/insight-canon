@@ -67,7 +67,7 @@ else()
 endif()
 
 ###########################################################
-#  Float determinism (F5-M3)
+#  Float determinism
 ###########################################################
 # Deterministic-content / significance-gate paths require cross-machine
 # bit-identity (technical_docs/architecture/insight_determinism_model.md, "Float
