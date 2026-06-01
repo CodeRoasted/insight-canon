@@ -34,8 +34,9 @@ namespace insight::det
 // log2/entropy magnitude we produce (|log2| ≤ 64), so the final fixed→double
 // conversion is EXACT (int64→double is lossless below 2^53; the divisor is a
 // power of two). This is what makes the emitted `double` bit-identical.
-inline constexpr int kFracBits{40};
-inline constexpr std::int64_t kOne{std::int64_t{1} << kFracBits}; // 1.0 in Qk
+inline constexpr unsigned int kFracBits{40U};
+inline constexpr std::int64_t kOne{
+    static_cast<std::int64_t>(std::uint64_t{1} << kFracBits)}; // 1.0 in Qk
 
 // ln(2) in Qk, = round(0.69314718055994530942 * 2^40). Used to convert log2→ln
 // without libm. A mathematical constant (documented derivation), not a magic
@@ -49,26 +50,27 @@ inline constexpr std::int64_t kLn2Fixed{762123384786};
 // Precondition: x ≥ 1. In the F5 reductions log2 is only ever applied to counts,
 // totals, and products of positive integers, all ≥ 1; x == 0 is a caller bug and
 // is mapped to 0 here purely to keep the function total (avoids a negative shift).
-[[nodiscard]] constexpr std::int64_t det_log2_fixed(std::uint64_t x) noexcept
+[[nodiscard]] constexpr std::int64_t det_log2_fixed(std::uint64_t value) noexcept
 {
-    if (x <= 1U)
-        return 0; // log2(1) = 0; x == 0 is a precondition violation, mapped to 0.
+    if (value <= 1U)
+        return 0; // log2(1) = 0; value == 0 is a precondition violation, mapped to 0.
 
-    // Integer part: floor(log2(x)) = position of the most-significant set bit.
-    const int msb{63 - std::countl_zero(x)}; // x ≥ 2 → msb in [1, 63]
+    // Integer part: floor(log2(value)) = position of the most-significant set bit.
+    const unsigned msb{
+        static_cast<unsigned>(63 - std::countl_zero(value))}; // value ≥ 2 → msb in [1, 63]
 
     // Work in Q(kFracBits + kGuard) so the kFracBits-bit fraction rounds to
-    // nearest. Normalised mantissa m = x / 2^msb ∈ [1, 2), held as m·2^kWork.
-    constexpr int kGuard{2};
-    constexpr int kWork{kFracBits + kGuard};
+    // nearest. Normalised mantissa m = value / 2^msb ∈ [1, 2), held as m·2^kWork.
+    constexpr unsigned kGuard{2U};
+    constexpr unsigned kWork{kFracBits + kGuard};
     using u128 = unsigned __int128;
-    u128 mantissa{(static_cast<u128>(x) << kWork) >> msb}; // ∈ [2^kWork, 2^(kWork+1))
-    const u128 two_work{u128{1} << (kWork + 1)};           // 2.0 in Q(kWork)
+    u128 mantissa{(static_cast<u128>(value) << kWork) >> msb}; // ∈ [2^kWork, 2^(kWork+1))
+    const u128 two_work{u128{1} << (kWork + 1U)};              // 2.0 in Q(kWork)
 
     // Bit-by-bit log2 of the mantissa via repeated squaring (pure integer):
     // squaring m doubles log2(m); the carry out of [1,2) is the next fraction bit.
     std::uint64_t frac{0};
-    for (int i = 0; i < kWork; ++i)
+    for (unsigned bit{0}; bit < kWork; ++bit)
     {
         mantissa = (mantissa * mantissa) >> kWork; // m := m² , now in [1, 4)
         frac <<= 1U;
@@ -83,15 +85,18 @@ inline constexpr std::int64_t kLn2Fixed{762123384786};
     // round-half-up == round-to-nearest-even here.
     const std::int64_t frac_rne{
         static_cast<std::int64_t>((frac + (std::uint64_t{1} << (kGuard - 1))) >> kGuard)};
-    return (static_cast<std::int64_t>(msb) << kFracBits) + frac_rne;
+    return static_cast<std::int64_t>(static_cast<std::uint64_t>(msb) << kFracBits) + frac_rne;
 }
 
 // ln(x) for positive integer x, in Qk fixed-point. ln(x) = log2(x) · ln(2).
-[[nodiscard]] constexpr std::int64_t det_ln_fixed(std::uint64_t x) noexcept
+[[nodiscard]] constexpr std::int64_t det_ln_fixed(std::uint64_t value) noexcept
 {
-    // log2(x) (Qk) · ln2 (Qk) = Q2k; round back to Qk. det_log2_fixed(x) ≥ 0.
-    const __int128 product{static_cast<__int128>(det_log2_fixed(x)) * kLn2Fixed};
-    return static_cast<std::int64_t>((product + (kOne >> 1)) >> kFracBits);
+    // log2(value) (Qk) · ln2 (Qk) = Q2k; round back to Qk. det_log2_fixed(value) ≥ 0,
+    // so the unsigned cast for the final shift is safe.
+    const __int128 product{static_cast<__int128>(det_log2_fixed(value)) * kLn2Fixed};
+    const unsigned __int128 rounded{static_cast<unsigned __int128>(product) +
+                                    (std::uint64_t{1} << (kFracBits - 1U))};
+    return static_cast<std::int64_t>(rounded >> kFracBits);
 }
 
 // Exact conversion of a Qk fixed-point value to double: int64→double is lossless
@@ -106,10 +111,10 @@ inline constexpr std::int64_t kLn2Fixed{762123384786};
 // (a count/total); num may be negative (KL/JS terms can be negative).
 [[nodiscard]] constexpr std::int64_t round_div(__int128 num, std::int64_t den) noexcept
 {
-    const __int128 d{den};
+    const __int128 den128{den};
     if (num >= 0)
-        return static_cast<std::int64_t>((num + d / 2) / d);
-    return -static_cast<std::int64_t>(((-num) + d / 2) / d);
+        return static_cast<std::int64_t>((num + (den128 / 2)) / den128);
+    return -static_cast<std::int64_t>(((-num) + (den128 / 2)) / den128);
 }
 
 // Exact ordered reduction for Σ over a set of terms (F5-M2). All accumulation is

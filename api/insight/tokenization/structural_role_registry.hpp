@@ -25,7 +25,7 @@ namespace insight::tokenization
 class StructuralRoleRegistry
 {
   public:
-    [[nodiscard]] StructuralRole classify(std::string_view content) const noexcept
+    [[nodiscard]] static StructuralRole classify(std::string_view content) noexcept
     {
         if (content.starts_with("##[group]") || content.starts_with("::group::"))
             return StructuralRole::GroupBegin;

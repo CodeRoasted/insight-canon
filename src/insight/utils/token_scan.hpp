@@ -46,10 +46,14 @@ namespace detail
         }
     }
 
+    inline constexpr unsigned kAsciiCaseBit{0x20U}; // OR-mask that folds uppercase to lowercase
+    inline constexpr unsigned kAlphabetLen{26U};
+    inline constexpr unsigned kDecimalDigitLen{10U};
+
     [[nodiscard]] constexpr bool is_token_alnum(char chr) noexcept
     {
         const unsigned chu{static_cast<unsigned>(static_cast<unsigned char>(chr))};
-        return ((chu | 0x20U) - 'a') < 26U || (chu - '0') < 10U;
+        return ((chu | kAsciiCaseBit) - 'a') < kAlphabetLen || (chu - '0') < kDecimalDigitLen;
     }
 
     // Length of an ANSI escape sequence starting at text[pos], or 0 if none. Handles

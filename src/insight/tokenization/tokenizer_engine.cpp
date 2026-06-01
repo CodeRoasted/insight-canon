@@ -77,7 +77,8 @@ struct Tokenizer::Impl
         event.component = parsed_line.component;
         event.template_str = match.template_str;
         event.params = match.params;
-        event.structural_role = role_registry.classify(parsed_line.content); // F12 announced role
+        event.structural_role = insight::tokenization::StructuralRoleRegistry::classify(
+            parsed_line.content); // F12 announced role
 
         ++produced;
 

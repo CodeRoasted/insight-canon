@@ -2,6 +2,7 @@
 
 #include "insight/utils/token_scan.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <span>
@@ -11,10 +12,13 @@ namespace insight::utils
 {
 namespace
 {
+    inline constexpr unsigned kAsciiCaseBit{0x20U}; // OR-mask that folds uppercase to lowercase
+    inline constexpr unsigned kAlphabetLen{26U};
 
     [[nodiscard]] constexpr bool is_alpha(char chr) noexcept
     {
-        return ((static_cast<unsigned>(static_cast<unsigned char>(chr)) | 0x20U) - 'a') < 26U;
+        return ((static_cast<unsigned>(static_cast<unsigned char>(chr)) | kAsciiCaseBit) - 'a') <
+               kAlphabetLen;
     }
     [[nodiscard]] constexpr char lower(char chr) noexcept
     {
@@ -37,13 +41,14 @@ namespace
     // never capitalised, so it can never form this suffix).
     [[nodiscard]] bool is_camel_error_type(std::string_view token) noexcept
     {
-        constexpr std::string_view kErrorSuffix{"Error"};
-        constexpr std::string_view kExceptionSuffix{"Exception"};
-        for (const std::string_view suffix : {kErrorSuffix, kExceptionSuffix})
-            if (token.size() > suffix.size() && token.ends_with(suffix) &&
-                is_alpha(token[token.size() - suffix.size() - 1U]))
-                return true;
-        return false;
+        constexpr std::array<std::string_view, 2U> kSuffixes{"Error", "Exception"};
+        return std::ranges::any_of(kSuffixes,
+                                   [&token](std::string_view suffix)
+                                   {
+                                       return token.size() > suffix.size() &&
+                                              token.ends_with(suffix) &&
+                                              is_alpha(token[token.size() - suffix.size() - 1U]);
+                                   });
     }
 
     // The unified failure lexicon — token forms (base + the inflections that occur in
