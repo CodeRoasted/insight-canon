@@ -143,7 +143,7 @@ enum class LogFormat : uint8_t
 // What a LINE does in the sequence (its structural role), as opposed to what a
 // token inside it MEANS (its SemanticClass). Two orthogonal ontologies, two
 // registries — keeping them separate is what avoids the value-vs-line-role
-// conflation (Salience epic flaw F12, §4.2). These roles are ANNOUNCED — the line
+// conflation. These roles are ANNOUNCED — the line
 // declares itself via a marker (`##[group]`, `##[error]`, a non-zero exit) — never
 // derived from graph position (that is a structural-layer output, not a role).
 // A seed catalog; designed to grow during calibration.

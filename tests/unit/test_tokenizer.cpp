@@ -335,7 +335,7 @@ TEST_F(TokenizerTest, HighVolumeTemplateStabilisesParams)
     // Send 8 lines in the pattern "fetched NNN rows returned" with varying NNN.
     // The numeric position is a VARIABLE count (not a status value), so it masks
     // to <*> and a param is extracted. (A status value behind code/status/exit/
-    // signal would instead be KEPT distinct — F2; see test_drain SourceLocation /
+    // signal would instead be KEPT distinct; see test_drain SourceLocation /
     // StatusValue tests. "rows" is not a status keyword, so masking applies.)
     const std::vector<std::string_view> lines = {
         R"({"msg":"fetched 200 rows returned"})", R"({"msg":"fetched 201 rows returned"})",

@@ -1,8 +1,7 @@
 #pragma once
 
 // det_math — deterministic, cross-machine bit-identical fixed-point math for
-// InSight's deterministic-content and significance-gate paths (F5-M1/M2; see
-// technical_docs/architecture/insight_determinism_model.md, "Float Hardening").
+// InSight's deterministic-content and significance-gate paths.
 //
 // Why this exists: IEEE `+ - * / sqrt` are correctly-rounded and ALREADY
 // cross-machine deterministic. The only divergence sources are (a) transcendentals
@@ -15,11 +14,11 @@
 //     identical on every compiler/arch. No libm, round-to-nearest.
 //   * FixedReducer — accumulates Σ in a signed 128-bit INTEGER. Integer addition
 //     is exact and associative, so the reduction is order-independent by
-//     construction (F5-M2) — no float rounding enters the sum. The single
+//     construction — no float rounding enters the sum. The single
 //     conversion to `double` happens once, at the end, via an exact divide.
 //
 // Header-only; lives in insight-canon, consumed by metalog + eidos. Consuming TUs
-// build with -ffp-contract=off (F5-M3) so the trailing fixed→double divide is
+// build with -ffp-contract=off so the trailing fixed→double divide is
 // never fused; SSE (not x87 80-bit) is the x86-64 default and arm has no x87.
 
 #include <bit>
@@ -47,7 +46,7 @@ inline constexpr std::int64_t kLn2Fixed{762123384786};
 // round(log2(x) · 2^kFracBits). Pure integer arithmetic, round-to-nearest,
 // no libm, identical on every compiler/architecture.
 //
-// Precondition: x ≥ 1. In the F5 reductions log2 is only ever applied to counts,
+// Precondition: x ≥ 1. In these reductions log2 is only ever applied to counts,
 // totals, and products of positive integers, all ≥ 1; x == 0 is a caller bug and
 // is mapped to 0 here purely to keep the function total (avoids a negative shift).
 [[nodiscard]] constexpr std::int64_t det_log2_fixed(std::uint64_t value) noexcept
@@ -100,7 +99,7 @@ inline constexpr std::int64_t kLn2Fixed{762123384786};
 }
 
 // Exact conversion of a Qk fixed-point value to double: int64→double is lossless
-// for |fixed| < 2^53 (true for all F5 magnitudes) and the divisor is a power of
+// for |fixed| < 2^53 (true for all magnitudes here) and the divisor is a power of
 // two, so the division is exact — no rounding, hence bit-identical everywhere.
 [[nodiscard]] constexpr double fixed_to_double(std::int64_t fixed) noexcept
 {
@@ -117,7 +116,7 @@ inline constexpr std::int64_t kLn2Fixed{762123384786};
     return -static_cast<std::int64_t>(((-num) + (den128 / 2)) / den128);
 }
 
-// Exact ordered reduction for Σ over a set of terms (F5-M2). All accumulation is
+// Exact ordered reduction for Σ over a set of terms. All accumulation is
 // in a signed 128-bit INTEGER: exact and associative, so the result does not
 // depend on summation order or on float rounding. The caller adds terms in the
 // canonical (sorted-by-key) order; for integer terms that order is immaterial to

@@ -125,7 +125,7 @@ def requirements(self):
   self.requires("insight_canon/1.4.0")
 ```
 
-Cross-repo package pins are tracked in [../technical_docs/compatibility_matrix.md](../technical_docs/compatibility_matrix.md), and planning lives in [../technical_docs/ROADMAP.md](../technical_docs/ROADMAP.md).
+insight-canon is the upstream tokenization and sequence layer of the [MetaLog](https://github.com/CodeRoasted/metalog-spec) pipeline.
 
 ---
 

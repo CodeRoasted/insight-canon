@@ -1,5 +1,5 @@
 // NOLINTBEGIN — unit test: short identifiers and test-specific patterns are fine.
-// test_structural_role.cpp — F12 StructuralRoleRegistry (announced line-roles).
+// test_structural_role.cpp — StructuralRoleRegistry (announced line-roles).
 //
 // A line's structural role (what it DOES in the sequence) is a separate ontology
 // from the semantic class of tokens inside it (what a value MEANS). This verifies

@@ -7,7 +7,7 @@
 // punctuation trimmed, ASCII case-insensitive) equal to a lexicon word, or as a
 // CamelCase `…Error`/`…Exception` type name — never as a substring buried inside
 // a larger token. The buried-substring over-match was the bug (spurious HIGH
-// "New error" diff promotions + inflated MetaLog F7 severity).
+// "New error" diff promotions + inflated MetaLog severity).
 
 #include <string_view>
 

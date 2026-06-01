@@ -482,7 +482,7 @@ TEST(Drain_Masking, EmptyMaskListPreservesLiteralTokens)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// F13 — SOURCE_LOCATION composite masking. A compiler location token
+// SOURCE_LOCATION composite masking. A compiler location token
 // `file:line:col` is masked to `file:<*>:<*>` (path kept, line/col masked), so
 // every (line,col) variant of one file shares a template instead of exploding
 // into singletons (the dominant cardinality driver on real CI logs).
@@ -530,7 +530,7 @@ TEST(Drain_Masking, ClockTimeNotTreatedAsSourceLocation)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// F2 — value-aware KEEP of low-cardinality status integers. A small integer
+// Value-aware KEEP of low-cardinality status integers. A small integer
 // immediately after a status keyword (code/status/exit/signal) is KEPT distinct
 // instead of masked, so `exit code 0` and `exit code 1` are different templates
 // and a green→red flip stays visible. Bare numbers elsewhere still mask.
@@ -541,7 +541,7 @@ TEST(Drain_Masking, StatusValueKeptDistinctAcrossFlip)
     Drain drain{tight_config()};
     const auto id0{do_match(drain, "pipeline run completed with exit code 0").template_id};
     auto r1{do_match(drain, "pipeline run completed with exit code 1")};
-    EXPECT_NE(id0, r1.template_id) << "exit code 0 and 1 must be DISTINCT templates (F2)";
+    EXPECT_NE(id0, r1.template_id) << "exit code 0 and 1 must be DISTINCT templates";
     EXPECT_NE(r1.template_str.find("exit code 1"), std::string::npos)
         << "the status value is kept literal; got: " << r1.template_str;
     EXPECT_EQ(r1.template_str.find("<*>"), std::string::npos)
@@ -554,7 +554,7 @@ TEST(Drain_Masking, HttpStatusKeptDistinct)
     Drain drain{tight_config()};
     const auto ok{do_match(drain, "request handled with status 200").template_id};
     const auto err{do_match(drain, "request handled with status 500").template_id};
-    EXPECT_NE(ok, err) << "status 200 and 500 must be DISTINCT templates (F2)";
+    EXPECT_NE(ok, err) << "status 200 and 500 must be DISTINCT templates";
 }
 
 TEST(Drain_Masking, CaseInsensitiveStatusKeyword)
@@ -587,7 +587,7 @@ TEST(Drain_Masking, LargeValueAfterKeywordMasked)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// F13 — VERSIONED_REF and BRACKET_INDEX composites. Package versions ("zlib/3")
+// VERSIONED_REF and BRACKET_INDEX composites. Package versions ("zlib/3")
 // and bracketed indices ("make[2]") otherwise template per value; normalize the
 // numeric part while keeping the name/word.
 // ─────────────────────────────────────────────────────────────────────────────
