@@ -312,19 +312,191 @@ namespace
                                    { return static_cast<unsigned>(chr) - '0' < kDecimalBase; });
     }
 
+    [[nodiscard]] constexpr bool is_ascii_digit(char chr) noexcept
+    {
+        return static_cast<unsigned>(chr) - '0' < kDecimalBase;
+    }
+
+    // F2 — value-aware KEEP of low-cardinality status integers.
+    //
+    // A bare integer is masked to `<*>` (all-digit rule), which collapses
+    // `exit code 0` and `exit code 1` into one template — a green→red flip then
+    // vanishes at the template level. To keep such values DISTINCT we KEEP an
+    // integer literal when it immediately follows a status keyword AND is small
+    // (≤ kMaxStatusDigits). Size-gating bounds cardinality (exit codes ≤ 255,
+    // HTTP status ≤ 599 — both ≤ 3 digits); the keyword gate keeps bare counts
+    // ("port 8080", "took 200 ms") masked. The lexicon is a seed and will grow
+    // during calibration (Salience epic §10 value-aware masking heuristic).
+    constexpr std::size_t kMaxStatusDigits{3};
+
+    [[nodiscard]] inline bool equals_ascii_lower(std::string_view tok,
+                                                 std::string_view lower) noexcept
+    {
+        if (tok.size() != lower.size())
+            return false;
+        for (std::size_t pos{0}; pos < tok.size(); ++pos)
+        {
+            char chr{tok[pos]};
+            if (chr >= 'A' && chr <= 'Z')
+                chr = static_cast<char>(chr - 'A' + 'a');
+            if (chr != lower[pos])
+                return false;
+        }
+        return true;
+    }
+
+    [[nodiscard]] inline bool is_status_keyword(std::string_view tok) noexcept
+    {
+        return equals_ascii_lower(tok, "code") || equals_ascii_lower(tok, "status") ||
+               equals_ascii_lower(tok, "exit") || equals_ascii_lower(tok, "signal");
+    }
+
+    // F13 — composite-token masking, SOURCE_LOCATION class.
+    //
+    // Drain masks only WHOLE tokens that are all-digit / IPv4 / hex. A compiler
+    // source location like `tokenizer.cpp:4500:30:` is one whitespace token that
+    // is none of those, so it stays literal and every (file,line,col) becomes its
+    // own template — the dominant cardinality blow-up (≈2160 singletons on the
+    // multi-format mix; most of the 2373). See the Salience epic flaw F13.
+    //
+    // Recognize `<path>:<digits>[:<digits>]…[:]` where the prefix before the first
+    // `:<digits>` is path-like (contains '.' or '/'), and normalize by masking each
+    // numeric `:<digits>` run to `:<*>` while KEEPING the path (the semantic part:
+    // which file). So `tokenizer.cpp:4500:30:` and `tokenizer.cpp:12:5:` collapse
+    // to one template `tokenizer.cpp:<*>:<*>:`, but a different file stays distinct.
+    //
+    // Pure and deterministic (a function of the token bytes only — I5). Returns
+    // true and fills `out` with the normalized form; returns false (leaving `out`
+    // untouched) when `tok` is not a source location. The path-like requirement
+    // keeps clock times (`12:30:45`) and bare ratios out — only `:<digits>` runs
+    // behind a path prefix are masked.
+    [[nodiscard]] inline bool normalize_source_location(std::string_view tok, std::string& out)
+    {
+        // Locate the first ':' that is immediately followed by a digit.
+        std::size_t first{std::string_view::npos};
+        for (std::size_t pos{0}; pos + 1 < tok.size(); ++pos)
+        {
+            if (tok[pos] == ':' && is_ascii_digit(tok[pos + 1]))
+            {
+                first = pos;
+                break;
+            }
+        }
+        if (first == std::string_view::npos)
+            return false;
+
+        const std::string_view prefix{tok.substr(0, first)};
+        if (prefix.empty())
+            return false;
+        const bool path_like{
+            std::ranges::any_of(prefix, [](char chr) { return chr == '.' || chr == '/'; })};
+        if (!path_like)
+            return false;
+
+        out.clear();
+        out.append(prefix);
+        std::size_t cursor{first};
+        while (cursor < tok.size())
+        {
+            if (tok[cursor] == ':' && cursor + 1 < tok.size() && is_ascii_digit(tok[cursor + 1]))
+            {
+                out.append(":<*>");
+                ++cursor; // consume ':'
+                while (cursor < tok.size() && is_ascii_digit(tok[cursor]))
+                    ++cursor; // consume the digit run
+            }
+            else
+            {
+                out.push_back(tok[cursor]);
+                ++cursor;
+            }
+        }
+        return true;
+    }
+
+    // F13 — VERSIONED_REF composite: `<name>/<numeric-version>[trailing punct]`.
+    // Conan/cmake/package output ("zlib/3", "boost/1.83.0:") keeps a literal token
+    // per (name,version), so a bumped version is a phantom new template. Normalize
+    // by KEEPing the name and masking the numeric version → `zlib/<*>`, `boost/<*>:`.
+    // Requires: a '/' whose suffix is a numeric (digits/dots) version run, then only
+    // punctuation to end (so paths like "src/foo.cpp" — alpha suffix — are NOT hit).
+    [[nodiscard]] inline bool normalize_versioned_ref(std::string_view tok, std::string& out)
+    {
+        const std::size_t slash{tok.rfind('/')};
+        if (slash == std::string_view::npos || slash + 1 >= tok.size())
+            return false;
+        if (!is_ascii_digit(tok[slash + 1]))
+            return false; // version must start with a digit
+
+        std::size_t cursor{slash + 1};
+        bool saw_digit{false};
+        while (cursor < tok.size() && (is_ascii_digit(tok[cursor]) || tok[cursor] == '.'))
+        {
+            saw_digit = saw_digit || is_ascii_digit(tok[cursor]);
+            ++cursor;
+        }
+        if (!saw_digit)
+            return false;
+        // Anything after the version run must be non-alphanumeric (punctuation),
+        // else this is a path segment ("v1/2x") not a terminal version.
+        for (std::size_t pos{cursor}; pos < tok.size(); ++pos)
+        {
+            const char chr{tok[pos]};
+            if (is_ascii_digit(chr) || (chr >= 'a' && chr <= 'z') || (chr >= 'A' && chr <= 'Z'))
+                return false;
+        }
+
+        out.clear();
+        out.append(tok.substr(0, slash + 1)); // "zlib/"
+        out.append("<*>");
+        out.append(tok.substr(cursor)); // trailing punctuation, e.g. ":"
+        return true;
+    }
+
+    // F13 — BRACKET_INDEX composite: `<word>[<digits>]<rest>`. Recursion depth and
+    // worker indices ("make[2]:", "thread[15]") otherwise template per index.
+    // Normalize the first bracketed digit run → `make[<*>]:`.
+    [[nodiscard]] inline bool normalize_bracket_index(std::string_view tok, std::string& out)
+    {
+        const std::size_t open{tok.find('[')};
+        if (open == std::string_view::npos || open + 1 >= tok.size())
+            return false;
+        std::size_t cursor{open + 1};
+        bool saw_digit{false};
+        while (cursor < tok.size() && is_ascii_digit(tok[cursor]))
+        {
+            saw_digit = true;
+            ++cursor;
+        }
+        if (!saw_digit || cursor >= tok.size() || tok[cursor] != ']')
+            return false;
+
+        out.clear();
+        out.append(tok.substr(0, open + 1)); // "make["
+        out.append("<*>");
+        out.append(tok.substr(cursor)); // "]:" and anything after
+        return true;
+    }
+
     template <typename Cb> inline void for_each_token(std::string_view content, Cb&& callback)
     {
+        const char* const base{content.data()};
         std::size_t cursor{0};
         const std::size_t len{content.size()};
         while (cursor < len)
         {
-            while (cursor < len && content[cursor] == ' ')
+            while (cursor < len && base[cursor] == ' ')
                 ++cursor;
             if (cursor >= len)
                 break;
             const std::size_t start{cursor};
-            while (cursor < len && content[cursor] != ' ')
-                ++cursor;
+            // Scan to the next space with memchr (vectorised in libc) — token bodies
+            // (paths, ids, JSON) are the long runs; bit-identical boundaries to the
+            // byte loop. memchr is never asymptotically worse for the short tokens.
+            const void* const space{std::memchr(base + cursor, ' ', len - cursor)};
+            cursor = space != nullptr
+                         ? static_cast<std::size_t>(static_cast<const char*>(space) - base)
+                         : len;
             std::forward<Cb>(callback)(content.substr(start, cursor - start));
         }
     }
@@ -387,6 +559,43 @@ struct Drain::Impl
     // Reusable per-line scratch.
     std::vector<TokenID> line_ids;
     std::vector<std::string_view> line_raw_tokens;
+    // Reusable scratch for composite-token normalization (F13). Capacity is
+    // retained across calls, so a matched composite costs no per-line heap alloc
+    // in steady state; non-composite tokens never touch it.
+    std::string composite_scratch;
+
+    // F2 — identity (KEEP) token ids. identity_id[id] is true for a status value
+    // kept distinct (exit code / status / signal). A difference at an identity
+    // position disqualifies a cluster (forces a new template) so a green→red flip
+    // does not get merged + re-wildcarded. `any_identity` gates the matcher check
+    // so logs without status values pay zero cost.
+    std::vector<std::uint8_t> identity_id;
+    bool any_identity{false};
+
+    void mark_identity(TokenID tok_id)
+    {
+        if (tok_id >= identity_id.size())
+            identity_id.resize(static_cast<std::size_t>(tok_id) + 1U, 0U);
+        identity_id[tok_id] = 1U;
+        any_identity = true;
+    }
+
+    [[nodiscard]] bool is_identity(TokenID tok_id) const noexcept
+    {
+        return tok_id < identity_id.size() && identity_id[tok_id] != 0U;
+    }
+
+    // True if line and candidate disagree at any IDENTITY position — i.e. a KEEP
+    // status value differs. Such a cluster is not the same template (F2).
+    [[nodiscard]] bool identity_mismatch(std::span<const TokenID> line,
+                                         std::span<const TokenID> cand) const noexcept
+    {
+        const std::size_t len{line.size()};
+        for (std::size_t pos{0}; pos < len; ++pos)
+            if (line[pos] != cand[pos] && (is_identity(line[pos]) || is_identity(cand[pos])))
+                return true;
+        return false;
+    }
 
     void reset_state()
     {
@@ -400,6 +609,8 @@ struct Drain::Impl
         next_id = 1;
         total_matched = 0;
         generation = 0;
+        identity_id.clear();
+        any_identity = false;
     }
 
     [[nodiscard]] bool is_masked(std::string_view tok) const noexcept
@@ -411,21 +622,62 @@ struct Drain::Impl
         return false;
     }
 
-    [[nodiscard]] TokenID intern_token(std::string_view tok)
+    // Lookup-or-insert a token as a LITERAL (never masked). Used by the F2
+    // status-value KEEP path, which must bypass the all-digit mask.
+    [[nodiscard]] TokenID intern_literal(std::string_view tok)
     {
-        if (tok.empty() || is_all_digits(tok))
+        const std::uint32_t hash_val{fnv1a32(tok)};
+        const TokenID existing{intern.lookup(tok, hash_val)};
+        if (existing != kInvalidId) [[likely]]
+            return existing;
+        return intern.insert(arena->store_string(tok), hash_val);
+    }
+
+    [[nodiscard]] TokenID intern_token(std::string_view tok, std::string_view prev)
+    {
+        // Classify the token's digit-ness ONCE (the predicate is used by both the
+        // F2 KEEP gate and the all-digit mask).
+        const bool all_digits{is_all_digits(tok)};
+
+        // F2: KEEP a low-cardinality status value distinct (exit code / status /
+        // signal). Context- and size-gated, so bare numbers elsewhere still mask
+        // and cardinality stays bounded. This is what makes a green→red flip
+        // (exit 0→1) two templates instead of one collapsed `exit code <*>`.
+        if (all_digits && tok.size() <= kMaxStatusDigits && is_status_keyword(prev))
+        {
+            const TokenID kept{intern_literal(tok)};
+            mark_identity(kept);
+            return kept;
+        }
+
+        if (tok.empty() || all_digits)
             return kWildcardId;
+
+        // F13: normalize a composite token (source location / versioned ref /
+        // bracket index) before interning, so noisy variants share a template.
+        // Single cheap pre-gate first: every composite needs a ':' '/' or '[', so
+        // a token with none (the common case) skips all three recognizers — one
+        // scan instead of three. Matching tokens build the scratch; the interned
+        // identity is the NORMALIZED form, so raw variants are never cached
+        // individually (a matched composite re-normalizes per occurrence).
+        std::string_view key{tok};
+        const bool maybe_composite{std::ranges::any_of(
+            tok, [](char chr) { return chr == ':' || chr == '/' || chr == '['; })};
+        if (maybe_composite && (normalize_source_location(tok, composite_scratch) ||
+                                normalize_versioned_ref(tok, composite_scratch) ||
+                                normalize_bracket_index(tok, composite_scratch)))
+            key = composite_scratch;
 
         // Hash lookup FIRST: steady-state hot path has zero RE2 calls.
         // kWildcardId (0) is a valid cached result for previously-masked tokens.
-        const std::uint32_t hash_val{fnv1a32(tok)};
-        const TokenID existing{intern.lookup(tok, hash_val)};
+        const std::uint32_t hash_val{fnv1a32(key)};
+        const TokenID existing{intern.lookup(key, hash_val)};
         if (existing != kInvalidId) [[likely]]
             return existing; // includes cached kWildcardId for masked tokens
 
         // Novel token: run masks once and cache result.
-        const std::string_view stable{arena->store_string(tok)};
-        if (is_masked(tok))
+        const std::string_view stable{arena->store_string(key)};
+        if (is_masked(key))
         {
             intern.insert_masked(stable, hash_val);
             return kWildcardId;
@@ -437,11 +689,13 @@ struct Drain::Impl
     {
         line_ids.clear();
         line_raw_tokens.clear();
+        std::string_view prev{}; // raw previous token — context for F2 status KEEP
         for_each_token(content,
                        [&](std::string_view tok)
                        {
                            line_raw_tokens.push_back(tok);
-                           line_ids.push_back(intern_token(tok));
+                           line_ids.push_back(intern_token(tok, prev));
+                           prev = tok;
                        });
     }
 
@@ -472,6 +726,11 @@ struct Drain::Impl
             const Cluster& cand{clusters[cand_idx]};
             const auto cand_span{
                 std::span<const TokenID>(template_token_ids).subspan(cand.token_offset, length)};
+            // F2: a cluster whose KEEP/identity value differs is a different
+            // template — skip it so the line forms its own cluster. Gated by
+            // any_identity, so streams without status values are unaffected.
+            if (any_identity && identity_mismatch(std::span<const TokenID>(line_ids), cand_span))
+                continue;
             const std::size_t match_count{
                 similarity_matches(std::span<const TokenID>(line_ids), cand_span)};
             if (match_count > best_matches)

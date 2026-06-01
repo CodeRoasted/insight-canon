@@ -28,6 +28,7 @@
 #include "insight/tokenization/drain_config.hpp"
 #include "insight/tokenization/log_parser.hpp"
 #include "insight/tokenization/parsed_line.hpp"
+#include "insight/tokenization/structural_role_registry.hpp"
 #include "insight/utils/logger.hpp"
 #include <expected>
 
@@ -47,6 +48,7 @@ struct Tokenizer::Impl
                            // shares the caller-managed arena for stable string_views.
     LogParser parser;
     Drain drain;
+    StructuralRoleRegistry role_registry;
     EventID next_id{0};
     std::size_t produced{0};
 
@@ -75,6 +77,8 @@ struct Tokenizer::Impl
         event.component = parsed_line.component;
         event.template_str = match.template_str;
         event.params = match.params;
+        event.structural_role = insight::tokenization::StructuralRoleRegistry::classify(
+            parsed_line.content); // F12 announced role
 
         ++produced;
 

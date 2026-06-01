@@ -481,4 +481,156 @@ TEST(Drain_Masking, EmptyMaskListPreservesLiteralTokens)
     EXPECT_NE(r2.template_str.find("<*>"), std::string::npos);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// F13 — SOURCE_LOCATION composite masking. A compiler location token
+// `file:line:col` is masked to `file:<*>:<*>` (path kept, line/col masked), so
+// every (line,col) variant of one file shares a template instead of exploding
+// into singletons (the dominant cardinality driver on real CI logs).
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST(Drain_Masking, SourceLocationLineColCollapseToOneTemplate)
+{
+    Drain drain{tight_config()};
+    const auto id1{do_match(drain, "main.cpp:10:5: warning unused variable").template_id};
+    auto r2{do_match(drain, "main.cpp:200:8: warning unused variable")};
+    EXPECT_EQ(id1, r2.template_id) << "line/col variants of one file must share a template";
+    EXPECT_NE(r2.template_str.find("main.cpp:<*>:<*>:"), std::string::npos)
+        << "path kept, line:col masked; got: " << r2.template_str;
+    EXPECT_EQ(drain.cluster_count(), 1u);
+}
+
+TEST(Drain_Masking, SourceLocationKeepsFileIdentityDistinct)
+{
+    Drain drain{tight_config()};
+    const auto id1{do_match(drain, "main.cpp:10:5: warning unused variable").template_id};
+    const auto id2{do_match(drain, "other.cpp:10:5: warning unused variable").template_id};
+    EXPECT_NE(id1, id2) << "different files are different templates (the path is semantic, kept)";
+    EXPECT_EQ(drain.cluster_count(), 2u);
+}
+
+TEST(Drain_Masking, SourceLocationSingleLineNumberMasked)
+{
+    Drain drain{tight_config()};
+    const auto id1{do_match(drain, "config.yaml:42: parse error here").template_id};
+    auto r2{do_match(drain, "config.yaml:99: parse error here")};
+    EXPECT_EQ(id1, r2.template_id);
+    EXPECT_NE(r2.template_str.find("config.yaml:<*>:"), std::string::npos)
+        << "single line number masked, path kept; got: " << r2.template_str;
+}
+
+// A path-like prefix is REQUIRED: a bare clock time has none, so it is left
+// literal rather than rewritten to "12:<*>:<*>". Guards against masking
+// non-source-location colon-digit tokens.
+TEST(Drain_Masking, ClockTimeNotTreatedAsSourceLocation)
+{
+    Drain drain{tight_config()};
+    auto r{do_match(drain, "job finished at 12:30:45 ok")};
+    EXPECT_NE(r.template_str.find("12:30:45"), std::string::npos)
+        << "clock time must stay literal; got: " << r.template_str;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// F2 — value-aware KEEP of low-cardinality status integers. A small integer
+// immediately after a status keyword (code/status/exit/signal) is KEPT distinct
+// instead of masked, so `exit code 0` and `exit code 1` are different templates
+// and a green→red flip stays visible. Bare numbers elsewhere still mask.
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST(Drain_Masking, StatusValueKeptDistinctAcrossFlip)
+{
+    Drain drain{tight_config()};
+    const auto id0{do_match(drain, "pipeline run completed with exit code 0").template_id};
+    auto r1{do_match(drain, "pipeline run completed with exit code 1")};
+    EXPECT_NE(id0, r1.template_id) << "exit code 0 and 1 must be DISTINCT templates (F2)";
+    EXPECT_NE(r1.template_str.find("exit code 1"), std::string::npos)
+        << "the status value is kept literal; got: " << r1.template_str;
+    EXPECT_EQ(r1.template_str.find("<*>"), std::string::npos)
+        << "no wildcard at the status position; got: " << r1.template_str;
+    EXPECT_EQ(drain.cluster_count(), 2u);
+}
+
+TEST(Drain_Masking, HttpStatusKeptDistinct)
+{
+    Drain drain{tight_config()};
+    const auto ok{do_match(drain, "request handled with status 200").template_id};
+    const auto err{do_match(drain, "request handled with status 500").template_id};
+    EXPECT_NE(ok, err) << "status 200 and 500 must be DISTINCT templates (F2)";
+}
+
+TEST(Drain_Masking, CaseInsensitiveStatusKeyword)
+{
+    Drain drain{tight_config()};
+    const auto a{do_match(drain, "Exit Code 0 reported").template_id};
+    const auto b{do_match(drain, "Exit Code 7 reported").template_id};
+    EXPECT_NE(a, b) << "keyword match is case-insensitive; 0 and 7 stay distinct";
+}
+
+// A bare integer NOT preceded by a status keyword still masks (cardinality bound).
+TEST(Drain_Masking, BareNumberNotAfterKeywordStillMasked)
+{
+    Drain drain{tight_config()};
+    const auto id1{do_match(drain, "request took 5 ms total").template_id};
+    auto r2{do_match(drain, "request took 9 ms total")};
+    EXPECT_EQ(id1, r2.template_id) << "bare latency numbers must still collapse to one template";
+    EXPECT_NE(r2.template_str.find("<*>"), std::string::npos);
+}
+
+// A LARGE value after a keyword exceeds the digit gate → masked (bounds cardinality
+// so a high-cardinality id behind "code" cannot explode templates).
+TEST(Drain_Masking, LargeValueAfterKeywordMasked)
+{
+    Drain drain{tight_config()};
+    const auto id1{do_match(drain, "request code 123456 returned").template_id};
+    auto r2{do_match(drain, "request code 987654 returned")};
+    EXPECT_EQ(id1, r2.template_id) << "values beyond kMaxStatusDigits must mask, not KEEP";
+    EXPECT_NE(r2.template_str.find("<*>"), std::string::npos);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// F13 — VERSIONED_REF and BRACKET_INDEX composites. Package versions ("zlib/3")
+// and bracketed indices ("make[2]") otherwise template per value; normalize the
+// numeric part while keeping the name/word.
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST(Drain_Masking, VersionedRefVersionMaskedKeepsName)
+{
+    Drain drain{tight_config()};
+    const auto id1{do_match(drain, "zlib/3 resolved from cache").template_id};
+    auto r2{do_match(drain, "zlib/7 resolved from cache")};
+    EXPECT_EQ(id1, r2.template_id) << "version variants of one package share a template";
+    EXPECT_NE(r2.template_str.find("zlib/<*>"), std::string::npos)
+        << "name kept, version masked; got: " << r2.template_str;
+    // A different package name stays distinct.
+    const auto id3{do_match(drain, "boost/3 resolved from cache").template_id};
+    EXPECT_NE(id1, id3) << "different package names are different templates";
+}
+
+TEST(Drain_Masking, VersionedRefHandlesTrailingPunctAndDottedVersion)
+{
+    Drain drain{tight_config()};
+    const auto id1{do_match(drain, "boost/1.83.0: already installed").template_id};
+    auto r2{do_match(drain, "boost/1.84.0: already installed")};
+    EXPECT_EQ(id1, r2.template_id) << "dotted versions collapse; trailing ':' preserved";
+    EXPECT_NE(r2.template_str.find("boost/<*>:"), std::string::npos) << "got: " << r2.template_str;
+}
+
+// A path with an alpha suffix after '/' is NOT a versioned ref — left literal.
+TEST(Drain_Masking, VersionedRefNotTriggeredForPaths)
+{
+    Drain drain{tight_config()};
+    auto r{do_match(drain, "loaded src/foo.cpp ok")};
+    EXPECT_NE(r.template_str.find("src/foo.cpp"), std::string::npos)
+        << "a path (alpha suffix) must stay literal; got: " << r.template_str;
+}
+
+TEST(Drain_Masking, BracketIndexMasked)
+{
+    Drain drain{tight_config()};
+    const auto id1{do_match(drain, "make[1]: Entering build").template_id};
+    auto r2{do_match(drain, "make[4]: Entering build")};
+    EXPECT_EQ(id1, r2.template_id) << "bracketed index variants share a template";
+    EXPECT_NE(r2.template_str.find("make[<*>]:"), std::string::npos)
+        << "index masked, word + brackets kept; got: " << r2.template_str;
+}
+
 // NOLINTEND

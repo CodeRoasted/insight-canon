@@ -24,6 +24,7 @@
 #include "insight/tokenization/strategies/bgl.hpp"
 #include "insight/tokenization/strategies/clf.hpp"
 #include "insight/tokenization/strategies/cloudwatch.hpp"
+#include "insight/tokenization/strategies/github_actions.hpp"
 #include "insight/tokenization/strategies/health_app.hpp"
 #include "insight/tokenization/strategies/hpc.hpp"
 #include "insight/tokenization/strategies/iis_w3c.hpp"
@@ -213,7 +214,12 @@ namespace
         if (looks_like_yyyy_mm_dd(line))
         {
             if (line.size() > kTimestampSeparatorIndex && line[kTimestampSeparatorIndex] == 'T')
+            {
+                // Both share the RFC3339 prefix; GitHubActions outranks Syslog
+                // by confidence on its precise 7-digit-fractional/'Z' shape.
+                candidates.add(LogFormat::GitHubActions);
                 candidates.add(LogFormat::Syslog);
+            }
             else
             {
                 candidates.add(LogFormat::WindowsCBS);
@@ -252,6 +258,7 @@ FormatDetector::FormatDetector()
 
     add_builtin(std::make_unique<JsonStrategy>());
     add_builtin(std::make_unique<SyslogStrategy>());
+    add_builtin(std::make_unique<GitHubActionsStrategy>());
     add_builtin(std::make_unique<CLFStrategy>());
     add_builtin(std::make_unique<KVStrategy>());
     add_builtin(std::make_unique<HealthAppStrategy>());

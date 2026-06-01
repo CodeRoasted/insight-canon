@@ -288,4 +288,103 @@ TEST(InferLeadingLogLevel, BareErrorBodyWithoutLevelPrefix)
     EXPECT_EQ(infer_leading_log_level("connection refused to db host 10.0.0.7"), LogLevel::Error);
 }
 
+// The level commonly sits right after a leading timestamp — the dominant raw
+// app-log shape ("<ts> LEVEL message"). Stage 1 must skip the timestamp (incl.
+// the ISO "T"/"Z" date artifacts) and recover the level, not stop at the first
+// alpha run. Regression: ts-led INFO/WARN/DEBUG lines were silently Unknown, so
+// the severity-salience axis never saw an INFO→ERROR deployment flip.
+TEST(InferLeadingLogLevel, IsoTimestampThenLevelTokenRecovered)
+{
+    EXPECT_EQ(infer_leading_log_level(
+                  "2026-05-29T10:00:00 INFO request id=1 path=/api/users status=200 latency_ms=12"),
+              LogLevel::Info)
+        << "ISO ts + INFO";
+    EXPECT_EQ(infer_leading_log_level(
+                  "2026-05-29T11:00:01 ERROR request id=2 status=500 error=\"db timeout\""),
+              LogLevel::Error)
+        << "ISO ts + ERROR";
+    EXPECT_EQ(infer_leading_log_level("2026-05-29T10:00:00 WARN db.pool exhausted"), LogLevel::Warn)
+        << "ISO ts + WARN";
+    EXPECT_EQ(infer_leading_log_level("2026-05-29T10:00:00.123456Z DEBUG cache miss key=user:42"),
+              LogLevel::Debug)
+        << "fractional ISO ts + DEBUG";
+}
+TEST(InferLeadingLogLevel, SpaceSeparatedDateTimeThenLevel)
+{
+    // "<date> <time>,<millis> LEVEL …" (e.g. Python logging default).
+    EXPECT_EQ(infer_leading_log_level("2026-05-29 10:00:00,123 WARN slow query 4200ms"),
+              LogLevel::Warn)
+        << "space-separated date+time prefix";
+}
+TEST(InferLeadingLogLevel, BracketedTimestampThenLevel)
+{
+    EXPECT_EQ(infer_leading_log_level("[2026-05-29T10:00:00Z] DEBUG connecting to db"),
+              LogLevel::Debug)
+        << "bracketed ISO timestamp prefix";
+}
+TEST(InferLeadingLogLevel, LeadingTraceTokenSurvivesTimestampSkip)
+{
+    // Guard: the fix must not treat the ISO "T" as a skippable char and shear the
+    // leading "TRACE"/"T…" tokens. The level vocabulary is matched whole.
+    EXPECT_EQ(infer_leading_log_level("TRACE startup complete in 12ms"), LogLevel::Trace)
+        << "leading TRACE must not be mangled";
+}
+TEST(InferLeadingLogLevel, TimestampThenNoLevelIsUnknown)
+{
+    // A ts-led line with no level word stays Unknown — the timestamp skip must
+    // not manufacture a level, and no error/warn keyword is present for stage 2.
+    EXPECT_EQ(infer_leading_log_level("2026-05-29T10:00:00 request GET /api/orders 200 14ms"),
+              LogLevel::Unknown)
+        << "ts-led, no level token";
+}
+// Regression: a failure word buried INSIDE a token (a filename / identifier /
+// plural negation) must NOT be read as Error. The old stage-2 raw-substring scan
+// fired on the embedded "error", which downstream promoted a benign NEW template
+// to HIGH "New error" in the eidos diff. Stage 2 is now token-aware.
+TEST(InferLeadingLogLevel, EmbeddedFailureSubstringIsNotError)
+{
+    EXPECT_EQ(infer_leading_log_level("Writing tsc-error-report.json"), LogLevel::Unknown)
+        << "filename containing 'error' is not an error line";
+    EXPECT_EQ(infer_leading_log_level("Compiled error_handler.ts successfully"), LogLevel::Unknown)
+        << "identifier containing 'error' is not an error line";
+    EXPECT_EQ(infer_leading_log_level("no errors found"), LogLevel::Unknown)
+        << "negated plural 'errors' is not an error line";
+    EXPECT_EQ(infer_leading_log_level("page fault handler registered"), LogLevel::Unknown)
+        << "'fault' is not a standalone failure cue (only 'segfault' is)";
+}
+// Recall guard: a CamelCase exception type is the failure cue even with no other
+// error word on the line (the substring scan caught these incidentally; the
+// token matcher catches them by design via the `…Error`/`…Exception` suffix).
+TEST(InferLeadingLogLevel, CamelCaseErrorTypeIsError)
+{
+    EXPECT_EQ(infer_leading_log_level("  raise ValueError(\"bad input\")"), LogLevel::Error)
+        << "ValueError type name";
+    EXPECT_EQ(infer_leading_log_level("IOError: disk full"), LogLevel::Error)
+        << "IOError type name";
+}
+// A bare OS/shell crash carries no level keyword, so the failure lexicon is the
+// only signal — "Segmentation fault" must be recovered as Error (as the adjacent
+// pair; a lone "segmentation"/"fault" is benign and stays Unknown).
+TEST(InferLeadingLogLevel, BareSegmentationFaultIsError)
+{
+    EXPECT_EQ(infer_leading_log_level("Segmentation fault (core dumped)"), LogLevel::Error)
+        << "OS crash line, no level prefix";
+    EXPECT_EQ(infer_leading_log_level("running image segmentation on shard 3"), LogLevel::Unknown)
+        << "bare 'segmentation' is benign";
+}
+// Real CI logs wrap the level/result word in ANSI SGR colour (`ESC[31mFAILED`).
+// The escape's `31m` tail must not glue to the word — the cue is still recovered.
+TEST(InferLeadingLogLevel, AnsiColourWrappedLevelRecovered)
+{
+    EXPECT_EQ(infer_leading_log_level("tests/test_db.py::tc_0 \x1b[31mFAILED\x1b[0m [ 99%]"),
+              LogLevel::Error)
+        << "ANSI-wrapped FAILED";
+    EXPECT_EQ(infer_leading_log_level("\x1b[31mERROR\x1b[0m: db connection refused"),
+              LogLevel::Error)
+        << "ANSI-wrapped leading ERROR";
+    EXPECT_EQ(infer_leading_log_level("tests/test_api.py::tc_0 \x1b[32mPASSED\x1b[0m [ 0%]"),
+              LogLevel::Unknown)
+        << "ANSI-wrapped PASSED is not a level";
+}
+
 // NOLINTEND

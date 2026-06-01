@@ -16,7 +16,6 @@ using Duration = std::chrono::system_clock::duration;
 // ── Identifiers ──
 using EventID = uint64_t;
 using TemplateID = uint64_t;
-using SessionID = uint64_t;
 using WindowID = uint64_t;
 
 // ── Sequences ──
@@ -77,6 +76,12 @@ enum class LogFormat : uint8_t
     IISW3C,
     RFC5424,
     NginxError,
+    // GitHub Actions / Azure Pipelines logs: every line prefixed with an
+    // RFC3339 UTC timestamp at 100-ns (7-fraction-digit) precision + 'Z', then
+    // the raw message (which may carry ##[group]/##[error]/##[warning] workflow
+    // commands). A first-class CI input — without it these lines are mis-claimed
+    // by Syslog (RFC3339 prefix) and shredded into empty templates.
+    GitHubActions,
     // Catch-all for unstructured text (CI / pytest / build logs). Selected only
     // when no structured strategy matches a non-empty line, so the tokenizer
     // never silently drops a line. Keep immediately before Unknown.
@@ -126,10 +131,44 @@ enum class LogFormat : uint8_t
         return "RFC5424"sv;
     case LogFormat::NginxError:
         return "NginxError"sv;
+    case LogFormat::GitHubActions:
+        return "GitHubActions"sv;
     case LogFormat::RawText:
         return "RawText"sv;
     default:
         return "Unknown"sv;
+    }
+}
+
+// What a LINE does in the sequence (its structural role), as opposed to what a
+// token inside it MEANS (its SemanticClass). Two orthogonal ontologies, two
+// registries — keeping them separate is what avoids the value-vs-line-role
+// conflation (Salience epic flaw F12, §4.2). These roles are ANNOUNCED — the line
+// declares itself via a marker (`##[group]`, `##[error]`, a non-zero exit) — never
+// derived from graph position (that is a structural-layer output, not a role).
+// A seed catalog; designed to grow during calibration.
+enum class StructuralRole : uint8_t
+{
+    None = 0,   ///< no announced role (the common case)
+    GroupBegin, ///< a section/group opens (`##[group]`)
+    GroupEnd,   ///< a section/group closes (`##[endgroup]`)
+    Terminator  ///< an outcome/failure marker (`##[error]`, error/fatal level, non-zero exit)
+};
+
+[[nodiscard]] constexpr std::string_view to_string(StructuralRole role) noexcept
+{
+    using namespace std::literals;
+
+    switch (role)
+    {
+    case StructuralRole::GroupBegin:
+        return "GroupBegin"sv;
+    case StructuralRole::GroupEnd:
+        return "GroupEnd"sv;
+    case StructuralRole::Terminator:
+        return "Terminator"sv;
+    default:
+        return "None"sv;
     }
 }
 
