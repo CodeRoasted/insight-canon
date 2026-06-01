@@ -58,7 +58,8 @@ TEST(FailureLexicon, WarningCue)
 {
     EXPECT_TRUE(contains_warning_cue("WARN db.pool exhausted"));
     EXPECT_TRUE(contains_warning_cue("deprecation warning: x removed"));
-    EXPECT_FALSE(contains_warning_cue("forwarding request upstream")) << "'forwarding' is not 'warn'";
+    EXPECT_FALSE(contains_warning_cue("forwarding request upstream"))
+        << "'forwarding' is not 'warn'";
     EXPECT_FALSE(contains_failure_cue("WARN db.pool exhausted")) << "a warn line is not a failure";
 }
 
@@ -68,8 +69,10 @@ TEST(FailureLexicon, WarningCue)
 TEST(FailureLexicon, SegmentationFaultPhrase)
 {
     EXPECT_TRUE(contains_failure_cue("Segmentation fault (core dumped)")) << "adjacent pair";
-    EXPECT_TRUE(contains_failure_cue("[ 12.3] worker: segmentation fault at 0x0")) << "mid-line pair";
-    EXPECT_FALSE(contains_failure_cue("image segmentation pipeline complete")) << "bare segmentation";
+    EXPECT_TRUE(contains_failure_cue("[ 12.3] worker: segmentation fault at 0x0"))
+        << "mid-line pair";
+    EXPECT_FALSE(contains_failure_cue("image segmentation pipeline complete"))
+        << "bare segmentation";
     EXPECT_FALSE(contains_failure_cue("network segmentation enabled")) << "bare segmentation";
     EXPECT_FALSE(contains_failure_cue("page fault handler registered")) << "bare fault";
 }

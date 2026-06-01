@@ -49,8 +49,8 @@ namespace
 
 } // namespace
 
-std::expected<ParsedLine, std::string>
-GitHubActionsStrategy::parse(std::string_view line, ArenaAllocator& arena) const
+std::expected<ParsedLine, std::string> GitHubActionsStrategy::parse(std::string_view line,
+                                                                    ArenaAllocator& arena) const
 {
     if (!detail::is_github_actions_prefix(line))
         return std::unexpected(std::string("GitHubActionsStrategy: missing GHA timestamp prefix"));
@@ -63,7 +63,8 @@ GitHubActionsStrategy::parse(std::string_view line, ArenaAllocator& arena) const
     // A timestamp-only line is a blank line. Decline it: make_event turns the
     // unexpected into a dropped line, so it never forms an empty "" template.
     if (content.empty())
-        return std::unexpected(std::string("GitHubActionsStrategy: blank GHA line (timestamp only)"));
+        return std::unexpected(
+            std::string("GitHubActionsStrategy: blank GHA line (timestamp only)"));
 
     ParsedLine parsed;
     parsed.raw_line = line;

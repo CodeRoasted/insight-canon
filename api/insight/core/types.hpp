@@ -149,10 +149,10 @@ enum class LogFormat : uint8_t
 // A seed catalog; designed to grow during calibration.
 enum class StructuralRole : uint8_t
 {
-    None = 0,    ///< no announced role (the common case)
-    GroupBegin,  ///< a section/group opens (`##[group]`)
-    GroupEnd,    ///< a section/group closes (`##[endgroup]`)
-    Terminator   ///< an outcome/failure marker (`##[error]`, error/fatal level, non-zero exit)
+    None = 0,   ///< no announced role (the common case)
+    GroupBegin, ///< a section/group opens (`##[group]`)
+    GroupEnd,   ///< a section/group closes (`##[endgroup]`)
+    Terminator  ///< an outcome/failure marker (`##[error]`, error/fatal level, non-zero exit)
 };
 
 [[nodiscard]] constexpr std::string_view to_string(StructuralRole role) noexcept

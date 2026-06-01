@@ -51,9 +51,10 @@ TEST(DetMath, Log2ReferenceVectorIsBitExact)
 {
     for (const auto& ref : kLog2Ref)
         EXPECT_EQ(det_log2_fixed(ref.x), ref.expected_q)
-            << "det_log2_fixed(" << ref.x << ") drifted from the frozen reference — a "
-               "cross-machine determinism regression. got=" << det_log2_fixed(ref.x)
-            << " expected=" << ref.expected_q;
+            << "det_log2_fixed(" << ref.x
+            << ") drifted from the frozen reference — a "
+               "cross-machine determinism regression. got="
+            << det_log2_fixed(ref.x) << " expected=" << ref.expected_q;
 }
 
 TEST(DetMath, PowersOfTwoAreExactIntegers)
@@ -105,8 +106,7 @@ TEST(DetMath, ReducerUniformDistributionEntropyIsExact)
     for (int i = 0; i < 4; ++i)
     {
         constexpr std::uint64_t count{25};
-        reducer.add_fixed(static_cast<__int128>(count) *
-                          (log2_total - det_log2_fixed(count)));
+        reducer.add_fixed(static_cast<__int128>(count) * (log2_total - det_log2_fixed(count)));
     }
     EXPECT_DOUBLE_EQ(reducer.normalized_bits(total), 2.0);
 }

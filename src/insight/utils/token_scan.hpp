@@ -9,73 +9,74 @@ namespace insight::utils
 namespace detail
 {
 
-// Token delimiters: whitespace + STRUCTURAL punctuation (brackets, parens,
-// quotes, and the `: = , ; |` value/field separators). Identifier- and
-// path-join chars (`- _ . /` …) are deliberately NOT delimiters, so a compound
-// like `tsc-error-report.json` stays a single atom while a bracketed marker
-// `##[error]` or a structured value `level=error` exposes its inner word.
-[[nodiscard]] constexpr bool is_token_delimiter(char chr) noexcept
-{
-    switch (chr)
+    // Token delimiters: whitespace + STRUCTURAL punctuation (brackets, parens,
+    // quotes, and the `: = , ; |` value/field separators). Identifier- and
+    // path-join chars (`- _ . /` …) are deliberately NOT delimiters, so a compound
+    // like `tsc-error-report.json` stays a single atom while a bracketed marker
+    // `##[error]` or a structured value `level=error` exposes its inner word.
+    [[nodiscard]] constexpr bool is_token_delimiter(char chr) noexcept
     {
-    case ' ':
-    case '\t':
-    case '\n':
-    case '\r':
-    case '\f':
-    case '\v':
-    case '[':
-    case ']':
-    case '(':
-    case ')':
-    case '{':
-    case '}':
-    case '<':
-    case '>':
-    case '"':
-    case '\'':
-    case '`':
-    case ',':
-    case ':':
-    case ';':
-    case '|':
-    case '=':
-        return true;
-    default:
-        return false;
+        switch (chr)
+        {
+        case ' ':
+        case '\t':
+        case '\n':
+        case '\r':
+        case '\f':
+        case '\v':
+        case '[':
+        case ']':
+        case '(':
+        case ')':
+        case '{':
+        case '}':
+        case '<':
+        case '>':
+        case '"':
+        case '\'':
+        case '`':
+        case ',':
+        case ':':
+        case ';':
+        case '|':
+        case '=':
+            return true;
+        default:
+            return false;
+        }
     }
-}
 
-[[nodiscard]] constexpr bool is_token_alnum(char chr) noexcept
-{
-    const unsigned chu{static_cast<unsigned>(static_cast<unsigned char>(chr))};
-    return ((chu | 0x20U) - 'a') < 26U || (chu - '0') < 10U;
-}
-
-// Length of an ANSI escape sequence starting at text[pos], or 0 if none. Handles
-// the CSI form `ESC [ <params> <final>` (covers the SGR colour codes CI logs wrap
-// level words in, e.g. `ESC[31mFAILED`) and a bare ESC. ANSI codes are formatting
-// noise, never token content, so a sequence is consumed as a delimiter — a level
-// or cue glued to one is still extracted as a clean word.
-[[nodiscard]] constexpr std::size_t ansi_escape_len(std::string_view text, std::size_t pos) noexcept
-{
-    if (pos >= text.size() || text[pos] != '\x1b')
-        return 0U;
-    // A CSI sequence terminates at its first "final byte" (ECMA-48 §5.4).
-    constexpr unsigned kCsiFinalByteMin{0x40U};
-    constexpr unsigned kCsiFinalByteMax{0x7EU};
-    std::size_t end{pos + 1U};
-    if (end < text.size() && text[end] == '[')
+    [[nodiscard]] constexpr bool is_token_alnum(char chr) noexcept
     {
-        ++end; // CSI params + intermediates, up to the final byte
-        while (end < text.size() && (static_cast<unsigned char>(text[end]) < kCsiFinalByteMin ||
-                                     static_cast<unsigned char>(text[end]) > kCsiFinalByteMax))
-            ++end;
-        if (end < text.size())
-            ++end; // include the final byte
+        const unsigned chu{static_cast<unsigned>(static_cast<unsigned char>(chr))};
+        return ((chu | 0x20U) - 'a') < 26U || (chu - '0') < 10U;
     }
-    return end - pos;
-}
+
+    // Length of an ANSI escape sequence starting at text[pos], or 0 if none. Handles
+    // the CSI form `ESC [ <params> <final>` (covers the SGR colour codes CI logs wrap
+    // level words in, e.g. `ESC[31mFAILED`) and a bare ESC. ANSI codes are formatting
+    // noise, never token content, so a sequence is consumed as a delimiter — a level
+    // or cue glued to one is still extracted as a clean word.
+    [[nodiscard]] constexpr std::size_t ansi_escape_len(std::string_view text,
+                                                        std::size_t pos) noexcept
+    {
+        if (pos >= text.size() || text[pos] != '\x1b')
+            return 0U;
+        // A CSI sequence terminates at its first "final byte" (ECMA-48 §5.4).
+        constexpr unsigned kCsiFinalByteMin{0x40U};
+        constexpr unsigned kCsiFinalByteMax{0x7EU};
+        std::size_t end{pos + 1U};
+        if (end < text.size() && text[end] == '[')
+        {
+            ++end; // CSI params + intermediates, up to the final byte
+            while (end < text.size() && (static_cast<unsigned char>(text[end]) < kCsiFinalByteMin ||
+                                         static_cast<unsigned char>(text[end]) > kCsiFinalByteMax))
+                ++end;
+            if (end < text.size())
+                ++end; // include the final byte
+        }
+        return end - pos;
+    }
 
 } // namespace detail
 
@@ -91,7 +92,8 @@ namespace detail
 template <class Visit>
 [[nodiscard]] bool for_each_token(std::string_view text, std::size_t scan_limit, Visit&& visit)
 {
-    const std::size_t limit{scan_limit == 0U || scan_limit > text.size() ? text.size() : scan_limit};
+    const std::size_t limit{scan_limit == 0U || scan_limit > text.size() ? text.size()
+                                                                         : scan_limit};
     std::size_t pos{0};
     while (pos < limit)
     {

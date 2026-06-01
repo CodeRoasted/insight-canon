@@ -219,7 +219,8 @@ TEST_F(GitHubActionsStrategyTest, InfersErrorFromBodyCueWhenUnmarked)
     auto crash{strategy.parse(kGHASegfault, arena)};
     ASSERT_TRUE(crash.has_value());
     EXPECT_EQ(crash.value().level, LogLevel::Error)
-        << "bare 'Segmentation fault (core dumped)' (no ##[error] marker) escalates via the lexicon";
+        << "bare 'Segmentation fault (core dumped)' (no ##[error] marker) escalates via the "
+           "lexicon";
     EXPECT_EQ(crash.value().content, "Segmentation fault (core dumped)")
         << "body templated bare (no marker), timestamp stripped";
 

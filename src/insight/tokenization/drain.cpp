@@ -494,8 +494,9 @@ namespace
             // (paths, ids, JSON) are the long runs; bit-identical boundaries to the
             // byte loop. memchr is never asymptotically worse for the short tokens.
             const void* const space{std::memchr(base + cursor, ' ', len - cursor)};
-            cursor = space != nullptr ? static_cast<std::size_t>(static_cast<const char*>(space) - base)
-                                      : len;
+            cursor = space != nullptr
+                         ? static_cast<std::size_t>(static_cast<const char*>(space) - base)
+                         : len;
             std::forward<Cb>(callback)(content.substr(start, cursor - start));
         }
     }
@@ -662,10 +663,9 @@ struct Drain::Impl
         std::string_view key{tok};
         const bool maybe_composite{std::ranges::any_of(
             tok, [](char chr) { return chr == ':' || chr == '/' || chr == '['; })};
-        if (maybe_composite &&
-            (normalize_source_location(tok, composite_scratch) ||
-             normalize_versioned_ref(tok, composite_scratch) ||
-             normalize_bracket_index(tok, composite_scratch)))
+        if (maybe_composite && (normalize_source_location(tok, composite_scratch) ||
+                                normalize_versioned_ref(tok, composite_scratch) ||
+                                normalize_bracket_index(tok, composite_scratch)))
             key = composite_scratch;
 
         // Hash lookup FIRST: steady-state hot path has zero RE2 calls.

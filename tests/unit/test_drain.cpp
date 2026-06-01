@@ -611,8 +611,7 @@ TEST(Drain_Masking, VersionedRefHandlesTrailingPunctAndDottedVersion)
     const auto id1{do_match(drain, "boost/1.83.0: already installed").template_id};
     auto r2{do_match(drain, "boost/1.84.0: already installed")};
     EXPECT_EQ(id1, r2.template_id) << "dotted versions collapse; trailing ':' preserved";
-    EXPECT_NE(r2.template_str.find("boost/<*>:"), std::string::npos)
-        << "got: " << r2.template_str;
+    EXPECT_NE(r2.template_str.find("boost/<*>:"), std::string::npos) << "got: " << r2.template_str;
 }
 
 // A path with an alpha suffix after '/' is NOT a versioned ref — left literal.

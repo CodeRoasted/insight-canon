@@ -359,7 +359,8 @@ TEST(InferLeadingLogLevel, CamelCaseErrorTypeIsError)
 {
     EXPECT_EQ(infer_leading_log_level("  raise ValueError(\"bad input\")"), LogLevel::Error)
         << "ValueError type name";
-    EXPECT_EQ(infer_leading_log_level("IOError: disk full"), LogLevel::Error) << "IOError type name";
+    EXPECT_EQ(infer_leading_log_level("IOError: disk full"), LogLevel::Error)
+        << "IOError type name";
 }
 // A bare OS/shell crash carries no level keyword, so the failure lexicon is the
 // only signal — "Segmentation fault" must be recovered as Error (as the adjacent
