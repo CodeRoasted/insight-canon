@@ -49,8 +49,12 @@ LogFormat RawTextStrategy::format() const noexcept
 
 double RawTextStrategy::confidence(std::string_view /*line*/) const noexcept
 {
-    // Always 0.0: never wins the structured majority vote, and never latches the
-    // sticky fast-path. Reached only via FormatDetector's explicit fallback.
+    // MUST stay a constant 0.0 — two behaviours depend on it: this catch-all
+    // never wins the structured majority vote, and it never arms LogParser's
+    // sticky fast-path. A >0 value here would let the fast-path latch this
+    // strategy and greedily template every FOLLOWING line as raw text, starving
+    // the structured strategies. So it is reached only via FormatDetector's
+    // explicit fallback (and only for a non-empty line), never by scoring.
     return 0.0;
 }
 

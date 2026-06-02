@@ -1,0 +1,12 @@
+2026-01-15T10:00:00.1234567Z ##[group]Run build and test
+2026-01-15T10:00:01.2345678Z Restoring dependencies from cache
+2026-01-15T10:00:02.3456789Z Compiling module auth
+2026-01-15T10:00:03.4567890Z Compiling module billing
+2026-01-15T10:00:04.5678901Z ##[warning]deprecated API used in billing/charge.cpp
+2026-01-15T10:00:05.6789012Z Linking target service
+2026-01-15T10:00:06.7890123Z ##[endgroup]
+2026-01-15T10:00:07.8901234Z ##[group]Run unit suite
+2026-01-15T10:00:08.9012345Z test auth.login passed
+2026-01-15T10:00:09.0123456Z test billing.charge passed
+2026-01-15T10:00:10.1234567Z ##[error]test gateway.route failed: connection refused
+2026-01-15T10:00:11.2345678Z ##[error]Process completed with exit code 1

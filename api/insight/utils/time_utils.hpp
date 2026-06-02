@@ -8,14 +8,25 @@
 namespace insight::utils
 {
 
+// Deterministic reference year for yearless timestamps (BSD syslog). The
+// deterministic-content path MUST NOT read the wall clock (insight_determinism_
+// model.md § Event-time, MUST 5); a yearless year comes from an injected
+// reference, defaulting to this constant. A live consumer MAY pass the real
+// current year (read once at stream open); batch/replay uses the constant so the
+// parsed year is bit-identical across runs and across the year rollover.
+inline constexpr int kDefaultReferenceYear{2024};
+
 // Parse ISO 8601 / RFC 3339 timestamps (UTC).
 // Accepted forms: "2024-01-15T10:30:00Z", "2024-01-15T10:30:00.123Z",
 //                 "2024-01-15T10:30:00+05:30", "2024-01-15 10:30:00"
 [[nodiscard]] std::optional<Timestamp> parse_iso8601(std::string_view timestamp_str) noexcept;
 
-// Parse BSD syslog timestamp (no year — uses current year, local time).
-// Accepted form: "Jan  1 12:00:00" or "Jan 15 08:03:22"
-[[nodiscard]] std::optional<Timestamp> parse_bsd_syslog_ts(std::string_view timestamp_str) noexcept;
+// Parse BSD syslog timestamp (no year — yearless RFC3164, e.g. "Jan 15 08:03:22").
+// The year is the injected `reference_year` (deterministic; no wall-clock read).
+// Accepted form: "Jan  1 12:00:00" or "Jan 15 08:03:22".
+[[nodiscard]] std::optional<Timestamp>
+parse_bsd_syslog_ts(std::string_view timestamp_str,
+                    int reference_year = kDefaultReferenceYear) noexcept;
 
 // Parse CLF/Combined-Log-Format timestamp.
 // Accepted form: "10/Oct/2000:13:55:36 -0700"

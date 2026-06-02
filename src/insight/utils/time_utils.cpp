@@ -32,7 +32,6 @@ namespace time_constants
     inline constexpr int kUnixEpochYear{1970};
     inline constexpr int kTmYearOffset{1900};
     inline constexpr int kPivotShortYear{70};
-    inline constexpr int kFallbackCurrentYear{2024};
     inline constexpr int kCenturyYears{100};
     inline constexpr int kLeapCycleYears{400};
     inline constexpr int kMonthsPerYear{12};
@@ -43,6 +42,14 @@ namespace time_constants
     inline constexpr std::int64_t kSecondsPerHour{kMinutesPerHour * kSecondsPerMinute};
     inline constexpr std::int64_t kHoursPerDay{24};
     inline constexpr std::int64_t kSecondsPerDay{kHoursPerDay * kSecondsPerHour};
+    // Representable-year window for a system_clock time_point. Its duration is
+    // signed-int64 nanoseconds (~292 years either side of 1970), so a parsed year
+    // outside this range overflows the seconds→nanoseconds conversion (UB). A
+    // malformed far-future/past year is not a valid log timestamp; clamp to the
+    // safe window with margin for the in-month day/time arithmetic.
+    inline constexpr int kMinReprYear{1678};
+    inline constexpr int kMaxReprYear{2261};
+    inline constexpr int kMaxDayOfMonth{31};
     inline constexpr std::size_t kIso8601MinLength{19};
     inline constexpr std::size_t kBsdSyslogMinLength{15};
     inline constexpr std::size_t kClfMinLength{20};
@@ -107,6 +114,19 @@ namespace
         const int month{utc_tm.tm_mon + 1};
         const int prev_year{year - 1};
 
+        // Field-range guard (found by the fuzz/ASan gate). Malformed fields in an
+        // otherwise well-formed timestamp must not (a) index kMonthOffset[month-1]
+        // out of bounds for month ∉ [1,12], nor (b) produce a time_t whose ns
+        // time_point overflows for a far-future/past year. Both are UB. An
+        // out-of-range field is not a valid date: return the epoch sentinel so the
+        // caller's from_time_t() yields Timestamp{} (un-timestamped downstream).
+        if (month < 1 || month > time_constants::kMonthsPerYear)
+            return 0;
+        if (year < time_constants::kMinReprYear || year > time_constants::kMaxReprYear)
+            return 0;
+        if (utc_tm.tm_mday < 1 || utc_tm.tm_mday > time_constants::kMaxDayOfMonth)
+            return 0;
+
         // Days from Unix epoch (1970-01-01) to the start of `year`.
         // Formula: 365*(year-1970) + (y/4 - 492) - (y/100 - 19) + (y/400 - 4)
         // where 492, 19, 4 = floor(1969/4), floor(1969/100), floor(1969/400).
@@ -140,14 +160,6 @@ namespace
         if (month_it != kMonthNames.end())
             return static_cast<int>(month_it - kMonthNames.begin()) + 1;
         return -1;
-    }
-
-    std::optional<std::tm> safe_gmtime(std::time_t time_point) noexcept
-    {
-        std::tm utc_tm{};
-        if (::gmtime_r(&time_point, &utc_tm) == nullptr)
-            return std::nullopt;
-        return utc_tm;
     }
 
     [[nodiscard]] bool iequals(std::string_view lhs, std::string_view rhs) noexcept
@@ -274,8 +286,14 @@ std::optional<Timestamp> parse_iso8601(std::string_view timestamp_str) noexcept
 }
 
 // BSD syslog: "Jan  1 12:00:00" or "Jan 15 08:03:22"
-// Uses the current calendar year (UTC); appropriate for local syslog.
-std::optional<Timestamp> parse_bsd_syslog_ts(std::string_view timestamp_str) noexcept
+// Yearless (RFC3164); the year is the injected `reference_year`. Deterministic by
+// construction — NO wall-clock read (insight_determinism_model.md § Event-time):
+// a `std::time(nullptr)`-derived year made the parsed timestamp non-reproducible
+// across the year rollover and (cached in a thread_local) invisible to the
+// differential oracle. Default = kDefaultReferenceYear; a live consumer injects
+// the real current year once at stream open.
+std::optional<Timestamp> parse_bsd_syslog_ts(std::string_view timestamp_str,
+                                             int reference_year) noexcept
 {
     if (timestamp_str.size() < time_constants::kBsdSyslogMinLength)
         return std::nullopt;
@@ -315,25 +333,9 @@ std::optional<Timestamp> parse_bsd_syslog_ts(std::string_view timestamp_str) noe
     if (!parse_fixed(ptr + 13, 2, second))
         return std::nullopt;
 
-    // Derive year from UTC clock.  std::gmtime() is not thread-safe (returns
-    // pointer to static storage), so we cache the year in a thread_local.
-    // Refreshed at most once per second via a cheap time_t comparison.
-    thread_local std::time_t tl_last_t{0};
-    thread_local int tl_year{time_constants::kFallbackCurrentYear};
-
-    const std::time_t now{std::time(nullptr)};
-    if (now != tl_last_t)
-    {
-        tl_last_t = now;
-        if (const auto now_tm{safe_gmtime(now)}; now_tm.has_value())
-        {
-            tl_year = now_tm->tm_year + 1900;
-        }
-    }
-    const int year{tl_year};
-
+    // Year = the injected deterministic reference (no wall-clock read).
     std::tm parsed_tm{};
-    parsed_tm.tm_year = year - 1900;
+    parsed_tm.tm_year = reference_year - time_constants::kTmYearOffset;
     parsed_tm.tm_mon = month - 1;
     parsed_tm.tm_mday = day;
     parsed_tm.tm_hour = hour;
