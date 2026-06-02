@@ -1,0 +1,14 @@
+Build started for commit a1b2c3d on branch main
+Restoring dependencies from cache
+Compiling module auth
+Compiling module billing
+Compiling module gateway
+warning: unused variable 'retry_count' in billing/charge.cpp
+Compiling module storage
+Linking target service
+Running unit suite
+test auth.login passed
+test auth.logout passed
+test billing.charge passed
+error: test gateway.route failed: connection refused
+Build failed with 1 error

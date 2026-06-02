@@ -1,0 +1,81 @@
+name: Public Determinism Proof
+
+# The externally-checkable half of the "same input → same output, bit-for-bit"
+# claim (the web "How we build" page rests on it). Runs entirely within this
+# PUBLIC Apache repo — no private superproject, no proprietary eidos, no secrets —
+# so anyone can fork canon and reproduce it.
+#
+# scripts/det_public_proof.sh compiles ONLY canon's public sources + proof/det_proof.cpp
+# across gcc x clang x -O{0,2,3} x -ffp-contract{off,fast}, replays proof/corpus/,
+# and asserts the canonical digest (tokenizer/Drain template set + failure_lexicon
+# token-scan + det_math entropy) is byte-identical across every build AND matches
+# the committed golden (proof/golden.sha256). It is the public twin of the
+# superproject's private determinism_bitidentity.sh — one methodology, public scope.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'api/**'
+      - 'src/**'
+      - 'proof/**'
+      - 'scripts/det_public_proof.sh'
+      - '.github/workflows/determinism-proof.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'api/**'
+      - 'src/**'
+      - 'proof/**'
+      - 'scripts/det_public_proof.sh'
+      - '.github/workflows/determinism-proof.yml'
+
+jobs:
+  public-proof:
+    runs-on: ubuntu-latest
+    env:
+      CONAN_HOME: ${{ github.workspace }}/.conan2
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup environment (gcc + clang — both legs of the cross-compiler proof)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build python3 build-essential clang
+          g++ --version | head -1
+          clang++ --version | head -1
+
+      - name: Setup Conan
+        uses: conan-io/setup-conan@v1
+        with:
+          version: "2.28.1"
+          home: ${{ env.CONAN_HOME }}
+          cache_packages: true
+          profile_detect: false
+
+      - name: Setup Conan profile
+        run: |
+          mkdir -p "$CONAN_HOME/profiles"
+          cp linux-gcc13-release "$CONAN_HOME/profiles/linux-gcc13-release"
+
+      - name: Install deps + emit compile_commands.json (for the dep include/lib paths)
+        run: |
+          conan install . \
+            --profile:host="$CONAN_HOME/profiles/linux-gcc13-release" \
+            --profile:build="$CONAN_HOME/profiles/linux-gcc13-release" \
+            --build=missing --output-folder=build
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/build/conan_toolchain.cmake" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Public determinism proof — cross-compiler byte-identity + golden
+        env:
+          # Both compilers MUST produce a build, or the cross-compiler property is
+          # unverified and the green would be hollow (the gate refuses to pass).
+          DETERMINISM_REQUIRE_COMPILERS: "g++ clang++"
+        run: bash scripts/det_public_proof.sh
