@@ -42,6 +42,14 @@ namespace time_constants
     inline constexpr std::int64_t kSecondsPerHour{kMinutesPerHour * kSecondsPerMinute};
     inline constexpr std::int64_t kHoursPerDay{24};
     inline constexpr std::int64_t kSecondsPerDay{kHoursPerDay * kSecondsPerHour};
+    // Representable-year window for a system_clock time_point. Its duration is
+    // signed-int64 nanoseconds (~292 years either side of 1970), so a parsed year
+    // outside this range overflows the seconds→nanoseconds conversion (UB). A
+    // malformed far-future/past year is not a valid log timestamp; clamp to the
+    // safe window with margin for the in-month day/time arithmetic.
+    inline constexpr int kMinReprYear{1678};
+    inline constexpr int kMaxReprYear{2261};
+    inline constexpr int kMaxDayOfMonth{31};
     inline constexpr std::size_t kIso8601MinLength{19};
     inline constexpr std::size_t kBsdSyslogMinLength{15};
     inline constexpr std::size_t kClfMinLength{20};
@@ -105,6 +113,19 @@ namespace
         const int year{utc_tm.tm_year + time_constants::kTmYearOffset};
         const int month{utc_tm.tm_mon + 1};
         const int prev_year{year - 1};
+
+        // Field-range guard (found by the fuzz/ASan gate). Malformed fields in an
+        // otherwise well-formed timestamp must not (a) index kMonthOffset[month-1]
+        // out of bounds for month ∉ [1,12], nor (b) produce a time_t whose ns
+        // time_point overflows for a far-future/past year. Both are UB. An
+        // out-of-range field is not a valid date: return the epoch sentinel so the
+        // caller's from_time_t() yields Timestamp{} (un-timestamped downstream).
+        if (month < 1 || month > time_constants::kMonthsPerYear)
+            return 0;
+        if (year < time_constants::kMinReprYear || year > time_constants::kMaxReprYear)
+            return 0;
+        if (utc_tm.tm_mday < 1 || utc_tm.tm_mday > time_constants::kMaxDayOfMonth)
+            return 0;
 
         // Days from Unix epoch (1970-01-01) to the start of `year`.
         // Formula: 365*(year-1970) + (y/4 - 492) - (y/100 - 19) + (y/400 - 4)
