@@ -53,6 +53,43 @@ TEST(FailureLexicon, CamelCaseTypeIsACue)
         << "'Error' as a PREFIX (ErrorBudget) is not a cue — only the type suffix is";
 }
 
+// ── A negated type name (…NotError) is NOT an error type ───────────────────────
+// Guard 1 (token-local, context-independent). The dogfood reproducer: a test named
+// "…IsNotError" whose ctest result line was promoted to a HIGH "New error" — a false
+// regression on a PASSING test (the cardinal sin). "…NotError"/"…NoError" semantically
+// negate the suffix; a real type name never does.
+TEST(FailureLexicon, NegatedErrorTypeIsNotACue)
+{
+    EXPECT_FALSE(
+        contains_failure_cue("InsightCanon.BenignNoveltyEntryIsCappedEvidenceNotError completed"))
+        << "the exact dogfood false match — '…NotError' is a negation, not an error type";
+    EXPECT_FALSE(contains_failure_cue("status NoError after retry")) << "'NoError' negates";
+    EXPECT_FALSE(contains_failure_cue("assert HandlesNonError path")) << "'NonError' negates";
+    EXPECT_TRUE(contains_failure_cue("raises a ValueError here"))
+        << "control: a real type ('Value' before 'Error') is still a cue";
+}
+
+// ── A declared PASS verdict demotes a bare error-TYPE NAME (Guard 2) ───────────
+// A test NAMED after an error type ("…RaisesValueError") that PASSED is not a
+// regression. The pass verdict overrides ONLY the weak name-based cue — an explicit
+// failure WORD ("Failed") still fires, so the failing counterpart is caught. The
+// verdict is scanned full-text because it trails a long test name past the keyword head.
+TEST(FailureLexicon, PassVerdictDemotesBareErrorTypeName)
+{
+    EXPECT_FALSE(contains_failure_cue(
+        "1/3 Test #1: InsightCanon.SalienceRaisesValueError ..........   Passed    0.00 sec"))
+        << "PASSING ctest line whose name embeds a real type — never a failure";
+    EXPECT_FALSE(contains_failure_cue("[       OK ] InsightCanon.ThrowsRuntimeException (0 ms)"))
+        << "gtest '[ OK ]' pass verdict demotes the embedded type name";
+    EXPECT_TRUE(contains_failure_cue(
+        "3/3 Test #3: InsightCanon.SalienceRaisesValueError ......***Failed    0.42 sec"))
+        << "the FAILING counterpart: the explicit 'Failed' word still fires";
+    EXPECT_TRUE(contains_failure_cue("[  FAILED  ] InsightCanon.ThrowsRuntimeException (0 ms)"))
+        << "gtest '[ FAILED ]' — the failure word wins";
+    EXPECT_TRUE(contains_failure_cue("ERROR teardown failed though setup was ok"))
+        << "a pass verdict NEVER overrides an explicit failure word";
+}
+
 // ── Warning lexicon is separate (no CamelCase types) ───────────────────────────
 TEST(FailureLexicon, WarningCue)
 {
