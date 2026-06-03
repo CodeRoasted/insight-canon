@@ -12,13 +12,6 @@
 #   ONLY consume the artifact the unprivileged job already rendered. Keep the build in
 #   1-of-2 (read-only token); keep the write here. Never cross the streams.
 #
-# ⚠️ DISABLED via the `.disabled` extension — GitHub ignores any non-`.yml`/`.yaml` file in
-# .github/workflows/, so this poster is inert (it does NOT run, even once merged to main).
-# THE FLIP — the founder-gated "LAST" act — is renaming this file to `sift-post.yml`, ONLY after:
-#   (1) the Parse-Path / fuzz-ASan determinism gate is GREEN on the final pre-Marketplace dispatch,
-#   (2) the engine-v<baseline> binary is published on sift-action (canon's render downloads it),
-#   (3) baseline.ts degrades gracefully on a fork token (Hephaïstos — done, sift-action 3064eff), and
-#   (4) the founder blesses it.
 name: Sift (post)
 
 on:
