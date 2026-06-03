@@ -1,6 +1,6 @@
 name: CI
 permissions:
-  contents: read
+  contents: write
   # canon is PUBLIC + accepts fork PRs: PR diffing/commenting goes through the fork-safe pair
   # (sift-build.yml renders unprivileged, sift-post.yml posts), NOT this job. Here Sift only SEEDS
   # the last-green baseline on push:main — no PR comment — so no pull-requests: write is needed.
@@ -69,4 +69,5 @@ jobs:
         with:
           log: build.log
           fail-on: none
+          commit-comment: regression
           build-status: ${{ job.status == 'success' && 'green' || 'red' }}
