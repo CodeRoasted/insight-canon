@@ -42,10 +42,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup environment (gcc + clang — both legs of the cross-compiler proof)
+      - name: Setup environment (gcc-15 + clang — both legs of the cross-compiler proof)
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build python3 build-essential clang
+          sudo apt-get install -y cmake ninja-build python3 build-essential g++-15 clang
+          # bare `g++` (what det_public_proof.sh invokes) must be the ship compiler gcc-15
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
           g++ --version | head -1
           clang++ --version | head -1
 
@@ -60,13 +63,13 @@ jobs:
       - name: Setup Conan profile
         run: |
           mkdir -p "$CONAN_HOME/profiles"
-          cp linux-gcc13-release "$CONAN_HOME/profiles/linux-gcc13-release"
+          cp linux-gcc15-release "$CONAN_HOME/profiles/linux-gcc15-release"
 
       - name: Install deps + emit compile_commands.json (for the dep include/lib paths)
         run: |
           conan install . \
-            --profile:host="$CONAN_HOME/profiles/linux-gcc13-release" \
-            --profile:build="$CONAN_HOME/profiles/linux-gcc13-release" \
+            --profile:host="$CONAN_HOME/profiles/linux-gcc15-release" \
+            --profile:build="$CONAN_HOME/profiles/linux-gcc15-release" \
             --build=missing --output-folder=build
           cmake -S . -B build -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/build/conan_toolchain.cmake" \

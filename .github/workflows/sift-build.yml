@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Setup environment
-        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build python3-pip build-essential clang-tidy
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build python3-pip build-essential g++-15 clang-tidy
 
       - name: Setup Conan
         uses: conan-io/setup-conan@v1
@@ -40,15 +40,15 @@ jobs:
           profile_detect: false
 
       - name: Setup Conan profile
-        run: mkdir -p "$CONAN_HOME/profiles" && cp linux-gcc13-release "$CONAN_HOME/profiles/linux-gcc13-release"
+        run: mkdir -p "$CONAN_HOME/profiles" && cp linux-gcc15-release "$CONAN_HOME/profiles/linux-gcc15-release"
 
       - id: build
         continue-on-error: true            # a red build must still render a diff
         run: |
           set -o pipefail                  # `| tee` must not mask the build's real exit, else build-status is wrongly green
           conan create . \
-            --profile:host="$CONAN_HOME/profiles/linux-gcc13-release" \
-            --profile:build="$CONAN_HOME/profiles/linux-gcc13-release" \
+            --profile:host="$CONAN_HOME/profiles/linux-gcc15-release" \
+            --profile:build="$CONAN_HOME/profiles/linux-gcc15-release" \
             --build=missing --build-test=missing 2>&1 | tee build.log
 
       - uses: CodeRoasted/sift-action@v1
