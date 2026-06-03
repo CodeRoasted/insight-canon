@@ -1,8 +1,10 @@
 name: CI
 permissions:
   contents: read
-  pull-requests: write   # Sift dogfood: post/update the sticky comment (same-repo, private repo — no forks)
-  actions: write         # Sift dogfood: upload the baseline-log artifact (+ read for last-green resolution)
+  # canon is PUBLIC + accepts fork PRs: PR diffing/commenting goes through the fork-safe pair
+  # (sift-build.yml renders unprivileged, sift-post.yml posts), NOT this job. Here Sift only SEEDS
+  # the last-green baseline on push:main — no PR comment — so no pull-requests: write is needed.
+  actions: write         # Sift: upload the baseline-log artifact the fork-safe render reads (last-green)
 
 on:
   workflow_dispatch:
@@ -58,8 +60,10 @@ jobs:
             --build=missing \
             --build-test=missing
 
-      - name: Sift — structural diff of this run's build+test log (advisory)
-        if: ${{ always() }}
+      - name: Sift — seed the baseline on push (PRs handled by the fork-safe sift-build/post pair)
+        # PUBLIC repo: only seed the last-green baseline on push:main (no-PR → main.ts seeds). PR diffing +
+        # commenting is the fork-safe topology's job (sift-build.yml renders unprivileged, sift-post.yml posts).
+        if: ${{ always() && github.event_name == 'push' }}
         continue-on-error: true    # advisory: a Sift error must NEVER fail this build
         uses: CodeRoasted/sift-action@v1
         with:
