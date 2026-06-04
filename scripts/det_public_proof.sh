@@ -76,12 +76,9 @@ builds=()
 for cxx in g++ clang++; do
   command -v "$cxx" >/dev/null || { echo "skip $cxx (not installed)" >&2; continue; }
   for opt in -O0 -O2 -O3; do for fpc in off fast; do
-    tag="${cxx//+/p}_${opt#-}_${fpc}"; extra=""
-    # Old clang (<21) under libstdc++ needs __cpp_concepts asserted for std::expected;
-    # clang-21 defines it natively and ignores the redefine with -Wno-builtin-macro-redefined.
-    [ "$cxx" = clang++ ] && extra="-D__cpp_concepts=202002L -Wno-builtin-macro-redefined"
+    tag="${cxx//+/p}_${opt#-}_${fpc}"
     # shellcheck disable=SC2086
-    if $cxx -std=c++23 "$opt" -ffp-contract="$fpc" $extra $DEFS $INCS $SRCS \
+    if $cxx -std=c++23 "$opt" -ffp-contract="$fpc" $DEFS $INCS $SRCS \
         "$PROOF/det_proof.cpp" $LIBS -o "$WORK/$tag" 2>"$WORK/$tag.log"; then
       builds+=("$tag")
     else echo "BUILD FAIL: $tag" >&2; tail -3 "$WORK/$tag.log" | sed 's/^/   /' >&2; fi

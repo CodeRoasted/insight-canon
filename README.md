@@ -46,7 +46,7 @@ The result: identical logs yield an identical fingerprint *input* everywhere —
 
 | Tool | Minimum version |
 |---|---|
-| C++ compiler | GCC 13 or Clang 17 with C++23 support |
+| C++ compiler | GCC 15 or Clang 21 with C++23 support |
 | CMake | 3.28 |
 | Ninja | any recent |
 | Conan | 2.x |
@@ -75,8 +75,8 @@ malf test .
 conan install . \
   --output-folder=build \
   --build=missing \
-  --profile:host=linux-gcc13-release \
-  --profile:build=linux-gcc13-release
+  --profile:host=linux-gcc15-release \
+  --profile:build=linux-gcc15-release
 ```
 
 A `build/CMakePresets.json` will be generated. The repo root
@@ -120,7 +120,7 @@ conan cache restore /tmp/insight_canon-X.Y.Z.tgz
 ```bash
 git clone https://github.com/CodeRoasted/insight-canon.git
 cd insight-canon
-conan create . --profile:host=linux-gcc13-release --profile:build=linux-gcc13-release --build=missing
+conan create . --profile:host=linux-gcc15-release --profile:build=linux-gcc15-release --build=missing
 ```
 
 ### CMake usage in your project
