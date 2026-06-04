@@ -45,7 +45,7 @@ jobs:
       - name: Setup environment (gcc-15 + clang — both legs of the cross-compiler proof)
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build python3 build-essential g++-15 clang
+          sudo apt-get install -y software-properties-common && sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test && sudo apt-get update && sudo apt-get install -y cmake ninja-build python3 build-essential gcc-15 g++-15 clang
           # bare `g++` (what det_public_proof.sh invokes) must be the ship compiler gcc-15
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
