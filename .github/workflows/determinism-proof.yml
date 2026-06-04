@@ -51,14 +51,22 @@ jobs:
           wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
           chmod +x /tmp/llvm.sh
           sudo /tmp/llvm.sh 21
-          # bare g++/clang++ (what det_public_proof.sh invokes) must be the real toolchains:
-          # g++ -> gcc-15 (ship), clang++ -> clang-21 (dev).
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
-          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
-          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-21 100
-          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-21 100
+          # bare g++/clang++ (what det_public_proof.sh invokes) must be the real toolchains.
+          # The runner PRE-INSTALLS an older clang as the clang++ alternative, so a plain
+          # --install at the same priority silently keeps it — use a high priority AND
+          # force --set, then VERIFY (fail here, not later with a cryptic std::expected error).
+          sudo update-alternatives --install /usr/bin/gcc     gcc     /usr/bin/gcc-15     1000
+          sudo update-alternatives --install /usr/bin/g++     g++     /usr/bin/g++-15     1000
+          sudo update-alternatives --install /usr/bin/clang   clang   /usr/bin/clang-21   1000
+          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-21 1000
+          sudo update-alternatives --set gcc     /usr/bin/gcc-15
+          sudo update-alternatives --set g++     /usr/bin/g++-15
+          sudo update-alternatives --set clang   /usr/bin/clang-21
+          sudo update-alternatives --set clang++ /usr/bin/clang++-21
           g++ --version | head -1
           clang++ --version | head -1
+          g++ --version     | grep -qE ' 15\.'        || { echo "ERROR: bare g++ is not gcc-15";        exit 1; }
+          clang++ --version | grep -qE 'version 21\.' || { echo "ERROR: bare clang++ is not clang-21 (std::expected would fail)"; exit 1; }
 
       - name: Setup Conan
         uses: conan-io/setup-conan@v1
