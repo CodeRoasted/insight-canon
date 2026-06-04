@@ -98,21 +98,61 @@ if(INSIGHT_CANON_ENABLE_NUMA)
 endif()
 
 ###########################################################
+#  Named-module wrapper (insight.canon) — §8.1 (1.5.0)
+###########################################################
+# Re-exports insight_canon's global-module public surface (5 namespaces) so
+# downstream repos `import insight.canon` instead of #include "insight/…". The
+# defs stay in src/*.cpp → the installed insight_canon.a is byte-identical; the
+# .cppm.o is the only added artifact. Links the lib PUBLIC (api/ includes,
+# fmt/spdlog, -ffp-contract=off); cxx_std_23 PUBLIC is the §10.4 producer gotcha.
+add_library(insight_canon_module STATIC)
+target_sources(insight_canon_module
+    PUBLIC
+        FILE_SET cxx_modules TYPE CXX_MODULES
+        BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/modules
+        FILES    ${CMAKE_CURRENT_SOURCE_DIR}/modules/insight_canon.cppm
+)
+target_link_libraries(insight_canon_module PUBLIC insight_canon)
+target_compile_features(insight_canon_module PUBLIC cxx_std_23)
+add_library(insight::canon_module ALIAS insight_canon_module)
+
+###########################################################
 #  Install rules  (used by `conan create`)
 ###########################################################
 include(GNUInstallDirs)
-install(TARGETS insight_canon
+# Library + module wrapper in ONE export set → single file-set owner (§10.5/§10.8).
+install(TARGETS insight_canon insight_canon_module
     EXPORT insight_canonTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILE_SET cxx_modules DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/insight_canon_modules
 )
 install(DIRECTORY api/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(EXPORT insight_canonTargets
     NAMESPACE insight::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/insight_canon
 )
+
+###########################################################
+#  Cross-package module shipping (Argos — §10.7/§10.9)
+###########################################################
+# Ship the package's OWN cmake config (carries FILE_SET CXX_MODULES); conan
+# defers via cmake_find_mode=none. create → install(EXPORT); editable →
+# BUILD-TREE export(). The config find_dependency()s canon's link deps.
+export(EXPORT insight_canonTargets
+    NAMESPACE insight::
+    FILE ${CMAKE_CURRENT_BINARY_DIR}/insight_canonTargets.cmake)
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/insight_canon-config.cmake
+"include(CMakeFindDependencyMacro)
+find_dependency(fmt)
+find_dependency(spdlog)
+find_dependency(simdjson)
+include(\"\${CMAKE_CURRENT_LIST_DIR}/insight_canonTargets.cmake\")
+")
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/insight_canon-config.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/insight_canon)
 
 ###########################################################
 #  Tests (unit + regression)

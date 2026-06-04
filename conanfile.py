@@ -41,7 +41,11 @@ class InsightCanonConan(ConanFile):
 
     def layout(self):
         self.cpp.source.includedirs = ["api"]
-        self.cpp.build.libdirs = [os.environ.get("MALF_EDITABLE_BUILD_DIR", "build")]
+        build_dir = os.environ.get("MALF_EDITABLE_BUILD_DIR", "build")
+        self.cpp.build.libdirs = [build_dir]
+        # Editable: the build-tree export()'d insight_canon-config.cmake (carrying the
+        # FILE_SET CXX_MODULES) lives in the build dir → consumers find it there (§10.9).
+        self.cpp.build.builddirs = [build_dir]
 
     def requirements(self):
         # spdlog/fmt are actual libraries that appear in public API headers
@@ -77,6 +81,14 @@ class InsightCanonConan(ConanFile):
         # Explicitly declare all consumed dependencies; spdlog/fmt are header-only
         self.cpp_info.requires = [
             "spdlog::spdlog",
-            "fmt::fmt",  
+            "fmt::fmt",
             "simdjson::simdjson"
+        ]
+        # Cross-package C++ modules (§10.7): defer to the package's OWN cmake config
+        # (it carries FILE_SET CXX_MODULES; conan's generator does not emit it).
+        # Editable build-tree config dir + create install path both listed.
+        self.cpp_info.set_property("cmake_find_mode", "none")
+        self.cpp_info.builddirs = [
+            os.environ.get("MALF_EDITABLE_BUILD_DIR", "build"),
+            "lib/cmake/insight_canon",
         ]
