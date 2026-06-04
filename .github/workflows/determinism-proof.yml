@@ -18,13 +18,8 @@ permissions:
 on:
   workflow_dispatch:
   push:
-    branches: [main]
-    paths:
-      - 'api/**'
-      - 'src/**'
-      - 'proof/**'
-      - 'scripts/det_public_proof.sh'
-      - '.github/workflows/determinism-proof.yml'
+    tags:
+      - 'v*'   # release cut only — the cross-compiler proof gates the tag, not every main push
   pull_request:
     branches: [main]
     paths:
