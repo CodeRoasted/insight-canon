@@ -750,9 +750,9 @@ LogLevel parse_log_level(std::string_view level_str) noexcept
     }
 }
 
-// Only throw path is for_each_token's substr(begin, ...) with begin <= line.size().
-// NOLINTNEXTLINE(bugprone-exception-escape): substr never throws — see token_scan.hpp
-// for_each_token.
+// Only throw path is for_each_token's substr(begin, ...) with begin <= line.size()
+// (see token_scan.hpp); the noexcept body cannot throw.
+// NOLINTNEXTLINE(bugprone-exception-escape)
 LogLevel infer_leading_log_level(std::string_view line) noexcept
 {
     // Two bounded, alloc-free stages over a SHARED tokenisation (token_scan.hpp):

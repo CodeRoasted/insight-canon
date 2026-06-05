@@ -64,8 +64,9 @@ std::string basename_of(const std::string& path)
 } // namespace
 
 // Proof tool, not a hot path; basename_of's substr(slash+1) runs only when find_last_of
-// returned a valid index. main is flagged by default; an escaping exception just aborts the tool.
-// NOLINTNEXTLINE(bugprone-exception-escape): acceptable in a standalone proof binary's main.
+// returned a valid index. main is flagged by default; an escaping exception just aborts the tool —
+// acceptable in a standalone proof binary's main.
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv)
 {
     if (argc < 2)

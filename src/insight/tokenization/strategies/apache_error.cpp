@@ -30,8 +30,8 @@ namespace
     // Extract the level word from a bracket like "error", "warn", "php:error".
     // RE2 pattern was `\[(\w+)\]` — \w+ stops at non-word chars, so for
     // "[php:error]" RE2 captured "php". We replicate: take word chars only.
-    // substr(0, idx) has pos arg 0, which is always <= size.
-    // NOLINTNEXTLINE(bugprone-exception-escape): substr never throws — pos is 0.
+    // substr(0, idx) has pos arg 0, always <= size, so this noexcept body cannot throw.
+    // NOLINTNEXTLINE(bugprone-exception-escape)
     [[nodiscard]] constexpr std::string_view extract_level_word(std::string_view bracket) noexcept
     {
         std::size_t idx{0};
