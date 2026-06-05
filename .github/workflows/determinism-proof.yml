@@ -40,7 +40,14 @@ jobs:
       - name: Setup environment (gcc-15 + clang-21 — both legs of the cross-compiler proof)
         run: |
           sudo apt-get update
-          sudo apt-get install -y software-properties-common && sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test && sudo apt-get update && sudo apt-get install -y cmake ninja-build python3 build-essential gcc-15 g++-15 wget lsb-release gnupg
+          sudo apt-get install -y software-properties-common && sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test && sudo apt-get update && sudo apt-get install -y ninja-build python3 build-essential gcc-15 g++-15 wget lsb-release gnupg
+          # Pin the dev-validated CMake 4.3.x workspace-wide (dev/CI parity). coderoast_server arms
+          # `import std` (CXX_MODULE_STD, gated by the experimental UUID 451f2fe2 — present only in
+          # CMake 4.3.x); Ubuntu's apt cmake (Noble 3.28) lacks that gate. Harmless / kept consistent
+          # in repos that don't arm import std yet.
+          sudo python3 -m pip install --break-system-packages "cmake==4.3.1"
+          hash -r
+          case "$(cmake --version | head -1)" in *" 4.3."*) cmake --version ;; *) echo "::error::expected CMake 4.3.x (got: $(cmake --version | head -1))"; exit 1 ;; esac
           # clang-21 (dev compiler) from apt.llvm.org — the base image's bare `clang` is too old
           # to compile std::expected now that the __cpp_concepts<21 shim is retired.
           wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
