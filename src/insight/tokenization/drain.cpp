@@ -478,7 +478,7 @@ namespace
         return true;
     }
 
-    template <typename Cb> inline void for_each_token(std::string_view content, Cb&& callback)
+    template <typename Cb> inline void for_each_token(std::string_view content, Cb callback)
     {
         const char* const base{content.data()};
         std::size_t cursor{0};
@@ -497,7 +497,7 @@ namespace
             cursor = space != nullptr
                          ? static_cast<std::size_t>(static_cast<const char*>(space) - base)
                          : len;
-            std::forward<Cb>(callback)(content.substr(start, cursor - start));
+            callback(content.substr(start, cursor - start)); // lvalue: invoked per token
         }
     }
 

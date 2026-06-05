@@ -1,6 +1,6 @@
 {
   "context": {
-    "date": "2026-06-05T09:17:41+02:00",
+    "date": "2026-06-05T12:44:09+02:00",
     "host_name": "DESKTOP-F7PPTO6",
     "executable": "/home/windows/workspace/coderoast/insight-canon/build/insight_canon_bench",
     "num_cpus": 8,
@@ -33,7 +33,7 @@
         "num_sharing": 8
       }
     ],
-    "load_avg": [1.50049,0.68457,0.390137],
+    "load_avg": [7.85742,8.11133,4.79688],
     "library_version": "v1.4.3-8-gdb4a26b1-dirty",
     "library_build_type": "release",
     "json_schema_version": 1
@@ -48,12 +48,12 @@
       "repetitions": 1,
       "repetition_index": 0,
       "threads": 1,
-      "iterations": 876,
-      "real_time": 7.8230778251872414e+02,
-      "cpu_time": 7.6802360388127727e+02,
+      "iterations": 833,
+      "real_time": 7.9185498675995586e+02,
+      "cpu_time": 7.7226822088835490e+02,
       "time_unit": "us",
-      "items_per_second": 1.3020433160470705e+06,
-      "ns_per_line": 7.6802360388127728e-07,
+      "items_per_second": 1.2948868967438294e+06,
+      "ns_per_line": 7.7226822088835484e-07,
       "templates_seen": 4.0000000000000000e+00
     },
     {
@@ -65,12 +65,12 @@
       "repetitions": 1,
       "repetition_index": 0,
       "threads": 1,
-      "iterations": 986,
-      "real_time": 7.4123559589544971e+02,
-      "cpu_time": 7.2835005679513063e+02,
+      "iterations": 913,
+      "real_time": 7.4126769571543673e+02,
+      "cpu_time": 7.2104058926615789e+02,
       "time_unit": "us",
-      "items_per_second": 1.3729661866166077e+06,
-      "ns_per_line": 7.2835005679513066e-07,
+      "items_per_second": 1.3868844762508504e+06,
+      "ns_per_line": 7.2104058926615800e-07,
       "templates_seen": 8.0000000000000000e+00
     }
   ]

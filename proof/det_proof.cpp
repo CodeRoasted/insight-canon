@@ -1,3 +1,4 @@
+// NOLINTBEGIN Test
 // Canon public determinism proof — fixture.
 //
 // The externally-checkable half of the "same input → same output, bit-for-bit"
@@ -51,7 +52,7 @@ std::string i128_to_dec(__int128 value)
     }
     if (negative)
         out.push_back('-');
-    std::reverse(out.begin(), out.end());
+    std::ranges::reverse(out);
     return out;
 }
 
@@ -62,6 +63,9 @@ std::string basename_of(const std::string& path)
 }
 } // namespace
 
+// Proof tool, not a hot path; basename_of's substr(slash+1) runs only when find_last_of
+// returned a valid index. main is flagged by default; an escaping exception just aborts the tool.
+// NOLINTNEXTLINE(bugprone-exception-escape): acceptable in a standalone proof binary's main.
 int main(int argc, char** argv)
 {
     if (argc < 2)
@@ -147,3 +151,4 @@ int main(int argc, char** argv)
 
     return 0;
 }
+// NOLINTEND Test

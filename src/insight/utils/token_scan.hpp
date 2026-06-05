@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <string_view>
-#include <utility>
 
 namespace insight::utils
 {
@@ -94,7 +93,7 @@ namespace detail
 // single pass — used by both leading-level inference and the failure lexicon so
 // the two never disagree on what counts as a standalone word.
 template <class Visit>
-[[nodiscard]] bool for_each_token(std::string_view text, std::size_t scan_limit, Visit&& visit)
+[[nodiscard]] bool for_each_token(std::string_view text, std::size_t scan_limit, Visit visit)
 {
     const std::size_t limit{scan_limit == 0U || scan_limit > text.size() ? text.size()
                                                                          : scan_limit};
@@ -121,7 +120,7 @@ template <class Visit>
             token.remove_prefix(1);
         while (!token.empty() && !detail::is_token_alnum(token.back()))
             token.remove_suffix(1);
-        if (!token.empty() && std::forward<Visit>(visit)(token))
+        if (!token.empty() && visit(token)) // lvalue: invoked per token
             return true;
     }
     return false;

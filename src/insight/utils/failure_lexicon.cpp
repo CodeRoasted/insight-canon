@@ -45,6 +45,10 @@ namespace
     // The CamelCase word ending just before `suffix_start`: the maximal lowercase run
     // ending at suffix_start-1, plus its leading uppercase letter if present. For
     // "EvidenceNotError" with the "Error" suffix at index 12, this returns "Not".
+    // substr(begin, suffix_start - begin): begin <= suffix_start, and the sole caller
+    // (is_camel_error_type) guards token.size() > suffix.size(), so
+    // suffix_start = token.size() - suffix.size() < token.size() — pos is in-bounds.
+    // NOLINTNEXTLINE(bugprone-exception-escape): substr never throws — begin <= size, proven above.
     [[nodiscard]] std::string_view preceding_camel_word(std::string_view token,
                                                         std::size_t suffix_start) noexcept
     {
@@ -109,6 +113,9 @@ namespace
     constexpr std::array<std::string_view, 4U> kSuccessVerdicts{"passed", "ok", "success",
                                                                 "succeeded"};
 
+    // Only throw path is for_each_token's substr(begin, ...) with begin <= limit <= text.size().
+    // NOLINTNEXTLINE(bugprone-exception-escape): substr never throws — see token_scan.hpp
+    // for_each_token.
     [[nodiscard]] bool any_standalone_word(std::string_view text,
                                            std::span<const std::string_view> words,
                                            std::size_t scan_limit) noexcept
@@ -124,6 +131,9 @@ namespace
 
 } // namespace
 
+// Only throw path is for_each_token / any_standalone_word, whose substr has begin <= text.size().
+// NOLINTNEXTLINE(bugprone-exception-escape): substr never throws — see token_scan.hpp
+// for_each_token.
 bool contains_failure_cue(std::string_view text, std::size_t scan_limit) noexcept
 {
     // One head-bounded pass. An explicit failure WORD, or the "segmentation fault"

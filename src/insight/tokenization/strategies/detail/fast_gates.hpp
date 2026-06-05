@@ -21,7 +21,7 @@
 #include <string_view>
 
 // SSE2 is guaranteed by -march=x86-64-v2 (baseline x86-64 v2 ABI).
-#if defined(__SSE2__)
+#ifdef __SSE2__
 #include <emmintrin.h> // _mm_cmpeq_epi8, _mm_movemask_epi8, _mm_set1_epi8
 #endif
 
@@ -537,7 +537,7 @@ namespace simd_detail
     {
         const char* ptr = str.data();
         const char* const end = str.data() + str.size();
-#if defined(__SSE2__)
+#ifdef __SSE2__
         const __m128i vsp = _mm_set1_epi8(' ');
         const __m128i vtab = _mm_set1_epi8('\t');
         while (ptr + kSseWidth <= end)
@@ -566,7 +566,7 @@ namespace simd_detail
     {
         const char* ptr = str.data();
         const char* const end = str.data() + str.size();
-#if defined(__SSE2__)
+#ifdef __SSE2__
         const __m128i vsp = _mm_set1_epi8(' ');
         const __m128i vtab = _mm_set1_epi8('\t');
         while (ptr + kSseWidth <= end)
@@ -600,6 +600,9 @@ inline void sv_skip_ws(std::string_view& str) noexcept
 
 // Take next non-whitespace token; advance str past token + trailing whitespace.
 // Returns the token (empty if str is all-whitespace).
+// Every substr pos is in-bounds: find_*_ptr returns a pointer in [data, data+size],
+// and the all-whitespace case (non_ws_off == size) early-returns before any substr.
+// NOLINTNEXTLINE(bugprone-exception-escape): substr never throws — pos <= size, proven above.
 [[nodiscard]] inline std::string_view sv_take_token(std::string_view& str) noexcept
 {
     const char* const non_ws = simd_detail::find_non_ws_ptr(str);
@@ -623,6 +626,9 @@ inline void sv_skip_ws(std::string_view& str) noexcept
 
 // Take chars up to (not including) delim; advance str past delim.
 // If delim not found, returns all of str and sets str to {}.
+// substr(0,pos) has pos arg 0; substr(pos+1U) runs only when find() returned a valid
+// index pos < size (npos returns early), so pos+1 <= size.
+// NOLINTNEXTLINE(bugprone-exception-escape): substr never throws — pos <= size, proven above.
 [[nodiscard]] constexpr std::string_view sv_take_until(std::string_view& str, char delim) noexcept
 {
     const auto pos = str.find(delim);
@@ -638,6 +644,8 @@ inline void sv_skip_ws(std::string_view& str) noexcept
 }
 
 // Take exactly n chars; advance str by n (capped at str.size()).
+// substr(0,actual) has pos arg 0; substr(actual) has actual = min(n,size) <= size.
+// NOLINTNEXTLINE(bugprone-exception-escape): substr never throws — pos <= size, proven above.
 [[nodiscard]] constexpr std::string_view sv_take_n(std::string_view& str, std::size_t n) noexcept
 {
     const auto actual = n < str.size() ? n : str.size();
