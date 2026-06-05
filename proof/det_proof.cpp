@@ -111,7 +111,8 @@ int main(int argc, char** argv)
         for (const auto& raw : lines)
         {
             const auto event{tokenizer.process_line(raw)};
-            std::string tmpl{event ? std::string{event->template_str} : std::string{"<<parse-error>>"}};
+            std::string tmpl{event ? std::string{event->template_str}
+                                   : std::string{"<<parse-error>>"}};
             std::string level{event ? std::string{insight::to_string(event->level)}
                                     : std::string{"Unknown"}};
             std::string role{event ? std::string{insight::to_string(event->structural_role)}

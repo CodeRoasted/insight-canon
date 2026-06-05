@@ -116,9 +116,9 @@ namespace
         return for_each_token(text, scan_limit,
                               [words](std::string_view token) noexcept
                               {
-                                  return std::ranges::any_of(
-                                      words, [token](std::string_view word) noexcept
-                                      { return iequals(token, word); });
+                                  return std::ranges::any_of(words,
+                                                             [token](std::string_view word) noexcept
+                                                             { return iequals(token, word); });
                               });
     }
 
