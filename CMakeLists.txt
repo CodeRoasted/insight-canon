@@ -179,6 +179,22 @@ if(INSIGHT_CANON_BUILD_TESTS)
         )
         include(GoogleTest)
         gtest_discover_tests(insight_canon_tests)
+
+        # Module-import proof (§8.1 / cxx_modules_migration_contract §10.15): a
+        # standalone TU that `import insight.canon;` and exercises the re-exported
+        # surface — header-only det_math + a src-defined failure_lexicon fn (the
+        # latter proves the re-export resolves to the library .a, not just header
+        # decls). Links the MODULE target so CMake scans the .cppm + builds the BMI;
+        # this is the runnable proof the wrapper is soundly importable, both toolchains.
+        add_executable(insight_canon_module_test
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/module/test_canon_module_import.cpp"
+        )
+        target_link_libraries(insight_canon_module_test PRIVATE
+            insight_canon_module
+            GTest::gtest
+            GTest::gtest_main
+        )
+        gtest_discover_tests(insight_canon_module_test)
     endif()
 endif()
 
