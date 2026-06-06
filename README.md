@@ -1,6 +1,6 @@
 # insight-canon
 
-**insight-canon** — tokenization and sequence: the foundational log-analysis pipeline.
+**insight-canon** — tokenization: the foundational log-analysis pipeline.
 
 **insight_canon** is a self-contained C++23 static library that provides the foundational
 pipeline for structured log analysis:
@@ -9,12 +9,11 @@ pipeline for structured log analysis:
 |---|---|
 | **core** | Shared types (`LogLevel`, `EventID`), logging façade (spdlog), ISO-8601 time utilities |
 | **tokenization** | Format detection, Drain template clustering, arena allocator, `CanonicalEvent` output |
-| **sequence** | Streaming flat history, sparse transition matrix, bounded n-gram counters, dominant-path reconstruction |
 
 > A _canonical event_ is the normalized, format-agnostic representation of a log line.
-> Tokenization produces it; sequence, insight-metalog, and insight-eidos all consume it.
+> Tokenization produces it; insight-metalog and insight-eidos consume it.
 
-All three layers are built as one library and consumed via a single CMake target: `insight::canon`.
+Both layers are built as one library and consumed via a single CMake target: `insight::canon`.
 
 ---
 
@@ -138,7 +137,7 @@ def requirements(self):
   self.requires("insight_canon/1.4.4")
 ```
 
-insight-canon is the upstream tokenization and sequence layer of the [MetaLog](https://github.com/CodeRoasted/metalog-spec) pipeline.
+insight-canon is the upstream tokenization layer of the [MetaLog](https://github.com/CodeRoasted/metalog-spec) pipeline.
 
 ---
 
@@ -150,16 +149,15 @@ insight-canon/
 │   └── insight/
 │       ├── core/           types.hpp
 │       ├── utils/          logger.hpp  time_utils.hpp
-│       ├── tokenization/   tokenizer_engine.hpp  canonical_event.hpp  …
-│       └── sequence/       sequence_engine.hpp
+│       ├── math/           det_math.hpp
+│       └── tokenization/   tokenizer_engine.hpp  canonical_event.hpp  …
 ├── src/                    Private implementation sources
 │   └── insight/
 │       ├── utils/
-│       ├── tokenization/   strategies/  drain  arena  …
-│       └── sequence/
+│       └── tokenization/   strategies/  drain  arena  …
 ├── test_package/           Conan consumer smoke test
 ├── tests/
-│   ├── unit/               GTest unit tests for all layers
+│   ├── unit/               GTest unit tests (core + tokenization)
 │   └── regression/         Loghub-dataset regression tests
 ├── scripts/
 │   └── download_logs.sh    Download Loghub 2k + Zenodo datasets for regression
@@ -273,7 +271,7 @@ INSIGHT_TOKENIZER_REGRESSION_MIN_SUCCESS_RATE=0.90 ctest --output-on-failure -R 
 
 ## Technical Docs
 
-Pipeline reference for tokenization and sequence lives in [technical_docs/](technical_docs/README.md).
+Pipeline reference for tokenization lives in [technical_docs/](technical_docs/README.md).
 
 ---
 
