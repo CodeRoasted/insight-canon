@@ -57,7 +57,11 @@ add_library(insight::canon_module ALIAS insight_canon)
 
 # src/ on the private include path so impl units resolve the textual macro layer
 # (#include "insight/utils/log_macros.hpp") and log_macros' fmt/spdlog includes.
-target_include_directories(insight_canon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_include_directories(insight_canon
+    PUBLIC  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/api> $<INSTALL_INTERFACE:include>
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+# Public textual macro layer: INSIGHT_LOG_* live in a header (macros can't be exported from a module);
+# downstream consumers `#include <insight/utils/log_macros.hpp>` + `import insight.canon` (accessors).
 
 # fmt + spdlog appear in the public logger accessor signatures (api module GMF); consumers
 # must see their includes + link them. simdjson is impl-only (JSON strategies in src/).
@@ -111,6 +115,8 @@ install(TARGETS insight_canon
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILE_SET cxx_modules DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/insight_canon_modules
 )
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/api/insight/utils/log_macros.hpp
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/insight/utils)
 install(EXPORT insight_canonTargets
     NAMESPACE insight::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/insight_canon
@@ -161,7 +167,7 @@ if(INSIGHT_CANON_BUILD_TESTS)
         target_link_libraries(insight_canon_tests PRIVATE
             fmt::fmt spdlog::spdlog simdjson::simdjson
             GTest::gtest GTest::gtest_main)
-        target_include_directories(insight_canon_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        target_include_directories(insight_canon_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/api ${CMAKE_CURRENT_SOURCE_DIR}/src)
         target_compile_features(insight_canon_tests PRIVATE cxx_std_23)
         set_target_properties(insight_canon_tests PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
         target_compile_definitions(insight_canon_tests PRIVATE

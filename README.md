@@ -134,7 +134,7 @@ In your `conanfile.py`:
 
 ```python
 def requirements(self):
-  self.requires("insight_canon/1.4.4")
+  self.requires("insight_canon/<version>")  # pin to the current release
 ```
 
 insight-canon is the upstream tokenization layer of the [MetaLog](https://github.com/CodeRoasted/metalog-spec) pipeline.
