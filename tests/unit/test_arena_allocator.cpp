@@ -6,13 +6,10 @@
 // Coverage: construction, allocation, alignment, store_string,
 //           reset, owns, move semantics, copy-deletion, accessors.
 
-#include <cstdint>
 #include <gtest/gtest.h>
-#include <stdexcept>
-#include <string_view>
-#include <type_traits>
 
-#include "insight/tokenization/arena_allocator.hpp"
+import std;
+import insight.canon;
 
 using insight::tokenization::ArenaAllocator;
 

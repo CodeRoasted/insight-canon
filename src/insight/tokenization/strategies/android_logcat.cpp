@@ -1,3 +1,10 @@
+module;
+#include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
+
+module insight.canon.detail;
+import insight.canon.internal;
+import insight.canon.api;
+
 // src/1_tokenization/strategies/android_logcat.cpp
 //
 // AndroidLogcatStrategy — parses Android logcat format:
@@ -7,17 +14,8 @@
 // pass with O(1) layout checks at fixed offsets — no regex, no heap.
 // Malformed lines that fail the fast path are a parse miss (returned as error).
 
-#include "insight/tokenization/strategies/android_logcat.hpp"
 
-#include <cstddef>
-#include <optional>
-#include <string_view>
 
-#include "insight/core/types.hpp"
-#include "insight/tokenization/arena_allocator.hpp"
-#include "insight/tokenization/parsed_line.hpp"
-#include "insight/utils/logger.hpp"
-#include <expected>
 
 namespace insight::tokenization
 {

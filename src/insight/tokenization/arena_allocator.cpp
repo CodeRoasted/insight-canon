@@ -1,20 +1,14 @@
-#include "insight/tokenization/arena_allocator.hpp"
-
-#include <algorithm>
-#include <cassert>
-#include <cstddef>
-#include <cstdint>
+module;
 #include <cstring>
-#include <new>
-#include <stdexcept>
-#include <string_view>
-#include <utility>
+#include <numa.h>
+#include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
+
+module insight.canon.api;
+import insight.canon.internal;
 
 #ifdef INSIGHT_HAS_NUMA
-#include <numa.h>
 #endif
 
-#include "insight/utils/logger.hpp"
 
 namespace insight::tokenization
 {

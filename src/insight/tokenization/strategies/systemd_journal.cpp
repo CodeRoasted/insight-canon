@@ -1,3 +1,12 @@
+module;
+#include <simdjson.h>
+#include "insight/tokenization/strategies/detail/simdjson_scratch.hpp" // textual: TU-local simdjson entities (§11.8 family)
+#include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
+
+module insight.canon.detail;
+import insight.canon.internal;
+import insight.canon.api;
+
 // src/1_tokenization/strategies/systemd_journal.cpp
 //
 // SystemdJournalStrategy — parses systemd journal JSON export format:
@@ -7,24 +16,8 @@
 // Hot path uses simdjson on-demand via the shared scratch helpers; nlohmann is
 // no longer linked into the production library.
 
-#include "insight/tokenization/strategies/systemd_journal.hpp"
 
-#include <array>
-#include <charconv>
-#include <chrono>
-#include <cstdint>
-#include <ctime>
-#include <simdjson.h>
-#include <string>
-#include <string_view>
-#include <system_error>
 
-#include "insight/core/types.hpp"
-#include "insight/tokenization/arena_allocator.hpp"
-#include "insight/tokenization/parsed_line.hpp"
-#include "insight/tokenization/strategies/detail/simdjson_scratch.hpp"
-#include "insight/utils/logger.hpp"
-#include <expected>
 
 namespace insight::tokenization
 {

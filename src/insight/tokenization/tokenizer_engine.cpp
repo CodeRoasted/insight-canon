@@ -1,3 +1,11 @@
+module;
+#include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
+
+module insight.canon;
+import insight.canon.internal;
+import insight.canon.api;
+import insight.canon.detail;
+
 // src/1_tokenization/tokenizer_engine.cpp
 //
 // Tokenizer: Phase 1 facade that converts raw log lines into CanonicalEvents.
@@ -14,23 +22,8 @@
 // Ownership: the arena is external; all string_views in CanonicalEvent point
 // into arena-managed memory and are valid until arena.reset() or destruction.
 
-#include "insight/tokenization/tokenizer_engine.hpp"
 
-#include <cstddef>
-#include <memory>
-#include <span>
-#include <string_view>
-#include <vector>
 
-#include "insight/tokenization/arena_allocator.hpp"
-#include "insight/tokenization/canonical_event.hpp"
-#include "insight/tokenization/drain.hpp"
-#include "insight/tokenization/drain_config.hpp"
-#include "insight/tokenization/log_parser.hpp"
-#include "insight/tokenization/parsed_line.hpp"
-#include "insight/tokenization/structural_role_registry.hpp"
-#include "insight/utils/logger.hpp"
-#include <expected>
 
 namespace insight::tokenization
 {

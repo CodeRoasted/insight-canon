@@ -1,3 +1,10 @@
+module;
+#include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
+
+module insight.canon.detail;
+import insight.canon.internal;
+import insight.canon.api;
+
 // src/1_tokenization/format_detector.cpp
 //
 // FormatDetector: registers all built-in format strategies and selects the
@@ -6,40 +13,8 @@
 // The constructor auto-registers built-in strategies. Additional strategies
 // can be injected at runtime via register_strategy().
 
-#include "insight/tokenization/format_detector.hpp"
 
-#include <algorithm>
-#include <array>
-#include <cstddef>
-#include <iterator>
-#include <memory>
-#include <span>
-#include <string_view>
-#include <utility>
 
-#include "insight/core/types.hpp"
-#include "insight/tokenization/format_strategy.hpp"
-#include "insight/tokenization/strategies/android_logcat.hpp"
-#include "insight/tokenization/strategies/apache_error.hpp"
-#include "insight/tokenization/strategies/bgl.hpp"
-#include "insight/tokenization/strategies/clf.hpp"
-#include "insight/tokenization/strategies/cloudwatch.hpp"
-#include "insight/tokenization/strategies/github_actions.hpp"
-#include "insight/tokenization/strategies/health_app.hpp"
-#include "insight/tokenization/strategies/hpc.hpp"
-#include "insight/tokenization/strategies/iis_w3c.hpp"
-#include "insight/tokenization/strategies/json.hpp"
-#include "insight/tokenization/strategies/kv.hpp"
-#include "insight/tokenization/strategies/log4j.hpp"
-#include "insight/tokenization/strategies/nginx_error.hpp"
-#include "insight/tokenization/strategies/proxifier.hpp"
-#include "insight/tokenization/strategies/raw_text.hpp"
-#include "insight/tokenization/strategies/rfc5424.hpp"
-#include "insight/tokenization/strategies/spark_hdfs.hpp"
-#include "insight/tokenization/strategies/syslog.hpp"
-#include "insight/tokenization/strategies/systemd_journal.hpp"
-#include "insight/tokenization/strategies/windows_cbs.hpp"
-#include "insight/utils/logger.hpp"
 
 namespace insight::tokenization
 {

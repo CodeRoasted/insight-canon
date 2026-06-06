@@ -1,18 +1,15 @@
-#pragma once
+// insight.canon — public facade (1.5.1 unwrap, §11.9). Consumers `import insight.canon;` unchanged.
+// Re-exports the public api surface; insight.canon.detail is NOT re-exported (sealed internal).
+// Tokenizer lives HERE (not in api): its impl needs LogParser/Drain from detail, which imports api —
+// homing it above detail (§11.9.6) breaks the api↔detail cycle. The Tokenizer decl uses only api types
+// (ArenaAllocator/DrainConfig/CanonicalEvent) + std; tokenizer_engine.cpp (module insight.canon) imports
+// detail in its purview.
+export module insight.canon;
+import insight.canon.internal;        // std (expected/unique_ptr/vector/span/string for the Tokenizer decl)
+export import insight.canon.api;      // public surface (types, det_math, arena, ...)
 
-#include <cstddef>
-#include <memory>
-#include <span>
-#include <string_view>
-#include <vector>
-
-#include "arena_allocator.hpp"
-#include "canonical_event.hpp"
-#include "drain_config.hpp"
-#include <expected>
-#include <string>
-
-namespace insight::tokenization
+// ──────── from api/insight/tokenization/tokenizer_engine.hpp ────────
+export namespace insight::tokenization
 {
 
 // Phase 1 facade: raw log line → CanonicalEvent.
@@ -51,3 +48,4 @@ class Tokenizer
 };
 
 } // namespace insight::tokenization
+

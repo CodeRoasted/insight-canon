@@ -16,15 +16,8 @@
 
 #include <benchmark/benchmark.h>
 
-#include <cstddef>
-#include <cstdint>
-#include <random>
-#include <string>
-#include <vector>
-
-#include "insight/tokenization/arena_allocator.hpp"
-#include "insight/tokenization/drain_config.hpp"
-#include "insight/tokenization/tokenizer_engine.hpp"
+import std;
+import insight.canon;
 
 namespace
 {

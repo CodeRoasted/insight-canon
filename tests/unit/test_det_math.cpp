@@ -8,13 +8,11 @@
 //   * ACCURACY (near): the fixed-point result is close to libm, proving the
 //     primitive is not just deterministic but correct. libm is used ONLY here in
 //     the test oracle, never in the primitive.
-#include <cmath>
-#include <cstdint>
-#include <iterator>
 
 #include <gtest/gtest.h>
 
-#include "insight/math/det_math.hpp"
+import std;
+import insight.canon;
 
 namespace
 {

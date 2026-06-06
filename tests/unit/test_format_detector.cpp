@@ -6,11 +6,10 @@
 // and batch-weighted detection.
 
 #include <gtest/gtest.h>
-#include <string_view>
-#include <vector>
 
-#include "insight/core/types.hpp"
-#include "insight/tokenization/format_detector.hpp"
+import std;
+import insight.canon;
+import insight.canon.detail; // white-box: drain/detector/strategies
 
 using namespace insight;
 using namespace insight::tokenization;

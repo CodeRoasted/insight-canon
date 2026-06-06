@@ -1,3 +1,11 @@
+module;
+#include <cstring>
+#include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
+
+module insight.canon.detail;
+import insight.canon.internal;
+import insight.canon.api;
+
 // src/1_tokenization/strategies/hpc.cpp
 //
 // HPCStrategy — parses HPC event logs:
@@ -6,19 +14,8 @@
 // Hand-written scanner: zero RE2. Component "facility.event_type" is the
 // only constructed string; built directly in the arena.
 
-#include "insight/tokenization/strategies/hpc.hpp"
 
-#include <cstring>
-#include <span>
-#include <string_view>
 
-#include "insight/core/types.hpp"
-#include "insight/tokenization/arena_allocator.hpp"
-#include "insight/tokenization/parsed_line.hpp"
-#include "insight/tokenization/strategies/detail/fast_gates.hpp"
-#include "insight/utils/logger.hpp"
-#include "insight/utils/time_utils.hpp"
-#include <expected>
 
 namespace insight::tokenization
 {

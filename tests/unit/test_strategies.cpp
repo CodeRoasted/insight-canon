@@ -10,29 +10,10 @@
 //   IISW3CStrategy, CloudWatchStrategy, SystemdJournalStrategy.
 
 #include <gtest/gtest.h>
-#include <string_view>
 
-#include "insight/core/types.hpp"
-#include "insight/tokenization/arena_allocator.hpp"
-#include "insight/tokenization/strategies/android_logcat.hpp"
-#include "insight/tokenization/strategies/apache_error.hpp"
-#include "insight/tokenization/strategies/bgl.hpp"
-#include "insight/tokenization/strategies/clf.hpp"
-#include "insight/tokenization/strategies/cloudwatch.hpp"
-#include "insight/tokenization/strategies/github_actions.hpp"
-#include "insight/tokenization/strategies/health_app.hpp"
-#include "insight/tokenization/strategies/hpc.hpp"
-#include "insight/tokenization/strategies/iis_w3c.hpp"
-#include "insight/tokenization/strategies/json.hpp"
-#include "insight/tokenization/strategies/kv.hpp"
-#include "insight/tokenization/strategies/log4j.hpp"
-#include "insight/tokenization/strategies/nginx_error.hpp"
-#include "insight/tokenization/strategies/proxifier.hpp"
-#include "insight/tokenization/strategies/rfc5424.hpp"
-#include "insight/tokenization/strategies/spark_hdfs.hpp"
-#include "insight/tokenization/strategies/syslog.hpp"
-#include "insight/tokenization/strategies/systemd_journal.hpp"
-#include "insight/tokenization/strategies/windows_cbs.hpp"
+import std;
+import insight.canon;
+import insight.canon.detail; // white-box: drain/detector/strategies
 
 using namespace insight;
 using namespace insight::tokenization;

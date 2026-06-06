@@ -1,3 +1,11 @@
+module;
+#include <cstring>
+#include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
+
+module insight.canon.detail;
+import insight.canon.internal;
+import insight.canon.api;
+
 // src/1_tokenization/strategies/clf.cpp
 //
 // CLFStrategy — parses Apache/Nginx Common Log Format and Combined Log Format.
@@ -11,21 +19,8 @@
 // Hand-written scanner: zero RE2, zero string copies except for the
 // three-part content construction ("METHOD URL STATUS").
 
-#include "insight/tokenization/strategies/clf.hpp"
 
-#include <charconv>
-#include <cstring>
-#include <optional>
-#include <span>
-#include <string_view>
 
-#include "insight/core/types.hpp"
-#include "insight/tokenization/arena_allocator.hpp"
-#include "insight/tokenization/parsed_line.hpp"
-#include "insight/tokenization/strategies/detail/fast_gates.hpp"
-#include "insight/utils/logger.hpp"
-#include "insight/utils/time_utils.hpp"
-#include <expected>
 
 namespace insight::tokenization
 {

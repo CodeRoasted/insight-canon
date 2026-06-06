@@ -7,10 +7,8 @@
 
 #include <gtest/gtest.h>
 
-#include "insight/core/types.hpp"
-#include "insight/tokenization/arena_allocator.hpp"
-#include "insight/tokenization/structural_role_registry.hpp"
-#include "insight/tokenization/tokenizer_engine.hpp"
+import std;
+import insight.canon;
 
 using insight::StructuralRole;
 using insight::tokenization::ArenaAllocator;

@@ -1,21 +1,19 @@
+module;
+#include <simdjson.h>
+#include "insight/tokenization/strategies/detail/simdjson_scratch.hpp" // textual: TU-local simdjson entities (§11.8 family)
+#include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
+
+module insight.canon.detail;
+import insight.canon.internal;
+import insight.canon.api;
+
 // src/1_tokenization/strategies/json.cpp
 //
 // JsonStrategy — parses structured JSON log lines using simdjson on-demand.
 // See detail/simdjson_scratch.hpp for the thread-local zero-alloc scaffolding.
 
-#include "insight/tokenization/strategies/json.hpp"
 
-#include <simdjson.h>
-#include <string>
-#include <string_view>
 
-#include "insight/core/types.hpp"
-#include "insight/tokenization/arena_allocator.hpp"
-#include "insight/tokenization/parsed_line.hpp"
-#include "insight/tokenization/strategies/detail/simdjson_scratch.hpp"
-#include "insight/utils/logger.hpp"
-#include "insight/utils/time_utils.hpp"
-#include <expected>
 
 namespace insight::tokenization
 {

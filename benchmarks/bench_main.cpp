@@ -3,6 +3,9 @@
 #include <benchmark/benchmark.h>
 #include <spdlog/spdlog.h>
 
+import std;
+import insight.canon;
+
 int main(int argc, char** argv)
 {
     spdlog::set_level(spdlog::level::off);

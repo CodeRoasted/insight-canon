@@ -1,3 +1,10 @@
+module;
+#include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
+
+module insight.canon.detail;
+import insight.canon.internal;
+import insight.canon.api;
+
 // src/1_tokenization/strategies/log4j.cpp
 //
 // Log4jStrategy — parses Java Log4j / Python logging formats.
@@ -13,17 +20,8 @@
 //
 // Hand-written scanner: zero RE2, zero string copies.
 
-#include "insight/tokenization/strategies/log4j.hpp"
 
-#include <string_view>
 
-#include "insight/core/types.hpp"
-#include "insight/tokenization/arena_allocator.hpp"
-#include "insight/tokenization/parsed_line.hpp"
-#include "insight/tokenization/strategies/detail/fast_gates.hpp"
-#include "insight/utils/logger.hpp"
-#include "insight/utils/time_utils.hpp"
-#include <expected>
 
 namespace insight::tokenization
 {

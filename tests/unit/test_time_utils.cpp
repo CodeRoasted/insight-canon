@@ -11,11 +11,10 @@
 //   - CLF timestamp with negative timezone
 //   - parse_log_level: all canonical aliases, case-insensitivity, unknowns
 
-#include <chrono>
 #include <gtest/gtest.h>
 
-#include "insight/core/types.hpp"
-#include "insight/utils/time_utils.hpp"
+import std;
+import insight.canon;
 
 using namespace insight;
 using namespace insight::utils;

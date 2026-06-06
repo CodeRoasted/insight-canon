@@ -1,23 +1,8 @@
 // NOLINTBEGIN
-#include <algorithm>
-#include <array>
-#include <cctype>
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
 #include <gtest/gtest.h>
-#include <iostream>
-#include <optional>
-#include <sstream>
-#include <string>
-#include <string_view>
-#include <vector>
 
-#include "insight/core/types.hpp"
-#include "insight/tokenization/arena_allocator.hpp"
-#include "insight/tokenization/canonical_event.hpp"
-#include "insight/tokenization/tokenizer_engine.hpp"
-#include <expected>
+import std;
+import insight.canon;
 
 namespace fs = std::filesystem;
 
@@ -186,6 +171,8 @@ constexpr std::array<DatasetExpectation, 16> kDatasetExpectations{{
     return {}; // Data not found - tests will be skipped
 }
 
+[[nodiscard]] std::vector<std::string> collect_dataset_path_strings(); // fwd (defined after collect_dataset_paths)
+
 [[nodiscard]] std::vector<fs::path> collect_dataset_paths()
 {
     const fs::path repo_root{find_repo_root()};
@@ -208,9 +195,17 @@ constexpr std::array<DatasetExpectation, 16> kDatasetExpectations{{
     return files;
 }
 
-[[nodiscard]] std::string dataset_name(const testing::TestParamInfo<fs::path>& info)
+[[nodiscard]] std::vector<std::string> collect_dataset_path_strings()
 {
-    std::string name{info.param.stem().string()};
+    std::vector<std::string> out;
+    for (const auto& path : collect_dataset_paths())
+        out.push_back(path.string());
+    return out;
+}
+
+[[nodiscard]] std::string dataset_name(const testing::TestParamInfo<std::string>& info)
+{
+    std::string name{fs::path{info.param}.stem().string()};
     std::replace_if(
         name.begin(), name.end(), [](unsigned char ch) { return !std::isalnum(ch); }, '_');
     return name;
@@ -327,7 +322,7 @@ struct DatasetRunSummary
     return out.str();
 }
 
-class TokenizerLoghubRegressionTest : public ::testing::TestWithParam<fs::path>
+class TokenizerLoghubRegressionTest : public ::testing::TestWithParam<std::string>
 {
 };
 
@@ -337,7 +332,7 @@ GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(TokenizerLoghubRegressionTest);
 
 TEST_P(TokenizerLoghubRegressionTest, ProcessesRealLoghubDataset)
 {
-    const fs::path& dataset = GetParam();
+    const fs::path dataset{GetParam()}; // param is std::string (gtest can't print fs::path under import std)
     const bool verbose_output{env_is_enabled("INSIGHT_TOKENIZER_REGRESSION_VERBOSE")};
     const std::optional<double> env_success_rate{env_min_success_rate()};
     const DatasetExpectation expected{expectation_for(dataset)};
@@ -366,7 +361,7 @@ TEST_P(TokenizerLoghubRegressionTest, ProcessesRealLoghubDataset)
 }
 
 INSTANTIATE_TEST_SUITE_P(TokenizationRegression, TokenizerLoghubRegressionTest,
-                         ::testing::ValuesIn(collect_dataset_paths()), dataset_name);
+                         ::testing::ValuesIn(collect_dataset_path_strings()), dataset_name);
 
 TEST(TokenizerLoghubRegressionDiscoveryTest, FindsExpectedDatasets)
 {

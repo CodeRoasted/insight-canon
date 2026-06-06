@@ -1,3 +1,9 @@
+module;
+
+module insight.canon.detail;
+import insight.canon.internal;
+import insight.canon.api;
+
 // src/insight/tokenization/strategies/github_actions.cpp
 //
 // GitHubActionsStrategy — see github_actions.hpp.
@@ -9,17 +15,8 @@
 // (copied by LogParser before parse()), so substrings are valid string_views;
 // only the templated `content` is arena-stored.
 
-#include "insight/tokenization/strategies/github_actions.hpp"
 
-#include <string>
-#include <string_view>
 
-#include "insight/core/types.hpp"
-#include "insight/tokenization/arena_allocator.hpp"
-#include "insight/tokenization/parsed_line.hpp"
-#include "insight/tokenization/strategies/detail/fast_gates.hpp"
-#include "insight/utils/time_utils.hpp"
-#include <expected>
 
 namespace insight::tokenization
 {

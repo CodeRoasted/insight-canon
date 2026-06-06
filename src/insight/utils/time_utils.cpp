@@ -1,25 +1,15 @@
+module;
+
+module insight.canon.api;
+import insight.canon.internal;
+
 // core/src/insight/utils/time_utils.cpp
 // Timestamp parsing helpers.  All functions are noexcept and return
 // std::nullopt on any malformed input rather than throwing.
 
-#include "insight/utils/time_utils.hpp"
 
-#include "insight/utils/failure_lexicon.hpp"
-#include "insight/utils/token_scan.hpp"
 
-#include <algorithm>
-#include <array>
-#include <cctype>
-#include <charconv>
-#include <chrono>
-#include <cstdint>
-#include <cstring>
-#include <ctime>
-#include <optional>
-#include <string_view>
-#include <system_error>
 
-#include "insight/core/types.hpp"
 
 // NOLINTBEGIN(readability-function-cognitive-complexity)
 // NOLINTBEGIN(readability-magic-numbers)

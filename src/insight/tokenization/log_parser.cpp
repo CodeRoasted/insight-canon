@@ -1,3 +1,10 @@
+module;
+#include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
+
+module insight.canon.detail;
+import insight.canon.internal;
+import insight.canon.api;
+
 // src/1_tokenization/log_parser.cpp
 //
 // LogParser: orchestrates arena allocation, format detection, and strategy
@@ -9,19 +16,8 @@
 //     so string_views inside the returned ParsedLine are stable for the arena's
 //     lifetime.
 
-#include "insight/tokenization/log_parser.hpp"
 
-#include <cstddef>
-#include <span>
-#include <string>
-#include <string_view>
-#include <vector>
 
-#include "insight/core/types.hpp"
-#include "insight/tokenization/arena_allocator.hpp"
-#include "insight/tokenization/parsed_line.hpp"
-#include "insight/utils/logger.hpp"
-#include <expected>
 
 namespace insight::tokenization
 {

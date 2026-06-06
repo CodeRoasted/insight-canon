@@ -1,3 +1,11 @@
+module;
+#include <cstring>
+#include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
+
+module insight.canon.detail;
+import insight.canon.internal;
+import insight.canon.api;
+
 // drain.cpp — Drain v2
 //
 // Online log-template miner (He et al., ICWS 2017) reimplemented for
@@ -33,26 +41,8 @@
 //  - **Zero RE2.** Token masking (IPv4, hex) uses constexpr hand-written
 //    scanners; no regex library is needed anywhere in this file.
 
-#include "insight/tokenization/drain.hpp"
 
-#include <algorithm>
-#include <cstddef>
-#include <cstdint>
-#include <cstring>
-#include <map>
-#include <memory>
-#include <optional>
-#include <span>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <utility>
-#include <vector>
 
-#include "insight/core/types.hpp"
-#include "insight/tokenization/arena_allocator.hpp"
-#include "insight/tokenization/drain_config.hpp"
-#include "insight/utils/logger.hpp"
 
 namespace insight::tokenization
 {

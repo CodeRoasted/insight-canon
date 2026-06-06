@@ -1,12 +1,7 @@
-#include "insight/utils/failure_lexicon.hpp"
+module;
 
-#include "insight/utils/token_scan.hpp"
-
-#include <algorithm>
-#include <array>
-#include <cstddef>
-#include <span>
-#include <string_view>
+module insight.canon.api;
+import insight.canon.internal;
 
 namespace insight::utils
 {

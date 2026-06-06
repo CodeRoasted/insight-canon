@@ -9,11 +9,10 @@
 // a larger token. The buried-substring over-match was the bug (spurious HIGH
 // "New error" diff promotions + inflated MetaLog severity).
 
-#include <string_view>
-
 #include <gtest/gtest.h>
 
-#include "insight/utils/failure_lexicon.hpp"
+import std;
+import insight.canon;
 
 using insight::utils::contains_failure_cue;
 using insight::utils::contains_warning_cue;

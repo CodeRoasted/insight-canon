@@ -1,18 +1,19 @@
-// core/src/insight/utils/logger.cpp
-//
-// Centralized spdlog logger initialisation and per-module logger accessors.
-
-#include "insight/utils/logger.hpp"
-
-#include <memory>
-#include <mutex>
+module;
 #include <spdlog/common.h>
 #include <spdlog/logger.h>
 #include <spdlog/sinks/sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
-#include <string_view>
-#include <vector>
+#include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
+
+module insight.canon.api;
+import insight.canon.internal;
+
+// core/src/insight/utils/logger.cpp
+//
+// Centralized spdlog logger initialisation and per-module logger accessors.
+
+
 
 namespace insight::logging
 {

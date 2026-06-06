@@ -20,8 +20,6 @@
 #include <spdlog/logger.h>
 #include <utility>
 
-#include "insight/utils/logger.hpp" // the accessor decls (module-imported in purview; textual here for the macros)
-
 namespace insight::logging
 {
 

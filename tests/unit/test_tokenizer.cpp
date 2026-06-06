@@ -9,12 +9,9 @@
 // identity, template grouping, param extraction, and batch processing.
 
 #include <gtest/gtest.h>
-#include <string_view>
-#include <vector>
 
-#include "insight/core/types.hpp"
-#include "insight/tokenization/arena_allocator.hpp"
-#include "insight/tokenization/tokenizer_engine.hpp"
+import std;
+import insight.canon;
 
 using namespace insight;
 using namespace insight::tokenization;

@@ -15,13 +15,11 @@
 //   - reset() teardown
 //   - Edge cases: empty content, max_clusters cap
 
-#include <string>
-
 #include <gtest/gtest.h>
 
-#include "insight/tokenization/arena_allocator.hpp"
-#include "insight/tokenization/drain.hpp"
-#include "insight/tokenization/drain_config.hpp"
+import std;
+import insight.canon;
+import insight.canon.detail; // white-box: drain/detector/strategies
 
 using namespace insight::tokenization;
 

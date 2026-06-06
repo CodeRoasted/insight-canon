@@ -1,3 +1,12 @@
+module;
+#include <simdjson.h>
+#include "insight/tokenization/strategies/detail/simdjson_scratch.hpp" // textual: TU-local simdjson entities (§11.8 family)
+#include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
+
+module insight.canon.detail;
+import insight.canon.internal;
+import insight.canon.api;
+
 // src/1_tokenization/strategies/cloudwatch.cpp
 //
 // CloudWatchStrategy — parses AWS CloudWatch JSON log events:
@@ -7,23 +16,8 @@
 // no longer linked into the production library. Detection is gated by an O(1)
 // substring check in confidence(), so parse() is invoked at most once per line.
 
-#include "insight/tokenization/strategies/cloudwatch.hpp"
 
-#include <array>
-#include <chrono>
-#include <cstdint>
-#include <ctime>
-#include <simdjson.h>
-#include <string>
-#include <string_view>
 
-#include "insight/core/types.hpp"
-#include "insight/tokenization/arena_allocator.hpp"
-#include "insight/tokenization/parsed_line.hpp"
-#include "insight/tokenization/strategies/detail/simdjson_scratch.hpp"
-#include "insight/utils/logger.hpp"
-#include "insight/utils/time_utils.hpp"
-#include <expected>
 
 namespace insight::tokenization
 {
