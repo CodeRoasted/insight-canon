@@ -27,12 +27,10 @@
 #include <string>
 #include <vector>
 
-#include "insight/core/types.hpp"
-#include "insight/math/det_math.hpp"
-#include "insight/tokenization/arena_allocator.hpp"
-#include "insight/tokenization/canonical_event.hpp"
-#include "insight/tokenization/tokenizer_engine.hpp"
-#include "insight/utils/failure_lexicon.hpp"
+// 1.5.1 unwrap (Approach B): the textual public headers are gone — the canon module's
+// public surface (Tokenizer, det::FixedReducer, failure_lexicon cues, to_string,
+// CanonicalEvent / StructuralRole) is all reachable through the single facade import.
+import insight.canon;
 
 namespace
 {
