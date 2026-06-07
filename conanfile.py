@@ -57,6 +57,11 @@ class InsightCanonConan(ConanFile):
         self.requires("spdlog/1.17.0", transitive_headers=True, transitive_libs=True)
         self.requires("fmt/12.1.0",    transitive_headers=True, transitive_libs=True)
         self.requires("simdjson/4.6.3")
+        # NUMA-aware arena allocation (hot path) — ON by default, especially for release.
+        # Vendored via conan (mirrors logcraft) so it's HERMETIC: no reliance on a system
+        # libnuma-dev, which CI runners lack (the cause of the create-path build break).
+        if self.settings.os == "Linux":
+            self.requires("libnuma/2.0.19", transitive_headers=True, transitive_libs=True)
 
     def build_requirements(self):
         self.test_requires("gtest/1.17.0")
@@ -89,6 +94,8 @@ class InsightCanonConan(ConanFile):
             "fmt::fmt",
             "simdjson::simdjson"
         ]
+        if self.settings.os == "Linux":
+            self.cpp_info.requires.append("libnuma::libnuma")
         # Cross-package C++ modules (§10.7): defer to the package's OWN cmake config
         # (it carries FILE_SET CXX_MODULES; conan's generator does not emit it).
         # Editable build-tree config dir + create install path both listed.

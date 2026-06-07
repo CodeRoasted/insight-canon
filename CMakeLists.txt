@@ -15,7 +15,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(INSIGHT_CANON_BUILD_TESTS  "Build unit and regression tests" ${PROJECT_IS_TOP_LEVEL})
 option(INSIGHT_CANON_BUILD_BENCHMARKS "Build micro-benchmarks" ${PROJECT_IS_TOP_LEVEL})
-option(INSIGHT_CANON_ENABLE_NUMA  "Enable optional NUMA-aware arena allocation (libnuma)" OFF)
+option(INSIGHT_CANON_ENABLE_NUMA  "Enable NUMA-aware arena allocation (libnuma, vendored via conan)" ON)
 
 ###########################################################
 #  External dependencies
@@ -90,15 +90,17 @@ target_compile_options(insight_canon PUBLIC
 ###########################################################
 #  Optional NUMA support (arena allocator)
 ###########################################################
+# libnuma is vendored via conan (libnuma/2.0.19 on Linux, mirrors logcraft) — hermetic, so
+# CI/release builds get NUMA without a system libnuma-dev. numa.h is included only under
+# INSIGHT_HAS_NUMA (arena_allocator.cpp), so a non-Linux / NUMA-off build needs no libnuma.
 if(INSIGHT_CANON_ENABLE_NUMA)
-    find_path(NUMA_INCLUDE_DIR numa.h)
-    find_library(NUMA_LIBRARY numa)
-    if(NUMA_INCLUDE_DIR AND NUMA_LIBRARY)
+    find_package(libnuma CONFIG QUIET)
+    if(libnuma_FOUND)
         target_compile_definitions(insight_canon PRIVATE INSIGHT_HAS_NUMA)
-        target_include_directories(insight_canon PRIVATE "${NUMA_INCLUDE_DIR}")
-        target_link_libraries(insight_canon PRIVATE "${NUMA_LIBRARY}")
+        target_link_libraries(insight_canon PRIVATE libnuma::libnuma)
+        message(STATUS "libnuma found via conan (libnuma::libnuma) — NUMA-aware arena enabled")
     else()
-        message(WARNING "INSIGHT_CANON_ENABLE_NUMA=ON but libnuma was not found; building without NUMA support")
+        message(STATUS "INSIGHT_CANON_ENABLE_NUMA=ON but libnuma not found — arena uses the portable allocator")
     endif()
 endif()
 
@@ -130,12 +132,18 @@ install(EXPORT insight_canonTargets
 export(EXPORT insight_canonTargets
     NAMESPACE insight::
     FILE ${CMAKE_CURRENT_BINARY_DIR}/insight_canonTargets.cmake)
-file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/insight_canon-config.cmake
-"include(CMakeFindDependencyMacro)
-find_dependency(fmt)
+# canon is a STATIC lib, so even PRIVATE link deps (libnuma) appear in its Targets.cmake and
+# must resolve in the consumer — add find_dependency(libnuma) ONLY when it was actually linked.
+set(_canon_find_deps "find_dependency(fmt)
 find_dependency(spdlog)
 find_dependency(simdjson)
-include(\"\${CMAKE_CURRENT_LIST_DIR}/insight_canonTargets.cmake\")
+")
+if(INSIGHT_CANON_ENABLE_NUMA AND libnuma_FOUND)
+    string(APPEND _canon_find_deps "find_dependency(libnuma)\n")
+endif()
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/insight_canon-config.cmake
+"include(CMakeFindDependencyMacro)
+${_canon_find_deps}include(\"\${CMAKE_CURRENT_LIST_DIR}/insight_canonTargets.cmake\")
 ")
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/insight_canon-config.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/insight_canon)
