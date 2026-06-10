@@ -1,0 +1,403 @@
+// NOLINTBEGIN
+// Unit tests: allow short identifiers and test-specific patterns
+// tests/1_tokenization/test_tokenizer.cpp
+//
+// Integration tests for the full Phase 1 pipeline:
+//   raw log line → Tokenizer → CanonicalEvent
+//
+// Tests validate end-to-end correctness for all four log formats, event
+// identity, template grouping, param extraction, and batch processing.
+
+#include <gtest/gtest.h>
+
+import insight.canon.test;
+
+using namespace insight;
+using namespace insight::tokenization;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fixture: a fresh arena + tokenizer per test
+// ─────────────────────────────────────────────────────────────────────────────
+
+class TokenizerTest : public ::testing::Test
+{
+  protected:
+    static constexpr std::size_t kArenaSize{1u << 20}; // 1 MiB
+
+    ArenaAllocator arena{kArenaSize};
+    Tokenizer tokenizer{arena};
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Basic pipeline correctness per format
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST_F(TokenizerTest, ProcessesBSDSyslogLine)
+{
+    constexpr std::string_view line{"Jan 15 08:03:22 myhost sshd[1]: Accepted password for alice"};
+    auto result{tokenizer.process_line(line)};
+    ASSERT_TRUE(result.has_value());
+    const auto& ev{result.value()};
+    EXPECT_EQ(ev.component, "sshd");
+    EXPECT_EQ(ev.level, LogLevel::Unknown); // BSD syslog has no inline level
+    EXPECT_FALSE(ev.template_str.empty());
+}
+
+TEST_F(TokenizerTest, ProcessesJSONLine)
+{
+    constexpr std::string_view line{
+        R"({"ts":"2024-01-15T10:30:00Z","level":"ERROR","component":"db","message":"Query timeout"})"};
+    auto result{tokenizer.process_line(line)};
+    ASSERT_TRUE(result.has_value());
+    const auto& ev{result.value()};
+    EXPECT_EQ(ev.level, LogLevel::Error);
+    EXPECT_EQ(ev.component, "db");
+    EXPECT_FALSE(ev.template_str.empty());
+}
+
+TEST_F(TokenizerTest, ProcessesKVLine)
+{
+    constexpr std::string_view line = "ts=2024-01-15T10:30:00Z level=WARN component=cache "
+                                      "msg=eviction_threshold_reached";
+    auto result{tokenizer.process_line(line)};
+    ASSERT_TRUE(result.has_value());
+    const auto& ev{result.value()};
+    EXPECT_EQ(ev.level, LogLevel::Warn);
+    EXPECT_EQ(ev.component, "cache");
+}
+
+TEST_F(TokenizerTest, ProcessesCLFLine)
+{
+    constexpr std::string_view line{
+        R"(192.168.1.5 - bob [15/Jan/2024:10:30:00 +0000] "GET /api/health HTTP/1.1" 200 42)"};
+    auto result{tokenizer.process_line(line)};
+    ASSERT_TRUE(result.has_value());
+    const auto& ev{result.value()};
+    EXPECT_EQ(ev.level, LogLevel::Info);
+    EXPECT_EQ(ev.component, "192.168.1.5");
+    EXPECT_NE(ev.template_str.find("GET"), std::string::npos);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Event identity
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST_F(TokenizerTest, EventIDMonotonicallyIncreases)
+{
+    constexpr std::string_view line{R"({"level":"INFO","message":"tick"})"};
+    auto r1{tokenizer.process_line(line)};
+    auto r2{tokenizer.process_line(line)};
+    ASSERT_TRUE(r1.has_value());
+    ASSERT_TRUE(r2.has_value());
+    EXPECT_LT(r1.value().id, r2.value().id);
+}
+
+TEST_F(TokenizerTest, EventsProducedCounterIncrements)
+{
+    EXPECT_EQ(tokenizer.events_produced(), 0u);
+    static_cast<void>(tokenizer.process_line(R"({"msg":"one"})"));
+    EXPECT_EQ(tokenizer.events_produced(), 1u);
+    static_cast<void>(tokenizer.process_line(R"({"msg":"two"})"));
+    EXPECT_EQ(tokenizer.events_produced(), 2u);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Template grouping
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST_F(TokenizerTest, SameStructuredLinesSameTemplateID)
+{
+    auto r1{tokenizer.process_line(R"({"msg":"User alice connected"})")};
+    auto r2{tokenizer.process_line(R"({"msg":"User alice connected"})")};
+    ASSERT_TRUE(r1.has_value() && r2.has_value());
+    EXPECT_EQ(r1.value().template_id, r2.value().template_id);
+}
+
+TEST_F(TokenizerTest, VariablePartBecomesWildcardInTemplate)
+{
+    // After two similar messages the Drain template should contain "<*>".
+    static_cast<void>(tokenizer.process_line(R"({"msg":"User alice logged in from 10.0.0.1"})"));
+    auto r{tokenizer.process_line(R"({"msg":"User bob logged in from 10.0.0.2"})")};
+    ASSERT_TRUE(r.has_value());
+    // By the second match the template should have been refined.
+    EXPECT_NE(r.value().template_str.find("User"), std::string::npos);
+}
+
+TEST_F(TokenizerTest, DifferentFormatLinesDifferentTemplates)
+{
+    // Use content with different first tokens to guarantee Drain routes them to
+    // different leaves regardless of similarity threshold.
+    auto rSyslog{tokenizer.process_line("Jan 15 08:03:22 host proc[1]: kernel startup completed")};
+    auto rJSON{
+        tokenizer.process_line(R"({"level":"INFO","message":"database connection established"})")};
+    ASSERT_TRUE(rSyslog.has_value() && rJSON.has_value());
+    // The two lines go through different strategies → different content →
+    // likely different templates.
+    EXPECT_NE(rSyslog.value().template_id, rJSON.value().template_id);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Params
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST_F(TokenizerTest, ParamsExtractedAfterTemplateStabilises)
+{
+    // Three identical-structure lines; after the second, wildcards appear.
+    static_cast<void>(tokenizer.process_line(R"({"msg":"Retry attempt 1 of 3"})"));
+    static_cast<void>(tokenizer.process_line(R"({"msg":"Retry attempt 2 of 3"})"));
+    auto r{tokenizer.process_line(R"({"msg":"Retry attempt 5 of 10"})")};
+    ASSERT_TRUE(r.has_value());
+    // Should have at least one param (the variable numeric fields).
+    EXPECT_GE(r.value().params.size(), 1u);
+}
+
+TEST_F(TokenizerTest, ParamsAreArenaOwned)
+{
+    static_cast<void>(tokenizer.process_line(R"({"msg":"connect from 10.0.0.1 ok"})"));
+    auto r{tokenizer.process_line(R"({"msg":"connect from 10.0.0.2 ok"})")};
+    ASSERT_TRUE(r.has_value());
+    for (auto sv : r.value().params)
+        EXPECT_TRUE(arena.owns(sv.data()));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Batch processing
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST_F(TokenizerTest, BatchReturnsOneResultPerLine)
+{
+    const std::vector<std::string_view> lines = {
+        R"({"msg":"line one"})",
+        R"({"msg":"line two"})",
+        R"({"msg":"line three"})",
+    };
+    auto results{tokenizer.process_batch(lines)};
+    EXPECT_EQ(results.size(), lines.size());
+}
+
+TEST_F(TokenizerTest, BatchCountsEventsProduced)
+{
+    const std::vector<std::string_view> lines = {
+        R"({"msg":"a"})",
+        R"({"msg":"b"})",
+        R"({"msg":"c"})",
+    };
+    static_cast<void>(tokenizer.process_batch(lines));
+    EXPECT_EQ(tokenizer.events_produced(), lines.size());
+}
+
+TEST_F(TokenizerTest, BatchErrorLineDoeNotCountAsProduced)
+{
+    const std::vector<std::string_view> lines = {
+        R"({"msg":"valid"})",
+        "", // empty → error
+        R"({"msg":"also valid"})",
+    };
+    auto results{tokenizer.process_batch(lines)};
+    ASSERT_EQ(results.size(), 3u);
+    EXPECT_TRUE(results[0].has_value());
+    EXPECT_FALSE(results[1].has_value());
+    EXPECT_TRUE(results[2].has_value());
+    EXPECT_EQ(tokenizer.events_produced(), 2u);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Error handling
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST_F(TokenizerTest, EmptyLineReturnsError)
+{
+    auto result{tokenizer.process_line("")};
+    EXPECT_FALSE(result.has_value());
+    EXPECT_EQ(tokenizer.events_produced(), 0u);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Accessor delegation
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST_F(TokenizerTest, ReportsParsedLineCount)
+{
+    static_cast<void>(tokenizer.process_line(R"({"msg":"test"})"));
+    EXPECT_GE(tokenizer.lines_parsed(), 1u);
+}
+
+TEST_F(TokenizerTest, ReportsClusterCount)
+{
+    static_cast<void>(tokenizer.process_line(R"({"msg":"drain test"})"));
+    EXPECT_GE(tokenizer.cluster_count(), 1u);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Edge cases / robustness
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST_F(TokenizerTest, ShortGarbageLineParsesAsRawText)
+{
+    // "xyz" matches no structured strategy, so the raw-text fallback templates
+    // it rather than dropping it (the wedge ingests unstructured CI logs).
+    auto result{tokenizer.process_line("xyz")};
+    ASSERT_TRUE(result.has_value());
+    const auto& ev{result.value()};
+    EXPECT_EQ(ev.level, LogLevel::Unknown);
+    EXPECT_FALSE(ev.template_str.empty());
+}
+
+TEST_F(TokenizerTest, WhitespaceOnlyLineReturnsError)
+{
+    auto result{tokenizer.process_line("   ")};
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST_F(TokenizerTest, UTF8ContentEndToEnd)
+{
+    // UTF-8 in a JSON message field should flow through without corruption
+    // and not cause any crash.
+    auto result{tokenizer.process_line(
+        R"({"level":"INFO","message":"connexion \u00e9tablie avec succ\u00e8s"})")};
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result.value().template_str.empty());
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Batch with all four formats
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST_F(TokenizerTest, BatchAllFourFormatsAllSucceed)
+{
+    const std::vector<std::string_view> lines = {
+        // Syslog (BSD)
+        "Jan 15 08:03:22 myhost sshd[1]: Accepted password for user",
+        // JSON
+        R"({"level":"INFO","component":"api","message":"request served"})",
+        // KV
+        "level=WARN component=cache msg=eviction_triggered",
+        // CLF
+        R"(10.0.0.1 - - [15/Jan/2024:10:30:00 +0000] "GET /status HTTP/1.1" 200 64)",
+    };
+    auto results{tokenizer.process_batch(lines)};
+    ASSERT_EQ(results.size(), 4u);
+    for (std::size_t i{0}; i < results.size(); ++i)
+    {
+        EXPECT_TRUE(results[i].has_value())
+            << "Line " << i << " failed: " << (!results[i].has_value() ? results[i].error() : "");
+    }
+    EXPECT_EQ(tokenizer.events_produced(), 4u);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Interleaving errors must not corrupt template IDs
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST_F(TokenizerTest, InterleaveErrorsDoNotCorruptTemplateIds)
+{
+    // Process a valid line, an error, then another structurally identical valid
+    // line. The third line's template_id must equal the first's (same structure).
+    auto r1{tokenizer.process_line(R"({"msg":"worker job started"})")};
+    ASSERT_TRUE(r1.has_value());
+
+    auto rErr{tokenizer.process_line("")}; // forced error
+    EXPECT_FALSE(rErr.has_value());
+
+    auto r3{tokenizer.process_line(R"({"msg":"worker job started"})")};
+    ASSERT_TRUE(r3.has_value());
+    EXPECT_EQ(r1.value().template_id, r3.value().template_id);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// JSON message containing KV-like content (nested format)
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST_F(TokenizerTest, JSONWithKVContentClustersCorrectly)
+{
+    // The JSON strategy extracts the message; Drain receives the KV-like content.
+    // The STABLE token must be first so both lines share the same routing leaf.
+    // Putting "action=login" first means token[0] = "action=login" for both lines
+    // → same prefix-tree leaf → compared → wildcard created for the varying
+    // user= position (similarity 2/3 ≈ 0.67 ≥ default threshold 0.4).
+    static_cast<void>(tokenizer.process_line(R"({"msg":"action=login user=alice status=ok"})"));
+    auto r{tokenizer.process_line(R"({"msg":"action=login user=bob status=ok"})")};
+    ASSERT_TRUE(r.has_value());
+    EXPECT_NE(r.value().template_str.find("action=login"), std::string::npos);
+    EXPECT_NE(r.value().template_str.find("<*>"), std::string::npos);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Drain param extraction stabilises after repeated similar lines
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST_F(TokenizerTest, HighVolumeTemplateStabilisesParams)
+{
+    // Send 8 lines in the pattern "fetched NNN rows returned" with varying NNN.
+    // The numeric position is a VARIABLE count (not a status value), so it masks
+    // to <*> and a param is extracted. (A status value behind code/status/exit/
+    // signal would instead be KEPT distinct; see test_drain SourceLocation /
+    // StatusValue tests. "rows" is not a status keyword, so masking applies.)
+    const std::vector<std::string_view> lines = {
+        R"({"msg":"fetched 200 rows returned"})", R"({"msg":"fetched 201 rows returned"})",
+        R"({"msg":"fetched 400 rows returned"})", R"({"msg":"fetched 404 rows returned"})",
+        R"({"msg":"fetched 500 rows returned"})", R"({"msg":"fetched 503 rows returned"})",
+        R"({"msg":"fetched 301 rows returned"})", R"({"msg":"fetched 204 rows returned"})",
+    };
+    auto results{tokenizer.process_batch(lines)};
+    ASSERT_EQ(results.size(), 8u);
+
+    // After stabilisation the results should have a non-empty param for the
+    // variable-count position.
+    bool any_param_found{false};
+    for (auto& r : results)
+    {
+        if (r.has_value() && !r.value().params.empty())
+        {
+            any_param_found = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(any_param_found);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Unicode extremes — non-Latin scripts and emoji
+// ─────────────────────────────────────────────────────────────────────────────
+
+TEST_F(TokenizerTest, NonLatinUnicodeEndToEnd)
+{
+    // Arabic, Cyrillic and CJK codepoints are valid UTF-8 and must pass through
+    // simdjson and Drain without corruption or crash.
+    // \u062a\u0633\u062c\u064a\u0644  = Arabic "tasjiil" (registration)
+    // \u0432\u0445\u043e\u0434        = Cyrillic "vkhod" (login)
+    // \u767b\u5f55                    = CJK "denglu" (login)
+    auto r1{tokenizer.process_line(
+        R"({"level":"INFO","message":"\u062a\u0633\u062c\u064a\u0644 \u0645\u0633\u062a\u062e\u062f\u0645"})")};
+    ASSERT_TRUE(r1.has_value());
+    EXPECT_FALSE(r1.value().template_str.empty());
+
+    auto r2{tokenizer.process_line(
+        R"({"level":"INFO","message":"\u0432\u0445\u043e\u0434 \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044f"})")};
+    ASSERT_TRUE(r2.has_value());
+    EXPECT_FALSE(r2.value().template_str.empty());
+
+    auto r3{tokenizer.process_line(R"({"level":"INFO","message":"\u767b\u5f55\u6210\u529f"})")};
+    ASSERT_TRUE(r3.has_value());
+    EXPECT_FALSE(r3.value().template_str.empty());
+}
+
+TEST_F(TokenizerTest, EmojiContentEndToEnd)
+{
+    // Emoji codepoints (encoded as JSON \uXXXX surrogate pairs or direct
+    // UTF-8) must survive simdjson → Drain without crashing.
+    // \ud83d\ude80 = U+1F680 ROCKET (surrogate pair)
+    // \u2705      = U+2705  WHITE HEAVY CHECK MARK
+    auto r1{tokenizer.process_line(
+        R"({"level":"INFO","message":"deploy \ud83d\ude80 succeeded \u2705"})")};
+    ASSERT_TRUE(r1.has_value());
+    EXPECT_FALSE(r1.value().template_str.empty());
+
+    // Two structurally identical emoji lines must receive the same template ID.
+    auto r2{tokenizer.process_line(
+        R"({"level":"INFO","message":"deploy \ud83d\ude80 succeeded \u2705"})")};
+    ASSERT_TRUE(r2.has_value());
+    EXPECT_EQ(r1.value().template_id, r2.value().template_id);
+}
+
+// NOLINTEND

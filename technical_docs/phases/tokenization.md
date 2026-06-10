@@ -1,6 +1,6 @@
 # Tokenization (insight-canon)
 
-Status: shipped. Package: `tokenization/` (insight-canon). Public API starts at `tokenization/api/insight/tokenization/tokenizer_engine.hpp`.
+Status: shipped. Repo: insight-canon (single package). The public surface is the `insight.canon` module facade (`api/insight/canon.cppm` — the `Tokenizer`); the tokenization internals live in the sealed `insight.canon.detail.{scan,strategy,drain,parse}` shards under `src/insight/`.
 
 Tokenization turns raw log lines into `CanonicalEvent` records that downstream layers can process without understanding log-format syntax. It owns format detection, structured parsing, template mining, wildcard parameter extraction, and arena-backed string lifetime.
 
@@ -69,4 +69,4 @@ The default `InsightPipeline` constructs the tokenizer with the shipped defaults
 
 ## Validation
 
-Unit coverage lives under `tokenization/tests/unit/`. Loghub regression coverage uses fixtures under `data/logs/loghub/` when present; missing fixtures are reported as skipped so local builds remain portable. Benchmarks live under `tokenization/benchmarks/` and are included in the aggregate pipeline performance reports.
+Unit coverage lives under `tests/<domain>/` (the per-domain mirror of `src/insight/` — strategy/drain/parse/tokenizer/arena/utils/math). Loghub regression coverage uses fixtures under `data/logs/loghub/` when present; missing fixtures are reported as skipped so local builds remain portable. Benchmarks live under `benchmarks/` and are included in the aggregate pipeline performance reports.

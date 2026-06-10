@@ -145,26 +145,40 @@ insight-canon is the upstream tokenization layer of the [MetaLog](https://github
 
 ```
 insight-canon/
-├── api/                    Public headers (install interface)
+├── api/                    PUBLIC (installed) module interface units
 │   └── insight/
-│       ├── core/           types.hpp
-│       ├── utils/          logger.hpp  time_utils.hpp
-│       ├── math/           det_math.hpp
-│       └── tokenization/   tokenizer_engine.hpp  canonical_event.hpp  …
-├── src/                    Private implementation sources
+│       ├── canon.internal.cppm   insight.canon.internal — std manifest
+│       ├── canon.api.cppm        insight.canon.api — the contract (types, det_math,
+│       │                         CanonicalEvent, DrainConfig, arena, utils, logging accessors)
+│       ├── canon.cppm            insight.canon — the facade (Tokenizer)
+│       └── utils/log_macros.hpp  textual INSIGHT_LOG_* macro layer (installed header)
+├── src/                    SEALED detail shards (build-only, never installed) + impl units
 │   └── insight/
-│       ├── utils/
-│       └── tokenization/   strategies/  drain  arena  …
-├── test_package/           Conan consumer smoke test
-├── tests/
-│   ├── unit/               GTest unit tests (core + tokenization)
+│       ├── scan/           insight.canon.detail.scan — fast_gates predicates + SSE2 sv_* scans
+│       ├── strategy/       insight.canon.detail.strategy — IFormatStrategy + 20 format strategies
+│       ├── drain/          insight.canon.detail.drain — the Drain template miner
+│       ├── parse/          insight.canon.detail.parse — FormatDetector + LogParser
+│       ├── tokenizer/      tokenizer_engine.cpp — facade impl unit (the Tokenizer seam)
+│       ├── arena/          arena_allocator.cpp — api impl unit
+│       └── utils/          logger / time_utils / failure_lexicon — api impl units
+├── test_package/           Conan consumer smoke test (zero-init, import insight.canon only)
+├── tests/                  Per-domain mirror of src/ + the insight.canon.test aggregate module
+│   ├── canon.test.cppm     insight.canon.test — re-exports facade + all detail shards
+│   ├── <domain>/           math/ arena/ utils/ drain/ strategy/ parse/ tokenizer/ — GTest suites
 │   └── regression/         Loghub-dataset regression tests
+├── benchmarks/             Benchmarks + the insight.canon.bench aggregate module
+├── proof/                  Public determinism proof gate (Approach B)
 ├── scripts/
 │   └── download_logs.sh    Download Loghub 2k + Zenodo datasets for regression
 ├── CMakeLists.txt          Single root CMake file
 ├── conanfile.py            Single Conan recipe
 └── .github/workflows/      ci.yml  release-publish.yml  workflow-lint.yml
 ```
+
+Module layering (the §11.9.11 pattern): `internal ◀ api ◀ detail.{scan ◀ strategy ◀ parse, drain} ◀
+facade`. The facade interface never imports a detail shard; `tokenizer_engine.cpp` (a facade impl
+unit) imports `detail.{strategy,drain,parse}` to assemble the pipeline — consumers just
+`import insight.canon;`.
 
 ---
 

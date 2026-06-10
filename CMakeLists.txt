@@ -1,5 +1,5 @@
 ###########################################################
-#  insight_canon — core types · tokenization (1.5.1 pure named module)
+#  insight_canon — core types · tokenization (1.5.2 domain-decomposed named modules)
 ###########################################################
 cmake_minimum_required(VERSION 3.28)
 
@@ -25,28 +25,44 @@ find_package(spdlog   REQUIRED CONFIG)
 find_package(simdjson REQUIRED CONFIG)
 
 ###########################################################
-#  Sources (1.5.1 unwrap)
-#  - Module interface units (FILE_SET cxx_modules): internal + api + facade (api/) + detail (src/).
-#  - Module impl units (regular sources, scanned): src/**/*.cpp attach via `module insight.canon.{api|detail};`.
-#  - Textual layer: only src/insight/utils/log_macros.hpp survives (the §11.9 macro layer).
+#  Sources (1.5.2 domain decomposition, §11.9.11)
+#  - PUBLIC module interface units (installed): internal + api + facade (api/).
+#  - PRIVATE (sealed, build-only) detail shards (src/<domain>/): scan ◀ strategy ◀ parse; drain a
+#    leaf over api. Never installed — external consumers cannot import insight.canon.detail.*.
+#  - Module impl units (regular sources, scanned): src/**/*.cpp attach via
+#    `module insight.canon{.api|.detail.<domain>};` (+ the facade impl unit tokenizer_engine.cpp).
+#  - Textual layer: api/insight/utils/log_macros.hpp (the §11.9 macro layer) and
+#    src/insight/strategy/simdjson_scratch.hpp (TU-local simdjson entities).
 ###########################################################
-set(CANON_MODULE_UNITS
+set(CANON_PUBLIC_MODULE_UNITS
     ${CMAKE_CURRENT_SOURCE_DIR}/api/insight/canon.internal.cppm
     ${CMAKE_CURRENT_SOURCE_DIR}/api/insight/canon.api.cppm
     ${CMAKE_CURRENT_SOURCE_DIR}/api/insight/canon.cppm
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/insight/canon.detail.cppm
+)
+set(CANON_DETAIL_MODULE_UNITS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/insight/scan/canon.detail.scan.cppm
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/insight/strategy/canon.detail.strategy.cppm
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/insight/drain/canon.detail.drain.cppm
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/insight/parse/canon.detail.parse.cppm
 )
 file(GLOB_RECURSE CANON_IMPL_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
 ###########################################################
 #  Module-bearing static library
 ###########################################################
+# §11.9.7/§11.9.11 install seal: the PUBLIC file set (internal/api/facade) is installed; the
+# PRIVATE cxx_modules_detail set (the detail.<domain> shards) is build-only — legal because no
+# external target imports the lib's private modules (tests/benchmarks are module MEMBERS below).
 add_library(insight_canon STATIC ${CANON_IMPL_SOURCES})
 target_sources(insight_canon
     PUBLIC
         FILE_SET cxx_modules TYPE CXX_MODULES
         BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/api ${CMAKE_CURRENT_SOURCE_DIR}/src
-        FILES    ${CANON_MODULE_UNITS}
+        FILES    ${CANON_PUBLIC_MODULE_UNITS}
+    PRIVATE
+        FILE_SET cxx_modules_detail TYPE CXX_MODULES
+        BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src
+        FILES    ${CANON_DETAIL_MODULE_UNITS}
 )
 set_target_properties(insight_canon PROPERTIES EXPORT_NAME canon
     CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
@@ -152,26 +168,30 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/insight_canon-config.cmake
 #  Tests (unit + regression)
 ###########################################################
 if(INSIGHT_CANON_BUILD_TESTS)
+    # Per-domain test mirror (§11.9.11): tests/<domain>/*.cpp 1:1 with the src/ domains
+    # (math/arena/utils are api-homed domains; regression holds the loghub corpus suite).
     file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/*.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/tests/regression/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp"
     )
     if(TEST_SOURCES)
         include(CTest)
         find_package(GTest REQUIRED CONFIG)
         enable_testing()
 
-        # §11.9.6 white-box tests are MODULE MEMBERS: the test target RECOMPILES the whole module
-        # (interface units + impl .cpp) + the test TUs, so a test may `import insight.canon.detail`
-        # (the sealed internals — drain/format_detector/strategies) WITHOUT the lib exporting them.
-        # CXX_MODULE_STD ON: the recompiled module is built against the std module, so the test TUs
-        # provide the same one. -ffp-contract=off mirrors the lib (det_math is recompiled here).
+        # §11.9.7 white-box tests are MODULE MEMBERS: the test target RECOMPILES the whole module
+        # (interface units + impl .cpp) + the test TUs, so a test may import the sealed
+        # insight.canon.detail.* shards (via the insight.canon.test aggregate) WITHOUT the lib
+        # exporting them. CXX_MODULE_STD ON: the recompiled module is built against the std module,
+        # so the test TUs provide the same one. -ffp-contract=off mirrors the lib (det_math is
+        # recompiled here).
         add_executable(insight_canon_tests ${TEST_SOURCES} ${CANON_IMPL_SOURCES})
         target_sources(insight_canon_tests
             PRIVATE
                 FILE_SET cxx_modules TYPE CXX_MODULES
                 BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/api ${CMAKE_CURRENT_SOURCE_DIR}/src
-                FILES    ${CANON_MODULE_UNITS})
+                         ${CMAKE_CURRENT_SOURCE_DIR}/tests
+                FILES    ${CANON_PUBLIC_MODULE_UNITS} ${CANON_DETAIL_MODULE_UNITS}
+                         tests/canon.test.cppm)
         target_link_libraries(insight_canon_tests PRIVATE
             fmt::fmt spdlog::spdlog simdjson::simdjson
             GTest::gtest GTest::gtest_main)
@@ -196,11 +216,33 @@ if(INSIGHT_CANON_BUILD_BENCHMARKS)
     )
     if(BENCH_SOURCES)
         find_package(benchmark REQUIRED CONFIG)
-        add_executable(insight_canon_bench ${BENCH_SOURCES})
+        # §11.9.7/§11.9.11: like the white-box tests, benchmarks are MODULE MEMBERS, not consumers —
+        # the bench target RECOMPILES the whole module (interface + detail shards + impl .cpp) + the
+        # bench TUs, so a bench may import the sealed insight.canon.detail.* shards (via the
+        # insight.canon.bench aggregate) WITHOUT the lib exporting them. Deliberately does NOT link
+        # insight_canon (the module is rebuilt here); pulls the lib's deps directly. NUMA mirrors
+        # the lib's configuration so the benched arena is the shipped arena.
+        add_executable(insight_canon_bench ${BENCH_SOURCES} ${CANON_IMPL_SOURCES})
+        target_sources(insight_canon_bench
+            PRIVATE
+                FILE_SET cxx_modules TYPE CXX_MODULES
+                BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/api ${CMAKE_CURRENT_SOURCE_DIR}/src
+                         ${CMAKE_CURRENT_SOURCE_DIR}/benchmarks
+                FILES    ${CANON_PUBLIC_MODULE_UNITS} ${CANON_DETAIL_MODULE_UNITS}
+                         benchmarks/canon.bench.cppm)
         target_link_libraries(insight_canon_bench PRIVATE
-            insight_canon benchmark::benchmark spdlog::spdlog)
-        target_include_directories(insight_canon_bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+            fmt::fmt spdlog::spdlog simdjson::simdjson benchmark::benchmark)
+        if(INSIGHT_CANON_ENABLE_NUMA AND libnuma_FOUND)
+            target_compile_definitions(insight_canon_bench PRIVATE INSIGHT_HAS_NUMA)
+            target_link_libraries(insight_canon_bench PRIVATE libnuma::libnuma)
+        endif()
+        target_include_directories(insight_canon_bench PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/api ${CMAKE_CURRENT_SOURCE_DIR}/src)
         target_compile_features(insight_canon_bench PRIVATE cxx_std_23)
         set_target_properties(insight_canon_bench PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
+        target_compile_definitions(insight_canon_bench PRIVATE
+            $<IF:$<CONFIG:Debug>,SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE,SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO>)
+        target_compile_options(insight_canon_bench PRIVATE
+            $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-ffp-contract=off>)
     endif()
 endif()

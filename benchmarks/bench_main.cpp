@@ -3,8 +3,7 @@
 #include <benchmark/benchmark.h>
 #include <spdlog/spdlog.h>
 
-import std;
-import insight.canon;
+import insight.canon.bench;
 
 int main(int argc, char** argv)
 {

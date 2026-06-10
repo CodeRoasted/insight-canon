@@ -1,8 +1,7 @@
 // NOLINTBEGIN
 #include <gtest/gtest.h>
 
-import std;
-import insight.canon;
+import insight.canon.test;
 
 namespace fs = std::filesystem;
 

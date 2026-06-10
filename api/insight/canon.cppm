@@ -1,9 +1,10 @@
-// insight.canon — public facade (1.5.1 unwrap, §11.9). Consumers `import insight.canon;` unchanged.
-// Re-exports the public api surface; insight.canon.detail is NOT re-exported (sealed internal).
-// Tokenizer lives HERE (not in api): its impl needs LogParser/Drain from detail, which imports api —
-// homing it above detail (§11.9.6) breaks the api↔detail cycle. The Tokenizer decl uses only api types
-// (ArenaAllocator/DrainConfig/CanonicalEvent) + std; tokenizer_engine.cpp (module insight.canon) imports
-// detail in its purview.
+// insight.canon — public facade (1.5.2 domain decomposition, §11.9.11). Consumers
+// `import insight.canon;` unchanged. Re-exports the public api surface; the
+// insight.canon.detail.{scan,strategy,drain,parse} shards are NOT re-exported (sealed, build-only).
+// Tokenizer lives HERE (not in api): its impl needs LogParser/Drain from the detail shards, which
+// import api — homing it above detail breaks the api↔detail cycle (the ADR-0002 facade seam). The
+// Tokenizer decl uses only api types (ArenaAllocator/DrainConfig/CanonicalEvent) + std;
+// tokenizer_engine.cpp (module insight.canon) imports detail.{strategy,drain,parse} in its purview.
 export module insight.canon;
 import insight.canon.internal;        // std (expected/unique_ptr/vector/span/string for the Tokenizer decl)
 export import insight.canon.api;      // public surface (types, det_math, arena, ...)

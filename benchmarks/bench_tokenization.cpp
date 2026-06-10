@@ -16,8 +16,7 @@
 
 #include <benchmark/benchmark.h>
 
-import std;
-import insight.canon;
+import insight.canon.bench;
 
 namespace
 {
