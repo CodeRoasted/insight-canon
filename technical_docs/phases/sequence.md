@@ -1,6 +1,6 @@
 # Sequence (insight-canon)
 
-Status: shipped. Package: `sequence/` (insight-canon). Public API: `sequence/api/insight/sequence/sequence_engine.hpp`.
+Status: shipped. Repo: insight-canon (single package — the former `sequence/` package is folded into `insight_canon`). The sequence surface ships in the `insight.canon` module facade alongside the Tokenizer.
 
 Sequence converts an ordered stream of canonical events into bounded temporal summaries. It preserves the order signal from tokenization without storing an unbounded event history.
 
@@ -58,4 +58,4 @@ insight-metalog uses these summaries to fill MetaLog behavior fields: top n-gram
 
 ## Validation
 
-Unit tests live under `sequence/tests/unit/`. The insight-playground package (in coderoast-server) also checks that the package still consumes LogCraft-backed tokenized streams through the full pipeline.
+Unit tests live under `tests/` (the per-domain mirror). The insight-playground package (in coderoast-server) also checks that the package still consumes LogCraft-backed tokenized streams through the full pipeline.
