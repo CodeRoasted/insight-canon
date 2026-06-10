@@ -5,8 +5,9 @@
 # and the dev-default TARGET for the workspace libc++ flip (migration track, §6/§7).
 # Determinism-relevant flags (-O3 -march=x86-64-v2, gnu23) MIRROR coderoast-security/linux-gcc15-release
 # so the diagonal is flag-comparable; -stdlib=libc++ is inherent to the libc++ leg.
-# Auto-keys to 'clang21-libcxx-release' (own conan cache + build-clang21-libcxx-release/ tree) via
-# _malf_profile_key, so it never contaminates the existing legs.
+# As the DEV DEFAULT it uses the UNKEYED base conan cache (.conan2 — _malf_profile_key -> "");
+# its BUILD TREES are profile-named like every other leg (build-clang21-libcxx-release/ via
+# _malf_build_key), so no leg ever squats on a bare build/.
 # Requires clang-21 + libc++-21-dev + libc++abi-21-dev (LLVM apt; installed 1:21.1.8, exact-match).
 # IMPORT STD PREREQUISITE (every dev box + CI): libc++-21's libc++.modules.json carries a relative
 # source-path that CMake misresolves to /lib/share/libc++/v1 (a packaging bug), so any libc++ build with
@@ -36,4 +37,4 @@ tools.build:sharedlinkflags=["-stdlib=libc++"]
 # build dir so a RAW `conan create --profile <this>` (no malf env) resolves an editable dep's
 # matching-profile build tree — closing the cross-stdlib editable .a contamination. malf still
 # sets MALF_EDITABLE_BUILD_DIR (takes precedence; covers sanitizer profiles).
-user.malf:editable_build_dir=build
+user.malf:editable_build_dir=build-clang21-libcxx-release
