@@ -24,9 +24,6 @@ import insight.canon.detail.parse;    // LogParser
 // Ownership: the arena is external; all string_views in CanonicalEvent point
 // into arena-managed memory and are valid until arena.reset() or destruction.
 
-
-
-
 namespace insight::tokenization
 {
 

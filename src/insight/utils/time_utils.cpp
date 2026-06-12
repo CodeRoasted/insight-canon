@@ -7,10 +7,6 @@ import insight.canon.internal;
 // Timestamp parsing helpers.  All functions are noexcept and return
 // std::nullopt on any malformed input rather than throwing.
 
-
-
-
-
 // NOLINTBEGIN(readability-function-cognitive-complexity)
 // NOLINTBEGIN(readability-magic-numbers)
 namespace insight::utils

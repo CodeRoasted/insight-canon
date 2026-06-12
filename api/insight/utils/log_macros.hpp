@@ -49,7 +49,7 @@
 #endif
 
 #if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_WARN
-#define INSIGHT_LOG_WARN(logger, ...)                                                             \
+#define INSIGHT_LOG_WARN(logger, ...)                                                              \
     ::insight::logging::detail::log_message(                                                       \
         (logger), spdlog::source_loc{__FILE__, __LINE__, SPDLOG_FUNCTION}, spdlog::level::warn,    \
         __VA_ARGS__)

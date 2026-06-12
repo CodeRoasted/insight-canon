@@ -4,7 +4,7 @@ Technical reference for the insight-canon library: tokenization and canonical ev
 
 ## Read Order
 
-1. [tokenization.md](phases/tokenization.md) — raw log line to `CanonicalEvent`: format detection, Drain clustering, arena allocator, and the public `Tokenizer` API.
+1. [tokenization.md](tokenization.md) — raw log line to `CanonicalEvent`: format detection, Drain clustering, arena allocator, and the public `Tokenizer` API.
 
 ## Pipeline Position
 

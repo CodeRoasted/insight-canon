@@ -2,7 +2,8 @@
 // §11.9.11). ParsedLine, the IFormatStrategy contract, and the 20 concrete format strategies.
 // Imports api (Timestamp/LogLevel/LogFormat/ArenaAllocator) — never the facade. The strategy impl
 // units additionally import detail.scan (fast_gates predicates) and keep simdjson textual in their
-// GMFs (simdjson_scratch.hpp). Never re-exported by the facade and never installed (PRIVATE file set).
+// GMFs (simdjson_scratch.hpp). Never re-exported by the facade and never installed (PRIVATE file
+// set).
 export module insight.canon.detail.strategy;
 import insight.canon.internal; // std + global C types
 import insight.canon.api;      // Timestamp, LogLevel, LogFormat, ArenaAllocator

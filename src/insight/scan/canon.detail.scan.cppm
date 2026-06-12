@@ -31,7 +31,6 @@ import insight.canon.internal; // std + global C types
 // scanning. The constexpr char predicates above remain constexpr; the
 // sv_* parse helpers are plain inline (runtime-only).
 
-
 // SSE2 is guaranteed by -march=x86-64-v2 (baseline x86-64 v2 ABI).
 
 export namespace insight::tokenization
@@ -85,9 +84,9 @@ export namespace insight::tokenization
 // ── Constants shared between predicate and parse() ───────────────────────
 // Strategy parse() methods import this module and use these directly; they
 // cannot be function-local.
-constexpr std::size_t kBsdMinLen{15U};      // "Mon DD HH:MM:SS" minimum
-constexpr std::size_t kHdfsMinLen{16U};     // "YYMMDD HHMMSS digit" minimum
-constexpr std::size_t kGhaPrefixLen{28U};   // "YYYY-MM-DDTHH:MM:SS.fffffffZ" length
+constexpr std::size_t kBsdMinLen{15U};    // "Mon DD HH:MM:SS" minimum
+constexpr std::size_t kHdfsMinLen{16U};   // "YYMMDD HHMMSS digit" minimum
+constexpr std::size_t kGhaPrefixLen{28U}; // "YYYY-MM-DDTHH:MM:SS.fffffffZ" length
 
 // ── Composite prefix predicates ──────────────────────────────────────────
 // Each returns true iff `str` begins (at offset 0 unless noted) with the
@@ -113,10 +112,10 @@ constexpr std::size_t kGhaPrefixLen{28U};   // "YYYY-MM-DDTHH:MM:SS.fffffffZ" le
 // "HH:MM:SS" at offset `pos`.
 [[nodiscard]] constexpr bool match_time_at(std::string_view str, std::size_t pos) noexcept
 {
-    static constexpr std::size_t kTimeLen{8U};     // "HH:MM:SS"
-    static constexpr std::size_t kTimeColon2{5U};  // second ':' separator
-    static constexpr std::size_t kTimeSec1{6U};    // first second digit
-    static constexpr std::size_t kTimeSec2{7U};    // second second digit
+    static constexpr std::size_t kTimeLen{8U};    // "HH:MM:SS"
+    static constexpr std::size_t kTimeColon2{5U}; // second ':' separator
+    static constexpr std::size_t kTimeSec1{6U};   // first second digit
+    static constexpr std::size_t kTimeSec2{7U};   // second second digit
     if (pos + kTimeLen > str.size())
         return false;
     return is_digit(str[pos]) && is_digit(str[pos + 1]) && str[pos + 2] == ':' &&
@@ -127,7 +126,8 @@ constexpr std::size_t kGhaPrefixLen{28U};   // "YYYY-MM-DDTHH:MM:SS.fffffffZ" le
 // "Mon DD HH:MM:SS" — BSD syslog date. e.g. "Jan 15 08:03:22"
 [[nodiscard]] constexpr bool is_bsd_syslog_prefix(std::string_view str) noexcept
 {
-    static constexpr std::size_t kTimeLen{8U}; // "HH:MM:SS" — for the size guard before match_time_at
+    static constexpr std::size_t kTimeLen{
+        8U}; // "HH:MM:SS" — for the size guard before match_time_at
     if (str.size() < kBsdMinLen)
         return false;
     if (!is_upper(str[0]) || !is_lower(str[1]) || !is_lower(str[2]))

@@ -170,7 +170,8 @@ constexpr std::array<DatasetExpectation, 16> kDatasetExpectations{{
     return {}; // Data not found - tests will be skipped
 }
 
-[[nodiscard]] std::vector<std::string> collect_dataset_path_strings(); // fwd (defined after collect_dataset_paths)
+[[nodiscard]] std::vector<std::string>
+collect_dataset_path_strings(); // fwd (defined after collect_dataset_paths)
 
 [[nodiscard]] std::vector<fs::path> collect_dataset_paths()
 {
@@ -331,7 +332,8 @@ GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(TokenizerLoghubRegressionTest);
 
 TEST_P(TokenizerLoghubRegressionTest, ProcessesRealLoghubDataset)
 {
-    const fs::path dataset{GetParam()}; // param is std::string (gtest can't print fs::path under import std)
+    const fs::path dataset{
+        GetParam()}; // param is std::string (gtest can't print fs::path under import std)
     const bool verbose_output{env_is_enabled("INSIGHT_TOKENIZER_REGRESSION_VERBOSE")};
     const std::optional<double> env_success_rate{env_min_success_rate()};
     const DatasetExpectation expected{expectation_for(dataset)};

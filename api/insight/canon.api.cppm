@@ -1,13 +1,14 @@
 // insight.canon.api — the public DATA + API surface of canon (1.5.1 unwrap, §11.9). The former
-// api/insight/**/*.hpp content (types, det_math, canonical_event, drain_config, structural_role_registry,
-// arena_allocator, tokenizer_engine, failure_lexicon, time_utils, logger accessors) lives here. std comes
-// from insight.canon.internal; spdlog (3rd-party, the logger accessor signatures) is a textual GMF
-// include. det_math is header-only integer math — it stays INLINE here (consumers compile it under the
-// package's -ffp-contract=off, the determinism guarantee). Class IMPLEMENTATIONS stay in src/*.cpp impl
-// units (byte-identical .a); this interface holds only their declarations.
+// api/insight/**/*.hpp content (types, det_math, canonical_event, drain_config,
+// structural_role_registry, arena_allocator, tokenizer_engine, failure_lexicon, time_utils, logger
+// accessors) lives here. std comes from insight.canon.internal; spdlog (3rd-party, the logger
+// accessor signatures) is a textual GMF include. det_math is header-only integer math — it stays
+// INLINE here (consumers compile it under the package's -ffp-contract=off, the determinism
+// guarantee). Class IMPLEMENTATIONS stay in src/*.cpp impl units (byte-identical .a); this
+// interface holds only their declarations.
 module;
-// SPDLOG_ACTIVE_LEVEL is a CMake -D per build type (Debug: TRACE, Release: INFO), propagated PUBLIC.
-// Guard a missing definition → default TRACE (nothing elided) — mirrors log_macros.hpp.
+// SPDLOG_ACTIVE_LEVEL is a CMake -D per build type (Debug: TRACE, Release: INFO), propagated
+// PUBLIC. Guard a missing definition → default TRACE (nothing elided) — mirrors log_macros.hpp.
 #ifndef SPDLOG_ACTIVE_LEVEL
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 #endif
@@ -318,7 +319,6 @@ enum class Severity : uint8_t
 // build with -ffp-contract=off so the trailing fixed→double divide is
 // never fused; SSE (not x87 80-bit) is the x86-64 default and arm has no x87.
 
-
 export namespace insight::det
 {
 
@@ -607,7 +607,7 @@ class ArenaAllocator
         bool numa_allocated{false};
     };
 
-    [[nodiscard]] Block make_block(std::size_t bytes, std::size_t alignment);
+    [[nodiscard]] Block make_block(std::size_t bytes, std::size_t alignment) const;
     void grow_to_fit(std::size_t size, std::size_t alignment);
 
     std::vector<Block> blocks_;
@@ -729,7 +729,8 @@ parse_nginx_error_ts(std::string_view timestamp_str) noexcept;
 } // namespace insight::utils
 
 // ──────── from api/insight/utils/logger.hpp (accessors + the log_message template + the one
-//          live compile-time gate; the MACROS-ONLY layer is src/insight/utils/log_macros.hpp) ────────
+//          live compile-time gate; the MACROS-ONLY layer is src/insight/utils/log_macros.hpp)
+//          ────────
 export namespace insight::logging
 {
 
@@ -743,23 +744,24 @@ inline constexpr bool kDebugLogsEnabled{SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_DEBU
 namespace detail
 {
 
-// The function INSIGHT_LOG_* expand to. Homed in the module (not the textual macro header) so no
-// first-party declaration leaks through the GMF — log_macros.hpp stays pure preprocessor + a single
-// third-party include (the logcraft canonical pattern, §11.4).
-template <typename... Args>
-inline void log_message(const std::shared_ptr<spdlog::logger>& logger,
-                        const spdlog::source_loc& source_location,
-                        spdlog::level::level_enum level, fmt::format_string<Args...> format,
-                        // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward) — forwarded in body
-                        Args&&... args)
-{
-    if (!logger || !logger->should_log(level))
+    // The function INSIGHT_LOG_* expand to. Homed in the module (not the textual macro header) so
+    // no first-party declaration leaks through the GMF — log_macros.hpp stays pure preprocessor + a
+    // single third-party include (the logcraft canonical pattern, §11.4).
+    template <typename... Args>
+    inline void
+    log_message(const std::shared_ptr<spdlog::logger>& logger,
+                const spdlog::source_loc& source_location, spdlog::level::level_enum level,
+                fmt::format_string<Args...> format,
+                // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward) — forwarded in body
+                Args&&... args)
     {
-        return;
-    }
+        if (!logger || !logger->should_log(level))
+        {
+            return;
+        }
 
-    logger->log(source_location, level, fmt::format(format, std::forward<Args>(args)...));
-}
+        logger->log(source_location, level, fmt::format(format, std::forward<Args>(args)...));
+    }
 
 } // namespace detail
 
@@ -913,4 +915,3 @@ template <typename Visit>
 }
 
 } // namespace insight::utils
-

@@ -1,6 +1,6 @@
 module;
-#include <cstring>
 #include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
+#include <cstring>
 
 module insight.canon.detail.drain;
 import insight.canon.internal;
@@ -40,9 +40,6 @@ import insight.canon.api;
 //
 //  - **Zero RE2.** Token masking (IPv4, hex) uses constexpr hand-written
 //    scanners; no regex library is needed anywhere in this file.
-
-
-
 
 namespace insight::tokenization
 {

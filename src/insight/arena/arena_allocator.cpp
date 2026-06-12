@@ -198,7 +198,7 @@ ArenaAllocator& ArenaAllocator::operator=(ArenaAllocator&& other) noexcept
 }
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static): NUMA builds use policy_.
-ArenaAllocator::Block ArenaAllocator::make_block(std::size_t bytes, std::size_t alignment)
+ArenaAllocator::Block ArenaAllocator::make_block(std::size_t bytes, std::size_t alignment) const
 {
     const std::size_t block_alignment = std::max(kDefaultBlockAlignment, alignment);
 #ifdef INSIGHT_HAS_NUMA

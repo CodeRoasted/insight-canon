@@ -1,8 +1,8 @@
 {
   "context": {
-    "date": "2026-06-06T13:58:34+02:00",
+    "date": "2026-06-12T09:27:30+02:00",
     "host_name": "DESKTOP-F7PPTO6",
-    "executable": "/home/windows/workspace/coderoast/insight-canon/build/insight_canon_bench",
+    "executable": "/home/windows/workspace/coderoast/insight-canon/build-clang21-libcxx-release/insight_canon_bench",
     "num_cpus": 8,
     "mhz_per_cpu": 4192,
     "cpu_scaling_enabled": false,
@@ -33,7 +33,7 @@
         "num_sharing": 8
       }
     ],
-    "load_avg": [2.2002,1.29639,1.0293],
+    "load_avg": [1.55664,0.601074,0.538086],
     "library_version": "v1.4.3-8-gdb4a26b1-dirty",
     "library_build_type": "release",
     "json_schema_version": 1
@@ -48,12 +48,12 @@
       "repetitions": 1,
       "repetition_index": 0,
       "threads": 1,
-      "iterations": 978,
-      "real_time": 7.5228048619673280e+02,
-      "cpu_time": 7.1109957464212675e+02,
+      "iterations": 963,
+      "real_time": 6.9297203217757101e+02,
+      "cpu_time": 6.6877005815160976e+02,
       "time_unit": "us",
-      "items_per_second": 1.4062728141881782e+06,
-      "ns_per_line": 7.1109957464212668e-07,
+      "items_per_second": 1.4952822540588391e+06,
+      "ns_per_line": 6.6877005815160987e-07,
       "templates_seen": 4.0000000000000000e+00
     },
     {
@@ -65,12 +65,12 @@
       "repetitions": 1,
       "repetition_index": 0,
       "threads": 1,
-      "iterations": 1087,
-      "real_time": 7.0197564452713516e+02,
-      "cpu_time": 6.6342756945722306e+02,
+      "iterations": 1013,
+      "real_time": 6.6773387761794629e+02,
+      "cpu_time": 6.4457176505429572e+02,
       "time_unit": "us",
-      "items_per_second": 1.5073235512629368e+06,
-      "ns_per_line": 6.6342756945722301e-07,
+      "items_per_second": 1.5514176298363996e+06,
+      "ns_per_line": 6.4457176505429577e-07,
       "templates_seen": 8.0000000000000000e+00
     }
   ]

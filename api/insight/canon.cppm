@@ -6,8 +6,8 @@
 // Tokenizer decl uses only api types (ArenaAllocator/DrainConfig/CanonicalEvent) + std;
 // tokenizer_engine.cpp (module insight.canon) imports detail.{strategy,drain,parse} in its purview.
 export module insight.canon;
-import insight.canon.internal;        // std (expected/unique_ptr/vector/span/string for the Tokenizer decl)
-export import insight.canon.api;      // public surface (types, det_math, arena, ...)
+import insight.canon.internal; // std (expected/unique_ptr/vector/span/string for the Tokenizer decl)
+export import insight.canon.api; // public surface (types, det_math, arena, ...)
 
 // ──────── from api/insight/tokenization/tokenizer_engine.hpp ────────
 export namespace insight::tokenization
@@ -49,4 +49,3 @@ class Tokenizer
 };
 
 } // namespace insight::tokenization
-

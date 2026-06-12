@@ -1,11 +1,12 @@
 // NOLINTBEGIN Smoke test: consumes insight::canon as if external.
+#include <expected>
 #include <gtest/gtest.h>
 #include <string_view>
-#include <expected>
 
 // Black-box consumer: the 1.5.1 unwrap (§11.9) replaced the textual public headers with a
-// module — the facade re-exports core types, tokenization (ArenaAllocator/Tokenizer/CanonicalEvent),
-// time_utils (parse_iso8601) and det_math, so one import gives the whole consumer surface.
+// module — the facade re-exports core types, tokenization
+// (ArenaAllocator/Tokenizer/CanonicalEvent), time_utils (parse_iso8601) and det_math, so one import
+// gives the whole consumer surface.
 import insight.canon;
 
 namespace

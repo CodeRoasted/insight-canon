@@ -24,8 +24,8 @@ TEST(FastGatesCharClass, DigitBoundaries)
 {
     EXPECT_TRUE(is_digit('0'));
     EXPECT_TRUE(is_digit('9'));
-    EXPECT_FALSE(is_digit('/'));   // '0' - 1
-    EXPECT_FALSE(is_digit(':'));   // '9' + 1
+    EXPECT_FALSE(is_digit('/')); // '0' - 1
+    EXPECT_FALSE(is_digit(':')); // '9' + 1
     EXPECT_FALSE(is_digit(' '));
     // Signed-char trap: a high-bit byte must not wrap into the digit range —
     // the unsigned-subtraction trick is exactly what this guards.
@@ -37,13 +37,13 @@ TEST(FastGatesCharClass, AlphaBoundaries)
     EXPECT_TRUE(is_upper('A'));
     EXPECT_TRUE(is_upper('Z'));
     EXPECT_FALSE(is_upper('a'));
-    EXPECT_FALSE(is_upper('@'));   // 'A' - 1
-    EXPECT_FALSE(is_upper('['));   // 'Z' + 1
+    EXPECT_FALSE(is_upper('@')); // 'A' - 1
+    EXPECT_FALSE(is_upper('[')); // 'Z' + 1
     EXPECT_TRUE(is_lower('a'));
     EXPECT_TRUE(is_lower('z'));
     EXPECT_FALSE(is_lower('A'));
-    EXPECT_FALSE(is_lower('`'));   // 'a' - 1
-    EXPECT_FALSE(is_lower('{'));   // 'z' + 1
+    EXPECT_FALSE(is_lower('`')); // 'a' - 1
+    EXPECT_FALSE(is_lower('{')); // 'z' + 1
     EXPECT_FALSE(is_upper('\xC4'));
     EXPECT_FALSE(is_lower('\xE4'));
 }
@@ -60,8 +60,8 @@ TEST(FastGatesCharClass, SpaceIsPosixSpaceTabOnly)
 TEST(FastGatesCharClass, SkipSpacesAndConsumeDigits)
 {
     EXPECT_EQ(skip_spaces("a   b", 1), 4U);
-    EXPECT_EQ(skip_spaces("ab", 1), 1U);   // nothing to skip
-    EXPECT_EQ(skip_spaces("a  ", 1), 3U);  // runs to end
+    EXPECT_EQ(skip_spaces("ab", 1), 1U);  // nothing to skip
+    EXPECT_EQ(skip_spaces("a  ", 1), 3U); // runs to end
 
     std::size_t pos{0};
     EXPECT_TRUE(consume_digits("123x", pos, 1U, 3U));
@@ -87,7 +87,8 @@ TEST(FastGatesCharClass, SkipSpacesAndConsumeDigits)
 TEST(FastGatesPrefix, BsdSyslog)
 {
     EXPECT_TRUE(is_bsd_syslog_prefix("Jan 15 08:03:22 host sshd[42]: accepted"));
-    EXPECT_TRUE(is_bsd_syslog_prefix("Jun  5 08:03:22 single-digit day")) << "double space + 1-digit day is valid BSD";
+    EXPECT_TRUE(is_bsd_syslog_prefix("Jun  5 08:03:22 single-digit day"))
+        << "double space + 1-digit day is valid BSD";
     EXPECT_FALSE(is_bsd_syslog_prefix("jan 15 08:03:22 lowercase month"));
     EXPECT_FALSE(is_bsd_syslog_prefix("Jan 15 08:03 no seconds"));
     EXPECT_FALSE(is_bsd_syslog_prefix("Jan 15 080322 no colons"));
@@ -191,8 +192,8 @@ TEST(FastGatesPrefix, ClfTimestampAnchor)
 {
     EXPECT_TRUE(has_clf_timestamp(
         R"(10.0.0.1 - frank [27/Apr/2024:10:15:00 +0000] "GET / HTTP/1.1" 200 2326)"));
-    EXPECT_FALSE(has_clf_timestamp(
-        R"(10.0.0.1 - frank [27/apr/2024:10:15:00 +0000] lowercase month)"));
+    EXPECT_FALSE(
+        has_clf_timestamp(R"(10.0.0.1 - frank [27/apr/2024:10:15:00 +0000] lowercase month)"));
     EXPECT_FALSE(has_clf_timestamp(R"(no bracketed timestamp anywhere 27/Apr/2024:10:15:00)"));
 }
 
