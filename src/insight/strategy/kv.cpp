@@ -1,6 +1,6 @@
 module;
-#include <cstring>
 #include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
+#include <cstring>
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
@@ -20,9 +20,6 @@ import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitive
 //
 // Hand-written KV scanner: zero RE2, zero per-pair string copies.
 
-
-
-
 namespace insight::tokenization
 {
 
@@ -32,13 +29,12 @@ namespace
     // Key-valid chars: \w + '.' + '-'
     [[nodiscard]] constexpr bool is_kv_key_char(char chr) noexcept
     {
-        return is_digit(chr) || is_upper(chr) || is_lower(chr) ||
-               chr == '_' || chr == '.' || chr == '-';
+        return is_digit(chr) || is_upper(chr) || is_lower(chr) || chr == '_' || chr == '.' ||
+               chr == '-';
     }
     [[nodiscard]] constexpr bool is_kv_key_start(char chr) noexcept
     {
-        return is_digit(chr) || is_upper(chr) || is_lower(chr) ||
-               chr == '_';
+        return is_digit(chr) || is_upper(chr) || is_lower(chr) || chr == '_';
     }
     [[nodiscard]] constexpr bool is_bare_value_char(char chr) noexcept
     {

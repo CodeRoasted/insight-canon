@@ -16,16 +16,13 @@ import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitive
 //
 // Hand-written scanner: zero RE2, zero string copies.
 
-
-
-
 namespace insight::tokenization
 {
 
 namespace
 {
-    static constexpr std::size_t kTimestampLen{19U}; // "YYYY-MM-DD HH:MM:SS"
-    static constexpr std::size_t kRestOffset{20U};   // past timestamp + comma
+    constexpr std::size_t kTimestampLen{19U}; // "YYYY-MM-DD HH:MM:SS"
+    constexpr std::size_t kRestOffset{20U};   // past timestamp + comma
 
 } // namespace
 
@@ -36,8 +33,7 @@ std::expected<ParsedLine, std::string> WindowsCBSStrategy::parse(std::string_vie
 
     // Confidence already validates "YYYY-MM-DD HH:MM:SS, Level".
     // Minimum: 19 chars timestamp + comma + space + level.
-    if (line.size() < kMinLineLen || line[kTimestampLen] != ',' ||
-        !is_space(line[kRestOffset]))
+    if (line.size() < kMinLineLen || line[kTimestampLen] != ',' || !is_space(line[kRestOffset]))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=WindowsCBS parse miss");
         return std::unexpected(
@@ -89,8 +85,7 @@ double WindowsCBSStrategy::confidence(std::string_view line) const noexcept
         return kNoConfidence;
     if (!is_iso_datetime_space_prefix(line, /*require_fraction=*/false))
         return kNoConfidence;
-    if (line.size() <= kRestOffset || line[kTimestampLen] != ',' ||
-        !is_space(line[kRestOffset]))
+    if (line.size() <= kRestOffset || line[kTimestampLen] != ',' || !is_space(line[kRestOffset]))
         return kNoConfidence;
     return kWindowsCbsConfidence;
 }

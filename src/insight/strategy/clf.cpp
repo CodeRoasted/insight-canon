@@ -1,6 +1,6 @@
 module;
-#include <cstring>
 #include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
+#include <cstring>
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
@@ -20,17 +20,12 @@ import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitive
 // Hand-written scanner: zero RE2, zero string copies except for the
 // three-part content construction ("METHOD URL STATUS").
 
-
-
-
 namespace insight::tokenization
 {
 
 namespace
 {
-
-    static constexpr int kDefaultSuccessStatusCode{200};
-
+    constexpr int kDefaultSuccessStatusCode{200};
 } // namespace
 
 // Group 1: client IP / hostname

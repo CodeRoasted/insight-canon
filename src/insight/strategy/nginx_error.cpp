@@ -13,15 +13,8 @@ import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitive
 //
 // Hand-written scanner: zero RE2, zero string copies.
 
-
-
-
 namespace insight::tokenization
 {
-
-namespace
-{
-} // namespace
 
 std::expected<ParsedLine, std::string> NginxErrorStrategy::parse(std::string_view line,
                                                                  ArenaAllocator& /*arena*/) const

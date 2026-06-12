@@ -21,9 +21,6 @@ import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitive
 //
 // Hand-written scanner: zero RE2, zero string copies.
 
-
-
-
 namespace insight::tokenization
 {
 

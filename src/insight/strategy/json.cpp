@@ -1,7 +1,7 @@
 module;
-#include <simdjson.h>
 #include "insight/strategy/simdjson_scratch.hpp" // textual: TU-local simdjson entities (§11.8 family)
-#include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
+#include "insight/utils/log_macros.hpp"          // textual macro layer (§11.9)
+#include <simdjson.h>
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
@@ -13,15 +13,8 @@ import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitive
 // JsonStrategy — parses structured JSON log lines using simdjson on-demand.
 // See detail/simdjson_scratch.hpp for the thread-local zero-alloc scaffolding.
 
-
-
-
 namespace insight::tokenization
 {
-
-namespace
-{
-} // namespace
 
 std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line,
                                                            ArenaAllocator& arena) const

@@ -1,6 +1,6 @@
 module;
-#include <cstring>
 #include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
+#include <cstring>
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
@@ -17,9 +17,6 @@ import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitive
 // HTTP status code is the first 3-digit 2xx/3xx/4xx/5xx token in REST_FIELDS.
 //
 // Hand-written scanner: zero RE2. Arena used only for content concat.
-
-
-
 
 namespace insight::tokenization
 {

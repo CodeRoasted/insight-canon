@@ -17,9 +17,6 @@ import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitive
 // arena-stable (copied by LogParser before parse() is called), so every
 // substring is a valid zero-copy string_view.
 
-
-
-
 namespace insight::tokenization
 {
 

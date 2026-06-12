@@ -1,6 +1,6 @@
 module;
-#include <cstring>
 #include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
+#include <cstring>
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
@@ -15,15 +15,8 @@ import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitive
 // Hand-written scanner: zero RE2. Component "facility.event_type" is the
 // only constructed string; built directly in the arena.
 
-
-
-
 namespace insight::tokenization
 {
-
-namespace
-{
-} // namespace
 
 std::expected<ParsedLine, std::string> HPCStrategy::parse(std::string_view line,
                                                           ArenaAllocator& arena) const

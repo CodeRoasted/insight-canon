@@ -12,10 +12,6 @@ import insight.canon.api;
 // message body is a subview of it after a pointer-arithmetic left-trim. Drain
 // (with its built-in numeric/IP/hex masking) does the templating downstream.
 
-
-
-
-
 namespace insight::tokenization
 {
 

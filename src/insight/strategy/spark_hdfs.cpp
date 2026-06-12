@@ -15,23 +15,15 @@ import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitive
 //
 // Hand-written scanner: zero RE2, zero string copies.
 
-
-
-
 namespace insight::tokenization
 {
-
-namespace
-{
-
-    constexpr std::size_t kSparkTimestampLen{17U}; // "YY/MM/DD HH:MM:SS"
-    constexpr std::size_t kHdfsTimestampEndOffset{13U}; // YYMMDD + space + HHMMSS
-
-} // namespace
 
 std::expected<ParsedLine, std::string> SparkHDFSStrategy::parse(std::string_view line,
                                                                 ArenaAllocator& /*arena*/) const
 {
+    static constexpr std::size_t kSparkTimestampLen{17U};      // "YY/MM/DD HH:MM:SS"
+    static constexpr std::size_t kHdfsTimestampEndOffset{13U}; // YYMMDD + space + HHMMSS
+
     // ── Spark: "YY/MM/DD HH:MM:SS LEVEL component: msg" ────────────────────
     if (is_spark_prefix(line))
     {
