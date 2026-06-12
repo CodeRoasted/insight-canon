@@ -28,7 +28,6 @@ namespace
     constexpr double kNoConfidence{0.0};
     constexpr double kBsdSyslogConfidence{0.85};
     constexpr double kRfc3339SyslogConfidence{0.80};
-    constexpr std::size_t kBsdMinLen{15U};
     constexpr std::size_t kBsdTimeLen{8U}; // "HH:MM:SS"
 
     // Parse "process[pid]:" tag section. Advances `rest` past ':' and
@@ -45,7 +44,7 @@ namespace
         else
         {
             tag = rest.substr(0, delim);
-            while (!tag.empty() && detail::is_space(tag.back()))
+            while (!tag.empty() && is_space(tag.back()))
                 tag.remove_suffix(1U);
             rest = rest.substr(delim);
             if (!rest.empty() && rest[0] == '[')
@@ -55,7 +54,7 @@ namespace
             }
             if (!rest.empty() && rest[0] == ':')
                 rest.remove_prefix(1U);
-            detail::sv_skip_ws(rest);
+            sv_skip_ws(rest);
         }
         return tag;
     }
@@ -76,22 +75,22 @@ std::expected<ParsedLine, std::string> SyslogStrategy::parse(std::string_view li
     }
 
     // ── BSD syslog: "Mon DD HH:MM:SS hostname process[pid]: message" ──────
-    if (detail::is_bsd_syslog_prefix(line))
+    if (is_bsd_syslog_prefix(line))
     {
         // Walk to the end of "HH:MM:SS".
         std::size_t ts_end{3};
-        while (ts_end < line.size() && detail::is_space(line[ts_end]))
+        while (ts_end < line.size() && is_space(line[ts_end]))
             ++ts_end;
-        while (ts_end < line.size() && detail::is_digit(line[ts_end]))
+        while (ts_end < line.size() && is_digit(line[ts_end]))
             ++ts_end;
-        while (ts_end < line.size() && detail::is_space(line[ts_end]))
+        while (ts_end < line.size() && is_space(line[ts_end]))
             ++ts_end;
         ts_end += kBsdTimeLen; // "HH:MM:SS"
 
         const std::string_view raw_ts{line.substr(0, ts_end)};
         std::string_view rest{line.substr(ts_end)};
-        detail::sv_skip_ws(rest);
-        (void)detail::sv_take_token(rest); // skip hostname
+        sv_skip_ws(rest);
+        (void)sv_take_token(rest); // skip hostname
         const std::string_view tag{extract_syslog_tag(rest)};
 
         ParsedLine parsed_line;
@@ -108,11 +107,11 @@ std::expected<ParsedLine, std::string> SyslogStrategy::parse(std::string_view li
     }
 
     // ── RFC 3339: "YYYY-MM-DDTHH:MM:SS[Z|±HH:MM] hostname process[pid]: msg"
-    if (detail::is_rfc3339_prefix(line))
+    if (is_rfc3339_prefix(line))
     {
         std::string_view rest{line};
-        const std::string_view raw_ts{detail::sv_take_token(rest)};
-        (void)detail::sv_take_token(rest); // skip hostname
+        const std::string_view raw_ts{sv_take_token(rest)};
+        (void)sv_take_token(rest); // skip hostname
         const std::string_view tag{extract_syslog_tag(rest)};
 
         ParsedLine parsed_line;
@@ -142,9 +141,9 @@ double SyslogStrategy::confidence(std::string_view line) const noexcept
 {
     if (line.size() < kBsdMinLen)
         return kNoConfidence;
-    if (detail::is_bsd_syslog_prefix(line))
+    if (is_bsd_syslog_prefix(line))
         return kBsdSyslogConfidence;
-    if (detail::is_rfc3339_prefix(line))
+    if (is_rfc3339_prefix(line))
         return kRfc3339SyslogConfidence;
     return kNoConfidence;
 }

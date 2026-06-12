@@ -19,7 +19,7 @@
 #include <span>
 #include <string_view>
 
-namespace insight::tokenization::detail
+namespace insight::tokenization
 {
 
 inline constexpr std::size_t kSimdjsonScratchCacheLine{64};
@@ -306,4 +306,4 @@ inline void parse_number_ts(FastJsonResult& result, std::string_view key,
     }
 }
 
-} // namespace insight::tokenization::detail
+} // namespace insight::tokenization

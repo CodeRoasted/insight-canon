@@ -66,7 +66,7 @@ namespace
 std::expected<ParsedLine, std::string> RFC5424Strategy::parse(std::string_view line,
                                                               ArenaAllocator& /*arena*/) const
 {
-    if (!detail::is_rfc5424_prefix(line))
+    if (!is_rfc5424_prefix(line))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=RFC5424 parse miss");
         return std::unexpected(std::string("RFC5424Strategy: line does not match RFC 5424 format"));
@@ -74,14 +74,14 @@ std::expected<ParsedLine, std::string> RFC5424Strategy::parse(std::string_view l
 
     std::string_view rest{line};
     rest.remove_prefix(1U); // skip '<' (validated by is_rfc5424_prefix)
-    const std::string_view pri_str{detail::sv_take_until(rest, '>')};
+    const std::string_view pri_str{sv_take_until(rest, '>')};
 
-    (void)detail::sv_take_token(rest); // skip version
-    const std::string_view timestamp_str{detail::sv_take_token(rest)};
-    const std::string_view hostname{detail::sv_take_token(rest)};
-    const std::string_view appname{detail::sv_take_token(rest)};
-    (void)detail::sv_take_token(rest); // skip procid
-    (void)detail::sv_take_token(rest); // skip msgid
+    (void)sv_take_token(rest); // skip version
+    const std::string_view timestamp_str{sv_take_token(rest)};
+    const std::string_view hostname{sv_take_token(rest)};
+    const std::string_view appname{sv_take_token(rest)};
+    (void)sv_take_token(rest); // skip procid
+    (void)sv_take_token(rest); // skip msgid
 
     // Strip structured-data prefix "- " or "[sd-id ...] "
     std::string_view msg{rest};
@@ -119,7 +119,7 @@ double RFC5424Strategy::confidence(std::string_view line) const noexcept
 {
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
-    if (detail::is_rfc5424_prefix(line))
+    if (is_rfc5424_prefix(line))
         return kRfc5424Confidence;
     return kNoConfidence;
 }

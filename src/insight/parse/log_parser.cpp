@@ -17,9 +17,6 @@ import insight.canon.detail.strategy; // IFormatStrategy, ParsedLine
 //     so string_views inside the returned ParsedLine are stable for the arena's
 //     lifetime.
 
-
-
-
 namespace insight::tokenization
 {
 
@@ -27,7 +24,6 @@ namespace
 {
 
     constexpr std::size_t kWarnEveryNFailures{100};
-    constexpr std::size_t kStatsEveryNLines{1000};
 
 } // namespace
 
@@ -138,6 +134,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view li
 
     if constexpr (logging::kDebugLogsEnabled)
     {
+        static constexpr std::size_t kStatsEveryNLines{1000};
         // Periodic stats every 1000 lines.
         const auto total{parsed_count_ + failed_count_};
         if (total > 0 && total % kStatsEveryNLines == 0)

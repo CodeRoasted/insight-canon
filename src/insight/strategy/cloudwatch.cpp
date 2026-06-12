@@ -62,7 +62,7 @@ std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_vie
     // Bypass simdjson for escape-free CloudWatch objects. Falls back on any
     // anomaly (nested structures, escape sequences, malformed JSON).
     {
-        const auto fast{detail::try_fast_json(line)};
+        const auto fast{try_fast_json(line)};
         if (fast.has_result)
         {
             ParsedLine parsed;
@@ -92,8 +92,8 @@ std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_vie
     }
     // ── Slow path: full simdjson ──────────────────────────────────────────────
 
-    auto& scratch{detail::json_scratch()};
-    const auto padded{detail::load_padded(scratch, line)};
+    auto& scratch{json_scratch()};
+    const auto padded{load_padded(scratch, line)};
 
     simdjson::ondemand::document doc;
     if (auto err = scratch.parser.iterate(padded).get(doc); err != simdjson::SUCCESS)
@@ -115,7 +115,7 @@ std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_vie
 
     // Timestamp: millisecond epoch
     std::int64_t millis{};
-    if (detail::try_get_int64(root, kTimestampKeys, millis))
+    if (try_get_int64(root, kTimestampKeys, millis))
     {
         const auto epoch_secs{static_cast<std::time_t>(millis / kMillisecondsPerSecond)};
         parsed.timestamp = std::chrono::system_clock::from_time_t(epoch_secs);
@@ -123,15 +123,15 @@ std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_vie
 
     std::string_view scratch_view;
 
-    if (detail::try_get_string(root, kLevelKeys, scratch_view))
+    if (try_get_string(root, kLevelKeys, scratch_view))
         parsed.level = utils::parse_log_level(scratch_view);
 
     // Component: prefer logGroup, fall back to logStream
-    if (detail::try_get_string(root, kComponentLogGroup, scratch_view) ||
-        detail::try_get_string(root, kComponentLogStream, scratch_view))
+    if (try_get_string(root, kComponentLogGroup, scratch_view) ||
+        try_get_string(root, kComponentLogStream, scratch_view))
         parsed.component = arena.store_string(scratch_view);
 
-    if (detail::try_get_string(root, kMessageKeys, scratch_view))
+    if (try_get_string(root, kMessageKeys, scratch_view))
     {
         parsed.content = arena.store_string(scratch_view);
     }

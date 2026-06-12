@@ -31,7 +31,7 @@ namespace
 std::expected<ParsedLine, std::string> ProxifierStrategy::parse(std::string_view line,
                                                                 ArenaAllocator& /*arena*/) const
 {
-    if (!detail::is_proxifier_prefix(line))
+    if (!is_proxifier_prefix(line))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=Proxifier parse miss");
         return std::unexpected(
@@ -40,13 +40,13 @@ std::expected<ParsedLine, std::string> ProxifierStrategy::parse(std::string_view
 
     // "[DD.MM HH:MM:SS] process [-|*N] message"
     std::string_view rest{line};
-    (void)detail::sv_take_bracketed(rest); // skip timestamp bracket (not stored)
-    detail::sv_skip_ws(rest);
-    const std::string_view process{detail::sv_take_token(rest)};
+    (void)sv_take_bracketed(rest); // skip timestamp bracket (not stored)
+    sv_skip_ws(rest);
+    const std::string_view process{sv_take_token(rest)};
 
     // Skip optional separator: "-" or "*N"
     if (!rest.empty() && (rest[0] == '-' || rest[0] == '*'))
-        (void)detail::sv_take_token(rest);
+        (void)sv_take_token(rest);
 
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
@@ -71,7 +71,7 @@ double ProxifierStrategy::confidence(std::string_view line) const noexcept
 {
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
-    if (detail::is_proxifier_prefix(line))
+    if (is_proxifier_prefix(line))
         return kProxifierConfidence;
     return kNoConfidence;
 }

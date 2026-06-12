@@ -39,7 +39,7 @@ std::expected<ParsedLine, std::string> WindowsCBSStrategy::parse(std::string_vie
     // Confidence already validates "YYYY-MM-DD HH:MM:SS, Level".
     // Minimum: 19 chars timestamp + comma + space + level.
     if (line.size() < kMinLineLen || line[kTimestampLen] != ',' ||
-        !detail::is_space(line[kRestOffset]))
+        !is_space(line[kRestOffset]))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=WindowsCBS parse miss");
         return std::unexpected(
@@ -49,10 +49,10 @@ std::expected<ParsedLine, std::string> WindowsCBSStrategy::parse(std::string_vie
     // Timestamp is first 19 chars: "YYYY-MM-DD HH:MM:SS"
     const std::string_view ts_str{line.substr(0, kTimestampLen)};
     std::string_view rest{line.substr(kRestOffset)}; // skip ','
-    detail::sv_skip_ws(rest);
+    sv_skip_ws(rest);
 
-    const std::string_view level_sv{detail::sv_take_token(rest)};
-    const std::string_view component{detail::sv_take_token(rest)};
+    const std::string_view level_sv{sv_take_token(rest)};
+    const std::string_view component{sv_take_token(rest)};
 
     if (level_sv.empty() || component.empty())
     {
@@ -85,10 +85,10 @@ double WindowsCBSStrategy::confidence(std::string_view line) const noexcept
 {
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
-    if (!detail::is_iso_datetime_space_prefix(line, /*require_fraction=*/false))
+    if (!is_iso_datetime_space_prefix(line, /*require_fraction=*/false))
         return kNoConfidence;
     if (line.size() <= kRestOffset || line[kTimestampLen] != ',' ||
-        !detail::is_space(line[kRestOffset]))
+        !is_space(line[kRestOffset]))
         return kNoConfidence;
     return kWindowsCbsConfidence;
 }

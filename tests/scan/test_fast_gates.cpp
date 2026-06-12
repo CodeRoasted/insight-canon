@@ -14,7 +14,7 @@
 
 import insight.canon.test;
 
-using namespace insight::tokenization::detail;
+using namespace insight::tokenization;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Character-class primitives

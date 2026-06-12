@@ -50,13 +50,13 @@ namespace
 std::expected<ParsedLine, std::string> GitHubActionsStrategy::parse(std::string_view line,
                                                                     ArenaAllocator& arena) const
 {
-    if (!detail::is_github_actions_prefix(line))
+    if (!is_github_actions_prefix(line))
         return std::unexpected(std::string("GitHubActionsStrategy: missing GHA timestamp prefix"));
 
     // Everything past the fixed-width timestamp; drop the separator space and
     // any GHA indentation so identical messages cluster regardless of nesting.
-    std::string_view content{line.substr(detail::kGhaPrefixLen)};
-    detail::sv_skip_ws(content);
+    std::string_view content{line.substr(kGhaPrefixLen)};
+    sv_skip_ws(content);
 
     // A timestamp-only line is a blank line. Decline it: make_event turns the
     // unexpected into a dropped line, so it never forms an empty "" template.
@@ -66,7 +66,7 @@ std::expected<ParsedLine, std::string> GitHubActionsStrategy::parse(std::string_
 
     ParsedLine parsed;
     parsed.raw_line = line;
-    parsed.timestamp = utils::parse_iso8601(line.substr(0U, detail::kGhaPrefixLen));
+    parsed.timestamp = utils::parse_iso8601(line.substr(0U, kGhaPrefixLen));
     // A workflow-command marker (##[error]/##[warning]/…) is authoritative when
     // present. Without one, the body is effectively raw stdout — a crashing
     // subprocess prints "Segmentation fault (core dumped)" with no marker and no
@@ -90,7 +90,7 @@ LogFormat GitHubActionsStrategy::format() const noexcept
 
 double GitHubActionsStrategy::confidence(std::string_view line) const noexcept
 {
-    return detail::is_github_actions_prefix(line) ? kGitHubActionsConfidence : kNoConfidence;
+    return is_github_actions_prefix(line) ? kGitHubActionsConfidence : kNoConfidence;
 }
 
 } // namespace insight::tokenization

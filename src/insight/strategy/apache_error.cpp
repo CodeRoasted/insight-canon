@@ -35,8 +35,8 @@ namespace
     {
         std::size_t idx{0};
         while (idx < bracket.size() &&
-               (detail::is_lower(bracket[idx]) || detail::is_upper(bracket[idx]) ||
-                detail::is_digit(bracket[idx]) || bracket[idx] == '_'))
+               (is_lower(bracket[idx]) || is_upper(bracket[idx]) ||
+                is_digit(bracket[idx]) || bracket[idx] == '_'))
             ++idx;
         return bracket.substr(0, idx);
     }
@@ -46,7 +46,7 @@ namespace
 std::expected<ParsedLine, std::string>
 ApacheErrorLogStrategy::parse(std::string_view line, ArenaAllocator& /*arena*/) const
 {
-    if (!detail::is_apache_error_prefix(line))
+    if (!is_apache_error_prefix(line))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=ApacheError parse miss");
         return std::unexpected(
@@ -55,7 +55,7 @@ ApacheErrorLogStrategy::parse(std::string_view line, ArenaAllocator& /*arena*/) 
 
     std::string_view rest{line};
     // "[Dow Mon DD HH:MM:SS YYYY]"
-    const std::string_view raw_ts{detail::sv_take_bracketed(rest)};
+    const std::string_view raw_ts{sv_take_bracketed(rest)};
     if (raw_ts.empty())
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=ApacheError parse miss (no ts)");
@@ -63,17 +63,17 @@ ApacheErrorLogStrategy::parse(std::string_view line, ArenaAllocator& /*arena*/) 
             std::string("ApacheErrorLogStrategy: line does not match Apache error-log format"));
     }
 
-    detail::sv_skip_ws(rest);
+    sv_skip_ws(rest);
     // "[error]" or "[error:debug]" or "[php:error]"
-    const std::string_view level_bracket{detail::sv_take_bracketed(rest)};
+    const std::string_view level_bracket{sv_take_bracketed(rest)};
     const std::string_view level_word{extract_level_word(level_bracket)};
 
-    detail::sv_skip_ws(rest);
+    sv_skip_ws(rest);
     // Skip any number of extra bracketed sections: [pid N], [client IP], etc.
     while (!rest.empty() && rest[0] == '[')
     {
-        (void)detail::sv_take_bracketed(rest);
-        detail::sv_skip_ws(rest);
+        (void)sv_take_bracketed(rest);
+        sv_skip_ws(rest);
     }
 
     ParsedLine parsed_line;
@@ -99,7 +99,7 @@ double ApacheErrorLogStrategy::confidence(std::string_view line) const noexcept
 {
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
-    if (detail::is_apache_error_prefix(line))
+    if (is_apache_error_prefix(line))
         return kApacheErrorConfidence;
     return kNoConfidence;
 }

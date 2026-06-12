@@ -38,7 +38,7 @@ namespace
     // Returns true and sets ts_start to the index where the ISO timestamp begins.
     constexpr bool find_log4j_ts_start(std::string_view line, std::size_t& ts_start) noexcept
     {
-        if (detail::is_iso_datetime_space_prefix(line, /*require_fraction=*/true))
+        if (is_iso_datetime_space_prefix(line, /*require_fraction=*/true))
         {
             ts_start = 0;
             return true;
@@ -48,9 +48,9 @@ namespace
         const std::size_t limit{line.size() < kScanLimit ? line.size() : kScanLimit};
         for (std::size_t i{1U}; i + kIsoTimestampMinLen <= limit; ++i)
         {
-            if (!detail::is_space(line[i - 1U]))
+            if (!is_space(line[i - 1U]))
                 continue;
-            if (detail::is_iso_datetime_space_prefix(line.substr(i), /*require_fraction=*/true))
+            if (is_iso_datetime_space_prefix(line.substr(i), /*require_fraction=*/true))
             {
                 ts_start = i;
                 return true;
@@ -74,10 +74,10 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
 
     // ── Extract 23-char timestamp "YYYY-MM-DD HH:MM:SS,mmm" ───────────────
     std::string_view rest{line.substr(ts_start)};
-    const std::string_view ts_str{detail::sv_take_n(rest, 23U)};
+    const std::string_view ts_str{sv_take_n(rest, 23U)};
 
     // Peek at next token to identify variant.
-    detail::sv_skip_ws(rest);
+    sv_skip_ws(rest);
 
     if (rest.empty())
     {
@@ -91,14 +91,14 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
     parsed_line.timestamp = utils::parse_log4j_timestamp(ts_str);
 
     // ── Dash variant: "ts - LEVEL [thread] - msg" ─────────────────────────
-    if (rest[0] == '-' && (rest.size() < 2U || detail::is_space(rest[1])))
+    if (rest[0] == '-' && (rest.size() < 2U || is_space(rest[1])))
     {
-        (void)detail::sv_take_token(rest); // consume '-'
-        const std::string_view level_sv{detail::sv_take_token(rest)};
-        const std::string_view thread_name{detail::sv_take_bracketed(rest)};
-        detail::sv_skip_ws(rest);
+        (void)sv_take_token(rest); // consume '-'
+        const std::string_view level_sv{sv_take_token(rest)};
+        const std::string_view thread_name{sv_take_bracketed(rest)};
+        sv_skip_ws(rest);
         if (!rest.empty() && rest[0] == '-')
-            (void)detail::sv_take_token(rest); // consume trailing '-'
+            (void)sv_take_token(rest); // consume trailing '-'
 
         parsed_line.level = utils::parse_log_level(level_sv);
         parsed_line.component = thread_name;
@@ -115,10 +115,10 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
     if (ts_start > 0U)
     {
         // next token should be a numeric PID
-        const std::string_view pid_or_level{detail::sv_take_token(rest)};
+        const std::string_view pid_or_level{sv_take_token(rest)};
         bool is_pid{true};
         for (const char chr : pid_or_level)
-            if (!detail::is_digit(chr))
+            if (!is_digit(chr))
             {
                 is_pid = false;
                 break;
@@ -126,14 +126,14 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
 
         std::string_view level_sv;
         if (is_pid)
-            level_sv = detail::sv_take_token(rest);
+            level_sv = sv_take_token(rest);
         else
             level_sv = pid_or_level;
 
-        const std::string_view component{detail::sv_take_token(rest)};
+        const std::string_view component{sv_take_token(rest)};
         // Skip optional "[req-id ...]"
         if (!rest.empty() && rest[0] == '[')
-            (void)detail::sv_take_bracketed(rest);
+            (void)sv_take_bracketed(rest);
 
         parsed_line.level = utils::parse_log_level(level_sv);
         parsed_line.component = component;
@@ -146,16 +146,16 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
     }
 
     // ── Standard variant: "ts LEVEL [thread] component: msg" ──────────────
-    const std::string_view level_sv{detail::sv_take_token(rest)};
-    (void)detail::sv_take_bracketed(rest); // skip [thread]
-    detail::sv_skip_ws(rest);
+    const std::string_view level_sv{sv_take_token(rest)};
+    (void)sv_take_bracketed(rest); // skip [thread]
+    sv_skip_ws(rest);
 
     // Component is until ':' or " -"
-    const std::string_view component{detail::sv_take_until(rest, ':')};
+    const std::string_view component{sv_take_until(rest, ':')};
     // sv_take_until already consumed ':', rest is now " msg" or "- msg"
-    detail::sv_skip_ws(rest);
+    sv_skip_ws(rest);
     if (!rest.empty() && rest[0] == '-')
-        (void)detail::sv_take_token(rest);
+        (void)sv_take_token(rest);
 
     parsed_line.level = utils::parse_log_level(level_sv);
     parsed_line.component = component;

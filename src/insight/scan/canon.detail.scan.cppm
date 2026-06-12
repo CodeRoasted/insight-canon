@@ -34,7 +34,7 @@ import insight.canon.internal; // std + global C types
 
 // SSE2 is guaranteed by -march=x86-64-v2 (baseline x86-64 v2 ABI).
 
-export namespace insight::tokenization::detail
+export namespace insight::tokenization
 {
 
 // ── Digit / alpha ranges ──────────────────────────────────────────────────
@@ -680,4 +680,4 @@ inline void sv_skip_ws(std::string_view& str) noexcept
     return sv_take_until(str, '"');
 }
 
-} // namespace insight::tokenization::detail
+} // namespace insight::tokenization

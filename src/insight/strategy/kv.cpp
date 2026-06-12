@@ -40,17 +40,17 @@ namespace
     // Key-valid chars: \w + '.' + '-'
     [[nodiscard]] constexpr bool is_kv_key_char(char chr) noexcept
     {
-        return detail::is_digit(chr) || detail::is_upper(chr) || detail::is_lower(chr) ||
+        return is_digit(chr) || is_upper(chr) || is_lower(chr) ||
                chr == '_' || chr == '.' || chr == '-';
     }
     [[nodiscard]] constexpr bool is_kv_key_start(char chr) noexcept
     {
-        return detail::is_digit(chr) || detail::is_upper(chr) || detail::is_lower(chr) ||
+        return is_digit(chr) || is_upper(chr) || is_lower(chr) ||
                chr == '_';
     }
     [[nodiscard]] constexpr bool is_bare_value_char(char chr) noexcept
     {
-        return !detail::is_space(chr) && chr != ',' && chr != ';';
+        return !is_space(chr) && chr != ',' && chr != ';';
     }
 
     // True iff `line` opens (after leading whitespace) with a `key=value` token.
@@ -64,7 +64,7 @@ namespace
     {
         std::size_t pos{0};
         const std::size_t len{line.size()};
-        while (pos < len && detail::is_space(line[pos]))
+        while (pos < len && is_space(line[pos]))
             ++pos;
         if (pos >= len || !is_kv_key_start(line[pos]))
             return false;
@@ -179,7 +179,7 @@ double KVStrategy::confidence(std::string_view line) const noexcept
     // message and leading level survive.
     if (!leads_with_kv_pair(line))
         return kNoConfidence;
-    const std::size_t count{detail::count_kv_pair_signatures(line, kHighConfidencePairCount)};
+    const std::size_t count{count_kv_pair_signatures(line, kHighConfidencePairCount)};
     if (count >= kHighConfidencePairCount)
         return kHighConfidence;
     if (count == kMediumConfidencePairCount)

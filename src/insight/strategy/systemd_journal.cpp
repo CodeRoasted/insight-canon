@@ -94,8 +94,8 @@ std::expected<ParsedLine, std::string> SystemdJournalStrategy::parse(std::string
             std::string("SystemdJournalStrategy: no journal indicator keys found"));
     }
 
-    auto& scratch{detail::json_scratch()};
-    const auto padded{detail::load_padded(scratch, line)};
+    auto& scratch{json_scratch()};
+    const auto padded{load_padded(scratch, line)};
 
     simdjson::ondemand::document doc;
     if (auto err = scratch.parser.iterate(padded).get(doc); err != simdjson::SUCCESS)
@@ -118,7 +118,7 @@ std::expected<ParsedLine, std::string> SystemdJournalStrategy::parse(std::string
     std::string_view scratch_view;
 
     // Timestamp: __REALTIME_TIMESTAMP is microseconds since epoch (string-encoded).
-    if (detail::try_get_string(root, kRealtimeKeys, scratch_view))
+    if (try_get_string(root, kRealtimeKeys, scratch_view))
     {
         std::int64_t microsecs{};
         const auto res{std::from_chars(scratch_view.data(),
@@ -130,16 +130,16 @@ std::expected<ParsedLine, std::string> SystemdJournalStrategy::parse(std::string
         }
     }
 
-    if (detail::try_get_string(root, kPriorityKeys, scratch_view))
+    if (try_get_string(root, kPriorityKeys, scratch_view))
         parsed.level = priority_to_level(parse_priority(scratch_view));
 
     // Component: prefer _COMM, fall back to SYSLOG_IDENTIFIER, then _SYSTEMD_UNIT.
-    if (detail::try_get_string(root, kCommKeys, scratch_view) ||
-        detail::try_get_string(root, kSyslogIdentifierKeys, scratch_view) ||
-        detail::try_get_string(root, kSystemdUnitKeys, scratch_view))
+    if (try_get_string(root, kCommKeys, scratch_view) ||
+        try_get_string(root, kSyslogIdentifierKeys, scratch_view) ||
+        try_get_string(root, kSystemdUnitKeys, scratch_view))
         parsed.component = arena.store_string(scratch_view);
 
-    if (detail::try_get_string(root, kMessageKeys, scratch_view))
+    if (try_get_string(root, kMessageKeys, scratch_view))
     {
         parsed.content = arena.store_string(scratch_view);
     }

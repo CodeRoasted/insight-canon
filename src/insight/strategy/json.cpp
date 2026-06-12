@@ -35,7 +35,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     // For escape-free JSON objects bypass simdjson entirely: single-pass byte
     // scan with no heap allocation. Falls back to simdjson on any anomaly.
     {
-        const auto fast{detail::try_fast_json(line)};
+        const auto fast{try_fast_json(line)};
         if (fast.has_result)
         {
             ParsedLine parsed_line;
@@ -61,8 +61,8 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     }
     // ── Slow path: full simdjson (handles escapes, nested objects, etc.) ──────
 
-    auto& scratch{detail::json_scratch()};
-    const auto padded{detail::load_padded(scratch, line)};
+    auto& scratch{json_scratch()};
+    const auto padded{load_padded(scratch, line)};
 
     simdjson::ondemand::document doc;
     if (auto err = scratch.parser.iterate(padded).get(doc); err != simdjson::SUCCESS)
@@ -84,20 +84,20 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
 
     std::string_view scratch_view;
 
-    if (detail::try_get_string(root, kTimestampKeys, scratch_view))
+    if (try_get_string(root, kTimestampKeys, scratch_view))
     {
         parsed_line.timestamp = utils::parse_iso8601(scratch_view);
         if (!parsed_line.timestamp)
             parsed_line.timestamp = utils::parse_bsd_syslog_ts(scratch_view);
     }
 
-    if (detail::try_get_string(root, kLevelKeys, scratch_view))
+    if (try_get_string(root, kLevelKeys, scratch_view))
         parsed_line.level = utils::parse_log_level(scratch_view);
 
-    if (detail::try_get_string(root, kComponentKeys, scratch_view))
+    if (try_get_string(root, kComponentKeys, scratch_view))
         parsed_line.component = arena.store_string(scratch_view);
 
-    if (detail::try_get_string(root, kMessageKeys, scratch_view))
+    if (try_get_string(root, kMessageKeys, scratch_view))
     {
         parsed_line.content = arena.store_string(scratch_view);
     }

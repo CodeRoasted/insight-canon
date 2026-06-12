@@ -50,27 +50,27 @@ std::expected<ParsedLine, std::string> CLFStrategy::parse(std::string_view line,
 {
     std::string_view rest{line};
 
-    const std::string_view host{detail::sv_take_token(rest)};
-    (void)detail::sv_take_token(rest); // skip ident
-    (void)detail::sv_take_token(rest); // skip user
+    const std::string_view host{sv_take_token(rest)};
+    (void)sv_take_token(rest); // skip ident
+    (void)sv_take_token(rest); // skip user
 
-    detail::sv_skip_ws(rest);
-    const std::string_view raw_ts{detail::sv_take_bracketed(rest)};
+    sv_skip_ws(rest);
+    const std::string_view raw_ts{sv_take_bracketed(rest)};
     if (raw_ts.empty())
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=CLF parse miss (no timestamp)");
         return std::unexpected(std::string("CLFStrategy: line does not match CLF/Combined format"));
     }
 
-    detail::sv_skip_ws(rest);
+    sv_skip_ws(rest);
     if (rest.empty() || rest[0] != '"')
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=CLF parse miss (no request)");
         return std::unexpected(std::string("CLFStrategy: line does not match CLF/Combined format"));
     }
-    const std::string_view request{detail::sv_take_quoted(rest)};
-    const std::string_view status_str{detail::sv_take_token(rest)};
-    (void)detail::sv_take_token(rest); // skip bytes
+    const std::string_view request{sv_take_quoted(rest)};
+    const std::string_view status_str{sv_take_token(rest)};
+    (void)sv_take_token(rest); // skip bytes
 
     if (host.empty() || status_str.size() != 3U)
     {
@@ -84,8 +84,8 @@ std::expected<ParsedLine, std::string> CLFStrategy::parse(std::string_view line,
     // Build content: "METHOD URL STATUS" — extracted from request string.
     // request already points into the arena-stable `line`.
     std::string_view req{request};
-    const std::string_view method{detail::sv_take_token(req)};
-    const std::string_view url{detail::sv_take_token(req)};
+    const std::string_view method{sv_take_token(req)};
+    const std::string_view url{sv_take_token(req)};
 
     // Allocate directly in arena — one bump-pointer advance, no heap.
     const std::size_t clen{method.size() + 1U + url.size() + 1U + status_str.size()};
@@ -126,7 +126,7 @@ double CLFStrategy::confidence(std::string_view line) const noexcept
     // (the strong path also requires `"GET / HTTP/1.x`) is left to parse() —
     // the cost difference between strong and weak confidences here was a
     // tie-break only, and parse() will catch malformed lines anyway.
-    if (detail::has_clf_timestamp(line))
+    if (has_clf_timestamp(line))
         return kStrongConfidence;
     return kNoConfidence;
 }

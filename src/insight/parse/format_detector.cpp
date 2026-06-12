@@ -14,15 +14,11 @@ import insight.canon.detail.strategy; // the 20 concrete strategies registered h
 // The constructor auto-registers built-in strategies. Additional strategies
 // can be injected at runtime via register_strategy().
 
-
-
-
 namespace insight::tokenization
 {
 
 namespace
 {
-    constexpr std::size_t kMaxCandidates{8};
     constexpr std::size_t kDateLength{10};
     constexpr std::size_t kShortDateLength{8};
     constexpr std::size_t kMonthFirstDigitIndex{5};
@@ -30,12 +26,11 @@ namespace
     constexpr std::size_t kDaySeparatorIndex{7};
     constexpr std::size_t kDayFirstDigitIndex{8};
     constexpr std::size_t kDaySecondDigitIndex{9};
-    constexpr std::size_t kTimestampSeparatorIndex{10};
-    constexpr std::size_t kCompactDateSeparatorIndex{8};
     constexpr std::size_t kMinCompactTimestampLength{18};
 
     struct CandidateList
     {
+        static constexpr std::size_t kMaxCandidates{8};
         std::array<LogFormat, kMaxCandidates> formats{};
         std::size_t size{0};
 
@@ -101,6 +96,8 @@ namespace
 
     [[nodiscard]] bool looks_like_health_app(std::string_view line) noexcept
     {
+        static constexpr std::size_t kCompactDateSeparatorIndex{8};
+
         if (line.size() < kMinCompactTimestampLength || line[kCompactDateSeparatorIndex] != '-')
             return false;
         for (std::size_t i = 0; i < kShortDateLength; ++i)
@@ -145,6 +142,8 @@ namespace
 
     [[nodiscard]] CandidateList candidates_for(std::string_view raw_line) noexcept
     {
+        static constexpr std::size_t kTimestampSeparatorIndex{10};
+
         CandidateList candidates;
         const std::string_view line = trim_left(raw_line);
         if (line.empty())

@@ -9,14 +9,11 @@ module;
 module insight.canon.api;
 import insight.canon.internal;
 
-
 namespace insight::tokenization
 {
 
 namespace
 {
-    constexpr std::size_t kGrowthFactor{2};
-    constexpr std::size_t kInitialBlockReserve{4};
 
     [[nodiscard]] constexpr bool is_power_of_two(std::size_t value) noexcept
     {
@@ -159,6 +156,7 @@ void ArenaAllocator::Block::reset() noexcept
 ArenaAllocator::ArenaAllocator(std::size_t initial_block_size, ArenaNumaPolicy policy)
     : initial_block_size_{initial_block_size}, policy_{resolve_policy(policy)}
 {
+    static constexpr std::size_t kInitialBlockReserve{4};
     if (initial_block_size == 0)
         throw std::invalid_argument("ArenaAllocator: initial block size must be > 0");
 
@@ -218,6 +216,8 @@ ArenaAllocator::Block ArenaAllocator::make_block(std::size_t bytes, std::size_t 
 
 void ArenaAllocator::grow_to_fit(std::size_t size, std::size_t alignment)
 {
+    static constexpr std::size_t kGrowthFactor{2};
+
     if (active_index_ + 1U < blocks_.size())
     {
         ++active_index_;

@@ -32,19 +32,19 @@ namespace
 std::expected<ParsedLine, std::string> HPCStrategy::parse(std::string_view line,
                                                           ArenaAllocator& arena) const
 {
-    if (!detail::is_hpc_prefix(line))
+    if (!is_hpc_prefix(line))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=HPC parse miss");
         return std::unexpected(std::string("HPCStrategy: line does not match HPC format"));
     }
 
     std::string_view rest{line};
-    (void)detail::sv_take_token(rest); // skip record_id
-    (void)detail::sv_take_token(rest); // skip node (not stored)
-    const std::string_view facility{detail::sv_take_token(rest)};
-    const std::string_view event_type{detail::sv_take_token(rest)};
-    const std::string_view epoch{detail::sv_take_token(rest)};
-    (void)detail::sv_take_token(rest); // skip flag
+    (void)sv_take_token(rest); // skip record_id
+    (void)sv_take_token(rest); // skip node (not stored)
+    const std::string_view facility{sv_take_token(rest)};
+    const std::string_view event_type{sv_take_token(rest)};
+    const std::string_view epoch{sv_take_token(rest)};
+    (void)sv_take_token(rest); // skip flag
 
     // Build "facility.event_type" in arena.
     const std::size_t clen{facility.size() + 1U + event_type.size()};
@@ -77,7 +77,7 @@ double HPCStrategy::confidence(std::string_view line) const noexcept
 {
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
-    if (detail::is_hpc_prefix(line))
+    if (is_hpc_prefix(line))
         return kHpcConfidence;
     return kNoConfidence;
 }

@@ -32,7 +32,7 @@ namespace
 std::expected<ParsedLine, std::string> BGLStrategy::parse(std::string_view line,
                                                           ArenaAllocator& /*arena*/) const
 {
-    if (!detail::is_bgl_prefix(line))
+    if (!is_bgl_prefix(line))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=BGL parse miss");
         return std::unexpected(
@@ -42,26 +42,26 @@ std::expected<ParsedLine, std::string> BGLStrategy::parse(std::string_view line,
     // Common prefix: "- epoch date node"
     std::string_view rest{line};
     rest.remove_prefix(1U); // skip '-'
-    detail::sv_skip_ws(rest);
+    sv_skip_ws(rest);
 
-    const std::string_view epoch{detail::sv_take_token(rest)}; // epoch digits
-    (void)detail::sv_take_token(rest);                         // skip date
-    const std::string_view node{detail::sv_take_token(rest)};  // node
+    const std::string_view epoch{sv_take_token(rest)}; // epoch digits
+    (void)sv_take_token(rest);                         // skip date
+    const std::string_view node{sv_take_token(rest)};  // node
 
     // Save position after node: this is where Thunderbird message starts.
     const std::string_view after_node{rest};
 
     // Skip addr1, addr2 — check for BGL "RAS KERNEL" signature.
-    (void)detail::sv_take_token(rest); // addr1 / first field
-    (void)detail::sv_take_token(rest); // addr2 / second field
+    (void)sv_take_token(rest); // addr1 / first field
+    (void)sv_take_token(rest); // addr2 / second field
 
     // BGL-specific: "RAS KERNEL LEVEL msg"
     if (rest.size() >= 3U && rest[0] == 'R' && rest[1] == 'A' && rest[2] == 'S' &&
-        (rest.size() < 4U || detail::is_space(rest[3])))
+        (rest.size() < 4U || is_space(rest[3])))
     {
-        (void)detail::sv_take_token(rest); // consume "RAS"
-        (void)detail::sv_take_token(rest); // consume "KERNEL"
-        const std::string_view level_sv{detail::sv_take_token(rest)};
+        (void)sv_take_token(rest); // consume "RAS"
+        (void)sv_take_token(rest); // consume "KERNEL"
+        const std::string_view level_sv{sv_take_token(rest)};
 
         ParsedLine parsed_line;
         parsed_line.raw_line = line;
@@ -98,7 +98,7 @@ double BGLStrategy::confidence(std::string_view line) const noexcept
 {
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
-    if (detail::is_bgl_prefix(line))
+    if (is_bgl_prefix(line))
         return kBglConfidence;
     return kNoConfidence;
 }

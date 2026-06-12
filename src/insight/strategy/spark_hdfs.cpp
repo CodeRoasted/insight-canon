@@ -28,7 +28,6 @@ namespace
     constexpr double kNoConfidence{0.0};
     constexpr double kSparkHdfsConfidence{0.85};
     constexpr std::size_t kSparkTimestampLen{17U}; // "YY/MM/DD HH:MM:SS"
-    constexpr std::size_t kHdfsMinLen{14U};
     constexpr std::size_t kHdfsTimestampEndOffset{13U}; // YYMMDD + space + HHMMSS
 
 } // namespace
@@ -37,7 +36,7 @@ std::expected<ParsedLine, std::string> SparkHDFSStrategy::parse(std::string_view
                                                                 ArenaAllocator& /*arena*/) const
 {
     // ── Spark: "YY/MM/DD HH:MM:SS LEVEL component: msg" ────────────────────
-    if (detail::is_spark_prefix(line))
+    if (is_spark_prefix(line))
     {
         if (line.size() < kSparkTimestampLen)
         {
@@ -48,11 +47,11 @@ std::expected<ParsedLine, std::string> SparkHDFSStrategy::parse(std::string_view
         // "YY/MM/DD HH:MM:SS" — 17 contiguous chars; directly sliceable.
         const std::string_view ts_str{line.substr(0, kSparkTimestampLen)};
         std::string_view rest{line.substr(kSparkTimestampLen)};
-        detail::sv_skip_ws(rest);
+        sv_skip_ws(rest);
 
-        const std::string_view level_sv{detail::sv_take_token(rest)};
-        const std::string_view component{detail::sv_take_until(rest, ':')};
-        detail::sv_skip_ws(rest);
+        const std::string_view level_sv{sv_take_token(rest)};
+        const std::string_view component{sv_take_until(rest, ':')};
+        sv_skip_ws(rest);
 
         ParsedLine parsed_line;
         parsed_line.raw_line = line;
@@ -68,7 +67,7 @@ std::expected<ParsedLine, std::string> SparkHDFSStrategy::parse(std::string_view
     }
 
     // ── HDFS: "YYMMDD HHMMSS N LEVEL component: msg" ──────────────────────
-    if (detail::is_hdfs_prefix(line))
+    if (is_hdfs_prefix(line))
     {
         if (line.size() < kHdfsMinLen)
         {
@@ -79,12 +78,12 @@ std::expected<ParsedLine, std::string> SparkHDFSStrategy::parse(std::string_view
         const std::string_view date{line.substr(0, 6U)};
         const std::string_view time_str{line.substr(7, 6U)};
         std::string_view rest{line.substr(kHdfsTimestampEndOffset)};
-        detail::sv_skip_ws(rest);
+        sv_skip_ws(rest);
 
-        (void)detail::sv_take_token(rest); // skip record count / thread id
-        const std::string_view level_sv{detail::sv_take_token(rest)};
-        const std::string_view component{detail::sv_take_until(rest, ':')};
-        detail::sv_skip_ws(rest);
+        (void)sv_take_token(rest); // skip record count / thread id
+        const std::string_view level_sv{sv_take_token(rest)};
+        const std::string_view component{sv_take_until(rest, ':')};
+        sv_skip_ws(rest);
 
         ParsedLine parsed_line;
         parsed_line.raw_line = line;
@@ -113,9 +112,9 @@ double SparkHDFSStrategy::confidence(std::string_view line) const noexcept
 {
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
-    if (detail::is_spark_prefix(line))
+    if (is_spark_prefix(line))
         return kSparkHdfsConfidence;
-    if (detail::is_hdfs_prefix(line))
+    if (is_hdfs_prefix(line))
         return kSparkHdfsConfidence;
     return kNoConfidence;
 }

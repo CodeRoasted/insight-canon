@@ -30,7 +30,7 @@ namespace
 std::expected<ParsedLine, std::string> NginxErrorStrategy::parse(std::string_view line,
                                                                  ArenaAllocator& /*arena*/) const
 {
-    if (!detail::is_nginx_error_prefix(line))
+    if (!is_nginx_error_prefix(line))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=NginxError parse miss");
         return std::unexpected(
@@ -40,10 +40,10 @@ std::expected<ParsedLine, std::string> NginxErrorStrategy::parse(std::string_vie
     // "YYYY/MM/DD HH:MM:SS [level] PID#TID: msg"
     // Timestamp = first 19 chars: "YYYY/MM/DD HH:MM:SS"
     std::string_view rest{line};
-    const std::string_view ts_str{detail::sv_take_n(rest, 19U)};
-    detail::sv_skip_ws(rest);
+    const std::string_view ts_str{sv_take_n(rest, 19U)};
+    sv_skip_ws(rest);
 
-    const std::string_view level_sv{detail::sv_take_bracketed(rest)};
+    const std::string_view level_sv{sv_take_bracketed(rest)};
     if (level_sv.empty())
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=NginxError parse miss (no level)");
@@ -51,7 +51,7 @@ std::expected<ParsedLine, std::string> NginxErrorStrategy::parse(std::string_vie
             std::string("NginxErrorStrategy: line does not match Nginx error format"));
     }
 
-    (void)detail::sv_take_token(rest); // skip "PID#TID:"
+    (void)sv_take_token(rest); // skip "PID#TID:"
     // rest = message (may start with "*CID ")
 
     ParsedLine parsed;
@@ -76,7 +76,7 @@ double NginxErrorStrategy::confidence(std::string_view line) const noexcept
 {
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
-    if (detail::is_nginx_error_prefix(line))
+    if (is_nginx_error_prefix(line))
         return kNginxErrorConfidence;
     return kNoConfidence;
 }

@@ -30,7 +30,7 @@ namespace
 std::expected<ParsedLine, std::string> HealthAppStrategy::parse(std::string_view line,
                                                                 ArenaAllocator& /*arena*/) const
 {
-    if (!detail::is_health_app_prefix(line))
+    if (!is_health_app_prefix(line))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=HealthApp parse miss");
         return std::unexpected(
@@ -39,9 +39,9 @@ std::expected<ParsedLine, std::string> HealthAppStrategy::parse(std::string_view
 
     // Format: "YYYYMMDD-HH:MM:SS:mmm|component|process_id|message"
     std::string_view rest{line};
-    const std::string_view ts_str{detail::sv_take_until(rest, '|')};
-    const std::string_view component{detail::sv_take_until(rest, '|')};
-    (void)detail::sv_take_until(rest, '|'); // skip process_id
+    const std::string_view ts_str{sv_take_until(rest, '|')};
+    const std::string_view component{sv_take_until(rest, '|')};
+    (void)sv_take_until(rest, '|'); // skip process_id
     // rest = message
 
     if (ts_str.empty() || component.empty())
@@ -74,7 +74,7 @@ double HealthAppStrategy::confidence(std::string_view line) const noexcept
 {
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
-    if (detail::is_health_app_prefix(line))
+    if (is_health_app_prefix(line))
         return kHealthAppConfidence;
     return kNoConfidence;
 }

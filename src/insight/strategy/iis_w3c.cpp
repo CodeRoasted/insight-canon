@@ -43,10 +43,10 @@ namespace
         std::string_view scan{rest};
         while (!scan.empty())
         {
-            const std::string_view tok{detail::sv_take_token(scan)};
+            const std::string_view tok{sv_take_token(scan)};
             if (tok.size() == 3U &&
                 (tok[0] == '2' || tok[0] == '3' || tok[0] == '4' || tok[0] == '5') &&
-                detail::is_digit(tok[1]) && detail::is_digit(tok[2]))
+                is_digit(tok[1]) && is_digit(tok[2]))
             {
                 if (tok[0] == '5')
                     return LogLevel::Error;
@@ -101,20 +101,20 @@ std::expected<ParsedLine, std::string> IISW3CStrategy::parse(std::string_view li
     // Timestamp: "YYYY-MM-DD HH:MM:SS" = first 19 chars (validated by confidence).
     const std::string_view ts_str{line.substr(0, kTimestampPrefixLen)};
     std::string_view rest{line.substr(kTimestampPrefixLen)};
-    detail::sv_skip_ws(rest);
+    sv_skip_ws(rest);
 
     // Detect full vs short format by checking whether next token is an HTTP method.
     std::string_view component{"IIS"};
 
-    const std::string_view tok1{detail::sv_take_token(rest)};
+    const std::string_view tok1{sv_take_token(rest)};
     if (!is_http_method(tok1))
     {
         // Full format: tok1=site, next=server, then method.
-        const std::string_view server{detail::sv_take_token(rest)};
+        const std::string_view server{sv_take_token(rest)};
         component = server.empty() ? tok1 : server;
         // Now tok1 for method
-        const std::string_view method{detail::sv_take_token(rest)};
-        const std::string_view uri{detail::sv_take_token(rest)};
+        const std::string_view method{sv_take_token(rest)};
+        const std::string_view uri{sv_take_token(rest)};
         if (method.empty() || uri.empty() || !is_http_method(method))
         {
             INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=IISW3C parse miss (no method)");
@@ -134,7 +134,7 @@ std::expected<ParsedLine, std::string> IISW3CStrategy::parse(std::string_view li
     }
 
     // Short format: tok1 is already the HTTP method.
-    const std::string_view uri{detail::sv_take_token(rest)};
+    const std::string_view uri{sv_take_token(rest)};
     ParsedLine parsed;
     parsed.raw_line = line;
     parsed.timestamp = utils::parse_iso8601(ts_str);
@@ -158,9 +158,9 @@ double IISW3CStrategy::confidence(std::string_view line) const noexcept
         return kNoConfidence;
     if (!line.empty() && line[0] == '#')
         return kNoConfidence;
-    if (!detail::is_iso_datetime_space_prefix(line, /*require_fraction=*/false))
+    if (!is_iso_datetime_space_prefix(line, /*require_fraction=*/false))
         return kNoConfidence;
-    if (line.size() <= kTimestampPrefixLen || !detail::is_space(line[kTimestampPrefixLen]))
+    if (line.size() <= kTimestampPrefixLen || !is_space(line[kTimestampPrefixLen]))
         return kNoConfidence;
     return kIisW3cConfidence;
 }

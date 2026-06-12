@@ -44,7 +44,6 @@ class FormatDetector
 
 } // namespace insight::tokenization
 
-// ──────── from src/insight/tokenization/log_parser.hpp ────────
 export namespace insight::tokenization
 {
 
