@@ -1,14 +1,13 @@
 module;
 #include <cassert>
 #include <cstring>
+#ifdef INSIGHT_HAS_NUMA
 #include <numa.h>
+#endif
 #include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)
 
 module insight.canon.api;
 import insight.canon.internal;
-
-#ifdef INSIGHT_HAS_NUMA
-#endif
 
 
 namespace insight::tokenization
