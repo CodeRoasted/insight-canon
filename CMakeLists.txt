@@ -134,7 +134,7 @@ install(TARGETS insight_canon
     FILE_SET cxx_modules DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/insight_canon_modules
 )
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/api/utils/log_macros.hpp
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/insight/utils)
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/utils)
 install(EXPORT insight_canonTargets
     NAMESPACE insight::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/insight_canon
