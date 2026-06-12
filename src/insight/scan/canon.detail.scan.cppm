@@ -37,140 +37,23 @@ import insight.canon.internal; // std + global C types
 export namespace insight::tokenization
 {
 
-// ── Digit / alpha ranges ──────────────────────────────────────────────────
-constexpr unsigned kDecimalRadix{10U}; // range of decimal digits [0-9]
-constexpr unsigned kAlphabetSize{26U}; // range of alpha letters [A-Z] / [a-z]
-
-// ── Common timestamp field sizes ──────────────────────────────────────────
-constexpr std::size_t kTimeLen{8U};     // "HH:MM:SS"
-constexpr std::size_t kIsoDateLen{10U}; // "YYYY-MM-DD"
-
-// ── Positions within HH:MM:SS at base `pos` (pos + X) ────────────────────
-constexpr std::size_t kTimeColon2{5U}; // second ':' separator
-constexpr std::size_t kTimeSec1{6U};   // first second digit
-constexpr std::size_t kTimeSec2{7U};   // second second digit
-
-// ── Positions within YYYY-MM-DD at base `pos` (pos + X) ──────────────────
-constexpr std::size_t kIsoMon1{5U}; // first month digit
-constexpr std::size_t kIsoMon2{6U}; // second month digit
-constexpr std::size_t kIsoSep2{7U}; // '-' before day
-constexpr std::size_t kIsoDd1{8U};  // first day digit
-constexpr std::size_t kIsoDd2{9U};  // second day digit
-
-// ── BSD syslog "Mon DD HH:MM:SS" ─────────────────────────────────────────
-constexpr std::size_t kBsdMinLen{15U};
-
-// ── RFC 3339 "YYYY-MM-DDTHH:MM:SS" ──────────────────────────────────────
-constexpr std::size_t kRfc3339TAt{10U};    // position of 'T' separator
-constexpr std::size_t kRfc3339TimeAt{11U}; // time field start
-
-// ── GitHub Actions "YYYY-MM-DDTHH:MM:SS.fffffffZ" ───────────────────────
-// RFC 3339 + .NET 100-ns ticks: exactly 7 fractional digits then 'Z'. This
-// precise sub-second shape is GHA's signature and distinguishes it from
-// syslog's whole-second / millisecond RFC 3339.
-constexpr std::size_t kGhaDotAt{19U};     // '.' immediately after HH:MM:SS
-constexpr std::size_t kGhaFracAt{20U};    // first of the 7 fractional digits
-constexpr std::size_t kGhaFracLen{7U};    // exactly 7 digits (100-ns ticks)
-constexpr std::size_t kGhaZAt{27U};       // trailing 'Z'
-constexpr std::size_t kGhaPrefixLen{28U}; // full "...Z" timestamp length
-
-// ── Nginx error "YYYY/MM/DD HH:MM:SS [" ─────────────────────────────────
-constexpr std::size_t kNginxMinLen{22U};
-constexpr std::size_t kNginxMon1{5U};
-constexpr std::size_t kNginxMon2{6U};
-constexpr std::size_t kNginxSlash2{7U};
-constexpr std::size_t kNginxDd1{8U};
-constexpr std::size_t kNginxDd2{9U};
-constexpr std::size_t kNginxSpaceAt{10U};
-constexpr std::size_t kNginxTimeAt{11U};
-constexpr std::size_t kNginxScanFrom{19U};
-constexpr std::size_t kNginxScanTo{32U};
-
-// ── Spark "YY/MM/DD HH:MM:SS" ────────────────────────────────────────────
-constexpr std::size_t kSparkMinLen{17U};
-constexpr std::size_t kSparkSlash2{5U};
-constexpr std::size_t kSparkMon1{6U};
-constexpr std::size_t kSparkMon2{7U};
-constexpr std::size_t kSparkSpaceAt{8U};
-constexpr std::size_t kSparkTimeAt{9U};
-
-// ── HDFS "YYMMDD HHMMSS digit" ───────────────────────────────────────────
-constexpr std::size_t kHdfsMinLen{16U};
-constexpr std::size_t kHdfsDateLen{6U};
-constexpr std::size_t kHdfsSpaceAt{6U};
-constexpr std::size_t kHdfsTimeStart{7U};
-constexpr std::size_t kHdfsTimeEnd{13U};
-constexpr std::size_t kHdfsLastSpace{13U};
-constexpr std::size_t kHdfsLastDigit{14U};
-
-// ── Proxifier "[DD.MM HH:MM:SS]" ─────────────────────────────────────────
-constexpr std::size_t kProxifierMinLen{17U};
-constexpr std::size_t kProxifierMm2{5U};
-constexpr std::size_t kProxifierSpaceAt{6U};
-constexpr std::size_t kProxifierTimeAt{7U};
-constexpr std::size_t kProxifierBracket{15U};
-
-// ── RFC 5424 "<NNN>D ..." ─────────────────────────────────────────────────
-constexpr std::size_t kRfc5424MinLen{6U};
-
-// ── Apache error "[Mon Mon DD HH:MM:SS YYYY]" ────────────────────────────
-constexpr std::size_t kApacheMinLen{22U};
-constexpr std::size_t kApacheMon1{5U};
-constexpr std::size_t kApacheMon2{6U};
-constexpr std::size_t kApacheMon3{7U};
-constexpr std::size_t kApacheDayAt{8U};
-
-// ── BGL "- N YYYY.MM.DD" ──────────────────────────────────────────────────
-constexpr std::size_t kBglMinLen{14U};
-constexpr std::size_t kBglMaxDigits{20U};
-constexpr std::size_t kBglDateLen{10U};
-constexpr std::size_t kBglMon1{5U};
-constexpr std::size_t kBglMon2{6U};
-constexpr std::size_t kBglSep2{7U};
-constexpr std::size_t kBglDay1{8U};
-constexpr std::size_t kBglDay2{9U};
-
-// ── Health App "DDDDDDDD-H:MM:SS:MMM|" ───────────────────────────────────
-constexpr std::size_t kHealthMinLen{18U};
-constexpr std::size_t kHealthDateLen{8U};
-constexpr std::size_t kHealthSepAt{8U};
-constexpr std::size_t kHealthTimeAt{9U};
-
-// ── HPC (long epoch timestamp) ────────────────────────────────────────────
-constexpr std::size_t kHpcMaxDigits{20U};
-constexpr std::size_t kHpcMinTsLen{10U};
-
-// ── CLF "[DD/Mon/YYYY:HH:MM:SS" ──────────────────────────────────────────
-// At bracket_start = i+1: [0..1]=day, [2]='/', [3..5]=month, [6]='/', [7..10]=year, [11]=':',
-// [12..]=time
-constexpr std::size_t kClfMinLen{22U};
-constexpr std::size_t kClfMon3{5U};
-constexpr std::size_t kClfSlash2{6U};
-constexpr std::size_t kClfYear1{7U};
-constexpr std::size_t kClfYear2{8U};
-constexpr std::size_t kClfYear3{9U};
-constexpr std::size_t kClfYear4{10U};
-constexpr std::size_t kClfColon{11U};
-constexpr std::size_t kClfTimeAt{12U};
-
-// ── SSE2 SIMD ────────────────────────────────────────────────────────────
-constexpr int kSseWidth{16};             // 128-bit SSE register = 16 bytes
-constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
-
 // ── Character class primitives ───────────────────────────────────────────
 
 [[nodiscard]] constexpr bool is_digit(char chr) noexcept
 {
+    static constexpr unsigned kDecimalRadix{10U}; // range of decimal digits [0-9]
     return static_cast<unsigned>(chr) - '0' < kDecimalRadix;
 }
 
 [[nodiscard]] constexpr bool is_upper(char chr) noexcept
 {
+    static constexpr unsigned kAlphabetSize{26U}; // range of alpha letters [A-Z]
     return static_cast<unsigned>(chr) - 'A' < kAlphabetSize;
 }
 
 [[nodiscard]] constexpr bool is_lower(char chr) noexcept
 {
+    static constexpr unsigned kAlphabetSize{26U}; // range of alpha letters [a-z]
     return static_cast<unsigned>(chr) - 'a' < kAlphabetSize;
 }
 
@@ -199,35 +82,26 @@ constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
     return (pos - start) >= min_n;
 }
 
+// ── Constants shared between predicate and parse() ───────────────────────
+// Strategy parse() methods import this module and use these directly; they
+// cannot be function-local.
+constexpr std::size_t kBsdMinLen{15U};      // "Mon DD HH:MM:SS" minimum
+constexpr std::size_t kHdfsMinLen{16U};     // "YYMMDD HHMMSS digit" minimum
+constexpr std::size_t kGhaPrefixLen{28U};   // "YYYY-MM-DDTHH:MM:SS.fffffffZ" length
+
 // ── Composite prefix predicates ──────────────────────────────────────────
 // Each returns true iff `str` begins (at offset 0 unless noted) with the
 // shape described by its name.
 
-// "Mon DD HH:MM:SS" — BSD syslog date. e.g. "Jan 15 08:03:22"
-[[nodiscard]] constexpr bool is_bsd_syslog_prefix(std::string_view str) noexcept
-{
-    if (str.size() < kBsdMinLen)
-        return false;
-    if (!is_upper(str[0]) || !is_lower(str[1]) || !is_lower(str[2]))
-        return false;
-    std::size_t pos{3};
-    pos = skip_spaces(str, pos);
-    if (pos >= str.size() || !is_digit(str[pos]))
-        return false;
-    if (!consume_digits(str, pos, 1U, 2U))
-        return false;
-    pos = skip_spaces(str, pos);
-    // HH:MM:SS
-    if (pos + kTimeLen > str.size())
-        return false;
-    return is_digit(str[pos]) && is_digit(str[pos + 1]) && str[pos + 2] == ':' &&
-           is_digit(str[pos + 3]) && is_digit(str[pos + 4]) && str[pos + kTimeColon2] == ':' &&
-           is_digit(str[pos + kTimeSec1]) && is_digit(str[pos + kTimeSec2]);
-}
-
 // "YYYY-MM-DD" at offset `pos`.
 [[nodiscard]] constexpr bool match_iso_date_at(std::string_view str, std::size_t pos) noexcept
 {
+    static constexpr std::size_t kIsoDateLen{10U}; // "YYYY-MM-DD"
+    static constexpr std::size_t kIsoMon1{5U};     // first month digit
+    static constexpr std::size_t kIsoMon2{6U};     // second month digit
+    static constexpr std::size_t kIsoSep2{7U};     // '-' before day
+    static constexpr std::size_t kIsoDd1{8U};      // first day digit
+    static constexpr std::size_t kIsoDd2{9U};      // second day digit
     if (pos + kIsoDateLen > str.size())
         return false;
     return is_digit(str[pos]) && is_digit(str[pos + 1]) && is_digit(str[pos + 2]) &&
@@ -239,6 +113,10 @@ constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
 // "HH:MM:SS" at offset `pos`.
 [[nodiscard]] constexpr bool match_time_at(std::string_view str, std::size_t pos) noexcept
 {
+    static constexpr std::size_t kTimeLen{8U};     // "HH:MM:SS"
+    static constexpr std::size_t kTimeColon2{5U};  // second ':' separator
+    static constexpr std::size_t kTimeSec1{6U};    // first second digit
+    static constexpr std::size_t kTimeSec2{7U};    // second second digit
     if (pos + kTimeLen > str.size())
         return false;
     return is_digit(str[pos]) && is_digit(str[pos + 1]) && str[pos + 2] == ':' &&
@@ -246,9 +124,31 @@ constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
            is_digit(str[pos + kTimeSec1]) && is_digit(str[pos + kTimeSec2]);
 }
 
+// "Mon DD HH:MM:SS" — BSD syslog date. e.g. "Jan 15 08:03:22"
+[[nodiscard]] constexpr bool is_bsd_syslog_prefix(std::string_view str) noexcept
+{
+    static constexpr std::size_t kTimeLen{8U}; // "HH:MM:SS" — for the size guard before match_time_at
+    if (str.size() < kBsdMinLen)
+        return false;
+    if (!is_upper(str[0]) || !is_lower(str[1]) || !is_lower(str[2]))
+        return false;
+    std::size_t pos{3};
+    pos = skip_spaces(str, pos);
+    if (pos >= str.size() || !is_digit(str[pos]))
+        return false;
+    if (!consume_digits(str, pos, 1U, 2U))
+        return false;
+    pos = skip_spaces(str, pos);
+    if (pos + kTimeLen > str.size())
+        return false;
+    return match_time_at(str, pos);
+}
+
 // "YYYY-MM-DDTHH:MM:SS" — RFC 3339 prefix (T separator).
 [[nodiscard]] constexpr bool is_rfc3339_prefix(std::string_view str) noexcept
 {
+    static constexpr std::size_t kRfc3339TAt{10U};    // position of 'T' separator
+    static constexpr std::size_t kRfc3339TimeAt{11U}; // time field start
     return match_iso_date_at(str, 0) && str.size() > kRfc3339TAt && str[kRfc3339TAt] == 'T' &&
            match_time_at(str, kRfc3339TimeAt);
 }
@@ -259,6 +159,10 @@ constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
 // while leaving real RFC 3339 syslog to Syslog.
 [[nodiscard]] constexpr bool is_github_actions_prefix(std::string_view str) noexcept
 {
+    static constexpr std::size_t kGhaDotAt{19U};  // '.' immediately after HH:MM:SS
+    static constexpr std::size_t kGhaFracAt{20U}; // first of the 7 fractional digits
+    static constexpr std::size_t kGhaFracLen{7U}; // exactly 7 digits (100-ns ticks)
+    static constexpr std::size_t kGhaZAt{27U};    // trailing 'Z'
     if (str.size() < kGhaPrefixLen)
         return false;
     if (!is_rfc3339_prefix(str))
@@ -279,6 +183,8 @@ constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
 [[nodiscard]] constexpr bool is_iso_datetime_space_prefix(std::string_view str,
                                                           bool require_fraction) noexcept
 {
+    static constexpr std::size_t kIsoDateLen{10U}; // "YYYY-MM-DD"
+    static constexpr std::size_t kTimeLen{8U};     // "HH:MM:SS"
     if (!match_iso_date_at(str, 0))
         return false;
     if (str.size() <= kIsoDateLen || !is_space(str[kIsoDateLen]))
@@ -295,6 +201,16 @@ constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
 // "YYYY/MM/DD HH:MM:SS [" — nginx error prefix.
 [[nodiscard]] constexpr bool is_nginx_error_prefix(std::string_view str) noexcept
 {
+    static constexpr std::size_t kNginxMinLen{22U};
+    static constexpr std::size_t kNginxMon1{5U};
+    static constexpr std::size_t kNginxMon2{6U};
+    static constexpr std::size_t kNginxSlash2{7U};
+    static constexpr std::size_t kNginxDd1{8U};
+    static constexpr std::size_t kNginxDd2{9U};
+    static constexpr std::size_t kNginxSpaceAt{10U};
+    static constexpr std::size_t kNginxTimeAt{11U};
+    static constexpr std::size_t kNginxScanFrom{19U};
+    static constexpr std::size_t kNginxScanTo{32U};
     if (str.size() < kNginxMinLen)
         return false;
     if (!(is_digit(str[0]) && is_digit(str[1]) && is_digit(str[2]) && is_digit(str[3]) &&
@@ -315,6 +231,12 @@ constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
 // "YY/MM/DD HH:MM:SS" — spark style (two-digit year-month-day).
 [[nodiscard]] constexpr bool is_spark_prefix(std::string_view str) noexcept
 {
+    static constexpr std::size_t kSparkMinLen{17U};
+    static constexpr std::size_t kSparkSlash2{5U};
+    static constexpr std::size_t kSparkMon1{6U};
+    static constexpr std::size_t kSparkMon2{7U};
+    static constexpr std::size_t kSparkSpaceAt{8U};
+    static constexpr std::size_t kSparkTimeAt{9U};
     if (str.size() < kSparkMinLen)
         return false;
     if (!(is_digit(str[0]) && is_digit(str[1]) && str[2] == '/' && is_digit(str[3]) &&
@@ -329,6 +251,12 @@ constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
 // "YYMMDD HHMMSS digits..." — HDFS style (two 6-digit groups + a number).
 [[nodiscard]] constexpr bool is_hdfs_prefix(std::string_view str) noexcept
 {
+    static constexpr std::size_t kHdfsDateLen{6U};
+    static constexpr std::size_t kHdfsSpaceAt{6U};
+    static constexpr std::size_t kHdfsTimeStart{7U};
+    static constexpr std::size_t kHdfsTimeEnd{13U};
+    static constexpr std::size_t kHdfsLastSpace{13U};
+    static constexpr std::size_t kHdfsLastDigit{14U};
     if (str.size() < kHdfsMinLen)
         return false;
     for (std::size_t i{0}; i < kHdfsDateLen; ++i)
@@ -345,6 +273,11 @@ constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
 // "[DD.MM HH:MM:SS]" — proxifier prefix.
 [[nodiscard]] constexpr bool is_proxifier_prefix(std::string_view str) noexcept
 {
+    static constexpr std::size_t kProxifierMinLen{17U};
+    static constexpr std::size_t kProxifierMm2{5U};
+    static constexpr std::size_t kProxifierSpaceAt{6U};
+    static constexpr std::size_t kProxifierTimeAt{7U};
+    static constexpr std::size_t kProxifierBracket{15U};
     if (str.size() < kProxifierMinLen || str[0] != '[')
         return false;
     if (!(is_digit(str[1]) && is_digit(str[2]) && str[3] == '.' && is_digit(str[4]) &&
@@ -360,6 +293,7 @@ constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
 // "<NNN>D " — RFC 5424 PRI + version, then ISO date.
 [[nodiscard]] constexpr bool is_rfc5424_prefix(std::string_view str) noexcept
 {
+    static constexpr std::size_t kRfc5424MinLen{6U};
     if (str.size() < kRfc5424MinLen || str[0] != '<')
         return false;
     std::size_t pos{1U};
@@ -379,6 +313,11 @@ constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
 // "[Mon Mon DD HH:MM:SS" — apache error prefix. e.g. "[Tue Apr 27 10:15:22"
 [[nodiscard]] constexpr bool is_apache_error_prefix(std::string_view str) noexcept
 {
+    static constexpr std::size_t kApacheMinLen{22U};
+    static constexpr std::size_t kApacheMon1{5U};
+    static constexpr std::size_t kApacheMon2{6U};
+    static constexpr std::size_t kApacheMon3{7U};
+    static constexpr std::size_t kApacheDayAt{8U};
     if (str.size() < kApacheMinLen || str[0] != '[')
         return false;
     if (!(is_upper(str[1]) && is_lower(str[2]) && is_lower(str[3]) && is_space(str[4]) &&
@@ -396,6 +335,14 @@ constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
 // "- N YYYY.MM.DD" — BGL prefix.
 [[nodiscard]] constexpr bool is_bgl_prefix(std::string_view str) noexcept
 {
+    static constexpr std::size_t kBglMinLen{14U};
+    static constexpr std::size_t kBglMaxDigits{20U};
+    static constexpr std::size_t kBglDateLen{10U};
+    static constexpr std::size_t kBglMon1{5U};
+    static constexpr std::size_t kBglMon2{6U};
+    static constexpr std::size_t kBglSep2{7U};
+    static constexpr std::size_t kBglDay1{8U};
+    static constexpr std::size_t kBglDay2{9U};
     if (str.size() < kBglMinLen || str[0] != '-')
         return false;
     std::size_t pos{1U};
@@ -414,6 +361,10 @@ constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
 // "DDDDDDDD-H:MM:S:MMM|" — health app prefix. e.g. "20171223-22:15:29:606|"
 [[nodiscard]] constexpr bool is_health_app_prefix(std::string_view str) noexcept
 {
+    static constexpr std::size_t kHealthMinLen{18U};
+    static constexpr std::size_t kHealthDateLen{8U};
+    static constexpr std::size_t kHealthSepAt{8U};
+    static constexpr std::size_t kHealthTimeAt{9U};
     if (str.size() < kHealthMinLen)
         return false;
     for (std::size_t i{0}; i < kHealthDateLen; ++i)
@@ -446,6 +397,8 @@ constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
 // (id, source, target, ?, big-timestamp(>=10 digits), id, space).
 [[nodiscard]] constexpr bool is_hpc_prefix(std::string_view str) noexcept
 {
+    static constexpr std::size_t kHpcMaxDigits{20U};
+    static constexpr std::size_t kHpcMinTsLen{10U};
     std::size_t pos{0};
     if (!consume_digits(str, pos, 1U, kHpcMaxDigits))
         return false;
@@ -477,6 +430,15 @@ constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
 // Linear scan; in CLF the bracket is near the start, so this is cheap.
 [[nodiscard]] constexpr bool has_clf_timestamp(std::string_view str) noexcept
 {
+    static constexpr std::size_t kClfMinLen{22U};
+    static constexpr std::size_t kClfMon3{5U};
+    static constexpr std::size_t kClfSlash2{6U};
+    static constexpr std::size_t kClfYear1{7U};
+    static constexpr std::size_t kClfYear2{8U};
+    static constexpr std::size_t kClfYear3{9U};
+    static constexpr std::size_t kClfYear4{10U};
+    static constexpr std::size_t kClfColon{11U};
+    static constexpr std::size_t kClfTimeAt{12U};
     if (str.size() < kClfMinLen)
         return false;
     const std::size_t limit{str.size() - 21U};
@@ -534,6 +496,9 @@ constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
 
 namespace simd_detail
 {
+
+    constexpr int kSseWidth{16};             // 128-bit SSE register = 16 bytes
+    constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
 
     // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast, bugprone-not-null-terminated-result)
     // SSE2 intrinsic path: raw pointer stride and _mm_loadu_si128 reinterpret_cast are required by
