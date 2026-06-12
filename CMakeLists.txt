@@ -32,18 +32,18 @@ find_package(simdjson REQUIRED CONFIG)
 #  - Module impl units (regular sources, scanned): src/**/*.cpp attach via
 #    `module insight.canon{.api|.detail.<domain>};` (+ the facade impl unit tokenizer_engine.cpp).
 #  - Textual layer: api/utils/log_macros.hpp (the §11.9 macro layer) and
-#    src/insight/strategy/simdjson_scratch.hpp (TU-local simdjson entities).
+#    src/strategy/simdjson_scratch.hpp (TU-local simdjson entities).
 ###########################################################
 set(CANON_PUBLIC_MODULE_UNITS
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/insight/canon.internal.cppm
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/canon.internal.cppm
     ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.api.cppm
     ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.cppm
 )
 set(CANON_DETAIL_MODULE_UNITS
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/insight/scan/canon.detail.scan.cppm
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/insight/strategy/canon.detail.strategy.cppm
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/insight/drain/canon.detail.drain.cppm
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/insight/parse/canon.detail.parse.cppm
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/scan/canon.detail.scan.cppm
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/strategy/canon.detail.strategy.cppm
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/drain/canon.detail.drain.cppm
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/parse/canon.detail.parse.cppm
 )
 file(GLOB_RECURSE CANON_IMPL_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 

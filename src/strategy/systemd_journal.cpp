@@ -1,5 +1,5 @@
 module;
-#include "insight/strategy/simdjson_scratch.hpp" // textual: TU-local simdjson entities (§11.8 family)
+#include "strategy/simdjson_scratch.hpp" // textual: TU-local simdjson entities (§11.8 family)
 #include "utils/log_macros.hpp"          // textual macro layer (§11.9)
 #include <simdjson.h>
 
