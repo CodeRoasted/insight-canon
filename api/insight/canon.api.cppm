@@ -876,7 +876,9 @@ namespace detail
 // when `visit` returns true, and for_each_token then returns true. Alloc-free,
 // single pass — used by both leading-level inference and the failure lexicon so
 // the two never disagree on what counts as a standalone word.
-template <class Visit>
+template <typename Visit>
+    requires std::invocable<Visit, std::string_view> &&
+             std::convertible_to<std::invoke_result_t<Visit, std::string_view>, bool>
 [[nodiscard]] bool for_each_token(std::string_view text, std::size_t scan_limit, Visit visit)
 {
     const std::size_t limit{scan_limit == 0U || scan_limit > text.size() ? text.size()

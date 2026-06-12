@@ -7,13 +7,10 @@ namespace insight::utils
 {
 namespace
 {
-    inline constexpr unsigned kAsciiCaseBit{0x20U}; // OR-mask that folds uppercase to lowercase
-    inline constexpr unsigned kAlphabetLen{26U};
-
     [[nodiscard]] constexpr bool is_alpha(char chr) noexcept
     {
-        return ((static_cast<unsigned>(static_cast<unsigned char>(chr)) | kAsciiCaseBit) - 'a') <
-               kAlphabetLen;
+        return ((static_cast<unsigned>(static_cast<unsigned char>(chr)) | detail::kAsciiCaseBit) -
+                'a') < detail::kAlphabetLen;
     }
     [[nodiscard]] constexpr char lower(char chr) noexcept
     {
