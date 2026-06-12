@@ -22,29 +22,6 @@ namespace insight::tokenization
 
 namespace
 {
-    // ── Layout constants for "MM-DD HH:MM:SS.mmm" (18 chars) ──────────────
-    constexpr std::size_t kTimestampLength{18};
-    constexpr std::size_t kMonthSep{2};      // '-'
-    constexpr std::size_t kDayHourSep{5};    // ' ' between date and time
-    constexpr std::size_t kHourMinSep{8};    // ':'
-    constexpr std::size_t kMinSecSep{11};    // ':'
-    constexpr std::size_t kSecMillisSep{14}; // '.'
-    constexpr std::size_t kDay1{3};
-    constexpr std::size_t kDay2{4};
-    constexpr std::size_t kHour1{6};
-    constexpr std::size_t kHour2{7};
-    constexpr std::size_t kMin1{9};
-    constexpr std::size_t kMin2{10};
-    constexpr std::size_t kSec1{12};
-    constexpr std::size_t kSec2{13};
-    constexpr std::size_t kMillis1{15};
-    constexpr std::size_t kMillis2{16};
-    constexpr std::size_t kMillis3{17};
-    constexpr std::size_t kMinimumCandidateLength{30};
-
-    constexpr double kNoConfidence{0.0};
-    constexpr double kLogcatConfidence{0.90};
-
     [[nodiscard]] constexpr bool is_digit(char chr) noexcept
     {
         return chr >= '0' && chr <= '9';
@@ -55,6 +32,24 @@ namespace
     // implementation guarantees the two never disagree.
     [[nodiscard]] bool has_logcat_prefix(std::string_view line) noexcept
     {
+        // ── Layout constants for "MM-DD HH:MM:SS.mmm" (18 chars) ──────────
+        static constexpr std::size_t kMinimumCandidateLength{30};
+        static constexpr std::size_t kMonthSep{2};      // '-'
+        static constexpr std::size_t kDay1{3};
+        static constexpr std::size_t kDay2{4};
+        static constexpr std::size_t kDayHourSep{5};    // ' ' between date and time
+        static constexpr std::size_t kHour1{6};
+        static constexpr std::size_t kHour2{7};
+        static constexpr std::size_t kHourMinSep{8};    // ':'
+        static constexpr std::size_t kMin1{9};
+        static constexpr std::size_t kMin2{10};
+        static constexpr std::size_t kMinSecSep{11};    // ':'
+        static constexpr std::size_t kSec1{12};
+        static constexpr std::size_t kSec2{13};
+        static constexpr std::size_t kSecMillisSep{14}; // '.'
+        static constexpr std::size_t kMillis1{15};
+        static constexpr std::size_t kMillis2{16};
+        static constexpr std::size_t kMillis3{17};
         if (line.size() < kMinimumCandidateLength)
             return false;
         // "MM-DD HH:MM:SS.mmm"
@@ -130,6 +125,7 @@ namespace
     [[nodiscard]] bool parse_fast(std::string_view line, LogLevel& out_level,
                                   std::string_view& out_tag, std::string_view& out_message) noexcept
     {
+        static constexpr std::size_t kTimestampLength{18}; // "MM-DD HH:MM:SS.mmm"
         if (!has_logcat_prefix(line)) [[unlikely]]
             return false;
 
@@ -218,6 +214,8 @@ LogFormat AndroidLogcatStrategy::format() const noexcept
 
 double AndroidLogcatStrategy::confidence(std::string_view line) const noexcept
 {
+    static constexpr double kLogcatConfidence{0.90};
+    static constexpr double kNoConfidence{0.0};
     return has_logcat_prefix(line) ? kLogcatConfidence : kNoConfidence;
 }
 
