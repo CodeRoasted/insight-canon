@@ -31,13 +31,13 @@ find_package(simdjson REQUIRED CONFIG)
 #    leaf over api. Never installed — external consumers cannot import insight.canon.detail.*.
 #  - Module impl units (regular sources, scanned): src/**/*.cpp attach via
 #    `module insight.canon{.api|.detail.<domain>};` (+ the facade impl unit tokenizer_engine.cpp).
-#  - Textual layer: api/insight/utils/log_macros.hpp (the §11.9 macro layer) and
+#  - Textual layer: api/utils/log_macros.hpp (the §11.9 macro layer) and
 #    src/insight/strategy/simdjson_scratch.hpp (TU-local simdjson entities).
 ###########################################################
 set(CANON_PUBLIC_MODULE_UNITS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/insight/canon.internal.cppm
-    ${CMAKE_CURRENT_SOURCE_DIR}/api/insight/canon.api.cppm
-    ${CMAKE_CURRENT_SOURCE_DIR}/api/insight/canon.cppm
+    ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.api.cppm
+    ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.cppm
 )
 set(CANON_DETAIL_MODULE_UNITS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/insight/scan/canon.detail.scan.cppm
@@ -133,7 +133,7 @@ install(TARGETS insight_canon
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILE_SET cxx_modules DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/insight_canon_modules
 )
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/api/insight/utils/log_macros.hpp
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/api/utils/log_macros.hpp
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/insight/utils)
 install(EXPORT insight_canonTargets
     NAMESPACE insight::
