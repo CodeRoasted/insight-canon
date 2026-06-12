@@ -26,7 +26,7 @@ find_package(simdjson REQUIRED CONFIG)
 
 ###########################################################
 #  Sources (1.5.2 domain decomposition, §11.9.11)
-#  - PUBLIC module interface units (installed): internal + api + facade (api/).
+#  - PUBLIC module interface units (installed): internal (src/) + api + facade (api/).
 #  - PRIVATE (sealed, build-only) detail shards (src/<domain>/): scan ◀ strategy ◀ parse; drain a
 #    leaf over api. Never installed — external consumers cannot import insight.canon.detail.*.
 #  - Module impl units (regular sources, scanned): src/**/*.cpp attach via
@@ -35,7 +35,7 @@ find_package(simdjson REQUIRED CONFIG)
 #    src/insight/strategy/simdjson_scratch.hpp (TU-local simdjson entities).
 ###########################################################
 set(CANON_PUBLIC_MODULE_UNITS
-    ${CMAKE_CURRENT_SOURCE_DIR}/api/insight/canon.internal.cppm
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/insight/canon.internal.cppm
     ${CMAKE_CURRENT_SOURCE_DIR}/api/insight/canon.api.cppm
     ${CMAKE_CURRENT_SOURCE_DIR}/api/insight/canon.cppm
 )
