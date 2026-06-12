@@ -1,10 +1,13 @@
-// log_macros.hpp — TEXTUAL macro layer for the canon logging facility (1.5.1 unwrap, §11.9).
+// log_macros.hpp — the INSIGHT_LOG_* macro layer (1.5.1 unwrap, §11.9).
 //
-// The INSIGHT_LOG_* macros + the detail::log_message template + the compile-time gate constants live
-// HERE, as a textual header, NOT in a module: macros cannot be exported from a module, the gate
-// constants need spdlog's SPDLOG_LEVEL_* macros, and the template pulls fmt/spdlog (third-party, not in
-// `import std`). Module impl units that log `#include` this in their global module fragment; the runtime
-// logger accessors (init_logging / *_logger()) live in the insight.canon.api module instead.
+// Macros cannot cross a module boundary (`import` brings declarations, not `#define`s), and the
+// compile-time level elision these macros provide is load-bearing (true zero-cost in Release). So
+// the macros stay a TEXTUAL header, #included in the GMF of every logging TU. This header is
+// SEALED to pure preprocessor + a SINGLE third-party include — NO first-party declarations leak
+// (§11.4: GMF = third-party-textual). The function the macros expand to (detail::log_message) and
+// the compile-time DEBUG gate (kDebugLogsEnabled) live in the insight.canon.api module; every
+// logging TU (canon's own + downstream consumers like eidos) also does `import insight.canon;`.
+// This header stays PUBLIC/installed because downstream packages use the INSIGHT_LOG_* macros.
 #pragma once
 
 // SPDLOG_ACTIVE_LEVEL is a CMake -D per build type (Debug: TRACE, Release: INFO). Guard a missing
@@ -13,44 +16,10 @@
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 #endif
 
-#include <fmt/core.h>
-#include <fmt/format.h>
-#include <memory>
-#include <spdlog/common.h>
-#include <spdlog/logger.h>
-#include <utility>
+#include <spdlog/common.h> // SPDLOG_FUNCTION, spdlog::source_loc, spdlog::level, SPDLOG_LEVEL_*
 
-namespace insight::logging
-{
-
-inline constexpr bool kTraceLogsEnabled{SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_TRACE};
-inline constexpr bool kDebugLogsEnabled{SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_DEBUG};
-inline constexpr bool kInfoLogsEnabled{SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_INFO};
-inline constexpr bool kWarnLogsEnabled{SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_WARN};
-
-namespace detail
-{
-
-    template <typename... Args>
-    inline void log_message(const std::shared_ptr<spdlog::logger>& logger,
-                            const spdlog::source_loc& source_location,
-                            spdlog::level::level_enum level, fmt::format_string<Args...> format,
-                            Args&&... args)
-    {
-        if (!logger || !logger->should_log(level))
-        {
-            return;
-        }
-
-        logger->log(source_location, level, fmt::format(format, std::forward<Args>(args)...));
-    }
-
-} // namespace detail
-
-} // namespace insight::logging
-
-// The macro layer is intentional: disabled log levels must compile out before
-// argument evaluation on hot paths.
+// The macro layer is intentional: disabled log levels must compile out before argument evaluation
+// on hot paths. detail::log_message resolves via `import insight.canon;`.
 // NOLINTBEGIN(cppcoreguidelines-macro-usage)
 #if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_TRACE
 #define INSIGHT_LOG_TRACE(logger, ...)                                                             \

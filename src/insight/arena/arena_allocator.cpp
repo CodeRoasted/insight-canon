@@ -1,4 +1,5 @@
 module;
+#include <cassert>
 #include <cstring>
 #include <numa.h>
 #include "insight/utils/log_macros.hpp" // textual macro layer (§11.9)

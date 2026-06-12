@@ -6,8 +6,15 @@
 // package's -ffp-contract=off, the determinism guarantee). Class IMPLEMENTATIONS stay in src/*.cpp impl
 // units (byte-identical .a); this interface holds only their declarations.
 module;
-#include <spdlog/common.h> // spdlog::level::level_enum — 3rd-party, not in import std
-#include <spdlog/logger.h> // spdlog::logger (logger accessor return types)
+// SPDLOG_ACTIVE_LEVEL is a CMake -D per build type (Debug: TRACE, Release: INFO), propagated PUBLIC.
+// Guard a missing definition → default TRACE (nothing elided) — mirrors log_macros.hpp.
+#ifndef SPDLOG_ACTIVE_LEVEL
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
+#endif
+#include <fmt/core.h>      // fmt::format_string (log_message template)
+#include <fmt/format.h>    // fmt::format (log_message template)
+#include <spdlog/common.h> // spdlog::level::level_enum, spdlog::source_loc, SPDLOG_LEVEL_* — 3rd-party
+#include <spdlog/logger.h> // spdlog::logger (logger accessor return types + log_message)
 
 export module insight.canon.api;
 import insight.canon.internal; // std + global C fixed-width types
@@ -721,9 +728,40 @@ parse_log4j_timestamp(std::string_view timestamp_str) noexcept;
 parse_nginx_error_ts(std::string_view timestamp_str) noexcept;
 } // namespace insight::utils
 
-// ──────── from api/insight/utils/logger.hpp (accessors only; macros+template+gate-consts → src/insight/utils/log_macros.hpp) ────────
+// ──────── from api/insight/utils/logger.hpp (accessors + the log_message template + the one
+//          live compile-time gate; the MACROS-ONLY layer is src/insight/utils/log_macros.hpp) ────────
 export namespace insight::logging
 {
+
+// Compile-time DEBUG gate for `if constexpr` call-site elision (tokenizer/parser progress logs).
+// Mirrors the macro layer's SPDLOG_ACTIVE_LEVEL threshold. Lives in the module (importable via
+// insight.canon.api) rather than the textual macro header — it is a first-party declaration, so
+// per §11.4 it must not leak through the GMF-textual log_macros.hpp. The TRACE/INFO/WARN twins are
+// gone (no `if constexpr` site used them; the macros gate those levels themselves).
+inline constexpr bool kDebugLogsEnabled{SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_DEBUG};
+
+namespace detail
+{
+
+// The function INSIGHT_LOG_* expand to. Homed in the module (not the textual macro header) so no
+// first-party declaration leaks through the GMF — log_macros.hpp stays pure preprocessor + a single
+// third-party include (the logcraft canonical pattern, §11.4).
+template <typename... Args>
+inline void log_message(const std::shared_ptr<spdlog::logger>& logger,
+                        const spdlog::source_loc& source_location,
+                        spdlog::level::level_enum level, fmt::format_string<Args...> format,
+                        // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward) — forwarded in body
+                        Args&&... args)
+{
+    if (!logger || !logger->should_log(level))
+    {
+        return;
+    }
+
+    logger->log(source_location, level, fmt::format(format, std::forward<Args>(args)...));
+}
+
+} // namespace detail
 
 // Module logger names.
 inline constexpr std::string_view kArenaLogger{"insight.arena"};
