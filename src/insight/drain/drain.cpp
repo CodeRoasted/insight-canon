@@ -468,7 +468,9 @@ namespace
         return true;
     }
 
-    template <typename Cb> inline void for_each_token(std::string_view content, Cb callback)
+    template <typename Cb>
+        requires std::invocable<Cb, std::string_view>
+    inline void for_each_token(std::string_view content, Cb callback)
     {
         const char* const base{content.data()};
         std::size_t cursor{0};
