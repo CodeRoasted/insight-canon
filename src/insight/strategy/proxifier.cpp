@@ -22,10 +22,6 @@ namespace insight::tokenization
 
 namespace
 {
-    constexpr std::string_view::size_type kMinimumCandidateLength{18};
-    constexpr double kNoConfidence{0.0};
-    constexpr double kProxifierConfidence{0.90};
-
 } // namespace
 
 std::expected<ParsedLine, std::string> ProxifierStrategy::parse(std::string_view line,
@@ -69,6 +65,9 @@ LogFormat ProxifierStrategy::format() const noexcept
 
 double ProxifierStrategy::confidence(std::string_view line) const noexcept
 {
+    static constexpr std::string_view::size_type kMinimumCandidateLength{18};
+    static constexpr double kProxifierConfidence{0.90};
+    static constexpr double kNoConfidence{0.0};
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
     if (is_proxifier_prefix(line))

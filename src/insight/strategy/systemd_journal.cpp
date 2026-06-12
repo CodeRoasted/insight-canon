@@ -26,19 +26,6 @@ namespace insight::tokenization
 namespace
 {
 
-    constexpr std::int64_t kMicrosecondsPerSecond{1'000'000};
-    constexpr int kDefaultInfoPriority{6};
-    constexpr std::size_t kMinimumCandidateLength{20};
-    constexpr double kNoConfidence{0.0};
-    constexpr double kJournalConfidence{1.06};
-
-    constexpr std::array<std::string_view, 1> kRealtimeKeys{"__REALTIME_TIMESTAMP"};
-    constexpr std::array<std::string_view, 1> kPriorityKeys{"PRIORITY"};
-    constexpr std::array<std::string_view, 1> kCommKeys{"_COMM"};
-    constexpr std::array<std::string_view, 1> kSyslogIdentifierKeys{"SYSLOG_IDENTIFIER"};
-    constexpr std::array<std::string_view, 1> kSystemdUnitKeys{"_SYSTEMD_UNIT"};
-    constexpr std::array<std::string_view, 1> kMessageKeys{"MESSAGE"};
-
     // systemd journal PRIORITY follows syslog severity: 0=emerg .. 7=debug
     // NOLINTBEGIN(readability-magic-numbers)
     LogLevel priority_to_level(int priority) noexcept
@@ -74,6 +61,8 @@ namespace
     // (no allocation) over the simdjson string view.
     int parse_priority(std::string_view priority_view) noexcept
     {
+        static constexpr int kDefaultInfoPriority{6};
+
         int prio{kDefaultInfoPriority};
         std::from_chars(priority_view.data(), priority_view.data() + priority_view.size(), prio);
         return prio;
@@ -84,6 +73,14 @@ namespace
 std::expected<ParsedLine, std::string> SystemdJournalStrategy::parse(std::string_view line,
                                                                      ArenaAllocator& arena) const
 {
+    static constexpr std::int64_t kMicrosecondsPerSecond{1'000'000};
+    static constexpr std::array<std::string_view, 1> kRealtimeKeys{"__REALTIME_TIMESTAMP"};
+    static constexpr std::array<std::string_view, 1> kPriorityKeys{"PRIORITY"};
+    static constexpr std::array<std::string_view, 1> kCommKeys{"_COMM"};
+    static constexpr std::array<std::string_view, 1> kSyslogIdentifierKeys{"SYSLOG_IDENTIFIER"};
+    static constexpr std::array<std::string_view, 1> kSystemdUnitKeys{"_SYSTEMD_UNIT"};
+    static constexpr std::array<std::string_view, 1> kMessageKeys{"MESSAGE"};
+
     // Cheap substring gate: production-shape journal lines always contain one
     // of these markers. Avoids a full simdjson parse on generic JSON.
     if (!has_journal_indicators(line))
@@ -162,6 +159,10 @@ LogFormat SystemdJournalStrategy::format() const noexcept
 
 double SystemdJournalStrategy::confidence(std::string_view line) const noexcept
 {
+    static constexpr std::size_t kMinimumCandidateLength{20};
+    static constexpr double kJournalConfidence{1.06};
+    static constexpr double kNoConfidence{0.0};
+
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
 

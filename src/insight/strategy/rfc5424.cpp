@@ -27,10 +27,6 @@ namespace insight::tokenization
 namespace
 {
 
-    constexpr std::size_t kMinimumCandidateLength{20};
-    constexpr double kNoConfidence{0.0};
-    constexpr double kRfc5424Confidence{0.92};
-
     // NOLINTBEGIN(readability-magic-numbers)
 
     LogLevel severity_to_level(int pri) noexcept
@@ -117,6 +113,10 @@ LogFormat RFC5424Strategy::format() const noexcept
 
 double RFC5424Strategy::confidence(std::string_view line) const noexcept
 {
+    static constexpr std::size_t kMinimumCandidateLength{20};
+    static constexpr double kRfc5424Confidence{0.92};
+    static constexpr double kNoConfidence{0.0};
+
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
     if (is_rfc5424_prefix(line))

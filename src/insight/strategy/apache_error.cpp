@@ -14,18 +14,11 @@ import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitive
 //
 // Hand-written scanner: zero RE2, zero string copies.
 
-
-
-
 namespace insight::tokenization
 {
 
 namespace
 {
-    constexpr std::string_view::size_type kMinimumCandidateLength{27};
-    constexpr double kNoConfidence{0.0};
-    constexpr double kApacheErrorConfidence{0.88};
-
     // Extract the level word from a bracket like "error", "warn", "php:error".
     // RE2 pattern was `\[(\w+)\]` — \w+ stops at non-word chars, so for
     // "[php:error]" RE2 captured "php". We replicate: take word chars only.
@@ -34,9 +27,8 @@ namespace
     [[nodiscard]] constexpr std::string_view extract_level_word(std::string_view bracket) noexcept
     {
         std::size_t idx{0};
-        while (idx < bracket.size() &&
-               (is_lower(bracket[idx]) || is_upper(bracket[idx]) ||
-                is_digit(bracket[idx]) || bracket[idx] == '_'))
+        while (idx < bracket.size() && (is_lower(bracket[idx]) || is_upper(bracket[idx]) ||
+                                        is_digit(bracket[idx]) || bracket[idx] == '_'))
             ++idx;
         return bracket.substr(0, idx);
     }
@@ -97,6 +89,10 @@ LogFormat ApacheErrorLogStrategy::format() const noexcept
 
 double ApacheErrorLogStrategy::confidence(std::string_view line) const noexcept
 {
+    static constexpr std::string_view::size_type kMinimumCandidateLength{27};
+    static constexpr double kApacheErrorConfidence{0.88};
+    static constexpr double kNoConfidence{0.0};
+
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
     if (is_apache_error_prefix(line))

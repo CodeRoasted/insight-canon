@@ -25,10 +25,6 @@ namespace insight::tokenization
 
 namespace
 {
-    constexpr double kNoConfidence{0.0};
-    constexpr double kBsdSyslogConfidence{0.85};
-    constexpr double kRfc3339SyslogConfidence{0.80};
-    constexpr std::size_t kBsdTimeLen{8U}; // "HH:MM:SS"
 
     // Parse "process[pid]:" tag section. Advances `rest` past ':' and
     // any trailing whitespace. Returns the process name (before '[' or ':').
@@ -68,6 +64,8 @@ namespace
 std::expected<ParsedLine, std::string> SyslogStrategy::parse(std::string_view line,
                                                              ArenaAllocator& /*arena*/) const
 {
+    static constexpr std::size_t kBsdTimeLen{8U}; // "HH:MM:SS"
+
     if (line.size() < kBsdMinLen)
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=Syslog parse miss (too short)");
@@ -139,6 +137,10 @@ LogFormat SyslogStrategy::format() const noexcept
 
 double SyslogStrategy::confidence(std::string_view line) const noexcept
 {
+    static constexpr double kBsdSyslogConfidence{0.85};
+    static constexpr double kRfc3339SyslogConfidence{0.80};
+    static constexpr double kNoConfidence{0.0};
+
     if (line.size() < kBsdMinLen)
         return kNoConfidence;
     if (is_bsd_syslog_prefix(line))

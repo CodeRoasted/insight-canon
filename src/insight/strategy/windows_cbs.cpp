@@ -24,18 +24,16 @@ namespace insight::tokenization
 
 namespace
 {
-    constexpr std::string_view::size_type kMinimumCandidateLength{25};
-    constexpr double kNoConfidence{0.0};
-    constexpr double kWindowsCbsConfidence{0.88};
-    constexpr std::size_t kTimestampLen{19U}; // "YYYY-MM-DD HH:MM:SS"
-    constexpr std::size_t kRestOffset{20U};   // past timestamp + comma
-    constexpr std::size_t kMinLineLen{21U};   // timestamp + ", "
+    static constexpr std::size_t kTimestampLen{19U}; // "YYYY-MM-DD HH:MM:SS"
+    static constexpr std::size_t kRestOffset{20U};   // past timestamp + comma
 
 } // namespace
 
 std::expected<ParsedLine, std::string> WindowsCBSStrategy::parse(std::string_view line,
                                                                  ArenaAllocator& /*arena*/) const
 {
+    static constexpr std::size_t kMinLineLen{21U}; // timestamp + ", "
+
     // Confidence already validates "YYYY-MM-DD HH:MM:SS, Level".
     // Minimum: 19 chars timestamp + comma + space + level.
     if (line.size() < kMinLineLen || line[kTimestampLen] != ',' ||
@@ -83,6 +81,10 @@ LogFormat WindowsCBSStrategy::format() const noexcept
 
 double WindowsCBSStrategy::confidence(std::string_view line) const noexcept
 {
+    static constexpr std::string_view::size_type kMinimumCandidateLength{25};
+    static constexpr double kWindowsCbsConfidence{0.88};
+    static constexpr double kNoConfidence{0.0};
+
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
     if (!is_iso_datetime_space_prefix(line, /*require_fraction=*/false))

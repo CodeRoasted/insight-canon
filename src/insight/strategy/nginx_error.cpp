@@ -21,10 +21,6 @@ namespace insight::tokenization
 
 namespace
 {
-    constexpr std::string_view::size_type kMinimumCandidateLength{25};
-    constexpr double kNoConfidence{0.0};
-    constexpr double kNginxErrorConfidence{0.89};
-
 } // namespace
 
 std::expected<ParsedLine, std::string> NginxErrorStrategy::parse(std::string_view line,
@@ -74,6 +70,9 @@ LogFormat NginxErrorStrategy::format() const noexcept
 
 double NginxErrorStrategy::confidence(std::string_view line) const noexcept
 {
+    static constexpr std::string_view::size_type kMinimumCandidateLength{25};
+    static constexpr double kNginxErrorConfidence{0.89};
+    static constexpr double kNoConfidence{0.0};
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
     if (is_nginx_error_prefix(line))

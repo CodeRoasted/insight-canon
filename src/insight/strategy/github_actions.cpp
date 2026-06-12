@@ -24,10 +24,8 @@ namespace insight::tokenization
 
 namespace
 {
-    constexpr double kNoConfidence{0.0};
     // Above SyslogStrategy's RFC3339 score (0.80): both are candidates for an
     // RFC3339 prefix, and the precise 7-digit/'Z' GHA shape must win its lines.
-    constexpr double kGitHubActionsConfidence{0.92};
 
     // Lift the log level from a GHA/Azure workflow-command annotation at the
     // head of the message. The marker is KEPT in the templated content (it is
@@ -90,6 +88,8 @@ LogFormat GitHubActionsStrategy::format() const noexcept
 
 double GitHubActionsStrategy::confidence(std::string_view line) const noexcept
 {
+    static constexpr double kGitHubActionsConfidence{0.92};
+    static constexpr double kNoConfidence{0.0};
     return is_github_actions_prefix(line) ? kGitHubActionsConfidence : kNoConfidence;
 }
 

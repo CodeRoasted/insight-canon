@@ -24,9 +24,6 @@ namespace insight::tokenization
 namespace
 {
 
-    constexpr std::size_t kMinimumCandidateLength{17};
-    constexpr double kNoConfidence{0.0};
-    constexpr double kSparkHdfsConfidence{0.85};
     constexpr std::size_t kSparkTimestampLen{17U}; // "YY/MM/DD HH:MM:SS"
     constexpr std::size_t kHdfsTimestampEndOffset{13U}; // YYMMDD + space + HHMMSS
 
@@ -110,6 +107,10 @@ LogFormat SparkHDFSStrategy::format() const noexcept
 
 double SparkHDFSStrategy::confidence(std::string_view line) const noexcept
 {
+    static constexpr std::size_t kMinimumCandidateLength{17};
+    static constexpr double kSparkHdfsConfidence{0.85};
+    static constexpr double kNoConfidence{0.0};
+
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
     if (is_spark_prefix(line))

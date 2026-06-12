@@ -21,10 +21,6 @@ namespace insight::tokenization
 
 namespace
 {
-    constexpr std::string_view::size_type kMinimumCandidateLength{22};
-    constexpr double kNoConfidence{0.0};
-    constexpr double kHealthAppConfidence{0.92};
-
 } // namespace
 
 std::expected<ParsedLine, std::string> HealthAppStrategy::parse(std::string_view line,
@@ -72,6 +68,9 @@ LogFormat HealthAppStrategy::format() const noexcept
 
 double HealthAppStrategy::confidence(std::string_view line) const noexcept
 {
+    static constexpr std::string_view::size_type kMinimumCandidateLength{22};
+    static constexpr double kHealthAppConfidence{0.92};
+    static constexpr double kNoConfidence{0.0};
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
     if (is_health_app_prefix(line))

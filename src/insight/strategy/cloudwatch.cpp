@@ -26,17 +26,6 @@ namespace insight::tokenization
 namespace
 {
 
-    constexpr std::int64_t kMillisecondsPerSecond{1000};
-    constexpr std::size_t kMinimumCandidateLength{15};
-    constexpr double kNoConfidence{0.0};
-    constexpr double kCloudWatchConfidence{1.05};
-
-    constexpr std::array<std::string_view, 1> kComponentLogGroup{"logGroup"};
-    constexpr std::array<std::string_view, 1> kComponentLogStream{"logStream"};
-    constexpr std::array<std::string_view, 1> kLevelKeys{"level"};
-    constexpr std::array<std::string_view, 1> kMessageKeys{"message"};
-    constexpr std::array<std::string_view, 1> kTimestampKeys{"timestamp"};
-
     // Substring scan; cheaper than parsing for the detection step.
     bool has_cloudwatch_indicators(std::string_view line) noexcept
     {
@@ -49,6 +38,13 @@ namespace
 std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_view line,
                                                                  ArenaAllocator& arena) const
 {
+    static constexpr std::int64_t kMillisecondsPerSecond{1000};
+    static constexpr std::array<std::string_view, 1> kTimestampKeys{"timestamp"};
+    static constexpr std::array<std::string_view, 1> kLevelKeys{"level"};
+    static constexpr std::array<std::string_view, 1> kComponentLogGroup{"logGroup"};
+    static constexpr std::array<std::string_view, 1> kComponentLogStream{"logStream"};
+    static constexpr std::array<std::string_view, 1> kMessageKeys{"message"};
+
     // Cheap substring gate: production-shape CloudWatch lines always contain
     // one of these markers. Avoids a full simdjson parse on generic JSON.
     if (!has_cloudwatch_indicators(line))
@@ -154,6 +150,10 @@ LogFormat CloudWatchStrategy::format() const noexcept
 
 double CloudWatchStrategy::confidence(std::string_view line) const noexcept
 {
+    static constexpr std::size_t kMinimumCandidateLength{15};
+    static constexpr double kCloudWatchConfidence{1.05};
+    static constexpr double kNoConfidence{0.0};
+
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
 

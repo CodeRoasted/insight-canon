@@ -14,9 +14,6 @@ import insight.canon.api;
 // pass with O(1) layout checks at fixed offsets — no regex, no heap.
 // Malformed lines that fail the fast path are a parse miss (returned as error).
 
-
-
-
 namespace insight::tokenization
 {
 
@@ -34,22 +31,23 @@ namespace
     {
         // ── Layout constants for "MM-DD HH:MM:SS.mmm" (18 chars) ──────────
         static constexpr std::size_t kMinimumCandidateLength{30};
-        static constexpr std::size_t kMonthSep{2};      // '-'
+        static constexpr std::size_t kMonthSep{2}; // '-'
         static constexpr std::size_t kDay1{3};
         static constexpr std::size_t kDay2{4};
-        static constexpr std::size_t kDayHourSep{5};    // ' ' between date and time
+        static constexpr std::size_t kDayHourSep{5}; // ' ' between date and time
         static constexpr std::size_t kHour1{6};
         static constexpr std::size_t kHour2{7};
-        static constexpr std::size_t kHourMinSep{8};    // ':'
+        static constexpr std::size_t kHourMinSep{8}; // ':'
         static constexpr std::size_t kMin1{9};
         static constexpr std::size_t kMin2{10};
-        static constexpr std::size_t kMinSecSep{11};    // ':'
+        static constexpr std::size_t kMinSecSep{11}; // ':'
         static constexpr std::size_t kSec1{12};
         static constexpr std::size_t kSec2{13};
         static constexpr std::size_t kSecMillisSep{14}; // '.'
         static constexpr std::size_t kMillis1{15};
         static constexpr std::size_t kMillis2{16};
         static constexpr std::size_t kMillis3{17};
+
         if (line.size() < kMinimumCandidateLength)
             return false;
         // "MM-DD HH:MM:SS.mmm"
@@ -216,6 +214,7 @@ double AndroidLogcatStrategy::confidence(std::string_view line) const noexcept
 {
     static constexpr double kLogcatConfidence{0.90};
     static constexpr double kNoConfidence{0.0};
+
     return has_logcat_prefix(line) ? kLogcatConfidence : kNoConfidence;
 }
 

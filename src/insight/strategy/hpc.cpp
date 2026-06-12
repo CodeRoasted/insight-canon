@@ -23,10 +23,6 @@ namespace insight::tokenization
 
 namespace
 {
-    constexpr std::string_view::size_type kMinimumCandidateLength{30};
-    constexpr double kNoConfidence{0.0};
-    constexpr double kHpcConfidence{0.80};
-
 } // namespace
 
 std::expected<ParsedLine, std::string> HPCStrategy::parse(std::string_view line,
@@ -75,6 +71,9 @@ LogFormat HPCStrategy::format() const noexcept
 
 double HPCStrategy::confidence(std::string_view line) const noexcept
 {
+    static constexpr std::string_view::size_type kMinimumCandidateLength{30};
+    static constexpr double kHpcConfidence{0.80};
+    static constexpr double kNoConfidence{0.0};
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
     if (is_hpc_prefix(line))

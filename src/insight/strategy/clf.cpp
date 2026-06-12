@@ -29,12 +29,7 @@ namespace insight::tokenization
 namespace
 {
 
-    constexpr int kDefaultSuccessStatusCode{200};
-    constexpr int kRedirectStatusStart{300};
-    constexpr int kClientErrorStatusStart{400};
-    constexpr int kServerErrorStatusStart{500};
-    constexpr double kNoConfidence{0.0};
-    constexpr double kStrongConfidence{0.95};
+    static constexpr int kDefaultSuccessStatusCode{200};
 
 } // namespace
 
@@ -122,6 +117,9 @@ LogFormat CLFStrategy::format() const noexcept
 
 double CLFStrategy::confidence(std::string_view line) const noexcept
 {
+    static constexpr double kStrongConfidence{0.95};
+    static constexpr double kNoConfidence{0.0};
+
     // Manual gate: locate "[DD/Mon/YYYY:HH:MM:SS". Strong vs weak distinction
     // (the strong path also requires `"GET / HTTP/1.x`) is left to parse() —
     // the cost difference between strong and weak confidences here was a
@@ -143,6 +141,10 @@ std::optional<Timestamp> CLFStrategy::parse_clf_timestamp(std::string_view times
 // Map HTTP status codes to LogLevel for downstream anomaly detection.
 LogLevel CLFStrategy::status_code_to_level(int status)
 {
+    static constexpr int kServerErrorStatusStart{500};
+    static constexpr int kClientErrorStatusStart{400};
+    static constexpr int kRedirectStatusStart{300};
+
     if (status >= kServerErrorStatusStart)
         return LogLevel::Error;
     if (status >= kClientErrorStatusStart)

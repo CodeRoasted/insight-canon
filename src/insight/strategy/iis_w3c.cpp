@@ -26,9 +26,6 @@ namespace insight::tokenization
 
 namespace
 {
-    constexpr std::string_view::size_type kMinimumCandidateLength{22};
-    constexpr double kNoConfidence{0.0};
-    constexpr double kIisW3cConfidence{0.87};
     constexpr std::size_t kTimestampPrefixLen{19}; // "YYYY-MM-DD HH:MM:SS"
 
     constexpr bool is_http_method(std::string_view tok) noexcept
@@ -154,6 +151,10 @@ LogFormat IISW3CStrategy::format() const noexcept
 
 double IISW3CStrategy::confidence(std::string_view line) const noexcept
 {
+    static constexpr std::string_view::size_type kMinimumCandidateLength{22};
+    static constexpr double kIisW3cConfidence{0.87};
+    static constexpr double kNoConfidence{0.0};
+
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
     if (!line.empty() && line[0] == '#')

@@ -29,14 +29,6 @@ namespace insight::tokenization
 namespace
 {
 
-    constexpr int kHighConfidencePairCount{3};
-    constexpr int kMediumConfidencePairCount{2};
-    constexpr int kLowConfidencePairCount{1};
-    constexpr double kNoConfidence{0.0};
-    constexpr double kLowConfidence{0.30};
-    constexpr double kMediumConfidence{0.70};
-    constexpr double kHighConfidence{0.90};
-
     // Key-valid chars: \w + '.' + '-'
     [[nodiscard]] constexpr bool is_kv_key_char(char chr) noexcept
     {
@@ -174,6 +166,14 @@ LogFormat KVStrategy::format() const noexcept
 
 double KVStrategy::confidence(std::string_view line) const noexcept
 {
+    static constexpr int kHighConfidencePairCount{3};
+    static constexpr int kMediumConfidencePairCount{2};
+    static constexpr int kLowConfidencePairCount{1};
+    static constexpr double kHighConfidence{0.90};
+    static constexpr double kMediumConfidence{0.70};
+    static constexpr double kLowConfidence{0.30};
+    static constexpr double kNoConfidence{0.0};
+
     // A line that does not OPEN with a key=value pair is free text with at most
     // an embedded assignment — not logfmt. Defer to the raw-text fallback so the
     // message and leading level survive.

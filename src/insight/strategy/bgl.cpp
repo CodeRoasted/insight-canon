@@ -15,19 +15,8 @@ import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitive
 //
 // Hand-written scanner: zero RE2, zero string copies.
 
-
-
-
 namespace insight::tokenization
 {
-
-namespace
-{
-    constexpr std::string_view::size_type kMinimumCandidateLength{20};
-    constexpr double kNoConfidence{0.0};
-    constexpr double kBglConfidence{0.90};
-
-} // namespace
 
 std::expected<ParsedLine, std::string> BGLStrategy::parse(std::string_view line,
                                                           ArenaAllocator& /*arena*/) const
@@ -96,6 +85,10 @@ LogFormat BGLStrategy::format() const noexcept
 
 double BGLStrategy::confidence(std::string_view line) const noexcept
 {
+    static constexpr std::string_view::size_type kMinimumCandidateLength{20};
+    static constexpr double kBglConfidence{0.90};
+    static constexpr double kNoConfidence{0.0};
+
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
     if (is_bgl_prefix(line))

@@ -29,15 +29,11 @@ namespace insight::tokenization
 
 namespace
 {
-    constexpr std::string_view::size_type kMinimumCandidateLength{23};
-    constexpr double kNoConfidence{0.0};
-    constexpr double kLog4jConfidence{0.82};
-    constexpr std::size_t kIsoTimestampMinLen{
-        20U}; // min chars needed after scan position for ISO ts
-
     // Returns true and sets ts_start to the index where the ISO timestamp begins.
     constexpr bool find_log4j_ts_start(std::string_view line, std::size_t& ts_start) noexcept
     {
+        static constexpr std::size_t kIsoTimestampMinLen{20U};
+
         if (is_iso_datetime_space_prefix(line, /*require_fraction=*/true))
         {
             ts_start = 0;
@@ -174,6 +170,10 @@ LogFormat Log4jStrategy::format() const noexcept
 
 double Log4jStrategy::confidence(std::string_view line) const noexcept
 {
+    static constexpr std::string_view::size_type kMinimumCandidateLength{23};
+    static constexpr double kLog4jConfidence{0.82};
+    static constexpr double kNoConfidence{0.0};
+
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
     std::size_t ts_start{0};

@@ -21,8 +21,6 @@ namespace insight::tokenization
 
 namespace
 {
-    constexpr double kNoConfidence{0.0};
-    constexpr double kJsonObjectConfidence{1.0};
 } // namespace
 
 std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line,
@@ -125,6 +123,8 @@ LogFormat JsonStrategy::format() const noexcept
 // this O(1) check, so the line is never traversed twice.
 double JsonStrategy::confidence(std::string_view line) const noexcept
 {
+    static constexpr double kJsonObjectConfidence{1.0};
+    static constexpr double kNoConfidence{0.0};
     for (const char current_char : line)
     {
         if (current_char == ' ' || current_char == '\t')
