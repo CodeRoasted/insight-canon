@@ -2,26 +2,38 @@ name: Windows Portability Probe
 
 # STAGED PROBE — not yet a ship gate (Argos 2026-06-13).
 #
-# canon is proven OS-portable at the SOURCE level: its only Linux coupling is libnuma,
-# fully #ifdef INSIGHT_HAS_NUMA-gated, and the NUMA-off build is bit-identical to NUMA-on
+# canon is proven OS-portable at the SOURCE level: its only Linux coupling is libnuma, fully
+# #ifdef INSIGHT_HAS_NUMA-gated, and the NUMA-off build is bit-identical to NUMA-on
 # (det_public_proof.sh golden matched with -DINSIGHT_CANON_ENABLE_NUMA=OFF). The remaining
-# unknown is the TOOLCHAIN leg: do C++23 named modules + `import std` work under clang on
-# Windows? This job exists to answer that — LOUDLY. It is intentionally NOT a required check
-# and NOT continue-on-error: it must show real red or real green so we learn the true state.
-# It cannot gate a ship until it has gone green at least once; that is a deliberate posture,
-# not a missing wire.
+# unknown is the TOOLCHAIN leg: do C++23 named modules + `import std` work on Windows?
+#
+# WHY MSVC (a probe-proven decision). The first attempt used clang to match the Linux clang-21
+# leg; it failed at the import-std generate step — CMake: "Only `libc++` and `libstdc++` are
+# supported". The official LLVM Windows release ships no libc++, so clang falls back to the MSVC
+# STL, which CXX_MODULE_STD rejects. clang + import std on Windows is a dead end (early 2026).
+# MSVC cl.exe is the only mature path: it ships std.ixx and has the most complete import-std
+# support (VS 2022 17.5+ / toolset 14.34+). Sources:
+#   - https://learn.microsoft.com/en-us/cpp/cpp/tutorial-import-stl-named-module
+#   - https://cmake.org/cmake/help/latest/prop_tgt/CXX_MODULE_STD.html  (Ninja-only; MSVC 14.34+)
+#
+# POSTURE: intentionally NOT a required check and NOT continue-on-error — it must show real red
+# or real green so we learn the true state. It cannot gate a ship until it goes green once.
+#
+# ⚠ Even a GREEN here proves only that canon COMPILES under MSVC. It does NOT assert the Windows
+# binary is byte-identical to the Linux determinism golden — MSVC is a third stdlib, outside the
+# pinned gcc-15/libstdc++ ≡ clang-21/libc++ diagonal. Whether cross-OS bit-identity extends to
+# MSVC is a determinism-model ruling owned by Daidalos (see windows-msvc-release header).
 #
 # SCOPE: `conan create .` — which on Windows exercises exactly the right surface:
-#   (1) builds canon as a module static-lib (the named-modules + import-std leg under clang/Windows),
+#   (1) builds canon as a module static-lib (the named-modules + import-std leg under MSVC),
 #   (2) builds test_package/ — a DOWNSTREAM consumer that find_package()s insight_canon, does
 #       `import insight.canon`, and is itself CXX_MODULE_STD ON (the cross-package module test), and
 #   (3) runs that consumer smoke test (can_run is true: native Windows, not a cross-build).
-# It does NOT touch canon's own gtest suite — and that is intentional, not a gap: the gtest suite
-# is not in exports_sources (only CMakeLists/src/api are), so `conan create` never builds it, AND
+# It does NOT touch canon's own gtest suite — intentional, not a gap: tests/ isn't in
+# exports_sources so `conan create` never builds it, AND
 # tests/regression/test_tokenizer_loghub_regression.cpp's find_repo_root() calls an UNGUARDED
 # fs::directory_iterator that std::terminate()s the whole suite when CWD != the build dir (Argos
-# finding, handed to Hephaïstos). When that fix lands — guard the iterator, fall through to the
-# existing GTEST_SKIP — a follow-up step can build + ctest the full suite from the build dir.
+# finding, handed to Hephaïstos). When that fix lands, a follow-up step can ctest the full suite.
 
 permissions:
   contents: read
@@ -35,63 +47,67 @@ on:
       - 'src/**'
       - 'CMakeLists.txt'
       - 'conanfile.py'
-      - 'windows-clang-release'
+      - 'windows-msvc-release'
       - '.github/workflows/windows-portability-probe.yml'
 
 jobs:
-  windows-clang-probe:
-    runs-on: windows-latest
+  windows-msvc-probe:
+    # PINNED windows-2022 (VS 2022, toolset v143/MSVC 19.4x — conan compiler.version=194). The
+    # windows-latest runner migrates to VS 2026 (toolset v144) mid-2026; pin for a stable toolset.
+    runs-on: windows-2022
     env:
       CONAN_HOME: ${{ github.workspace }}/.conan2
-    defaults:
-      run:
-        shell: bash   # the Linux jobs use bash; keep the probe steps copy-comparable
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install clang-21 (LLVM) — the runner's bundled LLVM is too old for std::expected / import std
-        # Mirrors the Linux legs, which install clang-21 from apt.llvm.org rather than trusting the
-        # image's bare clang. KyleMayes/install-llvm-action provides a pinned Windows LLVM toolchain.
-        uses: KyleMayes/install-llvm-action@v2
+      - name: Setup MSVC dev environment (puts cl.exe / link.exe on PATH for Ninja)
+        # Ninja cannot discover cl.exe without an activated MSVC environment. This action runs
+        # vcvars and exports the toolchain to PATH for every subsequent step. MSVC itself is
+        # pre-installed on the runner — no compiler install needed, unlike the Linux clang legs.
+        uses: ilammy/msvc-dev-cmd@v1
         with:
-          version: "21.1.8"
-          directory: ${{ runner.temp }}/llvm
+          arch: x64
 
-      - name: Verify clang-21 + libc++ are the active toolchain (fail here, not later with a cryptic error)
+      - name: Verify cl.exe is the active compiler (fail here, not later with a cryptic error)
+        shell: pwsh
         run: |
-          export PATH="${{ runner.temp }}/llvm/bin:$PATH"
-          clang++ --version | head -1
-          clang++ --version | grep -qE 'version 21\.' || { echo "::error::clang++ is not 21.x — std::expected / import std would fail"; exit 1; }
+          cl.exe 2>&1 | Select-Object -First 1
+          if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) { Write-Error "cl.exe not on PATH — MSVC env not activated"; exit 1 }
 
       - name: Setup CMake 4.3.x (the import-std experimental gate UUID 451f2fe2 lives only in 4.3.x)
+        shell: pwsh
         run: |
           python -m pip install "cmake==4.3.1"
-          hash -r
-          case "$(cmake --version | head -1)" in *" 4.3."*) cmake --version ;; *) echo "::error::expected CMake 4.3.x (got: $(cmake --version | head -1))"; exit 1 ;; esac
+          $v = (cmake --version | Select-Object -First 1)
+          if ($v -notmatch ' 4\.3\.') { Write-Error "expected CMake 4.3.x (got: $v)"; exit 1 }
+          cmake --version
 
       - name: Setup Conan
         uses: conan-io/setup-conan@v1
         with:
-          version: "2.28.1"
+          version: "2.29.0"
           home: ${{ env.CONAN_HOME }}
           cache_packages: true
           profile_detect: false
 
-      - name: Setup Conan profile (windows-clang-release)
+      - name: Setup Conan profile (windows-msvc-release)
+        shell: pwsh
         run: |
-          mkdir -p "$CONAN_HOME/profiles"
-          cp windows-clang-release "$CONAN_HOME/profiles/windows-clang-release"
+          New-Item -ItemType Directory -Force -Path "$env:CONAN_HOME/profiles" | Out-Null
+          Copy-Item windows-msvc-release "$env:CONAN_HOME/profiles/windows-msvc-release"
 
-      - name: Probe — conan create on Windows/clang (module lib + downstream import-std consumer)
-        # The actual test of C++23 named modules + `import std` under clang-on-Windows: conan create
-        # builds canon's real CXX_MODULE_STD lib AND test_package/ (a consumer that `import
-        # insight.canon` + is itself CXX_MODULE_STD ON), then runs its smoke test. NUMA is absent
-        # (conanfile gates libnuma to os==Linux → the portable arena allocator compiles). --build=missing
-        # builds the third-party deps (fmt/spdlog/simdjson/gtest) for os=Windows from source as needed.
+      - name: Probe — conan create on Windows/MSVC (module lib + downstream import-std consumer)
+        # The actual test of C++23 named modules + `import std` under MSVC: conan create builds
+        # canon's real CXX_MODULE_STD lib AND test_package/ (a consumer that `import insight.canon`
+        # + is itself CXX_MODULE_STD ON), then runs its smoke test. CMake auto-compiles std.ixx into
+        # a BMI — no manual std module step needed. NUMA is absent (conanfile gates libnuma to
+        # os==Linux → the portable arena allocator compiles). --build=missing builds the third-party
+        # deps (fmt/spdlog/simdjson/gtest) for os=Windows/MSVC from source (no prebuilt packages exist).
+        # pwsh (not bash): bash's `link` shadows MSVC's link.exe, breaking the link step.
+        shell: pwsh
         run: |
-          export PATH="${{ runner.temp }}/llvm/bin:$PATH"
-          conan create . \
-            --profile:host="$CONAN_HOME/profiles/windows-clang-release" \
-            --profile:build="$CONAN_HOME/profiles/windows-clang-release" \
+          conan create . `
+            --profile:host="$env:CONAN_HOME/profiles/windows-msvc-release" `
+            --profile:build="$env:CONAN_HOME/profiles/windows-msvc-release" `
             --build=missing
