@@ -167,10 +167,17 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $det = (Get-Content det_proof_path.txt).Trim()
           $corpus = Get-ChildItem -Path proof/corpus -Filter *.log | Sort-Object Name | ForEach-Object { $_.FullName }
-          # Write the digest the same way det_public_proof.sh does (raw stdout). -NoNewline so we hash
-          # exactly the bytes det_proof emitted; UTF8 without BOM to match `sha256sum` on Linux.
-          $out = & $det @corpus
-          [System.IO.File]::WriteAllText("$($PWD.Path)/msvc_digest.txt", ($out -join "`n") + "`n")
+          # Capture det_proof's stdout as RAW BYTES, exactly like det_public_proof.sh's `> file`
+          # redirect on Linux. The previous `$out = & $det; -join` round-tripped the bytes THROUGH
+          # pwsh string decoding, which mangled the one non-ASCII byte in the digest — the em-dash
+          # (U+2014, UTF-8 e2 80 94) in the "# canon public determinism proof — v1" prologue header —
+          # under the console's non-UTF-8 OutputEncoding. Every other section is pure ASCII and matched;
+          # only the prologue's hash moved. Start-Process -RedirectStandardOutput writes the child's
+          # raw stdout to the file with no pwsh re-encoding, so the bytes are det_proof's verbatim
+          # (det_proof itself emits UTF-8 — its source string literal is UTF-8 — matching the golden).
+          $p = Start-Process -FilePath $det -ArgumentList $corpus -NoNewWindow -Wait -PassThru `
+                 -RedirectStandardOutput "$($PWD.Path)/msvc_digest.txt"
+          if ($p.ExitCode -ne 0) { Write-Error "det_proof exited $($p.ExitCode)"; exit 1 }
           $msvc = (Get-FileHash -Algorithm SHA256 -Path msvc_digest.txt).Hash.ToLower()
           $golden = (Get-Content proof/golden.sha256).Trim().ToLower()
           Write-Host "MSVC canon digest : $msvc"

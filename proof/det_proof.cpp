@@ -26,6 +26,10 @@
 #include <map>
 #include <string>
 #include <vector>
+#if defined(_WIN32)
+#include <fcntl.h>  // _O_BINARY
+#include <io.h>     // _setmode, _fileno
+#endif
 
 // 1.5.1 unwrap (Approach B): the textual public headers are gone — the canon module's
 // public surface (Tokenizer, det::FixedReducer, failure_lexicon cues, to_string,
@@ -84,6 +88,15 @@ int main(int argc, char** argv)
         std::cerr << "usage: det_proof <corpus-file> [<corpus-file> ...]\n";
         return 2;
     }
+
+    // Binary stdout: the digest is hashed byte-for-byte, so the `\n` separators MUST stay LF on
+    // every platform. Windows std::cout defaults to TEXT mode, translating `\n`→`\r\n`, which would
+    // make the Windows digest diverge from the LF Linux golden on EVERY line. POSIX has no such
+    // translation, so this is a Windows-only no-op elsewhere. (The divergence this prevents is a
+    // platform artifact, never an engine difference — keep it out of the canonical bytes.)
+#if defined(_WIN32)
+    (void)_setmode(_fileno(stdout), _O_BINARY);
+#endif
 
     namespace tk = insight::tokenization;
 
