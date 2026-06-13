@@ -17,12 +17,21 @@ import hashlib
 import difflib
 
 
+def _basename(path: str) -> str:
+    # Match det_proof's basename_of (strip both separators) so the section KEY is the basename, not a
+    # platform-specific input path — otherwise Linux `ci_build.log` vs Windows `D:\...\ci_build.log`
+    # would key as different files and mask that the payloads are identical. The `## file` line itself
+    # is still compared (it's inside the (file-header) block), so a real header divergence still shows.
+    sep = max(path.rfind("/"), path.rfind("\\"))
+    return path[sep + 1:] if sep >= 0 else path
+
+
 def sections(path: str) -> dict:
     cur_file, cur_sec, out = "(prologue)", "(header)", {}
     with open(path, encoding="utf-8") as handle:
         for line in handle.read().split("\n"):
             if line.startswith("## file "):
-                cur_file, cur_sec = line[len("## file "):].strip(), "(file-header)"
+                cur_file, cur_sec = _basename(line[len("## file "):].strip()), "(file-header)"
             elif line.startswith("### "):
                 cur_sec = line[4:].split(" ")[0].strip()
             out.setdefault((cur_file, cur_sec), []).append(line)
@@ -30,7 +39,7 @@ def sections(path: str) -> dict:
 
 
 def block_hash(body) -> str:
-    return hashlib.sha256("\n".join(body).encode()).hexdigest()[:12] if body is not None else "—missing—"
+    return hashlib.sha256("\n".join(body).encode()).hexdigest()[:12] if body is not None else "-missing-"
 
 
 def main() -> int:

@@ -63,7 +63,12 @@ std::string i128_to_dec(insight::det::i128 value)
 
 std::string basename_of(const std::string& path)
 {
-    const auto slash{path.find_last_of('/')};
+    // Strip BOTH separators: the gate passes POSIX paths on Linux ('/') and Windows paths on MSVC
+    // ('\\', e.g. D:\...\corpus\ci_build.log). Splitting on '/' only left the full drive path on
+    // Windows, so the digest's `## file` header — and ONLY that header — diverged cross-OS while
+    // every templates/events/det_math payload was already byte-identical. The digest must encode the
+    // basename, never the platform-specific input path.
+    const auto slash{path.find_last_of("/\\")};
     return slash == std::string::npos ? path : path.substr(slash + 1);
 }
 } // namespace
