@@ -3,7 +3,7 @@
 # STAGED PORTABILITY PROBE, not yet a ship gate. canon is proven OS-portable at the
 # source level (Argos 2026-06-13): its only Linux coupling is libnuma, fully #ifdef
 # INSIGHT_HAS_NUMA-gated, and the NUMA-off build is BIT-IDENTICAL to NUMA-on
-# (det_public_proof.sh golden 65c062e0… matched with -DINSIGHT_CANON_ENABLE_NUMA=OFF).
+# (det_public_proof.sh golden c88e8e9a… matched with -DINSIGHT_CANON_ENABLE_NUMA=OFF).
 # So a Windows canon yields output identical to full Linux at the algorithm level — the
 # deterministic-replay guarantee survives the port.
 #

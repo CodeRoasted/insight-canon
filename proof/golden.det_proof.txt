@@ -1,4 +1,4 @@
-# canon public determinism proof — v1
+# canon public determinism proof -- v1
 ## file ci_build.log
 ### templates (11)
 1	Build failed with <*> error

@@ -100,7 +100,12 @@ int main(int argc, char** argv)
 
     namespace tk = insight::tokenization;
 
-    std::cout << "# canon public determinism proof — v1\n";
+    // ASCII-only banner: the digest is hashed byte-for-byte, so a non-ASCII byte (the old em-dash,
+    // U+2014) made the prologue's bytes depend on the compiler's execution charset — MSVC emitted a
+    // different sequence than gcc/clang's UTF-8, diverging the digest on that ONE line while every
+    // other (pure-ASCII) section matched. A byte-hashed canonical output must contain no character
+    // whose encoding varies by toolchain/locale. Plain '--'.
+    std::cout << "# canon public determinism proof -- v1\n";
 
     for (int arg = 1; arg < argc; ++arg)
     {
