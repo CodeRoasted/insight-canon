@@ -57,13 +57,17 @@ namespace
     // Internal helpers
     // ─────────────────────────────────────────────────────────────────────────────
 
-    // Parse a fixed-width ASCII integer from [p, p+len).
+    // Parse a fixed-width ASCII integer from [ptr, ptr+length).
     // Returns false if any character is not a digit.
     bool parse_fixed(const char* ptr, int length, int& out_value) noexcept
     {
-        const std::string_view digits{ptr, static_cast<std::size_t>(length)};
-        auto parse_result{std::from_chars(digits.begin(), digits.end(), out_value)};
-        return parse_result.ec == std::errc{} && parse_result.ptr == digits.end();
+        // from_chars takes `const char*` by the standard. Pass the raw pointers directly: a
+        // string_view's begin()/end() are `const char*` on libstdc++/libc++ but a wrapper class
+        // (_String_view_iterator) on MSVC's STL that does NOT convert to const char* — the bytes
+        // and parse are identical, this is just the portable spelling of the same call.
+        const char* const last{ptr + length};
+        const auto parse_result{std::from_chars(ptr, last, out_value)};
+        return parse_result.ec == std::errc{} && parse_result.ptr == last;
     }
 
     // Fast 2-digit ASCII integer parser — avoids from_chars overhead for
@@ -403,8 +407,10 @@ std::optional<Timestamp> parse_epoch_timestamp(std::string_view timestamp_str) n
         return std::nullopt;
     }
     std::int64_t epoch{0};
-    auto parse_result{std::from_chars(timestamp_str.begin(), timestamp_str.end(), epoch)};
-    if (parse_result.ec != std::errc{} || parse_result.ptr != timestamp_str.end())
+    // const char* (not begin()/end()): portable across stdlibs — see parse_fixed.
+    const char* const ts_last{timestamp_str.data() + timestamp_str.size()};
+    auto parse_result{std::from_chars(timestamp_str.data(), ts_last, epoch)};
+    if (parse_result.ec != std::errc{} || parse_result.ptr != ts_last)
     {
         return std::nullopt;
     }

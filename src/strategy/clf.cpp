@@ -69,7 +69,8 @@ std::expected<ParsedLine, std::string> CLFStrategy::parse(std::string_view line,
     }
 
     int status_code{kDefaultSuccessStatusCode};
-    std::from_chars(status_str.begin(), status_str.end(), status_code);
+    // const char* (not begin()/end()): portable across stdlibs (MSVC's sv iterator isn't a pointer).
+    std::from_chars(status_str.data(), status_str.data() + status_str.size(), status_code);
 
     // Build content: "METHOD URL STATUS" — extracted from request string.
     // request already points into the arena-stable `line`.
