@@ -362,7 +362,12 @@ IFormatStrategy* FormatDetector::detect_from_batch(std::span<const std::string_v
         }
     }
 
-    auto* const max_score_it{std::ranges::max_element(scores)};
+    // `auto` (not `auto*`): max_element returns an ITERATOR — a raw pointer on libstdc++/libc++ but
+    // a wrapper class on MSVC's STL, so forcing pointer deduction breaks there. *it and std::distance
+    // below work for any random-access iterator. NOLINT: clang-tidy's qualified-auto wants `auto*`,
+    // which is the very libstdc++-ism that broke MSVC — keep `auto`.
+    // NOLINTNEXTLINE(readability-qualified-auto)
+    const auto max_score_it{std::ranges::max_element(scores)};
     if (*max_score_it == 0.0)
     {
         // No structured format dominates the sample — fall back to raw text so a

@@ -146,9 +146,14 @@ namespace
 
     int parse_month_name(std::string_view month_str) noexcept
     {
-        const auto* const month_it{std::ranges::find(kMonthNames, month_str)};
+        // `const auto` (not `const auto*`): ranges::find returns an ITERATOR, which is a raw pointer
+        // on libstdc++/libc++ but a wrapper class on MSVC's STL — forcing pointer deduction breaks
+        // there. std::distance works for any random-access iterator. NOLINT: clang-tidy's
+        // qualified-auto wants `auto*`, the very libstdc++-ism that broke MSVC — keep `auto`.
+        // NOLINTNEXTLINE(readability-qualified-auto)
+        const auto month_it{std::ranges::find(kMonthNames, month_str)};
         if (month_it != kMonthNames.end())
-            return static_cast<int>(month_it - kMonthNames.begin()) + 1;
+            return static_cast<int>(std::distance(kMonthNames.begin(), month_it)) + 1;
         return -1;
     }
 
