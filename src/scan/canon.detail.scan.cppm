@@ -2,11 +2,18 @@
 // The fast_gates layer: branch-light constexpr char/prefix predicates + the SSE2 sv_* parsing
 // primitives the strategy confidence()/parse() hot paths ride. Interface-only (everything inline /
 // constexpr — no impl units). Bottom of the canon detail DAG: imports internal only; SSE2
-// intrinsics live in the textual GMF (guaranteed by -march=x86-64-v2).
+// intrinsics live in the textual GMF.
 // Never re-exported by the facade and never installed (PRIVATE file set).
 module;
-#ifdef __SSE2__
-#include <emmintrin.h> // SSE2 intrinsics (fast_gates) — guaranteed by -march=x86-64-v2
+// SSE2 is ABI-baseline on every x86-64 target, but the compilers ANNOUNCE it differently:
+// gcc/clang define __SSE2__ (here implied by -march=x86-64-v2); MSVC never does — it signals x64
+// via _M_X64 (and 32-bit SSE2 via _M_IX86_FP>=2). Detect the x86-64 target portably, then pull the
+// SSE2 intrinsics from each toolchain's header (<emmintrin.h> on gcc/clang/MSVC; <intrin.h> is the
+// MSVC umbrella that includes it). INSIGHT_CANON_SSE2 then gates BOTH the include AND the use below,
+// so a non-x86 target compiles the scalar fallback rather than failing on undeclared intrinsics.
+#if defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+#define INSIGHT_CANON_SSE2 1
+#include <emmintrin.h> // SSE2 intrinsics (fast_gates)
 #endif
 
 export module insight.canon.detail.scan;
@@ -490,9 +497,10 @@ constexpr std::size_t kGhaPrefixLen{28U}; // "YYYY-MM-DDTHH:MM:SS.fffffffZ" leng
 // calling parse()). These helpers slice string_views directly from `line`
 // — no heap copies needed for any split field.
 //
-// SIMD note: find_non_ws_ptr / find_ws_ptr use SSE2 16-byte scans.
-// -march=x86-64-v2 guarantees __SSE2__; the scalar fallback compiles for
-// other targets.
+// SIMD note: find_non_ws_ptr / find_ws_ptr use SSE2 16-byte scans when INSIGHT_CANON_SSE2 is
+// defined (every x86-64 target — see the GMF guard), and a scalar byte loop otherwise. The two
+// paths return identical pointers by construction (the scalar loop is the SIMD remainder handler,
+// reused as the whole-range path), so the canonical digest is invariant to the SSE2 decision.
 
 namespace simd_detail
 {
@@ -511,6 +519,7 @@ namespace simd_detail
     {
         const char* ptr = str.data();
         const char* const end = str.data() + str.size();
+#ifdef INSIGHT_CANON_SSE2
         const __m128i vsp = _mm_set1_epi8(' ');
         const __m128i vtab = _mm_set1_epi8('\t');
         while (ptr + kSseWidth <= end)
@@ -521,12 +530,19 @@ namespace simd_detail
                 _mm_or_si128(_mm_cmpeq_epi8(chunk, vsp), _mm_cmpeq_epi8(chunk, vtab))));
             if ((mask & kSseMaskAll) != kSseMaskAll)
             {
-                // At least one non-ws byte in this block.
-                ptr += __builtin_ctz(~mask & kSseMaskAll);
+                // At least one non-ws byte in this block. countr_zero (std <bit>) replaces the
+                // gcc/clang-only __builtin_ctz: bit-exact for the non-zero input guaranteed here
+                // (~mask masked to kSseMaskAll has a clear bit ⇒ never 0), and portable to MSVC so
+                // the SSE2 path is identical across all three compilers (cross-OS determinism leg).
+                ptr += std::countr_zero(~mask & kSseMaskAll);
                 return ptr;
             }
             ptr += kSseWidth;
         }
+#endif
+        // Scalar path: the SIMD remainder, or the WHOLE range on a non-SSE2 target. Byte-for-byte
+        // identical result to the SIMD block above — it IS the correctness reference the SIMD path
+        // mirrors — so the canonical digest is invariant to whether SSE2 was compiled in.
         while (ptr < end && is_space(*ptr))
             ++ptr;
         return ptr;
@@ -538,6 +554,7 @@ namespace simd_detail
     {
         const char* ptr = str.data();
         const char* const end = str.data() + str.size();
+#ifdef INSIGHT_CANON_SSE2
         const __m128i vsp = _mm_set1_epi8(' ');
         const __m128i vtab = _mm_set1_epi8('\t');
         while (ptr + kSseWidth <= end)
@@ -547,11 +564,15 @@ namespace simd_detail
                 _mm_or_si128(_mm_cmpeq_epi8(chunk, vsp), _mm_cmpeq_epi8(chunk, vtab))));
             if ((mask & kSseMaskAll) != 0U)
             {
-                ptr += __builtin_ctz(mask & kSseMaskAll);
+                // (mask & kSseMaskAll) != 0 guarantees a set bit ⇒ countr_zero input is non-zero ⇒
+                // bit-exact with the retired __builtin_ctz, portable to MSVC.
+                ptr += std::countr_zero(mask & kSseMaskAll);
                 return ptr;
             }
             ptr += kSseWidth;
         }
+#endif
+        // Scalar path: SIMD remainder, or the whole range on a non-SSE2 target (see find_non_ws_ptr).
         while (ptr < end && !is_space(*ptr))
             ++ptr;
         return ptr;
