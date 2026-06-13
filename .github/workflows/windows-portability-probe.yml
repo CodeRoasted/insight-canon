@@ -167,8 +167,10 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $det = (Get-Content det_proof_path.txt).Trim()
           $corpus = Get-ChildItem -Path proof/corpus -Filter *.log | Sort-Object Name | ForEach-Object { $_.FullName }
-          # Capture the digest as raw bytes → sha256, mirroring `sha256sum` over det_proof's stdout.
-          & $det @corpus | Out-File -FilePath msvc_digest.txt -Encoding utf8 -NoNewline
+          # Write the digest the same way det_public_proof.sh does (raw stdout). -NoNewline so we hash
+          # exactly the bytes det_proof emitted; UTF8 without BOM to match `sha256sum` on Linux.
+          $out = & $det @corpus
+          [System.IO.File]::WriteAllText("$($PWD.Path)/msvc_digest.txt", ($out -join "`n") + "`n")
           $msvc = (Get-FileHash -Algorithm SHA256 -Path msvc_digest.txt).Hash.ToLower()
           $golden = (Get-Content proof/golden.sha256).Trim().ToLower()
           Write-Host "MSVC canon digest : $msvc"
@@ -176,5 +178,25 @@ jobs:
           if ($msvc -eq $golden) {
             Write-Host "::notice::CROSS-OS BIT-IDENTICAL — MSVC canon digest == Linux golden. Tier-1 cross-OS is MEASURED (canon-public surface)."
           } else {
-            Write-Host "::warning::CROSS-OS DIVERGENCE — MSVC digest != Linux golden. Stay Tier-2; per the determinism-model timebox, record the stage and hand to Daidalos (likely a std::hash map-iteration leak). Per-stage localization is the next step, NOT an open-ended hardening front."
+            Write-Host "::warning::CROSS-OS DIVERGENCE — MSVC digest != Linux golden. Localizing per (file, section) below; staying Tier-2 per the determinism-model timebox."
+            # Self-LOCALIZE (Daidalos's "per-stage hashes localize it instantly"): split BOTH the MSVC
+            # output and the committed Linux reference text (proof/golden.det_proof.txt, which hashes
+            # to golden.sha256) into (file, section) blocks — templates / events / det_math — hash each,
+            # and print which block diverges. Turns "the digest differs" into "the EVENTS section of
+            # ci_build.log differs", which points straight at the cause. The localizer is a committed
+            # script (proof/localize_digest.py) — NOT a heredoc, which is bash-only and would break
+            # under pwsh. Python is present on the runner.
+            python proof/localize_digest.py msvc_digest.txt proof/golden.det_proof.txt
           }
+
+      - name: Upload determinism digests (MSVC output + the Linux reference) for offline diff
+        # Whatever the verdict, keep the artifacts so the divergence can be diffed offline beyond the
+        # in-log localization above. if: always() — we want them on divergence especially.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-os-determinism-digests
+          path: |
+            msvc_digest.txt
+            proof/golden.det_proof.txt
+          if-no-files-found: warn
