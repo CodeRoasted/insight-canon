@@ -66,7 +66,9 @@ struct Tokenizer::Impl
         event.template_id = match.template_id;
         event.timestamp = parsed_line.timestamp.value_or(Timestamp{});
         event.level = parsed_line.level;
+        event.format = parser.routed_format(); // the routed winner for THIS line (set by parse_line)
         event.component = parsed_line.component;
+        event.host = parsed_line.host;
         event.template_str = match.template_str;
         event.params = match.params;
         event.structural_role = insight::tokenization::StructuralRoleRegistry::classify(

@@ -20,39 +20,8 @@ import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitive
 namespace insight::tokenization
 {
 
-namespace
-{
-
-    // Parse "process[pid]:" tag section. Advances `rest` past ':' and
-    // any trailing whitespace. Returns the process name (before '[' or ':').
-    [[nodiscard]] std::string_view extract_syslog_tag(std::string_view& rest) noexcept
-    {
-        const auto delim = rest.find_first_of("[:");
-        std::string_view tag;
-        if (delim == std::string_view::npos)
-        {
-            tag = rest;
-            rest = {};
-        }
-        else
-        {
-            tag = rest.substr(0, delim);
-            while (!tag.empty() && is_space(tag.back()))
-                tag.remove_suffix(1U);
-            rest = rest.substr(delim);
-            if (!rest.empty() && rest[0] == '[')
-            {
-                const auto rb_pos = rest.find(']');
-                rest = rest.substr(rb_pos != std::string_view::npos ? rb_pos + 1U : 1U);
-            }
-            if (!rest.empty() && rest[0] == ':')
-                rest.remove_prefix(1U);
-            sv_skip_ws(rest);
-        }
-        return tag;
-    }
-
-} // namespace
+// extract_syslog_tag now lives in insight.canon.detail.scan (shared with the BGL/Thunderbird
+// branch, F3b) — the `[pid]` is stripped (identity), leaving the daemon name.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // IFormatStrategy interface

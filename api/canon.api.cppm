@@ -468,7 +468,17 @@ struct CanonicalEvent
     TemplateID template_id{};
     Timestamp timestamp;
     LogLevel level{LogLevel::Unknown};
+    // The format the line was ROUTED to by the strategy layer (the sticky/auto-detect winner).
+    // Observability metadata — NOT deterministic MetaLog content; downstream may group/correlate
+    // by it (e.g. mixed-stream router diagnostics). Unknown when no strategy matched (RawText
+    // fallback aside).
+    LogFormat format{LogFormat::Unknown};
+    // The low-card FUNCTIONAL SOURCE (subsystem / daemon / job) — a cube dimension (F3b
+    // D-F3b-1). NOT the node/host identity (that is `host`).
     std::string_view component;
+    // The high-card node/host IDENTITY (F3b D-F3b-1, §5.5-class) — kept, but HORS-CUBE: a
+    // field for correlation/grouping, never a cube dimension. Empty when the format has none.
+    std::string_view host;
     std::string_view template_str;            // "Connection from <*> port <*>"
     std::span<const std::string_view> params; // ["192.168.1.1", "22"]
     // What this line DOES in the sequence (announced role; StructuralRole

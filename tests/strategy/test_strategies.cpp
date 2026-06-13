@@ -937,6 +937,9 @@ TEST_F(BGLStrategyTest, ParsesBGLLine)
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.level, LogLevel::Info);
+    // F3b: component = the low-card subsystem (the cube dim), host = the node identity.
+    EXPECT_EQ(pl.component, "KERNEL");
+    EXPECT_EQ(pl.host, "R02-M1-N0-C:J12-U11");
     EXPECT_NE(pl.content.find("instruction cache parity error"), std::string::npos);
 }
 
@@ -946,8 +949,27 @@ TEST_F(BGLStrategyTest, ParsesThunderbirdLine)
     ASSERT_TRUE(result.has_value()) << result.error();
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
-    EXPECT_EQ(pl.component, "dn228");
-    EXPECT_NE(pl.content.find("crond"), std::string::npos);
+    // F3b: component = the daemon ([pid] stripped), host = the node; the message is content.
+    EXPECT_EQ(pl.component, "crond(pam_unix)");
+    EXPECT_EQ(pl.host, "dn228");
+    EXPECT_NE(pl.content.find("session closed for user root"), std::string::npos);
+}
+
+// F3b: BGL's FACILITY field is RAS or NULL — a NULL-facility line (DISCOVERY etc.) must still
+// yield the subsystem as component (not fall through to the syslog branch and grab a message
+// fragment). The digit-leading secondary timestamp routes it to the BGL branch.
+TEST_F(BGLStrategyTest, ParsesNullFacilityDiscoveryLine)
+{
+    static constexpr std::string_view kNullDiscoveryLine =
+        "- 1118246007 2005.06.08 R33-M1-N8 2005-06-08-08.53.27.435197 R33-M1-N8 "
+        "NULL DISCOVERY WARNING Node card VPD check: U01 node";
+    auto result{strategy.parse(kNullDiscoveryLine, arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const auto& pl{result.value()};
+    EXPECT_EQ(pl.component, "DISCOVERY");
+    EXPECT_EQ(pl.host, "R33-M1-N8");
+    EXPECT_EQ(pl.level, LogLevel::Warn);
+    EXPECT_NE(pl.content.find("Node card VPD check"), std::string::npos);
 }
 
 TEST_F(BGLStrategyTest, RejectsNonMatchingLines)

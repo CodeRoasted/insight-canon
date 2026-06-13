@@ -1,0 +1,97 @@
+name: Windows Portability Probe
+
+# STAGED PROBE — not yet a ship gate (Argos 2026-06-13).
+#
+# canon is proven OS-portable at the SOURCE level: its only Linux coupling is libnuma,
+# fully #ifdef INSIGHT_HAS_NUMA-gated, and the NUMA-off build is bit-identical to NUMA-on
+# (det_public_proof.sh golden matched with -DINSIGHT_CANON_ENABLE_NUMA=OFF). The remaining
+# unknown is the TOOLCHAIN leg: do C++23 named modules + `import std` work under clang on
+# Windows? This job exists to answer that — LOUDLY. It is intentionally NOT a required check
+# and NOT continue-on-error: it must show real red or real green so we learn the true state.
+# It cannot gate a ship until it has gone green at least once; that is a deliberate posture,
+# not a missing wire.
+#
+# SCOPE: `conan create .` — which on Windows exercises exactly the right surface:
+#   (1) builds canon as a module static-lib (the named-modules + import-std leg under clang/Windows),
+#   (2) builds test_package/ — a DOWNSTREAM consumer that find_package()s insight_canon, does
+#       `import insight.canon`, and is itself CXX_MODULE_STD ON (the cross-package module test), and
+#   (3) runs that consumer smoke test (can_run is true: native Windows, not a cross-build).
+# It does NOT touch canon's own gtest suite — and that is intentional, not a gap: the gtest suite
+# is not in exports_sources (only CMakeLists/src/api are), so `conan create` never builds it, AND
+# tests/regression/test_tokenizer_loghub_regression.cpp's find_repo_root() calls an UNGUARDED
+# fs::directory_iterator that std::terminate()s the whole suite when CWD != the build dir (Argos
+# finding, handed to Hephaïstos). When that fix lands — guard the iterator, fall through to the
+# existing GTEST_SKIP — a follow-up step can build + ctest the full suite from the build dir.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'api/**'
+      - 'src/**'
+      - 'CMakeLists.txt'
+      - 'conanfile.py'
+      - 'windows-clang-release'
+      - '.github/workflows/windows-portability-probe.yml'
+
+jobs:
+  windows-clang-probe:
+    runs-on: windows-latest
+    env:
+      CONAN_HOME: ${{ github.workspace }}/.conan2
+    defaults:
+      run:
+        shell: bash   # the Linux jobs use bash; keep the probe steps copy-comparable
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-21 (LLVM) — the runner's bundled LLVM is too old for std::expected / import std
+        # Mirrors the Linux legs, which install clang-21 from apt.llvm.org rather than trusting the
+        # image's bare clang. KyleMayes/install-llvm-action provides a pinned Windows LLVM toolchain.
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "21.1.8"
+          directory: ${{ runner.temp }}/llvm
+
+      - name: Verify clang-21 + libc++ are the active toolchain (fail here, not later with a cryptic error)
+        run: |
+          export PATH="${{ runner.temp }}/llvm/bin:$PATH"
+          clang++ --version | head -1
+          clang++ --version | grep -qE 'version 21\.' || { echo "::error::clang++ is not 21.x — std::expected / import std would fail"; exit 1; }
+
+      - name: Setup CMake 4.3.x (the import-std experimental gate UUID 451f2fe2 lives only in 4.3.x)
+        run: |
+          python -m pip install "cmake==4.3.1"
+          hash -r
+          case "$(cmake --version | head -1)" in *" 4.3."*) cmake --version ;; *) echo "::error::expected CMake 4.3.x (got: $(cmake --version | head -1))"; exit 1 ;; esac
+
+      - name: Setup Conan
+        uses: conan-io/setup-conan@v1
+        with:
+          version: "2.28.1"
+          home: ${{ env.CONAN_HOME }}
+          cache_packages: true
+          profile_detect: false
+
+      - name: Setup Conan profile (windows-clang-release)
+        run: |
+          mkdir -p "$CONAN_HOME/profiles"
+          cp windows-clang-release "$CONAN_HOME/profiles/windows-clang-release"
+
+      - name: Probe — conan create on Windows/clang (module lib + downstream import-std consumer)
+        # The actual test of C++23 named modules + `import std` under clang-on-Windows: conan create
+        # builds canon's real CXX_MODULE_STD lib AND test_package/ (a consumer that `import
+        # insight.canon` + is itself CXX_MODULE_STD ON), then runs its smoke test. NUMA is absent
+        # (conanfile gates libnuma to os==Linux → the portable arena allocator compiles). --build=missing
+        # builds the third-party deps (fmt/spdlog/simdjson/gtest) for os=Windows from source as needed.
+        run: |
+          export PATH="${{ runner.temp }}/llvm/bin:$PATH"
+          conan create . \
+            --profile:host="$CONAN_HOME/profiles/windows-clang-release" \
+            --profile:build="$CONAN_HOME/profiles/windows-clang-release" \
+            --build=missing

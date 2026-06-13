@@ -117,6 +117,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view li
     if (result.has_value())
     {
         ++parsed_count_;
+        last_format_ = strategy->format(); // the routed winner for this event (per-line observability)
         INSIGHT_LOG_TRACE(logging::parser_logger(), "parse ok: strategy={}",
                           to_string(strategy->format()));
     }
@@ -181,6 +182,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_stable(std::string_view 
     if (result.has_value())
     {
         ++parsed_count_;
+        last_format_ = strategy->format(); // the routed winner for this event (per-line observability)
         INSIGHT_LOG_TRACE(logging::parser_logger(), "parse_stable ok: strategy={}",
                           to_string(strategy->format()));
     }
@@ -219,6 +221,11 @@ std::size_t LogParser::lines_failed() const noexcept
 LogFormat LogParser::detected_format() const noexcept
 {
     return (active_strategy_ != nullptr) ? active_strategy_->format() : LogFormat::Unknown;
+}
+
+LogFormat LogParser::routed_format() const noexcept
+{
+    return last_format_;
 }
 
 } // namespace insight::tokenization

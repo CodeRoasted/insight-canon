@@ -75,6 +75,11 @@ class LogParser
     [[nodiscard]] std::size_t lines_parsed() const noexcept;
     [[nodiscard]] std::size_t lines_failed() const noexcept;
     [[nodiscard]] LogFormat detected_format() const noexcept;
+    // The format the most recent line was actually ROUTED to (the sticky/auto-detect winner).
+    // detected_format() reports only an explicitly set_format() — it stays Unknown under
+    // auto-detect, where the winner lives in sticky_strategy_. LogFormat::Unknown until a line
+    // routes. Per-line observability for the mixed-stream router (mis-route measurement).
+    [[nodiscard]] LogFormat routed_format() const noexcept;
 
   private:
     // Selects the active strategy for the given line, updating sticky/active
@@ -90,6 +95,7 @@ class LogParser
     // returns 0.0 (format change) or on the first line.
     IFormatStrategy* sticky_strategy_{nullptr};
     bool auto_detect_{true};
+    LogFormat last_format_{LogFormat::Unknown}; // the format the last routed line was parsed with
     std::size_t parsed_count_{0};
     std::size_t failed_count_{0};
 };

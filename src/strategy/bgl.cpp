@@ -37,44 +37,57 @@ std::expected<ParsedLine, std::string> BGLStrategy::parse(std::string_view line,
     (void)sv_take_token(rest);                         // skip date
     const std::string_view node{sv_take_token(rest)};  // node
 
-    // Save position after node: this is where Thunderbird message starts.
+    // Save position after node — the field right after it discriminates the two sub-formats:
+    //   BGL:         "<ts2> <node2> <FACILITY> <SUBSYS> <LEVEL> <msg>" — ts2 is digit-leading
+    //                (e.g. "2005-06-08-08.53.27…"), FACILITY ∈ {RAS, NULL}, SUBSYS is the dim.
+    //   Thunderbird: "<Month> <Day> <Time> <host> <daemon>[pid]: <msg>" — Month is alpha.
     const std::string_view after_node{rest};
 
-    // Skip addr1, addr2 — check for BGL "RAS KERNEL" signature.
-    (void)sv_take_token(rest); // addr1 / first field
-    (void)sv_take_token(rest); // addr2 / second field
-
-    // BGL-specific: "RAS KERNEL LEVEL msg"
-    if (rest.size() >= 3U && rest[0] == 'R' && rest[1] == 'A' && rest[2] == 'S' &&
-        (rest.size() < 4U || is_space(rest[3])))
+    if (!after_node.empty() && is_digit(after_node[0]))
     {
-        (void)sv_take_token(rest); // consume "RAS"
-        (void)sv_take_token(rest); // consume "KERNEL"
+        (void)sv_take_token(rest);                             // ts2 (secondary timestamp)
+        (void)sv_take_token(rest);                             // node2 (repeated node)
+        (void)sv_take_token(rest);                             // FACILITY — RAS or NULL (not a dim)
+        const std::string_view subsystem{sv_take_token(rest)}; // F3b: the low-card functional source
         const std::string_view level_sv{sv_take_token(rest)};
 
         ParsedLine parsed_line;
         parsed_line.raw_line = line;
         parsed_line.timestamp = utils::parse_epoch_timestamp(epoch);
         parsed_line.level = utils::parse_log_level(level_sv);
-        parsed_line.component = node;
+        parsed_line.component = subsystem; // F3b D-F3b-1: KERNEL/APP/DISCOVERY/MMCS… (the cube dim)
+        parsed_line.host = node;           // F3b D-F3b-1: the node identity (hors-cube)
         parsed_line.content = rest;
         INSIGHT_LOG_DEBUG(logging::strategy_logger(),
-                          "strategy=BGL parsed component={} level={} has_timestamp={}",
-                          parsed_line.component, to_string(parsed_line.level),
+                          "strategy=BGL parsed component={} host={} level={} has_timestamp={}",
+                          parsed_line.component, parsed_line.host, to_string(parsed_line.level),
                           parsed_line.timestamp.has_value());
         return std::expected<ParsedLine, std::string>{parsed_line};
     }
 
-    // Thunderbird / generic BGL: rest after node is the message.
+    // Thunderbird / syslog-tail: "<node> Mon DD HH:MM:SS host/host daemon[pid]: message".
+    // F3b D-F3b-1/3: component = the daemon (functional source, `[pid]` stripped = identity);
+    // host = the node; level = a pure-rule severity token-scan over the message (a characterized
+    // proxy, blind to contextual severity — D-F3b-3). Degrades gracefully on a short tail.
+    std::string_view tail{after_node};
+    (void)sv_take_token(tail); // syslog month
+    (void)sv_take_token(tail); // syslog day
+    (void)sv_take_token(tail); // syslog HH:MM:SS
+    (void)sv_take_token(tail); // syslog host (redundant with `node`)
+    const std::string_view daemon{extract_syslog_tag(tail)}; // tail now = the message body
+
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
     parsed_line.timestamp = utils::parse_epoch_timestamp(epoch);
-    parsed_line.level = LogLevel::Unknown;
-    parsed_line.component = node;
-    parsed_line.content = after_node;
+    parsed_line.level = utils::infer_leading_log_level(tail); // token-aware severity proxy
+    parsed_line.component = daemon;
+    parsed_line.host = node;
+    parsed_line.content = tail;
     INSIGHT_LOG_DEBUG(
-        logging::strategy_logger(), "strategy=BGL parsed component={} level={} has_timestamp={}",
-        parsed_line.component, to_string(parsed_line.level), parsed_line.timestamp.has_value());
+        logging::strategy_logger(),
+        "strategy=BGL/syslog parsed component={} host={} level={} has_timestamp={}",
+        parsed_line.component, parsed_line.host, to_string(parsed_line.level),
+        parsed_line.timestamp.has_value());
     return std::expected<ParsedLine, std::string>{parsed_line};
 }
 

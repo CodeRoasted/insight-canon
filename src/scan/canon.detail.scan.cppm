@@ -645,4 +645,32 @@ inline void sv_skip_ws(std::string_view& str) noexcept
     return sv_take_until(str, '"');
 }
 
+// Parse a syslog "process[pid]:" tag — the daemon/program name (F3b functional source).
+// Returns the name before '[' or ':' (the `[pid]` is identity → stripped); advances `str`
+// past the ']' and ':' and trailing whitespace, so `str` is left at the message body. Shared
+// by SyslogStrategy and BGLStrategy (the Thunderbird branch) — one tag extractor, no dup.
+[[nodiscard]] inline std::string_view extract_syslog_tag(std::string_view& str) noexcept
+{
+    const auto delim{str.find_first_of("[:")};
+    if (delim == std::string_view::npos)
+    {
+        const std::string_view tag{str};
+        str = {};
+        return tag;
+    }
+    std::string_view tag{str.substr(0, delim)};
+    while (!tag.empty() && is_space(tag.back()))
+        tag.remove_suffix(1U);
+    str = str.substr(delim);
+    if (!str.empty() && str[0] == '[')
+    {
+        const auto rbracket{str.find(']')};
+        str = str.substr(rbracket != std::string_view::npos ? rbracket + 1U : 1U);
+    }
+    if (!str.empty() && str[0] == ':')
+        str.remove_prefix(1U);
+    sv_skip_ws(str);
+    return tag;
+}
+
 } // namespace insight::tokenization

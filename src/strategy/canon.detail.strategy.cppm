@@ -27,7 +27,8 @@ struct ParsedLine
     std::string_view raw_line;
     std::optional<Timestamp> timestamp;
     LogLevel level{LogLevel::Unknown};
-    std::string_view component;
+    std::string_view component; // F3b: the low-card functional source (subsystem/daemon/job)
+    std::string_view host;      // F3b: the high-card node/host identity (hors-cube)
     std::string_view content;
 };
 

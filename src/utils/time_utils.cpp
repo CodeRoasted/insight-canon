@@ -727,7 +727,14 @@ LogLevel parse_log_level(std::string_view level_str) noexcept
         return (iequals(level_str, "error") || iequals(level_str, "err")) ? LogLevel::Error
                                                                           : LogLevel::Unknown;
     case 'f':
-        return iequals(level_str, "fatal") ? LogLevel::Fatal : LogLevel::Unknown;
+        // BGL emits FAILURE as its top RAS severity (fatal-class) — F3b D-F3b-3 lexicon (was a
+        // gap: FAILURE → Unknown lost the level on those lines).
+        return (iequals(level_str, "fatal") || iequals(level_str, "failure")) ? LogLevel::Fatal
+                                                                              : LogLevel::Unknown;
+    case 's':
+        // BGL SEVERE (between ERROR and FATAL) — mapped error-class (no enum tier between the
+        // two); F3b D-F3b-3 lexicon. Keeps SEVERE distinct from FATAL/FAILURE (which are fatal).
+        return iequals(level_str, "severe") ? LogLevel::Error : LogLevel::Unknown;
     case 'c':
         return (iequals(level_str, "critical") || iequals(level_str, "crit")) ? LogLevel::Fatal
                                                                               : LogLevel::Unknown;
