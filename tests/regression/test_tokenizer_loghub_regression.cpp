@@ -157,17 +157,32 @@ constexpr std::array<DatasetExpectation, 16> kDatasetExpectations{{
     return "err error=" + quote(result.error());
 }
 
-[[nodiscard]] fs::path find_repo_root()
+// Locate the Loghub fixture directory by probing a few CWD-relative candidates.
+// The corpus lives at "<repo>/data/logs/loghub" but the test may run with CWD set
+// to the build directory (CTest WORKING_DIRECTORY), the package root, or — on
+// Windows/Mac CI — yet another convention. We return the *validated* directory
+// directly rather than deriving a "repo root" and re-appending the suffix, so the
+// path that is checked and the path that is iterated can never disagree.
+[[nodiscard]] fs::path find_dataset_dir()
 {
-    // Look for data/logs/loghub at the same level as the test executable (build directory)
-    const fs::path data_dir{fs::absolute("data/logs/loghub")};
+    static constexpr std::array<std::string_view, 4> kCandidates{{
+        "data/logs/loghub",          // CWD == package root
+        "../data/logs/loghub",       // CWD == an in-package subdir
+        "../../data/logs/loghub",    // CWD == a nested build dir
+        "../../../data/logs/loghub", // deeper build-tree nesting
+    }};
 
-    if (fs::exists(data_dir))
+    for (const std::string_view candidate : kCandidates)
     {
-        return data_dir.parent_path().parent_path(); // Return parent of "data"
+        std::error_code ec;
+        const fs::path dir{fs::absolute(fs::path{candidate})};
+        if (fs::is_directory(dir, ec) && !ec)
+        {
+            return dir;
+        }
     }
 
-    return {}; // Data not found - tests will be skipped
+    return {}; // Fixtures not found - tests will be skipped
 }
 
 [[nodiscard]] std::vector<std::string>
@@ -175,19 +190,38 @@ collect_dataset_path_strings(); // fwd (defined after collect_dataset_paths)
 
 [[nodiscard]] std::vector<fs::path> collect_dataset_paths()
 {
-    const fs::path repo_root{find_repo_root()};
-    if (repo_root.empty())
+    const fs::path dataset_dir{find_dataset_dir()};
+    if (dataset_dir.empty())
     {
         return {};
     }
 
-    const fs::path dataset_dir{repo_root / "data" / "logs" / "loghub"};
-    std::vector<fs::path> files;
-    for (const auto& entry : fs::directory_iterator(dataset_dir))
+    // Guarded iteration: an unguarded fs::directory_iterator on a missing/raced
+    // directory throws, and an uncaught throw here aborts the whole suite
+    // (std::terminate, exit 134) instead of the intended skip. The error_code
+    // overloads make both construction and increment non-throwing, so a fixture
+    // directory that disappears mid-walk degrades to "no datasets" (skip), never
+    // an abort.
+    std::error_code ec;
+    fs::directory_iterator it{dataset_dir, ec};
+    if (ec)
     {
-        if (entry.is_regular_file() && entry.path().extension() == ".log")
+        return {};
+    }
+
+    std::vector<fs::path> files;
+    const fs::directory_iterator end{};
+    for (; it != end; it.increment(ec))
+    {
+        if (ec)
         {
-            files.push_back(entry.path());
+            return {};
+        }
+
+        std::error_code stat_ec;
+        if (it->is_regular_file(stat_ec) && !stat_ec && it->path().extension() == ".log")
+        {
+            files.push_back(it->path());
         }
     }
 
