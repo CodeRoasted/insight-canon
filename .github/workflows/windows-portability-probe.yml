@@ -19,10 +19,13 @@ name: Windows Portability Probe
 # POSTURE: intentionally NOT a required check and NOT continue-on-error — it must show real red
 # or real green so we learn the true state. It cannot gate a ship until it goes green once.
 #
-# ⚠ Even a GREEN here proves only that canon COMPILES under MSVC. It does NOT assert the Windows
-# binary is byte-identical to the Linux determinism golden — MSVC is a third stdlib, outside the
-# pinned gcc-15/libstdc++ ≡ clang-21/libc++ diagonal. Whether cross-OS bit-identity extends to
-# MSVC is a determinism-model ruling owned by Daidalos (see windows-msvc-release header).
+# Two things this probe answers, separately:
+#  (1) does canon COMPILE under MSVC (named modules + import std)? — the conan-create step.
+#  (2) is the MSVC canon digest BYTE-IDENTICAL to the Linux golden? — the determinism-measure step
+#      (Daidalos ruling 2026-06-13). MSVC is a third stdlib outside the pinned gcc-15/libstdc++ ≡
+#      clang-21/libc++ diagonal, so we MEASURE cross-OS bit-identity rather than assume it; we're
+#      Tier-2 until that step goes green. The measure step is non-gating (a mismatch is a result,
+#      not a break). See windows-msvc-release header + insight_determinism_model.md.
 #
 # SCOPE: `conan create .` — which on Windows exercises exactly the right surface:
 #   (1) builds canon as a module static-lib (the named-modules + import-std leg under MSVC),
@@ -111,3 +114,48 @@ jobs:
             --profile:host="$env:CONAN_HOME/profiles/windows-msvc-release" `
             --profile:build="$env:CONAN_HOME/profiles/windows-msvc-release" `
             --build=missing
+
+      - name: Measure cross-OS determinism — MSVC canon digest vs the Linux golden
+        # Daidalos ruling 2026-06-13 (insight_determinism_model.md § "The cross-OS Tier-1 question"):
+        # cross-OS bit-identity is an Eidos prize we MEASURE before claiming, not assume. The probe
+        # above proves canon COMPILES on MSVC but emits no digest — so "do we already have cross-OS?"
+        # is unanswerable from CI. This step closes that: it's the (N+1)-th "way" of the existing
+        # det_public_proof methodology — build canon-MSVC + the det_proof fixture, replay the public
+        # corpus, and compare the canonical digest's sha256 to the committed Linux golden.
+        #
+        # NON-GATING by design: a mismatch is the MEASUREMENT RESULT (we're Tier-2 until proven Tier-1),
+        # not a build break — it must not fail the probe or hide behind a green. continue-on-error so a
+        # divergence is recorded and visible without blocking; the digest + verdict are printed for the
+        # founder/Daidalos to read. Per the ruling's timebox: a hard wall → record it, stay Tier-2, no
+        # open-ended hardening front. The integer-only det core (det_math, token-level scan, Drain) makes
+        # a MATCH plausible; the real risk is MSVC's std::hash perturbing a map iteration our canonical
+        # sort is only proven to tame on two stdlibs — which a mismatch here would localize.
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $proofBuild = "build-msvc-proof"
+          # conan install brings the SAME third-party deps the conan-create step built for os=Windows
+          # into a toolchain the proof harness can consume (it add_subdirectory()s canon and links it).
+          conan install . `
+            --profile:host="$env:CONAN_HOME/profiles/windows-msvc-release" `
+            --profile:build="$env:CONAN_HOME/profiles/windows-msvc-release" `
+            --build=missing -of $proofBuild
+          $toolchain = Get-ChildItem -Path $proofBuild -Recurse -Filter conan_toolchain.cmake | Select-Object -First 1
+          cmake -S proof -B $proofBuild -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE="$($toolchain.FullName)" `
+            -DCANON_ROOT="$($PWD.Path)"
+          cmake --build $proofBuild --target det_proof
+          $det = Get-ChildItem -Path $proofBuild -Recurse -Filter det_proof.exe | Select-Object -First 1
+          $corpus = Get-ChildItem -Path proof/corpus -Filter *.log | Sort-Object Name | ForEach-Object { $_.FullName }
+          # Capture the digest as raw bytes → sha256, mirroring `sha256sum` over det_proof's stdout.
+          & $det.FullName @corpus | Out-File -FilePath msvc_digest.txt -Encoding utf8 -NoNewline
+          $msvc = (Get-FileHash -Algorithm SHA256 -Path msvc_digest.txt).Hash.ToLower()
+          $golden = (Get-Content proof/golden.sha256).Trim().ToLower()
+          Write-Host "MSVC canon digest : $msvc"
+          Write-Host "Linux golden      : $golden"
+          if ($msvc -eq $golden) {
+            Write-Host "::notice::CROSS-OS BIT-IDENTICAL — MSVC canon digest == Linux golden. Tier-1 cross-OS is MEASURED (canon-public surface)."
+          } else {
+            Write-Host "::warning::CROSS-OS DIVERGENCE — MSVC digest != Linux golden. Stay Tier-2; per the determinism-model timebox, record the stage and hand to Daidalos (likely a std::hash map-iteration leak). Per-stage localization is the next step, NOT an open-ended hardening front."
+          }

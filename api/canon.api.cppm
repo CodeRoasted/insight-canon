@@ -12,6 +12,7 @@ module;
 #ifndef SPDLOG_ACTIVE_LEVEL
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 #endif
+#include "det/det_int128.hpp" // portable 128-bit for det_math (native __int128 on gcc/clang; pure-C++ on MSVC)
 #include <fmt/core.h>      // fmt::format_string (log_message template)
 #include <fmt/format.h>    // fmt::format (log_message template)
 #include <spdlog/common.h> // spdlog::level::level_enum, spdlog::source_loc, SPDLOG_LEVEL_* — 3rd-party
@@ -322,6 +323,12 @@ enum class Severity : uint8_t
 export namespace insight::det
 {
 
+// 128-bit intermediates (det_int128.hpp): `unsigned __int128`/`__int128` on gcc/clang, a pure-C++
+// constexpr equivalent on MSVC. Same two's-complement semantics either way, so the canonical digest
+// is bit-identical across compilers (the cross-OS determinism leg).
+using u128 = detail::u128;
+using i128 = detail::i128;
+
 // Fixed-point scale: a stored value v represents v / 2^kFracBits (Qk).
 // 40 fractional bits → ~9.1e-13 resolution: far below the 1e-6 tolerances the
 // entropy/divergence tests assert, while keeping |value·2^k| < 2^53 for every
@@ -357,7 +364,6 @@ inline constexpr std::int64_t kLn2Fixed{762123384786};
     // nearest. Normalised mantissa m = value / 2^msb ∈ [1, 2), held as m·2^kWork.
     constexpr unsigned kGuard{2U};
     constexpr unsigned kWork{kFracBits + kGuard};
-    using u128 = unsigned __int128;
     u128 mantissa{(static_cast<u128>(value) << kWork) >> msb}; // ∈ [2^kWork, 2^(kWork+1))
     const u128 two_work{u128{1} << (kWork + 1U)};              // 2.0 in Q(kWork)
 
@@ -387,9 +393,8 @@ inline constexpr std::int64_t kLn2Fixed{762123384786};
 {
     // log2(value) (Qk) · ln2 (Qk) = Q2k; round back to Qk. det_log2_fixed(value) ≥ 0,
     // so the unsigned cast for the final shift is safe.
-    const __int128 product{static_cast<__int128>(det_log2_fixed(value)) * kLn2Fixed};
-    const unsigned __int128 rounded{static_cast<unsigned __int128>(product) +
-                                    (std::uint64_t{1} << (kFracBits - 1U))};
+    const i128 product{i128{det_log2_fixed(value)} * i128{kLn2Fixed}};
+    const u128 rounded{static_cast<u128>(product) + u128{std::uint64_t{1} << (kFracBits - 1U)}};
     return static_cast<std::int64_t>(rounded >> kFracBits);
 }
 
@@ -403,12 +408,12 @@ inline constexpr std::int64_t kLn2Fixed{762123384786};
 
 // Round-half-up integer division for the final Σ/N normalisation. den > 0
 // (a count/total); num may be negative (KL/JS terms can be negative).
-[[nodiscard]] constexpr std::int64_t round_div(__int128 num, std::int64_t den) noexcept
+[[nodiscard]] constexpr std::int64_t round_div(i128 num, std::int64_t den) noexcept
 {
-    const __int128 den128{den};
-    if (num >= 0)
-        return static_cast<std::int64_t>((num + (den128 / 2)) / den128);
-    return -static_cast<std::int64_t>(((-num) + (den128 / 2)) / den128);
+    const i128 den128{den};
+    if (num >= i128{0})
+        return static_cast<std::int64_t>((num + (den128 / i128{2})) / den128);
+    return -static_cast<std::int64_t>(((-num) + (den128 / i128{2})) / den128);
 }
 
 // Exact ordered reduction for Σ over a set of terms. All accumulation is
@@ -423,16 +428,19 @@ class FixedReducer
     // entropy / KL / JS once reformulated into integer-ratio form.
     constexpr void add_weighted_log2(std::uint64_t weight, std::uint64_t value) noexcept
     {
-        acc_ += static_cast<__int128>(weight) * det_log2_fixed(value);
+        // weight (u64) widens VALUE-PRESERVING to 128-bit (every u64 is a non-negative i128),
+        // matching native `static_cast<__int128>(weight)` — NOT via int64 (would sign-flip ≥2^63).
+        // static_cast (not braces): native i128 == __int128 rejects narrowing brace-init from u128.
+        acc_ += static_cast<i128>(u128{weight}) * i128{det_log2_fixed(value)};
     }
 
     // Add an already-fixed-point (Qk) term.
-    constexpr void add_fixed(__int128 term) noexcept
+    constexpr void add_fixed(i128 term) noexcept
     {
         acc_ += term;
     }
 
-    [[nodiscard]] constexpr __int128 raw() const noexcept
+    [[nodiscard]] constexpr i128 raw() const noexcept
     {
         return acc_;
     }
@@ -445,7 +453,7 @@ class FixedReducer
     }
 
   private:
-    __int128 acc_{0};
+    i128 acc_{0};
 };
 
 } // namespace insight::det
