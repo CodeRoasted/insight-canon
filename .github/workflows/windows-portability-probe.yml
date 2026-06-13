@@ -138,10 +138,18 @@ jobs:
             --build=missing -of $proofBuild
           $toolchain = Get-ChildItem -Path $proofBuild -Recurse -Filter conan_toolchain.cmake | Select-Object -First 1
           if (-not $toolchain) { Write-Error "no conan_toolchain.cmake under $proofBuild"; exit 1 }
+          # CELL_FLAGS MUST carry SPDLOG_ACTIVE_LEVEL=OFF, exactly as det_public_proof.sh does
+          # (its cell_flags = "-O… -ffp-contract=… -DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF"). canon's
+          # loggers write to a stdout sink (logger.cpp), and the digest IS det_proof's stdout — so
+          # without compile-time spdlog elision, format_detector's INFO lines ("strategy registered…")
+          # PREPEND ~1KB of log noise to the digest. That, not the engine, was the whole
+          # (prologue)/(header) divergence: every templated section matched, only the leading bytes
+          # differed. Matching the gate's flag removes the logs at compile time on every platform.
           cmake -S proof -B $proofBuild -G Ninja `
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_TOOLCHAIN_FILE="$($toolchain.FullName)" `
-            -DCANON_ROOT="$($PWD.Path)"
+            -DCANON_ROOT="$($PWD.Path)" `
+            -DCELL_FLAGS="-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF"
           cmake --build $proofBuild --target det_proof
           $det = Get-ChildItem -Path $proofBuild -Recurse -Filter det_proof.exe | Select-Object -First 1
           if (-not $det) { Write-Error "det_proof.exe was not produced — the MSVC det harness build failed"; exit 1 }
