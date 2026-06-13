@@ -135,6 +135,12 @@ install(TARGETS insight_canon
 )
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/api/utils/log_macros.hpp
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/utils)
+# det_int128.hpp is the OTHER textual GMF dependency: canon.api.cppm does `#include
+# "det/det_int128.hpp"`, so the installed module copy needs it alongside, at the same relative
+# path (consumer include root = INCLUDEDIR → `det/…` resolves). Same shipping shape as log_macros;
+# without it the test_package / any downstream module rebuild fails "Cannot open det/det_int128.hpp".
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/api/det/det_int128.hpp
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/det)
 install(EXPORT insight_canonTargets
     NAMESPACE insight::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/insight_canon
