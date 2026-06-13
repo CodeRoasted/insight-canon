@@ -110,7 +110,20 @@ TEST(DetInt128Portable, UnsignedDivMatchesNative)
                 const nat::u128 n{(static_cast<nat::u128>(hi) << 64) | lo};
                 const port::u128 p{lo, hi};
                 EXPECT_SAME_U128(n / static_cast<nat::u128>(den), p / port::u128{den});
+                EXPECT_SAME_U128(n % static_cast<nat::u128>(den), p % port::u128{den}); // serializer's %
             }
+}
+
+TEST(DetInt128Portable, UnsignedEqualityMatchesNative)
+{
+    // == / != drive the decimal serializer's `while (magnitude != 0)` loop.
+    for (auto a : kSamples)
+        for (auto b : kSamples)
+        {
+            const auto na{static_cast<nat::u128>(a)}, nb{static_cast<nat::u128>(b)};
+            EXPECT_EQ(na == nb, port::u128{a} == port::u128{b});
+            EXPECT_EQ(na != nb, port::u128{a} != port::u128{b});
+        }
 }
 
 TEST(DetInt128Portable, SignedMulDivAddMatchesNative)

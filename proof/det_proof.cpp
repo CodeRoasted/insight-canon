@@ -34,20 +34,27 @@ import insight.canon;
 
 namespace
 {
-// __int128 → decimal string (no std::to_string overload exists for it).
-std::string i128_to_dec(__int128 value)
+// det::i128 → decimal string (no std::to_string overload exists). Works on BOTH det_math 128-bit
+// representations (native __int128 on gcc/clang, the portable struct on MSVC) — det::i128/u128 are
+// the aliases from det_int128.hpp, and the ops used here (sign via is_negative()-equivalent compare,
+// magnitude(), %/÷ by ten, != 0) are provided on both. This output IS part of the canonical digest,
+// so it must be byte-identical across compilers — hence it goes through the same portable shim.
+std::string i128_to_dec(insight::det::i128 value)
 {
-    if (value == 0)
-        return "0";
-    const bool negative{value < 0};
-    unsigned __int128 magnitude{negative ? static_cast<unsigned __int128>(-(value + 1)) + 1U
-                                         : static_cast<unsigned __int128>(value)};
+    using insight::det::i128;
+    using insight::det::u128;
+    const bool negative{!(value >= i128{0})};
+    // magnitude in u128: -value for negatives (two's-complement -, exact for INT_MIN too).
+    const u128 magnitude{static_cast<u128>(negative ? -value : value)};
     std::string out;
-    while (magnitude != 0)
+    u128 rest{magnitude};
+    while (rest != u128{0})
     {
-        out.push_back(static_cast<char>('0' + static_cast<int>(magnitude % 10)));
-        magnitude /= 10;
+        out.push_back(static_cast<char>('0' + static_cast<int>(static_cast<std::uint64_t>(rest % u128{10}))));
+        rest = rest / u128{10};
     }
+    if (out.empty())
+        out.push_back('0');
     if (negative)
         out.push_back('-');
     std::ranges::reverse(out);

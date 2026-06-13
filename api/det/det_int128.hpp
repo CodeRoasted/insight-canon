@@ -62,6 +62,11 @@ struct u128
     {
         return hi != o.hi ? hi > o.hi : lo >= o.lo;
     }
+    // == / != : used by the decimal serializer's `while (magnitude != 0)` loop (the proof digest
+    // prints FixedReducer::raw() this way; native `unsigned __int128` provides these built-in, so
+    // the fixture code is identical on both paths).
+    [[nodiscard]] constexpr bool operator==(const u128& o) const noexcept { return lo == o.lo && hi == o.hi; }
+    [[nodiscard]] constexpr bool operator!=(const u128& o) const noexcept { return !(*this == o); }
 
     [[nodiscard]] constexpr u128 operator+(const u128& o) const noexcept
     {
@@ -124,9 +129,11 @@ struct u128
         return u128{r[0] | (r[1] << 32), r[2] | (r[3] << 32)};
     }
 
-    // Restoring long division, 128/128 → quotient (det_math only needs 128/positive-64, but the
-    // general form is no harder to keep provably correct). Bit-serial MSB→LSB.
-    [[nodiscard]] constexpr u128 operator/(const u128& den) const noexcept
+    // Restoring long division, bit-serial MSB→LSB. `want_remainder` selects which result the same
+    // loop returns — det_math needs only the quotient (round_div, 128/positive-64); the proof
+    // digest's decimal serializer also needs % (magnitude % 10) and / 10. One implementation, no
+    // incomplete-type nested struct, no duplicated loop.
+    [[nodiscard]] constexpr u128 div_or_mod(const u128& den, bool want_remainder) const noexcept
     {
         u128 quot{0, 0};
         u128 rem{0, 0};
@@ -144,8 +151,10 @@ struct u128
                     quot.lo |= (1ULL << s);
             }
         }
-        return quot;
+        return want_remainder ? rem : quot;
     }
+    [[nodiscard]] constexpr u128 operator/(const u128& den) const noexcept { return div_or_mod(den, false); }
+    [[nodiscard]] constexpr u128 operator%(const u128& den) const noexcept { return div_or_mod(den, true); }
 
     [[nodiscard]] explicit constexpr operator std::uint64_t() const noexcept { return lo; }
     [[nodiscard]] explicit constexpr operator std::int64_t() const noexcept
