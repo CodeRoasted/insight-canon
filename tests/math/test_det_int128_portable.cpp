@@ -82,9 +82,15 @@ TEST(DetInt128Portable, UnsignedCompareMatchesNative)
     for (auto a : kSamples)
         for (auto b : kSamples)
         {
-            const bool n{static_cast<nat::u128>(a) >= static_cast<nat::u128>(b)};
-            const bool p{port::u128{a} >= port::u128{b}};
-            EXPECT_EQ(n, p) << a << " >= " << b;
+            EXPECT_EQ(static_cast<nat::u128>(a) >= static_cast<nat::u128>(b),
+                      port::u128{a} >= port::u128{b})
+                << a << " >= " << b;
+            // < : metalog's HLL small-range branch. Also drive the MIXED u128 < u64 form (the
+            // threshold is a u64 that widens through the implicit ctor) — the exact call-site shape.
+            EXPECT_EQ(static_cast<nat::u128>(a) < static_cast<nat::u128>(b),
+                      port::u128{a} < port::u128{b})
+                << a << " < " << b;
+            EXPECT_EQ(static_cast<nat::u128>(a) < b, port::u128{a} < b) << a << " < (u64)" << b;
         }
 }
 
@@ -97,6 +103,12 @@ TEST(DetInt128Portable, UnsignedAddSubMatchesNative)
                              port::u128{a} + port::u128{b});
             EXPECT_SAME_U128(static_cast<nat::u128>(a) - static_cast<nat::u128>(b),
                              port::u128{a} - port::u128{b});
+            // += : metalog's HLL harmonic-sum accumulator. Must equal the +-then-assign native does.
+            nat::u128 nacc{static_cast<nat::u128>(a)};
+            port::u128 pacc{a};
+            nacc += static_cast<nat::u128>(b);
+            pacc += port::u128{b};
+            EXPECT_SAME_U128(nacc, pacc);
         }
 }
 

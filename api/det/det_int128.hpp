@@ -18,8 +18,12 @@
 //     (test_det_math.cpp) asserts struct ≡ native bit-for-bit — the MSVC-equivalence oracle that
 //     runs WITHOUT an MSVC box. This is how we MEASURE cross-OS bit-identity instead of assuming it.
 //
-// Scope is deliberately minimal: only the operators det_math invokes are provided. Adding an op
-// means a det_math change, which re-fires the golden + the oracle test.
+// Scope is deliberately minimal: only the operators the det core AND its downstream consumers
+// (metalog's HLL harmonic-sum + stats accumulators) invoke are provided — native `__int128` supplies
+// them ALL for free, so a missing one only ever surfaces on MSVC. Adding an op is a consumer-driven
+// change that MUST also extend the oracle (test_det_int128_portable.cpp), so the gap can't recur
+// silently; it moves a digest golden only if it changes an existing computed value (a new operator on
+// a new consumer path does not — canon's det_public_proof golden is untouched by +=/<).
 #ifndef INSIGHT_CANON_DET_INT128_HPP
 #define INSIGHT_CANON_DET_INT128_HPP
 
@@ -62,6 +66,12 @@ struct u128
     {
         return hi != o.hi ? hi > o.hi : lo >= o.lo;
     }
+    // < : metalog's HLL small-range branch (`raw < kSmallRangeThreshold`, threshold a u64 that widens
+    // via the implicit u64 ctor). Mirror of >=, inverted; native `unsigned __int128` provides it free.
+    [[nodiscard]] constexpr bool operator<(const u128& o) const noexcept
+    {
+        return hi != o.hi ? hi < o.hi : lo < o.lo;
+    }
     // == / != : used by the decimal serializer's `while (magnitude != 0)` loop (the proof digest
     // prints FixedReducer::raw() this way; native `unsigned __int128` provides these built-in, so
     // the fixture code is identical on both paths).
@@ -73,6 +83,9 @@ struct u128
         const std::uint64_t low{lo + o.lo};
         return u128{low, hi + o.hi + (low < lo ? 1ULL : 0ULL)}; // low<lo ⇒ wrap ⇒ carry
     }
+    // += : metalog's HLL harmonic sum (`sum_fixed += 1<<(kHllFrac-reg)`). Same +-then-assign the
+    // native type does; mirrors the existing >>= idiom.
+    constexpr u128& operator+=(const u128& o) noexcept { return *this = *this + o, *this; }
     [[nodiscard]] constexpr u128 operator~() const noexcept { return u128{~lo, ~hi}; }
     [[nodiscard]] constexpr u128 operator-(const u128& o) const noexcept
     {
