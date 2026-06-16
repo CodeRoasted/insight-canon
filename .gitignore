@@ -1,5 +1,8 @@
-# Log datasets (downloaded by scripts/download_logs.sh)
-/data/
+# Log datasets (materialized under data/logs/ by scripts/download_logs.sh and the
+# ci_revert_corpus crawler). The TRACKED corpus registry + smoke slices live under
+# data/corpora/ (ADR 0016 — corpus storage & governance); the big bytes stay ignored.
+/data/*
+!/data/corpora/
 
 # Build outputs
 **/build*/
