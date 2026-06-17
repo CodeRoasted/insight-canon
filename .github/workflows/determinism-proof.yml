@@ -38,10 +38,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup environment (gcc-15 + clang-21 — both legs of the cross-compiler proof)
+      - name: Provision gcc-15.3 toolchain (OUR OWN toolchain — 15.3 ONLY, never the PPA's 15.2)
+        # The proof stays publicly forkable: the gcc-15.3 release is PUBLIC + anonymous (no token).
+        uses: CodeRoasted/malf-toolchain/.github/actions/setup-gcc153@main
+
+      - name: Toolchain — gcc-15.3 (/opt) base + CMake 4.3 (the gcc/libstdc++ leg of the proof)
         run: |
           sudo apt-get update
-          sudo apt-get install -y software-properties-common && sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test && sudo apt-get update && sudo apt-get install -y ninja-build python3 build-essential gcc-15 g++-15 wget lsb-release gnupg
+          sudo apt-get install -y ninja-build python3 build-essential
           # Pin the dev-validated CMake 4.3.x workspace-wide (dev/CI parity). coderoast_server arms
           # `import std` (CXX_MODULE_STD, gated by the experimental UUID 451f2fe2 — present only in
           # CMake 4.3.x); Ubuntu's apt cmake (Noble 3.28) lacks that gate. Harmless / kept consistent
@@ -49,33 +53,21 @@ jobs:
           sudo python3 -m pip install --break-system-packages "cmake==4.3.1"
           hash -r
           case "$(cmake --version | head -1)" in *" 4.3."*) cmake --version ;; *) echo "::error::expected CMake 4.3.x (got: $(cmake --version | head -1))"; exit 1 ;; esac
-          # clang-21 (dev compiler) from apt.llvm.org — the base image's bare `clang` is too old
-          # to compile std::expected now that the __cpp_concepts<21 shim is retired.
-          wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
-          chmod +x /tmp/llvm.sh
-          sudo /tmp/llvm.sh 21
-          # The diagonal's clang-21 leg builds against libc++ (clang's native std module ships with
-          # libc++-21, NOT libstdc++ — so a clang+libstdc++ leg can't do `import std`). import-std prereq:
-          # libc++.modules.json carries a relative source path CMake misresolves to /lib/share/libc++/v1
-          # — bridge it once (cxx_modules_migration_contract.md §10.14 / [[import-std-on-server]]).
-          sudo apt-get install -y libc++-21-dev libc++abi-21-dev
-          sudo mkdir -p /usr/lib/share && sudo ln -sfn /usr/lib/llvm-21/share/libc++ /usr/lib/share/libc++
-          # the diagonal invokes g++-15 / clang++-21 directly; align bare gcc/g++/clang/clang++ too.
-          # The runner PRE-INSTALLS an older clang as the clang++ alternative, so a plain
-          # --install at the same priority silently keeps it — use a high priority AND
-          # force --set, then VERIFY (fail here, not later with a cryptic std::expected error).
-          sudo update-alternatives --install /usr/bin/gcc     gcc     /usr/bin/gcc-15     1000
-          sudo update-alternatives --install /usr/bin/g++     g++     /usr/bin/g++-15     1000
-          sudo update-alternatives --install /usr/bin/clang   clang   /usr/bin/clang-21   1000
-          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-21 1000
-          sudo update-alternatives --set gcc     /usr/bin/gcc-15
-          sudo update-alternatives --set g++     /usr/bin/g++-15
-          sudo update-alternatives --set clang   /usr/bin/clang-21
-          sudo update-alternatives --set clang++ /usr/bin/clang++-21
+          # 15.3 ONLY, from OUR OWN toolchain at /opt (setup-gcc153 above) — NO PPA. gcc<15.3
+          # mis-records partitioned-module linemaps (PR124309) and is NOT the determinism reference
+          # compiler. Wire bare gcc/g++ + g++-15/gcc-15 (the det_public_proof.sh LEGS) at /opt/gcc-15.3;
+          # the linux-gcc15-release profile already pins /opt + rpaths lib64.
+          sudo update-alternatives --install /usr/bin/gcc gcc /opt/gcc-15.3/bin/gcc 1000
+          sudo update-alternatives --install /usr/bin/g++ g++ /opt/gcc-15.3/bin/g++ 1000
+          sudo update-alternatives --set gcc /opt/gcc-15.3/bin/gcc
+          sudo update-alternatives --set g++ /opt/gcc-15.3/bin/g++
+          sudo ln -sf /opt/gcc-15.3/bin/g++ /usr/local/bin/g++-15
+          sudo ln -sf /opt/gcc-15.3/bin/gcc /usr/local/bin/gcc-15
           g++ --version | head -1
-          clang++ --version | head -1
-          g++ --version     | grep -qE ' 15\.'        || { echo "ERROR: bare g++ is not gcc-15";        exit 1; }
-          clang++ --version | grep -qE 'version 21\.' || { echo "ERROR: bare clang++ is not clang-21 (std::expected would fail)"; exit 1; }
+          g++ --version | grep -qE ' 15\.' || { echo "ERROR: bare g++ is not gcc-15.3 (/opt)"; exit 1; }
+
+      - name: Toolchain — clang-21 + libc++-21 (the clang/libc++ leg of the proof)
+        uses: CodeRoasted/malf-toolchain/.github/actions/setup-clang21-libcxx@main
 
       - name: Setup Conan
         uses: conan-io/setup-conan@v1
