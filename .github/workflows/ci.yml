@@ -39,14 +39,16 @@ jobs:
       - name: Start build-log capture (the conan-module step below appends; Sift diffs it)
         run: truncate --size 0 "$GITHUB_WORKSPACE/build.log"
 
-      - name: Build and test
-        run: |
-          exec > >(tee -a "$GITHUB_WORKSPACE/build.log") 2>&1   # capture the conan-module output for the Sift dogfood
-          conan create . \
-            --profile:host="$CONAN_HOME/profiles/linux-gcc15-release" \
-            --profile:build="$CONAN_HOME/profiles/linux-gcc15-release" \
-            --build=missing \
-            --build-test=missing
+      - name: Build + test canon
+        # canon is single-module (the package is the repo root) → module '.'. test=true runs the
+        # FULL gtest suite (conan install + cmake build + ctest) — `conan create` alone only runs
+        # test_package, never tests/. create=true also verifies packaging + test_package consumes
+        # it. Both mirror to build.log for the Sift dogfood.
+        uses: CodeRoasted/malf-toolchain/.github/actions/conan-module@main
+        with:
+          module: '.'
+          test: 'true'
+          create: 'true'
 
       - name: Sift — seed the baseline on push (PRs handled by the fork-safe sift-build/post pair)
         # PUBLIC repo: only seed the last-green baseline on push:main (no-PR → main.ts seeds). PR diffing +
