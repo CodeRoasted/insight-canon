@@ -157,19 +157,35 @@ constexpr std::array<DatasetExpectation, 16> kDatasetExpectations{{
     return "err error=" + quote(result.error());
 }
 
-// Locate the Loghub fixture directory by probing a few CWD-relative candidates.
-// The corpus lives at "<repo>/data/logs/loghub" but the test may run with CWD set
-// to the build directory (CTest WORKING_DIRECTORY), the package root, or — on
-// Windows/Mac CI — yet another convention. We return the *validated* directory
-// directly rather than deriving a "repo root" and re-appending the suffix, so the
-// path that is checked and the path that is iterated can never disagree.
+// Locate the committed LogHub smoke slice by probing a few CWD-relative candidates.
+// The slice is committed at "<repo>/data/corpora/loghub/slice" (ADR 0016 §5 — the
+// LogHub 2k sample tier, CC-BY-4.0; the full corpus stays fetch-on-demand and is
+// NOT read here). It is always in git, so the suite always runs (never silently
+// skips on a clean checkout). The test may run with CWD set to the build directory
+// (CTest WORKING_DIRECTORY), the package root, or — on Windows/Mac CI — yet another
+// convention. We return the *validated* directory directly rather than deriving a
+// "repo root" and re-appending the suffix, so the path that is checked and the path
+// that is iterated can never disagree.
 [[nodiscard]] fs::path find_dataset_dir()
 {
+    // Primary: the absolute slice path injected by CMake (LOGHUB_SLICE_DIR) — CWD-independent,
+    // so the committed slice is always found regardless of where CTest launches the binary.
+#ifdef LOGHUB_SLICE_DIR
+    {
+        std::error_code ec;
+        const fs::path dir{LOGHUB_SLICE_DIR};
+        if (fs::is_directory(dir, ec) && !ec)
+        {
+            return dir;
+        }
+    }
+#endif
+    // Fallback: probe a few CWD-relative candidates (e.g. a build without the define).
     static constexpr std::array<std::string_view, 4> kCandidates{{
-        "data/logs/loghub",          // CWD == package root
-        "../data/logs/loghub",       // CWD == an in-package subdir
-        "../../data/logs/loghub",    // CWD == a nested build dir
-        "../../../data/logs/loghub", // deeper build-tree nesting
+        "data/corpora/loghub/slice",          // CWD == package root
+        "../data/corpora/loghub/slice",       // CWD == an in-package subdir
+        "../../data/corpora/loghub/slice",    // CWD == a nested build dir
+        "../../../data/corpora/loghub/slice", // deeper build-tree nesting
     }};
 
     for (const std::string_view candidate : kCandidates)
@@ -360,8 +376,8 @@ class TokenizerLoghubRegressionTest : public ::testing::TestWithParam<std::strin
 {
 };
 
-// Allow this parameterized suite to be uninstantiated (e.g. when Loghub data
-// fixtures have not been downloaded into data/logs/loghub).
+// The committed slice is always in git, so this suite is normally instantiated.
+// The guard remains only for a pathological CWD where the slice can't be located.
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(TokenizerLoghubRegressionTest);
 
 TEST_P(TokenizerLoghubRegressionTest, ProcessesRealLoghubDataset)
@@ -403,8 +419,8 @@ TEST(TokenizerLoghubRegressionDiscoveryTest, FindsExpectedDatasets)
     const auto datasets{collect_dataset_paths()};
     if (datasets.empty())
     {
-        GTEST_SKIP() << "Loghub fixtures not present (data/logs/loghub). "
-                        "Run scripts/download_logs.sh to enable regression tests.";
+        GTEST_SKIP() << "Committed LogHub slice not located from this CWD "
+                        "(expected at data/corpora/loghub/slice).";
     }
     ASSERT_EQ(datasets.size(), 16u);
 }

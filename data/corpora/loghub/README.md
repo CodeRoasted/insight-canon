@@ -42,7 +42,12 @@ message-leading formats keep col-1 as real message).
 
 ## Smoke slice
 
-`slice/` = the standard LogHub per-format **`*_2k.log`** samples (2000 lines each) — the canonical
-small, deterministic, all-format input. Extraction: the LogHub `_2k` distribution verbatim (or
-`head -n 2000` of each full format file, label column preserved). Committed for zero-fetch CI /
+`slice/` = the standard LogHub per-format **`*_2k.log`** samples (16 files, 2000 lines each) — the
+canonical small, deterministic, all-format input — plus `ATTRIBUTION.md` (CC-BY-4.0 credit + the
+"no changes / full corpus not committed" notice). Extraction: the LogHub `_2k` distribution verbatim
+(or `head -n 2000` of each full format file, label column preserved). Committed for zero-fetch CI /
 determinism smoke; the full `BGL.log` / `Thunderbird_5M.log` are fetched only for deep runs.
+
+**Consumed by** (committed tests resolve here, never the gitignored `data/logs/`, ADR 0016 §6):
+`insight-canon` tokenizer regression test (`tests/regression/test_tokenizer_loghub_regression.cpp`,
+all 16 datasets) and the `insight-eidos` cube corpus test (`CUBE_LOGHUB_DIR` → `BGL_2k`/`Thunderbird_2k`).
