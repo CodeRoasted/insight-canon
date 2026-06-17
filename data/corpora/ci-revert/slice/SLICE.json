@@ -5,7 +5,7 @@
     "r2_positive": 1,
     "total": 5
   },
-  "generated_by": "scripts/ci_revert_corpus/make_synthetic_slice.py",
+  "generated_by": "coderoast-corpora/scripts/ci_revert_corpus/make_synthetic_slice.py",
   "purpose": "ADR 0016 \u00a72a public-safe smoke slice \u2014 FABRICATED data, no third-party bytes; mirrors the corpus schema + GHA annotated/stripped forms to exercise canon parse + lattice-lift. Real-data gates run private on a trusted runner.",
   "samples": [
     {

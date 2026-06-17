@@ -20,9 +20,9 @@ contract** (what it may and may not claim) is
 
 ## Provenance · license · posture
 
-- **Source:** crawled from public GitHub via `scripts/ci_revert_corpus/` over a **pinned 25-repo
-  set** (`pinned_repos.txt`). **Positive-Unlabeled** posture (positives reliable, negatives weak);
-  revert ≠ defect (re-applied reverts excluded).
+- **Source:** crawled from public GitHub via `coderoast-corpora/scripts/ci_revert_corpus/` over a
+  **pinned 25-repo set** (`pinned_repos.txt`). **Positive-Unlabeled** posture (positives reliable,
+  negatives weak); revert ≠ defect (re-applied reverts excluded).
 - **Distribution class: third-party / PRIVATE (ADR 0016 §2a).** These are **third-party CI logs**
   with **no redistribution licence**, and the scrub is **heuristic** with **IPv4 redaction
   deliberately dropped** (`ips: 0` in `summary.json` means *not redacted*, **not** *none present*).
@@ -55,29 +55,29 @@ contract** (what it may and may not claim) is
 
 ## Fetch / verify / freeze (reproducibility — private, trusted-runner only)
 
-The frozen artifact is produced by `insight-canon/scripts/freeze_corpus.sh` (deterministic tar →
-`zstd -19`; emits the content manifest, the asset, its sha256, and a `.pin.txt`). To re-freeze a
-future version: `bash scripts/freeze_corpus.sh data/logs/ci-revert-corpus ci-revert vN`. `v1` was
-frozen from `data/logs/ci-revert-corpus/` and **round-trip-verified** (asset hash OK; all 8171 files
-byte-exact on extract).
+All corpus tooling lives in the private warehouse **`coderoast-corpora`** (ADR 0016 §2a). The frozen
+artifact is produced by `coderoast-corpora/scripts/freeze_corpus.sh` (deterministic tar → `zstd -19`;
+emits the content manifest, the asset, its sha256, and a `.pin.txt`). To re-freeze a future version:
+`bash scripts/freeze_corpus.sh data/ci-revert-corpus ci-revert vN`. `v1` was frozen and
+**round-trip-verified** (asset hash OK; all 8171 files byte-exact on extract).
 
 Consuming `v1` happens **only on a trusted runner with the Argos credential** (§2a) — the public CI
 never fetches it. Fetch from the private store, verify the asset, extract, then verify the extracted
 tree against the content manifest — never trust an un-verified materialization.
 
 ```bash
-# (trusted runner, Argos credential) fetch ci-revert-v1.tar.zst + .sha256 + .manifest.sha256
-sha256sum -c ci-revert-v1.tar.zst.sha256                  # verify the asset bytes
-zstd -dc ci-revert-v1.tar.zst | tar -x -C data/logs/      # re-materialize data/logs/ci-revert-corpus/
-cd data/logs/ci-revert-corpus \
+# (trusted runner) fetch ci-revert-v1.tar.zst + .sha256 + .manifest.sha256 from the private store
+sha256sum -c ci-revert-v1.tar.zst.sha256                       # verify the asset bytes
+zstd -dc ci-revert-v1.tar.zst | tar -x -C data/                # re-materialize data/ci-revert-corpus/
+cd data/ci-revert-corpus \
   && sha256sum -c /path/to/ci-revert-v1.manifest.sha256 --quiet   # verify every file vs the anchor
 ```
 
 ## Acquisition
 
-`scripts/ci_revert_corpus/` (committed). Validity decisions are pre-registered in `config.py`
-(retention 90 d ceiling / 15 d safety → usable window [14, 75] d; T-sweep {14,30,60}; PU posture).
-Materializes under the gitignored `insight-canon/data/logs/ci-revert-corpus/`
+`coderoast-corpora/scripts/ci_revert_corpus/` (the crawler). Validity decisions are pre-registered in
+`config.py` (retention 90 d ceiling / 15 d safety → usable window [14, 75] d; T-sweep {14,30,60}; PU
+posture). Materializes under the warehouse's gitignored `coderoast-corpora/data/ci-revert-corpus/`
 (`corpus.jsonl`, `log_annotated/`, `log_stripped/`, `manifest/`).
 
 ## Smoke slice — SYNTHETIC (public-safe by construction, ADR 0016 §2a + §5)
@@ -89,22 +89,23 @@ with `"synthetic": true`) and the schema, so it exercises canon's `<ts> <msg>` p
 lattice-lift path; the stripped form is produced by the **real** pipeline `degrade()` so degradation
 matches production exactly. **5 fabricated samples** (1 R2-positive, 2 R1-failure, 2 clean).
 
-**Generated** (deterministic — regenerates byte-identically):
+**Generated** (deterministic — regenerates byte-identically; writes this canon slice):
 
 ```bash
-python3 -m ci_revert_corpus.make_synthetic_slice    # from scripts/
+# from coderoast-corpora/scripts/  (the generator targets the canon sibling by default)
+python3 -m ci_revert_corpus.make_synthetic_slice
 ```
 
 The **real-data** R1/R2/lattice-lift validity gates do **not** use this synthetic slice — they run
 **private, on a trusted runner**, against the real corpus extracted from the private `vN` asset. That
-private real-data slice is produced by `scripts/ci_revert_corpus/extract_slice.py` (non-empty log
-pairs; smallest-`(bytes, sample_id)` per label category; ≥1 R2 positive) — trusted-runner context
-only, **never** committed to public git:
+private real-data slice is produced by `coderoast-corpora/scripts/ci_revert_corpus/extract_slice.py`
+(non-empty log pairs; smallest-`(bytes, sample_id)` per label category; ≥1 R2 positive) —
+trusted-runner context only, **never** committed to public git:
 
 ```bash
-# trusted runner only — produces the PRIVATE real-data slice, never committed to public git
-python3 scripts/ci_revert_corpus/extract_slice.py \
-  --corpus insight-canon/data/logs/ci-revert-corpus \
+# trusted runner only — produces the PRIVATE real-data slice (warehouse data/), never public git
+python3 -m ci_revert_corpus.extract_slice \
+  --corpus coderoast-corpora/data/ci-revert-corpus \
   --parent-version ci-revert/v1 \
   --parent-pin 3054b158382c333301d986ad0472e2208078ee87a92edf42b33dd32a4660b059
 ```
