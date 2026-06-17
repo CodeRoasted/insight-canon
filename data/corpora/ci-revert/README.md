@@ -20,9 +20,10 @@ contract** (what it may and may not claim) is
 
 ## Provenance · license · posture
 
-- **Source:** crawled from public GitHub via `coderoast-corpora/scripts/ci_revert_corpus/` over a
-  **pinned 25-repo set** (`pinned_repos.txt`). **Positive-Unlabeled** posture (positives reliable,
-  negatives weak); revert ≠ defect (re-applied reverts excluded).
+- **Source:** crawled from public GitHub via `coderoast-corpora/scripts/ci_revert_corpus/` (v1: a
+  **pinned 25-repo set**, `pinned_repos.txt`; v2: ~60 repos, **revert-density-gated** selection).
+  **Positive-Unlabeled** posture (positives reliable, negatives weak); revert ≠ defect (re-applied
+  *and* relanded reverts excluded).
 - **Distribution class: third-party / PRIVATE (ADR 0016 §2a).** These are **third-party CI logs**
   with **no redistribution licence**, and the scrub is **heuristic** with **IPv4 redaction
   deliberately dropped** (`ips: 0` in `summary.json` means *not redacted*, **not** *none present*).
@@ -47,11 +48,16 @@ contract** (what it may and may not claim) is
     2 GiB ceiling). Backed up to the **private store** (§2a, Argos credential) — **never** a public
     Release. The asset is the only source of truth (re-crawl cannot rebuild it).
 
-- **`v2` (in progress):** the [bugs.md](../../../../technical_docs/bugs.md) R2 fixes — revert-first
-  sampling, revert-density repo selection, widened revert recall, uncapped high-volume repos, 50–100
-  repos, and the **longitudinal collector** (a standing scheduled crawler that captures merge-run
-  logs *fresh* and observes reverts over 3–6 months — the only path past the 90 d retention wall).
-  Each publication is a new immutable `ci-revert/vN`; `v1` stays pinned as the fallback.
+- **`v2` (policy `d11-ci-revert-v2`, 2026-06-17 — tooling IMPLEMENTED; awaits the official crawl):**
+  the [bugs.md](../../../../technical_docs/bugs.md) R2-yield fixes are all built + offline-tested —
+  widened revert recall (rebase-merge sha + PR-number + rollback/back-out/reland lexicon; `revert.method`),
+  revert-first sampling (guarantee-crawl every reverted PR + matched controls; `sampling_role`),
+  revert-density repo selection, uncapped high-volume repos, ~60 repos (schema v2). The **longitudinal
+  collector** (`coderoast-corpora/.../longitudinal/`) — a standing scheduled crawler that captures
+  merge-run logs *fresh* and observes reverts over 3–6 months — is the path past the 90 d retention
+  wall to a representative R2 gate. Publishing `ci-revert/v2` is a live crawl on a trusted runner (the
+  density-gated selection differs from v1's pin → re-run + Founder review); `v1` stays pinned as the
+  fallback. Each publication is a new immutable `ci-revert/vN`.
 
 ## Fetch / verify / freeze (reproducibility — private, trusted-runner only)
 

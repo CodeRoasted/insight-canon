@@ -39,5 +39,7 @@
       "sample_id": "sample__service__pr7__run900000007"
     }
   ],
+  "schema_version": 2,
+  "selection_policy_version": "d11-ci-revert-v2",
   "synthetic": true
 }
