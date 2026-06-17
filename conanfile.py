@@ -22,11 +22,21 @@ class InsightCanonConan(ConanFile):
     options = {
         "shared": [True, False],
         "fPIC": [True, False],
+        # NUMA-aware arena allocation links libnuma (LGPL-2.1-or-later). It is
+        # OPT-IN — off by default — so no distributed artifact ships copyleft by
+        # accident (it rode silently into the proprietary `sift` binary at 1.5.1).
+        # NUMA-off is BIT-IDENTICAL to NUMA-on (det_public_proof golden c88e8e9a)
+        # and a no-op on single-socket hosts (numa_available() short-circuits to
+        # the portable allocator). A consumer that genuinely runs multi-socket iron
+        # — and accepts the LGPL-2.1 §6 static-link obligations for ITS artifact —
+        # opts in with `insight_canon/*:with_numa=True`. Linux-only effect.
+        "with_numa": [True, False],
     }
 
     default_options = {
         "shared": False,
         "fPIC": True,
+        "with_numa": False,
     }
 
     exports_sources = "CMakeLists.txt", "src/*", "api/*"
@@ -57,10 +67,12 @@ class InsightCanonConan(ConanFile):
         self.requires("spdlog/1.17.0", transitive_headers=True, transitive_libs=True)
         self.requires("fmt/12.1.0",    transitive_headers=True, transitive_libs=True)
         self.requires("simdjson/4.6.3")
-        # NUMA-aware arena allocation (hot path) — ON by default, especially for release.
-        # Vendored via conan (mirrors logcraft) so it's HERMETIC: no reliance on a system
-        # libnuma-dev, which CI runners lack (the cause of the create-path build break).
-        if self.settings.os == "Linux":
+        # NUMA-aware arena allocation (hot path). OPT-IN (see the `with_numa` option):
+        # libnuma is LGPL-2.1, so it enters the graph ONLY when explicitly enabled —
+        # never by default, so it cannot contaminate the proprietary `sift` binary or
+        # the server artifact. Vendored via conan (mirrors logcraft) so it's HERMETIC
+        # when on: no reliance on a system libnuma-dev, which CI runners lack.
+        if self.settings.os == "Linux" and self.options.with_numa:
             self.requires("libnuma/2.0.19", transitive_headers=True, transitive_libs=True)
 
     def build_requirements(self):
@@ -70,6 +82,10 @@ class InsightCanonConan(ConanFile):
     def generate(self):
         tc = CMakeToolchain(self)
         tc.generator = "Ninja"
+        # Drive the CMake switch from the conan option so the two never drift: the
+        # libnuma require above and the INSIGHT_HAS_NUMA compile path are armed
+        # together or not at all.
+        tc.cache_variables["INSIGHT_CANON_ENABLE_NUMA"] = bool(self.options.with_numa)
         tc.generate()
 
         deps = CMakeDeps(self)
@@ -94,7 +110,7 @@ class InsightCanonConan(ConanFile):
             "fmt::fmt",
             "simdjson::simdjson"
         ]
-        if self.settings.os == "Linux":
+        if self.settings.os == "Linux" and self.options.with_numa:
             self.cpp_info.requires.append("libnuma::libnuma")
         # Cross-package C++ modules (§10.7): defer to the package's OWN cmake config
         # (it carries FILE_SET CXX_MODULES; conan's generator does not emit it).

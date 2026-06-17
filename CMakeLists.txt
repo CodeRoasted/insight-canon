@@ -15,7 +15,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(INSIGHT_CANON_BUILD_TESTS  "Build unit and regression tests" ${PROJECT_IS_TOP_LEVEL})
 option(INSIGHT_CANON_BUILD_BENCHMARKS "Build micro-benchmarks" ${PROJECT_IS_TOP_LEVEL})
-option(INSIGHT_CANON_ENABLE_NUMA  "Enable NUMA-aware arena allocation (libnuma, vendored via conan)" ON)
+# OFF by default: libnuma is LGPL-2.1, so NUMA is opt-in (conanfile.py drives this
+# from the `with_numa` option — default False — and a raw cmake build stays safe).
+option(INSIGHT_CANON_ENABLE_NUMA  "Enable NUMA-aware arena allocation (libnuma, LGPL-2.1, vendored via conan)" OFF)
 
 ###########################################################
 #  External dependencies

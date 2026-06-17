@@ -204,7 +204,7 @@ ctest --test-dir build --output-on-failure
 | Option | Default | Description |
 |---|---|---|
 | `INSIGHT_CANON_BUILD_TESTS` | `ON` when top-level | Build unit and regression tests |
-| `INSIGHT_CANON_ENABLE_NUMA` | `OFF` | Link libnuma for NUMA-aware arena allocation |
+| `INSIGHT_CANON_ENABLE_NUMA` | `OFF` | Link libnuma (LGPL-2.1) for NUMA-aware arena allocation. Opt-in via the conan `with_numa` option; off keeps the package's dep tree all-permissive. NUMA-off is bit-identical to NUMA-on and a no-op on single-socket hosts. |
 
 ---
 
