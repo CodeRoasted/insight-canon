@@ -1,0 +1,10 @@
+2026-05-01T10:00:00.1000000Z ##[group]Build
+2026-05-01T10:00:01.1000001Z cmake --build build --config Release
+2026-05-01T10:00:02.1000002Z [100%] Built target widget
+2026-05-01T10:00:03.1000003Z ##[endgroup]
+2026-05-01T10:00:04.1000004Z ##[group]Test
+2026-05-01T10:00:05.1000005Z ctest --output-on-failure
+2026-05-01T10:00:06.1000006Z The following tests FAILED:
+2026-05-01T10:00:07.1000007Z   17 - widget.serialize (Failed)
+2026-05-01T10:00:08.1000008Z ##[error]Process completed with exit code 1.
+2026-05-01T10:00:09.1000009Z ##[endgroup]

@@ -14,8 +14,9 @@ contract** (what it may and may not claim) is
 - **R2 — detection value** (`label_reverted_by_t`, revert archaeology, semantic, *after* merge):
   does a structurally-anomalous green run foreshadow a revert (silent-regression-on-green)?
   Decoupled from the merge log (`I(reverted; merge-log) ≈ 0`) — that is *why* the roles split.
-- **log_annotated/** (structure-rich GHA) vs **log_stripped/** (`##[…]` + timestamps removed) → the
-  lattice-lift experiment.
+- **log_annotated/** (structure-rich GHA) vs **log_stripped/** (`##[…]` markers removed, **timestamp
+  kept** — stripping it would break canon's `<ts> <msg>` parse, contract §4) → the lattice-lift
+  experiment.
 
 ## Provenance · license · posture
 
@@ -81,19 +82,24 @@ Materializes under the gitignored `insight-canon/data/logs/ci-revert-corpus/`
 
 ## Smoke slice — SYNTHETIC (public-safe by construction, ADR 0016 §2a + §5)
 
-Because ci-revert is third-party/private, the committed public slice is a **synthetic,
-clearly-labelled *shape* fixture** — never real crawled logs. It mirrors the on-disk layout
-(`slice/corpus.jsonl` + `log_annotated/` & `log_stripped/` pairs + `SLICE.json`) and the schema, so
-it exercises canon's JSONL + annotated/stripped parse and the lattice-lift path, while owning **zero
-third-party bytes**. **Authored by Heph/Kleio** (the fixture must exercise canon's tokenization
-correctly, like the other REDs) — *pending*; until it lands, the public determinism smoke leans on
-the **LogHub** slice (CC-BY-4.0, redistributable).
+Because ci-revert is third-party/private, the committed public slice is a **fully synthetic,
+clearly-labelled *shape* fixture** — fabricated repos/content, **zero third-party bytes**. It mirrors
+the on-disk layout (`slice/corpus.jsonl` + `log_annotated/` & `log_stripped/` pairs + `SLICE.json`
+with `"synthetic": true`) and the schema, so it exercises canon's `<ts> <msg>` parse and the
+lattice-lift path; the stripped form is produced by the **real** pipeline `degrade()` so degradation
+matches production exactly. **5 fabricated samples** (1 R2-positive, 2 R1-failure, 2 clean).
+
+**Generated** (deterministic — regenerates byte-identically):
+
+```bash
+python3 -m ci_revert_corpus.make_synthetic_slice    # from scripts/
+```
 
 The **real-data** R1/R2/lattice-lift validity gates do **not** use this synthetic slice — they run
 **private, on a trusted runner**, against the real corpus extracted from the private `vN` asset. That
-private real-data slice is produced deterministically by
-`scripts/ci_revert_corpus/extract_slice.py` (non-empty log pairs; smallest-`(bytes, sample_id)` per
-label category; ≥1 R2 positive) — for the trusted-runner context only, **not** committed here:
+private real-data slice is produced by `scripts/ci_revert_corpus/extract_slice.py` (non-empty log
+pairs; smallest-`(bytes, sample_id)` per label category; ≥1 R2 positive) — trusted-runner context
+only, **never** committed to public git:
 
 ```bash
 # trusted runner only — produces the PRIVATE real-data slice, never committed to public git

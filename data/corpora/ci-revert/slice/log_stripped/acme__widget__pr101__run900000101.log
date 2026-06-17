@@ -1,0 +1,8 @@
+2026-05-01T10:00:00.1000000Z Run actions/checkout@v4
+2026-05-01T10:00:01.1000001Z Syncing repository: acme/widget
+2026-05-01T10:00:03.1000003Z Build
+2026-05-01T10:00:04.1000004Z cmake --build build --config Release
+2026-05-01T10:00:05.1000005Z [100%] Built target widget
+2026-05-01T10:00:07.1000007Z Test
+2026-05-01T10:00:08.1000008Z ctest --output-on-failure
+2026-05-01T10:00:09.1000009Z 100% tests passed, 0 tests failed out of 42

@@ -1,0 +1,4 @@
+2026-05-01T10:00:00.1000000Z Build
+2026-05-01T10:00:01.1000001Z go build ./...
+2026-05-01T10:00:02.1000002Z service/handler.go:88:12: undefined: parseToken
+2026-05-01T10:00:03.1000003Z Process completed with exit code 2.
