@@ -68,12 +68,17 @@ class InsightCanonConan(ConanFile):
         self.requires("fmt/12.1.0",    transitive_headers=True, transitive_libs=True)
         self.requires("simdjson/4.6.3")
         # NUMA-aware arena allocation (hot path). OPT-IN (see the `with_numa` option):
-        # libnuma is LGPL-2.1, so it enters the graph ONLY when explicitly enabled —
-        # never by default, so it cannot contaminate the proprietary `sift` binary or
-        # the server artifact. Vendored via conan (mirrors logcraft) so it's HERMETIC
-        # when on: no reliance on a system libnuma-dev, which CI runners lack.
+        # libnuma is LGPL-2.1, so it enters the graph ONLY when explicitly enabled.
+        # When on it is **dynamically** linked (shared=True), NEVER statically: LGPL-2.1
+        # §6(b) permits a proprietary work to use the library via a replaceable shared
+        # object, whereas a STATIC link triggers the §6 relink obligation (ship object
+        # files / written offer) we will not meet. So NUMA-on is compliant by
+        # construction — the distributing artifact (the server) still owes the LGPL-2.1
+        # text + a "uses libnuma" notice + a source pointer (see SBOM.md § NUMA). Off by
+        # default ⇒ zero copyleft in the proprietary `sift` binary.
         if self.settings.os == "Linux" and self.options.with_numa:
-            self.requires("libnuma/2.0.19", transitive_headers=True, transitive_libs=True)
+            self.requires("libnuma/2.0.19", transitive_headers=True, transitive_libs=True,
+                          options={"shared": True})
 
     def build_requirements(self):
         self.test_requires("gtest/1.17.0")
