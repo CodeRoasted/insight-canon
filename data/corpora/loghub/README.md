@@ -36,14 +36,13 @@ All tooling lives in the private warehouse **`coderoast-corpora`** (ADR 0016 §2
 - **`_2k` samples + structured-JSON mix:** `coderoast-corpora/scripts/download_logs.sh` fetches the 16
   `_2k` samples (logpai/loghub GitHub) under the warehouse's `data/logs/loghub/` and a structured-JSON
   archive. (The committed slice is the `_2k` set — see below.)
-- **Full corpus (`coderoast-corpora/data/logs/loghub-full/`):** `BGL.zip` from Zenodo `8196385`
-  (extract → `BGL.log`); `Thunderbird_5M.log` is a 5 M-line head-extract of the full LogHub Thunderbird.
-  > **RECIPE GAP (Argos, open):** `download_logs.sh` does **not** automate the loghub-full fetch — the
-  > full corpus was placed out-of-band. The bytes are now **pinned** (above), so a re-download is
-  > verifiable, but the *automated* recipe (point `download_logs.sh` at `8196385`; add the Thunderbird
-  > head-extract step + confirm it reproduces the pin) is the open follow-up. Until then, the pinned
-  > bytes are the source of truth. No private backup is needed — the source is CC-BY on Zenodo
-  > (re-acquirable), unlike the non-re-acquirable `ci-revert`.
+- **Full corpus (`coderoast-corpora/data/logs/loghub-full/`):** `download_logs.sh` →
+  `fetch_loghub_full` re-acquires it from Zenodo `8196385`: `BGL.zip` → verify → extract → `BGL.log`
+  (verify); `Thunderbird.tar.gz` streamed through `tar -xzO Thunderbird.log | head -n 5000000` →
+  `Thunderbird_5M.log` (verify) — the head-extract is taken without materializing the full ~30 GB log.
+  Each step checks its sha256 pin inline. **Verified 2026-06-17** to reproduce all three pins from
+  scratch (BGL.zip / BGL.log / Thunderbird_5M.log all `OK`). No private backup needed — re-acquirable
+  CC-BY on Zenodo, unlike the non-re-acquirable `ci-revert`.
 
 ## Ground truth / labelling
 
