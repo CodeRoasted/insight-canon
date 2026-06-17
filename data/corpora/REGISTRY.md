@@ -18,7 +18,7 @@ The authoritative index of every corpus the workspace tests or measures against.
 | id | intent / test-purpose | class | provenance · license | pin (current) | recipe | consumed by | lifecycle |
 |---|---|---|---|---|---|---|---|
 | **loghub** | real-log structural ground for cube measurement, the cross-stdlib determinism measurement, and the rich-format AMI re-measure (decision #1) | big · **re-acquirable** | Zenodo record `8196385` · **CC-BY-4.0** (attribute) | `BGL.zip` sha256 `d67fd82a711aea0157a9b83175892c6ee60e384a2ddf5bc51f39118453816da8` (57,489,019 B → `BGL.log` 4,747,963 lines) | `insight-canon/scripts/download_logs.sh` | cube gates (concluded), determinism measurement | **measurement — mostly concluded** (cube arc closed); retained for AMI #1 + determinism. See [loghub/README.md](loghub/README.md) |
-| **ci-revert** | the CI-text labelled proxy: **R1** format-relative capture gate + **R2** silent-regression-on-green detection | big · **NON-re-acquirable** (90 d GHA log expiry) · versioned | crawled public GitHub (pinned 25-repo set) · public logs, **PU posture**, privacy-scrubbed | `ci-revert/v1` (to publish) — 4132 samples / 4082 logged / 403 R1 failures / ~10 R2 positives / 19 repos / merge-green 0.807 / canon 1.5.2 | `scripts/ci_revert_corpus/` (crawler — re-crawl **cannot** recover expired logs) | R1 gate, R2 detection | **LIVE — actively regrowing** (longitudinal collector + revert-first re-crawl, [bugs.md](../../../technical_docs/bugs.md)). Contract: [ci_corpus_validity_contract.md](../../../technical_docs/architecture/ci_corpus_validity_contract.md). See [ci-revert/README.md](ci-revert/README.md) |
+| **ci-revert** | the CI-text labelled proxy: **R1** format-relative capture gate + **R2** silent-regression-on-green detection | big · **NON-re-acquirable** (90 d GHA log expiry) · **third-party/private (§2a)** | crawled public GitHub (pinned 25-repo set) · **third-party CI logs, no redistribution licence** · **PU posture** · heuristic scrub (**IPv4 redaction dropped** — `ips:0` = *not redacted*, not *none*) | `ci-revert/v1` — content-anchor sha256 `3054b158382c333301d986ad0472e2208078ee87a92edf42b33dd32a4660b059` (manifest of 8171 files); frozen `ci-revert-v1.tar.zst` 262 MB sha256 `26d3d3d6af4e461f4ab955b91346a7ce9c458469671007d33f7c63856ee8dd49`. **Private store** (Argos credential; trusted-runner fetch only — **never** a public Release, §2a) — 4132 samples / 4082 logged / 403 R1 failures / ~10 R2 positives / 19 repos / merge-green 0.807 / canon 1.5.2 | `scripts/ci_revert_corpus/` (crawler — re-crawl **cannot** recover expired logs) | R1 gate, R2 detection — **trusted runner only** | **LIVE — actively regrowing** (longitudinal collector + revert-first re-crawl, [bugs.md](../../../technical_docs/bugs.md)). Contract: [ci_corpus_validity_contract.md](../../../technical_docs/architecture/ci_corpus_validity_contract.md). See [ci-revert/README.md](ci-revert/README.md) |
 
 ## Repo-local fixtures (defined where their tests own them — listed for completeness)
 
@@ -33,7 +33,14 @@ Do not relocate them here.
 
 ## Smoke slices
 
-Each big corpus commits a small, deterministic `slice.*` under its directory (ADR 0016 §5) so CI
-and the determinism gates have a **zero-fetch, reproducible** input; the full corpus is fetched only
-for deep runs. The slice's extraction recipe is in the corpus README so it regenerates when the
-corpus versions.
+Each big corpus commits a small, deterministic slice under its directory (ADR 0016 §5) so CI and the
+determinism gates have a **zero-fetch, reproducible** input; the full corpus is fetched only for deep
+runs. The slice's extraction recipe is in the corpus README so it regenerates when the corpus
+versions.
+
+**A committed slice MUST be public-safe by construction (§2a).** For a **first-party / redistributable**
+corpus (LogHub CC-BY-4.0, our goldens) the slice is real bytes. For a **third-party / private** corpus
+(`ci-revert`) the public slice is a **synthetic shape-fixture** — never real crawled logs; the
+real-data gates run private on a trusted runner. The lint
+([`corpus_registry_lint.py`](../../../scripts/corpus_registry_lint.py)) enforces that no
+third-party-class corpus has public bytes.
