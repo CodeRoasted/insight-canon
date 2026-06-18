@@ -37,9 +37,10 @@ jobs:
     runs-on: windows-2025
     env:
       MIN_VERSION: ${{ inputs.min_version || '14.52.36418' }}
-      # Preview channel Build Tools bootstrapper. VS 2022 = /vs/17, VS 2026 = /vs/18;
-      # channel 'pre' carries the Preview MSVC (14.52); 'release' would only give 14.5x-release.
-      PREVIEW_BOOTSTRAPPER_URL: 'https://aka.ms/vs/18/pre/vs_buildtools.exe'
+      # VS 2026 = major 18. Its early channel is 'insiders' (VS 2022's 'pre' was renamed) —
+      # /vs/18/pre and /vs/18/release are UNregistered (aka.ms falls back to Bing); only
+      # /vs/18/insiders resolves to a real CDN bootstrapper, and it carries the preview MSVC.
+      PREVIEW_BOOTSTRAPPER_URL: 'https://aka.ms/vs/18/insiders/vs_buildtools.exe'
 
     steps:
       - uses: actions/checkout@v4
@@ -71,7 +72,7 @@ jobs:
             Write-Host "no MSVC toolset dir under $msvc"
           }
 
-      - name: Compile the repro with the STOCK toolset (the 'before' — expected to break on 14.44)
+      - name: Compile the repro with the STOCK toolset (baseline on the runner's stock MSVC)
         id: stock
         continue-on-error: true
         shell: cmd
@@ -94,6 +95,16 @@ jobs:
           Write-Host "Downloading $env:PREVIEW_BOOTSTRAPPER_URL"
           Invoke-WebRequest -Uri $env:PREVIEW_BOOTSTRAPPER_URL -OutFile $exe
           if (-not (Test-Path $exe)) { throw "bootstrapper download failed" }
+
+          # Guard the silent-corruption trap: aka.ms returns a 0-byte / HTML page (not a 404)
+          # for an unregistered slug, which Test-Path passes but Start-Process rejects as
+          # "corrupted and unreadable". Assert the file is a real PE (size + 'MZ' signature).
+          $len = (Get-Item $exe).Length
+          $sig = -join ([System.IO.File]::ReadAllBytes($exe)[0..1] | ForEach-Object { [char]$_ })
+          Write-Host "downloaded $len bytes, signature '$sig'"
+          if ($len -lt 1MB -or $sig -ne 'MZ') {
+            throw "downloaded file is not a valid Windows executable (size=$len, sig='$sig') — the bootstrapper URL likely redirected to an error page, not a bootstrapper"
+          }
 
           $installPath = Join-Path $env:RUNNER_TEMP 'VSPreview'
           $vsArgs = @(
@@ -170,9 +181,9 @@ jobs:
           $sum += "| signal | value |"
           $sum += "| --- | --- |"
           $sum += "| stock toolset (runner) | ``$($env:STOCK_TOOLSET)`` |"
-          $sum += "| stock repro compile | ``${{ steps.stock.outcome }}`` (FAIL expected on 14.44) |"
-          $sum += "| gathered Preview toolset | ``$($env:PREVIEW_TOOLSET)`` |"
+          $sum += "| stock repro compile | ``${{ steps.stock.outcome }}`` (synthetic repro is a baseline, not a fail-repro) |"
+          $sum += "| gathered Insiders toolset | ``$($env:PREVIEW_TOOLSET)`` |"
           $sum += "| fix floor required | ``$($env:MIN_VERSION)`` |"
           $sum += ""
-          $sum += "Verdict: a green job = 14.52 is gatherable on a stock GitHub runner via the Preview channel."
+          $sum += "Verdict: a green job = the fix-floor toolset is gatherable on a stock GitHub runner via the Insiders channel."
           $sum -join "`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
