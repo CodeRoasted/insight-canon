@@ -1,62 +1,55 @@
 name: Determinism · msvc vs golden
 
-# STAGED PROBE — not yet a ship gate (Argos 2026-06-13).
+# STANDING GATE (release-blocking) — the MSVC leg of the cross-OS bit-identity contract.
+# (Promoted from a staged probe 2026-06-18 per Daidalos's gate-promotion handoff.)
 #
-# canon is proven OS-portable at the SOURCE level: its only Linux coupling is libnuma, fully
-# #ifdef INSIGHT_HAS_NUMA-gated, and the NUMA-off build is bit-identical to NUMA-on
-# (det_public_proof.sh golden matched with -DINSIGHT_CANON_ENABLE_NUMA=OFF). The remaining
-# unknown is the TOOLCHAIN leg: do C++23 named modules + `import std` work on Windows?
+# Asserts canon's public determinism digest is byte-identical to the committed Linux golden
+# (proof/golden.sha256) on MSVC 14.52, across the -O × -fp SWEEP — the four corners
+#   {/Od,/O2} × {/fp:precise,/fp:fast}
+# that harden the digest against optimization level AND float contraction/reassociation. MSVC is the
+# third stdlib outside the pinned gcc-15/libstdc++ ≡ clang-21/libc++ diagonal; EVERY cell matching the
+# one shared golden is what converts "measured-green MSVC" into the Tier-1 "tri-toolchain bit-identical"
+# claim. A red cell un-promotes the claim and blocks the cut, exactly like a red Linux diagonal.
 #
-# WHY MSVC (a probe-proven decision). The first attempt used clang to match the Linux clang-21
-# leg; it failed at the import-std generate step — CMake: "Only `libc++` and `libstdc++` are
-# supported". The official LLVM Windows release ships no libc++, so clang falls back to the MSVC
-# STL, which CXX_MODULE_STD rejects. clang + import std on Windows is a dead end (early 2026).
-# MSVC cl.exe is the only mature path: it ships std.ixx and has the most complete import-std
-# support (VS 2022 17.5+ / toolset 14.34+). Sources:
-#   - https://learn.microsoft.com/en-us/cpp/cpp/tutorial-import-stl-named-module
-#   - https://cmake.org/cmake/help/latest/prop_tgt/CXX_MODULE_STD.html  (Ninja-only; MSVC 14.34+)
+# WHY MSVC: clang ships no libc++ on Windows → no `import std` there; MSVC cl.exe is the only mature
+# C++23 named-modules + import-std path (ships std.ixx; CMake under Ninja). The runner's released
+# toolsets (14.51/14.44/…) are below the C++23-modules fix floor → setup-msvc1452 installs 14.52.
 #
-# POSTURE: intentionally NOT a required check and NOT continue-on-error — it must show real red
-# or real green so we learn the true state. It cannot gate a ship until it goes green once.
+# Each cell builds the Approach-B det_proof harness (proof/CMakeLists.txt: add_subdirectory(canon) +
+# the constant det_proof fixture importing `insight.canon`), with CELL_FLAGS carrying the cell's
+# -O/-fp PLUS SPDLOG_ACTIVE_LEVEL=OFF (canon's loggers write to a stdout sink and the digest IS
+# det_proof's stdout — without compile-time elision the INFO lines prepend log noise). Building canon
+# from source under each cell IS the recompile the sweep needs; the digest core is byte-untouched.
 #
-# Two things this probe answers, separately:
-#  (1) does canon COMPILE under MSVC (named modules + import std)? — the conan-create step.
-#  (2) is the MSVC canon digest BYTE-IDENTICAL to the Linux golden? — the determinism-measure step
-#      (Daidalos ruling 2026-06-13). MSVC is a third stdlib outside the pinned gcc-15/libstdc++ ≡
-#      clang-21/libc++ diagonal, so we MEASURE cross-OS bit-identity rather than assume it; we're
-#      Tier-2 until that step goes green. The measure step is non-gating (a mismatch is a result,
-#      not a break). See windows-msvc-release header + insight_determinism_model.md.
-#
-# SCOPE: `conan create .` — which on Windows exercises exactly the right surface:
-#   (1) builds canon as a module static-lib (the named-modules + import-std leg under MSVC),
-#   (2) builds test_package/ — a DOWNSTREAM consumer that find_package()s insight_canon, does
-#       `import insight.canon`, and is itself CXX_MODULE_STD ON (the cross-package module test), and
-#   (3) runs that consumer smoke test (can_run is true: native Windows, not a cross-build).
-# It does NOT touch canon's own gtest suite — intentional, not a gap: tests/ isn't in
-# exports_sources so `conan create` never builds it, AND
-# tests/regression/test_tokenizer_loghub_regression.cpp's find_repo_root() calls an UNGUARDED
-# fs::directory_iterator that std::terminate()s the whole suite when CWD != the build dir (Argos
-# finding, handed to Hephaïstos). When that fix lands, a follow-up step can ctest the full suite.
+# Freshness anchor: this asserts proof/golden.sha256 — the SAME golden the Linux determinism gate
+# freezes + asserts — so an intended engine change forces a refreeze on Linux before this can pass
+# (see [[determinism-golden-freshness-gate]]).
 
 permissions:
   contents: read
 
 on:
+  # The determinism-gate cadence: the release-tag cut (auto-runs, gating the tag) + a weekly drift
+  # catch + manual dispatch. NOT per-PR — per-PR determinism coverage is canon's own golden unit
+  # tests (determinism-proof.yml); this is the heavier cross-OS confirmation at the cut.
   workflow_dispatch:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'api/**'
-      - 'src/**'
-      - 'CMakeLists.txt'
-      - 'conanfile.py'
-      - '.github/workflows/windows-portability-probe.yml'
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays 06:00 UTC
 
 jobs:
-  windows-msvc-probe:
-    # windows-2025 (VS 2026). The runner's released toolsets (14.51/14.44/14.29) are all BELOW the
-    # C++23-modules fix floor, so setup-msvc1452 installs MSVC >= 14.52.36418 (Insiders Preview).
+  msvc-sweep:
+    name: msvc ${{ matrix.tag }} vs golden
     runs-on: windows-2025
+    strategy:
+      fail-fast: false   # report every cell; a red cell fails the leg (no silent skip)
+      matrix:
+        include:
+          - { opt: '/Od', fp: '/fp:precise', tag: 'Od-precise' }
+          - { opt: '/O2', fp: '/fp:precise', tag: 'O2-precise' }
+          - { opt: '/Od', fp: '/fp:fast',    tag: 'Od-fast' }
+          - { opt: '/O2', fp: '/fp:fast',    tag: 'O2-fast' }
     env:
       CONAN_HOME: ${{ github.workspace }}/.conan2
 
@@ -72,20 +65,12 @@ jobs:
           persist-credentials: false
 
       - name: Install + activate MSVC 14.52 (the fix floor; not pre-installed on the runner)
-        # The stock windows-2025 runner ships only released toolsets (14.51/14.44/14.29), all below
-        # the fix floor. setup-msvc1452 installs MSVC >= 14.52.36418 from the VS 2026 Insiders channel
-        # (the VC.Preview.Tools component) and activates it (cl.exe / link.exe + INCLUDE/LIB on PATH),
-        # so Ninja + the det_proof harness build with 14.52. Replaces ilammy/msvc-dev-cmd (which only
-        # activates a PRE-installed toolset). It also exports MSVC1452_INSTALL → the conan profile
-        # points conan's vcvars at this install so conan-create selects 14.52, not the released 14.51.
         uses: CodeRoasted/malf-toolchain/.github/actions/setup-msvc1452@main
 
       - name: Verify the active toolset is MSVC 14.52, not a fallback
         shell: pwsh
         run: |
           if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) { Write-Error "cl.exe not on PATH — MSVC env not activated"; exit 1 }
-          # Assert on VCToolsVersion (exported by setup-msvc1452), NOT a parsed cl banner: cl.exe with
-          # no input prints banner + usage on stderr whose line order is not stable.
           Write-Host "active VCToolsVersion: $env:VCToolsVersion"
           if (-not $env:VCToolsVersion) { Write-Error "VCToolsVersion not set — MSVC env not activated"; exit 1 }
           if ([version]$env:VCToolsVersion -lt [version]'14.52') { Write-Error "active toolset $env:VCToolsVersion < 14.52 (the fix floor)"; exit 1 }
@@ -106,13 +91,13 @@ jobs:
           cache_packages: false
           profile_detect: false
 
-      - name: Cache conan dep binaries (openssl/boost/drogon/… — keyed on the dep set + profile)
+      - name: Cache conan dep binaries (per cell — keyed on the dep set + profile + cell)
         uses: actions/cache@v5
         with:
           path: ${{ env.CONAN_HOME }}
-          key: conan-msvc1452-${{ runner.os }}-${{ hashFiles('**/conanfile.py', 'malf/profiles/windows-msvc-release') }}
+          key: conan-msvc1452-${{ matrix.tag }}-${{ runner.os }}-${{ hashFiles('**/conanfile.py', 'malf/profiles/windows-msvc-release') }}
           restore-keys: |
-            conan-msvc1452-${{ runner.os }}-
+            conan-msvc1452-${{ matrix.tag }}-${{ runner.os }}-
 
       - name: Setup Conan profile (windows-msvc-release, from malf-toolchain)
         shell: pwsh
@@ -120,117 +105,66 @@ jobs:
           New-Item -ItemType Directory -Force -Path "$env:CONAN_HOME/profiles" | Out-Null
           Copy-Item malf/profiles/windows-msvc-release "$env:CONAN_HOME/profiles/windows-msvc-release"
 
-      - name: Probe — conan create on Windows/MSVC (module lib + downstream import-std consumer)
-        # The actual test of C++23 named modules + `import std` under MSVC: conan create builds
-        # canon's real CXX_MODULE_STD lib AND test_package/ (a consumer that `import insight.canon`
-        # + is itself CXX_MODULE_STD ON), then runs its smoke test. CMake auto-compiles std.ixx into
-        # a BMI — no manual std module step needed. NUMA is absent (conanfile gates libnuma to
-        # os==Linux → the portable arena allocator compiles). --build=missing builds the third-party
-        # deps (fmt/spdlog/simdjson/gtest) for os=Windows/MSVC from source (no prebuilt packages exist).
-        # pwsh (not bash): bash's `link` shadows MSVC's link.exe, breaking the link step.
-        shell: pwsh
-        run: |
-          conan create . `
-            --profile:host="$env:CONAN_HOME/profiles/windows-msvc-release" `
-            --profile:build="$env:CONAN_HOME/profiles/windows-msvc-release" `
-            --build=missing
-
-      - name: Build the det_proof harness on MSVC (canon-MSVC + the public-corpus fixture)
-        # Split from the measure step ON PURPOSE: building canon+det_proof is a REAL build that must
-        # fail LOUD if MSVC can't compile it. The earlier single step wrapped build+measure in
-        # continue-on-error, so a build failure (det_proof.exe never produced) was swallowed and the
-        # job went green while the digest was never computed — a false green, the worst kind. This
-        # step is GATING; the measure step below is not.
-        #
-        # pwsh does NOT stop on a native command's non-zero exit by default — that is the deeper cause
-        # of the false green. Set the new-in-pwsh-7.4 PSNativeCommandUseErrorActionPreference + Stop,
-        # and assert det_proof.exe exists, so conan/cmake/ninja failures actually fail the job.
+      - name: Build det_proof @ cell ${{ matrix.tag }} (canon from source + the public-corpus fixture)
+        # GATING: building canon+det_proof under this cell's -O/-fp must fail LOUD if it can't compile.
+        # pwsh does NOT stop on a native non-zero exit by default → PSNativeCommandUseErrorActionPreference.
+        # The det_proof build IS the MSVC named-modules + import-std compile proof (it imports
+        # insight.canon, CXX_MODULE_STD ON), so no separate conan-create smoke is needed.
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
           $proofBuild = "build-msvc-proof"
-          # conan install brings the SAME third-party deps the conan-create step built for os=Windows
-          # into a toolchain the proof harness can consume (it add_subdirectory()s canon and links it).
           conan install . `
             --profile:host="$env:CONAN_HOME/profiles/windows-msvc-release" `
             --profile:build="$env:CONAN_HOME/profiles/windows-msvc-release" `
             --build=missing -of $proofBuild
           $toolchain = Get-ChildItem -Path $proofBuild -Recurse -Filter conan_toolchain.cmake | Select-Object -First 1
           if (-not $toolchain) { Write-Error "no conan_toolchain.cmake under $proofBuild"; exit 1 }
-          # CELL_FLAGS MUST carry SPDLOG_ACTIVE_LEVEL=OFF, exactly as det_public_proof.sh does
-          # (its cell_flags = "-O… -ffp-contract=… -DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF"). canon's
-          # loggers write to a stdout sink (logger.cpp), and the digest IS det_proof's stdout — so
-          # without compile-time spdlog elision, format_detector's INFO lines ("strategy registered…")
-          # PREPEND ~1KB of log noise to the digest. That, not the engine, was the whole
-          # (prologue)/(header) divergence: every templated section matched, only the leading bytes
-          # differed. Matching the gate's flag removes the logs at compile time on every platform.
+          # CELL_FLAGS = SPDLOG-off (digest is det_proof's stdout) + this cell's -O/-fp. cl last-wins
+          # resolves /Od over Release's /O2; /fp:fast enables contraction/reassociation, /fp:precise not.
           cmake -S proof -B $proofBuild -G Ninja `
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_TOOLCHAIN_FILE="$($toolchain.FullName)" `
             -DCANON_ROOT="$($PWD.Path)" `
-            -DCELL_FLAGS="-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF"
+            -DCELL_FLAGS="-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF ${{ matrix.opt }} ${{ matrix.fp }}"
           cmake --build $proofBuild --target det_proof
           $det = Get-ChildItem -Path $proofBuild -Recurse -Filter det_proof.exe | Select-Object -First 1
-          if (-not $det) { Write-Error "det_proof.exe was not produced — the MSVC det harness build failed"; exit 1 }
+          if (-not $det) { Write-Error "det_proof.exe was not produced — the MSVC det harness build failed at cell ${{ matrix.tag }}"; exit 1 }
           "$($det.FullName)" | Out-File -FilePath det_proof_path.txt -Encoding ascii -NoNewline
 
-      - name: Measure cross-OS determinism — MSVC canon digest vs the Linux golden
-        # Daidalos ruling 2026-06-13 (insight_determinism_model.md § "The cross-OS Tier-1 question"):
-        # cross-OS bit-identity is an Eidos prize we MEASURE before claiming, not assume. The build
-        # step above produced det_proof; here we replay the public corpus and compare the canonical
-        # digest's sha256 to the committed Linux golden — the (N+1)-th "way" of det_public_proof.
-        #
-        # NON-GATING by design, and ONLY because the harness is already PROVEN BUILT above: a digest
-        # MISMATCH is the legitimate MEASUREMENT RESULT (Tier-2 until proven Tier-1), not a break, so
-        # continue-on-error keeps it visible without blocking. This is NOT a blanket swallow — a build
-        # failure already failed the gating step, so the only thing this step can report is a real
-        # measurement (match or divergence). Per the ruling's timebox: a divergence → record the stage,
-        # hand to Daidalos, NOT an open-ended hardening front. Integer-only det core makes a MATCH
-        # plausible; the real risk is MSVC's std::hash perturbing a map iteration the canonical sort is
-        # only proven to tame on two stdlibs.
-        continue-on-error: true
+      - name: Measure — MSVC canon digest @ ${{ matrix.tag }} vs the Linux golden (GATING)
+        # GATING (no continue-on-error): a digest mismatch un-promotes the cross-OS claim + blocks the
+        # cut. Capture det_proof's stdout as RAW BYTES (Start-Process -RedirectStandardOutput; no pwsh
+        # re-encoding, the em-dash/CRLF lesson), sha256, compare to the committed golden. On divergence,
+        # self-localize per (file,section) before failing.
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $det = (Get-Content det_proof_path.txt).Trim()
           $corpus = Get-ChildItem -Path proof/corpus -Filter *.log | Sort-Object Name | ForEach-Object { $_.FullName }
-          # Capture det_proof's stdout as RAW BYTES, exactly like det_public_proof.sh's `> file`
-          # redirect on Linux. The previous `$out = & $det; -join` round-tripped the bytes THROUGH
-          # pwsh string decoding, which mangled the one non-ASCII byte in the digest — the em-dash
-          # (U+2014, UTF-8 e2 80 94) in the "# canon public determinism proof — v1" prologue header —
-          # under the console's non-UTF-8 OutputEncoding. Every other section is pure ASCII and matched;
-          # only the prologue's hash moved. Start-Process -RedirectStandardOutput writes the child's
-          # raw stdout to the file with no pwsh re-encoding, so the bytes are det_proof's verbatim
-          # (det_proof itself emits UTF-8 — its source string literal is UTF-8 — matching the golden).
           $p = Start-Process -FilePath $det -ArgumentList $corpus -NoNewWindow -Wait -PassThru `
                  -RedirectStandardOutput "$($PWD.Path)/msvc_digest.txt"
           if ($p.ExitCode -ne 0) { Write-Error "det_proof exited $($p.ExitCode)"; exit 1 }
           $msvc = (Get-FileHash -Algorithm SHA256 -Path msvc_digest.txt).Hash.ToLower()
           $golden = (Get-Content proof/golden.sha256).Trim().ToLower()
-          Write-Host "MSVC canon digest : $msvc"
-          Write-Host "Linux golden      : $golden"
+          Write-Host "cell ${{ matrix.tag }} — MSVC canon digest : $msvc"
+          Write-Host "cell ${{ matrix.tag }} — Linux golden      : $golden"
           if ($msvc -eq $golden) {
-            Write-Host "::notice::CROSS-OS BIT-IDENTICAL — MSVC canon digest == Linux golden. Tier-1 cross-OS is MEASURED (canon-public surface)."
-          } else {
-            Write-Host "::warning::CROSS-OS DIVERGENCE — MSVC digest != Linux golden. Localizing per (file, section) below; staying Tier-2 per the determinism-model timebox."
-            # Self-LOCALIZE (Daidalos's "per-stage hashes localize it instantly"): split BOTH the MSVC
-            # output and the committed Linux reference text (proof/golden.det_proof.txt, which hashes
-            # to golden.sha256) into (file, section) blocks — templates / events / det_math — hash each,
-            # and print which block diverges. Turns "the digest differs" into "the EVENTS section of
-            # ci_build.log differs", which points straight at the cause. The localizer is a committed
-            # script (proof/localize_digest.py) — NOT a heredoc, which is bash-only and would break
-            # under pwsh. Python is present on the runner.
-            python proof/localize_digest.py msvc_digest.txt proof/golden.det_proof.txt
+            Write-Host "::notice::cell ${{ matrix.tag }} CROSS-OS BIT-IDENTICAL — MSVC == Linux golden."
+            exit 0
           }
+          Write-Host "::error::cell ${{ matrix.tag }} CROSS-OS DIVERGENCE — MSVC digest != Linux golden."
+          # Self-localize per (file,section) — turns "the digest differs" into "the EVENTS section of
+          # ci_build.log differs". Committed script (Python is on the runner).
+          python proof/localize_digest.py msvc_digest.txt proof/golden.det_proof.txt
+          exit 1
 
-      - name: Upload determinism digests (MSVC output + the Linux reference) for offline diff
-        # Whatever the verdict, keep the artifacts so the divergence can be diffed offline beyond the
-        # in-log localization above. if: always() — we want them on divergence especially.
+      - name: Upload determinism digests @ ${{ matrix.tag }} (divergence localization)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cross-os-determinism-digests
+          name: cross-os-determinism-digests-${{ matrix.tag }}
           path: |
             msvc_digest.txt
             proof/golden.det_proof.txt
