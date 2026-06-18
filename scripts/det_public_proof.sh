@@ -69,6 +69,19 @@ export CONAN_HOME="${CONAN_HOME:-$(cd "$CANON/.." && pwd)/.conan2}"
 # a default g++). tag prefix (gpp_/clangpp_) feeds DETERMINISM_REQUIRE_COMPILERS.
 LEGS=( "g++:g++-15:gcc-15:linux-gcc15-release" "clang++:clang++-21:clang-21:linux-clang21-libcxx-release" )
 
+# Optional single-leg selection (DETERMINISM_LEG=gcc|clang) so a per-compiler CI matrix can run
+# one leg per parallel job. Default (unset) = the full cross-stdlib diagonal, unchanged. Each leg
+# still proves byte-identity across its OWN -O×-ffp sweep AND vs the committed golden; with both
+# legs run as separate jobs that each match the SAME committed golden, the cross-stdlib property
+# holds transitively (gcc==golden && clang==golden ⟹ gcc==clang).
+if [ -n "${DETERMINISM_LEG:-}" ]; then
+  case "$DETERMINISM_LEG" in
+    gcc)   LEGS=( "g++:g++-15:gcc-15:linux-gcc15-release" ) ;;
+    clang) LEGS=( "clang++:clang++-21:clang-21:linux-clang21-libcxx-release" ) ;;
+    *) echo "::error::unknown DETERMINISM_LEG='$DETERMINISM_LEG' (expected gcc|clang)" >&2; exit 2 ;;
+  esac
+fi
+
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 echo "canon=$CANON  conan_home=$CONAN_HOME  corpus=$(echo "$CORPUS" | wc -l) files" >&2
 

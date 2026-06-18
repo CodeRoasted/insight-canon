@@ -1,17 +1,21 @@
-name: Public Determinism Proof
+name: Determinism (vs golden)
 
-# The externally-checkable half of the "same input → same output, bit-for-bit"
-# claim (the web "How we build" page rests on it). Runs entirely within this
-# PUBLIC Apache repo — no private superproject, no proprietary eidos, no secrets —
-# so anyone can fork canon and reproduce it.
+# The externally-checkable "same input → same output, bit-for-bit" claim (the web "How we
+# build" page rests on it). Runs entirely within this PUBLIC Apache repo — no private
+# superproject, no proprietary eidos, no secrets — so anyone can fork canon and reproduce it.
 #
-# scripts/det_public_proof.sh (Approach B) builds canon as a MODULE STATIC-LIB N ways and
-# links the constant proof/det_proof.cpp fixture, across the cross-stdlib DIAGONAL
-# (gcc-15/libstdc++ × clang-21/libc++) x -O{0,3} x -ffp-contract{off,fast}, replays
-# proof/corpus/, and asserts the canonical digest (tokenizer/Drain template set +
-# failure_lexicon token-scan + det_math entropy) is byte-identical across every build AND
-# matches the committed golden (proof/golden.sha256). It is the public twin of the
-# superproject's private determinism_bitidentity.sh — one methodology, public scope.
+# Two PARALLEL legs, each asserting the SAME committed golden (proof/golden.sha256):
+#   • gcc-15 · libstdc++ vs golden
+#   • clang-21 · libc++ vs golden
+# (The third leg — msvc-14.52 vs golden — is the separate "Determinism · msvc vs golden"
+# workflow; MSVC needs a Windows runner. Golden-anchored: each leg matching the one committed
+# golden means gcc ≡ clang ≡ msvc transitively — stronger + clearer than a live cross-compare.)
+#
+# scripts/det_public_proof.sh (Approach B) builds canon as a MODULE STATIC-LIB and links the
+# constant proof/det_proof.cpp fixture, across this leg's compiler × -O{0,3} × -ffp-contract
+# {off,fast}, replays proof/corpus/, and asserts the canonical digest (tokenizer/Drain template
+# set + failure_lexicon token-scan + det_math entropy) is byte-identical across the sweep AND
+# matches the golden. DETERMINISM_LEG selects one leg per matrix job.
 
 permissions:
   contents: read
@@ -31,8 +35,21 @@ on:
       - '.github/workflows/determinism-proof.yml'
 
 jobs:
-  public-proof:
+  proof:
+    name: ${{ matrix.label }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - leg: gcc
+            label: "gcc-15 · libstdc++ vs golden"
+            require: "g++"
+            profile: linux-gcc15-release
+          - leg: clang
+            label: "clang-21 · libc++ vs golden"
+            require: "clang++"
+            profile: linux-clang21-libcxx-release
     env:
       CONAN_HOME: ${{ github.workspace }}/.conan2
     steps:
@@ -46,36 +63,37 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Provision gcc-15.3 toolchain (OUR OWN toolchain — 15.3 ONLY, never the PPA's 15.2)
-        # The proof stays publicly forkable: the gcc-15.3 release is PUBLIC + anonymous (no token).
+      - name: Provision gcc-15.3 toolchain (OUR OWN — 15.3 ONLY, never the PPA's 15.2)
+        if: matrix.leg == 'gcc'
+        # PUBLIC + anonymous (no token), so the proof stays forkable. gcc<15.3 mis-records
+        # partitioned-module linemaps (PR124309) and is NOT the determinism reference compiler.
         uses: CodeRoasted/malf-toolchain/.github/actions/setup-gcc153@main
 
-      - name: Toolchain — gcc-15.3 (/opt) base + CMake 4.3 (the gcc/libstdc++ leg of the proof)
+      - name: Provision clang-21 + libc++-21
+        if: matrix.leg == 'clang'
+        uses: CodeRoasted/malf-toolchain/.github/actions/setup-clang21-libcxx@main
+
+      - name: Base — ninja + CMake 4.3.x (+ gcc-15.3 /opt wiring on the gcc leg)
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build python3 build-essential
-          # Pin the dev-validated CMake 4.3.x workspace-wide (dev/CI parity). coderoast_server arms
-          # `import std` (CXX_MODULE_STD, gated by the experimental UUID 451f2fe2 — present only in
-          # CMake 4.3.x); Ubuntu's apt cmake (Noble 3.28) lacks that gate. Harmless / kept consistent
-          # in repos that don't arm import std yet.
+          # CMake 4.3.x workspace-wide (dev/CI parity): the import-std experimental gate UUID
+          # 451f2fe2 lives only in 4.3.x; Ubuntu's apt cmake lacks it.
           sudo python3 -m pip install --break-system-packages "cmake==4.3.1"
           hash -r
           case "$(cmake --version | head -1)" in *" 4.3."*) cmake --version ;; *) echo "::error::expected CMake 4.3.x (got: $(cmake --version | head -1))"; exit 1 ;; esac
-          # 15.3 ONLY, from OUR OWN toolchain at /opt (setup-gcc153 above) — NO PPA. gcc<15.3
-          # mis-records partitioned-module linemaps (PR124309) and is NOT the determinism reference
-          # compiler. Wire bare gcc/g++ + g++-15/gcc-15 (the det_public_proof.sh LEGS) at /opt/gcc-15.3;
-          # the linux-gcc15-release profile already pins /opt + rpaths lib64.
-          sudo update-alternatives --install /usr/bin/gcc gcc /opt/gcc-15.3/bin/gcc 1000
-          sudo update-alternatives --install /usr/bin/g++ g++ /opt/gcc-15.3/bin/g++ 1000
-          sudo update-alternatives --set gcc /opt/gcc-15.3/bin/gcc
-          sudo update-alternatives --set g++ /opt/gcc-15.3/bin/g++
-          sudo ln -sf /opt/gcc-15.3/bin/g++ /usr/local/bin/g++-15
-          sudo ln -sf /opt/gcc-15.3/bin/gcc /usr/local/bin/gcc-15
-          g++ --version | head -1
-          g++ --version | grep -qE ' 15\.' || { echo "ERROR: bare g++ is not gcc-15.3 (/opt)"; exit 1; }
-
-      - name: Toolchain — clang-21 + libc++-21 (the clang/libc++ leg of the proof)
-        uses: CodeRoasted/malf-toolchain/.github/actions/setup-clang21-libcxx@main
+          # gcc leg only: wire bare gcc/g++ + g++-15/gcc-15 (the det_public_proof.sh LEGS) to
+          # /opt/gcc-15.3 (NO PPA); the linux-gcc15-release profile pins /opt + rpaths lib64.
+          if [ "${{ matrix.leg }}" = "gcc" ]; then
+            sudo update-alternatives --install /usr/bin/gcc gcc /opt/gcc-15.3/bin/gcc 1000
+            sudo update-alternatives --install /usr/bin/g++ g++ /opt/gcc-15.3/bin/g++ 1000
+            sudo update-alternatives --set gcc /opt/gcc-15.3/bin/gcc
+            sudo update-alternatives --set g++ /opt/gcc-15.3/bin/g++
+            sudo ln -sf /opt/gcc-15.3/bin/g++ /usr/local/bin/g++-15
+            sudo ln -sf /opt/gcc-15.3/bin/gcc /usr/local/bin/gcc-15
+            g++ --version | head -1
+            g++ --version | grep -qE ' 15\.' || { echo "ERROR: bare g++ is not gcc-15.3 (/opt)"; exit 1; }
+          fi
 
       - name: Setup Conan
         uses: conan-io/setup-conan@v1
@@ -85,23 +103,23 @@ jobs:
           cache_packages: false
           profile_detect: false
 
-      - name: Cache conan dep binaries (openssl/boost/drogon/… — keyed on the dep set + profile)
+      - name: Cache conan dep binaries (openssl/boost/drogon/… — keyed per leg on the dep set)
         uses: actions/cache@v5
         with:
           path: ${{ env.CONAN_HOME }}
-          key: conan-gcc153-${{ runner.os }}-${{ hashFiles('**/conanfile.py', '**/linux-gcc15-release', '**/linux-clang21-libcxx-release') }}
+          key: conan-${{ matrix.leg }}-${{ runner.os }}-${{ hashFiles('conanfile.py') }}
           restore-keys: |
-            conan-gcc153-${{ runner.os }}-
+            conan-${{ matrix.leg }}-${{ runner.os }}-
 
-      - name: Setup Conan profiles (BOTH diagonal legs — gcc-15/libstdc++ + clang-21/libc++)
+      - name: Setup Conan profile (${{ matrix.profile }})
         run: |
           mkdir -p "$CONAN_HOME/profiles"
-          cp malf/profiles/linux-gcc15-release          "$CONAN_HOME/profiles/linux-gcc15-release"
-          cp malf/profiles/linux-clang21-libcxx-release "$CONAN_HOME/profiles/linux-clang21-libcxx-release"
+          cp "malf/profiles/${{ matrix.profile }}" "$CONAN_HOME/profiles/${{ matrix.profile }}"
 
-      - name: Public determinism proof — cross-compiler byte-identity + golden
+      - name: Determinism proof — ${{ matrix.label }}
         env:
-          # Both compilers MUST produce a build, or the cross-compiler property is
-          # unverified and the green would be hollow (the gate refuses to pass).
-          DETERMINISM_REQUIRE_COMPILERS: "g++ clang++"
+          # Single leg (this matrix job's compiler); REQUIRE makes its build mandatory, so a
+          # missing compiler fails LOUD rather than passing hollow.
+          DETERMINISM_LEG: ${{ matrix.leg }}
+          DETERMINISM_REQUIRE_COMPILERS: ${{ matrix.require }}
         run: bash scripts/det_public_proof.sh

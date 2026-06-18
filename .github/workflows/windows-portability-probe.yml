@@ -1,4 +1,4 @@
-name: Windows Portability Probe
+name: Determinism · msvc vs golden
 
 # STAGED PROBE — not yet a ship gate (Argos 2026-06-13).
 #
