@@ -80,13 +80,15 @@ jobs:
         # points conan's vcvars at this install so conan-create selects 14.52, not the released 14.51.
         uses: CodeRoasted/malf-toolchain/.github/actions/setup-msvc1452@main
 
-      - name: Verify cl.exe is MSVC 14.52 (19.5x), not a fallback toolset
+      - name: Verify the active toolset is MSVC 14.52, not a fallback
         shell: pwsh
         run: |
           if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) { Write-Error "cl.exe not on PATH — MSVC env not activated"; exit 1 }
-          $banner = (cl.exe 2>&1 | Select-Object -First 1)
-          Write-Host $banner
-          if ($banner -notmatch 'Version 19\.5[2-9]') { Write-Error "active cl.exe is not >= 19.52 (the 14.52 fix floor): $banner"; exit 1 }
+          # Assert on VCToolsVersion (exported by setup-msvc1452), NOT a parsed cl banner: cl.exe with
+          # no input prints banner + usage on stderr whose line order is not stable.
+          Write-Host "active VCToolsVersion: $env:VCToolsVersion"
+          if (-not $env:VCToolsVersion) { Write-Error "VCToolsVersion not set — MSVC env not activated"; exit 1 }
+          if ([version]$env:VCToolsVersion -lt [version]'14.52') { Write-Error "active toolset $env:VCToolsVersion < 14.52 (the fix floor)"; exit 1 }
 
       - name: Setup CMake 4.3.x (the import-std experimental gate UUID 451f2fe2 lives only in 4.3.x)
         shell: pwsh
