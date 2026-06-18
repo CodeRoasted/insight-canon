@@ -20,3 +20,9 @@
 *.exe binary
 *.dll binary
 *.ninja binary
+
+# Byte-exact reference data — never eol-normalize (determinism goldens/corpora are
+# compared byte-for-byte; a Windows checkout must preserve them verbatim).
+proof/corpus/** -text
+proof/golden.sha256 -text
+proof/golden.det_proof.txt -text
