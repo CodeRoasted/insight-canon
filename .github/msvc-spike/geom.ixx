@@ -1,10 +1,18 @@
 // Module interface for the MSVC 14.52 gather spike (.github/workflows/msvc-14_52-spike.yml).
-// Exports a struct with a DEFAULTED operator== — the exact construct that ICE'd the
-// stock 14.44 toolset when consumed across a translation unit. Synthetic, not eidos code.
+//
+// Mirrors the bug class from bugs.md (the eidos detection crash): a HEAP-OWNING DTO
+// (std::string + std::map<string,string>) with a DEFAULTED operator==, exported from a
+// module that uses a global-module-fragment #include. The consumer TU then implicitly
+// synthesizes this type's special members; on the buggy toolsets that synthesis is wrong
+// (shallow memcpy of the non-trivial map → double-free at destruction). Synthetic, not
+// eidos code — the exact eidos repro stays a private Heph spike.
+module;
+#include <string>
+#include <map>
 export module geom;
 
-export struct Point {
-    int x;
-    int y;
-    bool operator==(const Point& other) const = default;
+export struct Doc {
+    std::string id;
+    std::map<std::string, std::string> templates;
+    bool operator==(const Doc& other) const = default;
 };

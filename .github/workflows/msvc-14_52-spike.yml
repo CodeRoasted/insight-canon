@@ -4,9 +4,10 @@ name: MSVC 14.52 availability spike
 #
 # Our Windows/MSVC port is PARKED on a toolchain floor: it needs MSVC
 # >= 14.52.36418, which fixes the three bugs we hit — the exported defaulted
-# `operator==` ICE, the `import std` build failure, and the module-partitions /
-# global-module-fragment reentrancy crash. 14.52 is still PREVIEW (GA ~Nov 2026);
-# the stock GitHub runner ships only the v14.44 toolset (the one that miscompiles us).
+# `operator==` ICE, the `import std` + stop_token C1116, and the module-partitions /
+# global-module-fragment reentrancy crash. 14.52 is still PREVIEW (GA ~Nov 2026); the
+# stock GitHub runner ships 14.51 (VS 2026 Enterprise) — which is ALSO bugged: it carries
+# the import-std/stop_token C1116 and does not fix the operator== miscompile (bugs.md).
 #
 # This spike answers exactly: "Can we GATHER MSVC 14.52 on a GitHub-hosted runner
 # today?" — by installing the VS Build Tools *Preview channel* (/18/pre) and asserting
@@ -72,8 +73,8 @@ jobs:
             Write-Host "no MSVC toolset dir under $msvc"
           }
 
-      - name: Compile the repro with the STOCK toolset (baseline on the runner's stock MSVC)
-        id: stock
+      - name: STOCK toolset — heap-owning DTO repro (operator== / special-member bug class)
+        id: stock_dto
         continue-on-error: true
         shell: cmd
         run: |
@@ -87,7 +88,20 @@ jobs:
           cl /std:c++latest /EHsc /nologo main.cpp geom.obj /Fe:repro_stock.exe || exit /b 2
           repro_stock.exe || exit /b 3
 
-      - name: Install VS Build Tools — Preview channel (the 14.52 gather)
+      - name: STOCK toolset — import std + stop_token (the 14.51 C1116 discriminator — expected FAIL)
+        id: stock_importstd
+        continue-on-error: true
+        shell: cmd
+        run: |
+          call "%STOCK_VS%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 90
+          cd /d "%GITHUB_WORKSPACE%\.github\msvc-spike" || exit /b 91
+          echo === building the std module ===
+          cl /std:c++latest /EHsc /nologo /c "%VCToolsInstallDir%modules\std.ixx" || exit /b 1
+          echo === compiling a consumer that does import std; + stop_token ===
+          cl /std:c++latest /EHsc /nologo /c importstd_main.cpp || exit /b 2
+          echo import std smoke OK
+
+      - name: Install VS Build Tools — Insiders channel (the 14.52 gather)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -128,7 +142,7 @@ jobs:
           if (-not (Test-Path $installPath)) { throw "install path $installPath does not exist after install" }
           "PREVIEW_VS=$installPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding ascii
 
-      - name: VERDICT — assert the gathered toolset is >= the fix floor (fail loud on no-op to 14.44)
+      - name: VERDICT — assert the gathered toolset is >= the fix floor (fail loud on no-op to stock 14.51)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -146,7 +160,7 @@ jobs:
           }
           Write-Host "GATHER OK: $newest >= $floor"
 
-      - name: Compile + run the repro with the GATHERED 14.52 toolset (the 'after' — must pass)
+      - name: GATHERED 14.52 — heap-owning DTO repro (the 'after' — must pass)
         shell: cmd
         run: |
           call "%PREVIEW_VS%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 90
@@ -159,17 +173,16 @@ jobs:
           cl /std:c++latest /EHsc /nologo main.cpp geom.obj /Fe:repro_preview.exe || exit /b 2
           repro_preview.exe || exit /b 3
 
-      - name: import std smoke with the gathered toolset (informational — bug #2)
-        continue-on-error: true
+      - name: GATHERED 14.52 — import std + stop_token (the C1116 fix validation — must pass)
         shell: cmd
         run: |
           call "%PREVIEW_VS%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 90
           cd /d "%GITHUB_WORKSPACE%\.github\msvc-spike" || exit /b 91
           echo === building the std module ===
           cl /std:c++latest /EHsc /nologo /c "%VCToolsInstallDir%modules\std.ixx" || exit /b 1
-          echo === compiling a consumer that does import std; ===
+          echo === compiling a consumer that does import std; + stop_token ===
           cl /std:c++latest /EHsc /nologo /c importstd_main.cpp || exit /b 2
-          echo import std smoke OK
+          echo import std + stop_token OK
 
       - name: Summary
         if: ${{ always() }}
@@ -181,9 +194,10 @@ jobs:
           $sum += "| signal | value |"
           $sum += "| --- | --- |"
           $sum += "| stock toolset (runner) | ``$($env:STOCK_TOOLSET)`` |"
-          $sum += "| stock repro compile | ``${{ steps.stock.outcome }}`` (synthetic repro is a baseline, not a fail-repro) |"
+          $sum += "| stock — heap-owning DTO repro | ``${{ steps.stock_dto.outcome }}`` (synthetic; weak vs the eidos runtime miscompile) |"
+          $sum += "| stock — import std + stop_token | ``${{ steps.stock_importstd.outcome }}`` (FAIL = the 14.51 C1116 reproduced) |"
           $sum += "| gathered Insiders toolset | ``$($env:PREVIEW_TOOLSET)`` |"
           $sum += "| fix floor required | ``$($env:MIN_VERSION)`` |"
           $sum += ""
-          $sum += "Verdict: a green job = the fix-floor toolset is gatherable on a stock GitHub runner via the Insiders channel."
+          $sum += "Verdict: a green job = the fix-floor toolset (>= $($env:MIN_VERSION)) is gatherable on a stock GitHub runner via the Insiders channel AND it compiles import std + stop_token (the 14.51 C1116 fix)."
           $sum -join "`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
