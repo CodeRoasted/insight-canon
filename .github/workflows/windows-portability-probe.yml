@@ -50,33 +50,43 @@ on:
       - 'src/**'
       - 'CMakeLists.txt'
       - 'conanfile.py'
-      - 'windows-msvc-release'
       - '.github/workflows/windows-portability-probe.yml'
 
 jobs:
   windows-msvc-probe:
-    # PINNED windows-2022 (VS 2022, toolset v143/MSVC 19.4x — conan compiler.version=194). The
-    # windows-latest runner migrates to VS 2026 (toolset v144) mid-2026; pin for a stable toolset.
-    runs-on: windows-2022
+    # windows-2025 (VS 2026). The runner's released toolsets (14.51/14.44/14.29) are all BELOW the
+    # C++23-modules fix floor, so setup-msvc1452 installs MSVC >= 14.52.36418 (Insiders Preview).
+    runs-on: windows-2025
     env:
       CONAN_HOME: ${{ github.workspace }}/.conan2
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup MSVC dev environment (puts cl.exe / link.exe on PATH for Ninja)
-        # Ninja cannot discover cl.exe without an activated MSVC environment. This action runs
-        # vcvars and exports the toolchain to PATH for every subsequent step. MSVC itself is
-        # pre-installed on the runner — no compiler install needed, unlike the Linux clang legs.
-        uses: ilammy/msvc-dev-cmd@v1
+      - name: Check out malf-toolchain into malf/ (canonical conan profile; public, anonymous)
+        uses: actions/checkout@v4
         with:
-          arch: x64
+          repository: CodeRoasted/malf-toolchain
+          path: malf
+          fetch-depth: 1
+          persist-credentials: false
 
-      - name: Verify cl.exe is the active compiler (fail here, not later with a cryptic error)
+      - name: Install + activate MSVC 14.52 (the fix floor; not pre-installed on the runner)
+        # The stock windows-2025 runner ships only released toolsets (14.51/14.44/14.29), all below
+        # the fix floor. setup-msvc1452 installs MSVC >= 14.52.36418 from the VS 2026 Insiders channel
+        # (the VC.Preview.Tools component) and activates it (cl.exe / link.exe + INCLUDE/LIB on PATH),
+        # so Ninja + the det_proof harness build with 14.52. Replaces ilammy/msvc-dev-cmd (which only
+        # activates a PRE-installed toolset). It also exports MSVC1452_INSTALL → the conan profile
+        # points conan's vcvars at this install so conan-create selects 14.52, not the released 14.51.
+        uses: CodeRoasted/malf-toolchain/.github/actions/setup-msvc1452@main
+
+      - name: Verify cl.exe is MSVC 14.52 (19.5x), not a fallback toolset
         shell: pwsh
         run: |
-          cl.exe 2>&1 | Select-Object -First 1
           if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) { Write-Error "cl.exe not on PATH — MSVC env not activated"; exit 1 }
+          $banner = (cl.exe 2>&1 | Select-Object -First 1)
+          Write-Host $banner
+          if ($banner -notmatch 'Version 19\.5[2-9]') { Write-Error "active cl.exe is not >= 19.52 (the 14.52 fix floor): $banner"; exit 1 }
 
       - name: Setup CMake 4.3.x (the import-std experimental gate UUID 451f2fe2 lives only in 4.3.x)
         shell: pwsh
@@ -98,15 +108,15 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.CONAN_HOME }}
-          key: conan-msvc-${{ runner.os }}-${{ hashFiles('**/conanfile.py', 'windows-msvc-release') }}
+          key: conan-msvc1452-${{ runner.os }}-${{ hashFiles('**/conanfile.py', 'malf/profiles/windows-msvc-release') }}
           restore-keys: |
-            conan-msvc-${{ runner.os }}-
+            conan-msvc1452-${{ runner.os }}-
 
-      - name: Setup Conan profile (windows-msvc-release)
+      - name: Setup Conan profile (windows-msvc-release, from malf-toolchain)
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "$env:CONAN_HOME/profiles" | Out-Null
-          Copy-Item windows-msvc-release "$env:CONAN_HOME/profiles/windows-msvc-release"
+          Copy-Item malf/profiles/windows-msvc-release "$env:CONAN_HOME/profiles/windows-msvc-release"
 
       - name: Probe — conan create on Windows/MSVC (module lib + downstream import-std consumer)
         # The actual test of C++23 named modules + `import std` under MSVC: conan create builds
