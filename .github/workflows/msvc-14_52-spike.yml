@@ -93,6 +93,7 @@ jobs:
             '--quiet', '--norestart', '--wait', '--nocache',
             '--installPath', $installPath,
             '--add', 'Microsoft.VisualStudio.Workload.VCTools',
+            '--add', 'Microsoft.VisualStudio.Component.VC.CoreBuildTools',
             '--add', $env:PREVIEW_COMPONENT
           )
           Write-Host "Installing VS Build Tools (Insiders) + $($env:PREVIEW_COMPONENT) to $installPath"
@@ -128,10 +129,23 @@ jobs:
           }
           Write-Host "GATHER OK: $newest >= $floor"
 
+      - name: Locate vcvars64.bat in the gathered install (path is not assumed)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $found = Get-ChildItem -Path $env:PREVIEW_VS -Recurse -Filter vcvars64.bat -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $found) {
+            Write-Host "=== VC tree (3 levels) — vcvars64.bat not found ==="
+            Get-ChildItem -Path (Join-Path $env:PREVIEW_VS 'VC') -Recurse -Depth 3 -ErrorAction SilentlyContinue | Select-Object FullName | Format-Table -AutoSize -Wrap
+            throw "vcvars64.bat not found under $env:PREVIEW_VS — the build-scripts component did not install"
+          }
+          Write-Host "vcvars64.bat: $($found.FullName)"
+          "VCVARS64=$($found.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding ascii
+
       - name: GATHERED 14.52 — module + operator== functional smoke (compile + run with 14.52)
         shell: cmd
         run: |
-          call "%PREVIEW_VS%\VC\Auxiliary\Build\vcvars64.bat" -vcvars_ver=%PREVIEW_TOOLSET% || exit /b 90
+          call "%VCVARS64%" -vcvars_ver=%PREVIEW_TOOLSET% || exit /b 90
           cd /d "%GITHUB_WORKSPACE%\.github\msvc-spike" || exit /b 91
           echo === compiler in use (must be 14.52) ===
           cl 2>&1 | findstr /C:"Version"
@@ -142,7 +156,7 @@ jobs:
       - name: GATHERED 14.52 — import std functional smoke (compile with 14.52)
         shell: cmd
         run: |
-          call "%PREVIEW_VS%\VC\Auxiliary\Build\vcvars64.bat" -vcvars_ver=%PREVIEW_TOOLSET% || exit /b 90
+          call "%VCVARS64%" -vcvars_ver=%PREVIEW_TOOLSET% || exit /b 90
           cd /d "%GITHUB_WORKSPACE%\.github\msvc-spike" || exit /b 91
           cl /std:c++latest /EHsc /nologo /c "%VCToolsInstallDir%modules\std.ixx" || exit /b 1
           cl /std:c++latest /EHsc /nologo /c importstd_main.cpp || exit /b 2
