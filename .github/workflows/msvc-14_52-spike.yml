@@ -1,0 +1,178 @@
+name: MSVC 14.52 availability spike
+
+# WHY THIS EXISTS — one empirical question, answered for free.
+#
+# Our Windows/MSVC port is PARKED on a toolchain floor: it needs MSVC
+# >= 14.52.36418, which fixes the three bugs we hit — the exported defaulted
+# `operator==` ICE, the `import std` build failure, and the module-partitions /
+# global-module-fragment reentrancy crash. 14.52 is still PREVIEW (GA ~Nov 2026);
+# the stock GitHub runner ships only the v14.44 toolset (the one that miscompiles us).
+#
+# This spike answers exactly: "Can we GATHER MSVC 14.52 on a GitHub-hosted runner
+# today?" — by installing the VS Build Tools *Preview channel* (/18/pre) and asserting
+# cl's toolset is >= 14.52.36418. It FAILS LOUDLY if the install silently no-ops to the
+# stock 14.44 (runner-images #14101). It runs in PUBLIC canon → zero Actions minutes
+# billed, no secrets, no proprietary code — the gather question needs neither.
+#
+# It is NOT the full port proof: confirming 14.52 fixes our *exact* eidos repro is a
+# separate, private spike (Heph's lane). Here the repro under .github/msvc-spike/ is a
+# self-contained C++23 named module (exported defaulted operator== consumed + memcpy'd
+# across a TU — our bug class), compiled before (stock 14.44) and after (gathered 14.52).
+#
+# workflow_dispatch ONLY — never runs automatically; costs nothing unless triggered.
+
+on:
+  workflow_dispatch:
+    inputs:
+      min_version:
+        description: 'Minimum acceptable MSVC toolset version (the fix floor)'
+        required: false
+        default: '14.52.36418'
+
+permissions:
+  contents: read
+
+jobs:
+  gather-msvc-1452:
+    runs-on: windows-2025
+    env:
+      MIN_VERSION: ${{ inputs.min_version || '14.52.36418' }}
+      # Preview channel Build Tools bootstrapper. VS 2022 = /vs/17, VS 2026 = /vs/18;
+      # channel 'pre' carries the Preview MSVC (14.52); 'release' would only give 14.5x-release.
+      PREVIEW_BOOTSTRAPPER_URL: 'https://aka.ms/vs/18/pre/vs_buildtools.exe'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Report the runner's stock Visual Studio + MSVC toolset
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw "vswhere not found at $vswhere" }
+
+          Write-Host "=== stock VS (vswhere -latest) ==="
+          $disp = & $vswhere -latest -products * -property catalog_productDisplayVersion
+          $name = & $vswhere -latest -products * -property installationName
+          $path = & $vswhere -latest -products * -property installationPath
+          Write-Host "displayVersion : $disp"
+          Write-Host "installName    : $name"
+          Write-Host "installPath    : $path"
+          "STOCK_VS=$path" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding ascii
+
+          Write-Host "=== stock MSVC toolsets present on the image ==="
+          $msvc = Join-Path $path 'VC\Tools\MSVC'
+          if (Test-Path $msvc) {
+            $sets = Get-ChildItem $msvc -Directory | Sort-Object Name -Descending
+            $sets | Select-Object Name | Format-Table
+            "STOCK_TOOLSET=$($sets[0].Name)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding ascii
+            Write-Host "newest stock toolset: $($sets[0].Name)"
+          } else {
+            Write-Host "no MSVC toolset dir under $msvc"
+          }
+
+      - name: Compile the repro with the STOCK toolset (the 'before' — expected to break on 14.44)
+        id: stock
+        continue-on-error: true
+        shell: cmd
+        run: |
+          call "%STOCK_VS%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 90
+          cd /d "%GITHUB_WORKSPACE%\.github\msvc-spike" || exit /b 91
+          echo === stock cl version ===
+          cl 2>&1 | findstr /C:"Version"
+          echo === compiling module interface ===
+          cl /std:c++latest /EHsc /nologo /c geom.ixx || exit /b 1
+          echo === compiling + linking consumer ===
+          cl /std:c++latest /EHsc /nologo main.cpp geom.obj /Fe:repro_stock.exe || exit /b 2
+          repro_stock.exe || exit /b 3
+
+      - name: Install VS Build Tools — Preview channel (the 14.52 gather)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $env:RUNNER_TEMP 'vs_buildtools_pre.exe'
+          Write-Host "Downloading $env:PREVIEW_BOOTSTRAPPER_URL"
+          Invoke-WebRequest -Uri $env:PREVIEW_BOOTSTRAPPER_URL -OutFile $exe
+          if (-not (Test-Path $exe)) { throw "bootstrapper download failed" }
+
+          $installPath = Join-Path $env:RUNNER_TEMP 'VSPreview'
+          $vsArgs = @(
+            '--quiet', '--norestart', '--wait', '--nocache',
+            '--installPath', $installPath,
+            '--add', 'Microsoft.VisualStudio.Workload.VCTools',
+            '--add', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'
+          )
+          Write-Host "Installing VS Build Tools (Preview) to $installPath"
+          $proc = Start-Process -FilePath $exe -ArgumentList $vsArgs -Wait -PassThru
+          $code = $proc.ExitCode
+          Write-Host "installer exit code: $code"
+
+          # 0 = ok, 3010 = ok-reboot-required, 1641 = ok-reboot-initiated.
+          if ($code -ne 0 -and $code -ne 3010 -and $code -ne 1641) {
+            Write-Host "=== tail of newest VS setup log ==="
+            $logs = Get-ChildItem "$env:TEMP\dd_*.log" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending
+            if ($logs) { Get-Content $logs[0].FullName -Tail 80 }
+            throw "VS Build Tools Preview install failed (exit $code)"
+          }
+          if (-not (Test-Path $installPath)) { throw "install path $installPath does not exist after install" }
+          "PREVIEW_VS=$installPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding ascii
+
+      - name: VERDICT — assert the gathered toolset is >= the fix floor (fail loud on no-op to 14.44)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $msvc = Join-Path $env:PREVIEW_VS 'VC\Tools\MSVC'
+          if (-not (Test-Path $msvc)) { throw "no MSVC toolset dir under $msvc — gather produced nothing" }
+
+          $sets = Get-ChildItem $msvc -Directory | Sort-Object Name -Descending
+          Write-Host "gathered toolsets: $($sets.Name -join ', ')"
+          $newest = [version]$sets[0].Name
+          $floor  = [version]$env:MIN_VERSION
+          "PREVIEW_TOOLSET=$($sets[0].Name)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding ascii
+
+          if ($newest -lt $floor) {
+            throw "GATHER FAILED: newest Preview toolset $newest < required $floor. The install silently no-op'd to the stock toolset (runner-images #14101) or the Preview channel no longer ships 14.52."
+          }
+          Write-Host "GATHER OK: $newest >= $floor"
+
+      - name: Compile + run the repro with the GATHERED 14.52 toolset (the 'after' — must pass)
+        shell: cmd
+        run: |
+          call "%PREVIEW_VS%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 90
+          cd /d "%GITHUB_WORKSPACE%\.github\msvc-spike" || exit /b 91
+          echo === preview cl version ===
+          cl 2>&1 | findstr /C:"Version"
+          echo === compiling module interface ===
+          cl /std:c++latest /EHsc /nologo /c geom.ixx || exit /b 1
+          echo === compiling + linking consumer ===
+          cl /std:c++latest /EHsc /nologo main.cpp geom.obj /Fe:repro_preview.exe || exit /b 2
+          repro_preview.exe || exit /b 3
+
+      - name: import std smoke with the gathered toolset (informational — bug #2)
+        continue-on-error: true
+        shell: cmd
+        run: |
+          call "%PREVIEW_VS%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 90
+          cd /d "%GITHUB_WORKSPACE%\.github\msvc-spike" || exit /b 91
+          echo === building the std module ===
+          cl /std:c++latest /EHsc /nologo /c "%VCToolsInstallDir%modules\std.ixx" || exit /b 1
+          echo === compiling a consumer that does import std; ===
+          cl /std:c++latest /EHsc /nologo /c importstd_main.cpp || exit /b 2
+          echo import std smoke OK
+
+      - name: Summary
+        if: ${{ always() }}
+        shell: pwsh
+        run: |
+          $sum = @()
+          $sum += "## MSVC 14.52 availability spike"
+          $sum += ""
+          $sum += "| signal | value |"
+          $sum += "| --- | --- |"
+          $sum += "| stock toolset (runner) | ``$($env:STOCK_TOOLSET)`` |"
+          $sum += "| stock repro compile | ``${{ steps.stock.outcome }}`` (FAIL expected on 14.44) |"
+          $sum += "| gathered Preview toolset | ``$($env:PREVIEW_TOOLSET)`` |"
+          $sum += "| fix floor required | ``$($env:MIN_VERSION)`` |"
+          $sum += ""
+          $sum += "Verdict: a green job = 14.52 is gatherable on a stock GitHub runner via the Preview channel."
+          $sum -join "`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
