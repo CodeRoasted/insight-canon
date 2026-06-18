@@ -1,7 +1,6 @@
-// `import std;` + std::stop_token / std::jthread — the 14.51-specific C1116 fatal
-// (dev-community 11075026 / 11090254), per bugs.md the SECOND blocker on top of the
-// operator== miscompile. This is the clean discriminator: 14.51 GA fails to compile this,
-// 14.52 fixes it. Compiled with /c (the failure is a compile-time fatal, no link needed).
+// `import std;` functional smoke for the MSVC 14.52 gather spike — confirms the gathered
+// toolset's std module compiles and that import std + std::jthread/std::stop_token work
+// (a capability our module-based code relies on). Compiled with /c (no link needed).
 import std;
 
 int main() {
