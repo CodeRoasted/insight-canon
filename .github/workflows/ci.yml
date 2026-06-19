@@ -1,10 +1,10 @@
 name: CI
 permissions:
-  contents: write
-  # canon is PUBLIC + accepts fork PRs: PR diffing/commenting goes through the fork-safe pair
-  # (sift-build.yml renders unprivileged, sift-post.yml posts), NOT this job. Here Sift only SEEDS
-  # the last-green baseline on push:main — no PR comment — so no pull-requests: write is needed.
-  actions: write         # Sift: upload the baseline-log artifact the fork-safe render reads (last-green)
+  # Build + test only — checkout is all this job needs. The Sift baseline is seeded by
+  # sift-build.yml on its OWN push:main run (same-workflow baseline; see sift-build.yml +
+  # sift-action/src/baseline.ts §54), so this job no longer uploads the baseline artifact
+  # (actions: write) nor posts a commit-comment (contents: write).
+  contents: read
 
 on:
   workflow_dispatch:
@@ -36,28 +36,12 @@ jobs:
         # per-repo vendored copy). Owns CONAN_HOME. Replaces the inlined 5-step setup block.
         uses: CodeRoasted/malf-toolchain/.github/actions/setup-build-env@main
 
-      - name: Start build-log capture (the conan-module step below appends; Sift diffs it)
-        run: truncate --size 0 "$GITHUB_WORKSPACE/build.log"
-
       - name: Build + test canon
         # canon is single-module (the package is the repo root) → module '.'. test=true runs the
         # FULL gtest suite (conan install + cmake build + ctest) — `conan create` alone only runs
-        # test_package, never tests/. create=true also verifies packaging + test_package consumes
-        # it. Both mirror to build.log for the Sift dogfood.
+        # test_package, never tests/. create=true also verifies packaging + test_package consumes it.
         uses: CodeRoasted/malf-toolchain/.github/actions/conan-module@main
         with:
           module: '.'
           test: 'true'
           create: 'true'
-
-      - name: Sift — seed the baseline on push (PRs handled by the fork-safe sift-build/post pair)
-        # PUBLIC repo: only seed the last-green baseline on push:main (no-PR → main.ts seeds). PR diffing +
-        # commenting is the fork-safe topology's job (sift-build.yml renders unprivileged, sift-post.yml posts).
-        if: ${{ always() && github.event_name == 'push' }}
-        continue-on-error: true    # advisory: a Sift error must NEVER fail this build
-        uses: CodeRoasted/sift-action@v1
-        with:
-          log: build.log
-          fail-on: none
-          commit-comment: regression
-          build-status: ${{ job.status == 'success' && 'green' || 'red' }}
