@@ -13,6 +13,15 @@ name: Sift (build + render)
 on:
   pull_request:
     branches: [ main ]
+  # Seed THIS workflow's OWN last-green baseline on main. baseline.ts resolves the
+  # baseline from the last green run of the SAME workflow on the base branch
+  # (sift-action/src/baseline.ts §54) — so the fork render must itself have run
+  # green on `main`, or it cold-starts forever. A separate workflow's push-seed
+  # (ci.yml) is a different workflow_id the render never queries. On push there is
+  # no PR, so the Action just uploads this run's build.log as `sift-baseline-log`.
+  push:
+    branches: [ main ]
+  workflow_dispatch:   # manual reseed (e.g. first adoption, or after artifact retention lapses)
 
 permissions:
   contents: read          # checkout only — NO pull-requests: write, NO secrets in this fork-exposed job
