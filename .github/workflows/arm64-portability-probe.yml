@@ -1,0 +1,131 @@
+name: Determinism · linux-arm64 vs golden
+
+# STANDING GATE (release-blocking) — the Linux-arm64 (aarch64) leg of the cross-ISA bit-identity
+# contract, the 2nd ISA in the public "same input → same output, bit-for-bit" claim
+# (insight_determinism_model.md § cross-ISA; ROADMAP Topic C/F). Sibling of windows-portability-probe.yml
+# (the MSVC cross-OS leg) — same cadence, same release-blocking semantics, same shared Linux golden.
+#
+# Asserts canon's public determinism digest (proof/golden.sha256 — the SAME golden the x86 Linux gate
+# determinism-proof.yml freezes + asserts) is byte-identical when canon is BUILT and replayed on arm64,
+# across the (gcc-15/libstdc++ × clang-21/libc++) × -O{0,3} × -ffp-contract{off,fast} diagonal. A red
+# cell un-promotes the claim from "bit-identical across one ISA" to a real cross-ISA FINDING (NEON vs
+# SSE/x87 float codegen, FMA contraction, or an ISA-dependent container-iteration order) and BLOCKS the
+# cut — never a "transport artifact", never softened to keep a release moving.
+#
+# WHY a second ISA: det_math is integer / no-libm / -ffp-contract-invariant BY DESIGN, so arm64 SHOULD
+# reproduce the x86 golden — but determinism is MEASURED, not reasoned. GREEN upgrades the public claim
+# to bit-identity across two ISAs (unlocks Graviton/Ampere reach + un-gates Mac delivery, Topic F).
+#
+# RUNNER: hosted `ubuntu-24.04-arm`, HARDCODED — canon is PUBLIC, so a self-hosted runner is FORBIDDEN
+# here (a fork PR would run on our hardware = RCE). No org-var indirection on this leg, deliberately:
+# only the PRIVATE eidos chain leg may be routed to a self-hosted arm box. Hosted arm64 Linux minutes
+# are free for public repos.
+#
+# It reuses scripts/det_public_proof.sh VERBATIM (same harness as the x86 gate) with the arm64 conan
+# profiles injected via DETERMINISM_{GCC,CLANG}_PROFILE — the ONLY x86↔arm64 difference is the profile's
+# arch/-march, so a divergence cannot be a harness artifact.
+
+permissions:
+  contents: read
+
+on:
+  # The determinism-gate cadence, uniform with the MSVC probe: release-tag cut (auto-runs, gating the
+  # tag) + a weekly drift catch + manual dispatch. NOT per-PR — per-PR determinism coverage is canon's
+  # own x86 golden gate (determinism-proof.yml); this is the heavier cross-ISA confirmation at the cut.
+  workflow_dispatch:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays 06:00 UTC (with the x86 + MSVC legs)
+
+jobs:
+  arm64-proof:
+    name: ${{ matrix.label }}
+    runs-on: ubuntu-24.04-arm   # PUBLIC repo → hosted only; never self-hosted (fork-PR RCE).
+    strategy:
+      fail-fast: false   # report every leg; a red leg fails the gate (no silent skip)
+      matrix:
+        include:
+          - leg: gcc
+            label: "gcc-15 · libstdc++ · arm64 vs golden"
+            require: "g++"
+          - leg: clang
+            label: "clang-21 · libc++ · arm64 vs golden"
+            require: "clang++"
+    env:
+      CONAN_HOME: ${{ github.workspace }}/.conan2
+      # Arm64 profiles for both legs; det_public_proof.sh picks the one matching DETERMINISM_LEG.
+      DETERMINISM_GCC_PROFILE: linux-gcc15-arm64-release
+      DETERMINISM_CLANG_PROFILE: linux-clang21-libcxx-arm64-release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out malf-toolchain into malf/ (arm64 conan profiles; public, anonymous — stays forkable)
+        uses: actions/checkout@v4
+        with:
+          repository: CodeRoasted/malf-toolchain
+          path: malf
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Provision gcc-15.3 toolchain (OUR OWN — arm64 asset auto-picked by uname -m)
+        if: matrix.leg == 'gcc'
+        # Anonymous public release (no token), so the proof stays forkable. setup-gcc153 derives the
+        # aarch64 asset (gcc-15.3-noble-arm64.tar.zst) from the runner ISA → /opt/gcc-15.3.
+        uses: CodeRoasted/malf-toolchain/.github/actions/setup-gcc153@main
+
+      - name: Provision clang-21 + libc++-21 (apt.llvm.org serves aarch64 — same action as x86)
+        if: matrix.leg == 'clang'
+        uses: CodeRoasted/malf-toolchain/.github/actions/setup-clang21-libcxx@main
+
+      - name: Base — ninja + CMake 4.3.x (+ gcc-15.3 /opt wiring on the gcc leg)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build python3 build-essential
+          # CMake 4.3.x workspace-wide (dev/CI parity): the import-std experimental gate UUID 451f2fe2
+          # lives only in 4.3.x; Ubuntu's apt cmake lacks it.
+          sudo python3 -m pip install --break-system-packages "cmake==4.3.1"
+          hash -r
+          case "$(cmake --version | head -1)" in *" 4.3."*) cmake --version ;; *) echo "::error::expected CMake 4.3.x (got: $(cmake --version | head -1))"; exit 1 ;; esac
+          # gcc leg only: wire bare gcc/g++ + g++-15/gcc-15 (the det_public_proof.sh LEGS) to
+          # /opt/gcc-15.3 (NO PPA); linux-gcc15-arm64-release pins /opt + rpaths the from-source libstdc++.
+          if [ "${{ matrix.leg }}" = "gcc" ]; then
+            sudo update-alternatives --install /usr/bin/gcc gcc /opt/gcc-15.3/bin/gcc 1000
+            sudo update-alternatives --install /usr/bin/g++ g++ /opt/gcc-15.3/bin/g++ 1000
+            sudo update-alternatives --set gcc /opt/gcc-15.3/bin/gcc
+            sudo update-alternatives --set g++ /opt/gcc-15.3/bin/g++
+            sudo ln -sf /opt/gcc-15.3/bin/g++ /usr/local/bin/g++-15
+            sudo ln -sf /opt/gcc-15.3/bin/gcc /usr/local/bin/gcc-15
+            g++ --version | head -1
+            g++ --version | grep -qE ' 15\.' || { echo "ERROR: bare g++ is not gcc-15.3 (/opt)"; exit 1; }
+          fi
+
+      - name: Setup Conan
+        uses: conan-io/setup-conan@v1
+        with:
+          version: "2.28.1"
+          home: ${{ env.CONAN_HOME }}
+          cache_packages: false
+          profile_detect: false
+
+      - name: Cache conan dep binaries (arm64 — keyed per leg on the dep set)
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.CONAN_HOME }}
+          key: conan-arm64-${{ matrix.leg }}-${{ runner.os }}-${{ hashFiles('conanfile.py') }}
+          restore-keys: |
+            conan-arm64-${{ matrix.leg }}-${{ runner.os }}-
+
+      - name: Setup Conan arm64 profiles (from malf-toolchain)
+        run: |
+          mkdir -p "$CONAN_HOME/profiles"
+          cp "malf/profiles/linux-gcc15-arm64-release"          "$CONAN_HOME/profiles/linux-gcc15-arm64-release"
+          cp "malf/profiles/linux-clang21-libcxx-arm64-release" "$CONAN_HOME/profiles/linux-clang21-libcxx-arm64-release"
+
+      - name: Determinism proof — ${{ matrix.label }}
+        env:
+          # Single leg (this matrix job's compiler); REQUIRE makes its build mandatory, so a
+          # missing compiler fails LOUD rather than passing hollow.
+          DETERMINISM_LEG: ${{ matrix.leg }}
+          DETERMINISM_REQUIRE_COMPILERS: ${{ matrix.require }}
+        run: bash scripts/det_public_proof.sh

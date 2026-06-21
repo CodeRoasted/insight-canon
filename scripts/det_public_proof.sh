@@ -67,7 +67,15 @@ export CONAN_HOME="${CONAN_HOME:-$(cd "$CANON/.." && pwd)/.conan2}"
 # both-libstdc++ textual matrix, and the very pairing the determinism contract pins. The
 # compiler is pinned explicitly (the conan toolchain's -stdlib flags would otherwise reach
 # a default g++). tag prefix (gpp_/clangpp_) feeds DETERMINISM_REQUIRE_COMPILERS.
-LEGS=( "g++:g++-15:gcc-15:linux-gcc15-release" "clang++:clang++-21:clang-21:linux-clang21-libcxx-release" )
+# The conan PROFILE per leg is overridable so the SAME proof runs on a second ISA: the arm64
+# determinism leg sets DETERMINISM_GCC_PROFILE=linux-gcc15-arm64-release /
+# DETERMINISM_CLANG_PROFILE=linux-clang21-libcxx-arm64-release (the only difference vs x86 is the
+# profile's arch/-march; the compiler binaries g++-15/clang++-21 are wired the same way on both
+# ISAs). Defaults are the x86 profiles → the x86 gate is byte-unchanged. The golden is shared, so an
+# arm64 run matching it IS the cross-ISA bit-identity assertion (the whole point of the 2nd-ISA leg).
+GCC_PROFILE="${DETERMINISM_GCC_PROFILE:-linux-gcc15-release}"
+CLANG_PROFILE="${DETERMINISM_CLANG_PROFILE:-linux-clang21-libcxx-release}"
+LEGS=( "g++:g++-15:gcc-15:$GCC_PROFILE" "clang++:clang++-21:clang-21:$CLANG_PROFILE" )
 
 # Optional single-leg selection (DETERMINISM_LEG=gcc|clang) so a per-compiler CI matrix can run
 # one leg per parallel job. Default (unset) = the full cross-stdlib diagonal, unchanged. Each leg
@@ -76,8 +84,8 @@ LEGS=( "g++:g++-15:gcc-15:linux-gcc15-release" "clang++:clang++-21:clang-21:linu
 # holds transitively (gcc==golden && clang==golden ⟹ gcc==clang).
 if [ -n "${DETERMINISM_LEG:-}" ]; then
   case "$DETERMINISM_LEG" in
-    gcc)   LEGS=( "g++:g++-15:gcc-15:linux-gcc15-release" ) ;;
-    clang) LEGS=( "clang++:clang++-21:clang-21:linux-clang21-libcxx-release" ) ;;
+    gcc)   LEGS=( "g++:g++-15:gcc-15:$GCC_PROFILE" ) ;;
+    clang) LEGS=( "clang++:clang++-21:clang-21:$CLANG_PROFILE" ) ;;
     *) echo "::error::unknown DETERMINISM_LEG='$DETERMINISM_LEG' (expected gcc|clang)" >&2; exit 2 ;;
   esac
 fi
