@@ -70,8 +70,6 @@ set_target_properties(insight_canon PROPERTIES EXPORT_NAME canon
     CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
 target_compile_features(insight_canon PUBLIC cxx_std_23)
 add_library(insight::canon ALIAS insight_canon)
-# 1.5.1: the separate _module wrapper is retired (the module lives on insight_canon itself).
-add_library(insight::canon_module ALIAS insight_canon)
 
 # src/ on the private include path so impl units resolve the textual macro layer
 # (#include "insight/utils/log_macros.hpp") and log_macros' fmt/spdlog includes.
