@@ -58,10 +58,10 @@ jobs:
       DETERMINISM_GCC_PROFILE: linux-gcc15-arm64-release
       DETERMINISM_CLANG_PROFILE: linux-clang21-libcxx-arm64-release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check out malf-toolchain into malf/ (arm64 conan profiles; public, anonymous — stays forkable)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: CodeRoasted/malf-toolchain
           path: malf

@@ -33,7 +33,7 @@ jobs:
   sift-render:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Provision gcc-15.3 toolchain (our own toolchain — NO PPA; was PPA gcc-15 = 15.2)
         uses: CodeRoasted/malf-toolchain/.github/actions/setup-gcc153@main
