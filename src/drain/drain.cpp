@@ -1077,4 +1077,86 @@ std::map<TemplateID, std::string> Drain::all_templates() const
     return out;
 }
 
+// ── Stateless per-line template masker (D-TID-1/2) ──────────────────────────────
+// Per token, EMIT its canonical form by its OWN class — the same precedence Drain
+// applies in intern_token, but DECIDED per token (no absorb_into discovery, no
+// cluster lookup): status-value KEEP → the literal; bare-number / empty / IPv4 / hex
+// → "<*>" (a param); source-location / versioned-ref / bracket-index → the
+// normalized literal (KEPT, NOT a param — it carries its own embedded "<*>"); any
+// other token → the literal. The joined sequence is the template; the SHA-256 of it
+// (computed downstream, unchanged) is the run-independent template_id. Pure: a
+// function of `content`'s bytes only — no float, no map iteration, no state — so it is
+// cross-stdlib bit-identical and order-/stream-independent by construction (D-TID-9).
+StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& out_arena,
+                                     const DrainConfig& config)
+{
+    std::string tmpl;
+    tmpl.reserve(content.size() + kWildcard.size());
+    std::vector<std::string_view> params; // raw tokens at fully-masked positions
+    std::string composite;                // scratch for composite normalization
+    std::string_view prev{};              // raw previous token — context for status KEEP
+    bool first{true};
+
+    for_each_token(content,
+                   [&](std::string_view tok)
+                   {
+                       if (!first)
+                           tmpl.push_back(' ');
+                       first = false;
+                       const bool all_digits{is_all_digits(tok)};
+
+                       // 1. status-value KEEP (identity): "exit code 0" stays distinct
+                       //    from "exit code 1" — a green→red flip must not collapse.
+                       if (all_digits && tok.size() <= kMaxStatusDigits && is_status_keyword(prev))
+                       {
+                           tmpl.append(tok);
+                           prev = tok;
+                           return;
+                       }
+                       // 2. bare number / empty → mask (a param).
+                       if (tok.empty() || all_digits)
+                       {
+                           tmpl.append(kWildcard);
+                           params.push_back(tok);
+                           prev = tok;
+                           return;
+                       }
+                       // 3. composite normalization → the normalized literal (KEPT).
+                       const bool maybe_composite{std::ranges::any_of(
+                           tok, [](char chr) { return chr == ':' || chr == '/' || chr == '['; })};
+                       if (maybe_composite && (normalize_source_location(tok, composite) ||
+                                               normalize_versioned_ref(tok, composite) ||
+                                               normalize_bracket_index(tok, composite)))
+                       {
+                           tmpl.append(composite);
+                           prev = tok;
+                           return;
+                       }
+                       // 4. IPv4 / hex → mask (a param).
+                       if ((config.mask_ip_addresses && is_ipv4_token(tok)) ||
+                           (config.mask_hex_addresses && is_hex_token(tok)))
+                       {
+                           tmpl.append(kWildcard);
+                           params.push_back(tok);
+                           prev = tok;
+                           return;
+                       }
+                       // 5. literal KEEP.
+                       tmpl.append(tok);
+                       prev = tok;
+                   });
+
+    const std::string_view tmpl_view{out_arena.store_string(tmpl)};
+    std::span<const std::string_view> params_span{};
+    if (!params.empty())
+    {
+        auto* buf{static_cast<std::string_view*>(
+            out_arena.allocate(params.size() * sizeof(std::string_view), alignof(std::string_view)))};
+        const auto buf_span{std::span<std::string_view>{buf, params.size()}};
+        std::ranges::copy(params, buf_span.begin());
+        params_span = buf_span;
+    }
+    return {.template_str = tmpl_view, .params = params_span};
+}
+
 } // namespace insight::tokenization

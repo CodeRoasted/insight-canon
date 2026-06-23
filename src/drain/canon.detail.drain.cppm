@@ -64,4 +64,28 @@ class Drain
     std::unique_ptr<Impl> impl_;
 };
 
+// ── Stateless per-line template masker (stateless_template_id.md D-TID-1/2) ──────
+// A deterministic, run-independent function of the line's OWN masked/kept tokens —
+// NO cluster state, NO cross-line learning. The same logical line yields the same
+// template_str (hence the same SHA-256 template_id) in any run, any order, inside any
+// surrounding stream: the phantom pair (a shared line two drains template differently)
+// cannot form. The per-token KEEP / MASK / composite-normalize classification is the
+// SAME one Drain applies in intern_token (status-value KEEP, bare-number / IPv4 / hex
+// MASK, source-location / versioned-ref / bracket-index normalization); what is
+// dropped is absorb_into's cross-line wildcard *discovery* (D-TID-2: discover→decide).
+// This is the identity source that retires the clustering tree (D-TID-3).
+//
+// Result is arena-stable until out_arena.reset() (or destruction); `params` are the
+// raw tokens at fully-masked (<*>) positions, as views into `content` (which the
+// caller must keep stable for the params' lifetime).
+struct StatelessTemplate
+{
+    std::string_view template_str;
+    std::span<const std::string_view> params;
+};
+
+[[nodiscard]] StatelessTemplate stateless_template(std::string_view content,
+                                                   ArenaAllocator& out_arena,
+                                                   const DrainConfig& config);
+
 } // namespace insight::tokenization
