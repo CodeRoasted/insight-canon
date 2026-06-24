@@ -282,6 +282,29 @@ template <> struct hash<insight::TemplateId>
         return out;
     }
 };
+
+// std::hash<std::vector<TemplateId>> (D-TIR-4): keys the n-gram-sequence maps in
+// metalog's merge_behavior / diff_ngram_delta on the sequence itself. FNV-1a combine
+// over each id's first-8-bytes hash. Runtime-only (bucket distribution); those maps'
+// output is explicitly re-sorted, so the unordered iteration order is NOT a determinism
+// surface (ADR 0008). No allocation, no per-id mixing beyond the multiply.
+template <> struct hash<std::vector<insight::TemplateId>>
+{
+    [[nodiscard]] std::size_t
+    operator()(const std::vector<insight::TemplateId>& sequence) const noexcept
+    {
+        constexpr std::size_t kOffsetBasis{14695981039346656037ULL};
+        constexpr std::size_t kPrime{1099511628211ULL};
+        const hash<insight::TemplateId> id_hash{};
+        std::size_t out{kOffsetBasis};
+        for (const insight::TemplateId& id : sequence)
+        {
+            out ^= id_hash(id);
+            out *= kPrime;
+        }
+        return out;
+    }
+};
 } // namespace std
 
 // ──────── from api/insight/math/det_math.hpp ────────
