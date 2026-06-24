@@ -304,6 +304,12 @@ namespace
         return static_cast<unsigned>(chr) - '0' < kDecimalBase;
     }
 
+    [[nodiscard]] constexpr bool is_ascii_alpha(char chr) noexcept
+    {
+        const char lower{static_cast<char>(chr | static_cast<char>(kAsciiCaseMask))};
+        return lower >= 'a' && lower <= 'z';
+    }
+
     // Value-aware KEEP of low-cardinality status integers.
     //
     // A bare integer is masked to `<*>` (all-digit rule), which collapses
@@ -440,15 +446,21 @@ namespace
         return true;
     }
 
-    // BRACKET_INDEX composite: `<word>[<digits>]<rest>`. Recursion depth and
-    // worker indices ("make[2]:", "thread[15]") otherwise template per index.
-    // Normalize the first bracketed digit run → `make[<*>]:`.
+    // BRACKET_INDEX composite: `<word>[<short-alpha>?<digits>]<rest>`. Recursion depth,
+    // worker/shard indices ("make[2]:", "thread[15]", pytest-xdist "[gw0]") otherwise
+    // template per index. Normalize the bracketed digit run, KEEPING any short alpha
+    // class-prefix inside the bracket → `make[<*>]:`, `[gw<*>]` (D-TID-13b generalizes
+    // pure-`[N]` to `[<prefix><N>]`: keep the stable class marker, mask the varying index).
     [[nodiscard]] inline bool normalize_bracket_index(std::string_view tok, std::string& out)
     {
         const std::size_t open{tok.find('[')};
         if (open == std::string_view::npos || open + 1 >= tok.size())
             return false;
         std::size_t cursor{open + 1};
+        const std::size_t prefix_begin{cursor};
+        while (cursor < tok.size() && is_ascii_alpha(tok[cursor]))
+            ++cursor; // optional class prefix inside the bracket ("gw", "worker")
+        const std::string_view prefix{tok.substr(prefix_begin, cursor - prefix_begin)};
         bool saw_digit{false};
         while (cursor < tok.size() && is_ascii_digit(tok[cursor]))
         {
@@ -459,10 +471,126 @@ namespace
             return false;
 
         out.clear();
-        out.append(tok.substr(0, open + 1)); // "make["
+        out.append(tok.substr(0, open + 1)); // "make[" / "["
+        out.append(prefix);                  // "" for make[2]; "gw" for [gw0]
         out.append("<*>");
         out.append(tok.substr(cursor)); // "]:" and anything after
         return true;
+    }
+
+    // ── F13 composite-masking (stateless_template_id.md §8 / D-TID-12,13) ────────
+    // Per-line masking is the SOLE generalizer once Drain's learning is retired, so
+    // these classify the high-card SYNTACTIC token classes the fixed masks missed.
+    // Boundary (D-TID-14): syntactic classes only — varying WORDS stay literal (the
+    // deferred registry's job). All byte-only, single-token → cross-stdlib identical.
+
+    // D-TID-12 #5: digit-leading (after an optional sign) ⇒ a number / measurement /
+    // version / timestamp, intrinsically high-card. Subsumes the all-digit mask AND
+    // numbers-with-separators / decimals / number+unit / versions in ONE rule, no unit
+    // lexicon (`512MB`/`6.2s`/`0.25.5-3` mask; `sha256`/`x86` are letter-leading → keep).
+    [[nodiscard]] inline bool is_digit_leading(std::string_view tok) noexcept
+    {
+        std::size_t pos{0};
+        if (pos < tok.size() && (tok[pos] == '+' || tok[pos] == '-'))
+            ++pos;
+        return pos < tok.size() && is_ascii_digit(tok[pos]);
+    }
+
+    // D-TID-12 #3: a standalone UUID (8-4-4-4-12 hex-with-dashes) or a hex-only run
+    // ≥ 16 chars (a git SHA / content hash). The ≥16 floor keeps short hex-looking
+    // words ("deadbeef", "cafe") literal — only genuinely high-card hashes mask.
+    [[nodiscard]] inline bool is_uuid_or_long_hash(std::string_view tok) noexcept
+    {
+        static constexpr std::size_t kUuidLen{36};
+        static constexpr std::size_t kUuidDash1{8}, kUuidDash2{13}, kUuidDash3{18}, kUuidDash4{23};
+        static constexpr std::size_t kMinHashLen{16};
+        if (tok.size() == kUuidLen && tok[kUuidDash1] == '-' && tok[kUuidDash2] == '-' &&
+            tok[kUuidDash3] == '-' && tok[kUuidDash4] == '-')
+        {
+            for (std::size_t pos{0}; pos < kUuidLen; ++pos)
+                if (pos != kUuidDash1 && pos != kUuidDash2 && pos != kUuidDash3 &&
+                    pos != kUuidDash4 && !is_hex_char(tok[pos]))
+                    return false;
+            return true;
+        }
+        if (tok.size() >= kMinHashLen)
+            return std::ranges::all_of(tok, [](char chr) { return is_hex_char(chr); });
+        return false;
+    }
+
+    // D-TID-13(a): `#`-counter (`#42`, buildkit `#NN`) → `#<*>` — keep the marker, mask
+    // the index. The digit run must run to end-or-punctuation (so `#main` is not a counter).
+    [[nodiscard]] inline bool normalize_hash_counter(std::string_view tok, std::string& out)
+    {
+        if (tok.size() < 2U || tok[0] != '#' || !is_ascii_digit(tok[1]))
+            return false;
+        std::size_t cursor{1};
+        while (cursor < tok.size() && is_ascii_digit(tok[cursor]))
+            ++cursor;
+        for (std::size_t pos{cursor}; pos < tok.size(); ++pos)
+            if (is_ascii_digit(tok[pos]) || is_ascii_alpha(tok[pos]))
+                return false; // `#42abc` is not a clean counter
+        out.clear();
+        out.append("#<*>");
+        out.append(tok.substr(cursor));
+        return true;
+    }
+
+    // D-TID-12 #3, reached INSIDE a token: mask a UUID (8-4-4-4-12) or a long hex-run
+    // (≥ 16, delimiter-bounded) that is EMBEDDED in a larger token — temp-dir paths
+    // (`/…/_temp/<uuid>/cache.tzst`), `git-credentials-<uuid>.config`, `{worker-uuid}`,
+    // `builder-<uuid>` — keeping the surrounding path/structure, masking the identity
+    // instance (the same keep-class/mask-instance pattern as source-location). A UUID is
+    // a UUID whether standalone or in a path; this is the largest re-measured residual
+    // chunk and is squarely a SYNTACTIC class (D-TID-14), not a varying word.
+    [[nodiscard]] inline bool normalize_embedded_identity(std::string_view tok, std::string& out)
+    {
+        static constexpr std::size_t kUuidLen{36};
+        static constexpr std::array<std::size_t, 4> kUuidDashes{8, 13, 18, 23};
+        static constexpr std::size_t kMinHashLen{16};
+        const auto uuid_at{[&](std::size_t pos) -> bool
+                           {
+                               if (pos + kUuidLen > tok.size())
+                                   return false;
+                               for (std::size_t off{0}; off < kUuidLen; ++off)
+                               {
+                                   const bool is_dash{off == kUuidDashes[0] || off == kUuidDashes[1] ||
+                                                      off == kUuidDashes[2] || off == kUuidDashes[3]};
+                                   if (is_dash ? (tok[pos + off] != '-') : !is_hex_char(tok[pos + off]))
+                                       return false;
+                               }
+                               return true;
+                           }};
+        out.clear();
+        bool masked{false};
+        std::size_t pos{0};
+        while (pos < tok.size())
+        {
+            if (uuid_at(pos))
+            {
+                out.append(kWildcard);
+                pos += kUuidLen;
+                masked = true;
+                continue;
+            }
+            // A maximal hex-only run ≥ kMinHashLen, bounded left by a non-hex char.
+            if (is_hex_char(tok[pos]) && (pos == 0 || !is_hex_char(tok[pos - 1])))
+            {
+                std::size_t end{pos};
+                while (end < tok.size() && is_hex_char(tok[end]))
+                    ++end;
+                if (end - pos >= kMinHashLen)
+                {
+                    out.append(kWildcard);
+                    pos = end;
+                    masked = true;
+                    continue;
+                }
+            }
+            out.push_back(tok[pos]);
+            ++pos;
+        }
+        return masked;
     }
 
     template <typename Cb>
@@ -1097,51 +1225,60 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
     std::string_view prev{};              // raw previous token — context for status KEEP
     bool first{true};
 
+    // The declared per-token classification in TOTAL precedence (D-TID-12 §8.2): KEEP
+    // carve-outs win first, then the F13 masks. A masked position contributes a param
+    // (the raw token); a kept/normalized position does not.
     for_each_token(content,
                    [&](std::string_view tok)
                    {
                        if (!first)
                            tmpl.push_back(' ');
                        first = false;
-                       const bool all_digits{is_all_digits(tok)};
+                       const auto mask{[&]
+                                       {
+                                           tmpl.append(kWildcard);
+                                           params.push_back(tok);
+                                       }};
 
                        // 1. status-value KEEP (identity): "exit code 0" stays distinct
                        //    from "exit code 1" — a green→red flip must not collapse.
-                       if (all_digits && tok.size() <= kMaxStatusDigits && is_status_keyword(prev))
+                       if (is_all_digits(tok) && tok.size() <= kMaxStatusDigits &&
+                           is_status_keyword(prev))
                        {
                            tmpl.append(tok);
                            prev = tok;
                            return;
                        }
-                       // 2. bare number / empty → mask (a param).
-                       if (tok.empty() || all_digits)
-                       {
-                           tmpl.append(kWildcard);
-                           params.push_back(tok);
-                           prev = tok;
-                           return;
-                       }
-                       // 3. composite normalization → the normalized literal (KEPT).
+                       // 2. composite → the normalized literal (KEEP class, mask instance):
+                       //    source-location / versioned-ref / bracket-index / #-counter /
+                       //    embedded UUID·hash (the `-` pre-gate admits dashed UUID tokens).
                        const bool maybe_composite{std::ranges::any_of(
-                           tok, [](char chr) { return chr == ':' || chr == '/' || chr == '['; })};
+                           tok, [](char chr) {
+                               return chr == ':' || chr == '/' || chr == '[' || chr == '#' ||
+                                      chr == '-';
+                           })};
                        if (maybe_composite && (normalize_source_location(tok, composite) ||
                                                normalize_versioned_ref(tok, composite) ||
-                                               normalize_bracket_index(tok, composite)))
+                                               normalize_bracket_index(tok, composite) ||
+                                               normalize_hash_counter(tok, composite) ||
+                                               normalize_embedded_identity(tok, composite)))
                        {
                            tmpl.append(composite);
                            prev = tok;
                            return;
                        }
-                       // 4. IPv4 / hex → mask (a param).
-                       if ((config.mask_ip_addresses && is_ipv4_token(tok)) ||
-                           (config.mask_hex_addresses && is_hex_token(tok)))
+                       // 3. UUID / long hash → MASK.
+                       // 4. IPv4 / 0x-hex → MASK.
+                       // 5. digit-leading numeric (or empty) → MASK.
+                       if (tok.empty() || is_uuid_or_long_hash(tok) ||
+                           (config.mask_ip_addresses && is_ipv4_token(tok)) ||
+                           (config.mask_hex_addresses && is_hex_token(tok)) || is_digit_leading(tok))
                        {
-                           tmpl.append(kWildcard);
-                           params.push_back(tok);
+                           mask();
                            prev = tok;
                            return;
                        }
-                       // 5. literal KEEP.
+                       // 6. literal KEEP.
                        tmpl.append(tok);
                        prev = tok;
                    });

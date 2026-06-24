@@ -694,4 +694,82 @@ inline void sv_skip_ws(std::string_view& str) noexcept
     return tag;
 }
 
+// ── ANSI / terminal escape stripping (stateless_template_id.md D-TID-11) ─────────
+// The terminal escape-grammar byte ranges (ECMA-48): a CSI body is params then
+// intermediates then one final byte; OSC runs to a BEL or ST terminator.
+inline constexpr unsigned char kEsc{0x1bU};        // ESC, the escape introducer
+inline constexpr unsigned char kBel{0x07U};        // BEL, an OSC terminator
+inline constexpr unsigned char kCsiParamLo{0x30U}; // CSI parameter bytes 0–9:;<=>?
+inline constexpr unsigned char kCsiParamHi{0x3fU};
+inline constexpr unsigned char kCsiInterLo{0x20U}; // CSI intermediate bytes (space..'/')
+inline constexpr unsigned char kCsiInterHi{0x2fU};
+inline constexpr unsigned char kCsiFinalLo{0x40U}; // CSI final byte ('@'..'~', incl. SGR 'm')
+inline constexpr unsigned char kCsiFinalHi{0x7eU};
+
+// Advance past a CSI body (params* intermediates* final?). `pos` is the index just
+// after the `ESC [` introducer; returns the index of the first post-sequence byte.
+[[nodiscard]] inline std::size_t scan_csi_body(std::string_view line, std::size_t pos) noexcept
+{
+    const std::size_t len{line.size()};
+    const auto byte_at{[&](std::size_t idx) { return static_cast<unsigned char>(line[idx]); }};
+    while (pos < len && byte_at(pos) >= kCsiParamLo && byte_at(pos) <= kCsiParamHi)
+        ++pos;
+    while (pos < len && byte_at(pos) >= kCsiInterLo && byte_at(pos) <= kCsiInterHi)
+        ++pos;
+    if (pos < len && byte_at(pos) >= kCsiFinalLo && byte_at(pos) <= kCsiFinalHi)
+        ++pos;
+    return pos;
+}
+
+// Advance past an OSC body to its BEL or ST (ESC \) terminator (consumed). `pos` is
+// the index just after the `ESC ]` introducer.
+[[nodiscard]] inline std::size_t scan_osc_body(std::string_view line, std::size_t pos) noexcept
+{
+    const std::size_t len{line.size()};
+    const auto byte_at{[&](std::size_t idx) { return static_cast<unsigned char>(line[idx]); }};
+    while (pos < len)
+    {
+        if (byte_at(pos) == kBel)
+            return pos + 1U;
+        if (byte_at(pos) == kEsc && pos + 1U < len && line[pos + 1U] == '\\')
+            return pos + 2U;
+        ++pos;
+    }
+    return pos;
+}
+
+// Strip CSI / SGR / OSC and bare-ESC terminal escape sequences from a line as an
+// UNCONDITIONAL content normalization at canon ingest — BEFORE tokenization. Colour
+// is presentation, never content (D-TID-10); the escapes interleave within/between
+// tokens (`\x1b[31mERROR\x1b[0m`) so a per-token mask cannot reach them — they must
+// die here. A pure byte state machine: no float, order-independent → cross-stdlib
+// bit-identical (the same grammar the TTY `sanitize()` drops, re-homed at ingest).
+// Appends the cleaned bytes to `out` (cleared first); result ≤ input, so a reused
+// buffer makes this allocation-free in steady state.
+inline void strip_escape_sequences(std::string_view line, std::string& out)
+{
+    out.clear();
+    out.reserve(line.size());
+    const std::size_t len{line.size()};
+    std::size_t pos{0};
+    while (pos < len)
+    {
+        if (static_cast<unsigned char>(line[pos]) != kEsc)
+        {
+            out.push_back(line[pos]);
+            ++pos;
+            continue;
+        }
+        if (pos + 1U >= len)
+            break; // a lone trailing ESC — drop it
+        const char introducer{line[pos + 1U]};
+        if (introducer == '[')
+            pos = scan_csi_body(line, pos + 2U);
+        else if (introducer == ']')
+            pos = scan_osc_body(line, pos + 2U);
+        else
+            pos += 2U; // a simple two-byte ESC sequence (charset select, reset, …)
+    }
+}
+
 } // namespace insight::tokenization

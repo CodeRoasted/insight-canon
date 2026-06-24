@@ -116,6 +116,58 @@ TEST(StatelessTemplate, CompositesNormalized)
               masked("error at parser.cpp:1:1: bad token", arena));
 }
 
+// ── F13 strengthening (§8 / D-TID-11..13) — the re-measure rule set ──────────────
+
+TEST(StatelessTemplate, AnsiEscapesStrippedBeforeTokenization)
+{
+    // D-TID-11: colour codes are presentation, stripped at ingest. Two coloured
+    // variants of one line fold to the same colour-free content.
+    std::string clean;
+    strip_escape_sequences("\x1b[31mERROR\x1b[0m: pool down", clean);
+    EXPECT_EQ(clean, "ERROR: pool down");
+    strip_escape_sequences("plain text, no escapes", clean);
+    EXPECT_EQ(clean, "plain text, no escapes");
+    // An OSC sequence (ESC ] ... BEL) is dropped whole. (`\a` = BEL 0x07; avoid the
+    // greedy `\x07b` hex-escape that would absorb the trailing 'b'.)
+    strip_escape_sequences("a\x1b]0;title\ab", clean);
+    EXPECT_EQ(clean, "ab");
+}
+
+TEST(StatelessTemplate, DigitLeadingTokensMask)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // One rule subsumes numbers-with-separators, decimals, number+unit, versions —
+    // no unit lexicon. Each pair differs only in a digit-leading token → one template.
+    EXPECT_EQ(masked("built in 6.2s", arena), masked("built in 11.9s", arena));        // duration
+    EXPECT_EQ(masked("done 76.5%", arena), masked("done 100.0%", arena));              // percent
+    EXPECT_EQ(masked("compiled 31,260 targets", arena), masked("compiled 9 targets", arena)); // grouped
+    EXPECT_EQ(masked("installing pkg 0.25.5-3", arena), masked("installing pkg 1.2.11", arena)); // version
+    EXPECT_EQ(masked("freed 512MB", arena), masked("freed 8GB", arena));               // number+unit
+}
+
+TEST(StatelessTemplate, LetterLeadingKeptUuidAndHashMasked)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // Letter-leading words are KEPT (the F13 boundary — D-TID-14): a word is not a number.
+    EXPECT_NE(masked("decode utf8 stream", arena), masked("decode ascii stream", arena));
+    EXPECT_EQ(masked("decode utf8 stream", arena), masked("decode utf8 stream", arena));
+    EXPECT_NE(masked("hash sha256 ok", arena), masked("hash sha512 ok", arena)); // short, letter-leading → kept
+    // UUID + long hash collapse (high-card identity).
+    EXPECT_EQ(masked("temp f7f63412-b7a7-468d-bd31-1a6ae1ca2680 ready", arena),
+              masked("temp 8b4537c3-1dd0-411a-a760-2aeb13934993 ready", arena));
+    EXPECT_EQ(masked("commit 9fd7fb4c0de0abcd1234", arena),
+              masked("commit deadbeefcafe0badf00d5678", arena));
+}
+
+TEST(StatelessTemplate, HashCounterAndWorkerBracketCollapse)
+{
+    ArenaAllocator arena{256U * 1024U};
+    EXPECT_EQ(masked("step #26 done", arena), masked("step #7 done", arena));     // #-counter
+    EXPECT_EQ(masked("[gw0] PASSED test_x", arena), masked("[gw3] PASSED test_x", arena)); // xdist worker
+    // The class marker is kept (a counter ≠ a worker bracket).
+    EXPECT_NE(masked("#26", arena), masked("[gw26]", arena));
+}
+
 // ── Measure-first gate: post-stateless cardinality vs Drain on a real corpus ─────
 // Sizes the F13 need (the cardinality monitor's first reading) BEFORE the cascade.
 // Skipped unless CORPUS_DIR is set to a directory of *.log files (the CI revert
@@ -140,6 +192,7 @@ TEST(StatelessTemplate, CardinalityVsDrain_Corpus)
     LogParser parser{arena};
     Drain drain{cfg()};
     std::unordered_map<std::string, std::uint64_t> stateless_templates;
+    std::string clean; // reused ANSI-strip buffer
     std::size_t lines{0};
 
     for (const auto& file : files)
@@ -156,9 +209,11 @@ TEST(StatelessTemplate, CardinalityVsDrain_Corpus)
             const auto parsed{parser.parse_line(raw)};
             if (!parsed)
                 continue;
-            const std::string_view content{parsed->content};
-            drain.match_into_arena(content, arena); // Drain clusters (its own arena persists)
-            ++stateless_templates[std::string{stateless_template(content, arena, cfg()).template_str}];
+            // ANSI-strip the parsed content (D-TID-11, applied at ingest in production) so
+            // BOTH engines see colour-free content — the fair F13 re-measure.
+            strip_escape_sequences(parsed->content, clean);
+            drain.match_into_arena(clean, arena); // Drain clusters (its own arena persists)
+            ++stateless_templates[std::string{stateless_template(clean, arena, cfg()).template_str}];
             ++lines;
         }
     }
