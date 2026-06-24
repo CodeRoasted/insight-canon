@@ -44,6 +44,34 @@ using WindowID = uint64_t;
 // change (a new F13 class, the eventual SemanticClassRegistry).
 inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-1"};
 
+// ── Template identity (insight_perf_template_id.md D-TIR-1) ──
+// The structural identity of a canonicalised template: the first 16 bytes of
+// SHA-256(masked template_str), carried as a fixed-size POD through the whole
+// metalog/eidos domain. The 34-byte "h:"+hex string is materialised only at the
+// serialize seam (render()). Owned by canon because identity IS "the hash under
+// kCanonicalizationVersion" (D-TID-9/D-TID-16) — identity and its comparability
+// version belong in one place.
+struct TemplateId
+{
+    std::array<std::uint8_t, 16> bytes{}; // first 16 bytes of SHA-256(masked template_str)
+    // Defaulted byte-lexicographic order REPRODUCES the old "h:"+hex string order exactly
+    // (hex is order-preserving, the "h:" prefix is constant) — the golden-preserving
+    // invariant every vector<TemplateId> sort in merge_behavior/diff relies on. Do NOT
+    // hand-roll operator<.
+    auto operator<=>(const TemplateId&) const = default;
+    bool operator==(const TemplateId&) const = default;
+};
+
+// SHA-256 the canonical (masked) template; the first 16 bytes are the id. Same content
+// as the former MetaLogEngine::compute_template_id (spec §3.2) — render(template_id_of(s))
+// is byte-identical to the old string for every s (D-TIR-1 invariant 2).
+[[nodiscard]] TemplateId template_id_of(std::string_view canonical_template) noexcept;
+// Wire rendering: "h:" + 32 lowercase hex. The ONLY place the id string materialises.
+[[nodiscard]] std::string render(TemplateId template_id);
+// Inverse of render() — a TEST / fixture helper only (fixtures construct synthetic ids).
+// NOT on any product path: the wire is a one-way terminal render (D-TIR-1 §1).
+[[nodiscard]] TemplateId parse_template_id(std::string_view rendered);
+
 // ── Sequences ──
 using NGram = std::vector<EventID>;
 
@@ -231,6 +259,23 @@ enum class Severity : uint8_t
 }
 
 } // namespace insight
+
+// std::hash<TemplateId> (D-TIR-1 invariant 3): the content is already a uniform
+// cryptographic hash, so the first 8 bytes ARE a good size_t — no mixing, no allocation.
+// Reachable to importers of this module so `unordered_map<TemplateId,…>` in metalog/eidos
+// resolves it. (A specialization need not be exported; importing the module suffices.)
+namespace std
+{
+template <> struct hash<insight::TemplateId>
+{
+    [[nodiscard]] std::size_t operator()(const insight::TemplateId& template_id) const noexcept
+    {
+        std::size_t out{};
+        std::memcpy(&out, template_id.bytes.data(), sizeof out);
+        return out;
+    }
+};
+} // namespace std
 
 // ──────── from api/insight/math/det_math.hpp ────────
 // det_math — deterministic, cross-machine bit-identical fixed-point math for

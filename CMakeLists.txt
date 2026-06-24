@@ -25,6 +25,7 @@ option(INSIGHT_CANON_ENABLE_NUMA  "Enable NUMA-aware arena allocation (libnuma, 
 find_package(fmt      REQUIRED CONFIG)
 find_package(spdlog   REQUIRED CONFIG)
 find_package(simdjson REQUIRED CONFIG)
+find_package(picosha2 REQUIRED CONFIG)
 
 ###########################################################
 #  Sources (1.5.2 domain decomposition, §11.9.11)
@@ -83,7 +84,7 @@ target_include_directories(insight_canon
 # must see their includes + link them. simdjson is impl-only (JSON strategies in src/).
 target_link_libraries(insight_canon
     PUBLIC  fmt::fmt spdlog::spdlog
-    PRIVATE simdjson::simdjson)
+    PRIVATE simdjson::simdjson picosha2::picosha2)
 
 ###########################################################
 #  Compile-time spdlog level elision
@@ -199,7 +200,7 @@ if(INSIGHT_CANON_BUILD_TESTS)
                 FILES    ${CANON_PUBLIC_MODULE_UNITS} ${CANON_DETAIL_MODULE_UNITS}
                          tests/canon.test.cppm)
         target_link_libraries(insight_canon_tests PRIVATE
-            fmt::fmt spdlog::spdlog simdjson::simdjson
+            fmt::fmt spdlog::spdlog simdjson::simdjson picosha2::picosha2
             GTest::gtest GTest::gtest_main)
         target_include_directories(insight_canon_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/api ${CMAKE_CURRENT_SOURCE_DIR}/src)
         target_compile_features(insight_canon_tests PRIVATE cxx_std_23)
@@ -240,7 +241,7 @@ if(INSIGHT_CANON_BUILD_BENCHMARKS)
                 FILES    ${CANON_PUBLIC_MODULE_UNITS} ${CANON_DETAIL_MODULE_UNITS}
                          benchmarks/canon.bench.cppm)
         target_link_libraries(insight_canon_bench PRIVATE
-            fmt::fmt spdlog::spdlog simdjson::simdjson benchmark::benchmark)
+            fmt::fmt spdlog::spdlog simdjson::simdjson picosha2::picosha2 benchmark::benchmark)
         if(INSIGHT_CANON_ENABLE_NUMA AND libnuma_FOUND)
             target_compile_definitions(insight_canon_bench PRIVATE INSIGHT_HAS_NUMA)
             target_link_libraries(insight_canon_bench PRIVATE libnuma::libnuma)
