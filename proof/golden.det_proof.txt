@@ -1,33 +1,36 @@
 # canon public determinism proof -- v1
 ## file ci_build.log
-### templates (11)
+### templates (14)
 1	Build failed with <*> error
 1	Build started for commit a1b2c3d on branch main
-3	Compiling module <*>
 1	Compiling module auth
+1	Compiling module billing
+1	Compiling module gateway
+1	Compiling module storage
 1	Linking target service
 1	Restoring dependencies from cache
 1	Running unit suite
 1	error: test gateway.route failed: connection refused
-2	test <*> passed
 1	test auth.login passed
+1	test auth.logout passed
+1	test billing.charge passed
 1	warning: unused variable 'retry_count' in billing/charge.cpp
 ### events
 Unknown	--	None	Build started for commit a1b2c3d on branch main
 Unknown	--	None	Restoring dependencies from cache
 Unknown	--	None	Compiling module auth
-Unknown	--	None	Compiling module <*>
-Unknown	--	None	Compiling module <*>
+Unknown	--	None	Compiling module billing
+Unknown	--	None	Compiling module gateway
 Warn	-W	None	warning: unused variable 'retry_count' in billing/charge.cpp
-Unknown	--	None	Compiling module <*>
+Unknown	--	None	Compiling module storage
 Unknown	--	None	Linking target service
 Unknown	--	None	Running unit suite
 Unknown	--	None	test auth.login passed
-Unknown	--	None	test <*> passed
-Unknown	--	None	test <*> passed
+Unknown	--	None	test auth.logout passed
+Unknown	--	None	test billing.charge passed
 Error	F-	None	error: test gateway.route failed: connection refused
 Error	F-	None	Build failed with <*> error
-### det_math total=14 sum_c_log2c_qk=7427077352948
+### det_math total=14 sum_c_log2c_qk=0
 ## file github_actions.log
 ### templates (12)
 1	##[endgroup]
@@ -36,42 +39,42 @@ Error	F-	None	Build failed with <*> error
 1	##[group]Run build and test
 1	##[group]Run unit suite
 1	##[warning]deprecated API used in billing/charge.cpp
-1	Compiling module <*>
 1	Compiling module auth
+1	Compiling module billing
 1	Linking target service
 1	Restoring dependencies from cache
-1	test <*> passed
 1	test auth.login passed
+1	test billing.charge passed
 ### events
 Unknown	--	GroupBegin	##[group]Run build and test
 Unknown	--	None	Restoring dependencies from cache
 Unknown	--	None	Compiling module auth
-Unknown	--	None	Compiling module <*>
+Unknown	--	None	Compiling module billing
 Warn	-W	None	##[warning]deprecated API used in billing/charge.cpp
 Unknown	--	None	Linking target service
 Unknown	--	GroupEnd	##[endgroup]
 Unknown	--	GroupBegin	##[group]Run unit suite
 Unknown	--	None	test auth.login passed
-Unknown	--	None	test <*> passed
+Unknown	--	None	test billing.charge passed
 Error	F-	Terminator	##[error]test gateway.route failed: connection refused
 Error	F-	Terminator	##[error]Process completed with exit code 1
 ### det_math total=12 sum_c_log2c_qk=0
 ## file syslog.log
 ### templates (7)
-1	GET /api/users <*>
-2	GET <*> <*>
+1	GET /api/orders <*>
+2	GET /api/users <*>
 1	Out of memory: Killed process <*> (app)
-1	cache warmed in 12ms
-1	request <*> <*> <*>
-1	request completed in 8ms
+1	cache warmed in <*>
+1	request completed in <*>
+1	request failed after <*>
 1	upstream timeout on shard <*>
 ### events
 Unknown	--	None	GET /api/users <*>
-Unknown	--	None	GET <*> <*>
-Unknown	--	None	cache warmed in 12ms
-Unknown	--	None	request completed in 8ms
-Unknown	--	None	GET <*> <*>
+Unknown	--	None	GET /api/orders <*>
+Unknown	--	None	cache warmed in <*>
+Unknown	--	None	request completed in <*>
+Unknown	--	None	GET /api/users <*>
 Unknown	F-	None	upstream timeout on shard <*>
-Unknown	F-	None	request <*> <*> <*>
+Unknown	F-	None	request failed after <*>
 Unknown	--	None	Out of memory: Killed process <*> (app)
 ### det_math total=8 sum_c_log2c_qk=2199023255552
