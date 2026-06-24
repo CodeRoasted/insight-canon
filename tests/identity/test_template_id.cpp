@@ -8,6 +8,8 @@
 
 import insight.canon.test;
 
+using insight::ngram_id_of;
+using insight::NgramId;
 using insight::parse_template_id;
 using insight::render;
 using insight::TemplateId;
@@ -81,6 +83,51 @@ TEST(TemplateIdInvariants, StdHashUsableInUnorderedContainer)
     }
     // distinct non-empty samples → distinct ids (no accidental collision in the set)
     EXPECT_GE(by_id.size(), kSamples.size() - 1U); // -1 tolerates any dup in the literal list
+}
+
+// ── NgramId (D-TIR-4(2)): the scalar key for n-gram SEQUENCES ──
+// Transient (never serialized), so the contract is in-memory keying only: deterministic,
+// order-sensitive, distinct-per-distinct-sequence, and usable in an unordered_map.
+namespace
+{
+[[nodiscard]] std::vector<TemplateId> seq(std::initializer_list<std::string_view> templates)
+{
+    std::vector<TemplateId> out;
+    out.reserve(templates.size());
+    for (const auto& tmpl : templates)
+        out.push_back(template_id_of(tmpl));
+    return out;
+}
+} // namespace
+
+TEST(NgramIdInvariants, Deterministic)
+{
+    const auto sequence{seq({"GET <*> -> <*>", "user <*> logged in", "charge order total"})};
+    EXPECT_EQ(ngram_id_of(sequence), ngram_id_of(sequence));
+}
+
+TEST(NgramIdInvariants, OrderSensitive)
+{
+    // [a,b] and [b,a] are DISTINCT n-grams → distinct ids (transition order is significant).
+    const auto forward{seq({"user <*> logged in", "charge order total"})};
+    const auto reversed{seq({"charge order total", "user <*> logged in"})};
+    EXPECT_NE(ngram_id_of(forward), ngram_id_of(reversed));
+}
+
+TEST(NgramIdInvariants, DistinctSequencesGiveDistinctIds)
+{
+    const std::vector<std::vector<TemplateId>> sequences{
+        seq({"a"}),
+        seq({"a", "the quick brown fox jumps"}),
+        seq({"the quick brown fox jumps", "a"}),
+        seq({"GET <*> -> <*>", "user <*> logged in", "charge order total"}),
+        seq({"GET <*> -> <*>", "user <*> logged in"}),
+        seq({}), // empty sequence is well-defined (the basis), distinct from any non-empty
+    };
+    std::unordered_map<NgramId, std::size_t> by_id;
+    for (std::size_t i{0}; i < sequences.size(); ++i)
+        by_id[ngram_id_of(sequences[i])] = i;
+    EXPECT_EQ(by_id.size(), sequences.size()) << "ngram_id collision across distinct sequences";
 }
 
 // NOLINTEND
