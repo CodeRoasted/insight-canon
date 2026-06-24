@@ -72,6 +72,13 @@ struct TemplateId
 // NOT on any product path: the wire is a one-way terminal render (D-TIR-1 §1).
 [[nodiscard]] TemplateId parse_template_id(std::string_view rendered);
 
+// Stream rendering (ADL) so a TemplateId prints as "h:"+hex in logs / test diagnostics
+// (the "verbose on failure" rule). Not a product wire path — that is render() at the seam.
+inline std::ostream& operator<<(std::ostream& out, const TemplateId& template_id)
+{
+    return out << render(template_id);
+}
+
 // ── Sequences ──
 using NGram = std::vector<EventID>;
 

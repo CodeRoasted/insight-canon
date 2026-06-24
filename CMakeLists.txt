@@ -160,6 +160,7 @@ export(EXPORT insight_canonTargets
 set(_canon_find_deps "find_dependency(fmt)
 find_dependency(spdlog)
 find_dependency(simdjson)
+find_dependency(picosha2)
 ")
 if(INSIGHT_CANON_ENABLE_NUMA AND libnuma_FOUND)
     string(APPEND _canon_find_deps "find_dependency(libnuma)\n")
