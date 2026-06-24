@@ -62,6 +62,20 @@ struct TemplateId
     bool operator==(const TemplateId&) const = default;
 };
 
+// NgramId (D-TIR-4(2)): a fixed-width 128-bit key for an n-gram SEQUENCE
+// (std::vector<TemplateId>), so metalog's merge_behavior / diff_ngram_delta key on a
+// scalar instead of rehashing+recomparing the variable-length sequence on every map op.
+// NEVER serialized — a purely in-memory keying optimisation (the n-gram maps emit their
+// output sorted by the sequence, not by this id), so a fast non-crypto hash is correct;
+// 128 bits keeps collisions ~0 for window-bounded n-gram cardinality, so the map needs no
+// sequence compare. Order-sensitive: [a,b] and [b,a] are distinct n-grams → distinct ids.
+struct NgramId
+{
+    std::array<std::uint8_t, 16> bytes{};
+    auto operator<=>(const NgramId&) const = default;
+    bool operator==(const NgramId&) const = default;
+};
+
 // SHA-256 the canonical (masked) template; the first 16 bytes are the id. Same content
 // as the former MetaLogEngine::compute_template_id (spec §3.2) — render(template_id_of(s))
 // is byte-identical to the old string for every s (D-TIR-1 invariant 2).
@@ -71,6 +85,10 @@ struct TemplateId
 // Inverse of render() — a TEST / fixture helper only (fixtures construct synthetic ids).
 // NOT on any product path: the wire is a one-way terminal render (D-TIR-1 §1).
 [[nodiscard]] TemplateId parse_template_id(std::string_view rendered);
+
+// 128-bit content key for an n-gram sequence (D-TIR-4(2)). Fast non-crypto combine over
+// the sequence's id bytes; transient (never serialized), order-sensitive.
+[[nodiscard]] NgramId ngram_id_of(const std::vector<TemplateId>& sequence) noexcept;
 
 // Stream rendering (ADL) so a TemplateId prints as "h:"+hex in logs / test diagnostics
 // (the "verbose on failure" rule). Not a product wire path — that is render() at the seam.
@@ -283,25 +301,16 @@ template <> struct hash<insight::TemplateId>
     }
 };
 
-// std::hash<std::vector<TemplateId>> (D-TIR-4): keys the n-gram-sequence maps in
-// metalog's merge_behavior / diff_ngram_delta on the sequence itself. FNV-1a combine
-// over each id's first-8-bytes hash. Runtime-only (bucket distribution); those maps'
-// output is explicitly re-sorted, so the unordered iteration order is NOT a determinism
-// surface (ADR 0008). No allocation, no per-id mixing beyond the multiply.
-template <> struct hash<std::vector<insight::TemplateId>>
+// std::hash<NgramId> (D-TIR-4(2)): keys metalog's n-gram-sequence maps. NgramId is
+// already a uniform 128-bit hash, so the first 8 bytes ARE a good size_t — no mixing,
+// no allocation (mirrors std::hash<TemplateId>). The maps re-sort their output, so the
+// unordered iteration order is not a determinism surface (ADR 0008).
+template <> struct hash<insight::NgramId>
 {
-    [[nodiscard]] std::size_t
-    operator()(const std::vector<insight::TemplateId>& sequence) const noexcept
+    [[nodiscard]] std::size_t operator()(const insight::NgramId& ngram_id) const noexcept
     {
-        constexpr std::size_t kOffsetBasis{14695981039346656037ULL};
-        constexpr std::size_t kPrime{1099511628211ULL};
-        const hash<insight::TemplateId> id_hash{};
-        std::size_t out{kOffsetBasis};
-        for (const insight::TemplateId& id : sequence)
-        {
-            out ^= id_hash(id);
-            out *= kPrime;
-        }
+        std::size_t out{};
+        std::memcpy(&out, ngram_id.bytes.data(), sizeof out);
         return out;
     }
 };
