@@ -127,8 +127,7 @@ constexpr std::array<DatasetExpectation, 16> kDatasetExpectations{{
 [[nodiscard]] std::string format_event(const CanonicalEvent& event)
 {
     std::ostringstream out;
-    out << "ok" << " id=" << event.id << " template_id=" << event.template_id
-        << " level=" << to_string(event.level) << " ts_ms="
+    out << "ok" << " id=" << event.id << " level=" << to_string(event.level) << " ts_ms="
         << std::chrono::duration_cast<std::chrono::milliseconds>(event.timestamp.time_since_epoch())
                .count()
         << " component=" << quote(event.component) << " template=" << quote(event.template_str)

@@ -1,8 +1,11 @@
 // NOLINTBEGIN
-// Unit tests + measure-first gate for the stateless template masker
+// Unit tests + measurement for the stateless template masker
 // (stateless_template_id.md D-TID-1/2). The property tests are committed regression
-// guards; CardinalityVsDrain_Corpus is the F13-sizing measurement (env-gated, skipped
-// unless CORPUS_DIR points at a log corpus) — the reading that gates the cascade.
+// guards — chiefly the phantom-pair kill (the whole point, §9.5). CardinalityOnCorpus
+// is the masker-cardinality measurement (env-gated, skipped unless CORPUS_DIR points at
+// a log corpus); the one-time over-split ratio vs the (now-ripped) Drain was 4.12x→1.79x,
+// recorded at the re-measure gate (§8, commit 3829a88) — the standing guard is now the
+// K_dim cardinality monitor, not a vs-Drain ratio.
 
 #include <gtest/gtest.h>
 
@@ -14,10 +17,7 @@ namespace
 {
 DrainConfig cfg()
 {
-    DrainConfig c;
-    c.similarity_threshold = 0.5;
-    c.max_clusters = 100000;
-    return c;
+    return DrainConfig{}; // defaults: mask_ip_addresses / mask_hex_addresses on
 }
 
 // Copy the masked template out immediately (the arena is reused across calls).
@@ -25,12 +25,6 @@ std::string masked(std::string_view content, ArenaAllocator& arena)
 {
     arena.reset();
     return std::string{stateless_template(content, arena, cfg()).template_str};
-}
-
-std::string drain_tmpl(Drain& drain, ArenaAllocator& arena, std::string_view content)
-{
-    arena.reset();
-    return std::string{drain.match_into_arena(content, arena).template_str};
 }
 } // namespace
 
@@ -60,36 +54,37 @@ TEST(StatelessTemplate, LogicallyIdenticalLinesShareTemplate)
               masked("request from 192.168.1.250 took 9999 ms", arena));
 }
 
-// The phantom pair, demonstrated AND killed. Drain's absorb_into learns to wildcard a
-// non-numeric token that varied across the lines it happened to see; a different
-// surrounding stream learns differently — so the SAME logical line gets two templates
-// (a false NewTemplate + VanishedTemplate on an outcome flip). The stateless masker
-// gives it ONE template regardless of stream. (It also shows the accepted tradeoff,
-// D-TID-8: `eu-west` stays literal — the over-split F13 + the cardinality monitor size.)
+// The phantom pair, killed. The old stateful Drain learned (via absorb_into) to
+// wildcard a non-numeric token that varied across the lines it happened to see, so a
+// different surrounding stream learned differently — the SAME logical line got two
+// templates (a false NewTemplate + VanishedTemplate on an outcome flip). The stateless
+// masker decides masking per token from the line's OWN content, so the shared line
+// yields ONE template no matter what surrounds it — the phantom cannot form. (It also
+// shows the accepted tradeoff, D-TID-8: `eu-west` stays literal — a letter-leading word,
+// not a syntactic high-card class; the over-split that F13 + the cardinality monitor size.)
 TEST(StatelessTemplate, KillsThePhantomPair)
 {
     ArenaAllocator arena{256U * 1024U};
     const std::string_view shared{"deploy region eu-west complete"};
 
-    // Stream A: a sibling line first makes Drain wildcard the region token.
-    Drain drain_a{cfg()};
-    drain_tmpl(drain_a, arena, "deploy region us-east complete");
-    const std::string drain_a_tmpl{drain_tmpl(drain_a, arena, shared)};
+    // The shared line, computed in three different surrounding "streams" (each primed
+    // with a DIFFERENT sibling whose region token varies). A stateful learner would
+    // wildcard `eu-west` differently per stream; the stateless masker cannot — it never
+    // looks at the siblings.
+    masked("deploy region us-east complete", arena);
+    const std::string in_stream_a{masked(shared, arena)};
+    masked("deploy region ap-south complete", arena);
+    const std::string in_stream_b{masked(shared, arena)};
+    const std::string alone{masked(shared, arena)}; // no priming at all
 
-    // Stream B: the shared line alone — Drain keeps the region literal.
-    Drain drain_b{cfg()};
-    const std::string drain_b_tmpl{drain_tmpl(drain_b, arena, shared)};
-
-    ASSERT_NE(drain_a_tmpl, drain_b_tmpl)
-        << "precondition — Drain IS order/stream-dependent (the phantom pair)\n"
-        << "stream A: " << drain_a_tmpl << "\nstream B: " << drain_b_tmpl;
-
-    // The fix: one logical line → one stateless template, in either stream.
-    Drain unused{cfg()};
-    (void)drain_tmpl(unused, arena, "deploy region ap-south complete"); // priming has no effect
-    const std::string m1{masked(shared, arena)};
-    const std::string m2{masked(shared, arena)};
-    EXPECT_EQ(m1, m2) << "the stateless template must be stream-invariant: " << m1 << " vs " << m2;
+    EXPECT_EQ(in_stream_a, in_stream_b)
+        << "the stateless template must be stream-invariant (the phantom pair is impossible):\n"
+        << "stream A: " << in_stream_a << "\nstream B: " << in_stream_b;
+    EXPECT_EQ(in_stream_a, alone) << "priming must have zero effect: " << in_stream_a << " vs "
+                                  << alone;
+    // The accepted tradeoff (D-TID-8): the region word is KEPT literal, not wildcarded.
+    EXPECT_NE(in_stream_a.find("eu-west"), std::string::npos)
+        << "a letter-leading word stays literal (F13 boundary): " << in_stream_a;
 }
 
 TEST(StatelessTemplate, StatusValueKeptDistinct)
@@ -168,16 +163,37 @@ TEST(StatelessTemplate, HashCounterAndWorkerBracketCollapse)
     EXPECT_NE(masked("#26", arena), masked("[gw26]", arena));
 }
 
-// ── Measure-first gate: post-stateless cardinality vs Drain on a real corpus ─────
-// Sizes the F13 need (the cardinality monitor's first reading) BEFORE the cascade.
-// Skipped unless CORPUS_DIR is set to a directory of *.log files (the CI revert
-// corpus). Reports: lines, Drain clusters, stateless distinct templates, the
-// over-split ratio, and the singleton fraction (the over-split tail F13 must shrink).
-TEST(StatelessTemplate, CardinalityVsDrain_Corpus)
+TEST(StatelessTemplate, KvNumericValueMaskedWordKept)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // D-TID-13 extension: a key=<digit-leading-value> token masks the VALUE, keeps the
+    // key — so per-id KV lines collapse to one template (no error-singleton false-diff).
+    EXPECT_EQ(masked("checkout completed order=100000", arena),
+              masked("checkout completed order=999999", arena));
+    EXPECT_EQ(masked("payment timeout txn=50000", arena),
+              masked("payment timeout txn=70000", arena));
+    EXPECT_EQ(masked("GC pause=512ms heap=87%", arena), masked("GC pause=9ms heap=3%", arena));
+    // A value-WORD stays literal (the D-TID-14 boundary; the registry's job): user=alice
+    // ≠ user=bob.
+    EXPECT_NE(masked("login user=alice", arena), masked("login user=bob", arena));
+    // Status-value KEEP (KV form): a green→red flip must NOT collapse.
+    EXPECT_NE(masked("request status=200", arena), masked("request status=500", arena));
+    EXPECT_NE(masked("proc code=0", arena), masked("proc code=1", arena));
+    // …but a non-status numeric value beyond the status-digit gate masks.
+    EXPECT_EQ(masked("listening port=8080", arena), masked("listening port=9090", arena));
+}
+
+// ── Masker cardinality on a real corpus (the standing F13 re-measure instrument) ──
+// Reports the masker's distinct-template count + singleton fraction on a corpus — the
+// reading used to size F13 (the one-time over-split ratio vs the now-ripped Drain was
+// 4.12x→1.79x at the §8 gate; that comparison cannot re-run post-rip, and the standing
+// guard is the K_dim cardinality monitor). Re-run this after any F13 rule change.
+// Skipped unless CORPUS_DIR is a directory of *.log files (the CI revert corpus).
+TEST(StatelessTemplate, CardinalityOnCorpus)
 {
     const char* const corpus_dir{std::getenv("CORPUS_DIR")};
     if (corpus_dir == nullptr)
-        GTEST_SKIP() << "set CORPUS_DIR to a directory of *.log files to size F13";
+        GTEST_SKIP() << "set CORPUS_DIR to a directory of *.log files to measure cardinality";
 
     namespace fs = std::filesystem;
     std::vector<fs::path> files;
@@ -190,9 +206,7 @@ TEST(StatelessTemplate, CardinalityVsDrain_Corpus)
     constexpr std::size_t kMaxLines{300000};
     ArenaAllocator arena{8U * 1024U * 1024U};
     LogParser parser{arena};
-    Drain drain{cfg()};
     std::unordered_map<std::string, std::uint64_t> stateless_templates;
-    std::string clean; // reused ANSI-strip buffer
     std::size_t lines{0};
 
     for (const auto& file : files)
@@ -206,32 +220,25 @@ TEST(StatelessTemplate, CardinalityVsDrain_Corpus)
             if (raw.empty())
                 continue;
             arena.reset();
+            // parse_line ANSI-strips at ingest (D-TID-11) and the masker runs on the
+            // parsed content — exactly the production path.
             const auto parsed{parser.parse_line(raw)};
             if (!parsed)
                 continue;
-            // ANSI-strip the parsed content (D-TID-11, applied at ingest in production) so
-            // BOTH engines see colour-free content — the fair F13 re-measure.
-            strip_escape_sequences(parsed->content, clean);
-            drain.match_into_arena(clean, arena); // Drain clusters (its own arena persists)
-            ++stateless_templates[std::string{stateless_template(clean, arena, cfg()).template_str}];
+            ++stateless_templates[std::string{
+                stateless_template(parsed->content, arena, cfg()).template_str}];
             ++lines;
         }
     }
 
-    const std::size_t drain_clusters{drain.cluster_count()};
     const std::size_t stateless_distinct{stateless_templates.size()};
     const std::size_t singletons{static_cast<std::size_t>(
         std::ranges::count_if(stateless_templates, [](const auto& kv) { return kv.second == 1; }))};
-    const double ratio{drain_clusters > 0 ? static_cast<double>(stateless_distinct) /
-                                                static_cast<double>(drain_clusters)
-                                          : 0.0};
 
-    std::cout << "\n=== Stateless template_id cardinality (F13 sizing) ===\n"
+    std::cout << "\n=== Stateless template_id cardinality (F13 re-measure) ===\n"
               << "files            : " << files.size() << "\n"
               << "lines            : " << lines << "\n"
-              << "Drain clusters   : " << drain_clusters << "\n"
               << "Stateless distinct: " << stateless_distinct << "\n"
-              << "over-split ratio : " << ratio << "x\n"
               << "singletons       : " << singletons << " ("
               << (stateless_distinct > 0 ? (100.0 * static_cast<double>(singletons) /
                                             static_cast<double>(stateless_distinct))

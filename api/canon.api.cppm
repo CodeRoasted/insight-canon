@@ -31,8 +31,18 @@ using Duration = std::chrono::system_clock::duration;
 
 // ── Identifiers ──
 using EventID = uint64_t;
-using TemplateID = uint64_t;
 using WindowID = uint64_t;
+
+// ── Canonicalization-contract version (stateless_template_id.md D-TID-16) ──
+// The single canon-owned identifier of the canonicalization CONTRACT — the masking
+// rules that turn a raw line into its `template_str` (the stateless per-line masker +
+// the F13 class set). Every MetaLog producer DEFAULTS to this (MetaLogConfig), so a
+// rules change is one edit HERE and impossible to skip: bump it and old/new metalogs
+// become incomparable at the §2.4 gate (re-derive, never migrate — D-TID-9). It names
+// the rules generation, NOT the package version (decoupled — a patch release that does
+// not touch the masking rules must NOT change it). Bump the suffix on any masking-rule
+// change (a new F13 class, the eventual SemanticClassRegistry).
+inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-1"};
 
 // ── Sequences ──
 using NGram = std::vector<EventID>;
@@ -397,7 +407,6 @@ export namespace insight::tokenization
 struct CanonicalEvent
 {
     EventID id{};
-    TemplateID template_id{};
     Timestamp timestamp;
     LogLevel level{LogLevel::Unknown};
     // The format the line was ROUTED to by the strategy layer (the sticky/auto-detect winner).
@@ -414,9 +423,9 @@ struct CanonicalEvent
     std::string_view template_str;            // "Connection from <*> port <*>"
     std::span<const std::string_view> params; // ["192.168.1.1", "22"]
     // What this line DOES in the sequence (announced role; StructuralRole
-    // registry). Orthogonal to template_id (what the line IS) and to the semantic
-    // class of tokens inside it. Consumers: phase alignment + structural surprise
-    // (Phase 2/4); None for the vast majority of lines.
+    // registry). Orthogonal to template_str (what the line IS — its content identity)
+    // and to the semantic class of tokens inside it. Consumers: phase alignment +
+    // structural surprise (Phase 2/4); None for the vast majority of lines.
     StructuralRole structural_role{StructuralRole::None};
 };
 

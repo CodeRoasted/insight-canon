@@ -41,7 +41,6 @@ class Tokenizer
 
     [[nodiscard]] std::size_t events_produced() const noexcept;
     [[nodiscard]] std::size_t lines_parsed() const noexcept;
-    [[nodiscard]] std::size_t cluster_count() const noexcept;
 
   private:
     struct Impl;

@@ -56,7 +56,6 @@ TEST(InsightCanonPackage, TokenizesJsonLine)
     ASSERT_TRUE(static_cast<bool>(result)) << result.error();
 
     const auto& event{result.value()};
-    EXPECT_NE(event.template_id, 0U);
     EXPECT_FALSE(event.template_str.empty());
 }
 

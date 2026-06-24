@@ -1,16 +1,15 @@
 // NOLINTBEGIN
 // Tokenization throughput benchmark.
 //
-// Measures end-to-end Tokenizer::process_line() cost — Drain template mining
-// plus arena-backed CanonicalEvent emission — on a synthetic Zipf-ish corpus.
+// Measures end-to-end Tokenizer::process_line() cost — stateless per-line template
+// masking plus arena-backed CanonicalEvent emission — on a synthetic Zipf-ish corpus.
 //
 // Reported metrics:
 //   * `items_per_second`  — log lines tokenized per wall second
 //   * `ns_per_line`       — nanoseconds per line (lower is better)
-//   * `templates_seen`    — distinct Drain clusters at end of run
 //
 // Architectural target (technical_docs/overview/architecture.md):
-//   Steady-state per-line cost ≤ 1 µs at 32 templates / Drain depth 4.
+//   Steady-state per-line cost ≤ 1 µs at 32 templates.
 //
 // Modeled after insight-metalog/benchmarks/bench_metalog.cpp (Phase 3 anchor).
 
@@ -99,7 +98,7 @@ void BM_TokenizationThroughput(benchmark::State& state)
             benchmark::DoNotOptimize(tokenizer.process_line(line));
         }
         // Reset arena between iterations to avoid unbounded growth dominating
-        // the measurement; Drain state is preserved (steady-state regime).
+        // the measurement. The masker is stateless — no template state to preserve.
         state.PauseTiming();
         arena.reset();
         state.ResumeTiming();
@@ -109,7 +108,6 @@ void BM_TokenizationThroughput(benchmark::State& state)
     state.counters["ns_per_line"] = benchmark::Counter(
         static_cast<double>(kLinesPerIter),
         benchmark::Counter::kIsIterationInvariantRate | benchmark::Counter::kInvert);
-    state.counters["templates_seen"] = static_cast<double>(tokenizer.cluster_count());
 }
 
 BENCHMARK(BM_TokenizationThroughput)->Arg(4)->Arg(8)->Unit(benchmark::kMicrosecond);

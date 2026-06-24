@@ -83,12 +83,28 @@ void LogParser::set_auto_detect(bool enabled)
 
 // Successful parses are O(line.size()) for the arena copy + strategy parsing.
 // Rejected lines skip the arena copy.
-std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view line)
+std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view raw_line)
 {
-    if (line.empty())
+    if (raw_line.empty())
     {
         ++failed_count_;
         INSIGHT_LOG_TRACE(logging::parser_logger(), "parse: empty line skipped");
+        return std::unexpected(std::string("LogParser: empty line"));
+    }
+
+    // D-TID-11: strip ANSI/CSI/SGR/OSC escape sequences as an unconditional content
+    // normalization at canon ingest — BEFORE strategy detection AND tokenization, so the
+    // format prefix-match, the level token-scan, and the `component` extraction all see
+    // colour-free content (colour is presentation, never content; the escapes interleave
+    // within/between tokens so a per-token mask cannot reach them). Pure byte state machine
+    // → cross-stdlib bit-identical. The cleaned bytes live in escape_scratch_ until the
+    // arena copy below; failed-detection lines never reach the copy.
+    strip_escape_sequences(raw_line, escape_scratch_);
+    const std::string_view line{escape_scratch_};
+    if (line.empty())
+    {
+        ++failed_count_;
+        INSIGHT_LOG_TRACE(logging::parser_logger(), "parse: line was all escape bytes, skipped");
         return std::unexpected(std::string("LogParser: empty line"));
     }
 

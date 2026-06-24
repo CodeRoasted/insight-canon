@@ -110,30 +110,31 @@ TEST_F(TokenizerTest, SameStructuredLinesSameTemplateID)
     auto r1{tokenizer.process_line(R"({"msg":"User alice connected"})")};
     auto r2{tokenizer.process_line(R"({"msg":"User alice connected"})")};
     ASSERT_TRUE(r1.has_value() && r2.has_value());
-    EXPECT_EQ(r1.value().template_id, r2.value().template_id);
+    // Identity is the content-deterministic template_str (the downstream SHA-256 of it
+    // is template_id). Same line → same template_str, statelessly.
+    EXPECT_EQ(r1.value().template_str, r2.value().template_str);
 }
 
 TEST_F(TokenizerTest, VariablePartBecomesWildcardInTemplate)
 {
-    // After two similar messages the Drain template should contain "<*>".
-    static_cast<void>(tokenizer.process_line(R"({"msg":"User alice logged in from 10.0.0.1"})"));
+    // The IPv4 token is masked to "<*>" per-line (stateless); the kept literal "User"
+    // anchors the template. (The names alice/bob are letter-leading words → KEPT, not
+    // masked — the D-TID-14 boundary; only syntactic high-card classes mask.)
     auto r{tokenizer.process_line(R"({"msg":"User bob logged in from 10.0.0.2"})")};
     ASSERT_TRUE(r.has_value());
-    // By the second match the template should have been refined.
     EXPECT_NE(r.value().template_str.find("User"), std::string::npos);
+    EXPECT_NE(r.value().template_str.find("<*>"), std::string::npos); // the IP masked
 }
 
 TEST_F(TokenizerTest, DifferentFormatLinesDifferentTemplates)
 {
-    // Use content with different first tokens to guarantee Drain routes them to
-    // different leaves regardless of similarity threshold.
+    // Two lines with different content → different masked templates.
     auto rSyslog{tokenizer.process_line("Jan 15 08:03:22 host proc[1]: kernel startup completed")};
     auto rJSON{
         tokenizer.process_line(R"({"level":"INFO","message":"database connection established"})")};
     ASSERT_TRUE(rSyslog.has_value() && rJSON.has_value());
-    // The two lines go through different strategies → different content →
-    // likely different templates.
-    EXPECT_NE(rSyslog.value().template_id, rJSON.value().template_id);
+    // The two lines go through different strategies → different content → different templates.
+    EXPECT_NE(rSyslog.value().template_str, rJSON.value().template_str);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -222,11 +223,8 @@ TEST_F(TokenizerTest, ReportsParsedLineCount)
     EXPECT_GE(tokenizer.lines_parsed(), 1u);
 }
 
-TEST_F(TokenizerTest, ReportsClusterCount)
-{
-    static_cast<void>(tokenizer.process_line(R"({"msg":"drain test"})"));
-    EXPECT_GE(tokenizer.cluster_count(), 1u);
-}
+// (ReportsClusterCount retired — the stateless masker has no cluster state; cluster_count()
+//  was removed with the Drain clustering, stateless_template_id.md D-TID-3.)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Edge cases / robustness
@@ -292,7 +290,8 @@ TEST_F(TokenizerTest, BatchAllFourFormatsAllSucceed)
 TEST_F(TokenizerTest, InterleaveErrorsDoNotCorruptTemplateIds)
 {
     // Process a valid line, an error, then another structurally identical valid
-    // line. The third line's template_id must equal the first's (same structure).
+    // line. The third line's template_str must equal the first's (same structure) —
+    // the intervening error does not perturb the stateless masker.
     auto r1{tokenizer.process_line(R"({"msg":"worker job started"})")};
     ASSERT_TRUE(r1.has_value());
 
@@ -301,38 +300,45 @@ TEST_F(TokenizerTest, InterleaveErrorsDoNotCorruptTemplateIds)
 
     auto r3{tokenizer.process_line(R"({"msg":"worker job started"})")};
     ASSERT_TRUE(r3.has_value());
-    EXPECT_EQ(r1.value().template_id, r3.value().template_id);
+    EXPECT_EQ(r1.value().template_str, r3.value().template_str);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // JSON message containing KV-like content (nested format)
 // ─────────────────────────────────────────────────────────────────────────────
 
-TEST_F(TokenizerTest, JSONWithKVContentClustersCorrectly)
+TEST_F(TokenizerTest, JSONWithKVContentMaskedStatelessly)
 {
-    // The JSON strategy extracts the message; Drain receives the KV-like content.
-    // The STABLE token must be first so both lines share the same routing leaf.
-    // Putting "action=login" first means token[0] = "action=login" for both lines
-    // → same prefix-tree leaf → compared → wildcard created for the varying
-    // user= position (similarity 2/3 ≈ 0.67 ≥ default threshold 0.4).
-    static_cast<void>(tokenizer.process_line(R"({"msg":"action=login user=alice status=ok"})"));
-    auto r{tokenizer.process_line(R"({"msg":"action=login user=bob status=ok"})")};
-    ASSERT_TRUE(r.has_value());
-    EXPECT_NE(r.value().template_str.find("action=login"), std::string::npos);
-    EXPECT_NE(r.value().template_str.find("<*>"), std::string::npos);
+    // The JSON strategy extracts the message; the stateless masker classifies each KV
+    // token by its OWN content. A `key=value` pair is a single letter-leading token →
+    // KEPT literal (the D-TID-14 boundary: a varying value-WORD is not a syntactic
+    // high-card class; masking it needs the deferred SemanticClassRegistry). So two
+    // lines differing only in a KV value-word are DISTINCT templates — the accepted
+    // stateless over-split (D-TID-8), NOT Drain's old cross-line wildcard.
+    auto ra{tokenizer.process_line(R"({"msg":"action=login user=alice status=ok"})")};
+    auto rb{tokenizer.process_line(R"({"msg":"action=login user=bob status=ok"})")};
+    ASSERT_TRUE(ra.has_value() && rb.has_value());
+    EXPECT_NE(ra.value().template_str.find("action=login"), std::string::npos);
+    EXPECT_NE(ra.value().template_str, rb.value().template_str)
+        << "a varying KV value-word stays literal (no cross-line wildcard): "
+        << ra.value().template_str << " vs " << rb.value().template_str;
+    // A digit-leading value as its own token still masks per-line.
+    auto rn{tokenizer.process_line(R"({"msg":"served 500 status=ok"})")};
+    ASSERT_TRUE(rn.has_value());
+    EXPECT_NE(rn.value().template_str.find("<*>"), std::string::npos); // "500" masked
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Drain param extraction stabilises after repeated similar lines
+// Param extraction for variable (digit-leading) positions
 // ─────────────────────────────────────────────────────────────────────────────
 
 TEST_F(TokenizerTest, HighVolumeTemplateStabilisesParams)
 {
     // Send 8 lines in the pattern "fetched NNN rows returned" with varying NNN.
     // The numeric position is a VARIABLE count (not a status value), so it masks
-    // to <*> and a param is extracted. (A status value behind code/status/exit/
-    // signal would instead be KEPT distinct; see test_drain SourceLocation /
-    // StatusValue tests. "rows" is not a status keyword, so masking applies.)
+    // to <*> per-line and a param is extracted. (A status value behind code/status/
+    // exit/signal would instead be KEPT distinct; see the StatusValueKeptDistinct
+    // masker test. "rows" is not a status keyword, so masking applies.)
     const std::vector<std::string_view> lines = {
         R"({"msg":"fetched 200 rows returned"})", R"({"msg":"fetched 201 rows returned"})",
         R"({"msg":"fetched 400 rows returned"})", R"({"msg":"fetched 404 rows returned"})",
@@ -393,11 +399,11 @@ TEST_F(TokenizerTest, EmojiContentEndToEnd)
     ASSERT_TRUE(r1.has_value());
     EXPECT_FALSE(r1.value().template_str.empty());
 
-    // Two structurally identical emoji lines must receive the same template ID.
+    // Two structurally identical emoji lines must receive the same template.
     auto r2{tokenizer.process_line(
         R"({"level":"INFO","message":"deploy \ud83d\ude80 succeeded \u2705"})")};
     ASSERT_TRUE(r2.has_value());
-    EXPECT_EQ(r1.value().template_id, r2.value().template_id);
+    EXPECT_EQ(r1.value().template_str, r2.value().template_str);
 }
 
 // NOLINTEND

@@ -7,6 +7,7 @@ export module insight.canon.detail.parse;
 import insight.canon.internal;        // std + global C types
 import insight.canon.api;             // LogFormat, ArenaAllocator
 import insight.canon.detail.strategy; // IFormatStrategy, ParsedLine
+import insight.canon.detail.scan;     // strip_escape_sequences (ANSI ingest normalization)
 
 // ──────── from src/insight/tokenization/format_detector.hpp ────────
 export namespace insight::tokenization
@@ -98,6 +99,10 @@ class LogParser
     LogFormat last_format_{LogFormat::Unknown}; // the format the last routed line was parsed with
     std::size_t parsed_count_{0};
     std::size_t failed_count_{0};
+    // Reusable buffer for the D-TID-11 ANSI/escape strip applied to every raw line
+    // at ingest (before detection & tokenization). Result is ≤ input, so the retained
+    // capacity makes the strip allocation-free in steady state.
+    std::string escape_scratch_;
 };
 
 } // namespace insight::tokenization

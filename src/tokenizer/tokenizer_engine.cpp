@@ -5,7 +5,7 @@ module insight.canon;
 import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.detail.strategy; // ParsedLine
-import insight.canon.detail.drain;    // Drain
+import insight.canon.detail.drain;    // stateless_template, StatelessTemplate
 import insight.canon.detail.parse;    // LogParser
 
 // src/1_tokenization/tokenizer_engine.cpp
@@ -15,10 +15,14 @@ import insight.canon.detail.parse;    // LogParser
 // Data flow per line:
 //   raw_line
 //     →  LogParser::parse_line()  →  ParsedLine { level, timestamp, component,
-//                                                  content }   (all arena-stable)
-//     →  Drain::match_into_arena(content, arena_)
-//                                →  ArenaMatchResult { template_id, template_str,
-//                                                      params[], new_cluster }
+//                                                  content }   (all arena-stable;
+//                                                  ANSI-stripped at ingest, D-TID-11)
+//     →  stateless_template(content, arena, config)
+//                                →  StatelessTemplate { template_str, params[] }
+//                                   (a pure function of the line's own masked tokens —
+//                                    no clustering state, no cross-line learning, so the
+//                                    template_id derived downstream is run-independent;
+//                                    the phantom pair cannot form — stateless_template_id.md)
 //     →  CanonicalEvent
 //
 // Ownership: the arena is external; all string_views in CanonicalEvent point
@@ -39,13 +43,13 @@ struct Tokenizer::Impl
     ArenaAllocator& arena; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members): tokenizer
                            // shares the caller-managed arena for stable string_views.
     LogParser parser;
-    Drain drain;
+    DrainConfig config; // token-mask configuration for the stateless masker (mask IPv4/hex)
     StructuralRoleRegistry role_registry;
     EventID next_id{0};
     std::size_t produced{0};
 
     Impl(ArenaAllocator& arena_ref, DrainConfig drain_config)
-        : arena{arena_ref}, parser{arena_ref}, drain{drain_config}
+        : arena{arena_ref}, parser{arena_ref}, config{drain_config}
     {
     }
 
@@ -59,11 +63,10 @@ struct Tokenizer::Impl
         }
         const ParsedLine& parsed_line = parsed.value();
 
-        const Drain::ArenaMatchResult match{drain.match_into_arena(parsed_line.content, arena)};
+        const StatelessTemplate match{stateless_template(parsed_line.content, arena, config)};
 
         CanonicalEvent event;
         event.id = next_id++;
-        event.template_id = match.template_id;
         event.timestamp = parsed_line.timestamp.value_or(Timestamp{});
         event.level = parsed_line.level;
         event.format = parser.routed_format(); // the routed winner for THIS line (set by parse_line)
@@ -76,15 +79,14 @@ struct Tokenizer::Impl
 
         ++produced;
 
-        INSIGHT_LOG_TRACE(logging::tokenizer_logger(), "event: id={} tmpl_id={} params={}",
-                          event.id, event.template_id, event.params.size());
+        INSIGHT_LOG_TRACE(logging::tokenizer_logger(), "event: id={} tmpl=\"{}\" params={}",
+                          event.id, event.template_str, event.params.size());
 
         if constexpr (logging::kDebugLogsEnabled)
         {
             if (produced % kProgressLogInterval == 0)
             {
-                INSIGHT_LOG_DEBUG(logging::tokenizer_logger(), "progress: events={} clusters={}",
-                                  produced, drain.cluster_count());
+                INSIGHT_LOG_DEBUG(logging::tokenizer_logger(), "progress: events={}", produced);
             }
         }
         return std::expected<CanonicalEvent, std::string>{event};
@@ -129,10 +131,6 @@ std::size_t Tokenizer::events_produced() const noexcept
 std::size_t Tokenizer::lines_parsed() const noexcept
 {
     return impl_->parser.lines_parsed();
-}
-std::size_t Tokenizer::cluster_count() const noexcept
-{
-    return impl_->drain.cluster_count();
 }
 
 } // namespace insight::tokenization
