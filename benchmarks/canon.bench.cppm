@@ -7,5 +7,5 @@ export import std;
 export import insight.canon;
 export import insight.canon.detail.scan;
 export import insight.canon.detail.strategy;
-export import insight.canon.detail.drain;
+export import insight.canon.detail.mask;
 export import insight.canon.detail.parse;

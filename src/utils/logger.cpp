@@ -56,7 +56,7 @@ void init_logging(spdlog::level::level_enum default_level)
                        // Module loggers — order does not matter; names must match kXxxLogger
                        // constants in logger.hpp.
                        const std::vector<std::string_view> logger_names{
-                           kArenaLogger,  kDrainLogger,    kDetectorLogger,
+                           kArenaLogger,  kMaskLogger,     kDetectorLogger,
                            kParserLogger, kStrategyLogger, kTokenizerLogger,
                        };
 
@@ -83,9 +83,9 @@ std::shared_ptr<spdlog::logger> arena_logger()
     return logger ? logger : spdlog::default_logger();
 }
 
-std::shared_ptr<spdlog::logger> drain_logger()
+std::shared_ptr<spdlog::logger> mask_logger()
 {
-    auto logger{spdlog::get(std::string{kDrainLogger})};
+    auto logger{spdlog::get(std::string{kMaskLogger})};
     return logger ? logger : spdlog::default_logger();
 }
 

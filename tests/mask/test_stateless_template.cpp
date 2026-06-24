@@ -15,9 +15,9 @@ using namespace insight::tokenization;
 
 namespace
 {
-DrainConfig cfg()
+MaskConfig cfg()
 {
-    return DrainConfig{}; // defaults: mask_ip_addresses / mask_hex_addresses on
+    return MaskConfig{}; // defaults: mask_ip_addresses / mask_hex_addresses on
 }
 
 // Copy the masked template out immediately (the arena is reused across calls).

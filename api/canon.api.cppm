@@ -1,5 +1,5 @@
 // insight.canon.api — the public DATA + API surface of canon (1.5.1 unwrap, §11.9). The former
-// api/insight/**/*.hpp content (types, det_math, canonical_event, drain_config,
+// api/insight/**/*.hpp content (types, det_math, canonical_event, mask_config,
 // structural_role_registry, arena_allocator, tokenizer_engine, failure_lexicon, time_utils, logger
 // accessors) lives here. std comes from insight.canon.internal; spdlog (3rd-party, the logger
 // accessor signatures) is a textual GMF include. det_math is header-only integer math — it stays
@@ -431,20 +431,18 @@ struct CanonicalEvent
 
 } // namespace insight::tokenization
 
-// ──────── from api/insight/tokenization/drain_config.hpp ────────
+// ──────── stateless per-line masker configuration ────────
 export namespace insight::tokenization
 {
 
-struct DrainConfig
+// Token-masking configuration for the stateless per-line masker (stateless_template).
+// The Drain clustering knobs (max_depth / similarity_threshold / max_clusters) were
+// removed with the clustering itself (stateless_template_id.md D-TID-3) — a stateless
+// masker has no tree, no similarity match, and no cluster cap to bound.
+struct MaskConfig
 {
-    std::size_t max_depth{4};
-    static constexpr double kDefaultSimilarityThreshold{0.4};
-    static constexpr std::size_t kDefaultMaxClusters{10'000};
-    double similarity_threshold{kDefaultSimilarityThreshold};
-    std::size_t max_clusters{kDefaultMaxClusters};
-
-    // Token masking: structurally variable tokens are replaced with "<*>" before
-    // template matching so they never fossilise into the cluster template.
+    // Structurally variable tokens are replaced with "<*>" before the masked template
+    // is formed, so they never fossilise into the template identity.
     bool mask_ip_addresses{true};  // IPv4 address tokens (e.g. "192.168.1.1:")
     bool mask_hex_addresses{true}; // hex address tokens  (e.g. "0xdeadbeef")
 };
@@ -718,7 +716,7 @@ namespace detail
 
 // Module logger names.
 inline constexpr std::string_view kArenaLogger{"insight.arena"};
-inline constexpr std::string_view kDrainLogger{"insight.drain"};
+inline constexpr std::string_view kMaskLogger{"insight.mask"};
 inline constexpr std::string_view kPipelineLogger{"insight.pipeline"};
 inline constexpr std::string_view kDetectorLogger{"insight.detector"};
 inline constexpr std::string_view kParserLogger{"insight.parser"};
@@ -731,7 +729,7 @@ void init_logging(spdlog::level::level_enum default_level = spdlog::level::info)
 
 // Per-module logger accessors (named logger when registered, else the spdlog default).
 std::shared_ptr<spdlog::logger> arena_logger();
-std::shared_ptr<spdlog::logger> drain_logger();
+std::shared_ptr<spdlog::logger> mask_logger();
 std::shared_ptr<spdlog::logger> pipeline_logger();
 std::shared_ptr<spdlog::logger> detector_logger();
 std::shared_ptr<spdlog::logger> parser_logger();

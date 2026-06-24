@@ -1,8 +1,8 @@
 # Tokenization (insight-canon)
 
-Status: shipped. Repo: insight-canon (single package). The public surface is the `insight.canon` module facade (`api/insight/canon.cppm` — the `Tokenizer`); the tokenization internals live in the sealed `insight.canon.detail.{scan,strategy,drain,parse}` shards under `src/insight/`.
+Status: shipped. Repo: insight-canon (single package). The public surface is the `insight.canon` module facade (`api/insight/canon.cppm` — the `Tokenizer`); the tokenization internals live in the sealed `insight.canon.detail.{scan,strategy,mask,parse}` shards under `src/insight/`.
 
-Tokenization turns raw log lines into `CanonicalEvent` records that downstream layers can process without understanding log-format syntax. It owns format detection, structured parsing, template mining, wildcard parameter extraction, and arena-backed string lifetime.
+Tokenization turns raw log lines into `CanonicalEvent` records that downstream layers can process without understanding log-format syntax. It owns format detection, structured parsing, stateless per-line template masking, wildcard parameter extraction, and arena-backed string lifetime.
 
 ## Input
 
@@ -17,7 +17,6 @@ The output is `insight::tokenization::CanonicalEvent`:
 | Field | Meaning |
 |---|---|
 | `id` | Monotonic `EventID` assigned in tokenizer input order. |
-| `template_id` | Drain cluster id for the canonical template. |
 | `timestamp` | Parsed UTC timestamp when present; otherwise a fallback timestamp. |
 | `level` | Normalized `LogLevel` (`Trace` through `Fatal`, or `Unknown`). |
 | `component` | Parsed service, process, host, or source component when available. |
@@ -33,7 +32,7 @@ All string views in a `CanonicalEvent` point into the tokenizer's `ArenaAllocato
 raw line
   -> FormatDetector selects the highest-confidence strategy
   -> LogParser produces ParsedLine metadata and content
-  -> Drain matches or creates a template cluster
+  -> the stateless masker forms the per-line masked template + params
   -> Tokenizer returns CanonicalEvent
 ```
 
@@ -48,15 +47,15 @@ The important knobs live below the tokenizer facade:
 | Area | Knob | Effect |
 |---|---|---|
 | Arena | arena capacity | Bounds string storage for one tokenizer lifetime/window. |
-| Drain | depth, similarity threshold, max children/clusters | Controls template clustering sensitivity and memory use. |
+| Masker | `MaskConfig` (mask IPv4 / hex address tokens) | Which token classes are masked before the template is formed. |
 | Format strategies | registered strategy set | Controls which log formats participate in detection. |
 
-The default `InsightPipeline` constructs the tokenizer with the shipped defaults. Direct package users may construct and configure lower-level parser/Drain objects when they need different clustering behavior.
+The default `InsightPipeline` constructs the tokenizer with the shipped defaults. Direct package users may pass a `MaskConfig` to the `Tokenizer` when they need different masking behavior.
 
 ## Contracts
 
 - Tokenization is deterministic for the same ordered input stream.
-- `Tokenizer`, `LogParser`, `Drain`, and `ArenaAllocator` are not thread-safe; use one instance per worker or source.
+- `Tokenizer`, `LogParser`, and `ArenaAllocator` are not thread-safe; use one instance per worker or source.
 - Output-affecting paths must not depend on unordered-map iteration order.
 - Raw input lines must not be logged by diagnostics.
 - Downstream phases must not retain `CanonicalEvent` string views beyond the arena lifetime.
@@ -69,4 +68,4 @@ The default `InsightPipeline` constructs the tokenizer with the shipped defaults
 
 ## Validation
 
-Unit coverage lives under `tests/<domain>/` (the per-domain mirror of `src/insight/` — strategy/drain/parse/tokenizer/arena/utils/math). Loghub regression coverage uses fixtures under `data/logs/loghub/` when present; missing fixtures are reported as skipped so local builds remain portable. Benchmarks live under `benchmarks/` and are included in the aggregate pipeline performance reports.
+Unit coverage lives under `tests/<domain>/` (the per-domain mirror of `src/insight/` — strategy/mask/parse/tokenizer/arena/utils/math). Loghub regression coverage uses fixtures under `data/logs/loghub/` when present; missing fixtures are reported as skipped so local builds remain portable. Benchmarks live under `benchmarks/` and are included in the aggregate pipeline performance reports.

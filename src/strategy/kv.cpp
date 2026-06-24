@@ -16,7 +16,7 @@ import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitive
 //   key="quoted value" double-quoted value (may contain spaces)
 //
 // Well-known keys are mapped to structured fields; the rest are concatenated
-// into the content string as free-form pairs for Drain ingestion.
+// into the content string as free-form pairs for the masker.
 //
 // Hand-written KV scanner: zero RE2, zero per-pair string copies.
 
@@ -140,7 +140,7 @@ std::expected<ParsedLine, std::string> KVStrategy::parse(std::string_view line,
 
     if (write_pos == 0)
     {
-        // No content written — fall back to the full line for Drain.
+        // No content written — fall back to the full line for the masker.
         parsed_line.content = line;
     }
     else

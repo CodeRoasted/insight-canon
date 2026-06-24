@@ -5,7 +5,7 @@ module insight.canon;
 import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.detail.strategy; // ParsedLine
-import insight.canon.detail.drain;    // stateless_template, StatelessTemplate
+import insight.canon.detail.mask;     // stateless_template, StatelessTemplate
 import insight.canon.detail.parse;    // LogParser
 
 // src/1_tokenization/tokenizer_engine.cpp
@@ -43,13 +43,13 @@ struct Tokenizer::Impl
     ArenaAllocator& arena; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members): tokenizer
                            // shares the caller-managed arena for stable string_views.
     LogParser parser;
-    DrainConfig config; // token-mask configuration for the stateless masker (mask IPv4/hex)
+    MaskConfig config; // token-mask configuration for the stateless masker (mask IPv4/hex)
     StructuralRoleRegistry role_registry;
     EventID next_id{0};
     std::size_t produced{0};
 
-    Impl(ArenaAllocator& arena_ref, DrainConfig drain_config)
-        : arena{arena_ref}, parser{arena_ref}, config{drain_config}
+    Impl(ArenaAllocator& arena_ref, MaskConfig mask_config)
+        : arena{arena_ref}, parser{arena_ref}, config{mask_config}
     {
     }
 
@@ -93,8 +93,8 @@ struct Tokenizer::Impl
     }
 };
 
-Tokenizer::Tokenizer(ArenaAllocator& arena, DrainConfig drain_config)
-    : impl_{std::make_unique<Impl>(arena, drain_config)}
+Tokenizer::Tokenizer(ArenaAllocator& arena, MaskConfig mask_config)
+    : impl_{std::make_unique<Impl>(arena, mask_config)}
 {
     INSIGHT_LOG_INFO(logging::tokenizer_logger(), "tokenizer init");
 }

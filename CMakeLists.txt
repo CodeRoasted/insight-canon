@@ -29,7 +29,7 @@ find_package(simdjson REQUIRED CONFIG)
 ###########################################################
 #  Sources (1.5.2 domain decomposition, §11.9.11)
 #  - PUBLIC module interface units (installed): internal (src/) + api + facade (api/).
-#  - PRIVATE (sealed, build-only) detail shards (src/<domain>/): scan ◀ strategy ◀ parse; drain a
+#  - PRIVATE (sealed, build-only) detail shards (src/<domain>/): scan ◀ strategy ◀ parse; mask a
 #    leaf over api. Never installed — external consumers cannot import insight.canon.detail.*.
 #  - Module impl units (regular sources, scanned): src/**/*.cpp attach via
 #    `module insight.canon{.api|.detail.<domain>};` (+ the facade impl unit tokenizer_engine.cpp).
@@ -44,7 +44,7 @@ set(CANON_PUBLIC_MODULE_UNITS
 set(CANON_DETAIL_MODULE_UNITS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scan/canon.detail.scan.cppm
     ${CMAKE_CURRENT_SOURCE_DIR}/src/strategy/canon.detail.strategy.cppm
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/drain/canon.detail.drain.cppm
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mask/canon.detail.mask.cppm
     ${CMAKE_CURRENT_SOURCE_DIR}/src/parse/canon.detail.parse.cppm
 )
 file(GLOB_RECURSE CANON_IMPL_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")

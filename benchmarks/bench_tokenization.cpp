@@ -82,7 +82,7 @@ void BM_TokenizationThroughput(benchmark::State& state)
     const auto corpus{make_corpus(n_templates, kLinesPerIter, 42)};
 
     tok::ArenaAllocator arena{1U << 20U};
-    tok::Tokenizer tokenizer{arena, tok::DrainConfig{}};
+    tok::Tokenizer tokenizer{arena, tok::MaskConfig{}};
 
     // Warm up so the steady-state path dominates.
     for (const auto& line : corpus.lines)

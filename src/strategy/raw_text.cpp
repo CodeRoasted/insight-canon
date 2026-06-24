@@ -9,8 +9,8 @@ import insight.canon.api;
 // RawTextStrategy — last-resort catch-all for unstructured text.
 //
 // Zero-copy: the input is already arena-stable when parse() is invoked, so the
-// message body is a subview of it after a pointer-arithmetic left-trim. Drain
-// (with its built-in numeric/IP/hex masking) does the templating downstream.
+// message body is a subview of it after a pointer-arithmetic left-trim. The masker
+// (with its per-token numeric/IP/hex masking) does the templating downstream.
 
 namespace insight::tokenization
 {

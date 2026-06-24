@@ -1,19 +1,16 @@
-// insight.canon.detail.drain — SEALED stateless template-masking domain (1.5.2 domain
+// insight.canon.detail.mask — SEALED stateless template-masking domain (1.5.2 domain
 // decomposition, §11.9.11). The per-line masker: content → (arena-stable masked template +
 // params), a PURE function of the line's own tokens. A leaf over the contract: imports api only
-// (DrainConfig, ArenaAllocator) — independent of scan/strategy/parse. Never re-exported by the
+// (MaskConfig, ArenaAllocator) — independent of scan/strategy/parse. Never re-exported by the
 // facade and never installed (PRIVATE file set).
 //
 // History: this domain was the stateful Drain online log-template miner (clustering tree +
 // absorb_into wildcard learning). That cross-line learning made `template_id` order-dependent — the
 // "phantom pair" false-diff (stateless_template_id.md D-TID-3). The clustering was RIPPED; the
-// stateless masker below is the sole identity source. (Module/file/config names retain the historical
-// "drain" until the rename pass.)
-export module insight.canon.detail.drain;
+// stateless masker below is the sole identity source.
+export module insight.canon.detail.mask;
 import insight.canon.internal; // std + global C types
-import insight.canon.api;      // DrainConfig, ArenaAllocator
-
-// ──────── from src/insight/tokenization/drain.hpp ────────
+import insight.canon.api;      // MaskConfig, ArenaAllocator
 export namespace insight::tokenization
 {
 
@@ -40,6 +37,6 @@ struct StatelessTemplate
 
 [[nodiscard]] StatelessTemplate stateless_template(std::string_view content,
                                                    ArenaAllocator& out_arena,
-                                                   const DrainConfig& config);
+                                                   const MaskConfig& config);
 
 } // namespace insight::tokenization

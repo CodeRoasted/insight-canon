@@ -1,8 +1,8 @@
-module insight.canon.detail.drain;
+module insight.canon.detail.mask;
 import insight.canon.internal; // std (via `export import std;` — includes std::memchr)
 import insight.canon.api;
 
-// drain.cpp — the stateless per-line template masker
+// mask.cpp — the stateless per-line template masker
 //
 // `stateless_template(content, arena, config)` is the sole identity source: a PURE
 // function of a line's own whitespace-delimited tokens, each classified KEEP / MASK /
@@ -477,7 +477,7 @@ namespace
 // map iteration, no state — so it is cross-stdlib bit-identical and order-/stream-
 // independent by construction (D-TID-9).
 StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& out_arena,
-                                     const DrainConfig& config)
+                                     const MaskConfig& config)
 {
     std::string tmpl;
     tmpl.reserve(content.size() + kWildcard.size());

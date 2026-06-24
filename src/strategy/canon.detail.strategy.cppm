@@ -21,7 +21,7 @@ export namespace insight::tokenization
 //              the strategy is invoked.
 // component  — component / tag extracted by the strategy and stored into the
 //              arena via ArenaAllocator::store_string().
-// content    — message body fed to the Drain tokeniser, also arena-stored.
+// content    — message body fed to the masker, also arena-stored.
 struct ParsedLine
 {
     std::string_view raw_line;

@@ -14,7 +14,7 @@ import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitive
 // CLF:      host ident user [timestamp] "method url proto" status bytes
 // Combined: … "referer" "user-agent"
 //
-// The Drain input content is constructed as: "METHOD URL STATUS" — a compact
+// The masker input content is constructed as: "METHOD URL STATUS" — a compact
 // form useful for template extraction of HTTP access patterns.
 //
 // Hand-written scanner: zero RE2, zero string copies except for the

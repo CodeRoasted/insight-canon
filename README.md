@@ -8,7 +8,7 @@ pipeline for structured log analysis:
 | Layer | What it does |
 |---|---|
 | **core** | Shared types (`LogLevel`, `EventID`), logging façade (spdlog), ISO-8601 time utilities |
-| **tokenization** | Format detection, Drain template clustering, arena allocator, `CanonicalEvent` output |
+| **tokenization** | Format detection, stateless per-line template masking, arena allocator, `CanonicalEvent` output |
 
 > A _canonical event_ is the normalized, format-agnostic representation of a log line.
 > Tokenization produces it; insight-metalog and insight-eidos consume it.
@@ -34,7 +34,7 @@ insight-canon is the **content-determinism** layer of the pipeline: the same inp
 
 Two guarantees combine:
 
-- **Deterministic tokenization** — a line's template is a pure function of its bytes: `same bytes ⇒ same tokens ⇒ same template id`, versioned by a `canonicalization_version`. `EventID`s are monotonic (never wall-clock or hash-seeded), `CanonicalEvent` string views are arena-stable, Drain clustering is a pure function of (template prefix, parameter mask), and no `unordered_map` iteration order ever reaches output.
+- **Deterministic tokenization** — a line's template is a pure function of its bytes: `same bytes ⇒ same tokens ⇒ same template id`, versioned by a `canonicalization_version`. `EventID`s are monotonic (never wall-clock or hash-seeded), `CanonicalEvent` string views are arena-stable, the template is a pure per-line function of its own masked tokens (no cross-line state), and no `unordered_map` iteration order ever reaches output.
 - **Bit-identical math** (`det_math`) — every logarithm / entropy / divergence on the deterministic path is computed in integer fixed-point with **no libm** and accumulated in a 128-bit integer reducer (order-independent by construction). IEEE `+ − × ÷` are already cross-machine deterministic; removing libm transcendentals and float-sum ordering removes the only two divergence sources. Consuming code builds with `-ffp-contract=off`.
 
 The result: identical logs yield an identical fingerprint *input* everywhere — the foundation the transport (`coderoast-ipc`) and the format (`insight-metalog`) build a fully reproducible pipeline on.
@@ -149,14 +149,14 @@ insight-canon/
 │   └── insight/
 │       ├── canon.internal.cppm   insight.canon.internal — std manifest
 │       ├── canon.api.cppm        insight.canon.api — the contract (types, det_math,
-│       │                         CanonicalEvent, DrainConfig, arena, utils, logging accessors)
+│       │                         CanonicalEvent, MaskConfig, arena, utils, logging accessors)
 │       ├── canon.cppm            insight.canon — the facade (Tokenizer)
 │       └── utils/log_macros.hpp  textual INSIGHT_LOG_* macro layer (installed header)
 ├── src/                    SEALED detail shards (build-only, never installed) + impl units
 │   └── insight/
 │       ├── scan/           insight.canon.detail.scan — fast_gates predicates + SSE2 sv_* scans
 │       ├── strategy/       insight.canon.detail.strategy — IFormatStrategy + 20 format strategies
-│       ├── drain/          insight.canon.detail.drain — the Drain template miner
+│       ├── mask/           insight.canon.detail.mask — the stateless per-line template masker
 │       ├── parse/          insight.canon.detail.parse — FormatDetector + LogParser
 │       ├── tokenizer/      tokenizer_engine.cpp — facade impl unit (the Tokenizer seam)
 │       ├── arena/          arena_allocator.cpp — api impl unit
@@ -164,7 +164,7 @@ insight-canon/
 ├── test_package/           Conan consumer smoke test (zero-init, import insight.canon only)
 ├── tests/                  Per-domain mirror of src/ + the insight.canon.test aggregate module
 │   ├── canon.test.cppm     insight.canon.test — re-exports facade + all detail shards
-│   ├── <domain>/           math/ arena/ utils/ drain/ strategy/ parse/ tokenizer/ — GTest suites
+│   ├── <domain>/           math/ arena/ utils/ mask/ strategy/ parse/ tokenizer/ — GTest suites
 │   └── regression/         Loghub-dataset regression tests
 ├── benchmarks/             Benchmarks + the insight.canon.bench aggregate module
 ├── proof/                  Public determinism proof gate (Approach B)
@@ -175,9 +175,9 @@ insight-canon/
 └── .github/workflows/      ci.yml  release-publish.yml  workflow-lint.yml
 ```
 
-Module layering (the §11.9.11 pattern): `internal ◀ api ◀ detail.{scan ◀ strategy ◀ parse, drain} ◀
+Module layering (the §11.9.11 pattern): `internal ◀ api ◀ detail.{scan ◀ strategy ◀ parse, mask} ◀
 facade`. The facade interface never imports a detail shard; `tokenizer_engine.cpp` (a facade impl
-unit) imports `detail.{strategy,drain,parse}` to assemble the pipeline — consumers just
+unit) imports `detail.{strategy,mask,parse}` to assemble the pipeline — consumers just
 `import insight.canon;`.
 
 ---
