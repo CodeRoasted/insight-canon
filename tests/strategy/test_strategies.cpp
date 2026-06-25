@@ -1835,4 +1835,67 @@ TEST_F(SystemdJournalStrategyTest, RejectsCLFAndKV)
     EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// RawTextStrategy — the last-resort catch-all for unstructured application stdout.
+// Re-homes the canon raw-path invariants of insight-playground 09 T2
+// (RawAppStdout.RawPathTemplatesAndInfersLevels): a bare leading level word is lifted
+// (the dominant-level signal that lets Sift/Eidos rank a raw stream), while the prose
+// body is kept WHOLE — no KV-steal, no fabricated WHERE — so it does not fragment the
+// way the structured KV strategy would. These are single-component canon properties;
+// the raw EMISSION format is a LogCraft formatter concern (proven in logcraft), and the
+// end-to-end seam is contract fixture 09 — neither needs the full replay to prove this.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class RawTextStrategyTest : public ::testing::Test
+{
+  protected:
+    RawTextStrategy strategy;
+    ArenaAllocator arena{4096};
+};
+
+TEST_F(RawTextStrategyTest, FormatReturnsRawText)
+{
+    EXPECT_EQ(strategy.format(), LogFormat::RawText);
+}
+
+TEST_F(RawTextStrategyTest, InfersLeadingErrorLevel)
+{
+    // The error class surfaces with the level inferred from the bare leading word —
+    // only possible because canon took the raw path (no structured level field).
+    auto result{strategy.parse("ERROR connection refused to db pool", arena)};
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result.value().level, LogLevel::Error);
+}
+
+TEST_F(RawTextStrategyTest, InfersLeadingInfoLevel)
+{
+    auto result{strategy.parse("INFO checkout completed for order=ORD-4821", arena)};
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result.value().level, LogLevel::Info);
+}
+
+TEST_F(RawTextStrategyTest, KeepsProseWholeNoKvStealNoWhere)
+{
+    // The checkout prose carries a glued, ever-varying order id (order=ORD-<seq>). The
+    // raw strategy must NOT steal it as a KV field or fabricate a component (the
+    // WHERE-RAW boundary): the whole message stays the content (the masker templates it
+    // downstream), so it does not fragment the way the structured KV strategy would.
+    static constexpr std::string_view kProse{"checkout completed for order=ORD-4821 in 12 ms"};
+    auto result{strategy.parse(kProse, arena)};
+    ASSERT_TRUE(result.has_value());
+    const auto& pl{result.value()};
+    EXPECT_EQ(pl.content, kProse) << "prose must survive whole — no KV-steal fragmentation";
+    EXPECT_TRUE(pl.component.empty()) << "raw text carries no structured component (WHERE-RAW)";
+    EXPECT_FALSE(pl.timestamp.has_value()) << "raw stdout carries no parsed timestamp";
+}
+
+TEST_F(RawTextStrategyTest, LeadingWhitespaceTrimmedForContinuationGrouping)
+{
+    // Indented continuation lines (e.g. traceback frames) left-trim so they group with
+    // their peers — pure pointer arithmetic, no level word ⇒ the default level.
+    auto result{strategy.parse("    at frame in module", arena)};
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result.value().content, "at frame in module");
+}
+
 // NOLINTEND : Unit tests may intentionally violate some style rules for clarity or simplicity.
