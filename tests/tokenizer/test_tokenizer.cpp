@@ -66,6 +66,54 @@ TEST_F(TokenizerTest, ProcessesKVLine)
     EXPECT_EQ(ev.component, "cache");
 }
 
+// The cube-dimension precondition for the kv (logfmt) flow path: a kv line carrying
+// `level=` + `component=<service>` + a benign prose `msg=` tokenizes to a CLEAN
+// (level, component, role) tuple — component = the declared service (non-empty),
+// role None (the message announces no structural marker), and level taken verbatim
+// from the `level=` field (across the Info/Error band). The cube axes (insight::cube
+// kNumDims=3) read exactly these three CanonicalEvent fields, so this is their
+// canon-level guarantee.
+//
+// Re-homed from the former e2e do-operator substrate precondition (28-31's
+// `KvCanonPopulatesFlowCubeDimsCleanly`, ROADMAP Topic-H): that test asserted the
+// same tuple on LIVE LogCraft-generated kv flow records, but the wiring it guards is
+// a single-component canon property — proven here on hand-built kv lines, decoupled
+// from the generator. The do-axis collapse claim itself stays in the playground
+// do-operator contract fixtures (28-31), which rely on this precondition.
+TEST_F(TokenizerTest, KvFlowRecordsPopulateCubeDimsCleanly)
+{
+    struct KvCase
+    {
+        std::string_view line;
+        LogLevel level;
+        std::string_view component;
+    };
+    // Representative benign flow records — the declared services across the Info/Error
+    // band, plain prose messages (no announced ##[...] / ::...:: structural marker).
+    const KvCase cases[]{
+        {R"(level=info component=gateway msg="accept settle request")", LogLevel::Info, "gateway"},
+        {R"(level=info component=payments msg="settle order total")", LogLevel::Info, "payments"},
+        {R"(level=error component=payments msg="settle order total")", LogLevel::Error, "payments"},
+        {R"(level=info component=notifier msg="publish settlement event")", LogLevel::Info,
+         "notifier"},
+        {R"(level=error component=notifier msg="publish settlement event")", LogLevel::Error,
+         "notifier"},
+    };
+
+    for (const auto& kase : cases)
+    {
+        const auto event{tokenizer.process_line(kase.line)};
+        ASSERT_TRUE(event.has_value()) << "kv flow line failed to tokenize: " << kase.line;
+        EXPECT_EQ(event->component, kase.component)
+            << "component= field must populate the WHERE axis cleanly: " << kase.line;
+        EXPECT_FALSE(event->component.empty()) << "empty component on: " << kase.line;
+        EXPECT_EQ(event->level, kase.level)
+            << "level= field must populate the SEVERITY axis verbatim: " << kase.line;
+        EXPECT_EQ(event->structural_role, StructuralRole::None)
+            << "a benign prose message announces no role (KIND axis = None): " << kase.line;
+    }
+}
+
 TEST_F(TokenizerTest, ProcessesCLFLine)
 {
     constexpr std::string_view line{
