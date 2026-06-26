@@ -76,6 +76,99 @@ namespace
     return is_otel;
 }
 
+// Copy the matched ordinal observations (W1, D-W1-3) into arena-stable storage and return a span
+// over them. Empty in → empty out (no allocation) so a non-ordinal line stays zero-cost. The
+// observations' `field_name` views point at the declared catalog's static keys (stable for the
+// program lifetime), so only the small POD array is arena-copied.
+[[nodiscard]] std::span<const OrdinalObservation>
+store_ordinals(std::span<const OrdinalObservation> observations, ArenaAllocator& arena)
+{
+    if (observations.empty())
+        return {};
+    void* const mem{arena.allocate(observations.size() * sizeof(OrdinalObservation),
+                                   alignof(OrdinalObservation))};
+    auto* const dst{static_cast<OrdinalObservation*>(mem)};
+    for (std::size_t i{0}; i < observations.size(); ++i)
+        dst[i] = observations[i];
+    return std::span<const OrdinalObservation>{dst, observations.size()};
+}
+
+// W1 fast-path field-route (D-W1-3): match the scanner's numeric candidates against the declared
+// catalog; each hit → a consumed ordinal observation. The decimal TEXT → int64 (no float→int).
+[[nodiscard]] std::span<const OrdinalObservation>
+extract_ordinals_fast(const FastJsonResult& fast, ArenaAllocator& arena)
+{
+    if (fast.numeric_field_count == 0)
+        return {};
+    std::array<OrdinalObservation, kFastJsonMaxNumericFields> matched{};
+    std::size_t matched_count{0};
+    for (std::size_t k{0}; k < fast.numeric_field_count; ++k)
+    {
+        const FastJsonNumericField& candidate{fast.numeric_fields[k]};
+        const OrdinalFieldDescriptor* const descriptor{match_ordinal_field(candidate.key)};
+        if (descriptor == nullptr)
+            continue;
+        const std::optional<std::int64_t> value{
+            parse_decimal_scaled(candidate.text, descriptor->scale_to_canonical)};
+        if (value)
+            matched[matched_count++] = OrdinalObservation{
+                .field_name = descriptor->key, .schedule = descriptor->schedule, .value = *value};
+    }
+    return store_ordinals(std::span<const OrdinalObservation>{matched.data(), matched_count}, arena);
+}
+
+// W1 slow-path field-route (D-W1-3): find_field_unordered per declared key (the OTEL-route
+// pattern); the value's raw decimal TOKEN → int64 (never get_double() — the D-W1-3 pin). MUST run
+// before the OTLP body descent below (which spends the on-demand cursor).
+[[nodiscard]] std::span<const OrdinalObservation>
+extract_ordinals_slow(simdjson::ondemand::object& root, ArenaAllocator& arena)
+{
+    std::array<OrdinalObservation, kOrdinalFieldCatalog.size()> matched{};
+    std::size_t matched_count{0};
+    for (const auto& descriptor : kOrdinalFieldCatalog)
+    {
+        simdjson::ondemand::value field;
+        if (root.find_field_unordered(descriptor.key).get(field) != simdjson::SUCCESS)
+            continue;
+        const std::optional<std::int64_t> value{
+            parse_decimal_scaled(field.raw_json_token(), descriptor.scale_to_canonical)};
+        if (value)
+            matched[matched_count++] = OrdinalObservation{
+                .field_name = descriptor.key, .schedule = descriptor.schedule, .value = *value};
+    }
+    return store_ordinals(std::span<const OrdinalObservation>{matched.data(), matched_count}, arena);
+}
+
+// The escape-free fast path (no simdjson): a single byte scan. Returns nullopt when the scan
+// cannot complete (escapes / nesting / malformed) so the caller falls back to full simdjson. Split
+// out of parse() to keep it within the cognitive-complexity budget (the extract_otel_fields rule).
+[[nodiscard]] std::optional<ParsedLine> try_fast_parse(std::string_view line, ArenaAllocator& arena)
+{
+    const FastJsonResult fast{try_fast_json(line)};
+    if (!fast.has_result)
+        return std::nullopt;
+    ParsedLine parsed_line;
+    parsed_line.raw_line = line;
+    if (!fast.timestamp_str.empty())
+    {
+        parsed_line.timestamp = utils::parse_iso8601(fast.timestamp_str);
+        if (!parsed_line.timestamp)
+            parsed_line.timestamp = utils::parse_bsd_syslog_ts(fast.timestamp_str);
+    }
+    if (!fast.level_str.empty())
+        parsed_line.level = utils::parse_log_level(fast.level_str);
+    if (!fast.component_str.empty())
+        parsed_line.component = arena.store_string(fast.component_str);
+    parsed_line.content = fast.message_str.empty() ? arena.store_string(line)
+                                                   : arena.store_string(fast.message_str);
+    parsed_line.ordinals = extract_ordinals_fast(fast, arena); // W1 (D-W1-3)
+    INSIGHT_LOG_DEBUG(logging::strategy_logger(),
+                      "strategy=JSON fast_path component={} level={} has_timestamp={}",
+                      parsed_line.component, to_string(parsed_line.level),
+                      parsed_line.timestamp.has_value());
+    return parsed_line;
+}
+
 } // namespace
 
 std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line,
@@ -85,33 +178,10 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
         return std::unexpected(std::string("JsonStrategy: empty line"));
 
     // ── Fast path ─────────────────────────────────────────────────────────────
-    // For escape-free JSON objects bypass simdjson entirely: single-pass byte
-    // scan with no heap allocation. Falls back to simdjson on any anomaly.
-    {
-        const auto fast{try_fast_json(line)};
-        if (fast.has_result)
-        {
-            ParsedLine parsed_line;
-            parsed_line.raw_line = line;
-            if (!fast.timestamp_str.empty())
-            {
-                parsed_line.timestamp = utils::parse_iso8601(fast.timestamp_str);
-                if (!parsed_line.timestamp)
-                    parsed_line.timestamp = utils::parse_bsd_syslog_ts(fast.timestamp_str);
-            }
-            if (!fast.level_str.empty())
-                parsed_line.level = utils::parse_log_level(fast.level_str);
-            if (!fast.component_str.empty())
-                parsed_line.component = arena.store_string(fast.component_str);
-            parsed_line.content = fast.message_str.empty() ? arena.store_string(line)
-                                                           : arena.store_string(fast.message_str);
-            INSIGHT_LOG_DEBUG(logging::strategy_logger(),
-                              "strategy=JSON fast_path component={} level={} has_timestamp={}",
-                              parsed_line.component, to_string(parsed_line.level),
-                              parsed_line.timestamp.has_value());
-            return std::expected<ParsedLine, std::string>{parsed_line};
-        }
-    }
+    // For escape-free JSON objects bypass simdjson entirely (try_fast_parse: single-pass byte scan,
+    // no heap alloc); falls back to full simdjson on any anomaly.
+    if (std::optional<ParsedLine> fast_parsed{try_fast_parse(line, arena)})
+        return std::expected<ParsedLine, std::string>{*std::move(fast_parsed)};
     // ── Slow path: full simdjson (handles escapes, nested objects, etc.) ──────
 
     auto& scratch{json_scratch()};
@@ -156,6 +226,10 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     // from the template by construction (OR1). is_otel routes the message to the nested
     // OTLP body.stringValue (extract_otel_fields keeps parse() within the complexity budget).
     const bool is_otel{extract_otel_fields(root, parsed_line)};
+
+    // W1 ordinal field-route (D-W1-3) — MUST precede the body descent below (which spends the
+    // on-demand cursor); find_field_unordered per declared key, like the OTEL route above.
+    parsed_line.ordinals = extract_ordinals_slow(root, arena);
 
     if (is_otel)
     {

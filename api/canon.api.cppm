@@ -189,6 +189,156 @@ inline constexpr std::array<OtelFieldDescriptor, 4> kOtelFieldCatalog{{
     {.field_class = OtelFieldClass::SeverityNumber, .key = "severityNumber"},
 }};
 
+// ── Declared ordinal-field catalog (W1 ordinal channel, §4A.4 D-W1-2/3/8) ──
+// The "now" tier (D-TID-6): a declared, registry-free catalog of structured numeric fields whose
+// VALUE is ordinal (metric structure — magnitude + distance), recognized by EXACT top-level field
+// name in the JsonStrategy field-route (mirror kOtelFieldCatalog). A declared-key hit is captured
+// as a consumed-not-tokenized ordinal observation (CanonicalEvent.ordinals) — NEVER a param —
+// which metalog bins per schedule into the W1 carrier (TopKEntry.ordinal_histograms). NOT the
+// SemanticClassRegistry (deferred): arbitrary/client ordinals await that (the D-TID-14 anti-monster
+// boundary). EXACT keys only — uniform across the fast/slow JSON paths, no value-syntax guessing
+// (the D-W1-5 mis-route hazard); suffix/pattern matching is a future extension when a scenario
+// needs it. Unit-explicit names only, so each value's unit is unambiguous (D-W1-3).
+
+// Which ordinal SCHEDULE (canonical unit + log ladder) a field bins onto. The schedule is a
+// versioned catalog (D-W1-4): its stable string id is the eidos diff's comparability key.
+enum class OrdinalSchedule : std::uint8_t
+{
+    DurationLog2Ns, // log2-octave ladder over nanoseconds (durations / latencies)
+    SizeLog2Bytes,  // log2-octave ladder over bytes (payload / response sizes)
+};
+
+// Per-schedule wire identity + bin count B (the frozen, versioned ladder — D-W1-2). The ladder
+// MAP itself (bin = clamp(bit_width(value)−1, 0, B−1)) lives metalog-side — it owns binning; canon
+// only needs the stable string id (carried to the wire) and the B, and never bins.
+struct OrdinalScheduleSpec
+{
+    OrdinalSchedule schedule;
+    std::string_view schedule_id; // stable + versioned; mismatch ⇒ no W1 (the eidos diff gate)
+    std::uint32_t bin_count;      // B — fixed, small, bounds the carrier (D-W1-2)
+};
+inline constexpr std::array<OrdinalScheduleSpec, 2> kOrdinalScheduleCatalog{{
+    {.schedule = OrdinalSchedule::DurationLog2Ns, .schedule_id = "dur-log2-ns-v1", .bin_count = 48U},
+    {.schedule = OrdinalSchedule::SizeLog2Bytes, .schedule_id = "size-log2-bytes-v1", .bin_count = 48U},
+}};
+
+[[nodiscard]] constexpr std::string_view ordinal_schedule_id(OrdinalSchedule schedule) noexcept
+{
+    for (const auto& spec : kOrdinalScheduleCatalog)
+        if (spec.schedule == schedule)
+            return spec.schedule_id;
+    return {};
+}
+[[nodiscard]] constexpr std::uint32_t ordinal_schedule_bins(OrdinalSchedule schedule) noexcept
+{
+    for (const auto& spec : kOrdinalScheduleCatalog)
+        if (spec.schedule == schedule)
+            return spec.bin_count;
+    return 0U;
+}
+
+// A declared ordinal field: exact name → schedule + the integer factor scaling the field's declared
+// unit to the schedule's CANONICAL unit (ns for durations, bytes for sizes). Every factor is a
+// power of ten (or 1) so the decimal→fixed-point parse is EXACT (D-W1-3 pin: the value is parsed
+// from the JSON number's decimal TEXT, never via double — a get_double()→cast would be the
+// forbidden float→int on the deterministic-content path).
+struct OrdinalFieldDescriptor
+{
+    std::string_view key; // EXACT top-level JSON key
+    OrdinalSchedule schedule;
+    std::int64_t scale_to_canonical; // ×factor: field unit → canonical unit (power of 10, or 1)
+};
+inline constexpr std::int64_t kNanosPerMicro{1'000};
+inline constexpr std::int64_t kNanosPerMilli{1'000'000};
+inline constexpr std::int64_t kNanosPerSecond{1'000'000'000};
+inline constexpr std::array<OrdinalFieldDescriptor, 14> kOrdinalFieldCatalog{{
+    {.key = "latency_ms", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = kNanosPerMilli},
+    {.key = "duration_ms", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = kNanosPerMilli},
+    {.key = "elapsed_ms", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = kNanosPerMilli},
+    {.key = "response_time_ms", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = kNanosPerMilli},
+    {.key = "latency_us", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = kNanosPerMicro},
+    {.key = "duration_us", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = kNanosPerMicro},
+    {.key = "latency_ns", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = 1},
+    {.key = "duration_ns", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = 1},
+    {.key = "duration_seconds", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = kNanosPerSecond},
+    {.key = "elapsed_seconds", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = kNanosPerSecond},
+    {.key = "response_bytes", .schedule = OrdinalSchedule::SizeLog2Bytes, .scale_to_canonical = 1},
+    {.key = "request_bytes", .schedule = OrdinalSchedule::SizeLog2Bytes, .scale_to_canonical = 1},
+    {.key = "size_bytes", .schedule = OrdinalSchedule::SizeLog2Bytes, .scale_to_canonical = 1},
+    {.key = "payload_bytes", .schedule = OrdinalSchedule::SizeLog2Bytes, .scale_to_canonical = 1},
+}};
+
+[[nodiscard]] constexpr const OrdinalFieldDescriptor* match_ordinal_field(std::string_view key) noexcept
+{
+    for (const auto& descriptor : kOrdinalFieldCatalog)
+        if (descriptor.key == key)
+            return &descriptor;
+    return nullptr;
+}
+
+// Parse a non-negative JSON numeric token's decimal TEXT to an int64 in the schedule's canonical
+// unit, multiplying by `scale` (a power of ten, or 1). Integer/decimal-string arithmetic only —
+// NEVER via double (D-W1-3 determinism pin). Returns nullopt on a malformed / negative / exponent /
+// overflowing token (the observation is then omitted — omit-when-absent). Fractional digits beyond
+// the scale's decimal places are truncated (deterministic). `scale` MUST be a power of ten or 1.
+[[nodiscard]] constexpr std::optional<std::int64_t> parse_decimal_scaled(std::string_view text,
+                                                                         std::int64_t scale) noexcept
+{
+    constexpr std::string_view kTrim{" \t\r\n,}]"};
+    while (!text.empty() && kTrim.find(text.front()) != std::string_view::npos)
+        text.remove_prefix(1);
+    while (!text.empty() && kTrim.find(text.back()) != std::string_view::npos)
+        text.remove_suffix(1);
+    if (text.empty())
+        return std::nullopt;
+    constexpr std::int64_t kIntMax{std::numeric_limits<std::int64_t>::max()};
+    constexpr std::int64_t kRadix{10};
+    std::size_t idx{0};
+    std::int64_t value{0};
+    bool any_digit{false};
+    for (; idx < text.size() && text[idx] >= '0' && text[idx] <= '9'; ++idx)
+    {
+        any_digit = true;
+        const std::int64_t digit{text[idx] - '0'};
+        if (value > (kIntMax - digit) / kRadix)
+            return std::nullopt; // integer-part overflow ⇒ omit
+        value = (value * kRadix) + digit;
+    }
+    if (scale != 0 && value > kIntMax / scale)
+        return std::nullopt; // ×scale overflow ⇒ omit
+    value *= scale;
+    if (idx < text.size() && text[idx] == '.')
+    {
+        ++idx;
+        std::int64_t frac_scale{scale / kRadix};
+        for (; idx < text.size() && text[idx] >= '0' && text[idx] <= '9'; ++idx)
+        {
+            any_digit = true;
+            if (frac_scale == 0)
+                continue; // beyond the schedule's precision ⇒ truncate
+            const std::int64_t contribution{(text[idx] - '0') * frac_scale};
+            if (value > kIntMax - contribution)
+                return std::nullopt;
+            value += contribution;
+            frac_scale /= kRadix;
+        }
+    }
+    if (idx != text.size() || !any_digit)
+        return std::nullopt; // trailing junk / lone '.' / exponent / sign ⇒ omit
+    return value;
+}
+
+// A recognized ordinal observation (W1, D-W1-3): the matched declared field, its schedule, and the
+// value parsed to the canonical-unit int64. Consumed-not-tokenized — carried on CanonicalEvent
+// parallel to the params/trace, NEVER serialized as a param. `field_name` is the catalog's static
+// key (stable for the program lifetime — no arena), surfaced on the diff row for `attributable_to`.
+struct OrdinalObservation
+{
+    std::string_view field_name; // the declared catalog key (e.g. "latency_ms")
+    OrdinalSchedule schedule;
+    std::int64_t value{0}; // canonical-unit fixed integer (ns for durations, bytes for sizes)
+};
+
 // ── Sequences ──
 using NGram = std::vector<EventID>;
 
@@ -648,6 +798,12 @@ struct CanonicalEvent
     // span_id/parent_span_id feed the deferred O3 DAG) and NEVER serialized — the MetaLog wire
     // shape is unchanged (OR1). `present == false` for every non-OTEL input → zero added cost.
     OtelTraceContext trace{};
+    // Declared ordinal observations (W1, §4A.4 D-W1-3), captured by the strategy layer from
+    // recognized structured numeric fields (kOrdinalFieldCatalog). Consumed-not-tokenized: metalog
+    // bins these per schedule into TopKEntry.ordinal_histograms (the W1 carrier); they are NEVER
+    // params. A span over arena-allocated storage (like `params`); EMPTY for every non-ordinal line
+    // → zero added cost on the hot path (input-conditional, the OTEL D-OTEL-2a precedent).
+    std::span<const OrdinalObservation> ordinals{};
 };
 
 } // namespace insight::tokenization

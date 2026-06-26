@@ -78,6 +78,8 @@ struct Tokenizer::Impl
             parsed_line.content); // announced structural role
         event.trace = parsed_line.trace; // OTEL trace context (D-OTEL-1): consumed by O2/O3,
                                          // never serialized; default-empty for non-OTEL inputs
+        event.ordinals = parsed_line.ordinals; // W1 ordinal observations (D-W1-3): consumed by
+                                               // metalog binning; empty span for non-ordinal lines
 
         ++produced;
 

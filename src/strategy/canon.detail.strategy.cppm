@@ -34,6 +34,11 @@ struct ParsedLine
     // (today: JsonStrategy on OTLP/JSON). Consumed downstream (O2 grouping; O3 DAG), never
     // serialized; `present == false` for every non-OTEL input.
     OtelTraceContext trace{};
+    // Declared ordinal observations (W1, D-W1-3), populated by a strategy that recognizes declared
+    // structured numeric fields (today: JsonStrategy via kOrdinalFieldCatalog). A span over
+    // arena-stable storage; empty for every non-ordinal line. Consumed metalog-side (W1 binning),
+    // never tokenized into the template.
+    std::span<const OrdinalObservation> ordinals{};
 };
 
 } // namespace insight::tokenization

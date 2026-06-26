@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -169,6 +170,20 @@ struct alignas(kSimdjsonScratchCacheLine) JsonScratch
     return false; // unterminated string
 }
 
+// A numeric field captured during the fast scan: its key + the raw numeric token text. The
+// catalog match + decimal→int64 parse happen in JsonStrategy::parse's module purview (this GMF
+// header cannot see the canon.api ordinal catalog), so the scanner only records candidates.
+struct FastJsonNumericField
+{
+    std::string_view key;
+    std::string_view text; // the raw numeric literal (digits / '.' / sign), un-trimmed
+};
+
+// Bounds the per-line numeric-candidate capture (W1 ordinal field-route). Log JSON carries a
+// handful of numeric fields; beyond this cap extras are ignored (a recognized ordinal past the
+// cap is missed — acceptable for the declared seed set; the slow path has no cap).
+inline constexpr std::size_t kFastJsonMaxNumericFields{8};
+
 // Output of the fast-path scanner.
 struct FastJsonResult
 {
@@ -177,6 +192,10 @@ struct FastJsonResult
     std::string_view level_str;
     std::string_view component_str;
     std::string_view message_str;
+    // Numeric fields seen in the scan (W1 ordinal candidates); matched against the declared
+    // catalog by the caller. `numeric_field_count` ≤ kFastJsonMaxNumericFields.
+    std::array<FastJsonNumericField, kFastJsonMaxNumericFields> numeric_fields{};
+    std::size_t numeric_field_count{0};
     bool has_result{false}; // true iff scan completed without errors
 };
 
@@ -251,7 +270,12 @@ inline void parse_number_ts(FastJsonResult& result, std::string_view key,
                ((line[pos] >= '0' && line[pos] <= '9') || line[pos] == '-' || line[pos] == '+' ||
                 line[pos] == '.' || line[pos] == 'e' || line[pos] == 'E'))
             ++pos;
-        parse_number_ts(result, key, line.substr(num_start, pos - num_start));
+        const std::string_view num_text{line.substr(num_start, pos - num_start)};
+        parse_number_ts(result, key, num_text);
+        // Record as a W1 ordinal candidate (matched against the declared catalog by the caller).
+        if (result.numeric_field_count < kFastJsonMaxNumericFields)
+            result.numeric_fields[result.numeric_field_count++] =
+                FastJsonNumericField{.key = key, .text = num_text};
     }
     else if (vch == 't' || vch == 'f' || vch == 'n')
     {
