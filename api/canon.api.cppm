@@ -40,9 +40,12 @@ using WindowID = uint64_t;
 // rules change is one edit HERE and impossible to skip: bump it and old/new metalogs
 // become incomparable at the §2.4 gate (re-derive, never migrate — D-TID-9). It names
 // the rules generation, NOT the package version (decoupled — a patch release that does
-// not touch the masking rules must NOT change it). Bump the suffix on any masking-rule
-// change (a new F13 class, the eventual SemanticClassRegistry).
-inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-1"};
+// not touch the masking rules must NOT change it). Bump the suffix on any output-affecting
+// canonicalization change. Generations: -1 = stateless masker + F13; -2 = OTEL-awareness
+// (severity-from-severity_number + trace-context routing + the trace-scoped graph —
+// insight_otel_epic.md D-OTEL-2, unconditional). The content changes ONLY for inputs carrying
+// OTEL fields (D-OTEL-2a); a non-OTEL document is byte-identical except this version string.
+inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-2"};
 
 // ── Template identity (insight_perf_template_id.md D-TIR-1) ──
 // The structural identity of a canonicalised template: the first 16 bytes of
