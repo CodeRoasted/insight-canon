@@ -30,6 +30,10 @@ struct ParsedLine
     std::string_view component; // F3b: the low-card functional source (subsystem/daemon/job)
     std::string_view host;      // F3b: the high-card node/host identity (hors-cube)
     std::string_view content;
+    // OTEL trace context (D-OTEL-1), populated by a strategy that recognizes OTEL log records
+    // (today: JsonStrategy on OTLP/JSON). Consumed downstream (O2 grouping; O3 DAG), never
+    // serialized; `present == false` for every non-OTEL input.
+    OtelTraceContext trace{};
 };
 
 } // namespace insight::tokenization

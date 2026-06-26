@@ -16,6 +16,58 @@ import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitive
 namespace insight::tokenization
 {
 
+namespace
+{
+
+// Route the declared OTEL field-map (D-OTEL-4a) over the parsed OTLP object: severity_number
+// → the LogLevel band (declared > inferred — it runs after the level-string route, so it
+// overrides), and traceId/spanId/parentSpanId → the consumed trace context. Returns true iff
+// the record is OTEL (a severityNumber or traceId was present), which the caller uses to route
+// the message to the nested body.stringValue. Trace ids are hashed to scalar PODs and never
+// retained as values (OR1). Kept separate so JsonStrategy::parse stays within its complexity
+// budget.
+[[nodiscard]] bool extract_otel_fields(simdjson::ondemand::object& root, ParsedLine& parsed_line)
+{
+    bool is_otel{false};
+    std::string_view scratch_view;
+    for (const auto& descriptor : kOtelFieldCatalog)
+    {
+        const std::span<const std::string_view> key_span{&descriptor.key, 1};
+        switch (descriptor.field_class)
+        {
+        case OtelFieldClass::SeverityNumber:
+            if (std::int64_t severity_number{}; try_get_int64(root, key_span, severity_number))
+            {
+                parsed_line.level = log_level_from_severity_number(severity_number);
+                is_otel = true;
+            }
+            break;
+        case OtelFieldClass::TraceId:
+            if (try_get_string(root, key_span, scratch_view))
+            {
+                parsed_line.trace.present = true;
+                parsed_line.trace.trace_id = trace_id_from_hex(scratch_view);
+                is_otel = true;
+            }
+            break;
+        case OtelFieldClass::SpanId:
+            if (try_get_string(root, key_span, scratch_view))
+                parsed_line.trace.span_id = span_id_from_hex(scratch_view);
+            break;
+        case OtelFieldClass::ParentSpanId:
+            if (try_get_string(root, key_span, scratch_view))
+            {
+                parsed_line.trace.has_parent = true;
+                parsed_line.trace.parent_span_id = span_id_from_hex(scratch_view);
+            }
+            break;
+        }
+    }
+    return is_otel;
+}
+
+} // namespace
+
 std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line,
                                                            ArenaAllocator& arena) const
 {
@@ -88,7 +140,23 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     if (try_get_string(root, kComponentKeys, scratch_view))
         parsed_line.component = arena.store_string(scratch_view);
 
-    if (try_get_string(root, kMessageKeys, scratch_view))
+    // ── OTEL/OTLP field-map (insight_otel_epic.md D-OTEL-1, the declared catalog D-OTEL-4a) ──
+    // severity_number → the LogLevel band (declared > inferred) + the trace context, all
+    // consumed structural metadata; the trace keys are top-level → never tokenized → dropped
+    // from the template by construction (OR1). is_otel routes the message to the nested
+    // OTLP body.stringValue (extract_otel_fields keeps parse() within the complexity budget).
+    const bool is_otel{extract_otel_fields(root, parsed_line)};
+
+    if (is_otel)
+    {
+        // OTLP message lives under the nested body.stringValue. MUST be the last root access
+        // (it descends into a child). A malformed/absent body → arena-store the whole line.
+        if (std::string_view body_value; try_get_otel_body(root, body_value))
+            parsed_line.content = arena.store_string(body_value);
+        else
+            parsed_line.content = arena.store_string(line);
+    }
+    else if (try_get_string(root, kMessageKeys, scratch_view))
     {
         parsed_line.content = arena.store_string(scratch_view);
     }

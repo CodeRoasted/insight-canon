@@ -97,6 +97,95 @@ inline std::ostream& operator<<(std::ostream& out, const TemplateId& template_id
     return out << render(template_id);
 }
 
+// ── OTEL trace context (insight_otel_epic.md §12, D-OTEL-1) ──
+// The OTEL hex ids (traceId/spanId/parentSpanId) are hashed to fixed-width scalar PODs at
+// the strategy seam — the D-TIR-4 hash-to-POD discipline — carried IN-MEMORY on the
+// CanonicalEvent, CONSUMED by the structural layer (trace_id groups the n-gram graph in O2;
+// span_id/parent_span_id feed the deferred O3 observed-DAG) and NEVER serialized into the
+// MetaLog (OR1 — the per-transaction-unique hex would be a cardinality bomb). A zero `value`
+// means "absent"; the hash forces non-zero on any non-empty input so absent ≠ present.
+struct TraceId
+{
+    std::uint64_t value{};
+    auto operator<=>(const TraceId&) const = default;
+    bool operator==(const TraceId&) const = default;
+};
+struct SpanId
+{
+    std::uint64_t value{};
+    auto operator<=>(const SpanId&) const = default;
+    bool operator==(const SpanId&) const = default;
+};
+
+// The per-record OTEL trace context extracted by the strategy layer (D-OTEL-1). All fields
+// are consumed downstream and never serialized. `present` is true iff the record carried a
+// trace_id (the O2 grouping key); span_id/parent_span_id are carried for O3 (the causal
+// vertex/edge) and unread by O2.
+struct OtelTraceContext
+{
+    bool present{false};     // the record carried a trace_id (the O2 grouping key)
+    bool has_parent{false};  // a parent_span_id was present (O3 edge; usually absent on logs)
+    TraceId trace_id{};      // the transaction grouping key (O2)
+    SpanId span_id{};        // the causal vertex identity (carried for O3)
+    SpanId parent_span_id{}; // the observed causal edge span→parent (carried for O3)
+};
+
+// fnv1a-64 of the OTEL hex string → a scalar id (content-addressed: same hex → same id,
+// any run, byte-only → cross-stdlib bit-identical, no float). 0 is reserved for "absent",
+// so a non-empty hex that hashes to 0 is bumped to 1. The hex is otherwise discarded
+// (consumed, not retained — OR1).
+[[nodiscard]] constexpr std::uint64_t otel_id_hash(std::string_view hex) noexcept
+{
+    constexpr std::uint64_t kFnvOffsetBasis{0xcbf29ce484222325ULL};
+    constexpr std::uint64_t kFnvPrime{0x00000100000001b3ULL};
+    std::uint64_t hash{kFnvOffsetBasis};
+    for (const char character : hex)
+    {
+        hash ^= static_cast<std::uint64_t>(static_cast<unsigned char>(character));
+        hash *= kFnvPrime;
+    }
+    return hash == 0U ? 1U : hash;
+}
+[[nodiscard]] constexpr TraceId trace_id_from_hex(std::string_view hex) noexcept
+{
+    return TraceId{otel_id_hash(hex)};
+}
+[[nodiscard]] constexpr SpanId span_id_from_hex(std::string_view hex) noexcept
+{
+    return SpanId{otel_id_hash(hex)};
+}
+
+// ── Declared OTEL field-map catalog (D-OTEL-4a) ──
+// The four schema-declared OTLP fields canon recognizes, as a structured (class → recognizer
+// key) catalog so the future SemanticClassRegistry ABSORBS it rather than a parallel
+// hardcoded path (D-OTEL-4) — the D-TID-6 "now" tier (a declared contract with hardcoded
+// strategies, like the JsonStrategy key lists), NOT the deferred registry. OTEL fields are
+// schema-declared (never data-learned), so they need no registry. Each class routes to its
+// declared layer (D-OTEL-1): the three trace keys → consumed structural metadata (dropped
+// from the template, never tokenized); severity_number → the LogLevel band.
+enum class OtelFieldClass : std::uint8_t
+{
+    TraceId,        // → OtelTraceContext::trace_id (O2 grouping key)
+    SpanId,         // → OtelTraceContext::span_id (O3 vertex)
+    ParentSpanId,   // → OtelTraceContext::parent_span_id (O3 edge)
+    SeverityNumber, // → LogLevel band (declared > inferred)
+};
+
+struct OtelFieldDescriptor
+{
+    OtelFieldClass field_class;
+    std::string_view key; // the OTLP/JSON top-level key
+};
+
+// The OTLP/JSON top-level keys per the OpenTelemetry Log Data Model. Keys are exact (OTLP is
+// a declared schema); a structured catalog, not scattered inline predicates.
+inline constexpr std::array<OtelFieldDescriptor, 4> kOtelFieldCatalog{{
+    {.field_class = OtelFieldClass::TraceId, .key = "traceId"},
+    {.field_class = OtelFieldClass::SpanId, .key = "spanId"},
+    {.field_class = OtelFieldClass::ParentSpanId, .key = "parentSpanId"},
+    {.field_class = OtelFieldClass::SeverityNumber, .key = "severityNumber"},
+}};
+
 // ── Sequences ──
 using NGram = std::vector<EventID>;
 
@@ -132,6 +221,36 @@ enum class LogLevel : uint8_t
         return "Fatal"sv;
     default:
         return "Unknown"sv;
+    }
+}
+
+// ── OTEL severity_number → LogLevel band (insight_otel_epic.md D-OTEL-1) ──
+// The OpenTelemetry severity_number (1–24) folds into canon's existing 6-level LogLevel
+// by integer division: band = (n-1)/4 → Trace(1–4)/Debug(5–8)/Info(9–12)/Warn(13–16)/
+// Error(17–20)/Fatal(21–24). Integer-only (no float — D-OTEL-3); n<1 clamps to Trace,
+// n>24 clamps to Fatal. This is the *declared* severity channel for OTEL inputs and wins
+// over the failure_lexicon when present (declared > inferred); canon keeps its own 6-level
+// model and DISCARDS the raw 1–24 number (MetaLog ≠ OTEL — D-OTEL-8). The 24-band
+// granularity is deliberately not inherited.
+[[nodiscard]] constexpr LogLevel log_level_from_severity_number(std::int64_t severity_number) noexcept
+{
+    if (severity_number < 1)
+        return LogLevel::Trace;
+    static constexpr std::int64_t kBandWidth{4}; // 24 OTEL numbers / 6 canon levels
+    switch ((severity_number - 1) / kBandWidth)
+    {
+    case 0:
+        return LogLevel::Trace;
+    case 1:
+        return LogLevel::Debug;
+    case 2:
+        return LogLevel::Info;
+    case 3:
+        return LogLevel::Warn;
+    case 4:
+        return LogLevel::Error;
+    default:
+        return LogLevel::Fatal; // band >= 5 (severity_number >= 21), clamped
     }
 }
 
@@ -312,6 +431,16 @@ template <> struct hash<insight::NgramId>
         std::size_t out{};
         std::memcpy(&out, ngram_id.bytes.data(), sizeof out);
         return out;
+    }
+};
+
+// std::hash<TraceId> (D-OTEL-1): keys O2's per-trace ring map. `value` is already an fnv1a
+// hash of the OTEL hex, so it IS a good size_t — no mixing. Importing the module suffices.
+template <> struct hash<insight::TraceId>
+{
+    [[nodiscard]] std::size_t operator()(const insight::TraceId& trace_id) const noexcept
+    {
+        return static_cast<std::size_t>(trace_id.value);
     }
 };
 } // namespace std
@@ -511,6 +640,11 @@ struct CanonicalEvent
     // and to the semantic class of tokens inside it. Consumers: phase alignment +
     // structural surprise (Phase 2/4); None for the vast majority of lines.
     StructuralRole structural_role{StructuralRole::None};
+    // OTEL trace context (insight_otel_epic.md D-OTEL-1), extracted by the strategy layer for
+    // OTEL inputs. CONSUMED in-memory (trace_id groups the n-gram graph in O2;
+    // span_id/parent_span_id feed the deferred O3 DAG) and NEVER serialized — the MetaLog wire
+    // shape is unchanged (OR1). `present == false` for every non-OTEL input → zero added cost.
+    OtelTraceContext trace{};
 };
 
 } // namespace insight::tokenization

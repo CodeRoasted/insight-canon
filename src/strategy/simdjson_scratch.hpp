@@ -107,6 +107,30 @@ struct alignas(kSimdjsonScratchCacheLine) JsonScratch
     return false;
 }
 
+// OTLP body extraction (insight_otel_epic.md D-OTEL-1): the OpenTelemetry Log Data Model
+// nests the message under body.stringValue (`"body":{"stringValue":"…"}`). Returns the
+// stringValue, or false when body is absent / not an object / carries no stringValue. MUST
+// be the LAST field accessed on `obj` — it descends into a child, after which the parent
+// cursor cannot rewind to a sibling (simdjson on-demand).
+[[nodiscard]] inline bool try_get_otel_body(simdjson::ondemand::object& obj,
+                                            std::string_view& out) noexcept
+{
+    simdjson::ondemand::value body_field;
+    if (obj.find_field_unordered("body").get(body_field) != simdjson::SUCCESS)
+        return false;
+    simdjson::ondemand::object body_obj;
+    if (body_field.get_object().get(body_obj) != simdjson::SUCCESS)
+        return false;
+    simdjson::ondemand::value string_value_field;
+    if (body_obj.find_field_unordered("stringValue").get(string_value_field) != simdjson::SUCCESS)
+        return false;
+    std::string_view value;
+    if (string_value_field.get_string().get(value) != simdjson::SUCCESS)
+        return false;
+    out = value;
+    return true;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Fast-path byte scanner — avoids simdjson for escape-free JSON objects.
 //

@@ -76,6 +76,8 @@ struct Tokenizer::Impl
         event.params = match.params;
         event.structural_role = insight::tokenization::StructuralRoleRegistry::classify(
             parsed_line.content); // announced structural role
+        event.trace = parsed_line.trace; // OTEL trace context (D-OTEL-1): consumed by O2/O3,
+                                         // never serialized; default-empty for non-OTEL inputs
 
         ++produced;
 

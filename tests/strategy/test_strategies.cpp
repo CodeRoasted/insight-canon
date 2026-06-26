@@ -341,6 +341,86 @@ TEST_F(JsonStrategyTest, RawLinePreserved)
     EXPECT_EQ(result.value().raw_line, kJSONLine);
 }
 
+// ── OTEL/OTLP ingestion (insight_otel_epic.md O1, D-OTEL-1) ──────────────────
+// One OTLP/JSON LogRecord as the LogCraft producer emits it: nested body.stringValue,
+// numeric severityNumber, top-level traceId(32 hex)/spanId(16 hex)/parentSpanId.
+static constexpr std::string_view kOtelLine{
+    R"({"timeUnixNano":"1705312200000000000","observedTimeUnixNano":"1705312200000000000",)"
+    R"("severityNumber":17,"severityText":"ERROR","body":{"stringValue":"GET /api/users -> 500"},)"
+    R"("attributes":[{"key":"service.name","value":{"stringValue":"api"}}],)"
+    R"("traceId":"0123456789abcdeffedcba9876543210","spanId":"00000000000000ff",)"
+    R"("parentSpanId":"0000000000000001"})"};
+
+TEST_F(JsonStrategyTest, OtelExtractsTraceContextAndBands)
+{
+    auto result{strategy.parse(kOtelLine, arena)};
+    ASSERT_TRUE(result.has_value());
+    const auto& pl{result.value()};
+    // severityNumber 17 → band (17-1)/4 = 4 → Error (declared severity wins).
+    EXPECT_EQ(pl.level, LogLevel::Error);
+    // body.stringValue becomes the content (the masker templates the message, NOT the raw JSON).
+    EXPECT_EQ(pl.content, "GET /api/users -> 500");
+    // Trace context consumed; trace_id is the non-zero hash of the OTEL hex.
+    EXPECT_TRUE(pl.trace.present);
+    EXPECT_EQ(pl.trace.trace_id, trace_id_from_hex("0123456789abcdeffedcba9876543210"));
+    EXPECT_NE(pl.trace.trace_id.value, 0U);
+    EXPECT_EQ(pl.trace.span_id, span_id_from_hex("00000000000000ff"));
+    EXPECT_TRUE(pl.trace.has_parent);
+    EXPECT_EQ(pl.trace.parent_span_id, span_id_from_hex("0000000000000001"));
+    // OR1: the high-card trace ids are DROPPED from the content (never tokenized).
+    EXPECT_EQ(pl.content.find("0123456789"), std::string_view::npos);
+    EXPECT_EQ(pl.content.find("traceId"), std::string_view::npos);
+}
+
+TEST_F(JsonStrategyTest, OtelRootSpanHasNoParent)
+{
+    // No parentSpanId → root span. Still OTEL (severityNumber + traceId present).
+    auto result{strategy.parse(
+        R"({"severityNumber":9,"body":{"stringValue":"root step"},"traceId":"aa","spanId":"bb"})",
+        arena)};
+    ASSERT_TRUE(result.has_value());
+    const auto& pl{result.value()};
+    EXPECT_EQ(pl.level, LogLevel::Info); // 9 → band 2 → Info
+    EXPECT_TRUE(pl.trace.present);
+    EXPECT_FALSE(pl.trace.has_parent);
+    EXPECT_EQ(pl.trace.parent_span_id.value, 0U);
+    EXPECT_EQ(pl.content, "root step");
+}
+
+TEST_F(JsonStrategyTest, NonOtelJsonHasNoTraceContext)
+{
+    // A plain JSON log carries no trace context — present == false (the byte-identity basis).
+    auto result{strategy.parse(kJSONLine, arena)};
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result.value().trace.present);
+    EXPECT_EQ(result.value().trace.trace_id.value, 0U);
+}
+
+TEST_F(JsonStrategyTest, OtelSeverityNumberBands)
+{
+    struct Case
+    {
+        int severity_number;
+        LogLevel expected;
+    };
+    // (n-1)/4 banding across the 6 levels, with clamps at both ends.
+    const std::vector<Case> cases{
+        {1, LogLevel::Trace}, {4, LogLevel::Trace},  {5, LogLevel::Debug}, {9, LogLevel::Info},
+        {13, LogLevel::Warn}, {17, LogLevel::Error}, {21, LogLevel::Fatal}, {24, LogLevel::Fatal},
+    };
+    for (const auto& cas : cases)
+    {
+        const std::string line{R"({"severityNumber":)" + std::to_string(cas.severity_number) +
+                               R"(,"body":{"stringValue":"m"},"traceId":"t","spanId":"s"})"};
+        ArenaAllocator local_arena{1024};
+        auto result{strategy.parse(line, local_arena)};
+        ASSERT_TRUE(result.has_value()) << "severity_number=" << cas.severity_number;
+        EXPECT_EQ(result.value().level, cas.expected)
+            << "severity_number=" << cas.severity_number
+            << " got=" << to_string(result.value().level);
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // KVStrategy
 // ─────────────────────────────────────────────────────────────────────────────
