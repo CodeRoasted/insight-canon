@@ -356,6 +356,12 @@ TEST_F(JsonStrategyTest, OtelExtractsTraceContextAndBands)
     auto result{strategy.parse(kOtelLine, arena)};
     ASSERT_TRUE(result.has_value());
     const auto& pl{result.value()};
+    // OTLP timeUnixNano → event-time (without it the pipeline never closes a window). 1.7053122e18
+    // ns = 1705312200 s; round-trip through the parsed Timestamp must recover that epoch second.
+    ASSERT_TRUE(pl.timestamp.has_value());
+    EXPECT_EQ(std::chrono::duration_cast<std::chrono::seconds>(pl.timestamp->time_since_epoch())
+                  .count(),
+              1705312200);
     // severityNumber 17 → band (17-1)/4 = 4 → Error (declared severity wins).
     EXPECT_EQ(pl.level, LogLevel::Error);
     // body.stringValue becomes the content (the masker templates the message, NOT the raw JSON).

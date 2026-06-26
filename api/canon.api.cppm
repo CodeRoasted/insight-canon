@@ -858,6 +858,14 @@ parse_bsd_syslog_ts(std::string_view timestamp_str,
 [[nodiscard]] std::optional<Timestamp>
 parse_epoch_timestamp(std::string_view timestamp_str) noexcept;
 
+// Parse OTLP `timeUnixNano` — Unix epoch NANOSECONDS as a digit string (e.g.
+// "1705312200000000000") to Timestamp (insight_otel_epic.md O1). Integer-only (from_chars +
+// integer duration_cast, no float); the OTEL event-time channel so OTEL inputs window like any
+// other format. Sub-`system_clock::duration` resolution truncates deterministically per stdlib
+// (the OTLP producer emits millisecond-granular nanos → lossless on both libc++/libstdc++).
+[[nodiscard]] std::optional<Timestamp>
+parse_unix_nano_timestamp(std::string_view timestamp_str) noexcept;
+
 // Parse HDFS compact date+time: date="YYMMDD", time="HHMMSS".
 [[nodiscard]] std::optional<Timestamp> parse_compact_date_time(std::string_view date,
                                                                std::string_view time) noexcept;

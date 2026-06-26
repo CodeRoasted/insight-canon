@@ -30,6 +30,16 @@ namespace
 {
     bool is_otel{false};
     std::string_view scratch_view;
+    // OTLP timeUnixNano → event-time. Not one of the four classified fields, but required so OTEL
+    // inputs carry a timestamp and window like any other format (without it the whole pipeline
+    // never closes a window). A quoted epoch-nanoseconds string per the OTLP/JSON mapping.
+    static constexpr std::string_view kTimeUnixNanoKey{"timeUnixNano"};
+    if (try_get_string(root, std::span<const std::string_view>{&kTimeUnixNanoKey, 1}, scratch_view))
+        if (auto timestamp{utils::parse_unix_nano_timestamp(scratch_view)})
+        {
+            parsed_line.timestamp = timestamp;
+            is_otel = true;
+        }
     for (const auto& descriptor : kOtelFieldCatalog)
     {
         const std::span<const std::string_view> key_span{&descriptor.key, 1};

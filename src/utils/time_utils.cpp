@@ -40,6 +40,9 @@ namespace time_constants
     inline constexpr std::size_t kBsdSyslogMinLength{15};
     inline constexpr std::size_t kClfMinLength{20};
     inline constexpr std::size_t kEpochTimestampMaxDigits{12};
+    // OTLP timeUnixNano: epoch nanoseconds. ~19 digits at the current epoch; 19 keeps it within
+    // int64 (max ≈ 9.2e18) and rejects an overflowing 20-digit value at the length gate.
+    inline constexpr std::size_t kUnixNanoMaxDigits{19};
     inline constexpr std::size_t kCompactDateWidth{6};
     inline constexpr std::size_t kShortYearSlashMinLength{17};
     inline constexpr std::size_t kDottedDateMinLength{10};
@@ -422,6 +425,28 @@ std::optional<Timestamp> parse_epoch_timestamp(std::string_view timestamp_str) n
     if (epoch < 0)
         return std::nullopt;
     return std::chrono::system_clock::from_time_t(static_cast<std::time_t>(epoch));
+}
+
+// OTLP timeUnixNano: epoch nanoseconds, "1705312200000000000". Integer-only — no float
+// (insight_otel_epic.md D-OTEL-3). The integer duration_cast truncates to system_clock's
+// resolution deterministically per stdlib; the OTLP producer emits millisecond-granular nanos,
+// so the truncation is lossless and the derived window membership is bit-identical cross-stdlib.
+std::optional<Timestamp> parse_unix_nano_timestamp(std::string_view timestamp_str) noexcept
+{
+    if (timestamp_str.empty() || timestamp_str.size() > time_constants::kUnixNanoMaxDigits)
+    {
+        return std::nullopt;
+    }
+    std::int64_t nanos{0};
+    const char* const ts_last{timestamp_str.data() + timestamp_str.size()};
+    auto parse_result{std::from_chars(timestamp_str.data(), ts_last, nanos)};
+    if (parse_result.ec != std::errc{} || parse_result.ptr != ts_last)
+    {
+        return std::nullopt;
+    }
+    if (nanos < 0)
+        return std::nullopt;
+    return Timestamp{std::chrono::duration_cast<Duration>(std::chrono::nanoseconds{nanos})};
 }
 
 // HDFS compact: date="YYMMDD", time="HHMMSS"
