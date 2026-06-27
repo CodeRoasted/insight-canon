@@ -91,7 +91,7 @@ Unknown	--	None	GET /api/orders <*>
 Unknown	--	None	cache warmed in <*>
 Unknown	--	None	request completed in <*>
 Unknown	--	None	GET /api/users <*>
-Unknown	F-	None	upstream timeout on shard <*>
+Unknown	--	None	upstream timeout on shard <*>
 Unknown	F-	None	request failed after <*>
 Unknown	--	None	Out of memory: Killed process <*> (app)
 ### det_math total=8 sum_c_log2c_qk=2199023255552
