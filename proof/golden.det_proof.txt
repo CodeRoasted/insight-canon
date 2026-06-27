@@ -59,6 +59,23 @@ Unknown	--	None	test billing.charge passed
 Error	F-	Terminator	##[error]test gateway.route failed: connection refused
 Error	F-	Terminator	##[error]Process completed with exit code 1
 ### det_math total=12 sum_c_log2c_qk=0
+## file json_ordinals.log
+### templates (1)
+12	db query completed via shard "primary"
+### events
+Info	--	None	db query completed via shard "primary"
+Info	--	None	db query completed via shard "primary"
+Info	--	None	db query completed via shard "primary"
+Info	--	None	db query completed via shard "primary"
+Info	--	None	db query completed via shard "primary"
+Info	--	None	db query completed via shard "primary"
+Info	--	None	db query completed via shard "primary"
+Info	--	None	db query completed via shard "primary"
+Info	--	None	db query completed via shard "primary"
+Info	--	None	db query completed via shard "primary"
+Info	--	None	db query completed via shard "primary"
+Info	--	None	db query completed via shard "primary"
+### det_math total=12 sum_c_log2c_qk=47300495456208
 ## file syslog.log
 ### templates (7)
 1	GET /api/orders <*>
