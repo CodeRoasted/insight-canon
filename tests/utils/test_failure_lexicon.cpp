@@ -85,7 +85,46 @@ TEST(FailureLexicon, PassVerdictDemotesBareErrorTypeName)
     EXPECT_TRUE(contains_failure_cue("[  FAILED  ] InsightCanon.ThrowsRuntimeException (0 ms)"))
         << "gtest '[ FAILED ]' — the failure word wins";
     EXPECT_TRUE(contains_failure_cue("ERROR teardown failed though setup was ok"))
-        << "a pass verdict NEVER overrides an explicit failure word";
+        << "a pass WORD never overrides a failure word; only an unambiguous leading pass "
+           "GLYPH does (D-OUT-1) — here the line is led by a failure word, not a glyph";
+}
+
+// ── A leading PASS GLYPH demotes even an explicit failure WORD (D-OUT-1) ───────
+// CI test logs are full of PASSING tests whose NAMES carry failure vocabulary
+// ("✓ marks runs failed when the runtime throws", "✔ write_bash failure returns …").
+// The per-test pass glyph (✓/✔/✅/√) is an unambiguous verdict — it appears as a result
+// marker and nowhere else — so a line LED by one is a pass, regardless of the failure
+// words in the test name. The glyph is byte-matched directly: for_each_token trims a
+// standalone glyph to an empty token, so a lexicon alone never sees it. This is the
+// strict half of the precision gradient — a failure WORD is demoted ONLY by a leading
+// pass GLYPH, never by a pass WORD (a pass WORD would false-demote a real failure
+// summary, asserted negative below).
+TEST(FailureLexicon, LeadingPassGlyphDemotesFailureWord)
+{
+    EXPECT_FALSE(contains_failure_cue("@cline/core test: ✓ marks runs failed when it throws"))
+        << "P1: ✓ leads after a monorepo scope prefix — passing test, 'failed' is in the name";
+    EXPECT_FALSE(contains_failure_cue("✔ write_bash failure returns a non-empty error message"))
+        << "P3: ✔ leads — passing test, 'failure'/'error' are in the name";
+    EXPECT_FALSE(contains_failure_cue("✅ should reject when the upstream call errored"))
+        << "✅ leads — 'errored' is part of a passing test's name";
+    EXPECT_FALSE(contains_failure_cue("√ returns an error on a bad path"))
+        << "√ (mocha-on-Windows pass mark) leads — 'error' is in the name";
+    EXPECT_FALSE(
+        contains_failure_cue("tests/db.spec \x1b[32m✓\x1b[0m asserts the query failed cleanly"))
+        << "ANSI-wrapped ✓ leads — the colour SGR is skipped, the glyph still demotes";
+}
+
+// ── The pass demotion is GLYPH-gated, NOT word-gated (D-OUT-1 disconfirming) ───
+// A leading pass WORD or a non-leading glyph must NOT demote a real failure — the
+// discriminator is "first outcome token is a pass glyph", nothing weaker.
+TEST(FailureLexicon, PassWordOrTrailingGlyphDoesNotDemote)
+{
+    EXPECT_TRUE(contains_failure_cue("======== 25 passed, 5 failed ========"))
+        << "pytest summary: 'passed' leads as a COUNT, not a verdict — the failure stands";
+    EXPECT_TRUE(contains_failure_cue("ERROR build broke ✓ cache restored"))
+        << "first outcome token is the failure word ERROR; a trailing ✓ must not demote it";
+    EXPECT_TRUE(contains_failure_cue("✗ marks the run failed when the worker dies"))
+        << "✗ is a FAIL glyph (not a pass glyph), skipped — the failure word 'failed' stands";
 }
 
 // ── Warning lexicon is separate (no CamelCase types) ───────────────────────────

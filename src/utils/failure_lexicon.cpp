@@ -96,12 +96,14 @@ namespace
     using Phrase = std::array<std::string_view, 2U>;
     constexpr std::array<Phrase, 1U> kFailurePhrases{{{"segmentation", "fault"}}};
 
-    // Explicit positive test/CI verdicts. A line that DECLARES a pass ("… Passed",
-    // gtest "[ OK ]", pytest "PASSED") must not be promoted to a failure on the
-    // strength of a CamelCase error-TYPE name alone — a test named "…RaisesValueError"
-    // that PASSED is not a regression. The verdict overrides ONLY that weak,
-    // name-based signal, never an explicit failure WORD ("error"/"failed"/…), so a
-    // genuinely failing line ("***Failed") is still flagged.
+    // Explicit positive test/CI verdicts (success WORDS). A line that DECLARES a pass
+    // ("… Passed", gtest "[ OK ]", pytest "PASSED") must not be promoted to a failure on
+    // the strength of a CamelCase error-TYPE name alone — a test named
+    // "…RaisesValueError" that PASSED is not a regression. A success WORD overrides ONLY
+    // that weak, name-based signal; it NEVER demotes an explicit failure WORD
+    // ("error"/"failed"/…), because a leading pass WORD would false-demote a genuine
+    // failure summary ("25 passed, 5 failed"). The strong failure WORD is demoted only by
+    // an unambiguous leading pass GLYPH (D-OUT-1, leading_outcome_is_pass), never a word.
     constexpr std::array<std::string_view, 4U> kSuccessVerdicts{"passed", "ok", "success",
                                                                 "succeeded"};
 
@@ -119,6 +121,96 @@ namespace
                                                              [token](std::string_view word) noexcept
                                                              { return iequals(token, word); });
                               });
+    }
+
+    // ── Outcome-aware demotion: a leading PASS GLYPH (D-OUT-1) ───────────────────────
+    // Per-test PASS glyphs (3-byte UTF-8, lead byte 0xE2) are unambiguous verdicts: they
+    // appear in CI output as a result marker and NOWHERE else, unlike the words
+    // "passed"/"ok" (which double as summary counts, prose, and test names). They are
+    // also INVISIBLE to for_each_token — a standalone glyph is all-non-alnum, so the
+    // tokenizer trims it to an empty token and the verdict is destroyed before any
+    // lexicon sees it — so they are byte-matched directly at a token start.
+    //   ✓ U+2713 · ✔ U+2714 · ✅ U+2705 · √ U+221A (the mocha-on-Windows pass mark)
+    using Glyph = std::array<unsigned char, 3U>;
+    constexpr std::array<Glyph, 4U> kPassGlyphs{{
+        {0xE2U, 0x9CU, 0x93U}, // ✓ U+2713 CHECK MARK
+        {0xE2U, 0x9CU, 0x94U}, // ✔ U+2714 HEAVY CHECK MARK
+        {0xE2U, 0x9CU, 0x85U}, // ✅ U+2705 WHITE HEAVY CHECK MARK
+        {0xE2U, 0x88U, 0x9AU}, // √ U+221A SQUARE ROOT — mocha's Windows pass mark
+    }};
+
+    [[nodiscard]] bool starts_with_pass_glyph(std::string_view text, std::size_t pos) noexcept
+    {
+        constexpr std::size_t kGlyphLen{3U};
+        if (pos + kGlyphLen > text.size())
+            return false;
+        const Glyph head{static_cast<unsigned char>(text[pos]),
+                         static_cast<unsigned char>(text[pos + 1U]),
+                         static_cast<unsigned char>(text[pos + 2U])};
+        return std::ranges::find(kPassGlyphs, head) != kPassGlyphs.end();
+    }
+
+    // Advance past ANSI escapes + token delimiters; returns the next token-start index
+    // (or text.size() if the rest of the line is delimiters). Mirrors for_each_token's
+    // inter-token skip so the two agree on token boundaries.
+    [[nodiscard]] std::size_t skip_to_token_start(std::string_view text, std::size_t pos) noexcept
+    {
+        for (;;)
+        {
+            if (const std::size_t esc{detail::ansi_escape_len(text, pos)}; esc != 0U)
+                pos += esc;
+            else if (pos < text.size() && detail::is_token_delimiter(text[pos]))
+                ++pos;
+            else
+                return pos;
+        }
+    }
+
+    // The trimmed token starting at `pos` (caller guarantees a non-delimiter, non-ANSI
+    // start); advances `pos` past it. Mirrors for_each_token's token extraction + the
+    // surrounding-non-alnum trim. substr begin <= pos <= size → noexcept body cannot throw.
+    // NOLINTNEXTLINE(bugprone-exception-escape)
+    [[nodiscard]] std::string_view take_trimmed_token(std::string_view text,
+                                                      std::size_t& pos) noexcept
+    {
+        const std::size_t begin{pos};
+        while (pos < text.size() && !detail::is_token_delimiter(text[pos]) &&
+               detail::ansi_escape_len(text, pos) == 0U)
+            ++pos;
+        std::string_view token{text.substr(begin, pos - begin)};
+        while (!token.empty() && !detail::is_token_alnum(token.front()))
+            token.remove_prefix(1U);
+        while (!token.empty() && !detail::is_token_alnum(token.back()))
+            token.remove_suffix(1U);
+        return token;
+    }
+
+    // Does the line's FIRST outcome-bearing token declare a pass? Walk the head
+    // left-to-right (ANSI- and scope-prefix-tolerant, tokenising exactly as
+    // for_each_token): the first token that is a pass GLYPH ⇒ true (pass leads); the
+    // first token that is a failure WORD ⇒ false (failure leads — stop, so a pathological
+    // "ERROR … ✓" still fires and the "ERROR teardown failed though setup was ok" guard
+    // holds); any other token (scope segment "@cline/core", a name, a number) is skipped.
+    // End-of-head ⇒ false. Glyph-gated, NOT word-gated: a leading pass WORD
+    // ("25 passed, 5 failed") is a summary count, not a verdict, and must not demote a
+    // real failure summary. Pure byte-compare + ASCII case-fold ⇒ cross-stdlib and MSVC
+    // bit-identical (F5).
+    [[nodiscard]] bool leading_outcome_is_pass(std::string_view text) noexcept
+    {
+        static constexpr std::size_t kOutcomeHead{128U}; // generous monorepo scope-prefix bound
+        const std::size_t limit{text.size() < kOutcomeHead ? text.size() : kOutcomeHead};
+        std::size_t pos{0};
+        while ((pos = skip_to_token_start(text, pos)) < limit)
+        {
+            if (starts_with_pass_glyph(text, pos)) // first outcome token is a pass glyph
+                return true;
+            const std::string_view token{take_trimmed_token(text, pos)};
+            for (const std::string_view word : kFailureWords)
+                if (iequals(token, word)) // first outcome token is a failure word
+                    return false;
+            // otherwise a non-outcome token (scope segment / name / number) — continue
+        }
+        return false; // no leading outcome token within the head
     }
 
 } // namespace
@@ -148,15 +240,23 @@ bool contains_failure_cue(std::string_view text, std::size_t scan_limit) noexcep
                            prev = token; // remember for the next adjacency check
                            return false;
                        })};
-    if (saw_failure_word)
-        return true;
-    if (!saw_error_type)
+    // A strong failure WORD fires unconditionally; a weak error-TYPE name (no failure
+    // word) is demoted by any success WORD anywhere — scanned across the WHOLE text, as a
+    // ctest verdict trails a long test name well past the keyword head. The success-word
+    // pass runs ONLY on the rare error-type-without-failure-word line (`||` short-circuit),
+    // so the hot path is unaffected.
+    const bool result{saw_failure_word ||
+                      (saw_error_type && !any_standalone_word(text, kSuccessVerdicts,
+                                                              /*scan_limit=*/0U))};
+    // Outcome guard (D-OUT-1): a line that carries a failure cue but is LED by an
+    // unambiguous pass GLYPH (✓/✔/✅/√) is a passing test whose NAME embeds failure
+    // vocabulary ("✓ marks runs failed …"), not a regression. Only a leading pass GLYPH
+    // demotes a failure WORD; a leading pass WORD ("25 passed, 5 failed") must not, so
+    // words do not. Paid only on the would-be-positive minority (short-circuit), and the
+    // walk stops at the first outcome token.
+    if (result && leading_outcome_is_pass(text))
         return false;
-    // Only a weak error-TYPE name was seen: a declared pass verdict demotes it to a
-    // non-failure. Scanned across the WHOLE text — a ctest verdict trails a long test
-    // name well past the keyword head. This extra pass runs ONLY on the rare
-    // error-type-without-failure-word line, so the hot path is unaffected.
-    return !any_standalone_word(text, kSuccessVerdicts, /*scan_limit=*/0U);
+    return result;
 }
 
 bool contains_warning_cue(std::string_view text, std::size_t scan_limit) noexcept
