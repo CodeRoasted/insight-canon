@@ -183,6 +183,30 @@ TEST(StatelessTemplate, KvNumericValueMaskedWordKept)
     EXPECT_EQ(masked("listening port=8080", arena), masked("listening port=9090", arena));
 }
 
+// D-TID-22: a declared currency MARKER glued to a digit-led numeric core masks to <marker><*>
+// (keep-marker, the #42→#<*> shape) — the decidable-numeric refinement of D-TID-18. Closes the
+// over-split twin: `order completed total=$N` collapses to one stable template so its vanish forms.
+TEST(StatelessTemplate, CurrencyMarkerNumberMasked)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // Bare token (composite chain): per-amount lines collapse to one template.
+    EXPECT_EQ(masked("order completed $463", arena), masked("order completed $18", arena));
+    EXPECT_EQ(masked("charged $463.50", arena), masked("charged $9.99", arena)); // decimal core
+    // KV value (normalize_kv_value marker-strip): total=$N → total=$<*>.
+    EXPECT_EQ(masked("order completed total=$463", arena),
+              masked("order completed total=$18", arena));
+    // The marker is KEPT (legible + a distinct class): $463 ≠ a bare 463, and $ ≠ # counters.
+    EXPECT_NE(masked("$463", arena), masked("463", arena));
+    EXPECT_NE(masked("$463", arena), masked("#463", arena));
+    // Boundary (D-TID-22 does NOT cross): `$`+letter has no digit core → kept literal, distinct.
+    EXPECT_NE(masked("export $HOME", arena), masked("export $PATH", arena));
+    EXPECT_NE(masked("cfg path=$HOME", arena), masked("cfg path=$ROOT", arena));
+    // Letter-prefixed ids stay D-TID-18 registry-class (untouched, still distinct).
+    EXPECT_NE(masked("ticket ORD-123", arena), masked("ticket ORD-456", arena));
+    // `$42abc` is not a clean number (trailing alpha) → kept literal, like `#42abc`.
+    EXPECT_NE(masked("ref $42abc", arena), masked("ref $99xyz", arena));
+}
+
 // ── Masker cardinality on a real corpus (the standing F13 re-measure instrument) ──
 // Reports the masker's distinct-template count + singleton fraction on a corpus — the
 // reading used to size F13 (the one-time over-split ratio vs the now-ripped Drain was

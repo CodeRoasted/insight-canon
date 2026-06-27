@@ -351,6 +351,59 @@ namespace
         return true;
     }
 
+    // D-TID-22 currency-marker catalog: FROZEN, DECLARED byte sequences. ASCII `$` only for now;
+    // `€`/`£`/`¥` would be added here as their literal UTF-8 byte strings ("€" etc.) iff a
+    // corpus shows them — byte-exact, NO Unicode property lookup (cross-stdlib determinism +
+    // portability, the D-TID-9 oracle). Adding a marker here auto-extends both touch points (the
+    // pre-gate + normalize_marker_number) — single source of truth.
+    inline constexpr std::array<std::string_view, 1> kCurrencyMarkers{std::string_view{"$"}};
+
+    // Length in BYTES of the declared currency marker prefixing `tok` (0 if none). Requires at
+    // least one byte after the marker (the numeric core), so a lone `$` is not a marker.
+    [[nodiscard]] inline std::size_t marker_prefix_len(std::string_view tok) noexcept
+    {
+        for (const std::string_view marker : kCurrencyMarkers)
+            if (tok.size() > marker.size() && tok.starts_with(marker))
+                return marker.size();
+        return 0;
+    }
+
+    // D-TID-22: a declared currency MARKER glued to a digit-led numeric core (`$463`, `$1.50`) →
+    // `$<*>` — keep the marker, mask the high-card amount (the D-TID-13 `#42 → #<*>` keep-class/
+    // mask-instance shape). A DECIDABLE numeric: there is no low-card *keyword* of shape
+    // `<marker><digits>` worth protecting (shell positionals `$1`/`$2` are negligible-in-logs and
+    // lossless to mask), so it joins the D-TID-12 #5 digit-leading numerics that the first-char
+    // `is_digit_leading` test misses on a leading marker. The core is digits + one optional
+    // `.`-fraction; a trailing alpha/digit after a clean core rejects (`$42abc` is not a counter,
+    // like `#42abc`), trailing punctuation is kept (`$463,` → `$<*>,`). `$HOME` (`$`+letter) has no
+    // digit core → returns false → kept literal. Byte-only, single-token → cross-stdlib bit-identical.
+    [[nodiscard]] inline bool normalize_marker_number(std::string_view tok, std::string& out)
+    {
+        const std::size_t marker{marker_prefix_len(tok)};
+        if (marker == 0 || !is_ascii_digit(tok[marker]))
+            return false;
+        std::size_t cursor{marker + 1};
+        while (cursor < tok.size() && is_ascii_digit(tok[cursor]))
+            ++cursor;
+        if (cursor < tok.size() && tok[cursor] == '.')
+        {
+            const std::size_t frac{cursor + 1};
+            cursor = frac;
+            while (cursor < tok.size() && is_ascii_digit(tok[cursor]))
+                ++cursor;
+            if (cursor == frac)
+                return false; // trailing '.' with no fraction → not a clean number
+        }
+        for (std::size_t pos{cursor}; pos < tok.size(); ++pos)
+            if (is_ascii_digit(tok[pos]) || is_ascii_alpha(tok[pos]))
+                return false; // `$42abc` is not a clean marker-number
+        out.clear();
+        out.append(tok.substr(0, marker)); // keep the marker bytes
+        out.append(kWildcard);
+        out.append(tok.substr(cursor)); // keep trailing punctuation
+        return true;
+    }
+
     // D-TID-12 #3, reached INSIDE a token: mask a UUID (8-4-4-4-12) or a long hex-run
     // (≥ 16, delimiter-bounded) that is EMBEDDED in a larger token — temp-dir paths
     // (`/…/_temp/<uuid>/cache.tzst`), `git-credentials-<uuid>.config`, `{worker-uuid}`,
@@ -426,16 +479,25 @@ namespace
         if (eq == 0 || eq == std::string_view::npos || eq + 1 >= tok.size())
             return false;
         const std::string_view key{tok.substr(0, eq)};
-        const std::string_view value{tok.substr(eq + 1)};
+        const std::string_view raw_value{tok.substr(eq + 1)};
+        // D-TID-22: strip a declared currency marker off the value before the digit-leading gate,
+        // so `total=$463 → total=$<*>` (keep key AND marker, mask the amount). marker=0 for a bare
+        // value → `total=463 → total=<*>` unchanged. A non-numeric core (`total=$HOME`) fails the
+        // gate below → kept literal.
+        const std::size_t marker{marker_prefix_len(raw_value)};
+        const std::string_view value{raw_value.substr(marker)};
         if (!is_digit_leading(value))
             return false; // a value-word → kept literal (the registry's job), not masked
-        // Status-value KEEP (KV form): code=0 / status=500 must stay DISTINCT (the
-        // green→red flip), same context+size gate as the space-separated #1 carve-out.
+        // Status-value KEEP (KV form): code=0 / status=500 must stay DISTINCT (the green→red flip),
+        // same context+size gate as the space-separated #1 carve-out. (Status values never carry a
+        // currency marker, so the strip above is a no-op for them.)
         if (is_status_keyword(key) && is_all_digits(value) && value.size() <= kMaxStatusDigits)
             return false;
         out.clear();
         out.append(key);
-        out.append("=<*>");
+        out.push_back('=');
+        out.append(raw_value.substr(0, marker)); // keep the marker (empty when none)
+        out.append(kWildcard);
         return true;
     }
 
@@ -512,10 +574,12 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                        }
                        // 2. composite → the normalized literal (KEEP class, mask instance):
                        //    source-location / versioned-ref / bracket-index / #-counter /
-                       //    embedded UUID·hash / key=<numeric-value> (the `-` pre-gate admits
-                       //    dashed UUID tokens; `=` admits KV pairs).
-                       const bool maybe_composite{std::ranges::any_of(
-                           tok, [](char chr) {
+                       //    embedded UUID·hash / key=<numeric-value> / currency-marker number
+                       //    (the `-` pre-gate admits dashed UUID tokens; `=` admits KV pairs; a
+                       //    declared currency marker — D-TID-22 — admits `$463`).
+                       const bool maybe_composite{
+                           marker_prefix_len(tok) != 0 ||
+                           std::ranges::any_of(tok, [](char chr) {
                                return chr == ':' || chr == '/' || chr == '[' || chr == '#' ||
                                       chr == '-' || chr == '=';
                            })};
@@ -523,6 +587,7 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                                                normalize_versioned_ref(tok, composite) ||
                                                normalize_bracket_index(tok, composite) ||
                                                normalize_hash_counter(tok, composite) ||
+                                               normalize_marker_number(tok, composite) ||
                                                normalize_embedded_identity(tok, composite) ||
                                                normalize_kv_value(tok, composite)))
                        {

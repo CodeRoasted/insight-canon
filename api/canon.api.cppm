@@ -43,9 +43,11 @@ using WindowID = uint64_t;
 // not touch the masking rules must NOT change it). Bump the suffix on any output-affecting
 // canonicalization change. Generations: -1 = stateless masker + F13; -2 = OTEL-awareness
 // (severity-from-severity_number + trace-context routing + the trace-scoped graph —
-// insight_otel_epic.md D-OTEL-2, unconditional). The content changes ONLY for inputs carrying
-// OTEL fields (D-OTEL-2a); a non-OTEL document is byte-identical except this version string.
-inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-2"};
+// insight_otel_epic.md D-OTEL-2, unconditional); -3 = currency-marker numerics
+// (stateless_template_id.md D-TID-22 — `$463`/`total=$463` mask to `$<*>`/`total=$<*>`). The -3
+// content changes ONLY for inputs carrying a currency-marker-prefixed numeric token; every other
+// document is byte-identical except this version string.
+inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-3"};
 
 // ── Template identity (insight_perf_template_id.md D-TIR-1) ──
 // The structural identity of a canonicalised template: the first 16 bytes of
