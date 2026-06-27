@@ -127,6 +127,122 @@ TEST(FailureLexicon, PassWordOrTrailingGlyphDoesNotDemote)
         << "✗ is a FAIL glyph (not a pass glyph), skipped — the failure word 'failed' stands";
 }
 
+// ── D-OUT-4 — verdict-register awareness (§4A.6): a failure WORD is a cue ───────
+// ONLY in verdict register. A bare base-form failure NOUN in prose ("crash", "fail",
+// "error", "timeout" with no decoration) is NOT a verdict and must not fire — the
+// §6.7 re-run hard-floor false positives: P3 rank 1 `Storing crash reports into
+// '<path>'` (an informational startup line, the NOUN "crash") and P3 rank 2
+// `- deleting watched path emits watcher fail event` (a mocha test DESCRIPTION,
+// "fail" modifying "event"). This is one level past D-OUT-1/-1b: D-OUT-1 demotes a
+// pass-MARKED verdict (a ✓ leads); here there is NO marker to demote against — the
+// line is simply not a verdict. The discriminator is the same decoration CI/test
+// tooling uses to MARK an outcome — caps / `:` / `[ ]` / `( )` / CamelCase type /
+// the "segmentation fault" phrase / a self-anchoring outcome VERB. A term-noun
+// carries none → it does not classify. [[sift-failure-lexicon-must-be-outcome-aware]]
+TEST(FailureLexicon, InformationalFailureWordIsNotAVerdictCue)
+{
+    EXPECT_FALSE(
+        contains_failure_cue("Storing crash reports into 'D:\\a\\_work\\vscode\\.build\\crashes'"))
+        << "P3 rank-1 FP: the NOUN 'crash' in an informational startup config line, no register";
+    EXPECT_FALSE(contains_failure_cue("- deleting watched path emits watcher fail event"))
+        << "P3 rank-2 FP: a mocha test DESCRIPTION — 'fail' modifies 'event', not a verdict";
+    EXPECT_FALSE(contains_failure_cue("the error path is documented in the runbook"))
+        << "the base-form noun 'error' in prose, no register — not a failure verdict";
+    EXPECT_FALSE(contains_failure_cue("timeout budget set to 30s for the slow shards"))
+        << "the noun 'timeout' as configuration prose, no register";
+}
+
+// ── D-OUT-4 recall guard: a verdict-ANCHORED failure token still fires ──────────
+// The partition is by grammatical ROLE, not a blanket family suppression — proved by
+// the minimal pairs against the demotes above: the NOUN "crash"/"fail"/"error"
+// demotes, but the SAME stem in verdict register survives. Five anchors CONFIRM an
+// existing failure token (they never create one): caps, `:`-bound, `[ ]`/`( )`-
+// enclosed, CamelCase `…Error`/`…Exception` type, the "segmentation fault" phrase;
+// plus the self-anchoring outcome VERB (inflected morphology) which fires bare-
+// lowercase in prose. This is is_camel_error_type's existing rule generalised — a
+// caps `ValueError` is a verdict, a lowercase "error" in a path is not.
+TEST(FailureLexicon, VerdictAnchoredFailureSurvives)
+{
+    // caps register
+    EXPECT_TRUE(contains_failure_cue("BUILD FAILED in 3.2s")) << "caps 'FAILED'";
+    EXPECT_TRUE(contains_failure_cue("ERROR db connection reset by peer")) << "caps 'ERROR'";
+    // delimiter-bound — colon / bracket / paren
+    EXPECT_TRUE(contains_failure_cue("fatal: expected 'packfile' but got EOF")) << "'fatal:' colon";
+    EXPECT_TRUE(contains_failure_cue("testSitesStats (FAILED)")) << "paren+caps '(FAILED)'";
+    EXPECT_TRUE(contains_failure_cue("##[error]Process completed with exit code 1"))
+        << "bracket-bound '[error]' (GitHub Actions marker)";
+    // CamelCase error TYPE (is_camel_error_type, existing) — a self-evident verdict shape
+    EXPECT_TRUE(contains_failure_cue("raise ValueError(\"bad input\")")) << "CamelCase error TYPE";
+    // the crash phrase (kFailurePhrases, existing)
+    EXPECT_TRUE(contains_failure_cue("Segmentation fault (core dumped)")) << "the crash phrase";
+    // self-anchoring outcome VERBS — fire bare lowercase (the minimal-pair survivors:
+    // "crashed"≠"crash", "failed"≠"fail" — inflection self-anchors the verdict)
+    EXPECT_TRUE(contains_failure_cue("build failed after 4 retries")) << "outcome verb 'failed'";
+    EXPECT_TRUE(contains_failure_cue("connection refused to db host 10.0.0.7")) << "'refused'";
+    EXPECT_TRUE(contains_failure_cue("worker crashed during graceful shutdown")) << "'crashed'";
+    EXPECT_TRUE(contains_failure_cue("deploy aborted by operator")) << "'aborted'";
+}
+
+// ── D-OUT-4 role partition (Daidalos Q1 ruling): the criterion is BENIGN-COLLISION-
+// PRONENESS, not grammatical role. A SelfAnchoring noun essentially never appears
+// benignly (segfault / traceback / unhandled) → it fires BARE, no register; gating it
+// only suppressed recall ("unhandled exception" / "unhandled promise rejection" are
+// real, lowercase failures). These pin the role assignment — a future re-tag of any
+// of these to RegisterAnchored breaks this test. [[sift-failure-lexicon-must-be-outcome-aware]]
+TEST(FailureLexicon, SelfAnchoringNounsFireBare)
+{
+    EXPECT_TRUE(contains_failure_cue("segfault in worker 3 during teardown"))
+        << "'segfault' is a zero-collision failure noun — fires bare";
+    EXPECT_TRUE(contains_failure_cue("Traceback follows below for the failing request"))
+        << "'Traceback' fires bare (no colon / bracket register needed)";
+    EXPECT_TRUE(contains_failure_cue("unhandled exception in the request handler"))
+        << "'unhandled' fires bare — register-gating it only suppressed recall";
+    EXPECT_TRUE(contains_failure_cue("unhandled promise rejection during boot"))
+        << "'unhandled' bare again — the recall case the ruling protects";
+}
+// The RegisterAnchored half of the same partition: a collision-prone noun has a real
+// benign sense ("panic button", "fatal flaw") → it demotes in prose and fires ONLY in
+// verdict register. The minimal pairs against the SelfAnchoring set above are the point.
+TEST(FailureLexicon, RegisterAnchoredNounDemotesInProseFiresAnchored)
+{
+    EXPECT_FALSE(contains_failure_cue("hit the panic button to roll back the deploy"))
+        << "'panic' has a benign sense (panic button), no register — demote";
+    EXPECT_FALSE(contains_failure_cue("a fatal flaw in the original design"))
+        << "'fatal' has a benign sense (fatal flaw), no register — demote";
+    EXPECT_TRUE(contains_failure_cue("FATAL out of memory, killing worker")) << "caps 'FATAL' fires";
+    EXPECT_TRUE(contains_failure_cue("panic: runtime stack overflow")) << "'panic:' colon fires";
+}
+// ── D-OUT-4a — a leading FAIL glyph (✗/✕/✖/✘) ANCHORS a RegisterAnchored word but ──
+// never CREATES a cue. So a failing test "✗ should not crash …" surfaces (✗ anchors
+// "crash"), while a glyph-only line with no failure word stays silent — provably safe
+// against the deferred D-OUT-3 ×-risk: × U+00D7 (the "1920×1080" dimension separator)
+// is excluded from the fail-glyph set on purpose.
+TEST(FailureLexicon, LeadingFailGlyphAnchorsButNeverCreates)
+{
+    EXPECT_TRUE(contains_failure_cue("✗ should not crash on empty input"))
+        << "✗ leads → anchors the RegisterAnchored 'crash' (a failing-test verdict)";
+    EXPECT_FALSE(contains_failure_cue("✗ 1920×1080"))
+        << "✗ leads but NO failure word present — the glyph anchors nothing, stays silent";
+    EXPECT_FALSE(contains_failure_cue("rendering at 1920×1080 then 800×600"))
+        << "× U+00D7 is a dimension separator, NOT a fail glyph — no false cue";
+}
+
+// ── Tokenization boundary the §6.7 P3 finding identified (documenting pin) ─────
+// `_` is NOT a token delimiter and the ends are alnum, so "ERR_FAILED" is ONE atom —
+// it matches no kFailureLexicon word and is no CamelCase `…Error` type, so it fires no
+// cue (and infer_leading_log_level → Unknown). This is BY DESIGN, not a gap D-OUT-4
+// addresses: the real vscode P3 GT crash (`ERR_FAILED (-2) loading 'about:blank'`, 20×)
+// is surfaced by RECURRENCE/NOVELTY, not the failure level — orthogonal to verdict-
+// register classification. The caps anchor only CONFIRMS an already-matched failure
+// word; with no match it is never consulted. Pinned so this boundary can't shift
+// silently. [[sift-failure-lexicon-must-be-outcome-aware]]
+TEST(FailureLexicon, UnderscoreCompoundIsOneAtomNotADecomposedCue)
+{
+    EXPECT_FALSE(contains_failure_cue("ERR_FAILED (-2) loading 'about:blank'"))
+        << "'ERR_FAILED' is ONE atom (underscore is not a delimiter) — matches no lexicon "
+           "word; the 20x crash is caught by recurrence, not the failure level";
+}
+
 // ── Warning lexicon is separate (no CamelCase types) ───────────────────────────
 TEST(FailureLexicon, WarningCue)
 {
@@ -167,9 +283,13 @@ TEST(FailureLexicon, AnsiColourWrappedCueIsExtracted)
 // ── scan_limit bounds where a token may START (it may extend past the limit) ────
 TEST(FailureLexicon, ScanLimitBoundsTheHead)
 {
-    const std::string_view line{"INFO request ok ............................ then error happened"};
-    EXPECT_TRUE(contains_failure_cue(line, 0)) << "whole-line scan sees the late 'error'";
-    EXPECT_FALSE(contains_failure_cue(line, 20)) << "the late 'error' starts past a 20-char head";
+    // The late cue is CAPS 'ERROR' (verdict-anchored under D-OUT-4) so it genuinely
+    // fires — the head bound is then the SOLE reason the limit=20 scan stays silent
+    // (a bare lowercase 'error' would now demote on its own, masking the bound).
+    const std::string_view line{"INFO request ok ............................ then ERROR happened"};
+    EXPECT_TRUE(contains_failure_cue(line, 0)) << "whole-line scan sees the late caps 'ERROR'";
+    EXPECT_FALSE(contains_failure_cue(line, 20))
+        << "the late 'ERROR' STARTS past a 20-char head — out of head, not unanchored";
     // A token that STARTS within the head but extends past it is fully captured.
     EXPECT_TRUE(contains_failure_cue("OperationalError happened later", 5))
         << "the cue token starts at offset 0, within the head";

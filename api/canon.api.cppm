@@ -965,14 +965,24 @@ export namespace insight::utils
 // `no errors found`. That raw-substring over-match was the bug — it promoted
 // benign new templates to HIGH "New error" in the diff and inflated severity.
 //
+// A failure-vocab token classifies its line only IN VERDICT REGISTER (D-OUT-4): the
+// lexicon partitions by benign-collision-proneness — a zero-collision token (an outcome
+// verb failed/refused/…, OR a unique failure noun segfault/traceback/unhandled) self-
+// anchors and fires bare in prose ("build failed", "unhandled exception"); a collision-
+// prone token (error/fail/crash/timeout/fatal/panic/…) fires ONLY when verdict-anchored
+// (detail::is_verdict_anchored — CAPS, a `:`/bracket delimiter, a leading ✗ fail glyph,
+// the CamelCase `…Error` type form, or the `segmentation fault` phrase). A bare collision-
+// prone noun in a non-verdict line (`Storing crash reports into <path>`, `watcher fail
+// event`, `error_handler`) does NOT classify — the structural lesson, not a per-word denylist.
+//
 // Two precision guards keep a PASSING test from ever reading as a failure (the
 // cardinal false-positive — a HIGH "regression" on green torches trust):
 //   • a negated type name (`…NotError`/`…NoError`/`…NonError`) is NOT an error type
 //     (a test named `…IsNotError` is the textbook false match); and
 //   • an error-TYPE NAME alone (`…RaisesValueError`) is demoted to a non-failure when
-//     the text also DECLARES a pass verdict ("Passed" / gtest "[ OK ]" / "PASSED").
-// Both guards override only the weak, name-based signal — an explicit failure WORD
-// ("error"/"failed"/"segfault"/…) always wins, so a real failure still matches.
+//     the text also DECLARES a pass verdict ("Passed" / gtest "[ OK ]" / "PASSED"); and
+//   • a line carrying a real failure cue but LED by a pass GLYPH (✓/✔/✅/√) is a passing
+//     test whose name embeds failure vocabulary, not a regression (D-OUT-1).
 //
 // `scan_limit` bounds the head: a token must START within the first `scan_limit`
 // chars (it may extend past them — the full word is captured). 0 = scan all of
@@ -995,6 +1005,23 @@ namespace detail
     // product surface (the public failure-lexicon API stays contains_failure_cue /
     // contains_warning_cue); defined with the lexicon in failure_lexicon.cpp.
     [[nodiscard]] bool leading_outcome_is_pass(std::string_view line) noexcept;
+
+    // The verdict-register kernel (D-OUT-4) — true iff `token` carries the structural
+    // decoration CI/test tooling uses to mark an outcome, so a benign-collision-prone
+    // failure token classifies its line ONLY in verdict register (never in a path / config
+    // line / test description). Anchors: (1) CAPS register — token's raw bytes ALL-UPPERCASE,
+    // ≥2 letters (ERROR/FAILED/FATAL); (2) DELIMITER-bound — immediately followed by `:`
+    // (`error:`, `fatal:`), or enclosed by `[..]`/`(..)` (`[error]`, `##[error]`, `(FAILED)`);
+    // (3) a LEADING fail glyph `✗`/`✕`/`✖`/`✘` (D-OUT-4a) marking the line a failed verdict —
+    // a line-level register that CONFIRMS the token, never creates a cue (a glyph-only line
+    // has no failure word). (Type-named CamelCase `…Error` and the `segmentation fault`
+    // phrase are the other two register forms, handled at their own existing sites.)
+    // PRECONDITION: `token` MUST be a sub-view of `line` (a for_each_token token) — the
+    // kernel recovers the surrounding bytes by pointer arithmetic, as caps/adjacency are
+    // pre-casefold byte facts the trimmed token alone does not surface. Pure byte-compare +
+    // ASCII case test, order-independent ⇒ cross-stdlib + MSVC bit-identical by construction
+    // (F5). The SAME kernel both severity feeders consult; internal/detail, NOT a public surface.
+    [[nodiscard]] bool is_verdict_anchored(std::string_view line, std::string_view token) noexcept;
 } // namespace detail
 
 } // namespace insight::utils

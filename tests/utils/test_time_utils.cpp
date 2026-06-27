@@ -446,4 +446,59 @@ TEST(InferLeadingLogLevel, GenuineLeadingFailureSurvivesWithoutPassGlyph)
         << "leading FAIL glyph ✗ must NOT demote — Stage-1 'failure' stays Fatal";
 }
 
+// ── D-OUT-4 — verdict-register awareness at the LEVEL altitude (§4A.6) ─────────
+// The level (infer_leading_log_level) is what the diff consumes (→ dominant_level →
+// salience → eidos NewErrorPattern). One level past D-OUT-1b: not "does a pass glyph
+// lead?" but "is the line a failure VERDICT at all?" A non-verdict line carrying a
+// failure NOUN ("crash"/"fail", no register) must infer Unknown, not Error — the §6.7
+// re-run P3 FPs (`Storing crash reports into '<path>'`, `… watcher fail event`). These
+// route through Stage 2 (contains_failure_cue): neither "crash" nor "fail" is a
+// parse_log_level vocabulary word, so Stage 1 is silent — the cue fix alone demotes
+// them, no Stage-1 change required. [[sift-failure-lexicon-must-be-outcome-aware]]
+TEST(InferLeadingLogLevel, InformationalFailureWordLineIsNotAlerting)
+{
+    EXPECT_EQ(infer_leading_log_level(
+                  "Storing crash reports into 'D:\\a\\_work\\vscode\\.build\\crashes'"),
+              LogLevel::Unknown)
+        << "P3 rank-1 FP: informational startup line, NOUN 'crash' — not an error line";
+    EXPECT_EQ(infer_leading_log_level("- deleting watched path emits watcher fail event"),
+              LogLevel::Unknown)
+        << "P3 rank-2 FP: mocha test description, 'fail' modifies 'event' — not an error line";
+}
+// Recall guard: a verdict-ANCHORED failure still infers its alerting level (no
+// regression). Caps / colon / scope-prefixed caps / outcome verb / phrase survive.
+TEST(InferLeadingLogLevel, VerdictAnchoredFailureLevelSurvives)
+{
+    EXPECT_EQ(infer_leading_log_level("fatal: expected 'packfile' but got EOF"), LogLevel::Fatal)
+        << "'fatal:' colon-anchored — Stage-1 Fatal preserved";
+    EXPECT_EQ(infer_leading_log_level("[worker-3] ERROR connection refused"), LogLevel::Error)
+        << "scope-prefixed caps ERROR (token 1, not 0) — preserved";
+    EXPECT_EQ(infer_leading_log_level("build failed after 4 retries"), LogLevel::Error)
+        << "outcome verb 'failed' (Stage-2 cue) — still Error";
+    EXPECT_EQ(infer_leading_log_level("Segmentation fault (core dumped)"), LogLevel::Error)
+        << "the crash phrase — still Error";
+}
+// ── D-OUT-4 Stage-1 completion — the LATENT TWIN (§4A.6), GATED ────────────────
+// SEPARABLE from the blocker (the design marks Stage 1 a deferred-able twin): KEEP
+// this block IFF Heph lands the Stage-1 completion (gate the leading bare LEVEL word
+// on the same register kernel); DELETE it if he ships only the Stage-2 cue fix — these
+// stay Error/Fatal without it, and a RED that the shipped engine cannot satisfy is
+// tech debt. A LEADING bare level word with no register ("error handling enabled",
+// "failure modes documented") is classified authoritative-Error/Fatal by Stage 1
+// (parse_log_level), unguarded — the non-pass-glyph form of the D-OUT-1b feeder. The
+// rule: a leading level WORD is authoritative only when register-anchored (caps / `:` /
+// bracket) or it is the terminal/sole significant token.
+TEST(InferLeadingLogLevel, LeadingBareLevelWordDemotedWhenUnanchored)
+{
+    EXPECT_EQ(infer_leading_log_level("error handling enabled for the worker pool"),
+              LogLevel::Unknown)
+        << "leading bare 'error' (lowercase, no register), more tokens follow — not a verdict";
+    EXPECT_EQ(infer_leading_log_level("failure modes documented in the runbook"), LogLevel::Unknown)
+        << "leading bare 'failure' (Stage-1 Fatal, no register) — not a verdict";
+    // Recall guard (universal under any reasonable completion): caps + colon is
+    // unambiguously authoritative and must survive.
+    EXPECT_EQ(infer_leading_log_level("ERROR: db connection failed"), LogLevel::Error)
+        << "caps + colon — authoritative, preserved";
+}
+
 // NOLINTEND

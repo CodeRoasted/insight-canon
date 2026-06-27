@@ -812,25 +812,42 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
     constexpr std::size_t kLeadingScanHead{40}; // covers an ISO-8601 timestamp + the level start
     constexpr std::size_t kKeywordHead{64};     // head scanned for a failure/warning cue
 
-    // Stage 1 — first exact level token whose start lies within the head.
+    // Stage 1 — first exact level token whose start lies within the head, but
+    // authoritative only IN VERDICT REGISTER (D-OUT-4). parse_log_level is outcome-blind:
+    // it maps the bare words failure/fatal/critical → Fatal, error → Error, warn → Warn,
+    // so a descriptive line ("error handling enabled", "failure modes documented") whose
+    // FIRST token is a level WORD would otherwise be classified alerting and authoritative,
+    // bypassing the Stage-2 cue guard. So a leading level word is authoritative only when
+    // it is verdict-anchored (caps / `:` / bracket — e.g. "ERROR", "error:", "##[error]")
+    // OR it is the terminal/sole significant token in the head (a bare one-word status). An
+    // unanchored, non-terminal level word falls THROUGH to Stage 2's anchored cue scan.
     LogLevel leading{LogLevel::Unknown};
-    if (for_each_token(line, kLeadingScanHead,
-                       [&leading](std::string_view token) noexcept
-                       {
-                           const LogLevel level{parse_log_level(token)};
-                           if (level == LogLevel::Unknown)
-                               return false;
-                           leading = level;
-                           return true; // first level token wins
-                       }))
+    std::string_view level_token{};
+    bool token_follows_level{false};
+    // The return (did-stop-early) is unused: we read the captured leading/level_token/
+    // token_follows_level, set as side effects, instead.
+    (void)for_each_token(line, kLeadingScanHead,
+                         [&](std::string_view token) noexcept
+                         {
+                             if (leading != LogLevel::Unknown)
+                             {
+                                 token_follows_level = true; // the level word is not terminal
+                                 return true;                // stop — we have all we need
+                             }
+                             const LogLevel level{parse_log_level(token)};
+                             if (level == LogLevel::Unknown)
+                                 return false;
+                             leading = level; // first level token wins; keep scanning for a follower
+                             level_token = token;
+                             return false;
+                         });
+    if (leading != LogLevel::Unknown &&
+        (detail::is_verdict_anchored(line, level_token) || !token_follows_level))
     {
-        // D-OUT-1b: parse_log_level is OUTCOME-BLIND — it maps the bare words
-        // failure/fatal/critical → Fatal, error → Error, warn → Warn, so a passing test whose
-        // NAME embeds a level word ("✔ … failure …") is classified alerting by this
-        // authoritative Stage 1, bypassing the Stage-2 cue guard entirely. A leading pass GLYPH
-        // is an unambiguous pass verdict ⇒ demote the alerting level to Unknown. A genuine
-        // "ERROR:"/"FATAL:" line leads with the WORD, so leading_outcome_is_pass returns false
-        // and the level is preserved (no recall regression).
+        // Authoritative leading level. D-OUT-1b: a leading pass GLYPH ("✔ … ERROR …") is an
+        // unambiguous pass verdict whose name embeds a level word ⇒ demote an alerting level
+        // to Unknown. A genuine "ERROR:"/"FATAL:" leads with the WORD, so
+        // leading_outcome_is_pass returns false and the level is preserved (no recall loss).
         if (is_alerting_level(leading) && detail::leading_outcome_is_pass(line))
             return LogLevel::Unknown;
         return leading;

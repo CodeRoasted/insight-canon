@@ -78,15 +78,76 @@ namespace
     }
 
     // The unified failure lexicon — token forms (base + the inflections that occur in
-    // real CI / app logs). Plural "errors" is omitted ON PURPOSE so a negation like
-    // "no errors found" / "0 errors" is not read as an error (count-dependent, a
-    // numeric-rule concern, not the lexicon's); CamelCase `…Error`/`…Exception` types
-    // are caught structurally by is_camel_error_type, not enumerated here.
-    constexpr std::array<std::string_view, 18U> kFailureWords{
-        "error",   "exception", "fatal", "panic",   "panicked", "refused",
-        "timeout", "traceback", "fail",  "failed",  "failure",  "segfault",
-        "denied",  "unhandled", "abort", "aborted", "crash",    "crashed"};
+    // real CI / app logs), partitioned by BENIGN-COLLISION-PRONENESS (D-OUT-4, refined by
+    // the Daidalos Q1 ruling — the criterion is collision-proneness, NOT grammatical role):
+    //   • SelfAnchoring — a token that essentially NEVER appears benignly, so it fires bare
+    //     with no surrounding register. Two kinds: inflected outcome verbs whose morphology
+    //     IS the verdict ("build failed", "connection refused"), AND zero-collision failure-
+    //     event nouns ("segfault", "traceback", "unhandled" — "unhandled exception" /
+    //     "unhandled promise rejection" are real failures, lowercase, and register-gating
+    //     them only suppressed recall). No benign use exists to guard against.
+    //   • RegisterAnchored — a token with a real benign sense ("error rate", "crash course",
+    //     "timeout=30", "fatal flaw", "panic button", "fail-safe"). It fires ONLY in verdict
+    //     register (is_verdict_anchored: caps / `:` / bracket / leading ✗ / CamelCase type /
+    //     phrase), exactly as is_camel_error_type distinguishes "ValueError" from a path's
+    //     lowercase "error". A declared partition — NOT reactive per-FP tuning (we do not
+    //     remove "crash"; we say the collision-prone noun needs context).
+    // Plural "errors" is omitted ON PURPOSE so a negation like "no errors found" /
+    // "0 errors" is not read as an error (count-dependent, a numeric-rule concern, not
+    // the lexicon's); CamelCase `…Error`/`…Exception` types are caught structurally by
+    // is_camel_error_type, not enumerated here. (If a bare "Kernel panic - not syncing:"
+    // miss ever surfaces, add a `kernel panic` phrase like segmentation fault — do NOT
+    // promote the collision-prone bare "panic".)
+    enum class FailureRole : unsigned char
+    {
+        RegisterAnchored, // benign-collision-prone — fires ONLY when verdict-anchored
+        SelfAnchoring,    // zero benign collision — fires bare (outcome verb or unique noun)
+    };
+    struct FailureWord
+    {
+        std::string_view word;
+        FailureRole role;
+    };
+    constexpr std::array<FailureWord, 18U> kFailureLexicon{{
+        {.word = "error", .role = FailureRole::RegisterAnchored},
+        {.word = "exception", .role = FailureRole::RegisterAnchored},
+        {.word = "fatal", .role = FailureRole::RegisterAnchored},
+        {.word = "panic", .role = FailureRole::RegisterAnchored},
+        {.word = "panicked", .role = FailureRole::SelfAnchoring},
+        {.word = "refused", .role = FailureRole::SelfAnchoring},
+        {.word = "timeout", .role = FailureRole::RegisterAnchored},
+        {.word = "traceback", .role = FailureRole::SelfAnchoring},
+        {.word = "fail", .role = FailureRole::RegisterAnchored},
+        {.word = "failed", .role = FailureRole::SelfAnchoring},
+        {.word = "failure", .role = FailureRole::RegisterAnchored},
+        {.word = "segfault", .role = FailureRole::SelfAnchoring},
+        {.word = "denied", .role = FailureRole::SelfAnchoring},
+        {.word = "unhandled", .role = FailureRole::SelfAnchoring},
+        {.word = "abort", .role = FailureRole::RegisterAnchored},
+        {.word = "aborted", .role = FailureRole::SelfAnchoring},
+        {.word = "crash", .role = FailureRole::RegisterAnchored},
+        {.word = "crashed", .role = FailureRole::SelfAnchoring},
+    }};
     constexpr std::array<std::string_view, 2U> kWarningWords{"warn", "warning"};
+
+    // Caps register (D-OUT-4 anchor #1): the token's raw bytes are ALL-UPPERCASE ASCII
+    // letters, ≥2 of them — the decoration CI/test tooling uses to mark an outcome
+    // (ERROR, FAILED, FATAL, PANIC). A pre-casefold byte fact; the matched token keeps
+    // the source case (for_each_token trims surrounding non-alnum but never folds), so
+    // this reads the raw word. Any lowercase letter disqualifies it; non-letters are
+    // ignored, but a real failure word is all-alpha so this resolves to "all uppercase".
+    [[nodiscard]] bool is_caps_register(std::string_view token) noexcept
+    {
+        std::size_t letters{0U};
+        for (const char chr : token)
+        {
+            if (chr >= 'a' && chr <= 'z')
+                return false;
+            if (chr >= 'A' && chr <= 'Z')
+                ++letters;
+        }
+        return letters >= 2U;
+    }
 
     // Multi-word cues that are only precision-safe as an ADJACENT token pair. A bare
     // "segmentation"/"fault" collides with benign uses (image/network segmentation,
@@ -138,8 +199,19 @@ namespace
         {0xE2U, 0x9CU, 0x85U}, // ✅ U+2705 WHITE HEAVY CHECK MARK
         {0xE2U, 0x88U, 0x9AU}, // √ U+221A SQUARE ROOT — mocha's Windows pass mark
     }};
+    // Per-test FAIL glyphs (D-OUT-4a) — the ballot-X family, all 3-byte UTF-8. Like the
+    // pass glyphs, they are unambiguous per-test result markers. × U+00D7 (MULTIPLICATION
+    // SIGN, a 2-byte sequence) is EXCLUDED on purpose: it doubles as a dimension separator
+    // ("1920×1080"), the precision risk that deferred D-OUT-3.
+    constexpr std::array<Glyph, 4U> kFailGlyphs{{
+        {0xE2U, 0x9CU, 0x95U}, // ✕ U+2715 MULTIPLICATION X
+        {0xE2U, 0x9CU, 0x96U}, // ✖ U+2716 HEAVY MULTIPLICATION X
+        {0xE2U, 0x9CU, 0x97U}, // ✗ U+2717 BALLOT X
+        {0xE2U, 0x9CU, 0x98U}, // ✘ U+2718 HEAVY BALLOT X
+    }};
 
-    [[nodiscard]] bool starts_with_pass_glyph(std::string_view text, std::size_t pos) noexcept
+    [[nodiscard]] bool starts_with_glyph(std::string_view text, std::size_t pos,
+                                         std::span<const Glyph> glyphs) noexcept
     {
         constexpr std::size_t kGlyphLen{3U};
         if (pos + kGlyphLen > text.size())
@@ -147,7 +219,15 @@ namespace
         const Glyph head{static_cast<unsigned char>(text[pos]),
                          static_cast<unsigned char>(text[pos + 1U]),
                          static_cast<unsigned char>(text[pos + 2U])};
-        return std::ranges::find(kPassGlyphs, head) != kPassGlyphs.end();
+        return std::ranges::find(glyphs, head) != glyphs.end();
+    }
+    [[nodiscard]] bool starts_with_pass_glyph(std::string_view text, std::size_t pos) noexcept
+    {
+        return starts_with_glyph(text, pos, kPassGlyphs);
+    }
+    [[nodiscard]] bool starts_with_fail_glyph(std::string_view text, std::size_t pos) noexcept
+    {
+        return starts_with_glyph(text, pos, kFailGlyphs);
     }
 
     // Advance past ANSI escapes + token delimiters; returns the next token-start index
@@ -185,6 +265,34 @@ namespace
         return token;
     }
 
+    // ── D-OUT-4a — a leading FAIL glyph CONFIRMS a failure word (the ✗-anchor) ────────
+    // Mirror of leading_outcome_is_pass: does the line's FIRST outcome-bearing token mark a
+    // FAIL? Walk the head; the first token that is a ballot-X glyph ⇒ true; a PASS glyph ⇒
+    // false (a pass leads — not a fail line); a failure WORD ⇒ false (it self-handles via
+    // its own role/anchor — this predicate only adds the GLYPH register). End-of-head ⇒
+    // false. Used ONLY to ANCHOR an already-matched failure word, never to create a cue, so
+    // a glyph-only line ("✗ 1920×1080") with no failure word stays silent — provably safe
+    // against the deferred D-OUT-3 ×-risk. Pure byte-compare ⇒ MSVC bit-identical (F5).
+    [[nodiscard]] bool leading_outcome_is_fail(std::string_view line) noexcept
+    {
+        static constexpr std::size_t kOutcomeHead{128U}; // matches leading_outcome_is_pass
+        const std::size_t limit{line.size() < kOutcomeHead ? line.size() : kOutcomeHead};
+        std::size_t pos{0};
+        while ((pos = skip_to_token_start(line, pos)) < limit)
+        {
+            if (starts_with_fail_glyph(line, pos)) // first outcome token is a fail glyph
+                return true;
+            if (starts_with_pass_glyph(line, pos)) // a pass leads — not a fail line
+                return false;
+            const std::string_view token{take_trimmed_token(line, pos)};
+            for (const FailureWord& entry : kFailureLexicon)
+                if (iequals(token, entry.word)) // a failure word leads — it self-handles
+                    return false;
+            // otherwise a non-outcome token (scope segment / name / number) — continue
+        }
+        return false; // no leading fail glyph within the head
+    }
+
 } // namespace
 
 // The shared outcome predicate (D-OUT-1b) — declared on the canon-internal detail surface in
@@ -200,22 +308,47 @@ namespace
 // a real failure summary. Pure byte-compare + ASCII case-fold ⇒ cross-stdlib and MSVC bit-identical (F5).
 namespace detail
 {
-    [[nodiscard]] bool leading_outcome_is_pass(std::string_view text) noexcept
+    [[nodiscard]] bool leading_outcome_is_pass(std::string_view line) noexcept
     {
         static constexpr std::size_t kOutcomeHead{128U}; // generous monorepo scope-prefix bound
-        const std::size_t limit{text.size() < kOutcomeHead ? text.size() : kOutcomeHead};
+        const std::size_t limit{line.size() < kOutcomeHead ? line.size() : kOutcomeHead};
         std::size_t pos{0};
-        while ((pos = skip_to_token_start(text, pos)) < limit)
+        while ((pos = skip_to_token_start(line, pos)) < limit)
         {
-            if (starts_with_pass_glyph(text, pos)) // first outcome token is a pass glyph
+            if (starts_with_pass_glyph(line, pos)) // first outcome token is a pass glyph
                 return true;
-            const std::string_view token{take_trimmed_token(text, pos)};
-            for (const std::string_view word : kFailureWords)
-                if (iequals(token, word)) // first outcome token is a failure word
+            const std::string_view token{take_trimmed_token(line, pos)};
+            for (const FailureWord& entry : kFailureLexicon)
+                if (iequals(token, entry.word)) // first outcome token is a failure word
                     return false;
             // otherwise a non-outcome token (scope segment / name / number) — continue
         }
         return false; // no leading outcome token within the head
+    }
+
+    // D-OUT-4 — see canon.api.cppm for the contract. anchor #1 (caps) is a pure token
+    // test; anchors #2 (delimiter) need the surrounding bytes, recovered from `token`'s
+    // position within `line` (precondition: `token` is a sub-view of `line`).
+    [[nodiscard]] bool is_verdict_anchored(std::string_view line, std::string_view token) noexcept
+    {
+        if (is_caps_register(token)) // anchor #1 — ERROR / FAILED / FATAL …
+            return true;
+        const std::size_t start{static_cast<std::size_t>(token.data() - line.data())};
+        const std::size_t end{start + token.size()};
+        const char before{start > 0U ? line[start - 1U] : '\0'};
+        const char after{end < line.size() ? line[end] : '\0'};
+        // anchor #2 — a verdict colon ("error:"), or enclosed in brackets/parens
+        // ("[error]", "##[error]", "(FAILED)"): the separators CI/test runners frame an
+        // outcome with. A leading "##" is its own (empty-trimmed) token, so the byte
+        // immediately before "error" is the '[' — bracket-bound.
+        if (after == ':')
+            return true;
+        if ((before == '[' && after == ']') || (before == '(' && after == ')'))
+            return true;
+        // anchor #3 (D-OUT-4a) — a leading FAIL glyph (✗/✕/✖/✘) marks the line a failed
+        // verdict, confirming this failure word. Line-level, so it applies to every register-
+        // anchored token on a ✗-led line; never creates a cue (no failure word ⇒ never called).
+        return leading_outcome_is_fail(line);
     }
 } // namespace detail
 
@@ -224,9 +357,11 @@ namespace detail
 // NOLINTNEXTLINE(bugprone-exception-escape)
 bool contains_failure_cue(std::string_view text, std::size_t scan_limit) noexcept
 {
-    // One head-bounded pass. An explicit failure WORD, or the "segmentation fault"
-    // phrase, is a strong, unconditional cue (short-circuit true). A CamelCase
-    // error-TYPE name is a WEAKER signal — recorded, but the scan continues.
+    // One head-bounded pass. The "segmentation fault" phrase, or an OUTCOME verb (a
+    // self-anchoring inflected verdict), is a strong cue (short-circuit true). A TERM
+    // noun fires only in verdict register (D-OUT-4 is_verdict_anchored) — a bare noun in
+    // prose is not a verdict. A CamelCase error-TYPE name is a WEAKER signal — recorded,
+    // but the scan continues.
     bool saw_error_type{false};
     std::string_view prev{};
     const bool saw_failure_word{
@@ -235,14 +370,23 @@ bool contains_failure_cue(std::string_view text, std::size_t scan_limit) noexcep
                        {
                            for (const Phrase& phrase : kFailurePhrases)
                                if (iequals(prev, phrase[0]) && iequals(token, phrase[1]))
-                                   return true;
-                           for (const std::string_view word : kFailureWords)
-                               if (iequals(token, word))
-                                   return true;
-                           if (is_camel_error_type(token))
+                                   return true; // phrase completes — a strong cue
+                           bool fired{false};
+                           bool matched{false};
+                           for (const FailureWord& entry : kFailureLexicon)
+                               if (iequals(token, entry.word))
+                               {
+                                   // zero-collision token self-anchors; collision-prone
+                                   // token needs verdict register
+                                   fired = entry.role == FailureRole::SelfAnchoring ||
+                                           detail::is_verdict_anchored(text, token);
+                                   matched = true;
+                                   break;
+                               }
+                           if (!matched && is_camel_error_type(token))
                                saw_error_type = true;
                            prev = token; // remember for the next adjacency check
-                           return false;
+                           return fired;
                        })};
     // A strong failure WORD fires unconditionally; a weak error-TYPE name (no failure
     // word) is demoted by any success WORD anywhere — scanned across the WHOLE text, as a
