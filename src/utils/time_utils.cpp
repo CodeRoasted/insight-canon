@@ -779,6 +779,17 @@ LogLevel parse_log_level(std::string_view level_str) noexcept
     }
 }
 
+namespace
+{
+// An alerting tier (Warn/Error/Fatal) is the only severity a pass-glyph-led line can FALSELY
+// earn (D-OUT-1b): Info/Debug/Trace never alert, so the outcome guard below is paid only on a
+// would-be-positive result — the D-OUT-1 hot-path discipline.
+[[nodiscard]] constexpr bool is_alerting_level(LogLevel level) noexcept
+{
+    return level == LogLevel::Warn || level == LogLevel::Error || level == LogLevel::Fatal;
+}
+} // namespace
+
 // Only throw path is for_each_token's substr(begin, ...) with begin <= line.size()
 // (see token_scan.hpp); the noexcept body cannot throw.
 // NOLINTNEXTLINE(bugprone-exception-escape)
@@ -812,7 +823,18 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
                            leading = level;
                            return true; // first level token wins
                        }))
+    {
+        // D-OUT-1b: parse_log_level is OUTCOME-BLIND — it maps the bare words
+        // failure/fatal/critical → Fatal, error → Error, warn → Warn, so a passing test whose
+        // NAME embeds a level word ("✔ … failure …") is classified alerting by this
+        // authoritative Stage 1, bypassing the Stage-2 cue guard entirely. A leading pass GLYPH
+        // is an unambiguous pass verdict ⇒ demote the alerting level to Unknown. A genuine
+        // "ERROR:"/"FATAL:" line leads with the WORD, so leading_outcome_is_pass returns false
+        // and the level is preserved (no recall regression).
+        if (is_alerting_level(leading) && detail::leading_outcome_is_pass(line))
+            return LogLevel::Unknown;
         return leading;
+    }
 
     // Stage 2 — a failure/warning cue as a standalone word in the head. The match
     // is TOKEN-aware (see failure_lexicon.hpp), not a raw substring: a benign line
@@ -820,9 +842,10 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
     // tsc-error-report.json`) is not misread as Error — that substring over-match
     // spuriously promoted new templates to HIGH "New error" downstream in the diff.
     if (contains_failure_cue(line, kKeywordHead))
-        return LogLevel::Error;
+        return LogLevel::Error; // contains_failure_cue self-guards (D-OUT-1) — no double call
     if (contains_warning_cue(line, kKeywordHead))
-        return LogLevel::Warn;
+        // D-OUT-1b: contains_warning_cue has no outcome guard, so apply it here (Warn alerts).
+        return detail::leading_outcome_is_pass(line) ? LogLevel::Unknown : LogLevel::Warn;
     return LogLevel::Unknown;
 }
 

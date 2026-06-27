@@ -185,16 +185,21 @@ namespace
         return token;
     }
 
-    // Does the line's FIRST outcome-bearing token declare a pass? Walk the head
-    // left-to-right (ANSI- and scope-prefix-tolerant, tokenising exactly as
-    // for_each_token): the first token that is a pass GLYPH ⇒ true (pass leads); the
-    // first token that is a failure WORD ⇒ false (failure leads — stop, so a pathological
-    // "ERROR … ✓" still fires and the "ERROR teardown failed though setup was ok" guard
-    // holds); any other token (scope segment "@cline/core", a name, a number) is skipped.
-    // End-of-head ⇒ false. Glyph-gated, NOT word-gated: a leading pass WORD
-    // ("25 passed, 5 failed") is a summary count, not a verdict, and must not demote a
-    // real failure summary. Pure byte-compare + ASCII case-fold ⇒ cross-stdlib and MSVC
-    // bit-identical (F5).
+} // namespace
+
+// The shared outcome predicate (D-OUT-1b) — declared on the canon-internal detail surface in
+// canon.api.cppm so infer_leading_log_level (a SEPARATE TU) consults the SAME predicate as the
+// cue lexicon, not a TU-local copy. Defined here, with the failure lexicon, reusing the TU-local
+// glyph/scan helpers above (single-responsibility). Does the line's FIRST outcome-bearing token
+// declare a pass? Walk the head left-to-right (ANSI- and scope-prefix-tolerant, tokenising exactly
+// as for_each_token): the first token that is a pass GLYPH ⇒ true (pass leads); the first token
+// that is a failure WORD ⇒ false (failure leads — stop, so a pathological "ERROR … ✓" still fires
+// and the "ERROR teardown failed though setup was ok" guard holds); any other token (scope segment
+// "@cline/core", a name, a number) is skipped. End-of-head ⇒ false. Glyph-gated, NOT word-gated: a
+// leading pass WORD ("25 passed, 5 failed") is a summary count, not a verdict, and must not demote
+// a real failure summary. Pure byte-compare + ASCII case-fold ⇒ cross-stdlib and MSVC bit-identical (F5).
+namespace detail
+{
     [[nodiscard]] bool leading_outcome_is_pass(std::string_view text) noexcept
     {
         static constexpr std::size_t kOutcomeHead{128U}; // generous monorepo scope-prefix bound
@@ -212,8 +217,7 @@ namespace
         }
         return false; // no leading outcome token within the head
     }
-
-} // namespace
+} // namespace detail
 
 // Only throw path is for_each_token / any_standalone_word, whose substr has begin <= text.size()
 // (see token_scan.hpp); the noexcept body cannot throw.
@@ -254,7 +258,7 @@ bool contains_failure_cue(std::string_view text, std::size_t scan_limit) noexcep
     // demotes a failure WORD; a leading pass WORD ("25 passed, 5 failed") must not, so
     // words do not. Paid only on the would-be-positive minority (short-circuit), and the
     // walk stops at the first outcome token.
-    if (result && leading_outcome_is_pass(text))
+    if (result && detail::leading_outcome_is_pass(text))
         return false;
     return result;
 }

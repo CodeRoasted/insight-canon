@@ -385,4 +385,65 @@ TEST(InferLeadingLogLevel, AnsiColourWrappedLevelRecovered)
         << "ANSI-wrapped PASSED is not a level";
 }
 
+// ── D-OUT-1b — outcome-awareness at the LEVEL altitude (§4A.6) ────────────────
+// infer_leading_log_level is what the diff consumes (→ dominant_level → salience →
+// eidos NewErrorPattern). It has TWO severity feeders and D-OUT-1 guarded only one:
+//   • Stage 2 (contains_failure_cue) — D-OUT-1-guarded, caps at Error.
+//   • Stage 1 (explicit level token via parse_log_level) — runs FIRST, authoritative,
+//     UNGUARDED: the bare words `failure`/`fatal`/`critical` → Fatal, `error` → Error.
+// So a passing test whose NAME embeds an explicit level word ("✔ … failure …") is
+// classified Fatal by Stage 1, bypassing the glyph guard, and the diff fires
+// NewErrorPattern [CRITICAL] on a GREEN test (the cardinal FP — the §6.7 reassess P3
+// storm). The pass GLYPH leading the line says it PASSED → an alerting tier (Warn/
+// Error/Fatal) must demote to Unknown.
+//
+// THE TEST HOLE THIS CLOSES: the D-OUT-1 RED asserted contains_failure_cue (the cue
+// boolean) and went green while the LEVEL of the same line was Fatal — outcome-
+// awareness asserted at the wrong altitude. These cases assert the LEVEL the diff
+// actually consumes. [[sift-failure-lexicon-must-be-outcome-aware]]
+TEST(InferLeadingLogLevel, LeadingPassGlyphDemotesAlertingStage1Level)
+{
+    // "failure" is a parse_log_level word → Stage 1 Fatal (unguarded). ✔ leads ⇒ demote.
+    EXPECT_EQ(infer_leading_log_level("✔ start debugging failure (134ms)"), LogLevel::Unknown)
+        << "leading ✔ + Stage-1 'failure' (Fatal) must demote to Unknown";
+    EXPECT_EQ(infer_leading_log_level("✔ write_bash failure returns a non-empty error message"),
+              LogLevel::Unknown)
+        << "leading ✔ + Stage-1 'failure' (Fatal) must demote to Unknown";
+    // "ERROR" is a parse_log_level word → Stage 1 Error (unguarded). ✔ leads ⇒ demote.
+    EXPECT_EQ(infer_leading_log_level("✔ maps status codes: ERROR → ERROR, missing → UNSET"),
+              LogLevel::Unknown)
+        << "leading ✔ + Stage-1 'ERROR' (Error) must demote to Unknown";
+}
+// Real CI wraps the verdict glyph in ANSI SGR colour. The escape must be skipped so the
+// glyph is still the leading outcome token (mirrors AnsiColourWrappedLevelRecovered).
+TEST(InferLeadingLogLevel, AnsiWrappedLeadingPassGlyphDemotesStage1Level)
+{
+    EXPECT_EQ(
+        infer_leading_log_level("\x1b[32m✔\x1b[0m write_bash failure returns a non-empty error"),
+        LogLevel::Unknown)
+        << "ANSI-wrapped leading ✔ + Stage-1 'failure' must demote to Unknown";
+}
+// Recall guard (no demotion without a LEADING pass glyph). leading_outcome_is_pass is
+// true ONLY when the first outcome-bearing token is a pass glyph: a genuine leading
+// failure WORD leads → stop → false, and a summary with no leading glyph stays a
+// failure. These must NOT regress when the guard lands — they are the rejected
+// "true-leading only" recall loss made into a standing assertion (§4A.6 D-OUT-1b).
+TEST(InferLeadingLogLevel, GenuineLeadingFailureSurvivesWithoutPassGlyph)
+{
+    EXPECT_EQ(infer_leading_log_level("ERROR: db connection failed"), LogLevel::Error)
+        << "leading failure WORD, no pass glyph — preserved";
+    EXPECT_EQ(infer_leading_log_level("FATAL: kernel panic"), LogLevel::Fatal)
+        << "leading FATAL, no pass glyph — preserved";
+    EXPECT_EQ(infer_leading_log_level("[worker-3] ERROR connection refused"), LogLevel::Error)
+        << "scope-prefixed ERROR (token 1, not 0) — preserved (the recall guard)";
+    EXPECT_EQ(infer_leading_log_level("======== 25 passed, 5 failed ========"), LogLevel::Error)
+        << "failure summary, no leading glyph — stays Error";
+    // Symmetric disconfirm: the SAME line as the first demote case but led by a FAIL
+    // glyph (✗, not in the pass-glyph set) — leading_outcome_is_pass is false, so the
+    // Stage-1 'failure' (Fatal) survives. Proves the guard demotes PASS glyphs only,
+    // never any glyph (no over-demotion of a genuine glyph-led failure).
+    EXPECT_EQ(infer_leading_log_level("✗ start debugging failure (134ms)"), LogLevel::Fatal)
+        << "leading FAIL glyph ✗ must NOT demote — Stage-1 'failure' stays Fatal";
+}
+
 // NOLINTEND

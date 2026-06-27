@@ -982,6 +982,21 @@ export namespace insight::utils
 [[nodiscard]] bool contains_failure_cue(std::string_view text, std::size_t scan_limit = 0) noexcept;
 [[nodiscard]] bool contains_warning_cue(std::string_view text, std::size_t scan_limit = 0) noexcept;
 
+namespace detail
+{
+    // The shared outcome predicate (D-OUT-1b) — promoted from failure_lexicon.cpp's
+    // anonymous namespace so EVERY severity-classification site can consult it: the cue
+    // lexicon (contains_failure_cue) AND infer_leading_log_level's explicit-level Stage 1
+    // (parse_log_level), which lives in a SEPARATE TU that could not see a TU-local symbol.
+    // True iff the line's FIRST outcome-bearing token is a pass GLYPH (✓/✔/✅/√): an
+    // unambiguous per-test pass verdict, so a failure WORD embedded in the test NAME
+    // ("✔ … failure …") is not an alert. A leading failure WORD ⇒ false (failure leads),
+    // so a genuine "ERROR:"/"FATAL:" line is preserved. Internal/detail — NOT a public
+    // product surface (the public failure-lexicon API stays contains_failure_cue /
+    // contains_warning_cue); defined with the lexicon in failure_lexicon.cpp.
+    [[nodiscard]] bool leading_outcome_is_pass(std::string_view line) noexcept;
+} // namespace detail
+
 } // namespace insight::utils
 
 // ──────── from api/insight/utils/time_utils.hpp ────────
