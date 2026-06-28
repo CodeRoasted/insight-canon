@@ -249,6 +249,56 @@ TEST(FailureLexicon, UnderscoreCompoundIsOneAtomNotADecomposedCue)
            "word; the 20x crash is caught by recurrence, not the failure level";
 }
 
+// ── D-CNT-1 — the count register (§3.2): a counted-noun failure word is a SUMMARY ──
+// The symmetric dual of the "25 passed, 5 failed" pass-count: a failure word whose
+// IMMEDIATELY-preceding token is a bare integer ("1 failure", "5 failed") asserts an
+// aggregate, not a per-item verdict — so it does NOT fire as a cue, even when it carries
+// a verdict anchor (a counted noun is a summary even with a trailing colon). The P5 root:
+// `There was 1 failure:` read as a Fatal verdict outranked the named `testSitesStats
+// (FAILED)` it summarized. Count register is checked BEFORE the verdict anchors.
+// [[sift-failure-lexicon-must-be-outcome-aware]]
+TEST(FailureLexicon, CountRegisterFailureWordIsSummaryNotVerdict)
+{
+    EXPECT_FALSE(contains_failure_cue("There was 1 failure:"))
+        << "P5 root: '1 failure' is count register — count wins over the trailing-colon anchor";
+    EXPECT_FALSE(contains_failure_cue("Tests: 5 failed"))
+        << "'5 failed' is a count summary — the self-anchoring verb is demoted by the count";
+    EXPECT_FALSE(contains_failure_cue("Suite finished with 3 failed"))
+        << "'3 failed' count summary — not a per-item verdict";
+    // The minimal pairs that MUST stay verdicts — the predecessor is a WORD, not a number.
+    EXPECT_TRUE(contains_failure_cue("1 test failed"))
+        << "'failed' is preceded by 'test' (not the count '1') — a genuine per-item verdict";
+    EXPECT_TRUE(contains_failure_cue("testSitesStats (FAILED)"))
+        << "paren+caps '(FAILED)', no count predecessor — the specific verdict the summary counts";
+    EXPECT_TRUE(contains_failure_cue("Build failed with 1 error"))
+        << "'failed' preceded by 'Build' (not a count) — the verdict survives elsewhere on the line";
+}
+
+// ── D-OUT-2 — a leading pass WORD demotes, but ONLY as the first significant token ──
+// D-OUT-1 is glyph-gated (a leading pass GLYPH demotes; a pass WORD does not) to protect
+// the "25 passed, 5 failed" summary. D-OUT-2 closes the TAP/node-runner recall gap: a
+// kSuccessVerdicts WORD (passed/ok/success/succeeded) leading the line (first significant
+// token, mirroring the glyph rule) demotes a failure word — `ok 1 - … failed` is a PASSING
+// TAP assertion whose description carries failure vocab. The count register (above) is the
+// independent backstop for count-summaries, so the pass-WORD rule is now low-risk.
+TEST(FailureLexicon, LeadingPassWordDemotesAsFirstSignificantToken)
+{
+    EXPECT_FALSE(contains_failure_cue("ok 1 - request failed and retried"))
+        << "TAP pass: 'ok' is the first significant token — demotes the self-anchoring 'failed'";
+    EXPECT_FALSE(contains_failure_cue("passed: should reject when the upstream call refused"))
+        << "'passed' leads — 'refused' is in a passing assertion's description";
+    EXPECT_FALSE(contains_failure_cue("success - worker crashed cleanly under SIGTERM"))
+        << "'success' leads — 'crashed' is demoted as the line is verdict-led pass";
+    // Disconfirming — the rule is FIRST-significant-token only, never anywhere.
+    EXPECT_TRUE(contains_failure_cue("request failed and retried"))
+        << "no leading pass word — 'failed' fires (the recall the rule must not cost)";
+    EXPECT_TRUE(contains_failure_cue("worker crashed but all 4 checks passed"))
+        << "'crashed' is the first significant token; a TRAILING 'passed' must not demote it";
+    EXPECT_FALSE(contains_failure_cue("======== 25 passed, 5 failed ========"))
+        << "a NUMBER is the first significant token (not 'passed') — D-OUT-2 does not fire; the "
+           "count register independently demotes '5 failed' (so still no cue)";
+}
+
 // ── Warning lexicon is separate (no CamelCase types) ───────────────────────────
 TEST(FailureLexicon, WarningCue)
 {

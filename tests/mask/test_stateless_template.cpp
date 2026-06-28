@@ -111,6 +111,88 @@ TEST(StatelessTemplate, CompositesNormalized)
               masked("error at parser.cpp:1:1: bad token", arena));
 }
 
+// ── D-MSK-1 (§4.1) — generalized composite-numeric masking (Chromium/Electron prefix) ──
+// The glog/Chromium diagnostic prefix `[PID:MMDD/HHMMSS.micros:ERROR:file.cc:line]` is ONE
+// whitespace-delimited token. The old source-location normalizer masked only the trailing
+// `:line` and kept the whole `/`-bearing prefix as "path-like", so the high-cardinality
+// PID/date/time segments survived → a line byte-identical in baseline read as a NEW error
+// pattern (P6 dbus, 12×/12×). D-MSK-1 masks EVERY digit-leading sub-segment independently,
+// keeping the letter-leading class anchors (ERROR, dbus, bus.cc) → both sides collapse to
+// one template → not-new → dropped.
+TEST(StatelessTemplate, DiagnosticCompositeCollapsesChromiumPrefix)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // The exact P6 pair — only PID / date / time differ → ONE template.
+    EXPECT_EQ(
+        masked("[6226:0609/094020.430910:ERROR:dbus/bus.cc:408] Failed to connect to the bus", arena),
+        masked("[6225:0528/144005.901629:ERROR:dbus/bus.cc:408] Failed to connect to the bus", arena))
+        << "Chromium PID/date/time segments mask; ERROR/dbus/bus.cc kept → baseline ≡ changed";
+    // The letter-leading class anchor is KEPT: a different file in the prefix stays distinct.
+    EXPECT_NE(masked("[6226:0609/094020.430910:ERROR:dbus/bus.cc:408] x", arena),
+              masked("[6226:0609/094020.430910:ERROR:net/socket.cc:408] x", arena))
+        << "letter-leading segments (the stable class) are kept — dbus/bus.cc ≠ net/socket.cc";
+    // It subsumes the old source-location behaviour exactly (regression guard).
+    EXPECT_EQ(masked("error at tokenizer.cpp:4500:30: bad token", arena),
+              masked("error at tokenizer.cpp:12:5: bad token", arena))
+        << "source-location masking unchanged under the generalized rule";
+}
+
+// The status-value carve-out MUST survive PER-SEGMENT (the green→red split — load-bearing).
+// A digit segment that is a status value (≤ max digits, immediately preceded WITHIN the
+// composite by a status keyword: exit/code/signal/status) is KEPT, exactly as the bare-token
+// rule keeps `exit code 0`→`exit code 1`. So a varying id masks while the status flip stays
+// split — never collapse a categorical status change. [[diff-engine-significance-cut-invariant]]
+TEST(StatelessTemplate, DiagnosticCompositeKeepsStatusValuePerSegment)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // ONE composite that masks the request id AND keeps the status value: proves both paths.
+    EXPECT_EQ(masked("[req:42/status:500] handled", arena),
+              masked("[req:99/status:500] handled", arena))
+        << "the varying request id masks; the same status:500 is kept → collapse on the id only";
+    EXPECT_NE(masked("[req:42/status:500] handled", arena),
+              masked("[req:42/status:200] handled", arena))
+        << "the per-segment status carve-out: status:500 ≠ status:200 must NOT collapse";
+    EXPECT_NE(masked("worker exit:0 done", arena), masked("worker exit:1 done", arena))
+        << "exit:0 ≠ exit:1 — the colon-form of the exit-code carve-out, per-segment";
+}
+
+// ── D-MSK-2 (§4.2) — ephemeral-root path masking (randomized temp dirs, P6) ─────
+// Playwright temp dirs `/tmp/pw-electron-userdata-Kw9v4a` carry a random base-62 suffix —
+// letter-leading, not hex/UUID, so the existing masks keep it literal → a new template per
+// run → novelty fatigue. The suffix is undecidable, but the ROOT is an enumerable byte-exact
+// catalog (/tmp, /var/tmp, /var/folders): a child of an ephemeral root is a per-run instance
+// by construction, so the post-root remainder masks to `<root>/<*>` — lossless for diffing.
+TEST(StatelessTemplate, EphemeralRootPathMasksRemainder)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // The random-suffix variants collapse to one template…
+    EXPECT_EQ(masked("opened /tmp/pw-electron-userdata-Kw9v4a ok", arena),
+              masked("opened /tmp/pw-duplicate-collections-kvJMB5 ok", arena))
+        << "/tmp/<random> → /tmp/<*> on both sides — the novelty fatigue is killed";
+    // …and a stable temp file collapses with them (also non-diffable — lossless).
+    EXPECT_EQ(masked("opened /tmp/transient ok", arena),
+              masked("opened /tmp/pw-electron-userdata-Kw9v4a ok", arena))
+        << "a stable child of /tmp is itself non-diffable — collapses to the same /tmp/<*>";
+    EXPECT_EQ(masked("dir /var/folders/aB/cD ready", arena),
+              masked("dir /var/folders/xY/zW ready", arena))
+        << "/var/folders (macOS) is in the ephemeral-root catalog";
+}
+
+// The guard: this is an ephemeral-ROOT catalog, NOT a general absolute-path masker. A path
+// under a non-ephemeral root keeps its identity, and a /tmp SOURCE path (with :line) keeps
+// its file:line shape (the diagnostic composite is checked FIRST).
+TEST(StatelessTemplate, NonEphemeralPathsAndSourcePathsUntouched)
+{
+    ArenaAllocator arena{256U * 1024U};
+    EXPECT_NE(masked("reading /etc/hosts now", arena), masked("reading /etc/passwd now", arena))
+        << "/etc is NOT ephemeral — /etc/hosts ≠ /etc/passwd (no over-masking)";
+    EXPECT_NE(masked("exec /usr/bin/foo", arena), masked("exec /usr/bin/bar", arena))
+        << "/usr/bin is NOT ephemeral — distinct binaries stay distinct";
+    EXPECT_NE(masked("at /tmp/build/foo.cc:42 oops", arena),
+              masked("at /tmp/build/bar.cc:42 oops", arena))
+        << "a /tmp SOURCE path (:line) is a diagnostic composite first — file kept, only :line masks";
+}
+
 // ── F13 strengthening (§8 / D-TID-11..13) — the re-measure rule set ──────────────
 
 TEST(StatelessTemplate, AnsiEscapesStrippedBeforeTokenization)

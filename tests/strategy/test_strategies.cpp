@@ -298,6 +298,49 @@ TEST_F(JsonStrategyTest, FallsBackToJSONDumpWhenNoMessageKey)
     EXPECT_FALSE(result.value().content.empty());
 }
 
+// ── D-MSK-3 (§4.3) — nested-`fields` component/level descent (bugs.md:27) ───────
+// App loggers (and LogCraft) nest custom fields under "fields":{…}; the top-level
+// component/level lookups miss, so the cube WHERE axis went blind on JSON. When the
+// top-level lookup misses, descend ONE level into "fields" and read {component, level}.
+TEST_F(JsonStrategyTest, NestedFieldsComponentExtracted)
+{
+    auto result{strategy.parse(
+        R"({"msg":"User logged in","fields":{"component":"auth"}})", arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    EXPECT_EQ(result.value().component, "auth")
+        << "component nested under \"fields\" must be recovered (was blind → cube WHERE empty)";
+    EXPECT_EQ(result.value().content, "User logged in");
+}
+
+TEST_F(JsonStrategyTest, NestedFieldsLevelAndComponentExtracted)
+{
+    auto result{strategy.parse(
+        R"({"msg":"connection lost","fields":{"level":"ERROR","component":"db"}})", arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    EXPECT_EQ(result.value().level, LogLevel::Error) << "level nested under \"fields\" recovered";
+    EXPECT_EQ(result.value().component, "db");
+}
+
+// A `source` synonym under "fields" resolves too (kComponentKeys: component/source/logger/…).
+TEST_F(JsonStrategyTest, NestedFieldsSourceSynonymExtracted)
+{
+    auto result{strategy.parse(
+        R"({"msg":"job scheduled","fields":{"source":"worker-pool"}})", arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    EXPECT_EQ(result.value().component, "worker-pool");
+}
+
+// The descent is a FALLBACK only — a top-level component is authoritative and a nested
+// one must NOT override it (the fallback fires only when the top-level lookup missed).
+TEST_F(JsonStrategyTest, TopLevelComponentWinsOverNested)
+{
+    auto result{strategy.parse(
+        R"({"component":"gateway","msg":"x","fields":{"component":"nested"}})", arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    EXPECT_EQ(result.value().component, "gateway")
+        << "top-level component is authoritative; the nested fallback must not override it";
+}
+
 TEST_F(JsonStrategyTest, RejectsNonJSONLine)
 {
     auto result{strategy.parse(kBSDLine, arena)};

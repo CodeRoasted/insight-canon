@@ -502,4 +502,43 @@ TEST(InferLeadingLogLevel, LeadingBareLevelWordDemotedWhenUnanchored)
         << "caps + colon — authoritative, preserved";
 }
 
+// ── D-CNT-1 — count register at the LEVEL altitude (§3.2) ──────────────────────
+// infer_leading_log_level is what the diff consumes. A count-register failure word
+// ("1 failure", "5 failed") is a SUMMARY: it must NOT confer an alerting verdict tier
+// (Error/Fatal), but it still surfaces — capped at Warn (demote, never suppress). This is
+// the P5 root: `There was 1 failure:` was Fatal (colon anchor) and outranked the named
+// `testSitesStats (FAILED)` it summarized. `25 passed, 5 failed` → Warn is the dual,
+// already pinned by GenuineLeadingFailureSurvivesWithoutPassGlyph. [[sift-failure-lexicon-must-be-outcome-aware]]
+TEST(InferLeadingLogLevel, CountRegisterSummaryCapsAtWarn)
+{
+    EXPECT_EQ(infer_leading_log_level("There was 1 failure:"), LogLevel::Warn)
+        << "P5 root: '1 failure:' is a count summary → Warn, NOT the Fatal the colon would confer";
+    EXPECT_EQ(infer_leading_log_level("Tests: 5 failed"), LogLevel::Warn)
+        << "'5 failed' count summary → surfaced at Warn, below per-item verdicts";
+    EXPECT_EQ(infer_leading_log_level("HTTP 500 error"), LogLevel::Warn)
+        << "accepted precision boundary (§3.2): '500 error' is count-preceded → Warn summary, not "
+           "an Error verdict (corroborated by 5xx-rate signals in-window, not shouted)";
+    // The minimal-pair survivor: a genuine per-item verdict (predecessor is a WORD) stays Error.
+    EXPECT_EQ(infer_leading_log_level("1 test failed"), LogLevel::Error)
+        << "'failed' preceded by 'test' (not the count '1') — a real per-item failure, stays Error";
+}
+
+// ── D-OUT-2 — leading pass WORD demotes the level (§3.3) ───────────────────────
+// A passing TAP/node-runner assertion ("ok 1 - … failed …") whose description embeds
+// failure vocab must not earn an alerting level. The pass WORD demotes ONLY as the first
+// significant token (the count register is the independent backstop for "25 passed, …").
+TEST(InferLeadingLogLevel, LeadingPassWordDemotesLevel)
+{
+    EXPECT_EQ(infer_leading_log_level("ok 1 - request failed and retried"), LogLevel::Unknown)
+        << "TAP pass: 'ok' leads → the self-anchoring 'failed' is demoted to Unknown";
+    EXPECT_EQ(infer_leading_log_level("success - worker crashed cleanly under SIGTERM"),
+              LogLevel::Unknown)
+        << "'success' leads → 'crashed' demoted";
+    // Disconfirm: no leading pass word → the genuine failure level survives (recall guard).
+    EXPECT_EQ(infer_leading_log_level("request failed and retried"), LogLevel::Error)
+        << "no leading pass word — 'failed' stays an Error verdict";
+    EXPECT_EQ(infer_leading_log_level("worker crashed but all 4 checks passed"), LogLevel::Error)
+        << "'crashed' is the first significant token; a TRAILING 'passed' must not demote it";
+}
+
 // NOLINTEND
