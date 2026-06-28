@@ -810,7 +810,15 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
     //  2) Otherwise, scan the head for an error/warning CUE as a standalone token
     //     (pytest "…OperationalError", tracebacks, bare "connection refused").
     constexpr std::size_t kLeadingScanHead{40}; // covers an ISO-8601 timestamp + the level start
-    constexpr std::size_t kKeywordHead{64};     // head scanned for a failure/warning cue
+    // Head scanned for a failure/warning cue. 128 (not 64), aligned with the pass/fail-glyph
+    // kOutcomeHead: a VERDICT ANCHOR can sit at the END of a long line — a deeply-namespaced CI
+    // test verdict (`Tests\E2E\…\DocumentsDBCustomServerTest::testTimeout (FAILED)`) puts the
+    // `(FAILED)` anchor at col ~69, past the old 64 head, so the strongest possible failure signal
+    // was invisible and the line classified as a benign new template (D-RNK-2 measure-first: the
+    // P5 `testTimeout (FAILED)` recall miss is THIS head bound, not the significance cut). 128
+    // covers realistic verdict lines with margin; a pathological >128-char prefix is the accepted
+    // residual (the measure-first catalog discipline). Still bounded → no hot-path scan blow-up.
+    constexpr std::size_t kKeywordHead{128};
 
     // Stage 1 — first exact level token whose start lies within the head, but
     // authoritative only IN VERDICT REGISTER (D-OUT-4). parse_log_level is outcome-blind:
@@ -841,8 +849,15 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
                              level_token = token;
                              return false;
                          });
+    // D-CNT-1: a leading level WORD in COUNT register ("There was 1 failure:") is a SUMMARY,
+    // not a per-item verdict — even though it is verdict-anchored (the trailing colon), a counted
+    // noun is checked first and is NOT authoritative. Fall THROUGH to Stage 2, which still catches
+    // a genuine non-count verdict elsewhere on the line ("Build failed with 1 error" → "failed"
+    // fires → Error) or, absent one, caps the summary at Warn. Only alerting leading levels need
+    // this guard (Info/Debug never outrank).
     if (leading != LogLevel::Unknown &&
-        (detail::is_verdict_anchored(line, level_token) || !token_follows_level))
+        (detail::is_verdict_anchored(line, level_token) || !token_follows_level) &&
+        !(is_alerting_level(leading) && detail::is_count_register(line, level_token)))
     {
         // Authoritative leading level. D-OUT-1b: a leading pass GLYPH ("✔ … ERROR …") is an
         // unambiguous pass verdict whose name embeds a level word ⇒ demote an alerting level
@@ -860,6 +875,11 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
     // spuriously promoted new templates to HIGH "New error" downstream in the diff.
     if (contains_failure_cue(line, kKeywordHead))
         return LogLevel::Error; // contains_failure_cue self-guards (D-OUT-1) — no double call
+    // D-CNT-1: a count-register failure word ("1 failure", "5 failed") is a SUMMARY — it did not
+    // fire as a verdict cue above, but it still surfaces, capped at Warn (below per-item verdicts;
+    // demote, never suppress — the "25 passed, 5 failed" dual). A leading pass GLYPH still demotes.
+    if (detail::contains_failure_summary_cue(line, kKeywordHead))
+        return detail::leading_outcome_is_pass(line) ? LogLevel::Unknown : LogLevel::Warn;
     if (contains_warning_cue(line, kKeywordHead))
         // D-OUT-1b: contains_warning_cue has no outcome guard, so apply it here (Warn alerts).
         return detail::leading_outcome_is_pass(line) ? LogLevel::Unknown : LogLevel::Warn;

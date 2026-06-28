@@ -436,8 +436,9 @@ TEST(InferLeadingLogLevel, GenuineLeadingFailureSurvivesWithoutPassGlyph)
         << "leading FATAL, no pass glyph — preserved";
     EXPECT_EQ(infer_leading_log_level("[worker-3] ERROR connection refused"), LogLevel::Error)
         << "scope-prefixed ERROR (token 1, not 0) — preserved (the recall guard)";
-    EXPECT_EQ(infer_leading_log_level("======== 25 passed, 5 failed ========"), LogLevel::Error)
-        << "failure summary, no leading glyph — stays Error";
+    EXPECT_EQ(infer_leading_log_level("======== 25 passed, 5 failed ========"), LogLevel::Warn)
+        << "D-CNT-1: '5 failed' is a count summary → demoted to Warn (surfaced, below per-item "
+           "verdicts), not Error";
     // Symmetric disconfirm: the SAME line as the first demote case but led by a FAIL
     // glyph (✗, not in the pass-glyph set) — leading_outcome_is_pass is false, so the
     // Stage-1 'failure' (Fatal) survives. Proves the guard demotes PASS glyphs only,

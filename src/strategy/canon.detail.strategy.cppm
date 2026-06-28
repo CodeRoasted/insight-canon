@@ -30,6 +30,14 @@ struct ParsedLine
     std::string_view component; // F3b: the low-card functional source (subsystem/daemon/job)
     std::string_view host;      // F3b: the high-card node/host identity (hors-cube)
     std::string_view content;
+    // Echoed-source provenance (D-PROV-1): true when the RAW line was a CI command-echo of
+    // run-step SCRIPT source (the GHA `\x1b[36;1m … \x1b[0m` command-echo wrapper), NOT an
+    // observed runtime event. Captured at the ANSI-strip layer (the only code that sees the
+    // wrapper — log_parser.cpp, before any strategy/classifier; the wrapper dies at strip).
+    // A per-line classification attribute, NOT part of template identity: the parser uses it
+    // to demote `level` to Unknown so a failure WORD in echoed shell source ("echo
+    // \"Download failed …\"") never confers an alerting level. `false` for every non-echoed line.
+    bool echoed_source{false};
     // OTEL trace context (D-OTEL-1), populated by a strategy that recognizes OTEL log records
     // (today: JsonStrategy on OTLP/JSON). Consumed downstream (O2 grouping; O3 DAG), never
     // serialized; `present == false` for every non-OTEL input.

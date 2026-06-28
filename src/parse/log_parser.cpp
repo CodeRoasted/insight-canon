@@ -134,8 +134,19 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
     {
         ++parsed_count_;
         last_format_ = strategy->format(); // the routed winner for this event (per-line observability)
-        INSIGHT_LOG_TRACE(logging::parser_logger(), "parse ok: strategy={}",
-                          to_string(strategy->format()));
+        // D-PROV-1 (echoed-source register): the GHA command-echo SGR wrapper was destroyed
+        // by strip_escape_sequences above, so detect it on the RAW (ANSI-bearing) line — the
+        // only place it survives. An echoed-source line is run-step SCRIPT text, not an
+        // observed runtime event: demote its level to Unknown so a failure WORD in echoed
+        // shell source ("echo \"Download failed …\"") confers NO alerting level. Single root —
+        // the level demotion transitively suppresses NewErrorPattern across all eidos channels.
+        if (is_echoed_source_line(raw_line))
+        {
+            result->echoed_source = true;
+            result->level = LogLevel::Unknown;
+        }
+        INSIGHT_LOG_TRACE(logging::parser_logger(), "parse ok: strategy={} echoed_source={}",
+                          to_string(strategy->format()), result->echoed_source);
     }
     else
     {
@@ -199,8 +210,15 @@ std::expected<ParsedLine, std::string> LogParser::parse_stable(std::string_view 
     {
         ++parsed_count_;
         last_format_ = strategy->format(); // the routed winner for this event (per-line observability)
-        INSIGHT_LOG_TRACE(logging::parser_logger(), "parse_stable ok: strategy={}",
-                          to_string(strategy->format()));
+        // D-PROV-1: echoed-source demotion (see parse_line). Detect on the supplied line; a
+        // pre-ANSI-stripped stable line carries no wrapper, so this is a no-op there.
+        if (is_echoed_source_line(stable_line))
+        {
+            result->echoed_source = true;
+            result->level = LogLevel::Unknown;
+        }
+        INSIGHT_LOG_TRACE(logging::parser_logger(), "parse_stable ok: strategy={} echoed_source={}",
+                          to_string(strategy->format()), result->echoed_source);
     }
     else
     {

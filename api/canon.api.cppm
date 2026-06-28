@@ -44,10 +44,15 @@ using WindowID = uint64_t;
 // canonicalization change. Generations: -1 = stateless masker + F13; -2 = OTEL-awareness
 // (severity-from-severity_number + trace-context routing + the trace-scoped graph —
 // insight_otel_epic.md D-OTEL-2, unconditional); -3 = currency-marker numerics
-// (stateless_template_id.md D-TID-22 — `$463`/`total=$463` mask to `$<*>`/`total=$<*>`). The -3
-// content changes ONLY for inputs carrying a currency-marker-prefixed numeric token; every other
-// document is byte-identical except this version string.
-inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-3"};
+// (stateless_template_id.md D-TID-22 — `$463`/`total=$463` mask to `$<*>`/`total=$<*>`); -4 = the
+// 1.6.4 masking batch (detection_provenance_and_legibility.md): D-MSK-1 generalized
+// diagnostic-composite masking (per-`:`/`/`-segment digit-leading rule — collapses the
+// Chromium/glog prefix `[PID:DATE/TIME:LEVEL:file.cc:line]`, subsumes source-location), D-MSK-2
+// ephemeral-root path catalog (`/tmp/…` → `/tmp/<*>`), and D-MSK-3 JSON nested-`fields`
+// component/level descent (a cube-axis change folded into the same bump). The -4 content changes
+// ONLY for inputs carrying a diagnostic-composite / ephemeral-root token or a nested-`fields` JSON
+// record; every other document is byte-identical except this version string.
+inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-4"};
 
 // ── Template identity (insight_perf_template_id.md D-TIR-1) ──
 // The structural identity of a canonicalised template: the first 16 bytes of
@@ -998,12 +1003,15 @@ namespace detail
     // anonymous namespace so EVERY severity-classification site can consult it: the cue
     // lexicon (contains_failure_cue) AND infer_leading_log_level's explicit-level Stage 1
     // (parse_log_level), which lives in a SEPARATE TU that could not see a TU-local symbol.
-    // True iff the line's FIRST outcome-bearing token is a pass GLYPH (✓/✔/✅/√): an
-    // unambiguous per-test pass verdict, so a failure WORD embedded in the test NAME
-    // ("✔ … failure …") is not an alert. A leading failure WORD ⇒ false (failure leads),
-    // so a genuine "ERROR:"/"FATAL:" line is preserved. Internal/detail — NOT a public
-    // product surface (the public failure-lexicon API stays contains_failure_cue /
-    // contains_warning_cue); defined with the lexicon in failure_lexicon.cpp.
+    // True iff the line's leading outcome is a PASS: a pass GLYPH (✓/✔/✅/√) anywhere in the
+    // head (an unambiguous per-test verdict, so a failure WORD embedded in the test NAME
+    // "✔ … failure …" is not an alert), OR (D-OUT-2) a pass WORD (passed/ok/success/succeeded)
+    // as the FIRST SIGNIFICANT token ("ok 1 - should return error" → pass; the TAP/node-runner
+    // case). A leading failure WORD ⇒ false (failure leads), so a genuine "ERROR:"/"FATAL:" line
+    // is preserved; a summary "25 passed, 5 failed" ⇒ false (a number is the first significant
+    // token, not "passed"), and a prose "passed" mid-line never demotes (word must LEAD).
+    // Internal/detail — NOT a public product surface (the public failure-lexicon API stays
+    // contains_failure_cue / contains_warning_cue); defined with the lexicon in failure_lexicon.cpp.
     [[nodiscard]] bool leading_outcome_is_pass(std::string_view line) noexcept;
 
     // The verdict-register kernel (D-OUT-4) — true iff `token` carries the structural
@@ -1022,6 +1030,29 @@ namespace detail
     // ASCII case test, order-independent ⇒ cross-stdlib + MSVC bit-identical by construction
     // (F5). The SAME kernel both severity feeders consult; internal/detail, NOT a public surface.
     [[nodiscard]] bool is_verdict_anchored(std::string_view line, std::string_view token) noexcept;
+
+    // The count-register kernel (D-CNT-1) — true iff `token` is a COUNT register summary: its
+    // IMMEDIATELY-PRECEDING token (under the shared canon tokenization) is a BARE INTEGER count
+    // ("1 failure", "5 failed", "HTTP 500 error") that is NOT part of a numeric/temporal chain (the
+    // token before the count is not itself digit-leading — so a leading ISO timestamp
+    // "2026-…T11:00:01 ERROR" is NOT count register: ERROR's predecessor `01` is a bare integer, but
+    // `01`'s predecessor `00` is the `:MM` minutes, marking `01` a timestamp second). An aggregate
+    // statistic, not a per-item verdict. Checked BEFORE the verdict anchors (a counted noun is a
+    // summary even with a trailing colon: "1 failure:" is a summary, not Fatal). The symmetric dual
+    // of the "25 passed, 5 failed" disconfirming case that forced D-OUT-1 to be glyph-gated:
+    // count-quantified outcome vocab is a summary, not a verdict. A count-register word does NOT
+    // confer an alerting level — it caps at Warn (demote, never suppress). PRECONDITION: `token` MUST
+    // be a sub-view of `line`. Pure byte/case test, order-independent ⇒ cross-stdlib + MSVC bit-identical (F5).
+    [[nodiscard]] bool is_count_register(std::string_view line, std::string_view token) noexcept;
+
+    // D-CNT-1 dual — true iff the head carries a failure-lexicon word in COUNT register (a summary
+    // like "1 failure" / "5 failed"). contains_failure_cue treats such words as NON-firing (a count
+    // is not a per-item verdict); this reports their presence so infer_leading_log_level caps the
+    // line at Warn (surfaced, below per-item verdicts). `scan_limit` bounds the head as for
+    // contains_failure_cue. Internal/detail — NOT a public product surface. Cold path (consulted
+    // only when contains_failure_cue is false). Pure byte/case test ⇒ cross-stdlib bit-identical (F5).
+    [[nodiscard]] bool contains_failure_summary_cue(std::string_view text,
+                                                    std::size_t scan_limit = 0) noexcept;
 } // namespace detail
 
 } // namespace insight::utils

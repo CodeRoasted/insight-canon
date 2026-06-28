@@ -119,8 +119,14 @@ TEST(FailureLexicon, LeadingPassGlyphDemotesFailureWord)
 // discriminator is "first outcome token is a pass glyph", nothing weaker.
 TEST(FailureLexicon, PassWordOrTrailingGlyphDoesNotDemote)
 {
-    EXPECT_TRUE(contains_failure_cue("======== 25 passed, 5 failed ========"))
-        << "pytest summary: 'passed' leads as a COUNT, not a verdict — the failure stands";
+    // D-CNT-1: "5 failed" is a COUNT-register summary (a bare integer immediately precedes the
+    // failure word), so contains_failure_cue — a per-item VERDICT predicate — does NOT fire. The
+    // summary still surfaces at Warn via the level path; it just never outranks the per-item
+    // verdicts it summarizes (the symmetric dual of the "25 passed" pass-count).
+    EXPECT_FALSE(contains_failure_cue("======== 25 passed, 5 failed ========"))
+        << "pytest summary: '5 failed' is a count summary, not a per-item verdict (D-CNT-1)";
+    EXPECT_TRUE(contains_failure_cue("build failed after a retry"))
+        << "'failed' preceded by a WORD (not a bare-integer count) is a genuine verdict — fires";
     EXPECT_TRUE(contains_failure_cue("ERROR build broke ✓ cache restored"))
         << "first outcome token is the failure word ERROR; a trailing ✓ must not demote it";
     EXPECT_TRUE(contains_failure_cue("✗ marks the run failed when the worker dies"))

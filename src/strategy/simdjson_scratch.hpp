@@ -132,6 +132,22 @@ struct alignas(kSimdjsonScratchCacheLine) JsonScratch
     return true;
 }
 
+// Nested-object descent (detection_provenance_and_legibility.md D-MSK-3): app loggers (and
+// LogCraft) nest custom fields under `"fields":{…}`, so a top-level component/level lookup
+// misses. Get the child object at `key` (one level) so the caller can read its scalars with
+// try_get_string. Returns false when `key` is absent / not an object. Like try_get_otel_body,
+// this descends into a CHILD: it MUST be the LAST access on `obj` — after reading the child the
+// parent cursor cannot rewind to a sibling (simdjson on-demand). A nested object also forces the
+// fast byte-scanner to bail (it rejects `{`), so every nested-fields line takes this slow path.
+[[nodiscard]] inline bool get_nested_object(simdjson::ondemand::object& obj, std::string_view key,
+                                            simdjson::ondemand::object& out) noexcept
+{
+    simdjson::ondemand::value field;
+    if (obj.find_field_unordered(key).get(field) != simdjson::SUCCESS)
+        return false;
+    return field.get_object().get(out) == simdjson::SUCCESS;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Fast-path byte scanner — avoids simdjson for escape-free JSON objects.
 //

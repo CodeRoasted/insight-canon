@@ -26,6 +26,36 @@ namespace
         return true;
     }
 
+    // First byte is an ASCII digit ("5", "500", "5ms", "2026-01-15"). Used to detect a numeric/
+    // temporal CHAIN element (so a timestamp's `:SS` seconds, whose neighbour is the `:MM` minutes,
+    // is recognised as part of a chain, not a standalone count).
+    [[nodiscard]] bool is_digit_leading_numeric(std::string_view tok) noexcept
+    {
+        return !tok.empty() && tok.front() >= '0' && tok.front() <= '9';
+    }
+
+    // A BARE INTEGER ("1", "5", "500") — every byte an ASCII digit. A genuine failure COUNT is a
+    // bare integer, never "5ms" / "2026-01-15" / a hash; the trimmed token (for_each_token strips
+    // surrounding non-alnum) makes this exact.
+    [[nodiscard]] bool is_bare_integer(std::string_view tok) noexcept
+    {
+        return !tok.empty() &&
+               std::ranges::all_of(tok, [](char chr) noexcept { return chr >= '0' && chr <= '9'; });
+    }
+
+    // D-CNT-1 (count register): is a failure word in COUNT register, given its two preceding tokens?
+    // True iff the IMMEDIATELY-preceding token is a bare-integer count ("1 failure", "5 failed",
+    // "HTTP 500 error") that is NOT part of a numeric/temporal chain — i.e. the token before the
+    // count is NOT itself digit-leading. The chain guard is load-bearing: a leading ISO timestamp
+    // "2026-…T11:00:01 ERROR" tokenises to …,`00`,`01`,ERROR, so ERROR's predecessor `01` is a bare
+    // integer — but `01`'s predecessor `00` IS digit-leading (the `:MM` minutes), so it is a
+    // timestamp second, not a failure count. One source of truth, shared by is_count_register (the
+    // predicate) and contains_failure_cue / contains_failure_summary_cue (their in-loop prev pair).
+    [[nodiscard]] bool is_count_preceded(std::string_view prev, std::string_view prev2) noexcept
+    {
+        return is_bare_integer(prev) && !is_digit_leading_numeric(prev2);
+    }
+
     // Negation segments that INVERT an "…Error"/"…Exception" suffix: the CamelCase
     // word right before the suffix. "…NotError"/"…NoError" is not an error type — the
     // textbook false match is a test named "…IsNotError", whose ctest/gtest result
@@ -303,9 +333,12 @@ namespace
 // as for_each_token): the first token that is a pass GLYPH ⇒ true (pass leads); the first token
 // that is a failure WORD ⇒ false (failure leads — stop, so a pathological "ERROR … ✓" still fires
 // and the "ERROR teardown failed though setup was ok" guard holds); any other token (scope segment
-// "@cline/core", a name, a number) is skipped. End-of-head ⇒ false. Glyph-gated, NOT word-gated: a
-// leading pass WORD ("25 passed, 5 failed") is a summary count, not a verdict, and must not demote
-// a real failure summary. Pure byte-compare + ASCII case-fold ⇒ cross-stdlib and MSVC bit-identical (F5).
+// "@cline/core", a name, a number) is skipped. End-of-head ⇒ false. Glyph-gated AND (D-OUT-2)
+// first-significant-token-word-gated: a leading pass GLYPH demotes anywhere in the head; a pass WORD
+// (passed/ok/success/succeeded) demotes ONLY as the FIRST significant token ("ok 1 - should return
+// error" → demote), so a summary count "25 passed, 5 failed" (a number leads, not "passed") and a
+// prose "passed" mid-line never false-demote a real failure. Pure byte-compare + ASCII case-fold ⇒
+// cross-stdlib and MSVC bit-identical (F5).
 namespace detail
 {
     [[nodiscard]] bool leading_outcome_is_pass(std::string_view line) noexcept
@@ -313,14 +346,32 @@ namespace detail
         static constexpr std::size_t kOutcomeHead{128U}; // generous monorepo scope-prefix bound
         const std::size_t limit{line.size() < kOutcomeHead ? line.size() : kOutcomeHead};
         std::size_t pos{0};
+        bool first_significant{true};
         while ((pos = skip_to_token_start(line, pos)) < limit)
         {
-            if (starts_with_pass_glyph(line, pos)) // first outcome token is a pass glyph
+            if (starts_with_pass_glyph(line, pos)) // an outcome token is a pass glyph
                 return true;
             const std::string_view token{take_trimmed_token(line, pos)};
+            if (token.empty())
+                continue; // a pure-punctuation token (trimmed to nothing) — not significant
             for (const FailureWord& entry : kFailureLexicon)
-                if (iequals(token, entry.word)) // first outcome token is a failure word
+                if (iequals(token, entry.word)) // a failure word leads → not a pass
                     return false;
+            // D-OUT-2: a leading pass WORD (passed/ok/success/succeeded) demotes a failure word,
+            // but ONLY as the FIRST significant token — so the TAP/node-runner case
+            // "ok 1 - should return error" demotes (ok leads), while "25 passed, 5 failed" does
+            // NOT (a number is the first significant token, not "passed" — a summary count the
+            // count register independently handles). Conservative vs the glyph rule: a glyph is an
+            // unambiguous verdict that never appears in prose; a pass WORD does ("passed through"),
+            // so it must LEAD, never fire mid-line. Disconfirming "not ok 1 …" is a TAP FAILURE —
+            // "not" is the first significant token → no demote → the line stays a failure (correct).
+            if (first_significant)
+            {
+                for (const std::string_view verdict : kSuccessVerdicts)
+                    if (iequals(token, verdict))
+                        return true;
+                first_significant = false;
+            }
             // otherwise a non-outcome token (scope segment / name / number) — continue
         }
         return false; // no leading outcome token within the head
@@ -350,6 +401,65 @@ namespace detail
         // anchored token on a ✗-led line; never creates a cue (no failure word ⇒ never called).
         return leading_outcome_is_fail(line);
     }
+
+    // D-CNT-1 — see canon.api.cppm for the contract. true iff `token`'s IMMEDIATELY-PRECEDING
+    // token (under the shared canon tokenization) is a digit-leading numeric — count register
+    // ("1 failure", "5 failed"). PRECONDITION: `token` is a sub-view of `line` (a for_each_token
+    // token). Forward-scans `line` tracking the previous non-empty token until it reaches `token`
+    // (pointer identity, the occurrence not just an equal string); the predecessor's
+    // digit-leading-ness decides. Cold — consulted only once a level word matched. Mirrors
+    // for_each_token's boundaries exactly (ANSI- and delimiter-aware via the shared helpers).
+    // Pure byte/case test, order-independent ⇒ cross-stdlib + MSVC bit-identical (F5).
+    [[nodiscard]] bool is_count_register(std::string_view line, std::string_view token) noexcept
+    {
+        std::string_view prev{};
+        std::string_view prev_prev{};
+        std::size_t pos{0};
+        for (;;)
+        {
+            pos = skip_to_token_start(line, pos);
+            if (pos >= line.size())
+                return false; // token not found (not a valid sub-view) — conservative
+            const std::string_view cur{take_trimmed_token(line, pos)};
+            if (cur.data() == token.data() && cur.size() == token.size())
+                return is_count_preceded(prev, prev_prev);
+            if (!cur.empty())
+            {
+                prev_prev = prev;
+                prev = cur;
+            }
+        }
+    }
+
+    // D-CNT-1 — the DUAL of contains_failure_cue: true iff the head carries a failure-lexicon
+    // word in COUNT register (immediately preceded by a digit-leading numeric — "1 failure",
+    // "5 failed"): an aggregate SUMMARY, not a per-item verdict. contains_failure_cue treats
+    // such words as non-firing; this reports their presence so infer_leading_log_level caps a
+    // count-summary line at Warn (surfaced, below per-item verdicts — demote, never suppress).
+    // Cold path (only reached when contains_failure_cue is false). Single bounded pass;
+    // alloc-free, noexcept. Pure byte/case test ⇒ cross-stdlib + MSVC bit-identical (F5).
+    // Only throw path is for_each_token's substr (begin <= size); the noexcept body cannot throw.
+    // NOLINTNEXTLINE(bugprone-exception-escape)
+    [[nodiscard]] bool contains_failure_summary_cue(std::string_view text,
+                                                    std::size_t scan_limit) noexcept
+    {
+        std::string_view prev{};
+        std::string_view prev_prev{};
+        return for_each_token(text, scan_limit,
+                              [&](std::string_view token) noexcept
+                              {
+                                  bool summary{false};
+                                  for (const FailureWord& entry : kFailureLexicon)
+                                      if (iequals(token, entry.word))
+                                      {
+                                          summary = is_count_preceded(prev, prev_prev);
+                                          break;
+                                      }
+                                  prev_prev = prev;
+                                  prev = token;
+                                  return summary;
+                              });
+    }
 } // namespace detail
 
 // Only throw path is for_each_token / any_standalone_word, whose substr has begin <= text.size()
@@ -364,6 +474,7 @@ bool contains_failure_cue(std::string_view text, std::size_t scan_limit) noexcep
     // but the scan continues.
     bool saw_error_type{false};
     std::string_view prev{};
+    std::string_view prev_prev{};
     const bool saw_failure_word{
         for_each_token(text, scan_limit,
                        [&](std::string_view token) noexcept
@@ -376,16 +487,29 @@ bool contains_failure_cue(std::string_view text, std::size_t scan_limit) noexcep
                            for (const FailureWord& entry : kFailureLexicon)
                                if (iequals(token, entry.word))
                                {
+                                   matched = true;
+                                   // D-CNT-1: a count-register failure word (immediately
+                                   // preceded by a bare-integer count — "1 failure", "5 failed"
+                                   // — that is not a timestamp chain) is a SUMMARY, not a per-item
+                                   // verdict, so it does NOT fire as a cue (checked BEFORE the
+                                   // verdict anchors: a counted noun is a summary even with a
+                                   // trailing colon — "1 failure:"). The line still surfaces,
+                                   // demoted to Warn by the level path; it just stops outranking
+                                   // the specific verdicts it summarizes (the "25 passed, 5 failed"
+                                   // dual). On a masked TEMPLATE the digit is `<*>` (not a bare
+                                   // integer) so the metalog salience path is unaffected.
+                                   if (is_count_preceded(prev, prev_prev))
+                                       break;
                                    // zero-collision token self-anchors; collision-prone
                                    // token needs verdict register
                                    fired = entry.role == FailureRole::SelfAnchoring ||
                                            detail::is_verdict_anchored(text, token);
-                                   matched = true;
                                    break;
                                }
                            if (!matched && is_camel_error_type(token))
                                saw_error_type = true;
-                           prev = token; // remember for the next adjacency check
+                           prev_prev = prev; // shift the two-token window for the next adjacency
+                           prev = token;     // check (count register needs prev AND prev-prev)
                            return fired;
                        })};
     // A strong failure WORD fires unconditionally; a weak error-TYPE name (no failure

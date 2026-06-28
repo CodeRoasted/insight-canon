@@ -240,16 +240,43 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
         else
             parsed_line.content = arena.store_string(line);
     }
-    else if (try_get_string(root, kMessageKeys, scratch_view))
-    {
-        parsed_line.content = arena.store_string(scratch_view);
-    }
     else
     {
-        // Fallback: arena-store the original line. We avoid re-serialising the
-        // document (which would force a heap allocation); the raw bytes are
-        // already stable when the caller is LogParser.
-        parsed_line.content = arena.store_string(line);
+        if (try_get_string(root, kMessageKeys, scratch_view))
+        {
+            parsed_line.content = arena.store_string(scratch_view);
+        }
+        else
+        {
+            // Fallback: arena-store the original line. We avoid re-serialising the
+            // document (which would force a heap allocation); the raw bytes are
+            // already stable when the caller is LogParser.
+            parsed_line.content = arena.store_string(line);
+        }
+
+        // ── Nested-fields fallback (D-MSK-3) ──────────────────────────────────────
+        // App loggers (and LogCraft) nest custom fields under "fields":{…}, so the
+        // top-level component/level lookups above miss → the cube WHERE axis goes blind
+        // on JSON (bugs.md:27). When either missed, descend ONE level into "fields" and
+        // read {component, level} from it. MUST be the LAST root access — get_nested_object
+        // descends into a child and the parent cursor cannot rewind to a sibling afterward
+        // (so it sits after the top-level message read, and only on the non-OTEL path:
+        // OTEL records use resource attributes, not "fields", and already spent the cursor
+        // on body). A nested object also forces try_fast_parse to bail, so every
+        // nested-fields line reaches this slow path.
+        if (parsed_line.component.empty() || parsed_line.level == LogLevel::Unknown)
+        {
+            if (simdjson::ondemand::object fields_obj;
+                get_nested_object(root, "fields", fields_obj))
+            {
+                if (parsed_line.component.empty() &&
+                    try_get_string(fields_obj, kComponentKeys, scratch_view))
+                    parsed_line.component = arena.store_string(scratch_view);
+                if (parsed_line.level == LogLevel::Unknown &&
+                    try_get_string(fields_obj, kLevelKeys, scratch_view))
+                    parsed_line.level = utils::parse_log_level(scratch_view);
+            }
+        }
     }
 
     INSIGHT_LOG_TRACE(

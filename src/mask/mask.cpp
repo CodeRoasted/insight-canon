@@ -160,66 +160,134 @@ namespace
                equals_ascii_lower(tok, "exit") || equals_ascii_lower(tok, "signal");
     }
 
-    // Composite-token masking, SOURCE_LOCATION class.
+    // Composite-token masking, DIAGNOSTIC_COMPOSITE class (D-MSK-1).
     //
     // The fixed masks mask only WHOLE tokens that are digit-leading / IPv4 / hex. A
-    // compiler source location like `tokenizer.cpp:4500:30:` is one whitespace token that
-    // is none of those, so it stays literal and every (file,line,col) becomes its
-    // own template — a dominant cardinality blow-up.
+    // `:`/`/`-structured diagnostic token is none of those, so every numeric instance
+    // becomes its own template — a dominant cardinality blow-up. Two shapes:
+    //   • a compiler source location `tokenizer.cpp:4500:30:` (path then `:line:col`); and
+    //   • the Chromium/glog/Electron prefix `[6226:0609/094020.430910:ERROR:dbus/bus.cc:408]`
+    //     (PID:DATE/TIME:LEVEL:file.cc:line) — `normalize_source_location` kept the whole
+    //     PID/date/time prefix because it isn't "path-like", so it never collapsed.
     //
-    // Recognize `<path>:<digits>[:<digits>]…[:]` where the prefix before the first
-    // `:<digits>` is path-like (contains '.' or '/'), and normalize by masking each
-    // numeric `:<digits>` run to `:<*>` while KEEPING the path (the semantic part:
-    // which file). So `tokenizer.cpp:4500:30:` and `tokenizer.cpp:12:5:` collapse
-    // to one template `tokenizer.cpp:<*>:<*>:`, but a different file stays distinct.
+    // GENERALIZED RULE: split the token on `:` and `/` into sub-segments and classify EACH
+    // independently — a digit-leading sub-segment → `<*>` (mask the instance), a letter-leading
+    // sub-segment → KEEP (the stable class anchor: a filename, a level, a subsystem). Rejoin
+    // with the original separators. This SUBSUMES source-location exactly
+    // (`tokenizer.cpp:4500:30:` → `tokenizer.cpp:<*>:<*>:`, unchanged) and collapses the
+    // Chromium prefix (→ `[<*>:<*>/<*>:ERROR:dbus/bus.cc:<*>]`, byte-identical across PIDs/times).
     //
-    // Pure and deterministic (a function of the token bytes only — I5). Returns
-    // true and fills `out` with the normalized form; returns false (leaving `out`
-    // untouched) when `tok` is not a source location. The path-like requirement
-    // keeps clock times (`12:30:45`) and bare ratios out — only `:<digits>` runs
-    // behind a path prefix are masked.
-    [[nodiscard]] inline bool normalize_source_location(std::string_view tok, std::string& out)
+    // SCOPING (keeps the blast radius near genuine diagnostic composites, not all paths):
+    //   • TRIGGER — the token must contain a `:` immediately followed by a digit (the
+    //     source-location/diagnostic signature). A plain numeric path `/foo/12345/bar` (no
+    //     `:digit`) is NOT triggered → handled by the whole-token digit rule, unchanged.
+    //   • ANCHOR — at least one letter-leading sub-segment must exist. A pure-numeric colon
+    //     token (a clock `12:30:45`) has no anchor → falls through to the digit-leading whole-
+    //     token mask (`<*>`), unchanged. Letter-leading keywords (`arm64:v8`) never trigger.
+    //   • STATUS-VALUE CARVE-OUT (per segment) — a digit sub-segment that is a status value
+    //     (≤ kMaxStatusDigits, immediately preceded WITHIN the composite by a status keyword
+    //     segment `exit`/`code`/`signal`/`status`) is KEPT, so `exit:0`→`exit:1` /
+    //     `status:200`→`status:500` stay split (the green→red flip never collapses).
+    //
+    // Pure, byte-only, single-token (a function of the token bytes — I5) → cross-stdlib + MSVC
+    // bit-identical. Returns true and fills `out` only when ≥1 segment was masked AND an anchor
+    // exists; false (leaving the dispatch to fall through) otherwise.
+    [[nodiscard]] inline bool normalize_diagnostic_composite(std::string_view tok, std::string& out)
     {
-        // Locate the first ':' that is immediately followed by a digit.
-        std::size_t first{std::string_view::npos};
+        // TRIGGER: a ':' immediately followed by a digit (subsumes source-location).
+        bool has_colon_digit{false};
         for (std::size_t pos{0}; pos + 1 < tok.size(); ++pos)
-        {
             if (tok[pos] == ':' && is_ascii_digit(tok[pos + 1]))
             {
-                first = pos;
+                has_colon_digit = true;
                 break;
             }
-        }
-        if (first == std::string_view::npos)
-            return false;
-
-        const std::string_view prefix{tok.substr(0, first)};
-        if (prefix.empty())
-            return false;
-        const bool path_like{
-            std::ranges::any_of(prefix, [](char chr) { return chr == '.' || chr == '/'; })};
-        if (!path_like)
+        if (!has_colon_digit)
             return false;
 
         out.clear();
-        out.append(prefix);
-        std::size_t cursor{first};
-        while (cursor < tok.size())
-        {
-            if (tok[cursor] == ':' && cursor + 1 < tok.size() && is_ascii_digit(tok[cursor + 1]))
+        bool masked{false};
+        bool has_letter_anchor{false};
+        std::string_view prev_core{}; // the previous segment's core — for the status carve-out
+        std::size_t seg_start{0};
+        const auto flush_segment{[&](std::size_t end)
+                                 {
+                                     const std::string_view seg{tok.substr(seg_start, end - seg_start)};
+                                     // core = segment with leading/trailing non-alnum stripped
+                                     std::size_t lead{0};
+                                     while (lead < seg.size() && !is_ascii_digit(seg[lead]) &&
+                                            !is_ascii_alpha(seg[lead]))
+                                         ++lead;
+                                     std::size_t trail{seg.size()};
+                                     while (trail > lead && !is_ascii_digit(seg[trail - 1]) &&
+                                            !is_ascii_alpha(seg[trail - 1]))
+                                         --trail;
+                                     const std::string_view core{seg.substr(lead, trail - lead)};
+                                     if (core.empty())
+                                     {
+                                         out.append(seg); // pure punctuation — keep verbatim
+                                         prev_core = {};
+                                         return;
+                                     }
+                                     if (is_ascii_alpha(core.front()))
+                                     {
+                                         out.append(seg); // letter-leading → KEEP (class anchor)
+                                         has_letter_anchor = true;
+                                         prev_core = core;
+                                         return;
+                                     }
+                                     // digit-leading core: status-value carve-out, else mask.
+                                     if (is_status_keyword(prev_core) && is_all_digits(core) &&
+                                         core.size() <= kMaxStatusDigits)
+                                     {
+                                         out.append(seg); // exit:0 / status:500 → KEEP (categorical)
+                                         prev_core = core;
+                                         return;
+                                     }
+                                     out.append(seg.substr(0, lead)); // leading punct, e.g. '['
+                                     out.append(kWildcard);
+                                     out.append(seg.substr(trail)); // trailing punct, e.g. ']'
+                                     masked = true;
+                                     prev_core = core;
+                                 }};
+        for (std::size_t pos{0}; pos < tok.size(); ++pos)
+            if (tok[pos] == ':' || tok[pos] == '/')
             {
-                out.append(":<*>");
-                ++cursor; // consume ':'
-                while (cursor < tok.size() && is_ascii_digit(tok[cursor]))
-                    ++cursor; // consume the digit run
+                flush_segment(pos);
+                out.push_back(tok[pos]); // the separator, in its original position
+                seg_start = pos + 1;
             }
-            else
+        flush_segment(tok.size()); // the final segment
+        return masked && has_letter_anchor;
+    }
+
+    // Ephemeral-root path catalog (D-MSK-2). A path token under a declared ephemeral root is a
+    // per-run instance by construction (a randomized temp dir `/tmp/pw-electron-userdata-Kw9v4a`,
+    // base-62 suffix — letter-leading, not hex/UUID, so the existing masks keep it literal → a new
+    // template per run → false novelty). The random SUFFIX is undecidable (D-TID-18), but the
+    // ROOT is an enumerable, byte-exact catalog (the kCurrencyMarkers discipline) — there is no
+    // low-card stable keyword "child of /tmp" worth protecting, and a stable temp file is itself
+    // non-diffable, so masking the post-root remainder is lossless for diffing. Mask `<root>/<*>`.
+    // NOT a random-string classifier and NOT a general absolute-path masker (`/etc/hosts`,
+    // `/usr/bin/foo` untouched). Checked AFTER the diagnostic composite, so a `/tmp/…:42` source
+    // path keeps its `file:line` shape; a `/tmp/…` dir without `:digit` falls to this rule.
+    inline constexpr std::array<std::string_view, 3> kEphemeralRoots{
+        std::string_view{"/tmp"}, std::string_view{"/var/tmp"}, std::string_view{"/var/folders"}};
+
+    [[nodiscard]] inline bool normalize_ephemeral_root(std::string_view tok, std::string& out)
+    {
+        for (const std::string_view root : kEphemeralRoots)
+            // `<root>/<non-empty remainder>` — the '/' guard rejects `/tmpfoo`; the size guard
+            // requires a remainder (a bare `/tmp` / `/tmp/` is not collapsed).
+            if (tok.size() > root.size() + 1U && tok.starts_with(root) && tok[root.size()] == '/')
             {
-                out.push_back(tok[cursor]);
-                ++cursor;
+                out.clear();
+                out.append(root);
+                out.push_back('/');
+                out.append(kWildcard);
+                return true;
             }
-        }
-        return true;
+        return false;
     }
 
     // VERSIONED_REF composite: `<name>/<numeric-version>[trailing punct]`.
@@ -573,7 +641,8 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                            return;
                        }
                        // 2. composite → the normalized literal (KEEP class, mask instance):
-                       //    source-location / versioned-ref / bracket-index / #-counter /
+                       //    diagnostic-composite (source-location + Chromium/glog prefix, D-MSK-1) /
+                       //    ephemeral-root path (D-MSK-2) / versioned-ref / bracket-index / #-counter /
                        //    embedded UUID·hash / key=<numeric-value> / currency-marker number
                        //    (the `-` pre-gate admits dashed UUID tokens; `=` admits KV pairs; a
                        //    declared currency marker — D-TID-22 — admits `$463`).
@@ -583,7 +652,8 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                                return chr == ':' || chr == '/' || chr == '[' || chr == '#' ||
                                       chr == '-' || chr == '=';
                            })};
-                       if (maybe_composite && (normalize_source_location(tok, composite) ||
+                       if (maybe_composite && (normalize_diagnostic_composite(tok, composite) ||
+                                               normalize_ephemeral_root(tok, composite) ||
                                                normalize_versioned_ref(tok, composite) ||
                                                normalize_bracket_index(tok, composite) ||
                                                normalize_hash_counter(tok, composite) ||

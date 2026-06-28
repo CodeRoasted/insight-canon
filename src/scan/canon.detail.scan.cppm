@@ -772,4 +772,80 @@ inline void strip_escape_sequences(std::string_view line, std::string& out)
     }
 }
 
+// ── Echoed-source detection (detection_provenance_and_legibility.md D-PROV-1) ─────
+// The GHA command-echo SGR catalog: a FROZEN, DECLARED, byte-exact set of CSI
+// parameter strings. GitHub Actions wraps every line of a run-step script BODY it is
+// about to execute in set-foreground-cyan + bold (`\x1b[36;1m … \x1b[0m`) — the
+// echoed SCRIPT source, NOT an observed runtime event. The wrapper is destroyed by
+// strip_escape_sequences (it runs before any strategy/classifier sees the line — Fact 1),
+// so this — the ONLY layer that sees the wrapper — must classify it. Start narrow
+// (`36;1` / the equivalent `1;36`); widen ONLY on measured corpus evidence (the
+// kCurrencyMarkers catalog discipline), never speculatively.
+inline constexpr std::array<std::string_view, 2> kCommandEchoSgrParams{
+    std::string_view{"36;1"}, std::string_view{"1;36"}};
+// SGR reset parameter strings that close a span: `0` (full reset), `` (empty = `\x1b[m`,
+// an implicit full reset), `39` (default foreground). Byte-exact.
+inline constexpr std::array<std::string_view, 3> kSgrResetParams{
+    std::string_view{"0"}, std::string_view{}, std::string_view{"39"}};
+
+// Parse a CSI `\x1b[<params>m` at `pos`; on success advance `pos` past the final `m` and
+// return the parameter substring (digits and `;` only). Returns nullopt when `pos` is not
+// such a sequence. Pure byte walk — no float, order-independent (F5). The only throw path is
+// substr, whose pos arg (params_begin = pos+2) is ≤ size after the pos+1 < size guard, so the
+// noexcept body cannot throw.
+// NOLINTNEXTLINE(bugprone-exception-escape)
+[[nodiscard]] inline std::optional<std::string_view>
+parse_sgr_params(std::string_view line, std::size_t& pos) noexcept
+{
+    if (pos + 1U >= line.size() || static_cast<unsigned char>(line[pos]) != kEsc ||
+        line[pos + 1U] != '[')
+        return std::nullopt;
+    const std::size_t params_begin{pos + 2U};
+    std::size_t cur{params_begin};
+    while (cur < line.size() && (is_digit(line[cur]) || line[cur] == ';'))
+        ++cur;
+    if (cur >= line.size() || line[cur] != 'm')
+        return std::nullopt;
+    const std::string_view params{line.substr(params_begin, cur - params_begin)};
+    pos = cur + 1U; // past the final 'm'
+    return params;
+}
+
+// True iff `line` is an echoed-source line (D-PROV-1): after an optional leading GHA
+// timestamp + its separating space, the ENTIRE visible content is a SINGLE SGR-wrapped
+// span — an opening command-echo SGR (`36;1`/`1;36`), a content run (possibly empty),
+// and a closing reset (`0`/empty/`39`) — with no un-wrapped visible bytes outside the
+// span (only trailing whitespace tolerated). Byte-exact state machine, order-independent
+// ⇒ cross-stdlib + MSVC bit-identical (F5). Operates on the RAW line (ANSI intact), so it
+// MUST be called BEFORE strip_escape_sequences destroys the wrapper.
+[[nodiscard]] inline bool is_echoed_source_line(std::string_view line) noexcept
+{
+    std::size_t pos{0};
+    // Skip a leading GHA timestamp + its single separating space, if present.
+    if (is_github_actions_prefix(line))
+    {
+        pos = kGhaPrefixLen;
+        if (pos < line.size() && is_space(line[pos]))
+            ++pos;
+    }
+    // Opening span: a command-echo SGR.
+    const std::optional<std::string_view> open{parse_sgr_params(line, pos)};
+    if (!open || std::ranges::find(kCommandEchoSgrParams, *open) == kCommandEchoSgrParams.end())
+        return false;
+    // Content run up to the next ESC (the closing reset). Content may be empty; any
+    // non-ESC bytes are the echoed script text.
+    while (pos < line.size() && static_cast<unsigned char>(line[pos]) != kEsc)
+        ++pos;
+    if (pos >= line.size())
+        return false; // no closing reset → not a clean single wrapped span
+    // Closing span: an SGR reset.
+    const std::optional<std::string_view> close{parse_sgr_params(line, pos)};
+    if (!close || std::ranges::find(kSgrResetParams, *close) == kSgrResetParams.end())
+        return false;
+    // No un-wrapped visible bytes after the span (trailing whitespace/CR/LF tolerated).
+    while (pos < line.size() && (is_space(line[pos]) || line[pos] == '\r' || line[pos] == '\n'))
+        ++pos;
+    return pos == line.size();
+}
+
 } // namespace insight::tokenization
