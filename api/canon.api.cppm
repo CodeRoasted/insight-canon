@@ -811,6 +811,13 @@ struct CanonicalEvent
     // params. A span over arena-allocated storage (like `params`); EMPTY for every non-ordinal line
     // → zero added cost on the hot path (input-conditional, the OTEL D-OTEL-2a precedent).
     std::span<const OrdinalObservation> ordinals{};
+    // Observation-provenance attribute (D-PROV-1): the line is echoed program/script SOURCE (the
+    // CI harness printing a run-step body), not an observed runtime event — recognized at the ANSI
+    // strip layer by the GHA command-echo SGR wrapper (Fact 1). CONSUMED in-memory — it already
+    // demoted `level` to Unknown in the parser, and metalog skips the level-blind salience
+    // failure-cue tier for an all-echoed template (§3.1) — and NEVER serialized: the MetaLog wire
+    // shape is unchanged (like `trace`/`ordinals`). `false` for every non-echoed line.
+    bool echoed_source{false};
 };
 
 } // namespace insight::tokenization
