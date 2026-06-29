@@ -92,20 +92,33 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
         return std::unexpected(std::string("LogParser: empty line"));
     }
 
-    // D-TID-11: strip ANSI/CSI/SGR/OSC escape sequences as an unconditional content
-    // normalization at canon ingest — BEFORE strategy detection AND tokenization, so the
-    // format prefix-match, the level token-scan, and the `component` extraction all see
-    // colour-free content (colour is presentation, never content; the escapes interleave
-    // within/between tokens so a per-token mask cannot reach them). Pure byte state machine
-    // → cross-stdlib bit-identical. The cleaned bytes live in escape_scratch_ until the
-    // arena copy below; failed-detection lines never reach the copy.
-    strip_escape_sequences(raw_line, escape_scratch_);
-    const std::string_view line{escape_scratch_};
-    if (line.empty())
+    // D-TID-11: strip ANSI/CSI/SGR/OSC escape sequences as a content normalization at canon
+    // ingest — BEFORE strategy detection AND tokenization, so the format prefix-match, the level
+    // token-scan, and the `component` extraction all see colour-free content (colour is
+    // presentation, never content; the escapes interleave within/between tokens so a per-token
+    // mask cannot reach them). Pure byte state machine → cross-stdlib bit-identical.
+    //
+    // Fast path: the strip is a no-op for any line carrying no ESC byte — strip_escape_sequences
+    // copies such a line through verbatim, so its output is byte-identical to the input (a fixed
+    // point). The vast majority of real log lines have no ANSI, so gate the strip (and the
+    // escape_scratch_ copy) behind a memchr-backed ESC pre-scan (string_view::find is the SIMD
+    // any-ESC scan); a clean line then flows straight to the single arena copy below — no strip,
+    // no scratch copy. Identity-preserving by construction, so the canonical digest is unchanged.
+    std::string_view line;
+    if (raw_line.find(static_cast<char>(kEsc)) != std::string_view::npos)
     {
-        ++failed_count_;
-        INSIGHT_LOG_TRACE(logging::parser_logger(), "parse: line was all escape bytes, skipped");
-        return std::unexpected(std::string("LogParser: empty line"));
+        strip_escape_sequences(raw_line, escape_scratch_);
+        if (escape_scratch_.empty()) // the line was all escape bytes
+        {
+            ++failed_count_;
+            INSIGHT_LOG_TRACE(logging::parser_logger(), "parse: line was all escape bytes, skipped");
+            return std::unexpected(std::string("LogParser: empty line"));
+        }
+        line = escape_scratch_;
+    }
+    else
+    {
+        line = raw_line; // no ANSI → zero-copy; the stripped content equals the input
     }
 
     IFormatStrategy* strategy = active_strategy_;
