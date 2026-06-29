@@ -256,6 +256,15 @@ TEST(FailureLexicon, LeadingFailGlyphAnchorsButNeverCreates)
         << "✗ leads but NO failure word present — the glyph anchors nothing, stays silent";
     EXPECT_FALSE(contains_failure_cue("rendering at 1920×1080 then 800×600"))
         << "× U+00D7 is a dimension separator, NOT a fail glyph — no false cue";
+
+    // ❌ U+274C CROSS MARK — the emoji jest/vitest/mocha emit on a failing test. The 1.6.5
+    // dogfood found ❌-led fail lines anchoring nothing where ✗-led ones did (a recall gap of
+    // opposite polarity to the ▶ demotion). Added to the fail-glyph catalog: it anchors a
+    // failure word exactly like ✗, and — never doubling as a separator — creates no cue alone.
+    EXPECT_TRUE(contains_failure_cue("\xE2\x9D\x8C should not crash on empty input"))
+        << "❌ leads → anchors the RegisterAnchored 'crash', like ✗";
+    EXPECT_FALSE(contains_failure_cue("\xE2\x9D\x8C 1920x1080"))
+        << "❌ leads but NO failure word — anchors nothing, stays silent (never CREATES a cue)";
 }
 
 // ── Tokenization boundary the §6.7 P3 finding identified (documenting pin) ─────

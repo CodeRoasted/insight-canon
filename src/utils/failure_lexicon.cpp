@@ -229,15 +229,19 @@ namespace
         {0xE2U, 0x9CU, 0x85U}, // ✅ U+2705 WHITE HEAVY CHECK MARK
         {0xE2U, 0x88U, 0x9AU}, // √ U+221A SQUARE ROOT — mocha's Windows pass mark
     }};
-    // Per-test FAIL glyphs (D-OUT-4a) — the ballot-X family, all 3-byte UTF-8. Like the
-    // pass glyphs, they are unambiguous per-test result markers. × U+00D7 (MULTIPLICATION
-    // SIGN, a 2-byte sequence) is EXCLUDED on purpose: it doubles as a dimension separator
+    // Per-test FAIL glyphs (D-OUT-4a) — the ballot-X family + the ❌ cross-mark emoji, all
+    // 3-byte UTF-8. Like the pass glyphs, they are unambiguous per-test result markers. ❌
+    // U+274C (CROSS MARK) is the emoji jest/vitest/mocha emit on a failing test; it never
+    // doubles as a separator, so it is recall-safe to add (the 1.6.5 dogfood found ❌-led
+    // fail lines anchoring nothing where ✗-led ones did). × U+00D7 (MULTIPLICATION SIGN, a
+    // 2-byte sequence) stays EXCLUDED on purpose: it doubles as a dimension separator
     // ("1920×1080"), the precision risk that deferred D-OUT-3.
-    constexpr std::array<Glyph, 4U> kFailGlyphs{{
+    constexpr std::array<Glyph, 5U> kFailGlyphs{{
         {0xE2U, 0x9CU, 0x95U}, // ✕ U+2715 MULTIPLICATION X
         {0xE2U, 0x9CU, 0x96U}, // ✖ U+2716 HEAVY MULTIPLICATION X
         {0xE2U, 0x9CU, 0x97U}, // ✗ U+2717 BALLOT X
         {0xE2U, 0x9CU, 0x98U}, // ✘ U+2718 HEAVY BALLOT X
+        {0xE2U, 0x9DU, 0x8CU}, // ❌ U+274C CROSS MARK — the emoji fail mark jest/vitest/mocha emit
     }};
     // Per-suite DESCRIPTIVE glyphs (D-OUT-4b) — a test-runner *subtest/suite name* marker,
     // neither pass nor fail. The node:test spec reporter prefixes a describe/subtest HEADER
