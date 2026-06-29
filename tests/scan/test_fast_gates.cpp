@@ -273,4 +273,117 @@ TEST(FastGatesScan, SvTakeBracketedAndQuoted)
     EXPECT_EQ(sv_take_quoted(unquoted), "");
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TokenShape — the one-pass per-token byte profile (canon.detail.scan §8.2).
+//
+// TokenShape collapses three scans the masker's KEEP/MASK/NORMALIZE dispatch used
+// to run per token (is_all_digits, is_digit_leading, the maybe_composite separator
+// gate) into a single byte walk. Today it is exercised only TRANSITIVELY via the
+// stateless-template masker suite — a refactor of the walk could silently diverge
+// one field from the predicate it replaced and the masker tests might still pass.
+//
+// These lock the primitive DIRECTLY: each field is asserted byte-exact against an
+// INDEPENDENT reference oracle (deliberately spelled out with a different idiom than
+// the production scan — a plain '0'..'9' range instead of the unsigned-subtraction
+// is_digit — so the test is a real cross-check, not a tautology of the code under test).
+// ─────────────────────────────────────────────────────────────────────────────
+
+namespace
+{
+// Independent reference for each TokenShape field, mirroring the SPEC of the predicate
+// it replaced (not its code). is_all_digits: non-empty AND every byte a digit.
+// is_digit_leading: first byte after an optional +/- sign is a digit. maybe_composite:
+// the token contains a separator from the set : / [ # - = .
+struct ShapeOracle
+{
+    bool empty{};
+    bool all_digits{};
+    bool digit_leading{};
+    bool has_separator{};
+};
+
+[[nodiscard]] constexpr bool ascii_digit(char chr) noexcept { return chr >= '0' && chr <= '9'; }
+
+[[nodiscard]] ShapeOracle reference_shape(std::string_view tok) noexcept
+{
+    ShapeOracle ref{};
+    ref.empty = tok.empty();
+    if (ref.empty)
+        return ref; // empty token: every other field stays false, by spec
+
+    ref.all_digits = true;
+    for (const char chr : tok)
+        ref.all_digits = ref.all_digits && ascii_digit(chr);
+
+    const std::size_t lead{(tok[0] == '+' || tok[0] == '-') ? 1U : 0U};
+    ref.digit_leading = lead < tok.size() && ascii_digit(tok[lead]);
+
+    ref.has_separator = tok.find_first_of(":/[#-=") != std::string_view::npos;
+    return ref;
+}
+} // namespace
+
+TEST(FastGatesTokenShape, FieldsAreByteExactWithReplacedPredicates)
+{
+    // Edge cases the handoff calls out, plus the byte-trap rows the scan must survive.
+    const std::string_view cases[]{
+        "",          // empty token — early-out branch
+        "+",         // sign only: not empty, not a digit, '+' is NOT in the separator set
+        "-",         // sign only AND a separator ('-' is in the composite set)
+        "5",         // single pure digit
+        "0",         // single zero (boundary of is_digit's unsigned trick)
+        "12345",     // pure-digit run → all_digits
+        "+5",        // signed digit-leading, NOT all_digits (sign byte)
+        "-42",       // signed digit-leading
+        "+a",        // sign then non-digit → digit_leading false
+        "-=",        // sign then separator → digit_leading false, has_separator true
+        "a1",        // letter-leading, not all_digits
+        "1a",        // digit-leading, not all_digits
+        ":",  "/",  "[",  "#",  "=", // each separator in isolation
+        "10:15:00",  // separators interleaved with digits
+        "512MB",     // digit-leading, not all_digits, no separator
+        "6.2s",      // '.' is NOT a separator in this set
+        "0.25.5-3",  // digit-leading with a '-' separator
+        "user-name", // letter-leading with a '-' separator
+        "v1.2",      // letter-leading, no separator
+        "\xB0\xB0",  // high-bit bytes: not empty, no digits, no separators (signed-char trap)
+        "\xFF" "9",  // high-bit then digit: all_digits false, digit_leading false
+    };
+
+    for (const std::string_view tok : cases)
+    {
+        const ShapeOracle ref{reference_shape(tok)};
+        const TokenShape got{tok};
+        SCOPED_TRACE(::testing::Message() << "token=\"" << tok << "\" (len=" << tok.size() << ")");
+        EXPECT_EQ(got.empty, ref.empty) << "empty mismatch";
+        EXPECT_EQ(got.all_digits, ref.all_digits) << "all_digits mismatch (== is_all_digits)";
+        EXPECT_EQ(got.digit_leading, ref.digit_leading) << "digit_leading mismatch (== is_digit_leading)";
+        EXPECT_EQ(got.has_separator, ref.has_separator) << "has_separator mismatch (== maybe_composite)";
+    }
+}
+
+TEST(FastGatesTokenShape, SignOnlyTokenIsSeparatorButNotDigitLeading)
+{
+    // The subtle collision the handoff flags: "-" is sign-only (so digit_leading must
+    // be false — there is no digit after the sign) AND it is itself a separator byte.
+    const TokenShape minus{"-"};
+    EXPECT_FALSE(minus.empty);
+    EXPECT_FALSE(minus.all_digits);
+    EXPECT_FALSE(minus.digit_leading) << "a lone sign has no digit after it";
+    EXPECT_TRUE(minus.has_separator) << "'-' is in the composite separator set";
+
+    const TokenShape plus{"+"};
+    EXPECT_FALSE(plus.digit_leading);
+    EXPECT_FALSE(plus.has_separator) << "'+' is a sign but NOT a composite separator";
+}
+
+TEST(FastGatesTokenShape, EmptyTokenIsAllFalseExceptEmpty)
+{
+    const TokenShape empty{""};
+    EXPECT_TRUE(empty.empty);
+    EXPECT_FALSE(empty.all_digits) << "an empty token is not all-digits (matches is_all_digits)";
+    EXPECT_FALSE(empty.digit_leading);
+    EXPECT_FALSE(empty.has_separator);
+}
+
 // NOLINTEND
