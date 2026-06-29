@@ -78,6 +78,42 @@ export namespace insight::tokenization
     return chr == ' ' || chr == '\t';
 }
 
+// ── TokenShape — one-pass per-token byte profile (stateless_template_id.md §8.2) ──────
+// The masker classifies each whitespace token KEEP / MASK / NORMALIZE in a fixed precedence
+// (D-TID-12). Several steps of that dispatch each re-walked the token: is_all_digits (the
+// status-value KEEP), the composite-trigger any_of, and is_digit_leading (the digit mask).
+// TokenShape walks the token's bytes ONCE and records the facts they all need, so the dispatch
+// reads fields instead of re-scanning. Each field is the byte-exact equivalent of the scan it
+// replaces — same KEEP/MASK/NORMALIZE decision per token → masked template (hence template_id)
+// unchanged. Pure byte-only, single-token, no float, order-independent → cross-stdlib + MSVC
+// bit-identical (the D-TID-9 oracle). The composite normalizers keep their own segment walks;
+// this is the shared primitive for the common-case dispatch, and the seam A2's rule catalog reads.
+struct TokenShape
+{
+    bool empty{true};         // the token has no bytes
+    bool all_digits{false};   // non-empty AND every byte is an ASCII digit (== is_all_digits)
+    bool digit_leading{false};// first byte after an optional +/- sign is a digit (== is_digit_leading)
+    bool has_separator{false};// contains a composite separator : / [ # - =  (the maybe_composite gate)
+
+    explicit constexpr TokenShape(std::string_view tok) noexcept
+    {
+        empty = tok.empty();
+        if (empty)
+            return;
+        std::size_t lead{0};
+        if (tok[0] == '+' || tok[0] == '-')
+            ++lead;
+        digit_leading = lead < tok.size() && is_digit(tok[lead]);
+        all_digits = true;
+        for (const char chr : tok)
+        {
+            all_digits = all_digits && is_digit(chr);
+            has_separator = has_separator || chr == ':' || chr == '/' || chr == '[' ||
+                            chr == '#' || chr == '-' || chr == '=';
+        }
+    }
+};
+
 // Skip 1+ leading spaces/tabs starting at pos. Returns new offset.
 [[nodiscard]] constexpr std::size_t skip_spaces(std::string_view str, std::size_t pos) noexcept
 {

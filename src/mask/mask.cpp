@@ -615,6 +615,10 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                        if (!first)
                            tmpl.push_back(' ');
                        first = false;
+                       // One pass over the token's bytes → the shape facts the dispatch below
+                       // reads, replacing the separate is_all_digits / composite-trigger any_of /
+                       // is_digit_leading scans (byte-exact equivalents → identity unchanged).
+                       const TokenShape shape{tok};
                        const auto mask{[&]
                                        {
                                            tmpl.append(kWildcard);
@@ -623,7 +627,7 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
 
                        // 1. status-value KEEP (identity): "exit code 0" stays distinct
                        //    from "exit code 1" — a green→red flip must not collapse.
-                       if (is_all_digits(tok) && tok.size() <= kMaxStatusDigits &&
+                       if (shape.all_digits && tok.size() <= kMaxStatusDigits &&
                            is_status_keyword(prev))
                        {
                            tmpl.append(tok);
@@ -636,12 +640,7 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                        //    embedded UUID·hash / key=<numeric-value> / currency-marker number
                        //    (the `-` pre-gate admits dashed UUID tokens; `=` admits KV pairs; a
                        //    declared currency marker — D-TID-22 — admits `$463`).
-                       const bool maybe_composite{
-                           marker_prefix_len(tok) != 0 ||
-                           std::ranges::any_of(tok, [](char chr) {
-                               return chr == ':' || chr == '/' || chr == '[' || chr == '#' ||
-                                      chr == '-' || chr == '=';
-                           })};
+                       const bool maybe_composite{marker_prefix_len(tok) != 0 || shape.has_separator};
                        if (maybe_composite && (normalize_diagnostic_composite(tok, composite) ||
                                                normalize_ephemeral_root(tok, composite) ||
                                                normalize_versioned_ref(tok, composite) ||
@@ -658,9 +657,9 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                        // 3. UUID / long hash → MASK.
                        // 4. IPv4 / 0x-hex → MASK.
                        // 5. digit-leading numeric (or empty) → MASK.
-                       if (tok.empty() || is_uuid_or_long_hash(tok) ||
+                       if (shape.empty || is_uuid_or_long_hash(tok) ||
                            (config.mask_ip_addresses && is_ipv4_token(tok)) ||
-                           (config.mask_hex_addresses && is_hex_token(tok)) || is_digit_leading(tok))
+                           (config.mask_hex_addresses && is_hex_token(tok)) || shape.digit_leading)
                        {
                            mask();
                            prev = tok;
