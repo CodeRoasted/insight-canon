@@ -559,6 +559,31 @@ namespace
         return true;
     }
 
+    // ── The composite normalizer catalog (D-TID-12 step #2) ──────────────────────────
+    // The KEEP-class / mask-instance rules, as a DECLARED array whose ORDER IS THE PRECEDENCE:
+    // tried top-to-bottom, the first rule that claims the token wins (the former `||` short-circuit,
+    // now data). Each rule is a pure `bool(tok, out&)` — fills `out` with the normalized literal and
+    // returns true iff it claims the token. This catalog DEFINES the composite layer of
+    // kCanonicalizationVersion "stateless-masks-4"; adding, reordering, or removing a rule is an
+    // output-affecting change that REQUIRES a version bump — the single enumerable place that rule
+    // can be stated (closing the D-TID-16 "rules changed, version didn't" gap for the rule set
+    // itself). Each entry names its governing ruling + the generation that introduced it.
+    struct CompositeRule
+    {
+        std::string_view name; // stable rule id (diagnostics / the canon bible)
+        bool (*normalize)(std::string_view tok, std::string& out); // fills out; true iff claimed
+    };
+    constexpr std::array<CompositeRule, 8U> kCompositeRules{{
+        {.name = "diagnostic_composite", .normalize = normalize_diagnostic_composite}, // D-MSK-1  (-4)
+        {.name = "ephemeral_root", .normalize = normalize_ephemeral_root},             // D-MSK-2  (-4)
+        {.name = "versioned_ref", .normalize = normalize_versioned_ref},               // D-TID-12 #2
+        {.name = "bracket_index", .normalize = normalize_bracket_index},               // D-TID-13(b)
+        {.name = "hash_counter", .normalize = normalize_hash_counter},                 // D-TID-13(a)
+        {.name = "marker_number", .normalize = normalize_marker_number},               // D-TID-22 (-3)
+        {.name = "embedded_identity", .normalize = normalize_embedded_identity},       // D-TID-12 #3
+        {.name = "kv_value", .normalize = normalize_kv_value},                         // D-TID-17
+    }};
+
     template <typename Cb>
         requires std::invocable<Cb, std::string_view>
     inline void for_each_token(std::string_view content, Cb callback)
@@ -634,25 +659,21 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                            prev = tok;
                            return;
                        }
-                       // 2. composite → the normalized literal (KEEP class, mask instance):
-                       //    diagnostic-composite (source-location + Chromium/glog prefix, D-MSK-1) /
-                       //    ephemeral-root path (D-MSK-2) / versioned-ref / bracket-index / #-counter /
-                       //    embedded UUID·hash / key=<numeric-value> / currency-marker number
-                       //    (the `-` pre-gate admits dashed UUID tokens; `=` admits KV pairs; a
-                       //    declared currency marker — D-TID-22 — admits `$463`).
+                       // 2. composite → the normalized literal (KEEP class, mask instance). The
+                       //    declared rule set AND its precedence are kCompositeRules (tried in array
+                       //    order, first claim wins — the former `||` short-circuit, now data).
+                       //    maybe_composite is the cheap pre-gate that skips the whole catalog for a
+                       //    token carrying no separator (shape) and no declared currency marker.
                        const bool maybe_composite{marker_prefix_len(tok) != 0 || shape.has_separator};
-                       if (maybe_composite && (normalize_diagnostic_composite(tok, composite) ||
-                                               normalize_ephemeral_root(tok, composite) ||
-                                               normalize_versioned_ref(tok, composite) ||
-                                               normalize_bracket_index(tok, composite) ||
-                                               normalize_hash_counter(tok, composite) ||
-                                               normalize_marker_number(tok, composite) ||
-                                               normalize_embedded_identity(tok, composite) ||
-                                               normalize_kv_value(tok, composite)))
+                       if (maybe_composite)
                        {
-                           tmpl.append(composite);
-                           prev = tok;
-                           return;
+                           for (const CompositeRule& rule : kCompositeRules)
+                               if (rule.normalize(tok, composite))
+                               {
+                                   tmpl.append(composite);
+                                   prev = tok;
+                                   return;
+                               }
                        }
                        // 3. UUID / long hash → MASK.
                        // 4. IPv4 / 0x-hex → MASK.
