@@ -239,6 +239,15 @@ namespace
         {0xE2U, 0x9CU, 0x97U}, // ✗ U+2717 BALLOT X
         {0xE2U, 0x9CU, 0x98U}, // ✘ U+2718 HEAVY BALLOT X
     }};
+    // Per-suite DESCRIPTIVE glyphs (D-OUT-4b) — a test-runner *subtest/suite name* marker,
+    // neither pass nor fail. The node:test spec reporter prefixes a describe/subtest HEADER
+    // with ▶ (U+25B6); the line that follows is a test NAME, not a verdict. A CamelCase
+    // error-TYPE inside such a line (e.g. "▶ … when frameworkError calls …") REFERENCES an
+    // error type, it does not throw one. Used ONLY to demote the weak error-type signal in
+    // descriptive register — never to create or suppress a real failure-word verdict.
+    constexpr std::array<Glyph, 1U> kDescriptiveGlyphs{{
+        {0xE2U, 0x96U, 0xB6U}, // ▶ U+25B6 BLACK RIGHT-POINTING TRIANGLE — node:test subtest
+    }};
 
     [[nodiscard]] bool starts_with_glyph(std::string_view text, std::size_t pos,
                                          std::span<const Glyph> glyphs) noexcept
@@ -258,6 +267,10 @@ namespace
     [[nodiscard]] bool starts_with_fail_glyph(std::string_view text, std::size_t pos) noexcept
     {
         return starts_with_glyph(text, pos, kFailGlyphs);
+    }
+    [[nodiscard]] bool starts_with_descriptive_glyph(std::string_view text, std::size_t pos) noexcept
+    {
+        return starts_with_glyph(text, pos, kDescriptiveGlyphs);
     }
 
     // Advance past ANSI escapes + token delimiters; returns the next token-start index
@@ -321,6 +334,41 @@ namespace
             // otherwise a non-outcome token (scope segment / name / number) — continue
         }
         return false; // no leading fail glyph within the head
+    }
+
+    // ── D-OUT-4b — a leading DESCRIPTIVE glyph marks a test-NAME line ─────────────────
+    // Does the line's first significant token lead with a ▶ subtest/suite-name glyph? Walk
+    // the head; a descriptive glyph before any real (non-empty, trimmed) token ⇒ true; the
+    // first real token ⇒ false (a normal log line, not a test-runner suite header). Mirrors
+    // the pass/fail-glyph walks (ANSI- and scope-tolerant). Pure byte-compare ⇒ MSVC
+    // bit-identical (F5). Used ONLY to demote the weak CamelCase error-TYPE signal.
+    [[nodiscard]] bool leads_with_descriptive_glyph(std::string_view line) noexcept
+    {
+        static constexpr std::size_t kOutcomeHead{128U}; // matches the other outcome walks
+        const std::size_t limit{line.size() < kOutcomeHead ? line.size() : kOutcomeHead};
+        std::size_t pos{0};
+        while ((pos = skip_to_token_start(line, pos)) < limit)
+        {
+            if (starts_with_descriptive_glyph(line, pos))
+                return true;
+            if (!take_trimmed_token(line, pos).empty())
+                return false; // a real token leads before any ▶ — not a suite-name line
+        }
+        return false;
+    }
+
+    // D-OUT-4b: should a CamelCase error-TYPE token anchor a failure cue? The discriminator
+    // is REGISTER/POSITION, not the token. A verdict-anchored type (TypeError:, [Error], a
+    // ✗-led line — is_verdict_anchored) is a thrown verdict and fires regardless. Otherwise
+    // it is demoted when the line is a node:test ▶-suite DESCRIPTIVE line, where the
+    // …Error/…Exception identifier NAMES a type it does not throw — the 1.6.5 dogfood FP
+    // "▶ … when frameworkError calls …". Recall-safe: a real thrown error never leads its
+    // line with ▶, and this gates ONLY the weak error-TYPE signal, never a failure WORD.
+    [[nodiscard]] bool error_type_anchors(std::string_view line, std::string_view token) noexcept
+    {
+        if (detail::is_verdict_anchored(line, token))
+            return true;
+        return !leads_with_descriptive_glyph(line);
     }
 
 } // namespace
@@ -506,7 +554,11 @@ bool contains_failure_cue(std::string_view text, std::size_t scan_limit) noexcep
                                            detail::is_verdict_anchored(text, token);
                                    break;
                                }
-                           if (!matched && is_camel_error_type(token))
+                           // D-OUT-4b: the CamelCase error-TYPE anchors only in verdict
+                           // register; a ▶-led node:test suite-NAME line referencing a
+                           // …Error type does not (register/position, not the token).
+                           if (!matched && is_camel_error_type(token) &&
+                               error_type_anchors(text, token))
                                saw_error_type = true;
                            prev_prev = prev; // shift the two-token window for the next adjacency
                            prev = token;     // check (count register needs prev AND prev-prev)

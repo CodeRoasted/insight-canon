@@ -51,6 +51,31 @@ TEST(FailureLexicon, CamelCaseTypeIsACue)
         << "'Error' as a PREFIX (ErrorBudget) is not a cue — only the type suffix is";
 }
 
+// ── D-OUT-4b: a CamelCase error-TYPE in DESCRIPTIVE register is a reference ─────
+// The discriminator is REGISTER/POSITION, not the token. A …Error/…Exception name
+// inside a node:test ▶-suite NAME line NAMES a type, it does not throw one — the
+// 1.6.5 dogfood FP "▶ … when frameworkError calls …" (fastify) classified Error on a
+// PASSING run. Demote it there; a real thrown verdict (`:`-bound / a ✗-led fail line)
+// still fires — no recall loss. (Heph: verifies the slice; Kleio owns the full RED —
+// it()/describe() source register + the separate ❌-glyph recognition gap.)
+TEST(FailureLexicon, CamelCaseErrorTypeDemotedInDescriptiveRegister)
+{
+    // The exact dogfood FP — ▶-led subtest NAME, 'frameworkError' mid-clause.
+    EXPECT_FALSE(contains_failure_cue("\xE2\x96\xB6 Send 200 when frameworkError calls "
+                                      "reply.callNotFound"))
+        << "a ▶-led node:test subtest name references an error type, it does not throw one";
+    EXPECT_FALSE(contains_failure_cue("\xE2\x96\xB6 should map a FrameworkError to a 500 status"))
+        << "a ▶-led describe/subtest name with a …Error type is descriptive, not a verdict";
+
+    // Recall preserved — the SAME token fires in verdict register (register, not token):
+    EXPECT_TRUE(contains_failure_cue("FrameworkError: connection reset by peer"))
+        << "a `:`-bound thrown type is a verdict — still fires (no ▶ lead)";
+    EXPECT_TRUE(contains_failure_cue("raise FrameworkError"))
+        << "a non-▶ line with the same token still anchors — the discriminator is the register";
+    EXPECT_TRUE(contains_failure_cue("\xE2\x9C\x97 teardown threw FrameworkError"))
+        << "a ✗-led FAIL line confirms the verdict even with a …Error type name";
+}
+
 // ── A negated type name (…NotError) is NOT an error type ───────────────────────
 // Guard 1 (token-local, context-independent). The dogfood reproducer: a test named
 // "…IsNotError" whose ctest result line was promoted to a HIGH "New error" — a false
