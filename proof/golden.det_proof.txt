@@ -76,6 +76,23 @@ Info	--	None	db query completed via shard "primary"
 Info	--	None	db query completed via shard "primary"
 Info	--	None	db query completed via shard "primary"
 ### det_math total=12 sum_c_log2c_qk=47300495456208
+## file masking_v4.log
+### templates (4)
+3	[<*>:<*>/<*>:ERROR:dbus/bus.cc:<*>] Failed to connect to the bus
+1	cache evicted entry "hot-key"
+1	db query completed via shard "primary"
+4	order completed total=$<*>
+### events
+Error	F-	None	[<*>:<*>/<*>:ERROR:dbus/bus.cc:<*>] Failed to connect to the bus
+Error	F-	None	[<*>:<*>/<*>:ERROR:dbus/bus.cc:<*>] Failed to connect to the bus
+Error	F-	None	[<*>:<*>/<*>:ERROR:dbus/bus.cc:<*>] Failed to connect to the bus
+Error	--	None	db query completed via shard "primary"
+Warn	-W	None	cache evicted entry "hot-key"
+Unknown	--	None	order completed total=$<*>
+Unknown	--	None	order completed total=$<*>
+Unknown	--	None	order completed total=$<*>
+Unknown	--	None	order completed total=$<*>
+### det_math total=9 sum_c_log2c_qk=14024147119604
 ## file syslog.log
 ### templates (7)
 1	GET /api/orders <*>

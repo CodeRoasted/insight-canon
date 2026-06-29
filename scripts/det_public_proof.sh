@@ -49,6 +49,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CANON="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROOF="$CANON/proof"
 GOLDEN="$PROOF/golden.sha256"
+GOLDEN_TXT="$PROOF/golden.det_proof.txt"   # human-readable digest the windows probe line-diffs; its sha IS $GOLDEN
 
 [ -f "$PROOF/det_proof.cpp" ]   || { echo "error: $PROOF/det_proof.cpp missing." >&2; exit 2; }
 [ -f "$PROOF/CMakeLists.txt" ]  || { echo "error: $PROOF/CMakeLists.txt missing (the Approach-B per-cell harness)." >&2; exit 2; }
@@ -162,8 +163,11 @@ echo "PASS: canon public digest byte-identical across ${#builds[@]} builds." >&2
 
 digest_sha="$(sha256sum "$ref" | awk '{print $1}')"
 if [ "$FREEZE" -eq 1 ]; then
+  # Write BOTH the text digest (windows probe line-diffs it) and its sha — they must stay in lockstep
+  # (sha256(golden.det_proof.txt) == golden.sha256). Writing only the sha rots the text companion.
+  cp "$ref" "$GOLDEN_TXT"
   echo "$digest_sha" > "$GOLDEN"
-  echo "FROZEN golden → $GOLDEN : $digest_sha" >&2
+  echo "FROZEN golden → $GOLDEN : $digest_sha (+ $GOLDEN_TXT)" >&2
   exit 0
 fi
 [ -f "$GOLDEN" ] || { echo "no golden at $GOLDEN — run with --freeze to commit one." >&2; exit 2; }

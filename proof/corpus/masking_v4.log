@@ -1,0 +1,9 @@
+[6226:0609/094020.430910:ERROR:dbus/bus.cc:408] Failed to connect to the bus
+[6225:0528/144005.901629:ERROR:dbus/bus.cc:511] Failed to connect to the bus
+[7001:1231/235959.000001:ERROR:dbus/bus.cc:77] Failed to connect to the bus
+{"level":"error","msg":"db query completed via shard \"primary\"","fields":{"component":"query-engine"}}
+{"level":"warn","msg":"cache evicted entry \"hot-key\"","fields":{"component":"cache-tier"}}
+order completed total=$199
+order completed total=$4999
+order completed total=$42
+order completed total=$1000000
