@@ -63,6 +63,14 @@ export namespace insight::tokenization
     return static_cast<unsigned>(chr) - 'a' < kAlphabetSize;
 }
 
+// ASCII letter [A-Za-z] — the canonical alpha predicate for the tokenization-detail world
+// (mask / format_detector route here instead of carrying private copies). Composed from the
+// trusted upper/lower pair, so a non-ASCII byte (signed-char-negative) is false by construction.
+[[nodiscard]] constexpr bool is_alpha(char chr) noexcept
+{
+    return is_upper(chr) || is_lower(chr);
+}
+
 [[nodiscard]] constexpr bool is_space(char chr) noexcept
 {
     // POSIX [ \t]; the strategy patterns use \s+ but only space+tab occur

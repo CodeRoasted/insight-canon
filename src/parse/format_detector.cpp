@@ -45,15 +45,9 @@ namespace
         }
     };
 
-    [[nodiscard]] bool is_digit(char chr) noexcept
-    {
-        return chr >= '0' && chr <= '9';
-    }
-
-    [[nodiscard]] bool is_alpha(char chr) noexcept
-    {
-        return (chr >= 'A' && chr <= 'Z') || (chr >= 'a' && chr <= 'z');
-    }
+    // is_digit / is_alpha: the canonical char-class predicates from insight.canon.detail.scan
+    // (imported by this module via the parse interface) — not re-declared here (A3 consolidation,
+    // single source of truth). Behaviour-identical to the former local copies on every byte.
 
     [[nodiscard]] std::string_view trim_left(std::string_view line) noexcept
     {

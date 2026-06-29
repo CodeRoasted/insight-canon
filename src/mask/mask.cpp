@@ -1,6 +1,7 @@
 module insight.canon.detail.mask;
 import insight.canon.internal; // std (via `export import std;` — includes std::memchr)
 import insight.canon.api;
+import insight.canon.detail.scan; // canonical char-class predicates (is_digit / is_alpha)
 
 // mask.cpp — the stateless per-line template masker
 //
@@ -115,17 +116,6 @@ namespace
                                    { return static_cast<unsigned>(chr) - '0' < kDecimalBase; });
     }
 
-    [[nodiscard]] constexpr bool is_ascii_digit(char chr) noexcept
-    {
-        return static_cast<unsigned>(chr) - '0' < kDecimalBase;
-    }
-
-    [[nodiscard]] constexpr bool is_ascii_alpha(char chr) noexcept
-    {
-        const char lower{static_cast<char>(chr | static_cast<char>(kAsciiCaseMask))};
-        return lower >= 'a' && lower <= 'z';
-    }
-
     // Value-aware KEEP of low-cardinality status integers.
     //
     // A bare integer is masked to `<*>` (the digit-leading rule), which collapses
@@ -197,7 +187,7 @@ namespace
         // TRIGGER: a ':' immediately followed by a digit (subsumes source-location).
         bool has_colon_digit{false};
         for (std::size_t pos{0}; pos + 1 < tok.size(); ++pos)
-            if (tok[pos] == ':' && is_ascii_digit(tok[pos + 1]))
+            if (tok[pos] == ':' && is_digit(tok[pos + 1]))
             {
                 has_colon_digit = true;
                 break;
@@ -215,12 +205,12 @@ namespace
                                      const std::string_view seg{tok.substr(seg_start, end - seg_start)};
                                      // core = segment with leading/trailing non-alnum stripped
                                      std::size_t lead{0};
-                                     while (lead < seg.size() && !is_ascii_digit(seg[lead]) &&
-                                            !is_ascii_alpha(seg[lead]))
+                                     while (lead < seg.size() && !is_digit(seg[lead]) &&
+                                            !is_alpha(seg[lead]))
                                          ++lead;
                                      std::size_t trail{seg.size()};
-                                     while (trail > lead && !is_ascii_digit(seg[trail - 1]) &&
-                                            !is_ascii_alpha(seg[trail - 1]))
+                                     while (trail > lead && !is_digit(seg[trail - 1]) &&
+                                            !is_alpha(seg[trail - 1]))
                                          --trail;
                                      const std::string_view core{seg.substr(lead, trail - lead)};
                                      if (core.empty())
@@ -229,7 +219,7 @@ namespace
                                          prev_core = {};
                                          return;
                                      }
-                                     if (is_ascii_alpha(core.front()))
+                                     if (is_alpha(core.front()))
                                      {
                                          out.append(seg); // letter-leading → KEEP (class anchor)
                                          has_letter_anchor = true;
@@ -301,14 +291,14 @@ namespace
         const std::size_t slash{tok.rfind('/')};
         if (slash == std::string_view::npos || slash + 1 >= tok.size())
             return false;
-        if (!is_ascii_digit(tok[slash + 1]))
+        if (!is_digit(tok[slash + 1]))
             return false; // version must start with a digit
 
         std::size_t cursor{slash + 1};
         bool saw_digit{false};
-        while (cursor < tok.size() && (is_ascii_digit(tok[cursor]) || tok[cursor] == '.'))
+        while (cursor < tok.size() && (is_digit(tok[cursor]) || tok[cursor] == '.'))
         {
-            saw_digit = saw_digit || is_ascii_digit(tok[cursor]);
+            saw_digit = saw_digit || is_digit(tok[cursor]);
             ++cursor;
         }
         if (!saw_digit)
@@ -318,7 +308,7 @@ namespace
         for (std::size_t pos{cursor}; pos < tok.size(); ++pos)
         {
             const char chr{tok[pos]};
-            if (is_ascii_digit(chr) || (chr >= 'a' && chr <= 'z') || (chr >= 'A' && chr <= 'Z'))
+            if (is_digit(chr) || (chr >= 'a' && chr <= 'z') || (chr >= 'A' && chr <= 'Z'))
                 return false;
         }
 
@@ -341,11 +331,11 @@ namespace
             return false;
         std::size_t cursor{open + 1};
         const std::size_t prefix_begin{cursor};
-        while (cursor < tok.size() && is_ascii_alpha(tok[cursor]))
+        while (cursor < tok.size() && is_alpha(tok[cursor]))
             ++cursor; // optional class prefix inside the bracket ("gw", "worker")
         const std::string_view prefix{tok.substr(prefix_begin, cursor - prefix_begin)};
         bool saw_digit{false};
-        while (cursor < tok.size() && is_ascii_digit(tok[cursor]))
+        while (cursor < tok.size() && is_digit(tok[cursor]))
         {
             saw_digit = true;
             ++cursor;
@@ -376,7 +366,7 @@ namespace
         std::size_t pos{0};
         if (pos < tok.size() && (tok[pos] == '+' || tok[pos] == '-'))
             ++pos;
-        return pos < tok.size() && is_ascii_digit(tok[pos]);
+        return pos < tok.size() && is_digit(tok[pos]);
     }
 
     // D-TID-12 #3: a standalone UUID (8-4-4-4-12 hex-with-dashes) or a hex-only run
@@ -405,13 +395,13 @@ namespace
     // the index. The digit run must run to end-or-punctuation (so `#main` is not a counter).
     [[nodiscard]] inline bool normalize_hash_counter(std::string_view tok, std::string& out)
     {
-        if (tok.size() < 2U || tok[0] != '#' || !is_ascii_digit(tok[1]))
+        if (tok.size() < 2U || tok[0] != '#' || !is_digit(tok[1]))
             return false;
         std::size_t cursor{1};
-        while (cursor < tok.size() && is_ascii_digit(tok[cursor]))
+        while (cursor < tok.size() && is_digit(tok[cursor]))
             ++cursor;
         for (std::size_t pos{cursor}; pos < tok.size(); ++pos)
-            if (is_ascii_digit(tok[pos]) || is_ascii_alpha(tok[pos]))
+            if (is_digit(tok[pos]) || is_alpha(tok[pos]))
                 return false; // `#42abc` is not a clean counter
         out.clear();
         out.append("#<*>");
@@ -448,22 +438,22 @@ namespace
     [[nodiscard]] inline bool normalize_marker_number(std::string_view tok, std::string& out)
     {
         const std::size_t marker{marker_prefix_len(tok)};
-        if (marker == 0 || !is_ascii_digit(tok[marker]))
+        if (marker == 0 || !is_digit(tok[marker]))
             return false;
         std::size_t cursor{marker + 1};
-        while (cursor < tok.size() && is_ascii_digit(tok[cursor]))
+        while (cursor < tok.size() && is_digit(tok[cursor]))
             ++cursor;
         if (cursor < tok.size() && tok[cursor] == '.')
         {
             const std::size_t frac{cursor + 1};
             cursor = frac;
-            while (cursor < tok.size() && is_ascii_digit(tok[cursor]))
+            while (cursor < tok.size() && is_digit(tok[cursor]))
                 ++cursor;
             if (cursor == frac)
                 return false; // trailing '.' with no fraction → not a clean number
         }
         for (std::size_t pos{cursor}; pos < tok.size(); ++pos)
-            if (is_ascii_digit(tok[pos]) || is_ascii_alpha(tok[pos]))
+            if (is_digit(tok[pos]) || is_alpha(tok[pos]))
                 return false; // `$42abc` is not a clean marker-number
         out.clear();
         out.append(tok.substr(0, marker)); // keep the marker bytes
