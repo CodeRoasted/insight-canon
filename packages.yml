@@ -1,7 +1,7 @@
 packages:
   insight_canon:
     path: .
-    version: 1.6.4
+    version: 1.6.5
     license: Apache-2.0
     public: true
     release: true
