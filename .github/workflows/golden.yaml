@@ -1,0 +1,243 @@
+name: Determinism Golden Proof
+
+# The cross-toolchain / cross-ISA / cross-OS bit-identity gate — the externally-checkable
+# "same input → same output, bit-for-bit" claim. Merges the three former probes (determinism-proof,
+# arm64-portability-probe, windows-portability-probe) into ONE matrix + a compare:
+#
+#   5 legs — gcc-x86 · clang-x86 · gcc-arm64 · clang-arm64 · msvc — each builds canon from source and
+#   EMITS its determinism digest (proof/det_proof over proof/corpus). The compare job asserts all five
+#   are byte-identical: that IS the proof (no committed golden to go stale). Any divergence FAILS,
+#   gating the release. The agreed digest is uploaded as `determinism-golden` — the Release attaches it
+#   (per-release artifact, never committed).
+#
+# PUBLIC + anonymous (no secrets): anyone can fork canon and reproduce it. arm64 + msvc run on HOSTED
+# runners only (a self-hosted runner on a public repo = fork-PR RCE); hosted minutes are free here.
+#
+# Runs on every PR to main (full matrix — determinism is caught in the PR, per Founder direction) and
+# as the Release gate (workflow_call) + weekly drift catch + manual dispatch.
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays 06:00 UTC — drift catch
+
+jobs:
+  proof-linux:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { leg: gcc,   arch: x86,   runner: ubuntu-latest,    label: "gcc-15 · libstdc++ · x86",  require: "g++",     gcc_profile: linux-gcc15-release,       clang_profile: linux-clang21-libcxx-release }
+          - { leg: clang, arch: x86,   runner: ubuntu-latest,    label: "clang-21 · libc++ · x86",   require: "clang++", gcc_profile: linux-gcc15-release,       clang_profile: linux-clang21-libcxx-release }
+          - { leg: gcc,   arch: arm64, runner: ubuntu-24.04-arm, label: "gcc-15 · libstdc++ · arm64", require: "g++",    gcc_profile: linux-gcc15-arm64-release, clang_profile: linux-clang21-libcxx-arm64-release }
+          - { leg: clang, arch: arm64, runner: ubuntu-24.04-arm, label: "clang-21 · libc++ · arm64", require: "clang++", gcc_profile: linux-gcc15-arm64-release, clang_profile: linux-clang21-libcxx-arm64-release }
+    env:
+      CONAN_HOME: ${{ github.workspace }}/.conan2
+      # det_public_proof.sh picks the profile matching DETERMINISM_LEG; x86↔arm64 differ only by arch.
+      DETERMINISM_GCC_PROFILE: ${{ matrix.gcc_profile }}
+      DETERMINISM_CLANG_PROFILE: ${{ matrix.clang_profile }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check out malf-toolchain into malf/ (conan profiles; public, anonymous — stays forkable)
+        uses: actions/checkout@v5
+        with:
+          repository: CodeRoasted/malf-toolchain
+          path: malf
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Provision gcc-15.3 toolchain (OUR OWN — 15.3 only; arm64 asset auto-picked by uname -m)
+        if: matrix.leg == 'gcc'
+        uses: CodeRoasted/malf-toolchain/.github/actions/setup-gcc153@main
+
+      - name: Provision clang-21 + libc++-21
+        if: matrix.leg == 'clang'
+        uses: CodeRoasted/malf-toolchain/.github/actions/setup-clang21-libcxx@main
+
+      - name: Base — ninja + CMake 4.3.x (+ gcc-15.3 /opt wiring on the gcc leg)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build python3 build-essential
+          # CMake 4.3.x workspace-wide: the import-std experimental gate UUID 451f2fe2 lives only there.
+          sudo python3 -m pip install --break-system-packages "cmake==4.3.1"
+          hash -r
+          case "$(cmake --version | head -1)" in *" 4.3."*) cmake --version ;; *) echo "::error::expected CMake 4.3.x (got: $(cmake --version | head -1))"; exit 1 ;; esac
+          if [ "${{ matrix.leg }}" = "gcc" ]; then
+            sudo update-alternatives --install /usr/bin/gcc gcc /opt/gcc-15.3/bin/gcc 1000
+            sudo update-alternatives --install /usr/bin/g++ g++ /opt/gcc-15.3/bin/g++ 1000
+            sudo update-alternatives --set gcc /opt/gcc-15.3/bin/gcc
+            sudo update-alternatives --set g++ /opt/gcc-15.3/bin/g++
+            sudo ln -sf /opt/gcc-15.3/bin/g++ /usr/local/bin/g++-15
+            sudo ln -sf /opt/gcc-15.3/bin/gcc /usr/local/bin/gcc-15
+            g++ --version | grep -qE ' 15\.' || { echo "ERROR: bare g++ is not gcc-15.3 (/opt)"; exit 1; }
+          fi
+
+      - name: Setup Conan
+        uses: conan-io/setup-conan@v1
+        with:
+          version: "2.28.1"
+          home: ${{ env.CONAN_HOME }}
+          cache_packages: false
+          profile_detect: false
+
+      - name: Cache conan dep binaries (keyed per arch/leg on the dep set)
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.CONAN_HOME }}
+          key: conan-golden-${{ matrix.arch }}-${{ matrix.leg }}-${{ runner.os }}-${{ hashFiles('conanfile.py') }}
+          restore-keys: |
+            conan-golden-${{ matrix.arch }}-${{ matrix.leg }}-${{ runner.os }}-
+
+      - name: Setup Conan profiles (from malf-toolchain)
+        run: |
+          mkdir -p "$CONAN_HOME/profiles"
+          cp "malf/profiles/${{ matrix.gcc_profile }}"   "$CONAN_HOME/profiles/${{ matrix.gcc_profile }}"
+          cp "malf/profiles/${{ matrix.clang_profile }}" "$CONAN_HOME/profiles/${{ matrix.clang_profile }}"
+
+      - name: Determinism proof — ${{ matrix.label }} (sweep-invariance + emit the leg's digest)
+        env:
+          DETERMINISM_LEG: ${{ matrix.leg }}
+          DETERMINISM_REQUIRE_COMPILERS: ${{ matrix.require }}
+          DETERMINISM_OUT: ${{ github.workspace }}/digest-${{ matrix.arch }}-${{ matrix.leg }}.txt
+        run: bash scripts/det_public_proof.sh
+
+      - name: Upload this leg's digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: golden-digest-${{ matrix.arch }}-${{ matrix.leg }}
+          path: digest-${{ matrix.arch }}-${{ matrix.leg }}.txt
+          if-no-files-found: error
+
+  proof-msvc:
+    name: "msvc-14.52 · O2-fast"
+    runs-on: windows-2025
+    env:
+      CONAN_HOME: ${{ github.workspace }}/.conan2
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check out malf-toolchain into malf/ (conan profile; public, anonymous)
+        uses: actions/checkout@v5
+        with:
+          repository: CodeRoasted/malf-toolchain
+          path: malf
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install + activate MSVC 14.52 (the C++23-modules fix floor; not pre-installed)
+        uses: CodeRoasted/malf-toolchain/.github/actions/setup-msvc1452@main
+
+      - name: Verify the active toolset is MSVC 14.52, not a fallback
+        shell: pwsh
+        run: |
+          if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) { Write-Error "cl.exe not on PATH — MSVC env not activated"; exit 1 }
+          if (-not $env:VCToolsVersion) { Write-Error "VCToolsVersion not set — MSVC env not activated"; exit 1 }
+          if ([version]$env:VCToolsVersion -lt [version]'14.52') { Write-Error "active toolset $env:VCToolsVersion < 14.52 (the fix floor)"; exit 1 }
+          Write-Host "active VCToolsVersion: $env:VCToolsVersion"
+
+      - name: Setup CMake 4.3.x (import-std experimental gate UUID 451f2fe2 lives only in 4.3.x)
+        shell: pwsh
+        run: |
+          python -m pip install "cmake==4.3.1"
+          $v = (cmake --version | Select-Object -First 1)
+          if ($v -notmatch ' 4\.3\.') { Write-Error "expected CMake 4.3.x (got: $v)"; exit 1 }
+          cmake --version
+
+      - name: Setup Conan
+        uses: conan-io/setup-conan@v1
+        with:
+          version: "2.29.0"
+          home: ${{ env.CONAN_HOME }}
+          cache_packages: false
+          profile_detect: false
+
+      - name: Cache conan dep binaries
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.CONAN_HOME }}
+          key: conan-golden-msvc1452-${{ runner.os }}-${{ hashFiles('**/conanfile.py', 'malf/profiles/windows-msvc-release') }}
+          restore-keys: |
+            conan-golden-msvc1452-${{ runner.os }}-
+
+      - name: Setup Conan profile (windows-msvc-release, from malf-toolchain)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:CONAN_HOME/profiles" | Out-Null
+          Copy-Item malf/profiles/windows-msvc-release "$env:CONAN_HOME/profiles/windows-msvc-release"
+
+      - name: Build det_proof @ O2-fast (canon from source + the public-corpus fixture)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $proofBuild = "build-msvc-proof"
+          conan install . `
+            --profile:host="$env:CONAN_HOME/profiles/windows-msvc-release" `
+            --profile:build="$env:CONAN_HOME/profiles/windows-msvc-release" `
+            --build=missing -of $proofBuild
+          $toolchain = Get-ChildItem -Path $proofBuild -Recurse -Filter conan_toolchain.cmake | Select-Object -First 1
+          if (-not $toolchain) { Write-Error "no conan_toolchain.cmake under $proofBuild"; exit 1 }
+          # CELL_FLAGS = SPDLOG off (digest is det_proof's stdout) + /O2 /fp:fast (ship optimization +
+          # contraction ON — the dominating corner; matching the other legs proves contraction-invariance).
+          cmake -S proof -B $proofBuild -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE="$($toolchain.FullName)" `
+            -DCANON_ROOT="$($PWD.Path)" `
+            -DCELL_FLAGS="-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF /O2 /fp:fast"
+          cmake --build $proofBuild --target det_proof
+          $det = Get-ChildItem -Path $proofBuild -Recurse -Filter det_proof.exe | Select-Object -First 1
+          if (-not $det) { Write-Error "det_proof.exe was not produced — the MSVC det harness build failed"; exit 1 }
+          "$($det.FullName)" | Out-File -FilePath det_proof_path.txt -Encoding ascii -NoNewline
+
+      - name: Emit the MSVC digest (det_proof stdout — raw bytes, no re-encoding)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $det = (Get-Content det_proof_path.txt).Trim()
+          $corpus = Get-ChildItem -Path proof/corpus -Filter *.log | Sort-Object Name | ForEach-Object { $_.FullName }
+          $p = Start-Process -FilePath $det -ArgumentList $corpus -NoNewWindow -Wait -PassThru `
+                 -RedirectStandardOutput "$($PWD.Path)/digest-msvc.txt"
+          if ($p.ExitCode -ne 0) { Write-Error "det_proof exited $($p.ExitCode)"; exit 1 }
+          Write-Host "MSVC digest sha256: $((Get-FileHash -Algorithm SHA256 -Path digest-msvc.txt).Hash.ToLower())"
+
+      - name: Upload the MSVC digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: golden-digest-msvc
+          path: digest-msvc.txt
+          if-no-files-found: error
+
+  compare:
+    needs: [proof-linux, proof-msvc]
+    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    steps:
+      - name: Download every leg's digest
+        uses: actions/download-artifact@v7
+        with:
+          path: digests
+          pattern: golden-digest-*
+
+      - name: Compare + validate the golden (all 5 legs must be byte-identical)
+        uses: CodeRoasted/malf-toolchain/.github/actions/coderoast-golden-compare@main
+        with:
+          digests-dir: digests
+          min-legs: '5'
+          out: ${{ github.workspace }}/determinism-golden.txt
+
+      - name: Upload the validated golden (the Release attaches it)
+        uses: actions/upload-artifact@v7
+        with:
+          name: determinism-golden
+          path: determinism-golden.txt
+          if-no-files-found: error

@@ -34,22 +34,26 @@
 # profile (linux-gcc15-release = gcc-15/libstdc++, linux-clang21-release =
 # clang-21/libstdc++); -O / -ffp-contract are appended per cell after the profile.
 #
-#   det_public_proof.sh            run the gate (PASS/FAIL vs the golden)
-#   det_public_proof.sh --freeze   (re-)derive and write proof/golden.sha256
+#   det_public_proof.sh                          run the cross-build determinism check (PASS/FAIL)
+#   DETERMINISM_OUT=<path> det_public_proof.sh   ALSO emit this leg's digest to <path>, for the
+#                                                Determinism-Golden-Proof workflow to cross-compare
+#                                                against the other legs (no committed golden to rot)
+#
+# NEW MODEL — cross-leg agreement, not a committed golden. This script proves the per-leg invariant
+# (byte-identity across this leg's compiler × -O × -ffp sweep) and EMITS the leg's digest. The
+# workflow runs every leg (gcc/clang × x86/arm64 + msvc) and compares their emitted digests: all
+# equal ⇒ cross-toolchain/ISA/OS bit-identity, gating the release. The golden is the agreed digest,
+# published per-release as a Release artifact — never committed (so it cannot go stale, the trap the
+# old proof/golden.sha256 anchor had).
 #
 # DETERMINISM_REQUIRE_COMPILERS="g++ clang++" makes each listed compiler mandatory
 # (a clang-only break can't pass on the g++ builds alone — a hollow green).
 ###############################################################################
 set -euo pipefail
 
-FREEZE=0
-[ "${1:-}" = "--freeze" ] && FREEZE=1
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CANON="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROOF="$CANON/proof"
-GOLDEN="$PROOF/golden.sha256"
-GOLDEN_TXT="$PROOF/golden.det_proof.txt"   # human-readable digest the windows probe line-diffs; its sha IS $GOLDEN
 
 [ -f "$PROOF/det_proof.cpp" ]   || { echo "error: $PROOF/det_proof.cpp missing." >&2; exit 2; }
 [ -f "$PROOF/CMakeLists.txt" ]  || { echo "error: $PROOF/CMakeLists.txt missing (the Approach-B per-cell harness)." >&2; exit 2; }
@@ -162,20 +166,13 @@ fi
 echo "PASS: canon public digest byte-identical across ${#builds[@]} builds." >&2
 
 digest_sha="$(sha256sum "$ref" | awk '{print $1}')"
-if [ "$FREEZE" -eq 1 ]; then
-  # Write BOTH the text digest (windows probe line-diffs it) and its sha — they must stay in lockstep
-  # (sha256(golden.det_proof.txt) == golden.sha256). Writing only the sha rots the text companion.
-  cp "$ref" "$GOLDEN_TXT"
-  echo "$digest_sha" > "$GOLDEN"
-  echo "FROZEN golden → $GOLDEN : $digest_sha (+ $GOLDEN_TXT)" >&2
-  exit 0
+echo "canon public digest sha256=$digest_sha" >&2
+
+# Emit this leg's digest for the workflow to cross-compare against the other legs (gcc/clang ×
+# x86/arm64 + msvc). The per-leg sweep-invariance above is already asserted; the cross-toolchain/
+# ISA/OS bit-identity — and the published per-release golden — come from the workflow's compare.
+if [ -n "${DETERMINISM_OUT:-}" ]; then
+  cp "$ref" "$DETERMINISM_OUT"
+  echo "emitted digest → $DETERMINISM_OUT" >&2
 fi
-[ -f "$GOLDEN" ] || { echo "no golden at $GOLDEN — run with --freeze to commit one." >&2; exit 2; }
-want="$(tr -d '[:space:]' < "$GOLDEN")"
-if [ "$digest_sha" = "$want" ]; then
-  echo "GOLDEN MATCH: $digest_sha" >&2
-  exit 0
-fi
-echo "GOLDEN MISMATCH: got $digest_sha  want $want" >&2
-echo "  → a determinism regression, OR an intentional change needing 'det_public_proof.sh --freeze' + review." >&2
-exit 4
+exit 0
