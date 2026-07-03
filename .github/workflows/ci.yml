@@ -1,19 +1,23 @@
 name: CI
 
 on:
-  workflow_call:
+  workflow_call:     # the Release workflow chains Lint -> CI -> golden -> Release
   workflow_dispatch:
+  push:
+    branches: [ main ]   # seed the Sift render baseline (last-green of THIS "CI" workflow on main)
   pull_request:
     branches: [ main ]
 
 jobs:
   ci:
+    # PUBLIC repo: sift-mode: public renders the Sift comment fork-safe (read-only token; a fork PR
+    # can build here but post nothing) — coderoast-sift-post (via sift-post.yml) posts it. canon is a
+    # tower root (no first-party deps to vendor); the package is the repo root, so one module '.'.
     permissions:
-      contents: write
-      # Sift needed permissions (PR + actions write)
-      pull-requests: write   
-      actions: write
+      contents: read
+      actions: read      # resolve the base branch's last-green Sift baseline
     uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-ci.yml@main
     with:
       modules: '.'
+      sift-mode: public
     secrets: inherit
