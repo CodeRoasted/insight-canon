@@ -147,7 +147,7 @@ jobs:
       - name: Measure + publish the benchmark (canon is a leaf — no first-party deps to vendor)
         uses: CodeRoasted/malf-toolchain/.github/actions/publish-benchmark@main
         with:
-          label: insight-canon
+          outputs: insight_canon_bench=insight-canon
           tag: ${{ steps.tag.outputs.tag }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
