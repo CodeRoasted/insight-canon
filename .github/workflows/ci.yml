@@ -17,6 +17,21 @@ jobs:
       # the package is the repo root, so one module '.'.
       modules: '.'
       # PUBLIC repo: sift-mode: public renders the Sift comment fork-safe (read-only token; a fork PR
-      # can build here but post nothing) — coderoast-sift-post (via sift-post.yml) posts it. 
+      # can build here but post nothing) — the sift-post job below posts it.
       sift-mode: public
+    secrets: inherit
+
+  # Post the comment the `ci` build rendered to the sift-comment artifact. Separate job so `ci` (which
+  # runs PR code) stays read-only; only THIS job holds pull-requests: write, and it runs no PR code —
+  # it just posts the pre-rendered artifact of this same run. Same-repo PRs only: a fork PR's
+  # pull_request run is read-only, so posting is capped anyway (external forks get no comment).
+  sift-post:
+    needs: ci
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork != true }}
+    permissions:
+      pull-requests: write
+      actions: read
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-sift-post.yml@main
+    with:
+      run-id: ${{ github.run_id }}
     secrets: inherit

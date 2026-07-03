@@ -56,6 +56,7 @@ jobs:
       - name: Attach the golden (+ sha256) to the Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}   # no checkout here — gh can't infer the repo from .git, name it
           TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
