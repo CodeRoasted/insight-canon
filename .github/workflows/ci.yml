@@ -1,40 +1,20 @@
 name: CI
-permissions:
-  # Build + test only — checkout is all this job needs. The Sift baseline is seeded by
-  # sift-build.yml on its OWN push:main run (same-workflow baseline; see sift-build.yml +
-  # sift-action/src/baseline.ts §54), so this job no longer uploads the baseline artifact
-  # (actions: write) nor posts a commit-comment (contents: write).
-  contents: read
 
 on:
+  workflow_call:     # the Release workflow chains Lint -> CI -> Release
   workflow_dispatch:
-  push:
-    branches: [ main ]
-    tags: [ "v[0-9]+.[0-9]+.[0-9]+" ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Provision gcc-15.3 toolchain (PR124309 fix; replaces PPA gcc-15 = 15.2)
-        uses: CodeRoasted/malf-toolchain/.github/actions/setup-gcc153@main
-
-      - name: Setup build env (apt + CMake 4.3.x + Conan + dep cache + canonical profile)
-        # Single source: apt base + pinned CMake 4.3.1 + Conan (no autodetect) + the conan dep
-        # cache + the canonical linux-gcc15-release profile (fetched from malf-toolchain — no
-        # per-repo vendored copy). Owns CONAN_HOME. Replaces the inlined 5-step setup block.
-        uses: CodeRoasted/malf-toolchain/.github/actions/setup-build-env@main
-
-      - name: Build + test canon
-        # canon is single-module (the package is the repo root) → module '.'. test=true runs the
-        # FULL gtest suite (conan install + cmake build + ctest) — `conan create` alone only runs
-        # test_package, never tests/. create=true also verifies packaging + test_package consumes it.
-        uses: CodeRoasted/malf-toolchain/.github/actions/conan-module@main
-        with:
-          module: '.'
-          test: 'true'
-          create: 'true'
+  ci:
+    # Build + test only, contents:read — canon seeds its Sift baseline via sift-build.yml, so the
+    # shared CI dogfood is turned OFF (sift: false). canon is a tower root (no first-party deps to
+    # vendor); the package is the repo root, so one module '.'.
+    permissions:
+      contents: read
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-ci.yml@main
+    with:
+      modules: '.'
+      sift: false
+    secrets: inherit

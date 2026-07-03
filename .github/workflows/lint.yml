@@ -1,0 +1,11 @@
+name: Lint
+
+on:
+  workflow_call:     # the Release workflow chains Lint -> CI -> Release
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-lint.yml@main
