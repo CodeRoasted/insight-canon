@@ -160,14 +160,24 @@ namespace
         return -1;
     }
 
+    // ASCII-only lowercase — DETERMINISM-CRITICAL. `std::tolower(int)` consults the global C
+    // locale, so on non-ASCII bytes (e.g. a UTF-8 em-dash 0xE2 0x80 0x94) it can transform them
+    // differently under a non-C locale (a French/Windows-1252 CI runner) than under the C locale
+    // the Linux golden was built with — a flaky cross-OS divergence in any output computed from a
+    // comparison it drives (e.g. level-alias matching feeding a report's level field). This maps
+    // A-Z only and passes every other byte through verbatim; under the C locale it is identical to
+    // std::tolower, so the golden is unchanged, but it no longer depends on the ambient locale.
+    [[nodiscard]] constexpr char ascii_tolower(char character) noexcept
+    {
+        const auto uch{static_cast<unsigned char>(character)};
+        return (uch >= 'A' && uch <= 'Z') ? static_cast<char>(uch - 'A' + 'a') : character;
+    }
+
     [[nodiscard]] bool iequals(std::string_view lhs, std::string_view rhs) noexcept
     {
         if (lhs.size() != rhs.size())
             return false;
-        return std::ranges::equal(
-            lhs, rhs, {},
-            [](char character) { return std::tolower(static_cast<unsigned char>(character)); },
-            [](char character) { return std::tolower(static_cast<unsigned char>(character)); });
+        return std::ranges::equal(lhs, rhs, {}, ascii_tolower, ascii_tolower);
     }
 
     struct LevelAlias
