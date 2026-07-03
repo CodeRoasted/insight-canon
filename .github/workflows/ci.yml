@@ -2,9 +2,9 @@ name: CI
 
 on:
   workflow_call:     # the Release workflow chains Lint -> CI -> golden -> Release
+  # Also the Sift baseline seed: a no-PR run of THIS "CI" workflow on main uploads its build.log as the
+  # last-green baseline that PR renders diff against. Reseed manually (solo-dev; no CI on every push).
   workflow_dispatch:
-  push:
-    branches: [ main ]   # seed the Sift render baseline (last-green of THIS "CI" workflow on main)
   pull_request:
     branches: [ main ]
 
