@@ -16,7 +16,8 @@ on:
 
 permissions:
   contents: write        # release + attach-golden create/upload the Release
-  pull-requests: write   # (ci Sift dogfood — canon runs sift: false, so unused here, but harmless)
+  # Sift needed permissions (PR + actions write)
+  pull-requests: write
   actions: write
 
 jobs:
