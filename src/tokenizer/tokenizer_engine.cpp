@@ -76,6 +76,12 @@ struct Tokenizer::Impl
         event.params = match.params;
         event.structural_role = insight::tokenization::StructuralRoleRegistry::classify(
             parsed_line.content); // announced structural role
+        // Identity-derived WHERE (intent_identity_model.md §5.3, II-8): populate the empty GHA
+        // WHERE axis with the recognized test-file, gated by config so every other path is
+        // byte-identical. GHA carries no native component, so this fakes no native field.
+        if (config.recognize_test_where && event.format == LogFormat::GitHubActions &&
+            event.component.empty())
+            event.component = recognize_location(parsed_line.content);
         event.trace = parsed_line.trace; // OTEL trace context (D-OTEL-1): consumed by O2/O3,
                                          // never serialized; default-empty for non-OTEL inputs
         event.ordinals = parsed_line.ordinals; // W1 ordinal observations (D-W1-3): consumed by

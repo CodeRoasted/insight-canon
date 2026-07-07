@@ -875,6 +875,14 @@ struct MaskConfig
     // is formed, so they never fossilise into the template identity.
     bool mask_ip_addresses{true};  // IPv4 address tokens (e.g. "192.168.1.1:")
     bool mask_hex_addresses{true}; // hex address tokens  (e.g. "0xdeadbeef")
+    // Identity-derived WHERE (intent_identity_model.md §5.3, II-8): when set, a GitHub-Actions
+    // line whose NATIVE component is empty (GHA carries none) gets its recognize_location()
+    // test-file as `component` — populating the cube WHERE axis ABOVE the empty native tier
+    // (never faking it — GHA WHERE is identity-derived by construction). OFF by default so every
+    // existing path is byte-identical (the [[additive-gated-metalog-block-keeps-wire-version]]
+    // discipline: no output change, no golden movement, no version bump); the batch aligned
+    // pipeline turns it on to feed the where_set_shift coverage verdict (§5.4).
+    bool recognize_test_where{false};
 };
 
 } // namespace insight::tokenization
