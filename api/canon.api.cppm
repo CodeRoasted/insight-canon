@@ -100,6 +100,34 @@ struct NgramId
 // the sequence's id bytes; transient (never serialized), order-sensitive.
 [[nodiscard]] NgramId ngram_id_of(const std::vector<TemplateId>& sequence) noexcept;
 
+// ── Intent identity (intent_identity_model.md §5/§5.1, II-1/II-6/II-7) ──
+// The intent REGISTRY version — the II-7 comparability identity that rides every
+// intent-aligned report. It names the recognizer + identity-canonicalization rule
+// generation (the GitHub-Actions dialect lexicon: `intent-<dialect>-<generation>`),
+// DECOUPLED from kCanonicalizationVersion because it governs a DIFFERENT rule set
+// (identifiers, not line values — see intent_identity.cpp). Bump the suffix on any
+// output-affecting recognizer/canonicalization change: artifacts segmented under
+// different registries are re-segmented, never silently compared (a rule change
+// re-draws every boundary — the D-OTEL-2 "ruleset identity" discipline).
+inline constexpr std::string_view kIntentRegistryVersion{"intent-gha-1"};
+
+// Canonicalize a marker payload (a job or step name) to its intent CLASS: mask the
+// version-bearing / matrix / shard tokens that vary across homologous runs, keep the
+// structural name — so matrix legs and retries of ONE job collapse to one class
+// (instances are separated downstream by ordinal, per §5.3 multiplicity, NEVER eaten
+// here — II-2). This is the canon.detail.mask templating discipline REAPPLIED to
+// identifiers (§5.1 detail 1); it is a distinct rule set from the value masker (which
+// keeps `(1/<*>` to distinguish, where identity must collapse `(1/10)`→`(M)` to align).
+// Deterministic, ASCII-safe, no float, no regex, no cross-line state. Cold path (few
+// markers per log) — returns an owned string.
+[[nodiscard]] std::string canonicalize_intent(std::string_view name);
+
+// The intent identity: the 16-byte SHA-256 of the canonicalized name — a STRUCTURAL
+// grouping key derived from the marker, never a retained value (II-1, the O1/D-OTEL-1
+// discipline verbatim). Byte-identical to template_id_of(canonicalize_intent(name));
+// one call keeps `intent_id` co-located with its comparability version.
+[[nodiscard]] TemplateId intent_id_of(std::string_view name);
+
 // Stream rendering (ADL) so a TemplateId prints as "h:"+hex in logs / test diagnostics
 // (the "verbose on failure" rule). Not a product wire path — that is render() at the seam.
 inline std::ostream& operator<<(std::ostream& out, const TemplateId& template_id)
