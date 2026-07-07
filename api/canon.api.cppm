@@ -128,6 +128,17 @@ inline constexpr std::string_view kIntentRegistryVersion{"intent-gha-1"};
 // one call keeps `intent_id` co-located with its comparability version.
 [[nodiscard]] TemplateId intent_id_of(std::string_view name);
 
+// Location recognition (intent_identity_model.md §5.3/§5.4, II-8 — the intent registry's SECOND
+// rule class, beside the intent markers): extract the test-file WHERE coordinate from a line — the
+// sub-quantum location the where_set_shift COVERAGE verdict compares (which test files a step
+// reported this run). Returns the test-file path (a view into `content`), or empty when the line
+// names no recognized test file. Universal test-file families (a framework's file-naming is
+// CI-dialect-independent): jest/vitest/playwright `*.test.<ext>` / `*.spec.<ext>` with ext ∈
+// {ts,tsx,js,jsx,mjs,cjs,py}; pytest `test_*.py` / `*_test.py`; go `*_test.go`; ruby `*_spec.rb`
+// / `*_test.rb`. Rides kIntentRegistryVersion (II-7 — a rule change re-draws the coverage sets).
+// Deterministic, ASCII-safe, no regex, no cross-line state (a pure function of the line's bytes).
+[[nodiscard]] std::string_view recognize_location(std::string_view content) noexcept;
+
 // Stream rendering (ADL) so a TemplateId prints as "h:"+hex in logs / test diagnostics
 // (the "verbose on failure" rule). Not a product wire path — that is render() at the seam.
 inline std::ostream& operator<<(std::ostream& out, const TemplateId& template_id)
