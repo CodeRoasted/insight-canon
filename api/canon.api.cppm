@@ -902,6 +902,61 @@ class StructuralRoleRegistry
     }
 };
 
+// ── Intent-marker recognition (intent_identity_model.md §5.2, the registry's segmentation
+// rule class; GitHub-Actions dialect tier) ──────────────────────────────────────────────
+// On the STRIPPED content stream Sift consumes (studies/004: `strip_workflow_commands`), the
+// RESET-class markers that open a behavioural quantum — the segmentation anchors the aligned
+// pipeline walks. A JOB banner (`Complete job name: <name>`) names the job-scoped parent; a
+// STEP banner (`Run <name>`) opens the step quantum within it (the finest RESET grain, §5.3
+// bottoms at job▸step). The payload is the RAW name; canonicalize_intent turns it into the
+// alignment CLASS (so `test (win-msvc, …)` → `test (M)` pairs across runs).
+//
+// FORMAT-GATED (II-6 — a dialect never fires cross-format): the GHA-dialect rules fire only
+// for LogFormat::GitHubActions; every other format returns None. This is why the recognizer
+// takes the format (unlike StructuralRoleRegistry's universal `##[group]` markers): `Run ` is
+// GHA-runner-specific and WOULD misfire on a "Run daemon started" content line elsewhere. The
+// residual within-GHA phantom rate (content lines beginning `Run `) is the measured 0.8%
+// (studies/004 Table 2) — a phantom step-quantum simply fails to align (VANISHED+INSERTED,
+// low-sev), never a silent mispair (II-2). Deterministic, ASCII-safe, no cross-line state.
+enum class IntentMarkerKind : std::uint8_t
+{
+    None = 0, ///< the line opens no quantum (the common case)
+    Job,      ///< a job-scoped parent opens (`Complete job name: <name>`)
+    Step      ///< a step quantum opens (`Run <name>`)
+};
+
+struct IntentMarker
+{
+    IntentMarkerKind kind{IntentMarkerKind::None};
+    std::string_view name; ///< raw payload (empty when kind == None); canonicalize_intent → class
+    auto operator<=>(const IntentMarker&) const = default;
+    bool operator==(const IntentMarker&) const = default;
+};
+
+class IntentMarkerRegistry
+{
+  public:
+    [[nodiscard]] static IntentMarker recognize(std::string_view content, LogFormat format) noexcept
+    {
+        if (format != LogFormat::GitHubActions)
+            return {};
+        using namespace std::string_view_literals;
+        // remove_prefix (noexcept) not substr (may-throw) — the starts_with guard is the
+        // precondition, so the noexcept contract holds without a throwing call escaping.
+        if (constexpr auto job{"Complete job name: "sv}; content.starts_with(job))
+        {
+            content.remove_prefix(job.size());
+            return {.kind = IntentMarkerKind::Job, .name = content};
+        }
+        if (constexpr auto step{"Run "sv}; content.starts_with(step))
+        {
+            content.remove_prefix(step.size());
+            return {.kind = IntentMarkerKind::Step, .name = content};
+        }
+        return {};
+    }
+};
+
 } // namespace insight::tokenization
 
 // ──────── from api/insight/tokenization/arena_allocator.hpp ────────
