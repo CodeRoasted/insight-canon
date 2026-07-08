@@ -26,6 +26,9 @@ import insight.canon.spi;      // the grammar rows + SemanticPackageManifest (pl
 export namespace insight::semantic
 {
 
+// The truncated-SHA-256 width of semantic_identity (§4.1 — the TemplateId 16-byte precedent).
+inline constexpr std::size_t kSemanticIdentityBytes{16};
+
 // A composed package's identity, carried for the wire block's legibility (§4.2 — an operator can read
 // what vocabulary a report understood). The hash (§4.1) is the key; this list is the label.
 struct ComposedPackage
@@ -94,7 +97,7 @@ class ComposedSemantics
     [[nodiscard]] std::span<const ProvenanceHook> provenance_hooks() const noexcept { return provenance_hooks_; }
 
     // ── Identity + legibility (§4) ──
-    [[nodiscard]] const std::array<std::uint8_t, 16>& identity() const noexcept { return identity_; }
+    [[nodiscard]] const std::array<std::uint8_t, kSemanticIdentityBytes>& identity() const noexcept { return identity_; }
     [[nodiscard]] std::string identity_hex() const;                        // rendered hex, only at seams
     [[nodiscard]] std::span<const ComposedPackage> packages() const noexcept { return packages_; }
     [[nodiscard]] const CompositionReport& report() const noexcept { return report_; }
@@ -112,7 +115,7 @@ class ComposedSemantics
     std::vector<ProvenanceHook> provenance_hooks_;
     std::vector<ComposedPackage> packages_;
     CompositionReport report_;
-    std::array<std::uint8_t, 16> identity_{};
+    std::array<std::uint8_t, kSemanticIdentityBytes> identity_{};
 };
 
 // Compose the manifest set. Sorts packages by name (canonical order — independent of the caller's
@@ -133,54 +136,60 @@ namespace detail
     }
 } // namespace detail
 
+namespace detail
+{
+    // Every unordered (package,row) pair exactly ONCE: pkg_b>pkg_a, or pkg_b==pkg_a with idx_j>idx_i.
+    // Never a row against itself, and address-independent — detects an intra-package duplicate AND two
+    // packages that happen to share the same static row array (position, not address, is the key).
+    // Keyed on the shared .prefix + .format_gate members (roles / markers / level-lifts). Returns the
+    // duplicated prefix, or nullopt.
+    template <typename Row>
+    [[nodiscard]] constexpr std::optional<std::string_view>
+    first_prefix_dup(std::span<const SemanticPackageManifest> packages,
+                     std::span<const Row> SemanticPackageManifest::* member) noexcept
+    {
+        for (std::size_t pkg_a{0}; pkg_a < packages.size(); ++pkg_a)
+        {
+            const std::span<const Row> rows_a{packages[pkg_a].*member};
+            for (std::size_t idx_i{0}; idx_i < rows_a.size(); ++idx_i)
+                for (std::size_t pkg_b{pkg_a}; pkg_b < packages.size(); ++pkg_b)
+                {
+                    const std::span<const Row> rows_b{packages[pkg_b].*member};
+                    for (std::size_t idx_j{(pkg_b == pkg_a) ? idx_i + 1 : 0}; idx_j < rows_b.size();
+                         ++idx_j)
+                        if (rows_a[idx_i].prefix == rows_b[idx_j].prefix &&
+                            gates_intersect(rows_a[idx_i].format_gate, rows_b[idx_j].format_gate))
+                            return rows_a[idx_i].prefix;
+                }
+        }
+        return std::nullopt;
+    }
+} // namespace detail
+
 constexpr ConflictInfo find_conflict(std::span<const SemanticPackageManifest> packages) noexcept
 {
-    // Prefix-keyed rows: an exact duplicate is same prefix + intersecting gate. O(rows²) over a
-    // handful of rows, at compile time — cost is irrelevant, clarity is not.
-    // Roles.
-    for (std::size_t a{0}; a < packages.size(); ++a)
-        for (const StructuralRoleRow& lhs : packages[a].roles)
-            for (std::size_t b{a}; b < packages.size(); ++b)
-                for (const StructuralRoleRow& rhs : packages[b].roles)
-                {
-                    if (&lhs == &rhs)
-                        continue;
-                    if (lhs.prefix == rhs.prefix && detail::gates_intersect(lhs.format_gate, rhs.format_gate))
-                        return {.has_conflict = true, .kind = "role", .key = lhs.prefix};
-                }
-    // Markers.
-    for (std::size_t a{0}; a < packages.size(); ++a)
-        for (const IntentMarkerRow& lhs : packages[a].markers)
-            for (std::size_t b{a}; b < packages.size(); ++b)
-                for (const IntentMarkerRow& rhs : packages[b].markers)
-                {
-                    if (&lhs == &rhs)
-                        continue;
-                    if (lhs.prefix == rhs.prefix && detail::gates_intersect(lhs.format_gate, rhs.format_gate))
-                        return {.has_conflict = true, .kind = "marker", .key = lhs.prefix};
-                }
-    // Level lifts.
-    for (std::size_t a{0}; a < packages.size(); ++a)
-        for (const LevelLiftRow& lhs : packages[a].level_lifts)
-            for (std::size_t b{a}; b < packages.size(); ++b)
-                for (const LevelLiftRow& rhs : packages[b].level_lifts)
-                {
-                    if (&lhs == &rhs)
-                        continue;
-                    if (lhs.prefix == rhs.prefix && detail::gates_intersect(lhs.format_gate, rhs.format_gate))
-                        return {.has_conflict = true, .kind = "level_lift", .key = lhs.prefix};
-                }
-    // Value classes (keyed by `key`).
-    for (std::size_t a{0}; a < packages.size(); ++a)
-        for (const ValueClassRow& lhs : packages[a].value_classes)
-            for (std::size_t b{a}; b < packages.size(); ++b)
-                for (const ValueClassRow& rhs : packages[b].value_classes)
-                {
-                    if (&lhs == &rhs)
-                        continue;
-                    if (lhs.key == rhs.key)
-                        return {.has_conflict = true, .kind = "value_class", .key = lhs.key};
-                }
+    // An exact duplicate is same key + (for prefix rows) intersecting format gate. Each unordered
+    // (package,row) pair is checked once; O(rows²) over a handful of rows at compile time.
+    if (const auto key{detail::first_prefix_dup<StructuralRoleRow>(packages,
+                                                                   &SemanticPackageManifest::roles)})
+        return {.has_conflict = true, .kind = "role", .key = *key};
+    if (const auto key{detail::first_prefix_dup<IntentMarkerRow>(packages,
+                                                                 &SemanticPackageManifest::markers)})
+        return {.has_conflict = true, .kind = "marker", .key = *key};
+    if (const auto key{
+            detail::first_prefix_dup<LevelLiftRow>(packages, &SemanticPackageManifest::level_lifts)})
+        return {.has_conflict = true, .kind = "level_lift", .key = *key};
+    // Value classes are keyed by `.key` (no format gate).
+    for (std::size_t pkg_a{0}; pkg_a < packages.size(); ++pkg_a)
+        for (std::size_t idx_i{0}; idx_i < packages[pkg_a].value_classes.size(); ++idx_i)
+            for (std::size_t pkg_b{pkg_a}; pkg_b < packages.size(); ++pkg_b)
+                for (std::size_t idx_j{(pkg_b == pkg_a) ? idx_i + 1 : 0};
+                     idx_j < packages[pkg_b].value_classes.size(); ++idx_j)
+                    if (packages[pkg_a].value_classes[idx_i].key ==
+                        packages[pkg_b].value_classes[idx_j].key)
+                        return {.has_conflict = true,
+                                .kind = "value_class",
+                                .key = packages[pkg_a].value_classes[idx_i].key};
     return {};
 }
 
