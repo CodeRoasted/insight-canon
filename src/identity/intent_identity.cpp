@@ -8,14 +8,15 @@ import insight.canon.internal;
 // make-or-break (§5.1 detail 1). It is a DISTINCT rule set from the value masker, by design:
 //   - the value masker keeps structure to DISTINGUISH   ( `yarn (1/10)` → `yarn (1/<*>` )
 //   - identity canonicalization COLLAPSES to ALIGN      ( `yarn (1/10)` → `yarn (M)`     )
-// so that matrix legs / shards / version-parameterized jobs of ONE intent map to ONE class and
-// pair across homologous runs; the instance discriminant (§5.3 multiplicity) is the ordinal the
-// aligner adds downstream, NEVER a fingerprint-similarity merge here (II-2: alignment must never
-// eat the signal). Gate G1 (studies/004) measured this exact mask on the real GH-Actions corpus:
-// matrix jobs align 0%→100% (ESLint v6/v7, byte-identical steps) once the version/tuple tokens are
-// masked; the residual is genuine step-count churn, not a canonicalization miss.
+// so that matrix legs / shards / version-parameterized jobs of ONE intent map to ONE class. The
+// class is the alignment SCOPE; the raw `discriminant_of` (below) is the complementary third role
+// (ADR 0023 / II-9) that separates co-occurring siblings WITHIN the class — never a masked ordinal,
+// never a fingerprint-similarity merge (II-2). Gate G1 (studies/004) measured the class mask on the
+// real GH-Actions corpus: matrix jobs collapse to one class (`Test (M)`); the discriminant keeps the
+// raw tuple/version so the aligner pairs the right legs and surfaces cross-run drift (v6→v7) as a
+// REPLACED, not a masked-away 0-row or a raw-key storm (ADR 0023 §3).
 //
-// The frozen rule set (kIntentRegistryVersion "intent-gha-1", the GitHub-Actions dialect tier of
+// The frozen rule set (kIntentRegistryVersion "intent-gha-2", the GitHub-Actions dialect tier of
 // the §5.2 registry). Applied left-to-right in ONE pass, at word boundaries (\w = [A-Za-z0-9_]),
 // each rule masking the maximal token it claims:
 //   R1 dotted-version   v?\d+(\.\d+)+   → vX   (`1.2.3`, `v1.2.3`)   — before R3 so it is not fragmented
@@ -153,6 +154,38 @@ std::string canonicalize_intent(std::string_view name)
 TemplateId intent_id_of(std::string_view name)
 {
     return template_id_of(canonicalize_intent(name));
+}
+
+std::string_view discriminant_of(std::string_view name) noexcept
+{
+    // The instance discriminant is the COMPLEMENT of canonicalize_intent: the class MASKS the drift
+    // tokens (R1–R4), the discriminant KEEPS the first one VERBATIM. Same scan, same rules — so
+    // `Test (ubuntu-latest, Node 24.x)` → `(ubuntu-latest, Node 24.x)` (R4 tuple) and `ESLint v6` →
+    // `v6` (R2 version): the raw declared coordinate that separates co-occurring / cross-run-drifted
+    // legs. The FIRST masked span (contiguous → a view); a name with no drift token → empty.
+    while (!name.empty() && (name.front() == ' ' || name.front() == '\t'))
+        name.remove_prefix(1);
+    while (!name.empty() && (name.back() == ' ' || name.back() == '\t'))
+        name.remove_suffix(1);
+
+    std::size_t idx{0};
+    bool prev_is_word{false};
+    while (idx < name.size())
+    {
+        const char chr{name[idx]};
+        if (chr == '(') // R4 paren group → the raw tuple
+        {
+            const std::size_t close{name.find(')', idx + 1)};
+            if (close != std::string_view::npos)
+                return std::string_view{name.data() + idx, close - idx + 1};
+        }
+        if (!prev_is_word && (chr == 'v' || is_digit(chr))) // R1/R2/R3 → the raw version/digit token
+            if (const std::optional<NumericClaim> claim{claim_numeric(name, idx)}; claim)
+                return std::string_view{name.data() + idx, claim->end - idx};
+        prev_is_word = is_word(chr);
+        ++idx;
+    }
+    return {};
 }
 
 } // namespace insight

@@ -109,7 +109,10 @@ struct NgramId
 // output-affecting recognizer/canonicalization change: artifacts segmented under
 // different registries are re-segmented, never silently compared (a rule change
 // re-draws every boundary — the D-OTEL-2 "ruleset identity" discipline).
-inline constexpr std::string_view kIntentRegistryVersion{"intent-gha-1"};
+// -2 (ADR 0023): the instance-discriminant + per-level child_order (job=Unordered, step=Ordered)
+// alignment refinement — a child_order/discriminant change re-draws alignment, so it re-segments,
+// never silently re-compares (II-7).
+inline constexpr std::string_view kIntentRegistryVersion{"intent-gha-2"};
 
 // Canonicalize a marker payload (a job or step name) to its intent CLASS: mask the
 // version-bearing / matrix / shard tokens that vary across homologous runs, keep the
@@ -121,6 +124,16 @@ inline constexpr std::string_view kIntentRegistryVersion{"intent-gha-1"};
 // Deterministic, ASCII-safe, no float, no regex, no cross-line state. Cold path (few
 // markers per log) — returns an owned string.
 [[nodiscard]] std::string canonicalize_intent(std::string_view name);
+
+// The raw INSTANCE DISCRIMINANT (ADR 0023, II-9 — the third role on the identity spine): the matrix
+// tuple rendered into a job/step display name (`Test (ubuntu-latest, Node 24.x)` → `(ubuntu-latest,
+// Node 24.x)`), returned VERBATIM (a view into `name`). This is the STABLE declared parallelism
+// coordinate that separates co-occurring siblings within one identity class — kept raw (NOT masked,
+// NOT an appearance ordinal) because matrix axes are stable by declaration, so raw keys pair exactly
+// across runs. Empty when the name carries no tuple (the aligner then falls to a retry ordinal — the
+// declared-runs-on source is stripped from Sift's input stream, so it is inert here). The complement
+// of canonicalize_intent: the class MASKS the tuple to `(M)`, the discriminant KEEPS it verbatim.
+[[nodiscard]] std::string_view discriminant_of(std::string_view name) noexcept;
 
 // The intent identity: the 16-byte SHA-256 of the canonicalized name — a STRUCTURAL
 // grouping key derived from the marker, never a retained value (II-1, the O1/D-OTEL-1
@@ -944,10 +957,25 @@ enum class IntentMarkerKind : std::uint8_t
     Step      ///< a step quantum opens (`Run <name>`)
 };
 
+// How a level's sibling nodes are matched across two runs (ADR 0023 §2, a DECLARED property of the
+// dialect level — never a runtime heuristic). GHA: jobs are parallel-by-construction (Unordered →
+// set/multiset match, no REORDERED, completion-interleave invisible); steps are sequential-by-YAML
+// (Ordered → order-respecting nominal LCS, a transposition IS a signal). Rides kIntentRegistryVersion.
+enum class ChildOrder : std::uint8_t
+{
+    Ordered = 0, ///< sequential by construction (steps within a job)
+    Unordered    ///< parallel by construction (jobs / matrix legs under a parent)
+};
+
 struct IntentMarker
 {
     IntentMarkerKind kind{IntentMarkerKind::None};
     std::string_view name; ///< raw payload (empty when kind == None); canonicalize_intent → class
+    // The raw instance discriminant (ADR 0023 / II-9): the matrix tuple in the display name, kept
+    // VERBATIM (never masked) — the stable declared coordinate that separates co-occurring siblings.
+    // Empty when the name carries no tuple. `= discriminant_of(name)`.
+    std::string_view discriminant;
+    ChildOrder child_order{ChildOrder::Ordered}; ///< how THIS marker's level matches (job=Unordered)
     auto operator<=>(const IntentMarker&) const = default;
     bool operator==(const IntentMarker&) const = default;
 };
@@ -965,12 +993,18 @@ class IntentMarkerRegistry
         if (constexpr auto job{"Complete job name: "sv}; content.starts_with(job))
         {
             content.remove_prefix(job.size());
-            return {.kind = IntentMarkerKind::Job, .name = content};
+            return {.kind = IntentMarkerKind::Job,
+                    .name = content,
+                    .discriminant = discriminant_of(content),
+                    .child_order = ChildOrder::Unordered}; // jobs are parallel — set-matched
         }
         if (constexpr auto step{"Run "sv}; content.starts_with(step))
         {
             content.remove_prefix(step.size());
-            return {.kind = IntentMarkerKind::Step, .name = content};
+            return {.kind = IntentMarkerKind::Step,
+                    .name = content,
+                    .discriminant = discriminant_of(content),
+                    .child_order = ChildOrder::Ordered}; // steps are sequential — LCS-matched
         }
         return {};
     }

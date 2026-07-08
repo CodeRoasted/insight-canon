@@ -1,5 +1,5 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_intent_identity.cpp — the frozen `intent-gha-1` canonicalizer contract
+// test_intent_identity.cpp — the frozen `intent-gha-2` canonicalizer contract
 // (intent_identity_model.md §5.1; canon d2d460d). These pin the closure-as-identity
 // constructor: matrix legs / shards / version-parameterized jobs of ONE intent
 // canonicalize to ONE CLASS and pair across homologous runs (G1, studies/004),
@@ -100,7 +100,7 @@ TEST(IntentCanonicalize, WordBoundaryEdges)
     expect_canon({"  Build  ", "Build"});    // leading/trailing whitespace trimmed
 }
 
-// ── The frozen intent-gha-1 rule set, each rule on its own token ──
+// ── The frozen intent-gha-2 rule set, each rule on its own token ──
 // The identity is the WHOLE canonical string, not a per-rule fragment: distinct job names
 // never fuse just because they share a masked token position.
 TEST(IntentCanonicalize, FrozenRuleSet)
@@ -117,7 +117,7 @@ TEST(IntentCanonicalize, FrozenRuleSet)
 // never a silent edit; it must ride every intent-aligned report.
 TEST(IntentIdentity, RegistryVersionIsFrozen)
 {
-    EXPECT_EQ(kIntentRegistryVersion, "intent-gha-1");
+    EXPECT_EQ(kIntentRegistryVersion, "intent-gha-2");
 }
 
 // ── Co-location invariant (II-1) ──
