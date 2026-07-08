@@ -44,6 +44,10 @@ set(CANON_PUBLIC_MODULE_UNITS
     # re-exported by the facade (canon.cppm). A semantic package imports spi + api; consumers of
     # insight.canon never see it.
     ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.spi.cppm
+    # insight.canon.compose — static composition (ADR 0024 §3/§4): compose()/ComposedSemantics.
+    # Installed + public; re-exported by the facade so `import insight.canon;` yields it alongside
+    # Tokenizer. Imports spi (plain — the provider surface stays off the consumer default path).
+    ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.compose.cppm
     ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.cppm
 )
 set(CANON_DETAIL_MODULE_UNITS

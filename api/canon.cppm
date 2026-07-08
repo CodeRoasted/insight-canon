@@ -8,6 +8,7 @@
 export module insight.canon;
 import insight.canon.internal; // std (expected/unique_ptr/vector/span/string for the Tokenizer decl)
 export import insight.canon.api; // public surface (types, det_math, arena, ...)
+export import insight.canon.compose; // compose()/ComposedSemantics (ADR 0024 §3/§4) — Tokenizer takes it
 
 // ──────── from api/insight/tokenization/tokenizer_engine.hpp ────────
 export namespace insight::tokenization
