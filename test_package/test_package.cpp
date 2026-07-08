@@ -47,7 +47,11 @@ TEST(InsightCanonPackage, CoreIso8601ParserAcceptsUtc)
 TEST(InsightCanonPackage, TokenizesJsonLine)
 {
     insight::tokenization::ArenaAllocator arena{kArenaCapacity};
-    insight::tokenization::Tokenizer tokenizer{arena};
+    // The degenerate composition (ADR 0024 §3): core-only, zero packages — a defined, runnable state.
+    // This install smoke tokenizes universal representation formats (JSON / Syslog), which need no
+    // dialect vocabulary; test_package cannot depend on the semantic packages (they depend on canon).
+    const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};
+    insight::tokenization::Tokenizer tokenizer{arena, {}, composed};
 
     constexpr std::string_view kLine{
         R"({"ts":"2024-01-15T10:30:00Z","level":"INFO","msg":"hello"})"};
@@ -62,7 +66,11 @@ TEST(InsightCanonPackage, TokenizesJsonLine)
 TEST(InsightCanonPackage, TokenizesSyslogLine)
 {
     insight::tokenization::ArenaAllocator arena{kArenaCapacity};
-    insight::tokenization::Tokenizer tokenizer{arena};
+    // The degenerate composition (ADR 0024 §3): core-only, zero packages — a defined, runnable state.
+    // This install smoke tokenizes universal representation formats (JSON / Syslog), which need no
+    // dialect vocabulary; test_package cannot depend on the semantic packages (they depend on canon).
+    const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};
+    insight::tokenization::Tokenizer tokenizer{arena, {}, composed};
 
     constexpr std::string_view kLine{"Jan 15 08:03:22 myhost sshd[1234]: Accepted password"};
 
