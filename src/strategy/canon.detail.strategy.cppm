@@ -7,81 +7,12 @@
 export module insight.canon.detail.strategy;
 import insight.canon.internal; // std + global C types
 import insight.canon.api;      // Timestamp, LogLevel, LogFormat, ArenaAllocator
+// ParsedLine + IFormatStrategy — the provider CODE-TIER contract (ADR 0024 §2.3.1/§2.4) — moved to
+// the INSTALLED insight.canon.spi module so an external semantic package can implement a dialect
+// strategy without importing this SEALED shard. Re-exported here so the 19 core representation
+// strategies below (module members of this shard) are byte-unchanged.
+export import insight.canon.spi;
 
-// ──────── from src/insight/tokenization/parsed_line.hpp ────────
-export namespace insight::tokenization
-{
-
-// Intermediate representation produced by a format strategy.
-//
-// All string_view fields point into arena-managed storage. They remain
-// valid until the owning ArenaAllocator is reset or destroyed.
-//
-// raw_line   — the original line, copied into the arena by LogParser before
-//              the strategy is invoked.
-// component  — component / tag extracted by the strategy and stored into the
-//              arena via ArenaAllocator::store_string().
-// content    — message body fed to the masker, also arena-stored.
-struct ParsedLine
-{
-    std::string_view raw_line;
-    std::optional<Timestamp> timestamp;
-    LogLevel level{LogLevel::Unknown};
-    std::string_view component; // F3b: the low-card functional source (subsystem/daemon/job)
-    std::string_view host;      // F3b: the high-card node/host identity (hors-cube)
-    std::string_view content;
-    // Echoed-source provenance (D-PROV-1): true when the RAW line was a CI command-echo of
-    // run-step SCRIPT source (the GHA `\x1b[36;1m … \x1b[0m` command-echo wrapper), NOT an
-    // observed runtime event. Captured at the ANSI-strip layer (the only code that sees the
-    // wrapper — log_parser.cpp, before any strategy/classifier; the wrapper dies at strip).
-    // A per-line classification attribute, NOT part of template identity: the parser uses it
-    // to demote `level` to Unknown so a failure WORD in echoed shell source ("echo
-    // \"Download failed …\"") never confers an alerting level. `false` for every non-echoed line.
-    bool echoed_source{false};
-    // OTEL trace context (D-OTEL-1), populated by a strategy that recognizes OTEL log records
-    // (today: JsonStrategy on OTLP/JSON). Consumed downstream (O2 grouping; O3 DAG), never
-    // serialized; `present == false` for every non-OTEL input.
-    OtelTraceContext trace{};
-    // Declared ordinal observations (W1, D-W1-3), populated by a strategy that recognizes declared
-    // structured numeric fields (today: JsonStrategy via kOrdinalFieldCatalog). A span over
-    // arena-stable storage; empty for every non-ordinal line. Consumed metalog-side (W1 binning),
-    // never tokenized into the template.
-    std::span<const OrdinalObservation> ordinals{};
-};
-
-} // namespace insight::tokenization
-// ──────── from src/insight/tokenization/format_strategy.hpp ────────
-export namespace insight::tokenization
-{
-
-class IFormatStrategy
-{
-  public:
-    IFormatStrategy() = default;
-    IFormatStrategy(const IFormatStrategy&) = delete;
-    IFormatStrategy& operator=(const IFormatStrategy&) = delete;
-    IFormatStrategy(IFormatStrategy&&) = delete;
-    IFormatStrategy& operator=(IFormatStrategy&&) = delete;
-    virtual ~IFormatStrategy() = default;
-
-    // Parse a single log line.
-    //
-    // The input string_view must remain valid for the duration of the call
-    // (raw_line in the result borrows from it). Owned scalar fields
-    // (component, content) are copied into the supplied arena via
-    // ArenaAllocator::store_string(); their string_views remain valid until
-    // the arena is reset or destroyed.
-    [[nodiscard]] virtual std::expected<ParsedLine, std::string>
-    parse(std::string_view line, ArenaAllocator& arena) const = 0;
-
-    [[nodiscard]] virtual LogFormat format() const noexcept = 0;
-
-    // Returns a [0,1] confidence score that this strategy matches the line.
-    // Used by FormatDetector for majority-vote detection.  Must be O(1).
-    [[nodiscard]] virtual double confidence(std::string_view line) const noexcept = 0;
-};
-
-} // namespace insight::tokenization
 // ──────── from src/insight/tokenization/strategies/android_logcat.hpp ────────
 export namespace insight::tokenization
 {

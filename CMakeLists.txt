@@ -40,6 +40,10 @@ find_package(picosha2 REQUIRED CONFIG)
 set(CANON_PUBLIC_MODULE_UNITS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/canon.internal.cppm
     ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.api.cppm
+    # insight.canon.spi — the provider contract (ADR 0024 §2.4): installed + public, but NOT
+    # re-exported by the facade (canon.cppm). A semantic package imports spi + api; consumers of
+    # insight.canon never see it.
+    ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.spi.cppm
     ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.cppm
 )
 set(CANON_DETAIL_MODULE_UNITS
