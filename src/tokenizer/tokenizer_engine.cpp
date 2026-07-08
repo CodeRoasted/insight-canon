@@ -79,11 +79,14 @@ struct Tokenizer::Impl
         event.params = match.params;
         event.structural_role = insight::tokenization::classify(
             parsed_line.content, event.format, composed); // announced structural role (composed rows)
-        // Identity-derived WHERE (intent_identity_model.md §5.3, II-8): populate the empty GHA
-        // WHERE axis with the recognized test-file, gated by config so every other path is
-        // byte-identical. GHA carries no native component, so this fakes no native field.
-        if (config.recognize_test_where && event.format == LogFormat::GitHubActions &&
-            event.component.empty())
+        // Identity-derived WHERE (intent_identity_model.md §5.3, II-8): populate an EMPTY component
+        // WHERE axis with the recognized test-file. Semantic-unaware (SP-1): no dialect literal — a
+        // format whose lines carry a native component already skips via component.empty(); a format
+        // without one (GHA today, any future dialect tomorrow) gets the identity-derived WHERE, and
+        // recognize_location returns empty on non-test content so nothing is faked. Config-gated and
+        // default-OFF, so every G-SP-1 default path is byte-identical (the flag is the aligned
+        // pipeline's, feeding the where_set_shift coverage verdict — §5.4).
+        if (config.recognize_test_where && event.component.empty())
             event.component = insight::recognize_location(parsed_line.content, composed);
         event.trace = parsed_line.trace; // OTEL trace context (D-OTEL-1): consumed by O2/O3,
                                          // never serialized; default-empty for non-OTEL inputs
