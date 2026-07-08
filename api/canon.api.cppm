@@ -101,18 +101,14 @@ struct NgramId
 [[nodiscard]] NgramId ngram_id_of(const std::vector<TemplateId>& sequence) noexcept;
 
 // ── Intent identity (intent_identity_model.md §5/§5.1, II-1/II-6/II-7) ──
-// The intent REGISTRY version — the II-7 comparability identity that rides every
-// intent-aligned report. It names the recognizer + identity-canonicalization rule
-// generation (the GitHub-Actions dialect lexicon: `intent-<dialect>-<generation>`),
-// DECOUPLED from kCanonicalizationVersion because it governs a DIFFERENT rule set
-// (identifiers, not line values — see intent_identity.cpp). Bump the suffix on any
-// output-affecting recognizer/canonicalization change: artifacts segmented under
-// different registries are re-segmented, never silently compared (a rule change
-// re-draws every boundary — the D-OTEL-2 "ruleset identity" discipline).
-// -2 (ADR 0023): the instance-discriminant + per-level child_order (job=Unordered, step=Ordered)
-// alignment refinement — a child_order/discriminant change re-draws alignment, so it re-segments,
-// never silently re-compares (II-7).
-inline constexpr std::string_view kIntentRegistryVersion{"intent-gha-2"};
+// kIntentRegistryVersion RETIRED (ADR 0024 §4.1): it was a dead constant (zero downstream readers),
+// and its job — the II-7 comparability identity of the recognizer/marker rule set — is now discharged
+// by the composed `semantic_identity` (insight::semantic::ComposedSemantics), a CONTENT hash over the
+// actual marker/role/level rows the packages ship (content, not a hand-bumped label). A rule change is
+// a package version bump → a new semantic_identity → re-segment-or-refuse, wired for real on the
+// MetaLogDocument RulesetIdentity block. The intent-canonicalization ALGORITHM stays below
+// (canonicalize_intent / discriminant_of); kCanonicalizationVersion (the core masking generation)
+// remains and enters the composed hash as a component.
 
 // Canonicalize a marker payload (a job or step name) to its intent CLASS: mask the
 // version-bearing / matrix / shard tokens that vary across homologous runs, keep the
@@ -931,7 +927,8 @@ enum class IntentMarkerKind : std::uint8_t
 // How a level's sibling nodes are matched across two runs (ADR 0023 §2, a DECLARED property of the
 // dialect level — never a runtime heuristic). GHA: jobs are parallel-by-construction (Unordered →
 // set/multiset match, no REORDERED, completion-interleave invisible); steps are sequential-by-YAML
-// (Ordered → order-respecting nominal LCS, a transposition IS a signal). Rides kIntentRegistryVersion.
+// (Ordered → order-respecting nominal LCS, a transposition IS a signal). child_order is package DATA
+// (an IntentMarkerRow field) → it enters the composed semantic_identity (ADR 0024).
 enum class ChildOrder : std::uint8_t
 {
     Ordered = 0, ///< sequential by construction (steps within a job)

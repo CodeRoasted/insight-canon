@@ -16,8 +16,9 @@ import insight.canon.internal;
 // raw tuple/version so the aligner pairs the right legs and surfaces cross-run drift (v6→v7) as a
 // REPLACED, not a masked-away 0-row or a raw-key storm (ADR 0023 §3).
 //
-// The frozen rule set (kIntentRegistryVersion "intent-gha-2", the GitHub-Actions dialect tier of
-// the §5.2 registry). Applied left-to-right in ONE pass, at word boundaries (\w = [A-Za-z0-9_]),
+// The frozen canonicalization rule set (the intent-canonicalization ALGORITHM — canon-owned; the
+// dialect marker VOCABULARY it applies to lives in the semantic packages, hashed into
+// semantic_identity — ADR 0024). Applied left-to-right in ONE pass, at word boundaries (\w = [A-Za-z0-9_]),
 // each rule masking the maximal token it claims:
 //   R1 dotted-version   v?\d+(\.\d+)+   → vX   (`1.2.3`, `v1.2.3`)   — before R3 so it is not fragmented
 //   R2 v-version         v\d+           → vX   (`v6`, `v7`)
