@@ -20,7 +20,8 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# CANON_ROOT defaults to the parent (canon repo root); the driver may override it.
+# CANON_ROOT defaults to the parent (the canon REPO root — proof/ is a repo-level harness spanning
+# the core + semantic packages, which live at core/ and semantic/ under it); the driver may override.
 if(NOT DEFINED CANON_ROOT)
     get_filename_component(CANON_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
 endif()
@@ -33,8 +34,8 @@ if(DEFINED CELL_FLAGS)
     add_compile_options(${_cell_flags})
 endif()
 
-# Build canon as a module static-lib (tests/benchmarks default OFF — not top-level here).
-add_subdirectory(${CANON_ROOT} canon_build)
+# Build canon as a module static-lib (tests default OFF — not top-level here).
+add_subdirectory(${CANON_ROOT}/core canon_build)
 # The two semantic packages (ADR 0024) — added AFTER canon so their `if(NOT TARGET insight::canon)`
 # guards see the in-tree target (no find_package). det_proof composes their manifests, so the proof
 # exercises the composed pipeline (the byte-identity G-SP-1 gate).

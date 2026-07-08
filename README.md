@@ -61,8 +61,9 @@ For local CodeRoast workspace iteration, use the parent `malf` helper from the
 repo root:
 
 ```bash
-malf build .
-malf test .
+malf build     # every package under the repo root, dependency-ordered (core -> semantic/* -> bench)
+malf test      # same incremental build, then ctest per package
+malf test core # just the core package
 ```
 
 ## Conan workflow
@@ -143,36 +144,38 @@ insight-canon is the upstream tokenization layer of the [MetaLog](https://github
 
 ## Project layout
 
+Multi-package Conan repo (ADR 0024): the root is the shelf; the tree reads like the
+architecture — `core/` is the **language**, `semantic/*` are the **vocabularies**.
+
 ```
 insight-canon/
-├── api/                    PUBLIC (installed) module interface units
-│   └── insight/
-│       ├── canon.internal.cppm   insight.canon.internal — std manifest
-│       ├── canon.api.cppm        insight.canon.api — the contract (types, det_math,
-│       │                         CanonicalEvent, MaskConfig, arena, utils, logging accessors)
-│       ├── canon.cppm            insight.canon — the facade (Tokenizer)
-│       └── utils/log_macros.hpp  textual INSIGHT_LOG_* macro layer (installed header)
-├── src/                    SEALED detail shards (build-only, never installed) + impl units
-│   └── insight/
-│       ├── scan/           insight.canon.detail.scan — fast_gates predicates + SSE2 sv_* scans
-│       ├── strategy/       insight.canon.detail.strategy — IFormatStrategy + 20 format strategies
-│       ├── mask/           insight.canon.detail.mask — the stateless per-line template masker
-│       ├── parse/          insight.canon.detail.parse — FormatDetector + LogParser
-│       ├── tokenizer/      tokenizer_engine.cpp — facade impl unit (the Tokenizer seam)
-│       ├── arena/          arena_allocator.cpp — api impl unit
-│       └── utils/          logger / time_utils / failure_lexicon — api impl units
-├── test_package/           Conan consumer smoke test (zero-init, import insight.canon only)
-├── tests/                  Per-domain mirror of src/ + the insight.canon.test aggregate module
-│   ├── canon.test.cppm     insight.canon.test — re-exports facade + all detail shards
-│   ├── <domain>/           math/ arena/ utils/ mask/ strategy/ parse/ tokenizer/ — GTest suites
-│   └── regression/         Loghub-dataset regression tests
-├── benchmarks/             Benchmarks + the insight.canon.bench aggregate module
-├── proof/                  Public determinism proof gate (Approach B)
-├── scripts/
-│   └── download_logs.sh    Download Loghub 2k + Zenodo datasets for regression
-├── CMakeLists.txt          Single root CMake file
-├── conanfile.py            Single Conan recipe
-└── .github/workflows/      ci.yml  release-publish.yml  workflow-lint.yml
+├── core/                   insight_canon — the semantic-unaware core (Conan recipe + CMake)
+│   ├── api/                PUBLIC (installed) module interface units
+│   │   ├── canon.api.cppm        insight.canon.api — the contract (types, det_math,
+│   │   │                         CanonicalEvent, MaskConfig, arena, utils, logging accessors)
+│   │   ├── canon.spi.cppm        insight.canon.spi — the semantic-package provider contract
+│   │   ├── canon.compose.cppm    insight.canon.compose — compose()/ComposedSemantics
+│   │   ├── canon.cppm            insight.canon — the facade (Tokenizer; re-exports api + compose)
+│   │   └── utils/log_macros.hpp  textual INSIGHT_LOG_* macro layer (installed header)
+│   ├── src/                SEALED detail shards (build-only, never installed) + impl units
+│   │   ├── scan/           insight.canon.detail.scan — fast_gates predicates + SSE2 sv_* scans
+│   │   ├── strategy/       insight.canon.detail.strategy — IFormatStrategy + the format strategies
+│   │   ├── mask/           insight.canon.detail.mask — the stateless per-line template masker
+│   │   ├── parse/          insight.canon.detail.parse — FormatDetector + LogParser
+│   │   ├── compose/        composition walkers (role/marker/location over composed rule rows)
+│   │   ├── conformance/    insight.canon.conformance — the package conformance kit
+│   │   └── ...             tokenizer/ arena/ identity/ utils/ impl units
+│   ├── tests/              Per-domain mirror of src/ + the insight.canon.test aggregate module
+│   ├── data/corpora/       Tracked corpus registry + smoke slices (ADR 0016)
+│   └── test_package/       Conan consumer smoke test (zero-init, import insight.canon only)
+├── semantic/               The vocabulary packages (statically composed, Apache-2.0)
+│   ├── github/             insight_semantic_github — GitHub Actions / Azure dialect (rows + strategy)
+│   └── test_frameworks/    insight_semantic_test_frameworks — test-file location families
+├── bench/                  insight_canon_bench — the composed perf harness (SP-5 gate)
+├── proof/                  Public determinism proof gate (composes core + both packages)
+├── scripts/                det_public_proof.sh · sp1_semantic_unawareness_lint.sh · download_logs.sh
+├── packages.yml            The package manifest (paths, versions, public/release flags)
+└── .github/workflows/      ci.yml · lint.yml · golden.yaml · release.yaml
 ```
 
 Module layering (the §11.9.11 pattern): `internal ◀ api ◀ detail.{scan ◀ strategy ◀ parse, mask} ◀
@@ -277,8 +280,8 @@ INSIGHT_TOKENIZER_REGRESSION_MIN_SUCCESS_RATE=0.90 ctest --output-on-failure -R 
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `ci.yml` | PR touching `api/`, `src/`, `tests/`, `CMakeLists.txt`, or `conanfile.py` | `conan create` — builds the library, runs unit + regression tests, runs the test_package smoke test |
-| `release-publish.yml` | Push of a `vX.Y.Z` tag (or manual dispatch) | Verifies recipe version matches tag, builds, exports a `conan cache save` tarball, attaches it to the GitHub Release |
+| `ci.yml` | PRs to main | Dependency-ordered `conan create` of all four packages (core → semantic/* → bench) + tests + the test_package smoke test |
+| `release.yaml` | Push of a `vX.Y.Z` tag (or manual dispatch) | Lint → CI → 5-leg determinism golden gate → measures the composed benchmark → verifies recipe versions, exports `conan cache save` tarballs, attaches them + the golden to the GitHub Release |
 | `workflow-lint.yml` | PR touching `.github/workflows/**` | Runs actionlint on all workflow files |
 
 ---

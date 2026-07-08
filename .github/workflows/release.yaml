@@ -45,10 +45,14 @@ jobs:
       # populates the cache before each semantic package's create resolves `insight_canon/1.7.5`.
       # The release action verifies each recipe's version == tag and saves a per-package cache tarball.
       packages: |
-        insight_canon:.
+        insight_canon:core
         insight_semantic_github:semantic/github
         insight_semantic_test_frameworks:semantic/test_frameworks
+      # The composed bench harness (bench/ — insight_canon_bench, release:false) is BUILT + RUN by
+      # measure-benchmark but never published; its first-party deps resolve as workspace editables
+      # from this same tag checkout (measure-benchmark runs `malf bench bench`).
       benchmark: 'insight_canon_bench=insight-canon'
+      benchmark-subdir: bench
     secrets: inherit
 
   # Attach the validated golden (produced by the golden gate) to the Release — per-release, not committed.

@@ -13,21 +13,27 @@
 # leaked back into the core mechanism as a BEHAVIORAL string literal.
 #
 # ── Scope ──────────────────────────────────────────────────────────────────────
-# Core only: src/ + api/ (the mechanism + its public/provider surface). Excluded:
+# Core only: core/src + core/api (the mechanism + its public/provider surface). Excluded:
 #   * semantic/          — the packages; they OWN the vocabulary (that is the point)
-#   * tests/ proof/ benchmarks/ conformance harnesses' test bodies — not the mechanism
+#   * bench/ proof/      — composition consumers BY DESIGN (they name package manifests)
+#   * core/tests/        — test bodies exercise universal mechanisms with ecosystem-shaped
+#                          inputs (incl. absence assertions) — not the mechanism
 #   * build*/            — generated
 #
 # ── What is a violation vs what is allowed ─────────────────────────────────────
-# We scan COMMENT-STRIPPED code. Comments legitimately NAME the literals to document
-# the grammar (e.g. spi.cppm: "`##[group]` → GroupBegin") — that is the contract's
-# documentation, not knowledge fused into the mechanism, so it is NOT a violation.
+# We scan COMMENT-STRIPPED code, STRING-LITERALS PRESERVED: a deny literal inside a
+# string is behavioral (a matcher fused into the mechanism) even when it hides behind
+# a `//` sequence inside that string ("http://…::group::…"); a deny literal in a
+# comment legitimately documents the grammar (spi.cppm: "`##[group]` → GroupBegin").
 # The `LogFormat` enum (incl. its `to_string` render "GitHubActions") is the closed,
-# wire-stable identifier registry that §1.3 KEEPS in core — so format NAMES are NOT
-# on the deny-list; only behavioral markers/suffixes/dialect identifiers are.
+# wire-stable identifier registry that §1.3 KEEPS in core — the bare-word patterns
+# below are boundary-anchored so "GitHubActions" (no word boundary after "github")
+# never matches; only standalone dialect identifiers do.
 #
 # A hit in comment-stripped code = an ecosystem literal fused into the mechanism =
 # an SP-1 regression = FAIL. Verbose on failure (file:line of every hit).
+# NON-VACUITY: scanning zero files is a FAIL (a moved/renamed scan root must never
+# turn this gate silently green).
 ###############################################################################
 set -euo pipefail
 
@@ -35,39 +41,65 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CANON="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$CANON"
 
-# Core scan roots (the mechanism + its contract surface). semantic/ is deliberately absent.
-SCAN_ROOTS=(src api)
+# Core scan roots (the mechanism + its contract surface). semantic/, bench/, proof/ deliberately absent.
+SCAN_ROOTS=(core/src core/api)
 
 # The deny-list: BEHAVIORAL ecosystem literals as they appear in CODE. Deliberately NOT the
 # LogFormat enum names (GitHubActions/…) — those are the closed identifier registry §1.3 keeps core.
 #   - GHA workflow-command markers (`##[error]`, `::group::`, `::set-output`, …)
-#   - GHA intent-marker prefixes (`Complete job name: ` → Job)
-#   - test-framework file-naming suffixes (jest/vitest/playwright `.test.`/`.spec.`; pytest `test_*.py`;
-#     go/ruby `_test.go`/`_spec.rb`) — the naming vocabulary, package data
-#   - dialect identifiers that named the migrated code (the GHA strategy TU, framework tokens)
+#   - GHA intent-marker prefixes (`"Complete job name: "`, the exact `"Run "` step-marker literal)
+#   - the GHA discriminant source (`Requested labels`) + capture-section marker (`SIFT_CAPTURE`)
+#   - the echoed-source SGR params (`36;1`/`1;36`) — the GHA runner's command-echo styling
+#   - test-framework file-naming vocabulary (jest/vitest/playwright `.test.`/`.spec.`; the exact
+#     pytest `"test_"` prefix literal; go/ruby `_test.go`/`_spec.rb`; cypress `.cy.`)
+#   - dialect/framework identifiers in code (`github_actions`, bare `github`/`gha`, jest/mocha/
+#     pytest/vitest/playwright/jenkins, the retired `intent-gha` registry tag)
 DENY=(
   '##\['                                              # GHA workflow-command bracket
   '::(group|endgroup|error|warning|notice|debug|set-output|save-state|add-mask|echo|add-matcher)::'
   'Complete job name'                                 # GHA Job intent marker
+  '"Run "'                                            # GHA Step intent marker (exact code literal)
+  'Requested labels'                                  # GHA declared runs-on discriminant source
+  'SIFT_CAPTURE'                                      # sift-action capture-section marker
+  '36;1|1;36'                                         # GHA echoed-source SGR params
   '_test\.(go|py|rb)'                                 # go/pytest/ruby suffix set
   '_spec\.rb'                                         # ruby spec suffix
+  '"test_"'                                           # pytest basename prefix (exact code literal)
   '\.(test|spec)\.(ts|tsx|js|jsx|mjs|cjs)'            # jest/vitest/playwright spec-extension family
   '\.cy\.'                                            # cypress
   'github_actions'                                    # the migrated GHA strategy TU identifier
-  '\b(pytest|vitest|playwright|jenkins)\b'            # framework/dialect identifiers in code
+  'intent-gha'                                        # the retired dialect registry tag
+  '\b(github|gha)\b'                                  # bare dialect identifiers ("GitHubActions" has no \b after "github")
+  '\b(jest|mocha|pytest|vitest|playwright|jenkins)\b' # framework/dialect identifiers in code
 )
 
 # Build one alternation.
 PATTERN="$(IFS='|'; echo "${DENY[*]}")"
 
-# Comment-stripping: remove /* … */ (incl. multi-line) then // … to EOL, per file, before matching.
-# rg reports the ORIGINAL line number via a stripped mirror kept line-aligned (block comments become
-# blank lines, preserving numbering).
-strip_comments() { perl -0777 -pe 's{/\*.*?\*/}{ $& =~ tr/\n//cdr }ges; s{//[^\n]*}{}g' "$1"; }
+# Comment-stripping, STRING-AWARE: string/char literals are matched FIRST and kept verbatim
+# (a deny literal inside a string must stay scannable — the old `s{//…}{}` dropped everything
+# after a `//` inside a string, a false-negative vector); block comments become newline-preserving
+# blanks (line numbers stay aligned); line comments drop. Earliest-match-wins alternation gives
+# correct precedence (a quote inside a comment never opens a string, because the comment matched
+# first). Known conservative edge: C++ raw strings R"x(…)x" with embedded quotes are parsed as
+# plain strings — content stays scannable, which errs toward detection, never suppression.
+strip_comments() {
+  perl -0777 -pe '
+    s{
+        ( " (?: \\. | [^"\\] )* " )
+      | ( '\'' (?: \\. | [^'\''\\] )* '\'' )
+      | ( /\* .*? \*/ )
+      | ( //[^\n]* )
+    }{
+      defined $1 ? $1 : defined $2 ? $2 : defined $3 ? ($3 =~ tr/\n//cdr) : ""
+    }gesx' "$1"
+}
 
 violations=0
+scanned=0
 report=""
 while IFS= read -r -d '' f; do
+  scanned=$((scanned + 1))
   # Match comment-stripped content, but recover the real line numbers by grepping the stripped text.
   hits="$(strip_comments "$f" | grep -nEi "$PATTERN" || true)"
   if [ -n "$hits" ]; then
@@ -79,15 +111,21 @@ while IFS= read -r -d '' f; do
 done < <(
   for root in "${SCAN_ROOTS[@]}"; do
     [ -d "$root" ] || continue
-    find "$root" -type f \( -name '*.cpp' -o -name '*.cppm' -o -name '*.hpp' -o -name '*.h' \) \
+    find "$root" -type f \( -name '*.cpp' -o -name '*.cppm' -o -name '*.hpp' -o -name '*.h' -o -name '*.cc' \) \
       -not -path '*/build*/*' -print0
   done
 )
 
-echo "SP-1 semantic-unawareness lint — scanned: ${SCAN_ROOTS[*]} (core mechanism + contract surface)"
+echo "SP-1 semantic-unawareness lint — scanned: ${scanned} files under ${SCAN_ROOTS[*]} (core mechanism + contract surface)"
 echo "deny-list (behavioral ecosystem literals; LogFormat enum names deliberately excluded):"
 printf '    %s\n' "${DENY[@]}"
 echo
+
+if [ "$scanned" -eq 0 ]; then
+  echo "::error::SP-1 lint scanned ZERO files — the scan roots (${SCAN_ROOTS[*]}) are missing or empty."
+  echo "A relocated core must update SCAN_ROOTS; a vacuous scan is a silent green, so this FAILS."
+  exit 2
+fi
 
 if [ "$violations" -ne 0 ]; then
   echo "::error::SP-1 VIOLATION — ${violations} ecosystem literal(s) fused into canon CORE (must live in a semantic package):"

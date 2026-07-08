@@ -98,7 +98,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.CONAN_HOME }}
-          key: conan-golden-${{ matrix.arch }}-${{ matrix.leg }}-${{ runner.os }}-${{ hashFiles('conanfile.py') }}
+          key: conan-golden-${{ matrix.arch }}-${{ matrix.leg }}-${{ runner.os }}-${{ hashFiles('core/conanfile.py') }}
           restore-keys: |
             conan-golden-${{ matrix.arch }}-${{ matrix.leg }}-${{ runner.os }}-
 
@@ -185,7 +185,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
           $proofBuild = "build-msvc-proof"
-          conan install . `
+          conan install core `
             --profile:host="$env:CONAN_HOME/profiles/windows-msvc-release" `
             --profile:build="$env:CONAN_HOME/profiles/windows-msvc-release" `
             --build=missing -of $proofBuild

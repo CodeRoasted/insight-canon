@@ -14,7 +14,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(INSIGHT_CANON_BUILD_TESTS  "Build unit and regression tests" ${PROJECT_IS_TOP_LEVEL})
-option(INSIGHT_CANON_BUILD_BENCHMARKS "Build micro-benchmarks" ${PROJECT_IS_TOP_LEVEL})
 # OFF by default: libnuma is LGPL-2.1, so NUMA is opt-in (conanfile.py drives this
 # from the `with_numa` option — default False — and a raw cmake build stays safe).
 option(INSIGHT_CANON_ENABLE_NUMA  "Enable NUMA-aware arena allocation (libnuma, LGPL-2.1, vendored via conan)" OFF)
@@ -231,42 +230,7 @@ if(INSIGHT_CANON_BUILD_TESTS)
     endif()
 endif()
 
-###########################################################
-#  Benchmarks
-###########################################################
-if(INSIGHT_CANON_BUILD_BENCHMARKS)
-    file(GLOB_RECURSE BENCH_SOURCES CONFIGURE_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/*.cpp"
-    )
-    if(BENCH_SOURCES)
-        find_package(benchmark REQUIRED CONFIG)
-        # §11.9.7/§11.9.11: like the white-box tests, benchmarks are MODULE MEMBERS, not consumers —
-        # the bench target RECOMPILES the whole module (interface + detail shards + impl .cpp) + the
-        # bench TUs, so a bench may import the sealed insight.canon.detail.* shards (via the
-        # insight.canon.bench aggregate) WITHOUT the lib exporting them. Deliberately does NOT link
-        # insight_canon (the module is rebuilt here); pulls the lib's deps directly. NUMA mirrors
-        # the lib's configuration so the benched arena is the shipped arena.
-        add_executable(insight_canon_bench ${BENCH_SOURCES} ${CANON_IMPL_SOURCES})
-        target_sources(insight_canon_bench
-            PRIVATE
-                FILE_SET cxx_modules TYPE CXX_MODULES
-                BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/api ${CMAKE_CURRENT_SOURCE_DIR}/src
-                         ${CMAKE_CURRENT_SOURCE_DIR}/benchmarks
-                FILES    ${CANON_PUBLIC_MODULE_UNITS} ${CANON_DETAIL_MODULE_UNITS}
-                         benchmarks/canon.bench.cppm)
-        target_link_libraries(insight_canon_bench PRIVATE
-            fmt::fmt spdlog::spdlog simdjson::simdjson picosha2::picosha2 benchmark::benchmark)
-        if(INSIGHT_CANON_ENABLE_NUMA AND libnuma_FOUND)
-            target_compile_definitions(insight_canon_bench PRIVATE INSIGHT_HAS_NUMA)
-            target_link_libraries(insight_canon_bench PRIVATE libnuma::libnuma)
-        endif()
-        target_include_directories(insight_canon_bench PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/api ${CMAKE_CURRENT_SOURCE_DIR}/src)
-        target_compile_features(insight_canon_bench PRIVATE cxx_std_23)
-        set_target_properties(insight_canon_bench PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
-        target_compile_definitions(insight_canon_bench PRIVATE
-            $<IF:$<CONFIG:Debug>,SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE,SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO>)
-        target_compile_options(insight_canon_bench PRIVATE
-            $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-ffp-contract=off>)
-    endif()
-endif()
+# Benchmarks moved to the sibling `bench/` leaf package (insight_canon_bench, ADR 0024 / SP-5):
+# the composed perf gate links the semantic packages, which the core build must never do (SP-1/R1
+# dependency arrow). The bench consumes canon externally (the det_proof shape), so the white-box
+# insight.canon.bench aggregate is retired with it.

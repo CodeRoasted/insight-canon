@@ -1,8 +1,15 @@
 // NOLINTBEGIN
-// Tokenization throughput benchmark.
+// Tokenization throughput benchmark — two arms (ADR 0024 / SP-5).
 //
 // Measures end-to-end Tokenizer::process_line() cost — stateless per-line template
 // masking plus arena-backed CanonicalEvent emission — on a synthetic Zipf-ish corpus.
+//
+//   * BM_TokenizationThroughput            — the COMPOSED set (github + test_frameworks):
+//     the gate metric. This is the shape every product binary runs.
+//   * BM_TokenizationThroughputDegenerate  — compose({}): the format-partition control.
+//     The corpus carries no CI-dialect content, so the composed-vs-degenerate delta on it
+//     IS the SP-5 claim ("recognition cost independent of package count for non-matching
+//     lines"), measured directly. Expected delta: noise.
 //
 // Reported metrics:
 //   * `items_per_second`  — log lines tokenized per wall second
@@ -10,12 +17,21 @@
 //
 // Architectural target (technical_docs/overview/architecture.md):
 //   Steady-state per-line cost ≤ 1 µs at 32 templates.
-//
-// Modeled after insight-metalog/benchmarks/bench_metalog.cpp (Phase 3 anchor).
 
 #include <benchmark/benchmark.h>
 
-import insight.canon.bench;
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <random>
+#include <string>
+#include <vector>
+
+// External module consumption (the det_proof shape): the measured object is the shipped
+// library build, not a module-member rebuild.
+import insight.canon;
+import insight.semantic.github;
+import insight.semantic.test_frameworks;
 
 namespace
 {
@@ -74,7 +90,8 @@ SyntheticCorpus make_corpus(std::size_t n_templates, std::size_t n_lines, std::u
     return corpus;
 }
 
-void BM_TokenizationThroughput(benchmark::State& state)
+// Shared body: both arms run the identical corpus/loop; only the composition differs.
+void run_throughput(benchmark::State& state, const insight::semantic::ComposedSemantics& composed)
 {
     const auto n_templates{static_cast<std::size_t>(state.range(0))};
     constexpr std::size_t kLinesPerIter{1'000};
@@ -82,12 +99,6 @@ void BM_TokenizationThroughput(benchmark::State& state)
     const auto corpus{make_corpus(n_templates, kLinesPerIter, 42)};
 
     tok::ArenaAllocator arena{1U << 20U};
-    // ADR 0024: the Tokenizer takes a ComposedSemantics. This bench measures the core tokenization hot
-    // path over a SYNTHETIC corpus (no CI-dialect content), so a degenerate composition is representative
-    // — dialect rows are format-partitioned and never probed on non-matching lines. NOTE (Heph/Argos perf
-    // gate): the §6 SP-5 gate wants composed(github+test_frameworks) vs the pre-split baseline; that needs
-    // the bench target to link the packages (as proof/ does) — a perf-gate wiring decision, flagged.
-    const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};
     tok::Tokenizer tokenizer{arena, tok::MaskConfig{}, composed};
 
     // Warm up so the steady-state path dominates.
@@ -116,7 +127,26 @@ void BM_TokenizationThroughput(benchmark::State& state)
         benchmark::Counter::kIsIterationInvariantRate | benchmark::Counter::kInvert);
 }
 
+// The gate arm — the product composition (the det_proof set, built once, loop-invariant).
+void BM_TokenizationThroughput(benchmark::State& state)
+{
+    static const std::array<insight::semantic::SemanticPackageManifest, 2> kManifests{
+        insight::semantic::github::kManifest, insight::semantic::test_frameworks::kManifest};
+    static const insight::semantic::ComposedSemantics composed{
+        insight::semantic::compose(kManifests)};
+    run_throughput(state, composed);
+}
+
+// The control arm — core-only. Delta vs the gate arm on this non-dialect corpus = the
+// SP-5 composition overhead (expected: noise; dialect rows are format-partitioned).
+void BM_TokenizationThroughputDegenerate(benchmark::State& state)
+{
+    static const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};
+    run_throughput(state, composed);
+}
+
 BENCHMARK(BM_TokenizationThroughput)->Arg(4)->Arg(8)->Unit(benchmark::kMicrosecond);
+BENCHMARK(BM_TokenizationThroughputDegenerate)->Arg(4)->Arg(8)->Unit(benchmark::kMicrosecond);
 
 } // namespace
 // NOLINTEND

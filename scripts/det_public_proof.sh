@@ -107,8 +107,9 @@ for leg in "${LEGS[@]}"; do
   [ -f "$CONAN_HOME/profiles/$profile" ] || { echo "skip $cxx ($profile not in $CONAN_HOME/profiles)" >&2; continue; }
 
   # One conan install per leg → toolchain + dep configs for building canon from source.
+  # $CANON = the repo root; the core recipe lives at core/ (the multi-package layout).
   legdir="$WORK/conan-${cxx//+/p}"
-  if ! conan install "$CANON" --profile:host="$profile" --profile:build="$profile" \
+  if ! conan install "$CANON/core" --profile:host="$profile" --profile:build="$profile" \
         --build=missing -of "$legdir" >"$legdir.install.log" 2>&1; then
     echo "CONAN INSTALL FAIL: $cxx ($profile)" >&2; tail -4 "$legdir.install.log" | sed 's/^/   /' >&2; continue
   fi
