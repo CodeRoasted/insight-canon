@@ -90,6 +90,12 @@ class ComposedSemantics
     [[nodiscard]] std::span<const IntentMarkerRow> markers() const noexcept { return markers_; }
     [[nodiscard]] std::span<const LevelLiftRow> level_lifts() const noexcept { return level_lifts_; }
     [[nodiscard]] std::span<const LocationRow> locations() const noexcept { return locations_; }
+    // The christened ValueClassRegistry (ADR 0024 §5): the composed view over the package
+    // ValueClassRow seat. In 1.7.5 no package ships a value class (we do not build dormant vocabulary),
+    // so this is empty — the UNIVERSAL value concepts (kOrdinalFieldCatalog / kOtelFieldCatalog / the
+    // KEEP lexicons) stay core (the ratified rule), consumed directly. The registry is the point where
+    // a future package's client-ordinal / domain value classes compose in — the grammar seat exists,
+    // its unification with the core catalogs waits for a real consumer.
     [[nodiscard]] std::span<const ValueClassRow> value_classes() const noexcept { return value_classes_; }
 
     // ── The code-tier seams ──

@@ -210,9 +210,11 @@ struct OtelTraceContext
 
 // ── Declared OTEL field-map catalog (D-OTEL-4a) ──
 // The four schema-declared OTLP fields canon recognizes, as a structured (class → recognizer
-// key) catalog so the future SemanticClassRegistry ABSORBS it rather than a parallel
-// hardcoded path (D-OTEL-4) — the D-TID-6 "now" tier (a declared contract with hardcoded
-// strategies, like the JsonStrategy key lists), NOT the deferred registry. OTEL fields are
+// key) catalog — the christened ValueClassRegistry (ADR 0024 §5) is the composed view over THIS
+// catalog + kOrdinalFieldCatalog + the KEEP lexicons + the package ValueClassRow seat
+// (ComposedSemantics::value_classes). These UNIVERSAL value concepts stay core (the ratified rule);
+// this is the D-TID-6 "now" tier (a declared contract with hardcoded strategies, like the
+// JsonStrategy key lists) — NOT a package extension. OTEL fields are
 // schema-declared (never data-learned), so they need no registry. Each class routes to its
 // declared layer (D-OTEL-1): the three trace keys → consumed structural metadata (dropped
 // from the template, never tokenized); severity_number → the LogLevel band.
@@ -244,9 +246,11 @@ inline constexpr std::array<OtelFieldDescriptor, 4> kOtelFieldCatalog{{
 // VALUE is ordinal (metric structure — magnitude + distance), recognized by EXACT top-level field
 // name in the JsonStrategy field-route (mirror kOtelFieldCatalog). A declared-key hit is captured
 // as a consumed-not-tokenized ordinal observation (CanonicalEvent.ordinals) — NEVER a param —
-// which metalog bins per schedule into the W1 carrier (TopKEntry.ordinal_histograms). NOT the
-// SemanticClassRegistry (deferred): arbitrary/client ordinals await that (the D-TID-14 anti-monster
-// boundary). EXACT keys only — uniform across the fast/slow JSON paths, no value-syntax guessing
+// which metalog bins per schedule into the W1 carrier (TopKEntry.ordinal_histograms). A UNIVERSAL
+// value class → stays core (this catalog); arbitrary/client ordinals await a package ValueClassRow
+// (the ValueClassRegistry seat, ADR 0024 §5 — no package ships one in 1.7.5; we do not build dormant
+// vocabulary — the D-TID-14 anti-monster boundary). EXACT keys only — uniform across the fast/slow
+// JSON paths, no value-syntax guessing
 // (the D-W1-5 mis-route hazard); suffix/pattern matching is a future extension when a scenario
 // needs it. Unit-explicit names only, so each value's unit is unambiguous (D-W1-3).
 
