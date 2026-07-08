@@ -10,6 +10,11 @@ name: Determinism Golden Proof
 #   gating the release. The agreed digest is uploaded as `determinism-golden` — the Release attaches it
 #   (per-release artifact, never committed).
 #
+#   G-SP-4 (ADR 0024 §10.4) rides this gate for free: proof/det_proof composes the semantic package set
+#   (github + test_frameworks) and now emits `# semantic_identity <hash>` + the package list as the
+#   digest's first lines. So the composed-ruleset content hash is under the SAME 5-leg byte-identity
+#   assertion — a cross-OS/ISA divergence in the hash serialization fails the gate. No separate job.
+#
 # PUBLIC + anonymous (no secrets): anyone can fork canon and reproduce it. arm64 + msvc run on HOSTED
 # runners only (a self-hosted runner on a public repo = fork-PR RCE); hosted minutes are free here.
 #

@@ -112,6 +112,25 @@ int main(int argc, char** argv)
     // whose encoding varies by toolchain/locale. Plain '--'.
     std::cout << "# canon public determinism proof -- v1\n";
 
+    // The composition is loop-invariant (the SAME package set tokenizes every file), so build it
+    // ONCE here and thread it into each file's per-file arena/Tokenizer below.
+    const std::array<insight::semantic::SemanticPackageManifest, 2> manifests{
+        insight::semantic::github::kManifest, insight::semantic::test_frameworks::kManifest};
+    const insight::semantic::ComposedSemantics composed{insight::semantic::compose(manifests)};
+
+    // G-SP-4 (ADR 0024 §10.4): the composed `semantic_identity` content hash must be bit-identical
+    // across independent builds and every OS/ISA leg (no paths/timestamps/link-order in its input —
+    // by construction, verified anyway). Emitting it into THIS canonical digest folds G-SP-4 into the
+    // existing 5-leg byte-identity compare — a divergent identity byte diverges the digest and fails
+    // the gate. This is a REAL, non-redundant surface: the behavioral rows below could match while the
+    // hash serialization itself diverges cross-toolchain (endianness, string_view ordering) — exactly
+    // what this line catches. The package list rides for legibility (the wire block's §4.2 label).
+    std::cout << "# semantic_identity " << composed.identity_hex() << '\n';
+    std::cout << "# semantic_packages";
+    for (const auto& pkg : composed.packages())
+        std::cout << ' ' << pkg.name << '@' << pkg.version;
+    std::cout << '\n';
+
     for (int arg = 1; arg < argc; ++arg)
     {
         std::ifstream input{argv[arg], std::ios::binary};
@@ -132,9 +151,6 @@ int main(int argc, char** argv)
 
         constexpr std::size_t kArenaBytes{std::size_t{1} << 22};
         tk::ArenaAllocator arena{kArenaBytes};
-        const std::array<insight::semantic::SemanticPackageManifest, 2> manifests{
-            insight::semantic::github::kManifest, insight::semantic::test_frameworks::kManifest};
-        const insight::semantic::ComposedSemantics composed{insight::semantic::compose(manifests)};
         tk::Tokenizer tokenizer{arena, tk::MaskConfig{}, composed};
 
         std::map<std::string, std::uint64_t> templates; // ordered → deterministic iteration

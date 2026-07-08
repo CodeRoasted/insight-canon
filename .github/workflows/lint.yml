@@ -9,3 +9,16 @@ on:
 jobs:
   lint:
     uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-lint.yml@main
+
+  # SP-1 (ADR 0024 §9.1): canon core is semantic-unaware — no ecosystem literal fused into the
+  # mechanism. Canon-repo-local (the deny-list is canon-specific, so it stays here, not in the shared
+  # reusable lint). Gates PRs directly and the tag via release.yaml's `lint` job. Runs no package code
+  # — a pure greppable scrub over src/ + api/ — so it needs only checkout + perl (preinstalled).
+  sp1-semantic-unawareness:
+    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: SP-1 — canon core carries no behavioral ecosystem literal
+        run: bash scripts/sp1_semantic_unawareness_lint.sh

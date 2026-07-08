@@ -13,9 +13,17 @@ jobs:
       actions: read
     uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-ci.yml@main
     with:
-      # canon is a tower root (no first-party deps to vendor); 
-      # the package is the repo root, so one module '.'.
-      modules: '.'
+      # canon is a tower root (no first-party deps to vendor). Post-ADR-0024 it is a MULTI-package
+      # repo: the core at the root '.', then the two semantic vocabulary packages under semantic/.
+      # Dependency-ordered (canon first) — each row's `create` publishes into the local cache so the
+      # next row's `conan install` resolves it; the semantic packages `require insight_canon/1.7.5`,
+      # so canon MUST create before them. test+create both default true; kept explicit so the
+      # ordering intent is legible. Building the semantic packages here is what exercises the deepened
+      # cross-package C++-module closure (ADR 0024 §7) on every PR, not just at the tag.
+      modules: |
+        . true true
+        semantic/github true true
+        semantic/test_frameworks true true
       # PUBLIC repo: sift-mode: public renders the Sift comment fork-safe (read-only token; a fork PR
       # can build here but post nothing) — the sift-post job below posts it.
       sift-mode: public
