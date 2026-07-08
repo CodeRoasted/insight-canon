@@ -290,7 +290,10 @@ struct DatasetRunSummary
     }
 
     ArenaAllocator arena{kArenaSize};
-    Tokenizer tokenizer{arena};
+    // The loghub corpus is generic system logs (no CI dialect content), so a degenerate (zero-package)
+    // composition reproduces the pre-split tokenization. `composed` precedes `tokenizer` (const-ref outlive).
+    const insight::semantic::ComposedSemantics composed{insight::test_support::degenerate_composition()};
+    Tokenizer tokenizer{arena, insight::tokenization::MaskConfig{}, composed};
 
     std::string line;
     while (std::getline(input, line))

@@ -20,7 +20,10 @@ class OrdinalFieldTest : public ::testing::Test
   protected:
     static constexpr std::size_t kArenaSize{1u << 20};
     ArenaAllocator arena{kArenaSize};
-    Tokenizer tokenizer{arena};
+    // JSON ordinal capture is semantic-unaware — a degenerate (zero-package) composition suffices.
+    // `composed` precedes `tokenizer` so it outlives the const-ref the Tokenizer holds.
+    insight::semantic::ComposedSemantics composed{insight::test_support::degenerate_composition()};
+    Tokenizer tokenizer{arena, MaskConfig{}, composed};
 
     // Find the ordinal observation for `field` in the event, or nullptr. Verbose on failure: the
     // caller asserts presence and prints the full ordinal set.

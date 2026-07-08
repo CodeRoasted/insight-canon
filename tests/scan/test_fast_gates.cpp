@@ -105,21 +105,17 @@ TEST(FastGatesPrefix, IsoDateAndTimeAtOffset)
     EXPECT_FALSE(match_time_at("10:15:0", 0));
 }
 
-TEST(FastGatesPrefix, Rfc3339AndGithubActions)
+// The core RFC3339 scan primitive stays here. The GitHub-Actions prefix SUBSET (is_github_actions_prefix,
+// exactly-7-fractional-digits-'Z') moved with the dialect strategy into insight_semantic_github (a
+// package-PRIVATE helper); its boundary discipline is now covered by that package's strategy confidence()
+// tests (test_github_strategy::ConfidenceRespectsGhaPrefixSubset).
+TEST(FastGatesPrefix, Rfc3339Prefix)
 {
     EXPECT_TRUE(is_rfc3339_prefix("2024-04-27T10:15:00Z payload"));
     EXPECT_FALSE(is_rfc3339_prefix("2024-04-27 10:15:00 space separator is not RFC 3339"));
-
-    const std::string_view gha{"2024-04-27T10:15:00.1234567Z ##[group]Run actions/checkout"};
-    EXPECT_TRUE(is_github_actions_prefix(gha));
-    EXPECT_TRUE(is_github_actions_prefix("2024-04-27T10:15:00.1234567Z"))
-        << "a blank GHA line is exactly the 28-char timestamp";
-    EXPECT_FALSE(is_github_actions_prefix("2024-04-27T10:15:00.123456Z six fractional digits"))
-        << "GHA is a STRICT subset: exactly 7 fractional digits (100-ns ticks)";
-    EXPECT_FALSE(is_github_actions_prefix("2024-04-27T10:15:00.1234567+00:00 not Z"));
-    EXPECT_FALSE(is_github_actions_prefix("2024-04-27T10:15:00.1234567Zx"))
-        << "timestamp must be the whole line or followed by a space";
-    EXPECT_TRUE(is_rfc3339_prefix(gha)) << "every GHA line is also RFC 3339 (the subset relation)";
+    // A hi-res fractional 'Z' timestamp (the GHA line shape) is still an RFC 3339 prefix — the subset
+    // relation, asserted at the core-primitive level, independent of any dialect.
+    EXPECT_TRUE(is_rfc3339_prefix("2024-04-27T10:15:00.1234567Z ##[group]Run actions/checkout"));
 }
 
 TEST(FastGatesPrefix, IsoDatetimeSpace)

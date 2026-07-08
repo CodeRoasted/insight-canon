@@ -1,11 +1,11 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_instance_discriminant.cpp — discriminant_of + IntentMarker.child_order, the ADR 0023
-// third role on the identity spine (II-9). The class MASKS drift tokens to group siblings;
-// the discriminant KEEPS the raw declared coordinate verbatim to SEPARATE co-occurring /
-// cross-run-drifted siblings — it is the exact COMPLEMENT of canonicalize_intent (same R1–R4
-// scan, first masked span kept raw). Runner-agnostic by construction (it reads the declared
-// tuple, never a hardcoded runner lexicon). A diff here re-draws alignment (II-7) — it rides
-// kIntentRegistryVersion; fix the code, never the assertion.
+// test_instance_discriminant.cpp — discriminant_of, canon's SEMANTIC-UNAWARE complement of
+// canonicalize_intent (ADR 0023, the third role on the identity spine, II-9). The class MASKS drift
+// tokens to group siblings; the discriminant KEEPS the raw declared coordinate verbatim to SEPARATE
+// co-occurring / cross-run-drifted siblings — same R1–R4 scan, first masked span kept raw.
+// Runner-agnostic by construction (it reads the declared tuple, never a hardcoded runner lexicon). A
+// diff here re-draws alignment (II-7) — it rides the composed semantic_identity (ADR 0024 §4); fix the
+// code, never the assertion.
 
 #include <gtest/gtest.h>
 
@@ -13,9 +13,6 @@ import insight.canon.test;
 
 using insight::canonicalize_intent;
 using insight::discriminant_of;
-using insight::LogFormat;
-using insight::tokenization::ChildOrder;
-using insight::tokenization::IntentMarkerRegistry;
 
 namespace
 {
@@ -56,16 +53,7 @@ TEST(InstanceDiscriminant, RunnerAgnosticNoHardcodedNames)
     EXPECT_NE(discriminant_of("Test (my-gpu-box)"), discriminant_of("Test (my-cpu-box)"));
 }
 
-// ── child_order is a declared per-level property (ADR 0023 §2): job=Unordered, step=Ordered ──
-TEST(InstanceDiscriminant, JobUnorderedStepOrdered)
-{
-    const auto job{IntentMarkerRegistry::recognize("Complete job name: Test (ubuntu-latest)",
-                                                   LogFormat::GitHubActions)};
-    EXPECT_EQ(job.child_order, ChildOrder::Unordered) << "jobs are parallel → set-matched";
-    EXPECT_EQ(job.discriminant, "(ubuntu-latest)") << "the marker carries its raw discriminant";
-
-    const auto step{IntentMarkerRegistry::recognize("Run yarn build", LogFormat::GitHubActions)};
-    EXPECT_EQ(step.child_order, ChildOrder::Ordered) << "steps are sequential → LCS-matched";
-}
-
+// NOTE: the child_order marker-row property (job=Unordered, step=Ordered — ADR 0023 §2) migrated with the
+// GitHub-Actions marker VOCABULARY to the github package suite (test_github_markers::JobUnorderedStepOrdered);
+// discriminant_of / canonicalize_intent above are canon's SEMANTIC-UNAWARE algorithm and stay core.
 // NOLINTEND

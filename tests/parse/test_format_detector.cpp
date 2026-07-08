@@ -19,16 +19,20 @@ using namespace insight::tokenization;
 class FormatDetectorTest : public ::testing::Test
 {
   protected:
-    FormatDetector detector; // constructor auto-registers JSON, Syslog, CLF, KV
+    // Degenerate (zero-package) composition: the detector registers its 18 core REPRESENTATION-format
+    // strategies (ADR 0024 — the GitHub-Actions DIALECT strategy is no longer a builtin; it arrives via
+    // the composition, so GHA detection is now a github-package property, tested in that suite).
+    FormatDetector detector{insight::test_support::degenerate_composition()};
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Strategy registration
 // ─────────────────────────────────────────────────────────────────────────────
 
-TEST_F(FormatDetectorTest, HasNineteenBuiltInStrategies)
+TEST_F(FormatDetectorTest, HasEighteenBuiltInRepresentationStrategies)
 {
-    EXPECT_EQ(detector.strategies().size(), 19u);
+    // 18 core representation strategies (dialect strategies register into custom_strategies_, not here).
+    EXPECT_EQ(detector.strategies().size(), 18u);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -56,23 +60,10 @@ TEST_F(FormatDetectorTest, DetectsRFC3339Syslog)
     EXPECT_EQ(s->format(), LogFormat::Syslog);
 }
 
-TEST_F(FormatDetectorTest, DetectsGitHubActions)
-{
-    // GHA stamps an RFC3339 + 7-digit-fractional 'Z' prefix on every line. It
-    // must win over Syslog (which shares the bare RFC3339 prefix) on this shape.
-    auto* s{detector.detect(
-        "2026-05-27T15:26:41.7842152Z   CODEROAST_IPC_REPO: CodeRoasted/coderoast-ipc")};
-    ASSERT_NE(s, nullptr);
-    EXPECT_EQ(s->format(), LogFormat::GitHubActions);
-}
-
-TEST_F(FormatDetectorTest, GitHubActionsDoesNotStealRFC3339Syslog)
-{
-    // Whole-second RFC3339 (no 7-digit fraction) is real syslog, not GHA.
-    auto* s{detector.detect("2024-01-15T10:30:00Z myhost app[42]: User logged in")};
-    ASSERT_NE(s, nullptr);
-    EXPECT_EQ(s->format(), LogFormat::Syslog);
-}
+// NOTE: GHA format DETECTION (DetectsGitHubActions) and the "GHA does not steal whole-second RFC3339
+// syslog" guard migrated with the dialect strategy to the github package suite (test_github_strategy:
+// DetectionRoutesGhaLineToGitHubActions + DetectionLeavesWholeSecondRfc3339AsSyslog). With a degenerate
+// composition core has no GHA strategy, so those properties are only meaningful once github is composed.
 
 TEST_F(FormatDetectorTest, DetectsCLF)
 {

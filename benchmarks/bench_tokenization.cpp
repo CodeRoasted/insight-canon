@@ -82,7 +82,13 @@ void BM_TokenizationThroughput(benchmark::State& state)
     const auto corpus{make_corpus(n_templates, kLinesPerIter, 42)};
 
     tok::ArenaAllocator arena{1U << 20U};
-    tok::Tokenizer tokenizer{arena, tok::MaskConfig{}};
+    // ADR 0024: the Tokenizer takes a ComposedSemantics. This bench measures the core tokenization hot
+    // path over a SYNTHETIC corpus (no CI-dialect content), so a degenerate composition is representative
+    // — dialect rows are format-partitioned and never probed on non-matching lines. NOTE (Heph/Argos perf
+    // gate): the §6 SP-5 gate wants composed(github+test_frameworks) vs the pre-split baseline; that needs
+    // the bench target to link the packages (as proof/ does) — a perf-gate wiring decision, flagged.
+    const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};
+    tok::Tokenizer tokenizer{arena, tok::MaskConfig{}, composed};
 
     // Warm up so the steady-state path dominates.
     for (const auto& line : corpus.lines)

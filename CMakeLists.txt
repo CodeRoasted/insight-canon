@@ -49,6 +49,11 @@ set(CANON_PUBLIC_MODULE_UNITS
     # Tokenizer. Imports spi (plain — the provider surface stays off the consumer default path).
     ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.compose.cppm
     ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.cppm
+    # insight.canon.conformance — the package-agnostic CONFORMANCE KIT (ADR 0024 §2.3, SP-2): the
+    # canon-shipped harness every semantic package must pass. Installed + public (an external package
+    # author runs the identical gate), NOT re-exported by the facade — a package's test target imports it
+    # explicitly. Imports the facade + spi; pure (no gtest, no global operator new in the library).
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/conformance/canon.conformance.cppm
 )
 set(CANON_DETAIL_MODULE_UNITS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scan/canon.detail.scan.cppm

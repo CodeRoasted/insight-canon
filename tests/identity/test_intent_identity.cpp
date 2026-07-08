@@ -4,8 +4,10 @@
 // constructor: matrix legs / shards / version-parameterized jobs of ONE intent
 // canonicalize to ONE CLASS and pair across homologous runs (G1, studies/004),
 // WITHOUT over-collapsing distinct WHERE (II-2: alignment must never eat the signal).
-// The rule set is FROZEN under kIntentRegistryVersion (II-7): a diff here is a
-// cross-run comparability break, not a retune — fix the code, never the assertion.
+// canonicalize_intent is canon's SEMANTIC-UNAWARE algorithm, frozen under kCanonicalizationVersion; the
+// composed-ruleset comparability key (II-7) is now semantic_identity (ADR 0024 §4, tests/compose/
+// test_composition.cpp). A diff here is a cross-run comparability break, not a retune — fix the code,
+// never the assertion.
 
 #include <gtest/gtest.h>
 
@@ -13,7 +15,6 @@ import insight.canon.test;
 
 using insight::canonicalize_intent;
 using insight::intent_id_of;
-using insight::kIntentRegistryVersion;
 using insight::render;
 using insight::template_id_of;
 using insight::TemplateId;
@@ -112,13 +113,11 @@ TEST(IntentCanonicalize, FrozenRuleSet)
     expect_distinct_intent("Lint", "Build");   // distinct jobs never collapse
 }
 
-// ── II-7 comparability id — FROZEN ──
-// A bump here is a deliberate rule-generation change that invalidates cross-run alignment,
-// never a silent edit; it must ride every intent-aligned report.
-TEST(IntentIdentity, RegistryVersionIsFrozen)
-{
-    EXPECT_EQ(kIntentRegistryVersion, "intent-gha-2");
-}
+// NOTE: the II-7 comparability-version assertion (formerly RegistryVersionIsFrozen, pinning
+// kIntentRegistryVersion == "intent-gha-2") RETIRED with the constant (ADR 0024 §4.1): the composed-ruleset
+// content hash `semantic_identity` supersedes it and is pinned in tests/compose/test_composition.cpp
+// (stability + reproducibility + order-independence). canonicalize_intent below stays canon's frozen
+// semantic-unaware algorithm.
 
 // ── Co-location invariant (II-1) ──
 // intent_id_of is BY DEFINITION template_id_of(canonicalize_intent(name)): the identity is

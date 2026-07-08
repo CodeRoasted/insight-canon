@@ -311,7 +311,10 @@ TEST(StatelessTemplate, CardinalityOnCorpus)
 
     constexpr std::size_t kMaxLines{300000};
     ArenaAllocator arena{8U * 1024U * 1024U};
-    LogParser parser{arena};
+    // Generic corpus masking is semantic-unaware — a degenerate (zero-package) composition. `composed`
+    // precedes `parser` so it outlives the const-ref LogParser holds.
+    const insight::semantic::ComposedSemantics composed{insight::test_support::degenerate_composition()};
+    LogParser parser{arena, composed};
     std::unordered_map<std::string, std::uint64_t> stateless_templates;
     std::size_t lines{0};
 
