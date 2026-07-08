@@ -141,16 +141,11 @@ inline constexpr std::string_view kIntentRegistryVersion{"intent-gha-2"};
 // one call keeps `intent_id` co-located with its comparability version.
 [[nodiscard]] TemplateId intent_id_of(std::string_view name);
 
-// Location recognition (intent_identity_model.md §5.3/§5.4, II-8 — the intent registry's SECOND
-// rule class, beside the intent markers): extract the test-file WHERE coordinate from a line — the
-// sub-quantum location the where_set_shift COVERAGE verdict compares (which test files a step
-// reported this run). Returns the test-file path (a view into `content`), or empty when the line
-// names no recognized test file. Universal test-file families (a framework's file-naming is
-// CI-dialect-independent): jest/vitest/playwright `*.test.<ext>` / `*.spec.<ext>` with ext ∈
-// {ts,tsx,js,jsx,mjs,cjs,py}; pytest `test_*.py` / `*_test.py`; go `*_test.go`; ruby `*_spec.rb`
-// / `*_test.rb`. Rides kIntentRegistryVersion (II-7 — a rule change re-draws the coverage sets).
-// Deterministic, ASCII-safe, no regex, no cross-line state (a pure function of the line's bytes).
-[[nodiscard]] std::string_view recognize_location(std::string_view content) noexcept;
+// Location recognition (intent_identity_model.md §5.3/§5.4, II-8) moved to the facade
+// (insight::recognize_location over a ComposedSemantics) — it walks the composed location rows the
+// test_frameworks package ships, so it cannot live in api (which the compose module imports). The
+// three LocationMatchKind families (jest/vitest/playwright `.test.`/`.spec.`; pytest `test_*.py`;
+// go/ruby `_test.go`/`_spec.rb`) are canon algorithms; the file-naming vocabulary is package data.
 
 // Stream rendering (ADL) so a TemplateId prints as "h:"+hex in logs / test diagnostics
 // (the "verbose on failure" rule). Not a product wire path — that is render() at the seam.
@@ -900,39 +895,15 @@ struct MaskConfig
 
 } // namespace insight::tokenization
 
-// ──────── from api/insight/tokenization/structural_role_registry.hpp ────────
+// ──────── structural-role + intent-marker recognition TYPES ────────
+// The StructuralRoleRegistry / IntentMarkerRegistry CLASSES (the hardcoded GHA `starts_with` chains)
+// moved to the facade's COMPOSED walkers — insight::tokenization::classify / recognize over a
+// ComposedSemantics (ADR 0024 §3). Canon core is semantic-unaware (SP-1): it owns the recognition
+// ALGORITHM, the semantic packages own the rule ROWS. The result TYPES stay here — StructuralRole
+// (above) and IntentMarkerKind / ChildOrder / IntentMarker (below): the grammar's vocabulary + the
+// recognizer's return shapes, referenced by the spi rows and by every downstream consumer.
 export namespace insight::tokenization
 {
-
-// StructuralRoleRegistry — classifies a LINE's role in the sequence (what the line
-// DOES), as opposed to the SemanticClass of a token inside it (what a value MEANS).
-// Two orthogonal ontologies kept in two separate registries — that separation is
-// the countermeasure to value-vs-line-role conflation.
-//
-// Roles here are ANNOUNCED only: the line declares itself with a marker
-// (`##[group]`, `##[error]`). Positional roles ("is on the dominant path") are
-// DERIVED by the structural layer from the sequence graph — those are layer
-// outputs, NOT registry entries; keeping that line bright is what keeps "registry"
-// honest. The catalog is a seed; extend `classify` as scenarios surface markers.
-//
-// Bridge direction is one-way: the structural layer MAY read semantic annotations
-// (a kept `EXIT_CODE != 0` is a strong Terminator candidate) — never the reverse.
-// This seed recognizes the announced GitHub-Actions/Azure markers; the exit-code
-// bridge and level-based refinements are deliberate later additions.
-class StructuralRoleRegistry
-{
-  public:
-    [[nodiscard]] static StructuralRole classify(std::string_view content) noexcept
-    {
-        if (content.starts_with("##[group]") || content.starts_with("::group::"))
-            return StructuralRole::GroupBegin;
-        if (content.starts_with("##[endgroup]") || content.starts_with("::endgroup::"))
-            return StructuralRole::GroupEnd;
-        if (content.starts_with("##[error]") || content.starts_with("::error::"))
-            return StructuralRole::Terminator;
-        return StructuralRole::None;
-    }
-};
 
 // ── Intent-marker recognition (intent_identity_model.md §5.2, the registry's segmentation
 // rule class; GitHub-Actions dialect tier) ──────────────────────────────────────────────
@@ -978,36 +949,6 @@ struct IntentMarker
     ChildOrder child_order{ChildOrder::Ordered}; ///< how THIS marker's level matches (job=Unordered)
     auto operator<=>(const IntentMarker&) const = default;
     bool operator==(const IntentMarker&) const = default;
-};
-
-class IntentMarkerRegistry
-{
-  public:
-    [[nodiscard]] static IntentMarker recognize(std::string_view content, LogFormat format) noexcept
-    {
-        if (format != LogFormat::GitHubActions)
-            return {};
-        using namespace std::string_view_literals;
-        // remove_prefix (noexcept) not substr (may-throw) — the starts_with guard is the
-        // precondition, so the noexcept contract holds without a throwing call escaping.
-        if (constexpr auto job{"Complete job name: "sv}; content.starts_with(job))
-        {
-            content.remove_prefix(job.size());
-            return {.kind = IntentMarkerKind::Job,
-                    .name = content,
-                    .discriminant = discriminant_of(content),
-                    .child_order = ChildOrder::Unordered}; // jobs are parallel — set-matched
-        }
-        if (constexpr auto step{"Run "sv}; content.starts_with(step))
-        {
-            content.remove_prefix(step.size());
-            return {.kind = IntentMarkerKind::Step,
-                    .name = content,
-                    .discriminant = discriminant_of(content),
-                    .child_order = ChildOrder::Ordered}; // steps are sequential — LCS-matched
-        }
-        return {};
-    }
 };
 
 } // namespace insight::tokenization

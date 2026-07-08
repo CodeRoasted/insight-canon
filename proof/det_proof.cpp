@@ -35,6 +35,11 @@
 // public surface (Tokenizer, det::FixedReducer, failure_lexicon cues, to_string,
 // CanonicalEvent / StructuralRole) is all reachable through the single facade import.
 import insight.canon;
+// ADR 0024: the Tokenizer now takes a ComposedSemantics. The proof composes the SAME package set a
+// product binary does — insight_semantic_github + insight_semantic_test_frameworks — so the composed
+// pipeline (GHA dialect + test-file locations) reproduces the pre-split behavior byte-for-byte (G-SP-1).
+import insight.semantic.github;
+import insight.semantic.test_frameworks;
 
 namespace
 {
@@ -127,7 +132,10 @@ int main(int argc, char** argv)
 
         constexpr std::size_t kArenaBytes{std::size_t{1} << 22};
         tk::ArenaAllocator arena{kArenaBytes};
-        tk::Tokenizer tokenizer{arena};
+        const std::array<insight::semantic::SemanticPackageManifest, 2> manifests{
+            insight::semantic::github::kManifest, insight::semantic::test_frameworks::kManifest};
+        const insight::semantic::ComposedSemantics composed{insight::semantic::compose(manifests)};
+        tk::Tokenizer tokenizer{arena, tk::MaskConfig{}, composed};
 
         std::map<std::string, std::uint64_t> templates; // ordered → deterministic iteration
         struct Row

@@ -4,6 +4,8 @@ module;
 module insight.canon.detail.parse;
 import insight.canon.internal;
 import insight.canon.api;
+import insight.canon.spi;              // ProvenanceHook
+import insight.canon.compose;         // ComposedSemantics (echoed-source hooks)
 import insight.canon.detail.strategy; // IFormatStrategy, ParsedLine
 
 // src/1_tokenization/log_parser.cpp
@@ -27,7 +29,24 @@ namespace
 
 } // namespace
 
-LogParser::LogParser(ArenaAllocator& arena) : arena_(arena) {}
+LogParser::LogParser(ArenaAllocator& arena, const insight::semantic::ComposedSemantics& composed)
+    : arena_(arena), composed_(composed), detector_(composed)
+{
+}
+
+// D-PROV-1 echoed-source register: the GHA command-echo SGR wrapper is destroyed by
+// strip_escape_sequences before any strategy sees the line, so the composed provenance hooks classify
+// the RAW (ANSI-bearing) line — the only place it survives. Strategy-INDEPENDENT (a wrapped line is
+// echoed source whatever it routed to), reproducing the pre-split is_echoed_source_line exactly. In
+// 1.7.5 the single hook is the GitHub-Actions one from insight_semantic_github.
+[[nodiscard]] static bool is_echoed_source(std::string_view raw_line,
+                                           const insight::semantic::ComposedSemantics& composed) noexcept
+{
+    for (const insight::semantic::ProvenanceHook hook : composed.provenance_hooks())
+        if (hook(raw_line))
+            return true;
+    return false;
+}
 
 // O(1) fast path: tries sticky strategy first; falls back to full detect.
 // Updates sticky_strategy_ / active_strategy_ as a side-effect.
@@ -153,7 +172,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
         // observed runtime event: demote its level to Unknown so a failure WORD in echoed
         // shell source ("echo \"Download failed …\"") confers NO alerting level. Single root —
         // the level demotion transitively suppresses NewErrorPattern across all eidos channels.
-        if (is_echoed_source_line(raw_line))
+        if (is_echoed_source(raw_line, composed_))
         {
             result->echoed_source = true;
             result->level = LogLevel::Unknown;
@@ -225,7 +244,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_stable(std::string_view 
         last_format_ = strategy->format(); // the routed winner for this event (per-line observability)
         // D-PROV-1: echoed-source demotion (see parse_line). Detect on the supplied line; a
         // pre-ANSI-stripped stable line carries no wrapper, so this is a no-op there.
-        if (is_echoed_source_line(stable_line))
+        if (is_echoed_source(stable_line, composed_))
         {
             result->echoed_source = true;
             result->level = LogLevel::Unknown;

@@ -6,6 +6,8 @@
 export module insight.canon.detail.parse;
 import insight.canon.internal;        // std + global C types
 import insight.canon.api;             // LogFormat, ArenaAllocator
+import insight.canon.spi;             // SemanticPackageManifest (composed strategy factories)
+import insight.canon.compose;         // ComposedSemantics — composed strategies + echoed-source hooks
 import insight.canon.detail.strategy; // IFormatStrategy, ParsedLine
 import insight.canon.detail.scan;     // strip_escape_sequences (ANSI ingest normalization)
 
@@ -16,7 +18,10 @@ export namespace insight::tokenization
 class FormatDetector
 {
   public:
-    FormatDetector();
+    // Registers the built-in REPRESENTATION-format strategies, then the composed DIALECT strategies
+    // (ADR 0024 §3): the strategy factories `composed` carries are instantiated via register_strategy.
+    // No dialect strategy is hardcoded here — core is semantic-unaware (SP-1).
+    explicit FormatDetector(const insight::semantic::ComposedSemantics& composed);
 
     void register_strategy(std::unique_ptr<IFormatStrategy> strategy);
 
@@ -53,7 +58,9 @@ export namespace insight::tokenization
 class LogParser
 {
   public:
-    explicit LogParser(ArenaAllocator& arena);
+    // Holds the composed vocabulary (borrowed): the FormatDetector's dialect strategies + the
+    // echoed-source provenance hooks it consults on the raw line (ADR 0024 §3). Must outlive the parser.
+    LogParser(ArenaAllocator& arena, const insight::semantic::ComposedSemantics& composed);
 
     // Force a specific format; disables auto-detection.
     void set_format(LogFormat fmt);
@@ -88,6 +95,10 @@ class LogParser
     [[nodiscard]] IFormatStrategy* select_strategy(std::string_view line);
     ArenaAllocator& arena_; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members): parser is
                             // a non-owning facade over a caller-managed arena.
+    // The composed vocabulary (borrowed): the echoed-source provenance hooks parse_line consults.
+    // Declared BEFORE detector_ so it is constructed first (detector_ is built from it). NOLINT for
+    // the same non-owning-ref reason as arena_.
+    const insight::semantic::ComposedSemantics& composed_; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     FormatDetector detector_;
     IFormatStrategy* active_strategy_{nullptr};
     // Sticky: remembers the last auto-detected strategy. Tried first on each

@@ -42,14 +42,17 @@ struct Tokenizer::Impl
 {
     ArenaAllocator& arena; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members): tokenizer
                            // shares the caller-managed arena for stable string_views.
+    // The composed vocabulary (ADR 0024): borrowed, not owned — must outlive the Tokenizer. NOLINT
+    // for the same non-owning-ref reason as `arena`.
+    const insight::semantic::ComposedSemantics& composed; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     LogParser parser;
     MaskConfig config; // token-mask configuration for the stateless masker (mask IPv4/hex)
-    StructuralRoleRegistry role_registry;
     EventID next_id{0};
     std::size_t produced{0};
 
-    Impl(ArenaAllocator& arena_ref, MaskConfig mask_config)
-        : arena{arena_ref}, parser{arena_ref}, config{mask_config}
+    Impl(ArenaAllocator& arena_ref, MaskConfig mask_config,
+         const insight::semantic::ComposedSemantics& composed_ref)
+        : arena{arena_ref}, composed{composed_ref}, parser{arena_ref, composed_ref}, config{mask_config}
     {
     }
 
@@ -74,14 +77,14 @@ struct Tokenizer::Impl
         event.host = parsed_line.host;
         event.template_str = match.template_str;
         event.params = match.params;
-        event.structural_role = insight::tokenization::StructuralRoleRegistry::classify(
-            parsed_line.content); // announced structural role
+        event.structural_role = insight::tokenization::classify(
+            parsed_line.content, event.format, composed); // announced structural role (composed rows)
         // Identity-derived WHERE (intent_identity_model.md §5.3, II-8): populate the empty GHA
         // WHERE axis with the recognized test-file, gated by config so every other path is
         // byte-identical. GHA carries no native component, so this fakes no native field.
         if (config.recognize_test_where && event.format == LogFormat::GitHubActions &&
             event.component.empty())
-            event.component = recognize_location(parsed_line.content);
+            event.component = insight::recognize_location(parsed_line.content, composed);
         event.trace = parsed_line.trace; // OTEL trace context (D-OTEL-1): consumed by O2/O3,
                                          // never serialized; default-empty for non-OTEL inputs
         event.ordinals = parsed_line.ordinals; // W1 ordinal observations (D-W1-3): consumed by
@@ -107,8 +110,9 @@ struct Tokenizer::Impl
     }
 };
 
-Tokenizer::Tokenizer(ArenaAllocator& arena, MaskConfig mask_config)
-    : impl_{std::make_unique<Impl>(arena, mask_config)}
+Tokenizer::Tokenizer(ArenaAllocator& arena, MaskConfig mask_config,
+                     const insight::semantic::ComposedSemantics& composed)
+    : impl_{std::make_unique<Impl>(arena, mask_config, composed)}
 {
     INSIGHT_LOG_INFO(logging::tokenizer_logger(), "tokenizer init");
 }

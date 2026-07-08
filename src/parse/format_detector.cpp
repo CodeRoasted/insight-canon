@@ -4,7 +4,9 @@ module;
 module insight.canon.detail.parse;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.detail.strategy; // the 20 concrete strategies registered here
+import insight.canon.spi;              // StrategyFactory
+import insight.canon.compose;         // ComposedSemantics
+import insight.canon.detail.strategy; // the 19 core representation strategies registered here
 
 // src/1_tokenization/format_detector.cpp
 //
@@ -184,9 +186,11 @@ namespace
         {
             if (line.size() > kTimestampSeparatorIndex && line[kTimestampSeparatorIndex] == 'T')
             {
-                // Both share the RFC3339 prefix; GitHubActions outranks Syslog
-                // by confidence on its precise 7-digit-fractional/'Z' shape.
-                candidates.add(LogFormat::GitHubActions);
+                // Syslog is the core representation-format candidate for an RFC3339+T line. A composed
+                // GitHub-Actions dialect strategy (if present) is probed via custom_strategies_ on
+                // every line and outranks Syslog by confidence (0.92 vs 0.80) on its precise
+                // 7-digit-fractional/'Z' shape — so canon names no dialect here (ADR 0024 §1.3), and a
+                // real RFC3339 syslog line (GHA confidence 0.0) still routes to Syslog. Byte-identical.
                 candidates.add(LogFormat::Syslog);
             }
             else
@@ -216,7 +220,7 @@ namespace
 
 } // namespace
 
-FormatDetector::FormatDetector()
+FormatDetector::FormatDetector(const insight::semantic::ComposedSemantics& composed)
 {
     auto add_builtin = [this](std::unique_ptr<IFormatStrategy> strategy)
     {
@@ -225,9 +229,11 @@ FormatDetector::FormatDetector()
         by_format_.at(index) = strategies_.back().get();
     };
 
+    // The core REPRESENTATION-format strategies (semantic-unaware — how data is represented, not what
+    // an ecosystem means). The GitHub-Actions DIALECT strategy is no longer a builtin; it arrives via
+    // the composition below (ADR 0024 §1.3/§3).
     add_builtin(std::make_unique<JsonStrategy>());
     add_builtin(std::make_unique<SyslogStrategy>());
-    add_builtin(std::make_unique<GitHubActionsStrategy>());
     add_builtin(std::make_unique<CLFStrategy>());
     add_builtin(std::make_unique<KVStrategy>());
     add_builtin(std::make_unique<HealthAppStrategy>());
@@ -245,6 +251,14 @@ FormatDetector::FormatDetector()
     add_builtin(std::make_unique<RFC5424Strategy>());
     add_builtin(std::make_unique<SystemdJournalStrategy>());
     fallback_ = std::make_unique<RawTextStrategy>();
+
+    // Composed DIALECT strategies (ADR 0024 §3): each factory the composition carries produces one
+    // strategy, registered through the existing injection seam (probed once-per-line via
+    // custom_strategies_). In 1.7.5 this is the GitHub-Actions strategy from insight_semantic_github;
+    // canon core names no dialect. The factories are in canonical (package-sorted) order.
+    for (const insight::semantic::StrategyFactory factory : composed.strategy_factories())
+        register_strategy(factory());
+
     INSIGHT_LOG_INFO(logging::detector_logger(),
                      "format detector init: {} strategies registered (+ raw-text fallback)",
                      strategies_.size());
