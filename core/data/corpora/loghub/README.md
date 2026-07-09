@@ -35,7 +35,7 @@ All tooling lives in the private warehouse **`coderoast-corpora`** (ADR 0016 §2
 
 - **`_2k` samples + structured-JSON mix:** `coderoast-corpora/zenodo_corpora/loghub/scripts/download_logs.sh` fetches the 16
   `_2k` samples (logpai/loghub GitHub) under the warehouse's `data/logs/loghub/` and a structured-JSON
-  archive. (The committed slice is the `_2k` set — see below.)
+  archive. (The published sample slice is the `_2k` set — see below.)
 - **Full corpus (`coderoast-corpora/zenodo_corpora/loghub/data/loghub-full/`):** `download_logs.sh` →
   `fetch_loghub_full` re-acquires it from Zenodo `8196385`: `BGL.zip` → verify → extract → `BGL.log`
   (verify); `Thunderbird.tar.gz` streamed through `tar -xzO Thunderbird.log | head -n 5000000` →
@@ -50,14 +50,15 @@ BGL / Thunderbird carry an **alert-label column 1** (`-` = normal; `KERNDTLB`/`A
 class). The loader strips col-1 **only** where the sentinel-rate detector confirms it exists (the 14
 message-leading formats keep col-1 as real message).
 
-## Smoke slice
+## Public-safe sample slice (ADR 0016 §5)
 
-`slice/` = the standard LogHub per-format **`*_2k.log`** samples (16 files, 2000 lines each) — the
-canonical small, deterministic, all-format input — plus `ATTRIBUTION.md` (CC-BY-4.0 credit + the
-"no changes / full corpus not committed" notice). Extraction: the LogHub `_2k` distribution verbatim
-(or `head -n 2000` of each full format file, label column preserved). Committed for zero-fetch CI /
-determinism smoke; the full `BGL.log` / `Thunderbird_5M.log` are fetched only for deep runs.
+The LogHub per-format **`*_2k.log`** set (16 files, 2000 lines each) — the canonical small,
+deterministic, all-format input — plus `ATTRIBUTION.md` (CC-BY-4.0 credit + the "no changes / full
+corpus not committed" notice) lives at **`coderoast-corpora/zenodo_corpora/loghub/samples/`** and
+publishes to the **public hub** via the corpora Sample Release workflow. Extraction: the LogHub `_2k`
+distribution verbatim (or `head -n 2000` of each full format file, label column preserved).
 
-**Consumed by** (committed tests resolve here, never the gitignored `data/logs/`, ADR 0016 §6):
-`insight-canon` tokenizer regression test (`tests/regression/test_tokenizer_loghub_regression.cpp`,
-all 16 datasets) and the `insight-eidos` cube corpus test (`CUBE_LOGHUB_DIR` → `BGL_2k`/`Thunderbird_2k`).
+**Consumed by:** the **canon Samples Showcase** — `insight-canon/proof/det_proof` run over the hub
+samples for a client-facing "what Canon extracts" render (a showcase, **not** a gate: the determinism
+gate uses `proof/corpus/`, and the end-to-end is owned by Eidos + the playground e2e). No canon test
+resolves an in-git slice, so the LogHub `_2k` bytes were removed from canon git (ADR 0016 §5, 2026-07-09).

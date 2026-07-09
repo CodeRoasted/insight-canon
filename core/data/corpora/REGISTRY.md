@@ -4,12 +4,15 @@ The authoritative index of every corpus the workspace tests or measures against.
 [ADR 0016 — corpus storage & governance](../../../technical_docs/adr/0016-corpus-storage-and-governance.md).
 
 **Rules (ADR 0016):**
-- A committed test/gate references a corpus **by the `id` below**, resolving to in-git bytes (a
-  fixture or the smoke `slice`) or a **pinned + checksummed** asset — **never** an untracked
-  `data/logs/` path.
+- A committed test/gate references a corpus **by the `id` below**, resolving to a **repo-local
+  fixture** (e.g. the determinism `proof/corpus/`) or a **pinned + checksummed** asset — **never** an
+  untracked `data/logs/` path. Public-safe **sample slices no longer live in canon git**: they live
+  in `coderoast-corpora/<platform>_corpora/<corpus>/samples/` (§2a gate `_shared/samples_safety_lint.py`)
+  and publish to the **public hub** via the corpora Sample Release workflow; the canon *showcase*
+  fetches them from the hub (a client-facing render, not a gate — ADR 0016 §5).
 - Big bytes are **not** in git (no LFS); they live in the private warehouse **`coderoast-corpora`**
   (tooling + materialized data + pinned Release assets) and materialize there via the acquisition
-  recipe. Only this `data/corpora/` tree (registry + READMEs + smoke slices) is tracked, in canon.
+  recipe. Only this `data/corpora/` tree (registry + READMEs) is tracked, in canon.
 - Corpora are **versioned datasets**: each materialization is an immutable `<id>/<version>` + sha256;
   the `pin` column is the current version, old versions stay reproducible.
 
@@ -36,16 +39,22 @@ Do not relocate them here.
 | **eidos-fuzz** | parse-path fuzz replay set (minimized) + curated seeds | `insight-eidos/fuzz/corpus/` | `parse_fuzzer` (libFuzzer/ASAN gate) |
 | **playground-red** | cube REDs + e2e scenario fixtures (1:1 scenario↔test) | `coderoast-server/insight-playground/` | the e2e regression suite |
 
-## Smoke slices
+## Public-safe sample slices (ADR 0016 §5 — home moved to the warehouse + hub)
 
-Each big corpus commits a small, deterministic slice under its directory (ADR 0016 §5) so CI and the
-determinism gates have a **zero-fetch, reproducible** input; the full corpus is fetched only for deep
-runs. The slice's extraction recipe is in the corpus README so it regenerates when the corpus
-versions.
+Each big corpus's small, deterministic **public-safe slice** lives at
+`coderoast-corpora/<platform>_corpora/<corpus>/samples/` — **not** in canon git. Its purpose is now a
+**client-facing showcase** (canon's `det_proof` run over it, published as evidence — the
+[Samples Showcase](../../../.github/workflows/samples-showcase.yaml) workflow fetches from the hub),
+**not** a zero-fetch canon test gate: the determinism gate uses its own repo-local `proof/corpus/`
+fixture, and the end-to-end coverage is owned by Eidos + the playground e2e. So no canon test needs an
+in-git slice, and the slices were removed from canon (the CC-BY LogHub `_2k` set + the ci-revert
+synthetic fixture).
 
-**A committed slice MUST be public-safe by construction (§2a).** For a **first-party / redistributable**
-corpus (LogHub CC-BY-4.0, our goldens) the slice is real bytes. For a **third-party / private** corpus
-(`ci-revert`) the public slice is a **synthetic shape-fixture** — never real crawled logs; the
-real-data gates run private on a trusted runner. The lint
-([`corpus_registry_lint.py`](../../../scripts/corpus_registry_lint.py)) enforces that no
-third-party-class corpus has public bytes.
+**A published slice MUST be public-safe by construction (§2a).** For a **first-party / redistributable**
+corpus (LogHub CC-BY-4.0) the slice is real bytes + an `ATTRIBUTION.md`; for a **third-party / private**
+corpus (`ci-revert`, `jenkins-markers`) it is a **synthetic shape-fixture** (`SLICE.json "synthetic":
+true`) — never real crawled logs; the real-data gates run private on a trusted runner. Two lints
+enforce it, fail-closed, before anything is published: the warehouse
+`coderoast-corpora/_shared/samples_safety_lint.py` (every `*/samples/` is synthetic-or-attributed) and
+the workspace [`corpus_registry_lint.py`](../../../scripts/corpus_registry_lint.py) Rule D (no
+third-party-class corpus has committed bytes in canon's public tree).

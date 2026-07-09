@@ -86,19 +86,21 @@ cd data/ci-revert/v1/full \
 posture). Materializes under the warehouse's gitignored `coderoast-corpora/github_corpora/revert_corpus/data/v1/full/`
 (`corpus.jsonl`, `log_annotated/`, `log_stripped/`, `manifest/`).
 
-## Smoke slice — SYNTHETIC (public-safe by construction, ADR 0016 §2a + §5)
+## Public-safe sample slice — SYNTHETIC (public-safe by construction, ADR 0016 §2a + §5)
 
-Because ci-revert is third-party/private, the committed public slice is a **fully synthetic,
-clearly-labelled *shape* fixture** — fabricated repos/content, **zero third-party bytes**. It mirrors
-the on-disk layout (`slice/corpus.jsonl` + `log_annotated/` & `log_stripped/` pairs + `SLICE.json`
-with `"synthetic": true`) and the schema, so it exercises canon's `<ts> <msg>` parse and the
-lattice-lift path; the stripped form is produced by the **real** pipeline `degrade()` so degradation
-matches production exactly. **5 fabricated samples** (1 R2-positive, 2 R1-failure, 2 clean).
+Because ci-revert is third-party/private, its public slice is a **fully synthetic, clearly-labelled
+*shape* fixture** — fabricated repos/content, **zero third-party bytes** — living at
+**`coderoast-corpora/github_corpora/revert_corpus/samples/`** (and publishing to the **public hub**
+via the corpora Sample Release workflow), **never** in canon git. It mirrors the on-disk layout
+(`corpus.jsonl` + `log_annotated/` & `log_stripped/` pairs + `SLICE.json` with `"synthetic": true`)
+and the schema, so it exercises canon's `<ts> <msg>` parse and the lattice-lift path; the stripped
+form is produced by the **real** pipeline `degrade()` so degradation matches production exactly.
+**5 fabricated samples** (1 R2-positive, 2 R1-failure, 2 clean).
 
-**Generated** (deterministic — regenerates byte-identically; writes this canon slice):
+**Generated** (deterministic — regenerates byte-identically; writes the warehouse `samples/`):
 
 ```bash
-# from coderoast-corpora/github_corpora/revert_corpus/scripts/  (the generator targets the canon sibling by default)
+# from coderoast-corpora/github_corpora/revert_corpus/scripts/  (writes ../samples by default)
 python3 -m ci_revert_corpus.make_synthetic_slice
 ```
 

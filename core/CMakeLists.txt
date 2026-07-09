@@ -189,7 +189,7 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/insight_canon-config.cmake
 ###########################################################
 if(INSIGHT_CANON_BUILD_TESTS)
     # Per-domain test mirror (§11.9.11): tests/<domain>/*.cpp 1:1 with the src/ domains
-    # (math/arena/utils are api-homed domains; regression holds the loghub corpus suite).
+    # (math/arena/utils are api-homed domains).
     file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp"
     )
@@ -219,10 +219,7 @@ if(INSIGHT_CANON_BUILD_TESTS)
         target_compile_features(insight_canon_tests PRIVATE cxx_std_23)
         set_target_properties(insight_canon_tests PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
         target_compile_definitions(insight_canon_tests PRIVATE
-            $<IF:$<CONFIG:Debug>,SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE,SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO>
-            # The committed LogHub smoke slice (ADR 0016 §5) — absolute source path so the
-            # regression suite resolves it independent of the CTest CWD (never data/logs/).
-            LOGHUB_SLICE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data/corpora/loghub/slice")
+            $<IF:$<CONFIG:Debug>,SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE,SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO>)
         target_compile_options(insight_canon_tests PRIVATE
             $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-ffp-contract=off>)
         include(GoogleTest)
