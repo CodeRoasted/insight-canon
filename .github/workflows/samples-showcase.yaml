@@ -107,7 +107,10 @@ jobs:
           set -euo pipefail
           conan install core --profile:host="$PROFILE" --profile:build="$PROFILE" \
             --build=missing -of build-showcase
-          TOOLCHAIN="$(find build-showcase -name conan_toolchain.cmake | head -1)"
+          # ABSOLUTE toolchain path: cmake resolves a relative CMAKE_TOOLCHAIN_FILE against the BUILD
+          # dir (-B build-showcase), so a relative "build-showcase/…" would miss. det_public_proof.sh
+          # + the golden msvc leg both pass an absolute path — match them.
+          TOOLCHAIN="$(find "$PWD/build-showcase" -name conan_toolchain.cmake | head -1)"
           [ -f "$TOOLCHAIN" ] || { echo "::error::no conan_toolchain.cmake under build-showcase"; exit 1; }
           # CELL_FLAGS = SPDLOG off only (engine logs carry a wall-clock stamp; keep them out of the
           # output). No -O/-ffp sweep here — the showcase is legibility, not the determinism matrix.
