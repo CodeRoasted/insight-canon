@@ -154,3 +154,48 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ inputs.tag }}
         run: gh release upload "$TAG" canon-samples-showcase.tar.zst --clobber
+
+  # PROPOSE the rendered showcase to the public hub — a PR, never a force-push (the Founder merges =
+  # pulls the trigger). Same containment as sample-release's propose-to-hub. Gated on a repo VARIABLE
+  # (secrets can't gate a job `if`); needs the HUB_PUBLISH_TOKEN secret + SAMPLES_HUB_PUBLISH=true var
+  # in THIS repo. Skips cleanly until both are set — the artifact + Release attach above stand alone.
+  mirror-to-hub:
+    needs: showcase
+    runs-on: ubuntu-latest
+    if: ${{ vars.SAMPLES_HUB_PUBLISH == 'true' }}
+    steps:
+      - name: Checkout the public hub
+        uses: actions/checkout@v5
+        with:
+          repository: CodeRoasted/coderoast-hub
+          token: ${{ secrets.HUB_PUBLISH_TOKEN }}
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: canon-samples-showcase
+          path: incoming
+
+      - name: Stage showcase/canon/ + manifest into the hub, open a PR
+        env:
+          GH_TOKEN: ${{ secrets.HUB_PUBLISH_TOKEN }}
+          V: ${{ inputs.tag || github.run_id }}
+        run: |
+          set -euo pipefail
+          rm -rf showcase/canon && mkdir -p showcase/canon
+          cp -r incoming/. showcase/canon/
+          python3 - <<'PY'
+          import json, os
+          m = json.load(open("manifest.json"))
+          m["showcase"] = {"canon": {"version": os.environ["V"], "path": "showcase/canon/"}}
+          json.dump(m, open("manifest.json", "w"), indent=2)
+          PY
+          git config user.name "coderoast-showcase[bot]"
+          git config user.email "showcase@coderoast.fr"
+          BR="showcase-canon-$V"
+          git checkout -b "$BR"
+          git add showcase/canon manifest.json
+          git commit -m "showcase: Canon over our public samples ($V) — client-facing transparency"
+          git push origin "$BR" --force-with-lease
+          gh pr create --title "Canon-over-samples showcase ($V)" \
+            --body "Human-legible render of what the open canon core extracts from our public sample logs. Client-facing transparency, not a gate. Merge to publish." \
+            || echo "PR may already exist"

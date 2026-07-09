@@ -55,6 +55,17 @@ jobs:
       benchmark-subdir: bench
     secrets: inherit
 
+  # Client-facing transparency: build canon over our PUBLIC hub samples and attach the human-legible
+  # "Canon over our samples" bundle to the Release. NOT a gate (needs: release, runs after the cut is
+  # published); a showcase. Passing the tag makes the reusable workflow attach the bundle.
+  samples-showcase:
+    needs: release
+    uses: ./.github/workflows/samples-showcase.yaml
+    with:
+      tag: ${{ github.event.inputs.tag || github.ref_name }}
+      samples_ref: main
+    secrets: inherit   # HUB_PUBLISH_TOKEN for the optional hub-mirror job (skips until configured)
+
   # Attach the validated golden (produced by the golden gate) to the Release — per-release, not committed.
   attach-golden:
     needs: [release, golden]
