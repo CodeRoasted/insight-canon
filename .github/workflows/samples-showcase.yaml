@@ -1,0 +1,153 @@
+name: Samples Showcase
+
+# CLIENT-FACING TRANSPARENCY — build canon's PUBLIC det_proof (the open, Apache-2.0 tokenizer +
+# event-extraction core) and run it over our PUBLIC sample logs, fetched from the public
+# coderoast-hub. An external reader sees exactly what Canon does to a log — line shapes, event
+# roles, the deterministic det_math — over the same samples we publish. It NEVER asserts and NEVER
+# blocks a release: Eidos + Sift own the end-to-end; this is a showcase, not a gate.
+#
+# Single gcc-15 leg on the SAME proven build path as golden.yaml's gcc-x86 leg (the 5-leg
+# cross-toolchain determinism matrix stays golden.yaml's job — a showcase needs one build, not five).
+#
+# PUBLIC + anonymous: canon + malf-toolchain + coderoast-hub are all public, so no secret is needed
+# to build or to fetch the samples. The hub-mirror job (optional) is the ONLY thing that touches a
+# credential, and it skips cleanly until ops config is set.
+
+on:
+  workflow_dispatch:
+    inputs:
+      samples_ref:
+        description: 'coderoast-hub ref holding the samples (branch / tag / sha)'
+        required: false
+        default: main
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Release tag to attach the showcase bundle to'
+        type: string
+        required: false
+      samples_ref:
+        type: string
+        required: false
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  showcase:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # attach the bundle to the Release (only when a tag is passed)
+    env:
+      CONAN_HOME: ${{ github.workspace }}/.conan2
+      PROFILE: linux-gcc15-release
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check out malf-toolchain into malf/ (conan profiles; public, anonymous)
+        uses: actions/checkout@v5
+        with:
+          repository: CodeRoasted/malf-toolchain
+          path: malf
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Fetch the PUBLIC samples from coderoast-hub (public, anonymous)
+        uses: actions/checkout@v5
+        with:
+          repository: CodeRoasted/coderoast-hub
+          path: hub
+          ref: ${{ inputs.samples_ref || 'main' }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Provision gcc-15.3 toolchain (OUR OWN — 15.3 only)
+        uses: CodeRoasted/malf-toolchain/.github/actions/setup-gcc153@main
+
+      - name: Base — ninja + CMake 4.3.x (+ gcc-15.3 /opt wiring)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build python3 build-essential zstd
+          # CMake 4.3.x: the import-std experimental gate UUID 451f2fe2 lives only there.
+          sudo python3 -m pip install --break-system-packages "cmake==4.3.1"
+          hash -r
+          case "$(cmake --version | head -1)" in *" 4.3."*) cmake --version ;; *) echo "::error::expected CMake 4.3.x (got: $(cmake --version | head -1))"; exit 1 ;; esac
+          sudo update-alternatives --install /usr/bin/gcc gcc /opt/gcc-15.3/bin/gcc 1000
+          sudo update-alternatives --install /usr/bin/g++ g++ /opt/gcc-15.3/bin/g++ 1000
+          sudo update-alternatives --set gcc /opt/gcc-15.3/bin/gcc
+          sudo update-alternatives --set g++ /opt/gcc-15.3/bin/g++
+          sudo ln -sf /opt/gcc-15.3/bin/g++ /usr/local/bin/g++-15
+          sudo ln -sf /opt/gcc-15.3/bin/gcc /usr/local/bin/gcc-15
+          g++ --version | grep -qE ' 15\.' || { echo "ERROR: bare g++ is not gcc-15.3 (/opt)"; exit 1; }
+
+      - name: Setup Conan
+        uses: conan-io/setup-conan@v1
+        with:
+          version: "2.28.1"
+          home: ${{ env.CONAN_HOME }}
+          cache_packages: false
+          profile_detect: false
+
+      - name: Cache conan dep binaries
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.CONAN_HOME }}
+          key: conan-showcase-x86-gcc-${{ runner.os }}-${{ hashFiles('core/conanfile.py') }}
+          restore-keys: |
+            conan-showcase-x86-gcc-${{ runner.os }}-
+
+      - name: Setup Conan profile (linux-gcc15-release, from malf-toolchain)
+        run: |
+          mkdir -p "$CONAN_HOME/profiles"
+          cp "malf/profiles/$PROFILE" "$CONAN_HOME/profiles/$PROFILE"
+
+      - name: Build canon's det_proof (single gcc-15 leg — the golden.yaml gcc build path)
+        run: |
+          set -euo pipefail
+          conan install core --profile:host="$PROFILE" --profile:build="$PROFILE" \
+            --build=missing -of build-showcase
+          TOOLCHAIN="$(find build-showcase -name conan_toolchain.cmake | head -1)"
+          [ -f "$TOOLCHAIN" ] || { echo "::error::no conan_toolchain.cmake under build-showcase"; exit 1; }
+          # CELL_FLAGS = SPDLOG off only (engine logs carry a wall-clock stamp; keep them out of the
+          # output). No -O/-ffp sweep here — the showcase is legibility, not the determinism matrix.
+          cmake -S proof -B build-showcase -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=gcc-15 -DCMAKE_CXX_COMPILER=g++-15 \
+            -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
+            -DCANON_ROOT="$PWD" \
+            -DCELL_FLAGS="-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF"
+          cmake --build build-showcase --target det_proof
+          DET="$(find build-showcase -name det_proof -type f -perm -u+x | head -1)"
+          [ -x "$DET" ] || { echo "::error::det_proof was not produced"; exit 1; }
+          echo "DET=$DET" >> "$GITHUB_ENV"
+
+      - name: Render the showcase over the hub samples
+        run: bash scripts/samples_showcase.sh "$DET" hub/samples showcase
+
+      - name: Bundle + step summary
+        id: bundle
+        run: |
+          set -euo pipefail
+          tar --sort=name --mtime='2026-01-01 00:00:00Z' --owner=0 --group=0 --numeric-owner \
+              -C showcase -cf - . | zstd -19 -o canon-samples-showcase.tar.zst
+          {
+            echo "## Canon over our public samples"
+            echo
+            cat showcase/README.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: canon-samples-showcase
+          path: showcase
+          if-no-files-found: error
+
+      # Only in the release path (workflow_call with a tag): attach the bundle to the Release.
+      - name: Attach the showcase bundle to the Release
+        if: ${{ inputs.tag }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: gh release upload "$TAG" canon-samples-showcase.tar.zst --clobber
