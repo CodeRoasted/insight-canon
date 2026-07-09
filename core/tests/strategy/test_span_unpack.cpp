@@ -69,6 +69,43 @@ TEST(SpanUnpack, NonDocumentYieldsNothing)
     EXPECT_TRUE(records.empty());
 }
 
+// O4b Span Links (D-OTEL-9 / D-OTEL-23): a crafted flat OTLP span declaring two cross-trace link
+// targets — the canon-grain unit guard for the lab's links[] emission. Canon collects each link's
+// spanId into linked_span_ids in order; the link's traceId (and any link attributes) are
+// consumed-not-retained (only the span_id feeds metalog's cross-trace service distillation).
+constexpr std::string_view kSpanWithLinks{
+    R"({"traceId":"aabb","spanId":"0001","name":"consumer","kind":"SPAN_KIND_INTERNAL",)"
+    R"("startTimeUnixNano":"1000","endTimeUnixNano":"1500","status":{"code":"STATUS_CODE_UNSET"},)"
+    R"("links":[{"traceId":"ccdd","spanId":"00a1"},{"traceId":"eeff","spanId":"00b2"}],)"
+    R"("attributes":[{"key":"service.name","value":{"stringValue":"consumer-svc"}}]})"};
+
+TEST(SpanUnpack, FlatSpanLinksPopulateLinkedSpanIdsInOrder)
+{
+    JsonStrategy strategy;
+    ArenaAllocator arena{4096};
+
+    const auto span{strategy.parse(kSpanWithLinks, arena)};
+    ASSERT_TRUE(span.has_value());
+    ASSERT_EQ(span->linked_span_ids.size(), 2U)
+        << "expected 2 link targets, got " << span->linked_span_ids.size();
+    EXPECT_EQ(span->linked_span_ids[0], span_id_from_hex("00a1"));
+    EXPECT_EQ(span->linked_span_ids[1], span_id_from_hex("00b2"));
+    // The link's traceId does not disturb the span's own trace context (own spanId retained).
+    EXPECT_EQ(span->trace.span_id, span_id_from_hex("0001"));
+}
+
+// A span without a links[] array carries no cross-trace edges — empty in ⇒ empty out (store_span_ids
+// allocates nothing), so a non-linking span stays byte-identical to pre-links.
+TEST(SpanUnpack, FlatSpanWithoutLinksHasEmptyLinkedSpanIds)
+{
+    JsonStrategy strategy;
+    ArenaAllocator arena{4096};
+
+    const auto span{strategy.parse(kExpectedSpan0, arena)};
+    ASSERT_TRUE(span.has_value());
+    EXPECT_TRUE(span->linked_span_ids.empty());
+}
+
 // The de-risk: every unpacked record parses through the SAME flat-span parser (2a) into the
 // CanonicalEvent it should — closing the loop shape-1 → shape-2 → event.
 TEST(SpanUnpack, UnpackedRecordsRoundTripThroughTheFlatSpanParser)
