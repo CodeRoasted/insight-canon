@@ -19,7 +19,7 @@ cube measurement, the cross-stdlib determinism measurement, and the rich-format 
 
 - **Source:** Zenodo record [`8196385`](https://zenodo.org/records/8196385) (LogHub).
 - **License:** **CC-BY-4.0** — attribute LogHub in any published artifact derived from it.
-- **Pins** (the full corpus under the warehouse's gitignored `coderoast-corpora/data/logs/loghub-full/`; sha256 = data-input anchor):
+- **Pins** (the full corpus under the warehouse's gitignored `coderoast-corpora/zenodo_corpora/loghub/data/loghub-full/`; sha256 = data-input anchor):
   - `BGL.zip` — 57,489,019 B · sha256 `d67fd82a711aea0157a9b83175892c6ee60e384a2ddf5bc51f39118453816da8` **(verified 2026-06-17)**; extracts to →
   - `BGL.log` — 743,185,031 B · 4,747,963 lines · sha256 `666130b15ef44eb32fd02bd053e6c6e007c37696b5e7e8b9d8e45b729876a5d2` (4.40 M normal + ~348 k alerts / ~30 classes, labels intact).
   - `Thunderbird_5M.log` — 868,147,617 B · 5,000,000 lines · sha256 `6e0f52d45d639c76fc2f430e6ef609a915072c2328b862cb097dc59ac5694580` (a 5 M-line head-extract of LogHub Thunderbird — exact source/extraction step **to be reconstructed**, see Acquisition).
@@ -33,10 +33,10 @@ cube measurement, the cross-stdlib determinism measurement, and the rich-format 
 
 All tooling lives in the private warehouse **`coderoast-corpora`** (ADR 0016 §2a).
 
-- **`_2k` samples + structured-JSON mix:** `coderoast-corpora/scripts/download_logs.sh` fetches the 16
+- **`_2k` samples + structured-JSON mix:** `coderoast-corpora/zenodo_corpora/loghub/scripts/download_logs.sh` fetches the 16
   `_2k` samples (logpai/loghub GitHub) under the warehouse's `data/logs/loghub/` and a structured-JSON
   archive. (The committed slice is the `_2k` set — see below.)
-- **Full corpus (`coderoast-corpora/data/logs/loghub-full/`):** `download_logs.sh` →
+- **Full corpus (`coderoast-corpora/zenodo_corpora/loghub/data/loghub-full/`):** `download_logs.sh` →
   `fetch_loghub_full` re-acquires it from Zenodo `8196385`: `BGL.zip` → verify → extract → `BGL.log`
   (verify); `Thunderbird.tar.gz` streamed through `tar -xzO Thunderbird.log | head -n 5000000` →
   `Thunderbird_5M.log` (verify) — the head-extract is taken without materializing the full ~30 GB log.

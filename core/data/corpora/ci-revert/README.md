@@ -20,7 +20,7 @@ contract** (what it may and may not claim) is
 
 ## Provenance · license · posture
 
-- **Source:** crawled from public GitHub via `coderoast-corpora/scripts/ci_revert_corpus/` (v1: a
+- **Source:** crawled from public GitHub via `coderoast-corpora/github_corpora/revert_corpus/scripts/ci_revert_corpus/` (v1: a
   **pinned 25-repo set**, `pinned_repos.txt`; v2: ~60 repos, **revert-density-gated** selection).
   **Positive-Unlabeled** posture (positives reliable, negatives weak); revert ≠ defect (re-applied
   *and* relanded reverts excluded).
@@ -62,7 +62,7 @@ contract** (what it may and may not claim) is
 ## Fetch / verify / freeze (reproducibility — private, trusted-runner only)
 
 All corpus tooling lives in the private warehouse **`coderoast-corpora`** (ADR 0016 §2a). The frozen
-artifact is produced by `coderoast-corpora/scripts/freeze_corpus.sh` (deterministic tar → `zstd -19`;
+artifact is produced by `coderoast-corpora/_shared/freeze_corpus.sh` (deterministic tar → `zstd -19`;
 emits the content manifest, the asset, its sha256, and a `.pin.txt`). To re-freeze a future version:
 `bash scripts/freeze_corpus.sh data/ci-revert/v1/full ci-revert vN`. `v1` was frozen and
 **round-trip-verified** (asset hash OK; all 8171 files byte-exact on extract).
@@ -81,9 +81,9 @@ cd data/ci-revert/v1/full \
 
 ## Acquisition
 
-`coderoast-corpora/scripts/ci_revert_corpus/` (the crawler). Validity decisions are pre-registered in
+`coderoast-corpora/github_corpora/revert_corpus/scripts/ci_revert_corpus/` (the crawler). Validity decisions are pre-registered in
 `config.py` (retention 90 d ceiling / 15 d safety → usable window [14, 75] d; T-sweep {14,30,60}; PU
-posture). Materializes under the warehouse's gitignored `coderoast-corpora/data/ci-revert/v1/full/`
+posture). Materializes under the warehouse's gitignored `coderoast-corpora/github_corpora/revert_corpus/data/v1/full/`
 (`corpus.jsonl`, `log_annotated/`, `log_stripped/`, `manifest/`).
 
 ## Smoke slice — SYNTHETIC (public-safe by construction, ADR 0016 §2a + §5)
@@ -98,20 +98,20 @@ matches production exactly. **5 fabricated samples** (1 R2-positive, 2 R1-failur
 **Generated** (deterministic — regenerates byte-identically; writes this canon slice):
 
 ```bash
-# from coderoast-corpora/scripts/  (the generator targets the canon sibling by default)
+# from coderoast-corpora/github_corpora/revert_corpus/scripts/  (the generator targets the canon sibling by default)
 python3 -m ci_revert_corpus.make_synthetic_slice
 ```
 
 The **real-data** R1/R2/lattice-lift validity gates do **not** use this synthetic slice — they run
 **private, on a trusted runner**, against the real corpus extracted from the private `vN` asset. That
-private real-data slice is produced by `coderoast-corpora/scripts/ci_revert_corpus/extract_slice.py`
+private real-data slice is produced by `coderoast-corpora/github_corpora/revert_corpus/scripts/ci_revert_corpus/extract_slice.py`
 (non-empty log pairs; smallest-`(bytes, sample_id)` per label category; ≥1 R2 positive) —
 trusted-runner context only, **never** committed to public git:
 
 ```bash
 # trusted runner only — produces the PRIVATE real-data slice (warehouse data/), never public git
 python3 -m ci_revert_corpus.extract_slice \
-  --corpus coderoast-corpora/data/ci-revert/v1/full \
+  --corpus coderoast-corpora/github_corpora/revert_corpus/data/v1/full \
   --parent-version ci-revert/v1 \
   --parent-pin 3054b158382c333301d986ad0472e2208078ee87a92edf42b33dd32a4660b059
 ```
