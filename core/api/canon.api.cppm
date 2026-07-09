@@ -178,6 +178,10 @@ struct OtelTraceContext
 {
     bool present{false};     // the record carried a trace_id (the O2 grouping key)
     bool has_parent{false};  // a parent_span_id was present (O3 edge; usually absent on logs)
+    bool is_span{false};     // O3 (D-OTEL-11): a SPAN record (declared causality → observed edge),
+                             // not a log record with trace context (positional causality → O2 ring).
+                             // Set by the flat-span parser; false on the OTEL-log path. Metalog
+                             // routes spans to the observed-DAG, never the adjacency ring.
     TraceId trace_id{};      // the transaction grouping key (O2)
     SpanId span_id{};        // the causal vertex identity (carried for O3)
     SpanId parent_span_id{}; // the observed causal edge span→parent (carried for O3)
@@ -653,6 +657,15 @@ template <> struct hash<insight::TraceId>
     [[nodiscard]] std::size_t operator()(const insight::TraceId& trace_id) const noexcept
     {
         return static_cast<std::size_t>(trace_id.value);
+    }
+};
+// std::hash<SpanId> (D-OTEL-11): keys O3's per-window span_id → template map for close-time
+// observed-edge resolution. `value` is already an fnv1a hash of the OTEL hex → a good size_t.
+template <> struct hash<insight::SpanId>
+{
+    [[nodiscard]] std::size_t operator()(const insight::SpanId& span_id) const noexcept
+    {
+        return static_cast<std::size_t>(span_id.value);
     }
 };
 } // namespace std
