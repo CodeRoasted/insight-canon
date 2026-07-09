@@ -64,7 +64,7 @@ contract** (what it may and may not claim) is
 All corpus tooling lives in the private warehouse **`coderoast-corpora`** (ADR 0016 §2a). The frozen
 artifact is produced by `coderoast-corpora/scripts/freeze_corpus.sh` (deterministic tar → `zstd -19`;
 emits the content manifest, the asset, its sha256, and a `.pin.txt`). To re-freeze a future version:
-`bash scripts/freeze_corpus.sh data/ci-revert-corpus ci-revert vN`. `v1` was frozen and
+`bash scripts/freeze_corpus.sh data/ci-revert/v1/full ci-revert vN`. `v1` was frozen and
 **round-trip-verified** (asset hash OK; all 8171 files byte-exact on extract).
 
 Consuming `v1` happens **only on a trusted runner with the Argos credential** (§2a) — the public CI
@@ -74,8 +74,8 @@ tree against the content manifest — never trust an un-verified materialization
 ```bash
 # (trusted runner) fetch ci-revert-v1.tar.zst + .sha256 + .manifest.sha256 from the private store
 sha256sum -c ci-revert-v1.tar.zst.sha256                       # verify the asset bytes
-zstd -dc ci-revert-v1.tar.zst | tar -x -C data/                # re-materialize data/ci-revert-corpus/
-cd data/ci-revert-corpus \
+zstd -dc ci-revert-v1.tar.zst | tar -x -C data/                # re-materialize data/ci-revert/v1/full/
+cd data/ci-revert/v1/full \
   && sha256sum -c /path/to/ci-revert-v1.manifest.sha256 --quiet   # verify every file vs the anchor
 ```
 
@@ -83,7 +83,7 @@ cd data/ci-revert-corpus \
 
 `coderoast-corpora/scripts/ci_revert_corpus/` (the crawler). Validity decisions are pre-registered in
 `config.py` (retention 90 d ceiling / 15 d safety → usable window [14, 75] d; T-sweep {14,30,60}; PU
-posture). Materializes under the warehouse's gitignored `coderoast-corpora/data/ci-revert-corpus/`
+posture). Materializes under the warehouse's gitignored `coderoast-corpora/data/ci-revert/v1/full/`
 (`corpus.jsonl`, `log_annotated/`, `log_stripped/`, `manifest/`).
 
 ## Smoke slice — SYNTHETIC (public-safe by construction, ADR 0016 §2a + §5)
@@ -111,7 +111,7 @@ trusted-runner context only, **never** committed to public git:
 ```bash
 # trusted runner only — produces the PRIVATE real-data slice (warehouse data/), never public git
 python3 -m ci_revert_corpus.extract_slice \
-  --corpus coderoast-corpora/data/ci-revert-corpus \
+  --corpus coderoast-corpora/data/ci-revert/v1/full \
   --parent-version ci-revert/v1 \
   --parent-pin 3054b158382c333301d986ad0472e2208078ee87a92edf42b33dd32a4660b059
 ```
