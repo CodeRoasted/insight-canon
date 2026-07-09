@@ -305,7 +305,12 @@ struct OrdinalFieldDescriptor
 inline constexpr std::int64_t kNanosPerMicro{1'000};
 inline constexpr std::int64_t kNanosPerMilli{1'000'000};
 inline constexpr std::int64_t kNanosPerSecond{1'000'000'000};
-inline constexpr std::array<OrdinalFieldDescriptor, 14> kOrdinalFieldCatalog{{
+inline constexpr std::array<OrdinalFieldDescriptor, 15> kOrdinalFieldCatalog{{
+    // OTEL span wall-duration (insight_otel_epic.md §13, D-OTEL-12): endTimeUnixNano −
+    // startTimeUnixNano, already integer ns. Computed by the flat-span parser and emitted as
+    // this declared ordinal on the shipped DurationLog2Ns ladder (activates W1 + latency_shift
+    // on traces). The key also self-matches a literal span_duration_ns field if a log carries one.
+    {.key = "span_duration_ns", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = 1},
     {.key = "latency_ms", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = kNanosPerMilli},
     {.key = "duration_ms", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = kNanosPerMilli},
     {.key = "elapsed_ms", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = kNanosPerMilli},

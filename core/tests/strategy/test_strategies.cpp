@@ -323,6 +323,82 @@ TEST_F(JsonStrategyTest, NonOtelJsonHasNoTraceContext)
     EXPECT_EQ(result.value().trace.trace_id.value, 0U);
 }
 
+// ── OTEL span ingestion (insight_otel_epic.md §13, D-OTEL-10 shape 2 / D-OTEL-18) ────────────
+// The canonical flat-span record the lab emits (name / start+end times / status / service.name),
+// distinct from the OTLP log record above. Detected by the span-specific startTimeUnixNano key.
+static constexpr std::string_view kSpanLine{
+    R"({"traceId":"0123456789abcdeffedcba9876543210","spanId":"00000000000000ff",)"
+    R"("parentSpanId":"0000000000000001","name":"checkout","kind":"SPAN_KIND_INTERNAL",)"
+    R"("startTimeUnixNano":"1705312200000000000","endTimeUnixNano":"1705312200000500000",)"
+    R"("status":{"code":"STATUS_CODE_UNSET"},)"
+    R"("attributes":[{"key":"service.name","value":{"stringValue":"api-gateway"}},)"
+    R"({"key":"method","value":{"stringValue":"GET"}}]})"};
+
+TEST_F(JsonStrategyTest, OtelSpanMapsAllFields)
+{
+    auto result{strategy.parse(kSpanLine, arena)};
+    ASSERT_TRUE(result.has_value());
+    const auto& pl{result.value()};
+
+    // startTimeUnixNano → event time (a span is a POINT event at its start — D-OTEL-10).
+    ASSERT_TRUE(pl.timestamp.has_value());
+    EXPECT_EQ(std::chrono::duration_cast<std::chrono::seconds>(pl.timestamp->time_since_epoch())
+                  .count(),
+              1705312200);
+    // name → content (the templated operation, NOT the raw JSON); status UNSET → Info (declared).
+    EXPECT_EQ(pl.content, "checkout");
+    EXPECT_EQ(pl.level, LogLevel::Info);
+    // service.name (from attributes[]) → component (the WHERE tier).
+    EXPECT_EQ(pl.component, "api-gateway");
+    // Consumed trace context (same hashing as the log path).
+    EXPECT_TRUE(pl.trace.present);
+    EXPECT_EQ(pl.trace.trace_id, trace_id_from_hex("0123456789abcdeffedcba9876543210"));
+    EXPECT_EQ(pl.trace.span_id, span_id_from_hex("00000000000000ff"));
+    EXPECT_TRUE(pl.trace.has_parent);
+    EXPECT_EQ(pl.trace.parent_span_id, span_id_from_hex("0000000000000001"));
+    // end − start → the span_duration_ns ordinal on the DurationLog2Ns ladder (D-OTEL-12).
+    ASSERT_EQ(pl.ordinals.size(), 1U);
+    EXPECT_EQ(pl.ordinals[0].field_name, "span_duration_ns");
+    EXPECT_EQ(pl.ordinals[0].schedule, OrdinalSchedule::DurationLog2Ns);
+    EXPECT_EQ(pl.ordinals[0].value, 500000); // 1705312200000500000 − 1705312200000000000
+    // OR1: the high-card trace ids never enter the content.
+    EXPECT_EQ(pl.content.find("0123456789"), std::string_view::npos);
+}
+
+TEST_F(JsonStrategyTest, OtelSpanErrorStatusLiftsLevel)
+{
+    // status STATUS_CODE_ERROR → Error (declared > inferred).
+    auto result{strategy.parse(
+        R"({"traceId":"aa","spanId":"bb","name":"db_query","startTimeUnixNano":"1705312200000000000",)"
+        R"("endTimeUnixNano":"1705312200000000000","status":{"code":"STATUS_CODE_ERROR"},)"
+        R"("attributes":[{"key":"service.name","value":{"stringValue":"db"}}]})",
+        arena)};
+    ASSERT_TRUE(result.has_value());
+    const auto& pl{result.value()};
+    EXPECT_EQ(pl.level, LogLevel::Error);
+    EXPECT_EQ(pl.content, "db_query");
+    EXPECT_EQ(pl.component, "db");
+    // Zero-duration span (start == end) → the smallest bin, never negative.
+    ASSERT_EQ(pl.ordinals.size(), 1U);
+    EXPECT_EQ(pl.ordinals[0].value, 0);
+}
+
+TEST_F(JsonStrategyTest, OtelSpanRootHasNoParent)
+{
+    // No parentSpanId → a root span.
+    auto result{strategy.parse(
+        R"({"traceId":"aa","spanId":"bb","name":"root","startTimeUnixNano":"1705312200000000000",)"
+        R"("endTimeUnixNano":"1705312200000010000","status":{"code":"STATUS_CODE_UNSET"},)"
+        R"("attributes":[{"key":"service.name","value":{"stringValue":"gw"}}]})",
+        arena)};
+    ASSERT_TRUE(result.has_value());
+    const auto& pl{result.value()};
+    EXPECT_TRUE(pl.trace.present);
+    EXPECT_FALSE(pl.trace.has_parent);
+    EXPECT_EQ(pl.trace.parent_span_id.value, 0U);
+    EXPECT_EQ(pl.ordinals[0].value, 10000);
+}
+
 TEST_F(JsonStrategyTest, OtelSeverityNumberBands)
 {
     struct Case
