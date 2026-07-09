@@ -42,13 +42,29 @@ inline constexpr std::array<StructuralRoleRow, 6> kRoles{{
 // The hierarchy rides the rows: Job = Unordered (jobs parallel-by-construction), Step = Ordered (steps
 // sequential-by-YAML) — the ADR 0023 level-typed alignment declaration. The payload is the content
 // after the prefix, verbatim (core's canonicalize_intent/discriminant_of derive the class + instance).
-inline constexpr std::array<IntentMarkerRow, 2> kMarkers{{
+//
+// A step banner appears in TWO materializations of the same GHA stream: the runner's raw form wraps
+// it as `##[group]Run <cmd>`; the §5.3 workflow-command strip (crawl corpus) exposes the bare
+// `Run <cmd>`. Both are corpus-attested (bare in the stripped slices, wrapped in every raw job log;
+// `::group::Run ` is NOT attested — the runner rewrites `::` to `##[…]` — so no such row). Shipping
+// BOTH prefixes with RemainderAfterPrefix makes the recognized step name materialization-INVARIANT
+// (`##[group]Run yarn lint` and `Run yarn lint` both yield payload `yarn lint`) — so the stripped and
+// raw streams segment identically, which is what dissolves the "which form did Sift get fed" hazard
+// without any binary-side ingest strip (the strip is dialect grammar, and lives here, not in an
+// adapter — ADR 0024 §3, II-8 one-recognizer-layer). The two Step prefixes never shadow: neither is a
+// proper prefix of the other, so compose's longest-match note stays empty.
+inline constexpr std::array<IntentMarkerRow, 3> kMarkers{{
     {.prefix = "Complete job name: ",
      .kind = insight::tokenization::IntentMarkerKind::Job,
      .child_order = insight::tokenization::ChildOrder::Unordered,
      .format_gate = insight::LogFormat::GitHubActions,
      .extract = PayloadExtract::RemainderAfterPrefix},
     {.prefix = "Run ",
+     .kind = insight::tokenization::IntentMarkerKind::Step,
+     .child_order = insight::tokenization::ChildOrder::Ordered,
+     .format_gate = insight::LogFormat::GitHubActions,
+     .extract = PayloadExtract::RemainderAfterPrefix},
+    {.prefix = "##[group]Run ", // the raw (un-stripped) materialization of the same step banner
      .kind = insight::tokenization::IntentMarkerKind::Step,
      .child_order = insight::tokenization::ChildOrder::Ordered,
      .format_gate = insight::LogFormat::GitHubActions,
@@ -71,12 +87,14 @@ inline constexpr std::array<LevelLiftRow, 8> kLevelLifts{{
 }};
 
 // ── The manifest (§2.5) — the package's single composed contribution ──
-// name "github", version "1.0.0" (SP-7 immutable-release discipline). Ships no locations (that is
-// the test_frameworks package) and no value classes (none has a consumer in 1.7.5). Code tier: the
-// dialect strategy + the echoed-source hook.
+// name "github", version "1.1.0" — bumped from 1.0.0 for the additive `##[group]Run ` step row (SP-7
+// immutable-release discipline: a released version's rows are frozen, a content change is a new
+// version; the bump also rides the II-7 semantic_identity hash, an honest comparability boundary).
+// Ships no locations (that is the test_frameworks package) and no value classes (none has a consumer
+// yet). Code tier: the dialect strategy + the echoed-source hook.
 export inline constexpr SemanticPackageManifest kManifest{
     .name = "github",
-    .version = "1.0.0",
+    .version = "1.1.0",
     .roles = kRoles,
     .markers = kMarkers,
     .level_lifts = kLevelLifts,

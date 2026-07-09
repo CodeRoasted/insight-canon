@@ -64,6 +64,29 @@ TEST(GithubMarkers, RecognizesJobAndStepBanners)
     EXPECT_EQ(step.name, "actions/checkout@v4") << "raw step payload wrong: " << show(step);
 }
 
+// ── A step banner has two materializations of the SAME stream: the runner's raw `##[group]Run <cmd>`
+// and the §5.3-stripped bare `Run <cmd>`. Both open a Step, and RemainderAfterPrefix must yield the
+// IDENTICAL step name — that materialization-invariance is what makes the stripped and raw streams
+// segment identically (the property that lets Sift's shipped surfaces, which feed the raw form, reach
+// the same identity as the measured stripped corpus). `::group::Run ` is deliberately absent (not
+// corpus-attested; the runner rewrites `::` → `##[…]`).
+TEST(GithubMarkers, WrappedStepMaterializationIsInvariant)
+{
+    const ComposedSemantics gh{github_only()};
+    const auto wrapped{recognize("##[group]Run yarn lint", LogFormat::GitHubActions, gh)};
+    EXPECT_EQ(wrapped.kind, IntentMarkerKind::Step) << "wrapped step not recognized: " << show(wrapped);
+    EXPECT_EQ(wrapped.name, "yarn lint") << "wrapped payload must strip to the bare step name: " << show(wrapped);
+
+    const auto bare{recognize("Run yarn lint", LogFormat::GitHubActions, gh)};
+    EXPECT_EQ(bare.name, wrapped.name)
+        << "raw vs stripped materialization diverged: bare=\"" << bare.name << "\" wrapped=\"" << wrapped.name
+        << "\" — segmentation would differ across the two streams";
+
+    // `::group::Run ` is not a shipped row → it must NOT open a Step (guards against a speculative row).
+    const auto colon{recognize("::group::Run yarn lint", LogFormat::GitHubActions, gh)};
+    EXPECT_EQ(colon.kind, IntentMarkerKind::None) << "::group:: form unexpectedly recognized: " << show(colon);
+}
+
 // ── II-6: format-gated to GitHubActions — the dialect never fires cross-format ──
 // The gate is the ONLY difference (proven by the GHA sanity line). Post-split the gate is a ROW field
 // (kMarkers[*].format_gate = GitHubActions); the walker's gate_matches enforces it.
