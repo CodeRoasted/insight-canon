@@ -52,7 +52,7 @@ using WindowID = uint64_t;
 // component/level descent (a cube-axis change folded into the same bump). The -4 content changes
 // ONLY for inputs carrying a diagnostic-composite / ephemeral-root token or a nested-`fields` JSON
 // record; every other document is byte-identical except this version string.
-inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-4"};
+inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-5"};
 
 // ── Template identity (insight_perf_template_id.md D-TIR-1) ──
 // The structural identity of a canonicalised template: the first 16 bytes of
