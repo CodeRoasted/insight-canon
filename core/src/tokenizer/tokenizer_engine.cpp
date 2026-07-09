@@ -92,6 +92,9 @@ struct Tokenizer::Impl
                                          // never serialized; default-empty for non-OTEL inputs
         event.ordinals = parsed_line.ordinals; // W1 ordinal observations (D-W1-3): consumed by
                                                // metalog binning; empty span for non-ordinal lines
+        event.linked_span_ids = parsed_line.linked_span_ids; // O4b Span Links (D-OTEL-9): consumed by
+                                                             // metalog into the service topology; empty
+                                                             // for lines without links
         event.echoed_source = parsed_line.echoed_source; // D-PROV-1: echoed script source, not a
                                                          // runtime event; consumed (salience tier
                                                          // gate), never serialized; false for the

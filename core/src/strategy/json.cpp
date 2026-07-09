@@ -112,6 +112,19 @@ store_ordinals(std::span<const OrdinalObservation> observations, ArenaAllocator&
 // traceId/spanId/parentSpanId→the consumed trace context (OR1). `kind` is a deferred diagnostic
 // field (D-OTEL-18b — it needs a categorical-field→value_counts channel canon lacks today; not
 // load-bearing for the structural exhibits).
+// O4b Span Links (D-OTEL-9): copy the collected linked span_ids into arena-stable storage (mirrors
+// store_ordinals). Empty in → empty out (no allocation) so a span without links stays zero-cost.
+[[nodiscard]] std::span<const SpanId> store_span_ids(std::span<const SpanId> ids, ArenaAllocator& arena)
+{
+    if (ids.empty())
+        return {};
+    void* const mem{arena.allocate(ids.size() * sizeof(SpanId), alignof(SpanId))};
+    auto* const dst{static_cast<SpanId*>(mem)};
+    for (std::size_t i{0}; i < ids.size(); ++i)
+        dst[i] = ids[i];
+    return std::span<const SpanId>{dst, ids.size()};
+}
+
 void parse_otel_span(simdjson::ondemand::object& root, ParsedLine& parsed_line, ArenaAllocator& arena)
 {
     std::string_view start_nano;
@@ -119,6 +132,7 @@ void parse_otel_span(simdjson::ondemand::object& root, ParsedLine& parsed_line, 
     std::string_view name_view;
     std::string_view service_name;
     bool is_error{false};
+    std::vector<SpanId> linked; // O4b Span Links (D-OTEL-9): the declared cross-trace edge targets
 
     for (auto field : root)
     {
@@ -194,6 +208,25 @@ void parse_otel_span(simdjson::ondemand::object& root, ParsedLine& parsed_line, 
                 }
             }
         }
+        else if (key == "links")
+        {
+            // O4b Span Links (D-OTEL-9): each link declares a cross-trace edge to another span. Collect
+            // the linked span_ids; metalog resolves them (by span_id, across traces) into the distilled
+            // service topology (component(this) → component(linked)). The link's trace_id/attributes are
+            // consumed-not-retained like the parent context.
+            simdjson::ondemand::array links_array;
+            if (field.value().get_array().get(links_array) == simdjson::SUCCESS)
+                for (auto element : links_array)
+                {
+                    simdjson::ondemand::object link;
+                    if (element.get_object().get(link) != simdjson::SUCCESS)
+                        continue;
+                    std::string_view link_span_hex;
+                    if (link.find_field_unordered("spanId").get_string().get(link_span_hex) ==
+                        simdjson::SUCCESS)
+                        linked.push_back(span_id_from_hex(link_span_hex));
+                }
+        }
     }
 
     // Apply the mapping. Event time + duration are integer ns (D-OTEL-3, by construction).
@@ -216,6 +249,9 @@ void parse_otel_span(simdjson::ondemand::object& root, ParsedLine& parsed_line, 
                                                               .value = duration_ns}}};
         parsed_line.ordinals = store_ordinals(observation, arena);
     }
+
+    // O4b Span Links (D-OTEL-9): publish the declared cross-trace edge targets (empty ⇒ no allocation).
+    parsed_line.linked_span_ids = store_span_ids(linked, arena);
 }
 
 // Copy the matched ordinal observations (W1, D-W1-3) into arena-stable storage and return a span

@@ -876,6 +876,12 @@ struct CanonicalEvent
     // params. A span over arena-allocated storage (like `params`); EMPTY for every non-ordinal line
     // → zero added cost on the hot path (input-conditional, the OTEL D-OTEL-2a precedent).
     std::span<const OrdinalObservation> ordinals{};
+    // O4b Span Links (insight_otel_epic.md §5.3 / D-OTEL-9, D-OTEL-21): the span_ids this span DECLARES
+    // a cross-trace edge to (OTEL `links[]`). Consumed metalog-side — each resolves (by span_id, across
+    // traces) into the SAME distilled service topology as intra-trace parentage: component(this) →
+    // component(linked). A span over arena-allocated storage; EMPTY for every span without links (and
+    // every non-span line) → zero added cost. NEVER retained/serialized (the trace-context discipline).
+    std::span<const SpanId> linked_span_ids{};
     // Observation-provenance attribute (D-PROV-1): the line is echoed program/script SOURCE (the
     // CI harness printing a run-step body), not an observed runtime event — recognized at the ANSI
     // strip layer by the GHA command-echo SGR wrapper (Fact 1). CONSUMED in-memory — it already
