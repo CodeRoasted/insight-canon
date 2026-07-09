@@ -4,7 +4,7 @@ packages:
   # core/ = the language, semantic/* = the vocabularies, bench/ = the composed perf harness.
   insight_canon:
     path: core
-    version: 1.7.5
+    version: 1.7.6
     license: Apache-2.0
     public: true
     release: true
@@ -15,14 +15,14 @@ packages:
   # PO-scheduled successors riding the same contract, never pre-built.
   insight_semantic_github:
     path: semantic/github
-    version: 1.7.5
+    version: 1.7.6
     license: Apache-2.0
     public: true
     release: true
     depends: [insight_canon]
   insight_semantic_test_frameworks:
     path: semantic/test_frameworks
-    version: 1.7.5
+    version: 1.7.6
     license: Apache-2.0
     public: true
     release: true
@@ -32,7 +32,7 @@ packages:
   # and the on-tag measure-benchmark gate; never published as a release artifact.
   insight_canon_bench:
     path: bench
-    version: 1.7.5
+    version: 1.7.6
     license: Apache-2.0
     public: true
     release: false
