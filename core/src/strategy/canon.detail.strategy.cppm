@@ -368,6 +368,25 @@ class SystemdJournalStrategy final : public IFormatStrategy
 
 } // namespace insight::tokenization
 
+// ──────── OTEL span-export document unpack (insight_otel_epic.md §13, D-OTEL-18) ────────
+export namespace insight::tokenization
+{
+
+// True iff `line` is an OTLP/JSON resourceSpans trace-export DOCUMENT (shape 1) — the record-
+// source layer routes these to unpack_otel_spans before tokenization; a flat span (shape 2)
+// and every non-OTEL line return false. A cheap raw-byte check, no simdjson cursor spent.
+[[nodiscard]] bool is_otel_span_document(std::string_view line) noexcept;
+
+// Unpack one OTLP/JSON resourceSpans trace-export DOCUMENT into N CANONICAL flat-span record
+// strings (D-OTEL-10 shape 1 → shape 2, D-OTEL-18a) — byte-form-identical to what the LogCraft
+// lab emits for the same spans, so the flat-span parser is authored once and shape-1 ≡ shape-2 is
+// a golden-tested property. resource `service.name` is injected into each span's attributes (the
+// declared allowlist); span attributes are copied verbatim. Appends to `out`; returns the count
+// of spans emitted (0 if `document` is not a resourceSpans export).
+std::size_t unpack_otel_spans(std::string_view document, std::vector<std::string>& out);
+
+} // namespace insight::tokenization
+
 // ──────── from src/insight/tokenization/strategies/windows_cbs.hpp ────────
 export namespace insight::tokenization
 {

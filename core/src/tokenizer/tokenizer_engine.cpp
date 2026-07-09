@@ -140,8 +140,22 @@ Tokenizer::process_batch(std::span<const std::string_view> lines)
 {
     std::vector<std::expected<CanonicalEvent, std::string>> out;
     out.reserve(lines.size());
+    std::vector<std::string> span_records; // reused scratch for the document unpack
     for (auto line : lines)
+    {
+        // D-OTEL-18 record-source 1→N: an OTLP `resourceSpans` export is unpacked into N canonical
+        // flat-span records, each tokenized 1:1 (the strategy stays 1:1). A flat span (shape 2) and
+        // every non-OTEL line take the direct path — byte-identical to pre-O3.
+        if (is_otel_span_document(line))
+        {
+            span_records.clear();
+            unpack_otel_spans(line, span_records);
+            for (const auto& record : span_records)
+                out.push_back(process_line(record));
+            continue;
+        }
         out.push_back(process_line(line));
+    }
     return out;
 }
 
