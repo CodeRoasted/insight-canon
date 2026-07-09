@@ -15,7 +15,8 @@ jobs:
   # reusable lint). Gates PRs directly and the tag via release.yaml's `lint` job. Runs no package code
   # — a pure greppable scrub over src/ + api/ — so it needs only checkout + perl (preinstalled).
   sp1-semantic-unawareness:
-    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-latest' }}
+    # PUBLIC repo: pinned to hosted — a self-hosted runner reachable from a fork PR is an RCE. Never vars.CI_RUNS_ON here.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
