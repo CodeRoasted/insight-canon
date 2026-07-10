@@ -97,6 +97,10 @@ class ComposedSemantics
     // a future package's client-ordinal / domain value classes compose in — the grammar seat exists,
     // its unification with the core catalogs waits for a real consumer.
     [[nodiscard]] std::span<const ValueClassRow> value_classes() const noexcept { return value_classes_; }
+    // The run-outcome vocabulary (grammar-2, ADR 0025): the composed dialect verdict maps + the
+    // console-tail markers. Consumed by map_outcome_token / scan_run_outcome / resolve_run_outcome.
+    [[nodiscard]] std::span<const OutcomeTokenRow> outcome_tokens() const noexcept { return outcome_tokens_; }
+    [[nodiscard]] std::span<const OutcomeMarkerRow> outcome_markers() const noexcept { return outcome_markers_; }
 
     // ── The code-tier seams ──
     [[nodiscard]] std::span<const StrategyFactory> strategy_factories() const noexcept { return strategies_; }
@@ -117,6 +121,8 @@ class ComposedSemantics
     std::vector<LevelLiftRow> level_lifts_;
     std::vector<LocationRow> locations_;
     std::vector<ValueClassRow> value_classes_;
+    std::vector<OutcomeTokenRow> outcome_tokens_;
+    std::vector<OutcomeMarkerRow> outcome_markers_;
     std::vector<StrategyFactory> strategies_;
     std::vector<ProvenanceHook> provenance_hooks_;
     std::vector<ComposedPackage> packages_;
@@ -172,6 +178,32 @@ namespace detail
     }
 } // namespace detail
 
+namespace detail
+{
+    // The outcome-token variant of first_prefix_dup: keyed on .token + intersecting gate (ADR 0025
+    // §3.3 — two packages mapping the SAME token under intersecting gates is a conflict, whatever
+    // the mapped outcome; a duplicate row has no deterministic resolution either way).
+    [[nodiscard]] constexpr std::optional<std::string_view>
+    first_outcome_token_dup(std::span<const SemanticPackageManifest> packages) noexcept
+    {
+        for (std::size_t pkg_a{0}; pkg_a < packages.size(); ++pkg_a)
+        {
+            const std::span<const OutcomeTokenRow> rows_a{packages[pkg_a].outcome_tokens};
+            for (std::size_t idx_i{0}; idx_i < rows_a.size(); ++idx_i)
+                for (std::size_t pkg_b{pkg_a}; pkg_b < packages.size(); ++pkg_b)
+                {
+                    const std::span<const OutcomeTokenRow> rows_b{packages[pkg_b].outcome_tokens};
+                    for (std::size_t idx_j{(pkg_b == pkg_a) ? idx_i + 1 : 0}; idx_j < rows_b.size();
+                         ++idx_j)
+                        if (rows_a[idx_i].token == rows_b[idx_j].token &&
+                            gates_intersect(rows_a[idx_i].format_gate, rows_b[idx_j].format_gate))
+                            return rows_a[idx_i].token;
+                }
+        }
+        return std::nullopt;
+    }
+} // namespace detail
+
 constexpr ConflictInfo find_conflict(std::span<const SemanticPackageManifest> packages) noexcept
 {
     // An exact duplicate is same key + (for prefix rows) intersecting format gate. Each unordered
@@ -185,6 +217,11 @@ constexpr ConflictInfo find_conflict(std::span<const SemanticPackageManifest> pa
     if (const auto key{
             detail::first_prefix_dup<LevelLiftRow>(packages, &SemanticPackageManifest::level_lifts)})
         return {.has_conflict = true, .kind = "level_lift", .key = *key};
+    if (const auto key{detail::first_outcome_token_dup(packages)})
+        return {.has_conflict = true, .kind = "outcome_token", .key = *key};
+    if (const auto key{detail::first_prefix_dup<OutcomeMarkerRow>(
+            packages, &SemanticPackageManifest::outcome_markers)})
+        return {.has_conflict = true, .kind = "outcome_marker", .key = *key};
     // Value classes are keyed by `.key` (no format gate).
     for (std::size_t pkg_a{0}; pkg_a < packages.size(); ++pkg_a)
         for (std::size_t idx_i{0}; idx_i < packages[pkg_a].value_classes.size(); ++idx_i)

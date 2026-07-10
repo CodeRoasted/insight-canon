@@ -97,6 +97,7 @@ void serialize_manifest(std::string& out, const SemanticPackageManifest& pkg)
         append_u8(out, static_cast<std::uint8_t>(row.child_order));
         append_u8(out, static_cast<std::uint8_t>(row.format_gate));
         append_u8(out, static_cast<std::uint8_t>(row.extract));
+        append_str_span(out, row.payload_excludes); // grammar-2: the exclusion set is identity
     }
     append_u32_le(out, static_cast<std::uint32_t>(pkg.level_lifts.size()));
     for (const LevelLiftRow& row : pkg.level_lifts)
@@ -121,6 +122,22 @@ void serialize_manifest(std::string& out, const SemanticPackageManifest& pkg)
         append_u8(out, static_cast<std::uint8_t>(row.cls));
         append_str(out, row.schedule_id);
         append_i64_le(out, row.scale);
+    }
+    // grammar-2 (ADR 0025): the run-outcome vocabulary enters the identity — a mapping change
+    // honestly stales cross-artifact comparability (SP-4). Appended after the grammar-1 sections
+    // (fixed field order; the version string above already segregates the generations).
+    append_u32_le(out, static_cast<std::uint32_t>(pkg.outcome_tokens.size()));
+    for (const OutcomeTokenRow& row : pkg.outcome_tokens)
+    {
+        append_str(out, row.token);
+        append_u8(out, static_cast<std::uint8_t>(row.outcome));
+        append_u8(out, static_cast<std::uint8_t>(row.format_gate));
+    }
+    append_u32_le(out, static_cast<std::uint32_t>(pkg.outcome_markers.size()));
+    for (const OutcomeMarkerRow& row : pkg.outcome_markers)
+    {
+        append_str(out, row.prefix);
+        append_u8(out, static_cast<std::uint8_t>(row.format_gate));
     }
 }
 
@@ -196,6 +213,10 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
                                    pkg.locations.end());
         composed.value_classes_.insert(composed.value_classes_.end(), pkg.value_classes.begin(),
                                        pkg.value_classes.end());
+        composed.outcome_tokens_.insert(composed.outcome_tokens_.end(), pkg.outcome_tokens.begin(),
+                                        pkg.outcome_tokens.end());
+        composed.outcome_markers_.insert(composed.outcome_markers_.end(),
+                                         pkg.outcome_markers.begin(), pkg.outcome_markers.end());
         if (pkg.strategy != nullptr)
             composed.strategies_.push_back(pkg.strategy);
         if (pkg.echoed_source != nullptr)
@@ -215,6 +236,7 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
     note_shadows<StructuralRoleRow>(composed.roles_, "role", composed.report_);
     note_shadows<IntentMarkerRow>(composed.markers_, "marker", composed.report_);
     note_shadows<LevelLiftRow>(composed.level_lifts_, "level_lift", composed.report_);
+    note_shadows<OutcomeMarkerRow>(composed.outcome_markers_, "outcome_marker", composed.report_);
 
     return composed;
 }

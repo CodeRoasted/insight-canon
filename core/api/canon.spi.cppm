@@ -103,7 +103,10 @@ export namespace insight::semantic
 
 // The grammar version — a component of the composed identity (§4). Bump on any grammar SHAPE change
 // (a new row kind, a new closed-enum member, a serialization change). ASCII, versioned string id.
-inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-1"};
+// grammar-2 (ADR 0025, the first anticipated growth): the run-outcome row kinds (OutcomeTokenRow /
+// OutcomeMarkerRow), the IntentMarkerRow payload-exclusion set, and the RemainderToClosingParen
+// extractor — the shapes the Jenkins dialect genuinely needs.
+inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-2"};
 
 // The "any format" sentinel for a row's format gate: the rule fires regardless of the line's routed
 // format. `LogFormat::Unknown` is that sentinel (no real routed line carries Unknown — RawText is the
@@ -113,12 +116,18 @@ inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-1"};
 inline constexpr insight::LogFormat kAnyFormat{insight::LogFormat::Unknown};
 
 // How a matched marker's payload is extracted (§2.2 — a CLOSED extractor enum; the algorithm lives in
-// core). Today one shape suffices: the payload is the content AFTER the matched prefix, verbatim (the
-// alignment CLASS / discriminant are then derived in core by canonicalize_intent/discriminant_of).
+// core). The alignment CLASS / discriminant are then derived in core by canonicalize_intent /
+// discriminant_of. A new extractor is a grammar-version bump, part of the identity.
 enum class PayloadExtract : std::uint8_t
 {
     None = 0,             ///< no payload (structural markers carry none)
     RemainderAfterPrefix, ///< the content after the matched prefix, verbatim (intent markers)
+    // grammar-2 (ADR 0025 / studies/006): the content after the matched prefix up to a REQUIRED
+    // line-final ')' — the Jenkins named-block-open form `[Pipeline] { (<name>)`. A line that does
+    // not end with ')' does not match the row at all (strict — an un-named `[Pipeline] {` wrapper
+    // is scaffold, not a quantum). Nested parens stay inside the payload (`{ (Branch: test (lts))`
+    // → `Branch: test (lts)`): only the single final ')' is the delimiter.
+    RemainderToClosingParen,
 };
 
 // Which core location-matching ALGORITHM a LocationRow selects + parameterizes (§2.2 — a CLOSED enum;
@@ -154,6 +163,14 @@ struct IntentMarkerRow
     insight::tokenization::ChildOrder child_order;
     insight::LogFormat format_gate;
     PayloadExtract extract;
+    // grammar-2 (ADR 0025 / studies/006): a CLOSED exclusion set over the extracted payload — the
+    // row does NOT fire when the payload's leading token matches an entry (entry == payload, or
+    // payload starts with entry followed by a space). The Jenkins step form `[Pipeline] <verb>`
+    // needs it: the verb set is open (any pipeline step), the structural tokens that share the
+    // prefix (`{`, `}`, `stage`, `node`, `parallel`, `//`, `End of Pipeline`) are closed dialect
+    // data. Empty for rows without exclusions (every pre-grammar-2 row). The span points at
+    // package-static constexpr storage (SP-7 lifetime); serialized into semantic_identity.
+    std::span<const std::string_view> payload_excludes{};
 };
 
 // A level-lift rule: a prefix lifts the line's LogLevel (§1.2 — `##[error]` → Error). Consumed by the
@@ -177,6 +194,32 @@ struct LocationRow
     std::span<const std::string_view> extensions; // ts/tsx/js/… (TestSpec) or `.py` (PrefixAndExtension)
     std::span<const std::string_view> prefixes;   // `test_` / `_test` basename forms (PrefixAndExtension)
     std::span<const std::string_view> suffixes;   // `_test.go` / `_spec.rb` / `_test.rb` (SuffixSet)
+};
+
+// ── Run-outcome rows (grammar-2, ADR 0025 / insight_run_outcome_model.md §4) ──
+// The dialect's run-verdict MAPPING — native verdict string → the core-owned RunOutcome — plus the
+// console-tail fallback marker. Matcher algorithms live in core (map_outcome_token /
+// scan_run_outcome / resolve_run_outcome, the D-OUT-RUN-1 precedence); a package ships only rows,
+// and either set may be empty (GHA ships tokens but no marker — it has no run-verdict console line).
+
+// One native verdict token → RunOutcome (byte-exact, format-gated). Consumed on BOTH resolution
+// rungs: the authoritative `--*-outcome` side-input token and the console-tail marker's extracted
+// remainder map through the SAME set.
+struct OutcomeTokenRow
+{
+    std::string_view token; // the native dialect verdict string, verbatim ("UNSTABLE", "cancelled")
+    insight::RunOutcome outcome;
+    insight::LogFormat format_gate;
+};
+
+// The console-tail terminal-verdict line (Jenkins: `Finished: `). Core matches it line-anchored on
+// the routed format, extracts the remainder token (which must be a single ASCII word), and maps it
+// through the composed OutcomeTokenRow set; the LAST match in line order wins (a run has one
+// terminal verdict; deterministic integer index).
+struct OutcomeMarkerRow
+{
+    std::string_view prefix;
+    insight::LogFormat format_gate;
 };
 
 // A value-class rule (the grammar SEAT for package value classes, §5). No package ships domain value
@@ -221,6 +264,10 @@ struct SemanticPackageManifest
     std::span<const LevelLiftRow> level_lifts;
     std::span<const LocationRow> locations;
     std::span<const ValueClassRow> value_classes;
+    // grammar-2 (ADR 0025): the run-outcome vocabulary. Both may be empty (§3.2 — a package
+    // declares exactly the outcome surfaces its dialect actually has).
+    std::span<const OutcomeTokenRow> outcome_tokens;
+    std::span<const OutcomeMarkerRow> outcome_markers;
     StrategyFactory strategy{nullptr};  // nullable — the dialect format-strategy code tier
     ProvenanceHook echoed_source{nullptr}; // nullable — the raw-line echoed-source code tier
 };

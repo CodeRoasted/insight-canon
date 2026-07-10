@@ -171,22 +171,71 @@ StructuralRole classify(std::string_view content, LogFormat format,
     return best;
 }
 
+namespace
+{
+// Extract a row's payload from the content past its matched prefix (the closed extractor algorithms,
+// grammar-2). nullopt = the extractor's own shape requirement failed ⇒ the ROW does not match at all
+// (RemainderToClosingParen without a line-final ')' — an un-named `[Pipeline] {` wrapper).
+[[nodiscard]] std::optional<std::string_view>
+extract_payload(std::string_view content, const insight::semantic::IntentMarkerRow& row) noexcept
+{
+    const std::string_view remainder{content.substr(row.prefix.size())};
+    switch (row.extract)
+    {
+    case insight::semantic::PayloadExtract::None:
+        return std::string_view{};
+    case insight::semantic::PayloadExtract::RemainderAfterPrefix:
+        return remainder;
+    case insight::semantic::PayloadExtract::RemainderToClosingParen:
+        // The content after the prefix up to a REQUIRED line-final ')' (studies/006 STAGE form
+        // `^\{ \((.+)\)$`): non-empty payload, single trailing delimiter dropped, nested parens kept.
+        if (remainder.size() < 2U || remainder.back() != ')')
+            return std::nullopt;
+        return remainder.substr(0, remainder.size() - 1U);
+    }
+    return std::nullopt;
+}
+
+// grammar-2 payload exclusion (ADR 0025 / studies/006): an entry excludes when it equals the payload
+// or is its leading space-delimited token — `stage` excludes `stage` and `node` excludes `node {`,
+// while `stages` stays a step (word boundary). Matches the spike's first-token/whole-body semantics.
+[[nodiscard]] bool payload_excluded(std::string_view payload,
+                                    const insight::semantic::IntentMarkerRow& row) noexcept
+{
+    for (const std::string_view entry : row.payload_excludes)
+        if (payload.starts_with(entry) &&
+            (payload.size() == entry.size() || payload[entry.size()] == ' '))
+            return true;
+    return false;
+}
+} // namespace
+
 IntentMarker recognize(std::string_view content, LogFormat format,
                        const insight::semantic::ComposedSemantics& composed) noexcept
 {
     const insight::semantic::IntentMarkerRow* best{nullptr};
+    std::string_view best_payload;
     for (const insight::semantic::IntentMarkerRow& row : composed.markers())
-        if (gate_matches(row.format_gate, format) && content.starts_with(row.prefix) &&
-            (best == nullptr || row.prefix.size() > best->prefix.size()))
-            best = &row;
+    {
+        if (!gate_matches(row.format_gate, format) || !content.starts_with(row.prefix) ||
+            (best != nullptr && row.prefix.size() <= best->prefix.size()))
+            continue;
+        // A row matches only when its extractor's shape holds AND the payload is not excluded
+        // (grammar-2) — a failed row falls through so a shorter row may still claim the line
+        // (longest VALID match wins, deterministic).
+        const std::optional<std::string_view> payload{extract_payload(content, row)};
+        if (!payload || payload_excluded(*payload, row))
+            continue;
+        best = &row;
+        best_payload = *payload;
+    }
     if (best == nullptr)
         return {};
-    // RemainderAfterPrefix: the payload is the content after the matched prefix, verbatim; the class
-    // (canonicalize_intent) is derived downstream, the discriminant here (the ADR 0023 raw coordinate).
-    const std::string_view payload{content.substr(best->prefix.size())};
+    // The payload is the extractor's capture, verbatim; the class (canonicalize_intent) is derived
+    // downstream, the discriminant here (the ADR 0023 raw coordinate).
     return {.kind = best->kind,
-            .name = payload,
-            .discriminant = discriminant_of(payload),
+            .name = best_payload,
+            .discriminant = discriminant_of(best_payload),
             .child_order = best->child_order};
 }
 

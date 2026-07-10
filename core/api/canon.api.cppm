@@ -440,6 +440,67 @@ enum class LogLevel : uint8_t
     }
 }
 
+// ── Run outcome (ADR 0025 / insight_run_outcome_model.md §2) ──
+// The CI run's terminal verdict — a run-level sibling of LogLevel, NOT a per-event field (never on
+// CanonicalEvent) and NOT a cube dimension (OUTCOME is the run LABEL — [[cube-dimension-model]]).
+// Universal outcome CATEGORIES; the strings that name them per dialect are semantic-package data
+// (OutcomeTokenRow, insight.canon.spi). The five span the CI outcome space: Jenkins/GHA/GitLab all
+// map into them. UNSTABLE (ran, partially failed, continued) is neither Success nor Failure and is
+// NEVER folded into either; ABORTED means the log is INCOMPLETE and is never read as pass or fail.
+enum class RunOutcome : std::uint8_t
+{
+    Unknown = 0, // no verdict observed (absence / legacy / unmapped token) — the default
+    Success,     // the run completed clean
+    Failure,     // the run failed as a whole (a hard build break)
+    Unstable,    // the run RAN and partially failed but continued — flaky/partial, NOT Failure
+    Aborted,     // the run was cancelled / timed out / did not complete — the log is INCOMPLETE
+};
+
+[[nodiscard]] constexpr std::string_view to_string(RunOutcome outcome) noexcept
+{
+    using namespace std::literals;
+
+    switch (outcome)
+    {
+    case RunOutcome::Success:
+        return "SUCCESS"sv;
+    case RunOutcome::Failure:
+        return "FAILURE"sv;
+    case RunOutcome::Unstable:
+        return "UNSTABLE"sv;
+    case RunOutcome::Aborted:
+        return "ABORTED"sv;
+    default:
+        return "UNKNOWN"sv;
+    }
+}
+
+// §6.1: did the run verdict get strictly WORSE on the pass↔fail axis Success < Unstable < Failure?
+// Aborted/Unknown are EXCLUDED — they are not points on that axis (an aborted run is inconclusive,
+// an unknown one carries no verdict), so any transition touching them is never an outcome
+// regression. Deterministic integer compare; the single-source predicate the CLI gate, the check
+// and the comment verdict read.
+[[nodiscard]] constexpr bool outcome_regressed(RunOutcome baseline, RunOutcome changed) noexcept
+{
+    constexpr auto axis_rank{[](RunOutcome outcome) noexcept -> int
+                             {
+                                 switch (outcome)
+                                 {
+                                 case RunOutcome::Success:
+                                     return 0;
+                                 case RunOutcome::Unstable:
+                                     return 1;
+                                 case RunOutcome::Failure:
+                                     return 2;
+                                 default:
+                                     return -1; // Aborted / Unknown — off the axis
+                                 }
+                             }};
+    const int baseline_rank{axis_rank(baseline)};
+    const int changed_rank{axis_rank(changed)};
+    return baseline_rank >= 0 && changed_rank >= 0 && changed_rank > baseline_rank;
+}
+
 // ── OTEL severity_number → LogLevel band (insight_otel_epic.md D-OTEL-1) ──
 // The OpenTelemetry severity_number (1–24) folds into canon's existing 6-level LogLevel
 // by integer division: band = (n-1)/4 → Trace(1–4)/Debug(5–8)/Info(9–12)/Warn(13–16)/
@@ -496,6 +557,11 @@ enum class LogFormat : uint8_t
     // commands). A first-class CI input — without it these lines are mis-claimed
     // by Syslog (RFC3339 prefix) and shredded into empty templates.
     GitHubActions,
+    // Jenkins Pipeline console dialect (ADR 0024 §1.3 registration; the strategy code lives in
+    // insight_semantic_jenkins). Line-selective: `[Pipeline] ` annotations, timestamper-plugin
+    // `[<RFC3339>] `-prefixed lines, and the `Finished: <RESULT>` run epilogue; other console
+    // output falls through (typically RawText) — a Jenkins console has no uniform line prefix.
+    Jenkins,
     // Catch-all for unstructured text (CI / pytest / build logs). Selected only
     // when no structured strategy matches a non-empty line, so the tokenizer
     // never silently drops a line. Keep immediately before Unknown.
@@ -547,6 +613,8 @@ enum class LogFormat : uint8_t
         return "NginxError"sv;
     case LogFormat::GitHubActions:
         return "GitHubActions"sv;
+    case LogFormat::Jenkins:
+        return "Jenkins"sv;
     case LogFormat::RawText:
         return "RawText"sv;
     default:

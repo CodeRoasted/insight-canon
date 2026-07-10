@@ -73,6 +73,56 @@ class Tokenizer
 export namespace insight
 {
 
+// ── Run-outcome recognition + resolution (ADR 0025 / insight_run_outcome_model.md §3–§4) ────────
+// Canon owns the ALGORITHMS (the format-gated token map, the console-tail scan, the D-OUT-RUN-1
+// precedence resolver); the composed OutcomeTokenRow/OutcomeMarkerRow sets are the DATA. Homed in
+// the facade (they consume ComposedSemantics; the scan drives the sealed LogParser).
+
+// Map a native verdict token through the composed OutcomeTokenRow set, gated to `format` (a Jenkins
+// token resolves against Jenkins rows only — II-6). nullopt = no row claims the token under that
+// gate (distinct from a row that maps it TO RunOutcome::Unknown, e.g. Jenkins NOT_BUILT).
+[[nodiscard]] std::optional<RunOutcome>
+map_outcome_token(std::string_view token, LogFormat format,
+                  const insight::semantic::ComposedSemantics& composed) noexcept;
+
+// The whole-log console-tail scan (§3.2 — the degenerate "only a console log" source). One
+// parse-only pass (no masking): per line, the routed format gates the composed OutcomeMarkerRow
+// walk; a match extracts the remainder token (a single ASCII word, strict) and the LAST match wins.
+// Also latches the log's outcome-bearing DIALECT: the first routed format any OutcomeTokenRow is
+// gated on — the gate the side-input token resolves under.
+struct RunOutcomeScan
+{
+    LogFormat dialect{LogFormat::Unknown};       // first outcome-bearing routed format; Unknown = none
+    LogFormat marker_format{LogFormat::Unknown}; // the matched marker line's routed format
+    bool marker_present{false};
+    std::string token; // the last console-tail verdict token (empty when !marker_present)
+};
+
+[[nodiscard]] RunOutcomeScan scan_run_outcome(std::span<const std::string> lines,
+                                              const insight::semantic::ComposedSemantics& composed);
+
+// D-OUT-RUN-1 — the strict total resolution order, NEVER a reconciliation:
+//   1. the authoritative side-input token, if provided AND it maps in the detected dialect;
+//   2. else the console-tail marker's last match, if present AND it maps;
+//   3. else Unknown.
+// When rung 1 resolves, a present-but-DISAGREEING console tail is NOT consulted (Accumulo #498 —
+// a local/nested/caught outcome, not a competing whole-run verdict): the divergence is surfaced as
+// a kept trace-level log + the `divergent` flag, the authoritative value stands. A token that is
+// provided but does not map is never a silent misclassification: it surfaces in `note` (fail-closed,
+// the SP-3/SP-4 discipline applied to values) and resolution falls down the ladder.
+struct RunOutcomeResolution
+{
+    RunOutcome outcome{RunOutcome::Unknown};
+    RunOutcome console{RunOutcome::Unknown}; // the console candidate's mapped value (Unknown otherwise)
+    bool authoritative{false};               // rung 1 resolved
+    bool divergent{false};                   // rung 1 resolved AND a mapped console tail disagrees
+    std::string note;                        // surfaced fail-closed note ("" = clean)
+};
+
+[[nodiscard]] RunOutcomeResolution
+resolve_run_outcome(std::string_view side_input_token, const RunOutcomeScan& scan,
+                    const insight::semantic::ComposedSemantics& composed);
+
 // Location recognition (intent_identity_model.md §5.3/§5.4, II-8) — the test-file WHERE coordinate,
 // homed in the facade because it walks the composed location rows (ComposedSemantics is in
 // insight.canon.compose). Canon owns the three LocationMatchKind algorithms; the composed rows are the
