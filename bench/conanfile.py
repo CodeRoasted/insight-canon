@@ -36,6 +36,7 @@ class InsightCanonBenchConan(ConanFile):
     def requirements(self):
         self.requires("insight_canon/1.7.7")
         self.requires("insight_semantic_github/1.7.7")
+        self.requires("insight_semantic_jenkins/1.7.7")
         self.requires("insight_semantic_test_frameworks/1.7.7")
         self.requires("benchmark/1.9.5")
 

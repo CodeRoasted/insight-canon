@@ -31,6 +31,7 @@
 // library build, not a module-member rebuild.
 import insight.canon;
 import insight.semantic.github;
+import insight.semantic.jenkins;
 import insight.semantic.test_frameworks;
 
 namespace
@@ -130,8 +131,9 @@ void run_throughput(benchmark::State& state, const insight::semantic::ComposedSe
 // The gate arm — the product composition (the det_proof set, built once, loop-invariant).
 void BM_TokenizationThroughput(benchmark::State& state)
 {
-    static const std::array<insight::semantic::SemanticPackageManifest, 2> kManifests{
-        insight::semantic::github::kManifest, insight::semantic::test_frameworks::kManifest};
+    static const std::array<insight::semantic::SemanticPackageManifest, 3> kManifests{
+        insight::semantic::github::kManifest, insight::semantic::jenkins::kManifest,
+        insight::semantic::test_frameworks::kManifest};
     static const insight::semantic::ComposedSemantics composed{
         insight::semantic::compose(kManifests)};
     run_throughput(state, composed);

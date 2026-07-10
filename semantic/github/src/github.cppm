@@ -86,20 +86,41 @@ inline constexpr std::array<LevelLiftRow, 8> kLevelLifts{{
     {.prefix = "::notice::", .level = insight::LogLevel::Info, .format_gate = insight::LogFormat::GitHubActions},
 }};
 
+// ── Run-outcome token rows (grammar-2, ADR 0025 §4 — the GitHub reshape) ──
+// The GHA native job/run conclusion strings (`${{ needs.<job>.result }}` / the API `conclusion`),
+// mapped into the core four-class vocabulary. This RETIRES the render-side `deriveBuildStatus`
+// binary at its root: the verdict now enters the ENGINE four-class-aware through the same channel
+// as Jenkins (the Action forwards the native token to `sift --*-outcome`; Argos rewires the JS).
+// GHA has no native UNSTABLE string today — the category stays core, this dialect simply ships no
+// row for it. skipped/neutral/action_required carry no pass↔fail verdict → Unknown (honest, never
+// a guess). NO OutcomeMarkerRow: GHA emits no single run-verdict console line (`Process completed
+// with exit code N` is per-step) — the degenerate console path is correctly Unknown (§3.2).
+inline constexpr std::array<OutcomeTokenRow, 7> kOutcomeTokens{{
+    {.token = "success", .outcome = insight::RunOutcome::Success, .format_gate = insight::LogFormat::GitHubActions},
+    {.token = "failure", .outcome = insight::RunOutcome::Failure, .format_gate = insight::LogFormat::GitHubActions},
+    {.token = "cancelled", .outcome = insight::RunOutcome::Aborted, .format_gate = insight::LogFormat::GitHubActions},
+    {.token = "timed_out", .outcome = insight::RunOutcome::Aborted, .format_gate = insight::LogFormat::GitHubActions},
+    {.token = "skipped", .outcome = insight::RunOutcome::Unknown, .format_gate = insight::LogFormat::GitHubActions},
+    {.token = "neutral", .outcome = insight::RunOutcome::Unknown, .format_gate = insight::LogFormat::GitHubActions},
+    {.token = "action_required", .outcome = insight::RunOutcome::Unknown, .format_gate = insight::LogFormat::GitHubActions},
+}};
+
 // ── The manifest (§2.5) — the package's single composed contribution ──
-// name "github", version "1.1.0" — bumped from 1.0.0 for the additive `##[group]Run ` step row (SP-7
+// name "github", version "1.2.0" — bumped from 1.1.0 for the grammar-2 outcome-token rows (SP-7
 // immutable-release discipline: a released version's rows are frozen, a content change is a new
 // version; the bump also rides the II-7 semantic_identity hash, an honest comparability boundary).
 // Ships no locations (that is the test_frameworks package) and no value classes (none has a consumer
 // yet). Code tier: the dialect strategy + the echoed-source hook.
 export inline constexpr SemanticPackageManifest kManifest{
     .name = "github",
-    .version = "1.1.0",
+    .version = "1.2.0",
     .roles = kRoles,
     .markers = kMarkers,
     .level_lifts = kLevelLifts,
     .locations = {},
     .value_classes = {},
+    .outcome_tokens = kOutcomeTokens,
+    .outcome_markers = {},
     .strategy = &make_strategy,
     .echoed_source = &is_echoed_source,
 };

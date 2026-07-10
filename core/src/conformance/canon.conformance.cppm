@@ -189,6 +189,21 @@ CheckResult check_format_gate_honesty(const SemanticPackageManifest& manifest, c
                                   std::string{insight::to_string(fmt)} + " — II-6 gate leak."};
         }
     }
+    // Outcome tokens (grammar-2, always concretely gated — a dialect's verdict string never resolves
+    // under another format, ADR 0025 §3.1).
+    for (const OutcomeTokenRow& row : manifest.outcome_tokens)
+        for (const insight::LogFormat fmt : kProbeFormats)
+        {
+            if (fmt == row.format_gate || row.format_gate == kAnyFormat)
+                continue;
+            if (insight::map_outcome_token(row.token, fmt, composed).has_value())
+                return {.name = "format_gate.outcome_leak",
+                        .passed = false,
+                        .detail = "outcome token \"" + std::string{row.token} + "\" (gated to " +
+                                  std::string{insight::to_string(row.format_gate)} +
+                                  ") RESOLVED cross-format under " +
+                                  std::string{insight::to_string(fmt)} + " — II-6 gate leak."};
+        }
     return {.name = "format_gate_honesty", .passed = true, .detail = {}};
 }
 
@@ -202,9 +217,18 @@ CheckResult check_ascii_safety(const SemanticPackageManifest& manifest)
             return {.name = "ascii.role", .passed = false,
                     .detail = "role key contains a non-ASCII byte: \"" + std::string{row.prefix} + "\"."};
     for (const IntentMarkerRow& row : manifest.markers)
-        if (!is_ascii(row.prefix))
+        if (!is_ascii(row.prefix) || !span_ok(row.payload_excludes))
             return {.name = "ascii.marker", .passed = false,
-                    .detail = "marker key contains a non-ASCII byte: \"" + std::string{row.prefix} + "\"."};
+                    .detail = "marker key or payload-exclusion entry contains a non-ASCII byte: \"" +
+                              std::string{row.prefix} + "\"."};
+    for (const OutcomeTokenRow& row : manifest.outcome_tokens)
+        if (!is_ascii(row.token))
+            return {.name = "ascii.outcome_token", .passed = false,
+                    .detail = "outcome token contains a non-ASCII byte: \"" + std::string{row.token} + "\"."};
+    for (const OutcomeMarkerRow& row : manifest.outcome_markers)
+        if (!is_ascii(row.prefix))
+            return {.name = "ascii.outcome_marker", .passed = false,
+                    .detail = "outcome-marker key contains a non-ASCII byte: \"" + std::string{row.prefix} + "\"."};
     for (const LevelLiftRow& row : manifest.level_lifts)
         if (!is_ascii(row.prefix))
             return {.name = "ascii.level_lift", .passed = false,
@@ -228,6 +252,18 @@ CheckResult check_grammar_wellformed(const SemanticPackageManifest& manifest)
     for (const LevelLiftRow& row : manifest.level_lifts)
         if (row.prefix.empty())
             return {.name = "grammar.empty_level_lift", .passed = false, .detail = "a level-lift row has an empty prefix."};
+    for (const OutcomeTokenRow& row : manifest.outcome_tokens)
+        if (row.token.empty())
+            return {.name = "grammar.empty_outcome_token", .passed = false, .detail = "an outcome-token row has an empty token."};
+    for (const OutcomeMarkerRow& row : manifest.outcome_markers)
+        if (row.prefix.empty())
+            return {.name = "grammar.empty_outcome_marker", .passed = false, .detail = "an outcome-marker row has an empty prefix."};
+    for (const IntentMarkerRow& row : manifest.markers)
+        for (const std::string_view exclude : row.payload_excludes)
+            if (exclude.empty())
+                return {.name = "grammar.empty_payload_exclude", .passed = false,
+                        .detail = "marker key \"" + std::string{row.prefix} +
+                                  "\" carries an empty payload-exclusion entry (would exclude every payload)."};
 
     // Self-conflict: a package must not carry an exact-duplicate key within itself (the runtime compose
     // would fatal on it — the kit catches it as a well-formedness failure, not a crash).

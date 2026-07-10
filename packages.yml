@@ -11,10 +11,17 @@ packages:
     depends: []
   # Semantic packages (ADR 0024): per-dialect VOCABULARY (rule rows + code tier), Apache-2.0, statically
   # composed via insight::semantic::compose(). One module interface unit each — no partitions (the
-  # cross-package BMI closure must not deepen). 1.7.5 ships exactly these two; Jenkins/gcc/cloud are
-  # PO-scheduled successors riding the same contract, never pre-built.
+  # cross-package BMI closure must not deepen). gcc/cloud are PO-scheduled successors riding the
+  # same contract, never pre-built.
   insight_semantic_github:
     path: semantic/github
+    version: 1.7.7
+    license: Apache-2.0
+    public: true
+    release: true
+    depends: [insight_canon]
+  insight_semantic_jenkins:
+    path: semantic/jenkins
     version: 1.7.7
     license: Apache-2.0
     public: true
@@ -36,4 +43,4 @@ packages:
     license: Apache-2.0
     public: true
     release: false
-    depends: [insight_canon, insight_semantic_github, insight_semantic_test_frameworks]
+    depends: [insight_canon, insight_semantic_github, insight_semantic_jenkins, insight_semantic_test_frameworks]
