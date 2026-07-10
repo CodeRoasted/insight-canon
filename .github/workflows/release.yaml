@@ -47,6 +47,7 @@ jobs:
       packages: |
         insight_canon:core
         insight_semantic_github:semantic/github
+        insight_semantic_jenkins:semantic/jenkins
         insight_semantic_test_frameworks:semantic/test_frameworks
       # The composed bench harness (bench/ — insight_canon_bench, release:false) is BUILT + RUN by
       # measure-benchmark but never published; its first-party deps resolve as workspace editables
