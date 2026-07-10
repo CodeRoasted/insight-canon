@@ -164,18 +164,35 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ vars.SAMPLES_HUB_PUBLISH == 'true' }}
     steps:
+      # A job `if` can't read secrets, so the var gates the job but the SECRET may still be missing
+      # (unset, or an org secret not shared with this PUBLIC repo). Skip gracefully then — passing an
+      # empty `token:` to actions/checkout hard-fails ("Input required and not supplied: token") and
+      # would red the release over a best-effort, propose-only transparency PR.
+      - name: Preflight — hub publish token present?
+        id: pf
+        env:
+          TOK: ${{ secrets.HUB_PUBLISH_TOKEN }}
+        run: |
+          if [ -z "${TOK:-}" ]; then
+            echo "::warning::SAMPLES_HUB_PUBLISH=true but HUB_PUBLISH_TOKEN is empty (unset, or an org secret not granted to this public repo) — skipping hub mirror (advisory)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout the public hub
+        if: ${{ steps.pf.outputs.skip != 'true' }}
         uses: actions/checkout@v5
         with:
           repository: CodeRoasted/coderoast-hub
           token: ${{ secrets.HUB_PUBLISH_TOKEN }}
 
       - uses: actions/download-artifact@v7
+        if: ${{ steps.pf.outputs.skip != 'true' }}
         with:
           name: canon-samples-showcase
           path: incoming
 
       - name: Stage showcase/canon/ + manifest into the hub, open a PR
+        if: ${{ steps.pf.outputs.skip != 'true' }}
         env:
           GH_TOKEN: ${{ secrets.HUB_PUBLISH_TOKEN }}
           V: ${{ inputs.tag || github.run_id }}
@@ -192,10 +209,19 @@ jobs:
           git config user.name "coderoast-showcase[bot]"
           git config user.email "showcase@coderoast.fr"
           BR="showcase-canon-$V"
-          git checkout -b "$BR"
+          git checkout -B "$BR"      # -B: reset if a same-name local branch somehow exists (idempotent)
           git add showcase/canon manifest.json
+          # IDEMPOTENT: a re-run whose showcase is already published (a prior PR was merged → the
+          # content is already on the hub's default branch) stages NOTHING → clean no-op, never fail
+          # the release with `git commit`'s "nothing to commit" under `set -e`.
+          if git diff --cached --quiet; then
+            echo "::notice::showcase already up to date ($V) — nothing to publish"
+            exit 0
+          fi
           git commit -m "showcase: Canon over our public samples ($V) — client-facing transparency"
+          # --force-with-lease updates an existing (open-PR) branch in place; safe for a brand-new one.
           git push origin "$BR" --force-with-lease
+          # PR already open for this branch → not an error; the push above already refreshed it.
           gh pr create --title "Canon-over-samples showcase ($V)" \
             --body "Human-legible render of what the open canon core extracts from our public sample logs. Client-facing transparency, not a gate. Merge to publish." \
-            || echo "PR may already exist"
+            || echo "::notice::PR for $BR already open — branch updated in place"
