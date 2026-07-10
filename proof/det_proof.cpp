@@ -36,9 +36,12 @@
 // CanonicalEvent / StructuralRole) is all reachable through the single facade import.
 import insight.canon;
 // ADR 0024: the Tokenizer now takes a ComposedSemantics. The proof composes the SAME package set a
-// product binary does — insight_semantic_github + insight_semantic_test_frameworks — so the composed
-// pipeline (GHA dialect + test-file locations) reproduces the pre-split behavior byte-for-byte (G-SP-1).
+// product binary does — insight_semantic_github + insight_semantic_jenkins +
+// insight_semantic_test_frameworks (the eidos composition TU's exact set and order) — so the
+// composed pipeline (GHA + Jenkins dialects + test-file locations) is what the 5-leg byte-identity
+// compare proves (G-SP-1; the grammar-2 composed identity = G-OUT-6, extending G-SP-4).
 import insight.semantic.github;
+import insight.semantic.jenkins;
 import insight.semantic.test_frameworks;
 
 namespace
@@ -110,12 +113,15 @@ int main(int argc, char** argv)
     // different sequence than gcc/clang's UTF-8, diverging the digest on that ONE line while every
     // other (pure-ASCII) section matched. A byte-hashed canonical output must contain no character
     // whose encoding varies by toolchain/locale. Plain '--'.
-    std::cout << "# canon public determinism proof -- v1\n";
+    // v2: the grammar-2 cut (ADR 0025) — jenkins joins the composed set and every file section
+    // gains a `### run_outcome` line (the console-tail scan surface the compare must cover).
+    std::cout << "# canon public determinism proof -- v2\n";
 
     // The composition is loop-invariant (the SAME package set tokenizes every file), so build it
     // ONCE here and thread it into each file's per-file arena/Tokenizer below.
-    const std::array<insight::semantic::SemanticPackageManifest, 2> manifests{
-        insight::semantic::github::kManifest, insight::semantic::test_frameworks::kManifest};
+    const std::array<insight::semantic::SemanticPackageManifest, 3> manifests{
+        insight::semantic::github::kManifest, insight::semantic::jenkins::kManifest,
+        insight::semantic::test_frameworks::kManifest};
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose(manifests)};
 
     // G-SP-4 (ADR 0024 §10.4): the composed `semantic_identity` content hash must be bit-identical
@@ -200,6 +206,21 @@ int main(int argc, char** argv)
 
         std::cout << "### det_math total=" << total
                   << " sum_c_log2c_qk=" << i128_to_dec(reducer.raw()) << '\n';
+
+        // G-OUT-6 behavioral arm: the console-tail run-outcome scan + the degenerate (no
+        // side-input) resolution, per file. The composed identity line above already pins the
+        // grammar-2 HASH; this pins the outcome-scan BYTES — the compare covers only what the
+        // fixture emits, so the new grammar-2 surface must be emitted to be proven. Byte-exact
+        // ASCII walk + last-match-wins integer line index ⇒ deterministic by construction; any
+        // cross-leg divergence here is an engine bug the gate must catch.
+        const insight::RunOutcomeScan outcome_scan{insight::scan_run_outcome(lines, composed)};
+        const insight::RunOutcomeResolution outcome_resolution{
+            insight::resolve_run_outcome("", outcome_scan, composed)};
+        std::cout << "### run_outcome dialect=" << insight::to_string(outcome_scan.dialect)
+                  << " marker=" << (outcome_scan.marker_present ? '1' : '0') << " token="
+                  << (outcome_scan.marker_present ? std::string_view{outcome_scan.token}
+                                                  : std::string_view{"-"})
+                  << " resolved=" << insight::to_string(outcome_resolution.outcome) << '\n';
     }
 
     return 0;

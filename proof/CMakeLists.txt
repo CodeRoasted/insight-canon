@@ -36,15 +36,18 @@ endif()
 
 # Build canon as a module static-lib (tests default OFF — not top-level here).
 add_subdirectory(${CANON_ROOT}/core canon_build)
-# The two semantic packages (ADR 0024) — added AFTER canon so their `if(NOT TARGET insight::canon)`
-# guards see the in-tree target (no find_package). det_proof composes their manifests, so the proof
-# exercises the composed pipeline (the byte-identity G-SP-1 gate).
+# The semantic packages (ADR 0024) — added AFTER canon so their `if(NOT TARGET insight::canon)`
+# guards see the in-tree target (no find_package). det_proof composes the product's exact manifest
+# set {github, jenkins, test_frameworks}, so the proof exercises the composed pipeline (the
+# byte-identity G-SP-1 gate; the grammar-2 composed identity = G-OUT-6).
 add_subdirectory(${CANON_ROOT}/semantic/github github_build)
+add_subdirectory(${CANON_ROOT}/semantic/jenkins jenkins_build)
 add_subdirectory(${CANON_ROOT}/semantic/test_frameworks testfw_build)
 
-# The constant fixture, consuming canon + the two packages as external modules.
+# The constant fixture, consuming canon + the packages as external modules.
 add_executable(det_proof det_proof.cpp)
 target_link_libraries(det_proof PRIVATE
-    insight::canon insight::semantic_github insight::semantic_test_frameworks)
+    insight::canon insight::semantic_github insight::semantic_jenkins
+    insight::semantic_test_frameworks)
 target_compile_features(det_proof PRIVATE cxx_std_23)
 set_target_properties(det_proof PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)

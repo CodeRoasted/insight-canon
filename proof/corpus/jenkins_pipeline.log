@@ -1,0 +1,38 @@
+Started by user CodeRoast CI
+[2026-05-01T10:00:01.101Z] [Pipeline] Start of Pipeline
+[2026-05-01T10:00:02.102Z] [Pipeline] node
+[2026-05-01T10:00:03.103Z] Running on linux-agent-07 in /home/jenkins/workspace/proof_pipeline_main
+[2026-05-01T10:00:04.104Z] [Pipeline] {
+[2026-05-01T10:00:05.105Z] [Pipeline] stage
+[2026-05-01T10:00:06.106Z] [Pipeline] { (Declarative: Checkout SCM)
+[2026-05-01T10:00:07.107Z] [Pipeline] checkout
+[2026-05-01T10:00:08.108Z] Checking out Revision 4f2a9c1e (refs/remotes/origin/main)
+[2026-05-01T10:00:09.109Z] [Pipeline] }
+[2026-05-01T10:00:10.110Z] [Pipeline] stage
+[2026-05-01T10:00:11.111Z] [Pipeline] { (Build)
+[2026-05-01T10:00:12.112Z] [Pipeline] sh
+[2026-05-01T10:00:13.113Z] + cmake --build build --config Release -j 8
+[2026-05-01T10:00:14.114Z] [ 45%] Building CXX object src/engine/core.cpp.o
+[2026-05-01T10:00:15.115Z] [100%] Built target proof_engine
+[2026-05-01T10:00:16.116Z] [Pipeline] }
+[2026-05-01T10:00:17.117Z] [Pipeline] stage
+[2026-05-01T10:00:18.118Z] [Pipeline] { (Test)
+[2026-05-01T10:00:19.119Z] [Pipeline] sh
+[2026-05-01T10:00:20.120Z] + ctest --output-on-failure --timeout 300
+[2026-05-01T10:00:21.121Z] Test project /home/jenkins/workspace/proof_pipeline_main/build
+[2026-05-01T10:00:22.122Z] 41/42 Test #17: engine_replay_roundtrip .......... FAILED (2.31 sec)
+[2026-05-01T10:00:23.123Z] ERROR: expected 128 sealed windows, observed 127
+[2026-05-01T10:00:24.124Z] 98% tests passed, 1 tests failed out of 42
+[2026-05-01T10:00:25.125Z] [Pipeline] junit
+[2026-05-01T10:00:26.126Z] Recording test results
+[2026-05-01T10:00:27.127Z] [Pipeline] }
+[2026-05-01T10:00:28.128Z] [Pipeline] stage
+[2026-05-01T10:00:29.129Z] [Pipeline] { (Package)
+[2026-05-01T10:00:30.130Z] [Pipeline] sh
+[2026-05-01T10:00:31.131Z] + tar czf proof-engine-1.4.2.tar.gz build/dist
+[2026-05-01T10:00:32.132Z] [Pipeline] archiveArtifacts
+[2026-05-01T10:00:33.133Z] Archiving artifacts
+[2026-05-01T10:00:34.134Z] [Pipeline] }
+[2026-05-01T10:00:35.135Z] [Pipeline] }
+[2026-05-01T10:00:36.136Z] [Pipeline] End of Pipeline
+[2026-05-01T10:00:37.137Z] Finished: UNSTABLE
