@@ -124,17 +124,17 @@ void append_canonical_span(simdjson::ondemand::object& span, std::string_view se
         if (field.unescaped_key().get(key) != simdjson::SUCCESS)
             continue;
         if (key == "traceId")
-            (void)field.value().raw_json().get(trace_id);
+            read_raw_json_or_keep(field.value(), trace_id);
         else if (key == "spanId")
-            (void)field.value().raw_json().get(span_id);
+            read_raw_json_or_keep(field.value(), span_id);
         else if (key == "parentSpanId")
             has_parent = field.value().raw_json().get(parent_span_id) == simdjson::SUCCESS;
         else if (key == "name")
-            (void)field.value().raw_json().get(name);
+            read_raw_json_or_keep(field.value(), name);
         else if (key == "startTimeUnixNano")
-            (void)field.value().raw_json().get(start_nano);
+            read_raw_json_or_keep(field.value(), start_nano);
         else if (key == "endTimeUnixNano")
-            (void)field.value().raw_json().get(end_nano);
+            read_raw_json_or_keep(field.value(), end_nano);
         else if (key == "kind")
             kind = read_enum(field.value(), span_kind_name, "SPAN_KIND_INTERNAL");
         else if (key == "status")
@@ -148,7 +148,7 @@ void append_canonical_span(simdjson::ondemand::object& span, std::string_view se
             }
         }
         else if (key == "attributes")
-            (void)field.value().raw_json().get(span_attributes);
+            read_raw_json_or_keep(field.value(), span_attributes);
     }
 
     out += R"({"traceId":)";

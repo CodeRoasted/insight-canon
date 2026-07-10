@@ -142,15 +142,15 @@ void parse_otel_span(simdjson::ondemand::object& root, ParsedLine& parsed_line, 
         std::string_view hex;
         if (key == "startTimeUnixNano")
         {
-            (void)field.value().get_string().get(start_nano);
+            read_string_or_keep(field.value(), start_nano);
         }
         else if (key == "endTimeUnixNano")
         {
-            (void)field.value().get_string().get(end_nano);
+            read_string_or_keep(field.value(), end_nano);
         }
         else if (key == "name")
         {
-            (void)field.value().get_string().get(name_view);
+            read_string_or_keep(field.value(), name_view);
         }
         else if (key == "traceId")
         {
@@ -202,9 +202,8 @@ void parse_otel_span(simdjson::ondemand::object& root, ParsedLine& parsed_line, 
                     simdjson::ondemand::object value_obj;
                     if (attr.find_field_unordered("value").get_object().get(value_obj) ==
                         simdjson::SUCCESS)
-                        (void)value_obj.find_field_unordered("stringValue")
-                            .get_string()
-                            .get(service_name);
+                        read_string_or_keep(value_obj.find_field_unordered("stringValue"),
+                                            service_name);
                 }
             }
         }

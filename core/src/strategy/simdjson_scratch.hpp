@@ -108,6 +108,36 @@ struct alignas(kSimdjsonScratchCacheLine) JsonScratch
     return false;
 }
 
+// ── Single-value readers that KEEP the caller's default on error (span seams) ──
+// simdjson's `simdjson_result<T>::get(T&)` is `simdjson_warn_unused`, which on gcc/clang expands
+// to `__attribute__((warn_unused_result))` — and a `(void)` cast does NOT silence that (unlike a
+// C++ `[[nodiscard]]`). The span pass-throughs want exactly "read the field if present, else keep
+// the value the caller pre-seeded": an unreadable field is a fail-safe SKIP, not an error to abort
+// on, and the pre-seeded default keeps the emitted record well-formed. These two adapters make that
+// intent explicit and consume the error_code, so the warning dies at the root rather than being
+// masked. Mirrors try_get_string's discipline, for a single already-resolved value.
+
+// Read a string-valued field into `out`; leave `out` untouched when the value is absent / not a
+// string.
+inline void read_string_or_keep(simdjson::simdjson_result<simdjson::ondemand::value> value,
+                                std::string_view& out) noexcept
+{
+    std::string_view parsed;
+    if (value.get_string().get(parsed) == simdjson::SUCCESS)
+        out = parsed;
+}
+
+// Read a value's raw JSON slice into `out` (quotes/escaping byte-preserved); leave `out` untouched
+// on error. The span-document unpack (span_unpack.cpp) passes fields through verbatim this way, so
+// its JSON-literal defaults (`""`, `"0"`) survive an unreadable field and keep shape-2 well-formed.
+inline void read_raw_json_or_keep(simdjson::simdjson_result<simdjson::ondemand::value> value,
+                                  std::string_view& out) noexcept
+{
+    std::string_view raw;
+    if (value.raw_json().get(raw) == simdjson::SUCCESS)
+        out = raw;
+}
+
 // OTLP body extraction (insight_otel_epic.md D-OTEL-1): the OpenTelemetry Log Data Model
 // nests the message under body.stringValue (`"body":{"stringValue":"…"}`). Returns the
 // stringValue, or false when body is absent / not an object / carries no stringValue. MUST
