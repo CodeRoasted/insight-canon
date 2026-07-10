@@ -25,10 +25,12 @@
 # string is behavioral (a matcher fused into the mechanism) even when it hides behind
 # a `//` sequence inside that string ("http://…::group::…"); a deny literal in a
 # comment legitimately documents the grammar (spi.cppm: "`##[group]` → GroupBegin").
-# The `LogFormat` enum (incl. its `to_string` render "GitHubActions") is the closed,
-# wire-stable identifier registry that §1.3 KEEPS in core — the bare-word patterns
-# below are boundary-anchored so "GitHubActions" (no word boundary after "github")
-# never matches; only standalone dialect identifiers do.
+# The `LogFormat` enum (incl. its `to_string` render and every qualified `LogFormat::<Ident>`
+# reference) is the closed, wire-stable identifier registry that §1.3 KEEPS in core. It is
+# exempted EXPLICITLY — `strip_logformat_registry` blanks the enum body, the `to_string(LogFormat)`
+# render, and qualified refs before the scan — so a single-word dialect name (Jenkins, and any
+# future Splunk/Datadog/…) is exempt on principle, not by the accident that the compound
+# "GitHubActions" carries no word boundary after "github" (that never generalized to bare names).
 #
 # A hit in comment-stripped code = an ecosystem literal fused into the mechanism =
 # an SP-1 regression = FAIL. Verbose on failure (file:line of every hit).
@@ -95,13 +97,36 @@ strip_comments() {
     }gesx' "$1"
 }
 
+# Exempt the LogFormat identifier registry (ADR 0024 §1.3). The closed enum, its
+# `to_string` render, and any qualified `LogFormat::<Ident>` reference are the sanctioned
+# home of dialect *identifiers* in core — an identifier registry, never a behavioral literal
+# fused into the mechanism. Blank them (newline-preserving) BEFORE the deny scan so a
+# single-word dialect name (Jenkins, and any future Splunk/Datadog/…) is exempt on principle,
+# not by the fragile accident that the compound "GitHubActions" carries no word boundary after
+# "github". A dialect literal ANYWHERE ELSE (a bare "jenkins" behavior in a recognizer, a marker
+# string) is untouched here and still trips the gate — this narrows the registry, not the scan.
+strip_logformat_registry() {
+  # `!`-delimited s/// throughout: the patterns carry bare `{`/`}` in their character classes,
+  # which collide with perl's brace-counting when `{…}` is the delimiter (a crashed scrubber
+  # emits nothing → a silent green); `~` collides with the `=~` in the replacement code. `!`
+  # appears in neither pattern nor replacement.
+  perl -0777 -pe '
+    # (a) the enum body: `enum class LogFormat … { … }` (flat — enum values carry no nested braces)
+    s! (enum \s+ class \s+ LogFormat \b [^{]*) (\{ [^{}]* \}) ! $1 . ($2 =~ tr/\n//cdr) !gesx;
+    # (b) the `to_string(LogFormat …) … { … }` body — the switch nests braces, so match balanced
+    s! (\b to_string \s* \( [^)]*\b LogFormat \b [^)]* \) [^{;]*) (\{ (?: [^{}]++ | (?2) )* \}) ! $1 . ($2 =~ tr/\n//cdr) !gesx;
+    # (c) qualified enum references elsewhere (recognizers, conformance probe arrays)
+    s! \b LogFormat \s* :: \s* [A-Za-z_]\w* !LogFormat::_!gx;
+  '
+}
+
 violations=0
 scanned=0
 report=""
 while IFS= read -r -d '' f; do
   scanned=$((scanned + 1))
   # Match comment-stripped content, but recover the real line numbers by grepping the stripped text.
-  hits="$(strip_comments "$f" | grep -nEi "$PATTERN" || true)"
+  hits="$(strip_comments "$f" | strip_logformat_registry | grep -nEi "$PATTERN" || true)"
   if [ -n "$hits" ]; then
     while IFS= read -r line; do
       report+="  ${f}:${line}"$'\n'
