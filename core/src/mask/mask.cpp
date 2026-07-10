@@ -563,8 +563,8 @@ namespace
     // The KEEP-class / mask-instance rules, as a DECLARED array whose ORDER IS THE PRECEDENCE:
     // tried top-to-bottom, the first rule that claims the token wins (the former `||` short-circuit,
     // now data). Each rule is a pure `bool(tok, out&)` — fills `out` with the normalized literal and
-    // returns true iff it claims the token. This catalog DEFINES the composite layer of
-    // kCanonicalizationVersion "stateless-masks-4"; adding, reordering, or removing a rule is an
+    // returns true iff it claims the token. This catalog DEFINES the composite layer of the ruleset
+    // generation named by kCanonicalizationVersion; adding, reordering, or removing a rule is an
     // output-affecting change that REQUIRES a version bump — the single enumerable place that rule
     // can be stated (closing the D-TID-16 "rules changed, version didn't" gap for the rule set
     // itself). Each entry names its governing ruling + the generation that introduced it.
