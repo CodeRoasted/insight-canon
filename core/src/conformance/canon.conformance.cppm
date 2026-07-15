@@ -78,6 +78,19 @@ struct Report
 // recognizers are pure byte functions, so every check is a pure function of the manifest data.
 [[nodiscard]] Report run(const SemanticPackageManifest& manifest);
 
+// The studies/008 G2 round-trip closure kit — the RUNTIME (value) half of the C2 bidirectionality
+// obligation the DialectIntent concept enforces at COMPILE time (shared_intent_declaration §3.2/§6, G2).
+// For every recognition marker, materialize its PAIRED generation row (render_row) with a probe payload
+// and assert canon recognizes the declared (kind, child_order, payload) back — recognize(render_row(W))==R.
+// Pure, deterministic, seedless, self-adapting over ANY dialect's row spans (zero per-package config, the
+// same honesty-kit spirit as run()). Target: 100% — a miss is a declaration-expressivity bug, never a knob
+// (studies/008 §5 G2). Homed here (not folded into run(manifest)) because the generation rows live on the
+// dialect TYPE, not the SemanticPackageManifest, until the identity wiring lands with the ADR at
+// ratification (G4); a package passes its `Dialect::markers` / `Dialect::emit_markers` spans directly.
+[[nodiscard]] Report round_trip_report(std::span<const IntentMarkerRow> markers,
+                                        std::span<const IntentEmitRow> emits,
+                                        const ComposedSemantics& composed);
+
 } // namespace insight::semantic::conformance
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -342,6 +355,78 @@ Report run(const SemanticPackageManifest& manifest)
     report.checks.push_back(check_ascii_safety(manifest));
     report.checks.push_back(check_grammar_wellformed(manifest));
     report.checks.push_back(check_code_tier(manifest));
+    return report;
+}
+
+namespace
+{
+
+// Verbose-on-failure enum names (no canon to_string exists for these two — G2's diagnostic needs them).
+[[nodiscard]] std::string_view kind_name(insight::tokenization::IntentMarkerKind kind) noexcept
+{
+    using insight::tokenization::IntentMarkerKind;
+    switch (kind)
+    {
+    case IntentMarkerKind::None: return "None";
+    case IntentMarkerKind::Job:  return "Job";
+    case IntentMarkerKind::Step: return "Step";
+    }
+    return "?";
+}
+
+[[nodiscard]] std::string_view order_name(insight::tokenization::ChildOrder order) noexcept
+{
+    using insight::tokenization::ChildOrder;
+    return order == ChildOrder::Unordered ? "Unordered" : "Ordered";
+}
+
+} // namespace
+
+Report round_trip_report(std::span<const IntentMarkerRow> markers,
+                         std::span<const IntentEmitRow> emits, const ComposedSemantics& composed)
+{
+    // A benign single-token ASCII payload valid for every POC row: not a Jenkins kStepExcludes structural
+    // token, no parens/whitespace that a payload extractor would trim — so a closure miss is a real
+    // expressivity failure, never an artifact of the probe. Deterministic (a fixed literal, no RNG).
+    constexpr std::string_view kProbePayload{"probe"};
+
+    Report report;
+    for (const IntentMarkerRow& reader : markers)
+    {
+        const IntentEmitRow* writer{paired_writer_row(reader, emits)};
+        if (writer == nullptr)
+        {
+            // The DialectIntent concept should have rejected this at compile time; the runtime kit
+            // asserts it too so an external author who bypassed the concept still gets a legible failure.
+            report.checks.push_back(
+                {.name = "round_trip.unpaired", .passed = false,
+                 .detail = "recognition marker \"" + std::string{reader.prefix} +
+                           "\" has NO paired generation row — a reader without a writer (SID / G2). "
+                           "DialectIntent<Dialect> should have refused to compile."});
+            continue;
+        }
+
+        const std::string line{render_row(*writer, kProbePayload)};
+        const insight::tokenization::IntentMarker got{
+            insight::tokenization::recognize(line, reader.format_gate, composed)};
+
+        if (got.kind == reader.kind && got.child_order == reader.child_order && got.name == kProbePayload)
+        {
+            report.checks.push_back({.name = "round_trip", .passed = true, .detail = {}});
+            continue;
+        }
+
+        report.checks.push_back(
+            {.name = "round_trip.closure", .passed = false,
+             .detail = "recognize(render_row(\"" + std::string{reader.prefix} + "\", \"" +
+                       std::string{kProbePayload} + "\")) over line \"" + line +
+                       "\" did NOT recover the declared intent. expected {kind=" +
+                       std::string{kind_name(reader.kind)} + ", child_order=" +
+                       std::string{order_name(reader.child_order)} + ", payload=\"" +
+                       std::string{kProbePayload} + "\"} got {kind=" + std::string{kind_name(got.kind)} +
+                       ", child_order=" + std::string{order_name(got.child_order)} + ", payload=\"" +
+                       std::string{got.name} + "\"}."});
+    }
     return report;
 }
 

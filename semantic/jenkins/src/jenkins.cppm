@@ -78,7 +78,7 @@ inline constexpr std::array<IntentEmitRow, 2> kEmitMarkers{{
 
 // The C2 bidirectionality obligation: this dialect exposes BOTH projections, and every recognition row
 // is paired with a generation row. DialectIntent fails to compile if a reader ships without a writer.
-struct Dialect
+export struct Dialect
 {
     static constexpr std::span<const IntentMarkerRow> markers{kMarkers};
     static constexpr std::span<const IntentEmitRow> emit_markers{kEmitMarkers};
