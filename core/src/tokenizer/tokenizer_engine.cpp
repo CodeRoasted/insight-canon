@@ -36,6 +36,12 @@ namespace
 
     constexpr std::size_t kProgressLogInterval{1000};
 
+    // canon-internal DEBUG gate for `if constexpr` elision of the progress-log block (computation +
+    // log). SPDLOG_ACTIVE_LEVEL is canon's PRIVATE build-type compile def, reaching this build-only
+    // impl unit via the textual log_macros.hpp include. Kept OFF the public insight.canon.api surface
+    // (which every consumer recompiles) so the level macro never leaks onto a consumer's command line.
+    constexpr bool kDebugLogsEnabled{SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_DEBUG};
+
 } // namespace
 
 struct Tokenizer::Impl
@@ -105,7 +111,7 @@ struct Tokenizer::Impl
         INSIGHT_LOG_TRACE(logging::tokenizer_logger(), "event: id={} tmpl=\"{}\" params={}",
                           event.id, event.template_str, event.params.size());
 
-        if constexpr (logging::kDebugLogsEnabled)
+        if constexpr (kDebugLogsEnabled)
         {
             if (produced % kProgressLogInterval == 0)
             {

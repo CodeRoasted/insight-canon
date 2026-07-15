@@ -192,7 +192,11 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
         }
     }
 
-    if constexpr (logging::kDebugLogsEnabled)
+    // canon-internal DEBUG gate (see the note in tokenizer_engine.cpp). SPDLOG_ACTIVE_LEVEL is
+    // canon's PRIVATE build-type compile def, via the textual log_macros.hpp include — kept off the
+    // public insight.canon.api surface so the level macro never leaks to consumers.
+    constexpr bool kDebugLogsEnabled{SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_DEBUG};
+    if constexpr (kDebugLogsEnabled)
     {
         static constexpr std::size_t kStatsEveryNLines{1000};
         // Periodic stats every 1000 lines.

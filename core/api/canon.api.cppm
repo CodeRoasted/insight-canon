@@ -7,11 +7,10 @@
 // guarantee). Class IMPLEMENTATIONS stay in src/*.cpp impl units (byte-identical .a); this
 // interface holds only their declarations.
 module;
-// SPDLOG_ACTIVE_LEVEL is a CMake -D per build type (Debug: TRACE, Release: INFO), propagated
-// PUBLIC. Guard a missing definition → default TRACE (nothing elided) — mirrors log_macros.hpp.
-#ifndef SPDLOG_ACTIVE_LEVEL
-#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
-#endif
+// NB: this exported unit deliberately references NO build-config macro (SPDLOG_ACTIVE_LEVEL et al).
+// It is recompiled by every consumer, so any -D-dependent code here would force that macro PUBLIC and
+// diverge per consumer. Canon's spdlog elision level stays PRIVATE to canon's build; the one gate that
+// needed it (kDebugLogsEnabled) lives in the build-only tokenizer/parser impl units.
 #include "det/det_int128.hpp" // portable 128-bit for det_math (native __int128 on gcc/clang; pure-C++ on MSVC)
 #include <fmt/core.h>      // fmt::format_string (log_message template)
 #include <fmt/format.h>    // fmt::format (log_message template)
@@ -1319,13 +1318,6 @@ parse_nginx_error_ts(std::string_view timestamp_str) noexcept;
 //          ────────
 export namespace insight::logging
 {
-
-// Compile-time DEBUG gate for `if constexpr` call-site elision (tokenizer/parser progress logs).
-// Mirrors the macro layer's SPDLOG_ACTIVE_LEVEL threshold. Lives in the module (importable via
-// insight.canon.api) rather than the textual macro header — it is a first-party declaration, so
-// per §11.4 it must not leak through the GMF-textual log_macros.hpp. The TRACE/INFO/WARN twins are
-// gone (no `if constexpr` site used them; the macros gate those levels themselves).
-inline constexpr bool kDebugLogsEnabled{SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_DEBUG};
 
 namespace detail
 {

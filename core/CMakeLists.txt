@@ -101,10 +101,15 @@ target_link_libraries(insight_canon
 ###########################################################
 #  Compile-time spdlog level elision
 ###########################################################
+# PRIVATE, not PUBLIC: SPDLOG_ACTIVE_LEVEL is a spdlog GLOBAL macro and canon's own build-time
+# elision level — it must NOT ride canon's api onto consumers' command lines (it collided with
+# logcraft's own SPDLOG_ACTIVE_LEVEL, and exposing a config macro through an api is wrong). The only
+# api-level consumer of it (the kDebugLogsEnabled constexpr) was moved into the build-only tokenizer/
+# parser impl units, so nothing on the public insight.canon.api surface references it anymore.
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    target_compile_definitions(insight_canon PUBLIC SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
+    target_compile_definitions(insight_canon PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
 else()
-    target_compile_definitions(insight_canon PUBLIC SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO)
+    target_compile_definitions(insight_canon PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO)
 endif()
 
 ###########################################################
