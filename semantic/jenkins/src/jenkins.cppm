@@ -56,6 +56,36 @@ inline constexpr std::array<IntentMarkerRow, 2> kMarkers{{
      .payload_excludes = kStepExcludes},
 }};
 
+// ── Generation-template rows (studies/008, shared_intent_declaration §3.2) — the WRITER dual ──
+// One emit row per recognition row, paired by (prefix, kind, format_gate). The STAGE emit is
+// PayloadThenClosingParen, the exact inverse of the reader's RemainderToClosingParen:
+// render_row(stage_row, "Build") reproduces `[Pipeline] { (Build)`, which canon segments back to the
+// named STAGE "Build". The STEP emit is PayloadAfterPrefix — the writer only ever emits a REAL step
+// verb (`sh`, `echo`, …), never a kStepExcludes structural token, so the reader's exclusion set has no
+// generation dual and the round-trip closes (G2).
+inline constexpr std::array<IntentEmitRow, 2> kEmitMarkers{{
+    {.prefix = "[Pipeline] { (",
+     .kind = insight::tokenization::IntentMarkerKind::Job,
+     .child_order = insight::tokenization::ChildOrder::Unordered,
+     .format_gate = insight::LogFormat::Jenkins,
+     .emit = PayloadEmit::PayloadThenClosingParen},
+    {.prefix = "[Pipeline] ",
+     .kind = insight::tokenization::IntentMarkerKind::Step,
+     .child_order = insight::tokenization::ChildOrder::Ordered,
+     .format_gate = insight::LogFormat::Jenkins,
+     .emit = PayloadEmit::PayloadAfterPrefix},
+}};
+
+// The C2 bidirectionality obligation: this dialect exposes BOTH projections, and every recognition row
+// is paired with a generation row. DialectIntent fails to compile if a reader ships without a writer.
+struct Dialect
+{
+    static constexpr std::span<const IntentMarkerRow> markers{kMarkers};
+    static constexpr std::span<const IntentEmitRow> emit_markers{kEmitMarkers};
+};
+static_assert(insight::semantic::DialectIntent<Dialect>,
+              "jenkins: a recognition marker has no paired generation row (reader without a writer)");
+
 // ── Run-outcome rows (ADR 0025 §4, studies/006 Table 4) ──
 // The five native Jenkins `result` strings → the core four-class vocabulary. NOT_BUILT maps to
 // Unknown (the run never produced a verdict — honest, not a guess). The console-tail marker is the

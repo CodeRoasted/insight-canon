@@ -130,6 +130,20 @@ enum class PayloadExtract : std::uint8_t
     RemainderToClosingParen,
 };
 
+// How a WRITER row materializes an intent's payload into log bytes (studies/008,
+// shared_intent_declaration §2.3/§3.2) — the CLOSED dual of PayloadExtract: each emit value is the
+// exact inverse of one extractor, so recognize(render_row(row, payload)) recovers the payload. This is
+// the generation side of "one declaration, two projections": canon RECOGNIZES via PayloadExtract,
+// LogCraft GENERATES via PayloadEmit, both rows-as-data (SID-2 — never a render() callable, which is
+// un-hashable and lets the two projections diverge). A new emit shape is a grammar-version bump, part
+// of the identity, exactly as a new extractor is.
+enum class PayloadEmit : std::uint8_t
+{
+    None = 0,                ///< dual of PayloadExtract::None — the prefix alone (structural markers)
+    PayloadAfterPrefix,      ///< dual of RemainderAfterPrefix — the prefix, then the payload verbatim
+    PayloadThenClosingParen, ///< dual of RemainderToClosingParen — prefix, payload, then the final ')'
+};
+
 // Which core location-matching ALGORITHM a LocationRow selects + parameterizes (§2.2 — a CLOSED enum;
 // the three families location_recognizer implements today). A new dialect needing a new family is a
 // grammar-version bump, part of the identity.
@@ -171,6 +185,24 @@ struct IntentMarkerRow
     // data. Empty for rows without exclusions (every pre-grammar-2 row). The span points at
     // package-static constexpr storage (SP-7 lifetime); serialized into semantic_identity.
     std::span<const std::string_view> payload_excludes{};
+};
+
+// A generation-template rule (studies/008, shared_intent_declaration §3.2) — the WRITER dual of
+// IntentMarkerRow. Carries the SAME dialect hierarchy (kind + child_order, the ADR 0023 declaration)
+// and the SAME medium gate (format_gate = the format+sink the line materializes into — the O2 medium
+// axis; the two GHA Step media `Run ` / `##[group]Run ` are two emit rows sharing kind, differing in
+// prefix). No payload_excludes: the writer only ever emits a real intent, never an excluded structural
+// token, so the exclusion set is a reader-side concern with no generation dual. Rows-as-data (SID-2):
+// the emit shape is the closed PayloadEmit enum, never a callable. Content-hashable exactly as
+// IntentMarkerRow is, so a generation-side change moves semantic_identity as a recognition change does
+// (G4 — the hash wiring lands with the ADR at ratification).
+struct IntentEmitRow
+{
+    std::string_view prefix;
+    insight::tokenization::IntentMarkerKind kind;
+    insight::tokenization::ChildOrder child_order;
+    insight::LogFormat format_gate;
+    PayloadEmit emit;
 };
 
 // A level-lift rule: a prefix lifts the line's LogLevel (§1.2 — `##[error]` → Error). Consumed by the
@@ -271,5 +303,91 @@ struct SemanticPackageManifest
     StrategyFactory strategy{nullptr};  // nullable — the dialect format-strategy code tier
     ProvenanceHook echoed_source{nullptr}; // nullable — the raw-line echoed-source code tier
 };
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// The generation projection API (studies/008, shared_intent_declaration §3.2) — the WRITER half of
+// "one declaration, two projections". render_row is the pure inverse of core's payload extraction;
+// paired_writer_row + all_intents_paired + the DialectIntent concept make bidirectionality a
+// compile-time obligation (a package that ships a recognition row without its paired generation row
+// does not satisfy DialectIntent → does not compile). This is the C2 mechanism (§3.2): the round-trip
+// obligation turned into a TYPE obligation. render_row/paired_writer_row are the surface the studies/008
+// G2 closure kit round-trips against; the concept is the structural guarantee behind it.
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+// render_row — the writer-row expansion. PURE: a function of (row, payload) ONLY — no RNG, no envelope,
+// no engine state, no wall-clock — so it lives on the canon (recognition) side and LogCraft merely
+// calls it to materialize. The exact inverse of the PayloadExtract algorithm: for every emit shape,
+// recognize(render_row(row, payload), row.format_gate, composed) recovers (row.kind, row.child_order,
+// payload) — the G2 round-trip. Allocates the result string (the only allocation; caller-owned).
+[[nodiscard]] inline std::string render_row(const IntentEmitRow& row, std::string_view payload)
+{
+    std::string out;
+    switch (row.emit)
+    {
+    case PayloadEmit::None:
+        out.reserve(row.prefix.size());
+        out.append(row.prefix);
+        break;
+    case PayloadEmit::PayloadAfterPrefix:
+        out.reserve(row.prefix.size() + payload.size());
+        out.append(row.prefix);
+        out.append(payload);
+        break;
+    case PayloadEmit::PayloadThenClosingParen:
+        out.reserve(row.prefix.size() + payload.size() + 1);
+        out.append(row.prefix);
+        out.append(payload);
+        out.push_back(')');
+        break;
+    }
+    return out;
+}
+
+// paired_writer_row — the reader→writer pairing. Given a recognition row, returns the generation row
+// that materializes into a line THAT row recognizes: same prefix, kind, and medium (format_gate).
+// Well-defined iff every reader row has exactly one paired writer row — the property all_intents_paired
+// enforces. Returns nullptr when unpaired (a violation the static check rejects; exposed so a runtime
+// closure kit can assert on it too). constexpr — usable in the consteval check and at runtime.
+[[nodiscard]] constexpr const IntentEmitRow*
+paired_writer_row(const IntentMarkerRow& reader, std::span<const IntentEmitRow> emits) noexcept
+{
+    for (const IntentEmitRow& emit : emits)
+    {
+        if (emit.prefix == reader.prefix && emit.kind == reader.kind &&
+            emit.format_gate == reader.format_gate)
+        {
+            return &emit;
+        }
+    }
+    return nullptr;
+}
+
+// all_intents_paired — the bidirectionality predicate (SID: no reader without a writer). consteval so a
+// package static_asserts it over its constexpr rows: every recognition marker has a paired generation
+// row. The value half of the C2 type obligation (§3.2).
+[[nodiscard]] consteval bool all_intents_paired(std::span<const IntentMarkerRow> markers,
+                                                std::span<const IntentEmitRow> emits) noexcept
+{
+    for (const IntentMarkerRow& reader : markers)
+    {
+        if (paired_writer_row(reader, emits) == nullptr)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+// The DialectIntent concept (§3.2) — bidirectionality as a TYPE obligation. A type models DialectIntent
+// iff it exposes BOTH projections as constexpr row spans (recognition `markers` + generation
+// `emit_markers`) AND every reader row is paired (all_intents_paired). A dialect whose type ships a
+// recognition row without its generation row does NOT satisfy the concept → does not compile where the
+// concept is required. This is the compile-time half of G2; render_row + the runtime round-trip are the
+// value half.
+template <typename Dialect>
+concept DialectIntent = requires {
+    { Dialect::markers } -> std::convertible_to<std::span<const IntentMarkerRow>>;
+    { Dialect::emit_markers } -> std::convertible_to<std::span<const IntentEmitRow>>;
+} && all_intents_paired(Dialect::markers, Dialect::emit_markers);
 
 } // namespace insight::semantic

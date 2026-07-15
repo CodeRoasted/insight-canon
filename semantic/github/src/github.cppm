@@ -71,6 +71,41 @@ inline constexpr std::array<IntentMarkerRow, 3> kMarkers{{
      .extract = PayloadExtract::RemainderAfterPrefix},
 }};
 
+// ── Generation-template rows (studies/008, shared_intent_declaration §3.2) — the WRITER dual ──
+// One emit row per recognition row, paired by (prefix, kind, format_gate). Both Step media are present
+// (the O2 medium axis): `Run <cmd>` is the stripped-command materialization, `##[group]Run <cmd>` the
+// runner-wrapped one — one Step intent, two media, canon reads both to the same identity, so the writer
+// generates either and the round-trip closes (G2). Each emit is PayloadAfterPrefix, the exact inverse
+// of the reader's RemainderAfterPrefix: render_row(row, "yarn lint") reproduces the banner canon
+// segments back to Step "yarn lint".
+inline constexpr std::array<IntentEmitRow, 3> kEmitMarkers{{
+    {.prefix = "Complete job name: ",
+     .kind = insight::tokenization::IntentMarkerKind::Job,
+     .child_order = insight::tokenization::ChildOrder::Unordered,
+     .format_gate = insight::LogFormat::GitHubActions,
+     .emit = PayloadEmit::PayloadAfterPrefix},
+    {.prefix = "Run ",
+     .kind = insight::tokenization::IntentMarkerKind::Step,
+     .child_order = insight::tokenization::ChildOrder::Ordered,
+     .format_gate = insight::LogFormat::GitHubActions,
+     .emit = PayloadEmit::PayloadAfterPrefix},
+    {.prefix = "##[group]Run ", // the runner-wrapped medium of the same step banner
+     .kind = insight::tokenization::IntentMarkerKind::Step,
+     .child_order = insight::tokenization::ChildOrder::Ordered,
+     .format_gate = insight::LogFormat::GitHubActions,
+     .emit = PayloadEmit::PayloadAfterPrefix},
+}};
+
+// The C2 bidirectionality obligation: this dialect exposes BOTH projections, and every recognition row
+// is paired with a generation row. DialectIntent fails to compile if a reader ships without a writer.
+struct Dialect
+{
+    static constexpr std::span<const IntentMarkerRow> markers{kMarkers};
+    static constexpr std::span<const IntentEmitRow> emit_markers{kEmitMarkers};
+};
+static_assert(insight::semantic::DialectIntent<Dialect>,
+              "github: a recognition marker has no paired generation row (reader without a writer)");
+
 // ── Level-lift rows (§1.2) ──
 // The GHA workflow-command level lift. FORMAT-GATED to GitHubActions; consumed by THIS package's
 // dialect strategy (level_from_message walks these, inside parse(), before raw-text inference — the
