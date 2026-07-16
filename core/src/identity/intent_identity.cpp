@@ -102,14 +102,36 @@ struct NumericClaim
         return NumericClaim{.mask = kDigitMask, .end = pos};
     return std::nullopt;
 }
+// The bytes trimmed off a marker payload's ends before it is classed. ONE definition, because
+// canonicalize_intent and discriminant_of are explicit COMPLEMENTS ("same scan, same rules") — if they
+// trimmed different byte sets, one name would yield a class and a discriminant that disagree about
+// where it starts.
+//
+// `\r` is in the set because a CR is a MATERIALIZATION artifact, not part of the intent: a Windows
+// runner emits CRLF, so a genuine banner on a windows-latest leg carries a trailing CR (measured:
+// 52121/511861 = 10.2% of real banners; 337 distinct step payloads seen BOTH bare and CR corpus-wide).
+// Trimming it is exactly what canon's materialization-invariance goal demands — the same intent
+// rendered by a different runner must reach the same identity.
+//
+// Prevalence, honestly (measured, and the bound on severity): CR rides the runner OS, which is
+// near-stable across builds, so it only fragments pairing when CR-ness FLIPS for the same job+step
+// across two builds — 18/34640 same-job same-step pairs (0.052%), all windows-latest. Real and
+// reproducible (one VanishedPhase + one NewPhase for a step that never changed), but rare. What makes
+// it worth fixing at the root anyway is that it is UN-DIAGNOSABLE from the output: both rows render the
+// byte-identical string, so the report shows a step vanishing and reappearing with the same name and no
+// visible difference.
+[[nodiscard]] constexpr bool is_intent_trim_byte(char byte) noexcept
+{
+    return byte == ' ' || byte == '\t' || byte == '\r';
+}
 } // namespace
 
 std::string canonicalize_intent(std::string_view name)
 {
     // Trim (the marker payload is extracted verbatim after the banner prefix; G1 strips).
-    while (!name.empty() && (name.front() == ' ' || name.front() == '\t'))
+    while (!name.empty() && is_intent_trim_byte(name.front()))
         name.remove_prefix(1);
-    while (!name.empty() && (name.back() == ' ' || name.back() == '\t'))
+    while (!name.empty() && is_intent_trim_byte(name.back()))
         name.remove_suffix(1);
 
     std::string out;
@@ -164,9 +186,9 @@ std::string_view discriminant_of(std::string_view name) noexcept
     // `Test (ubuntu-latest, Node 24.x)` → `(ubuntu-latest, Node 24.x)` (R4 tuple) and `ESLint v6` →
     // `v6` (R2 version): the raw declared coordinate that separates co-occurring / cross-run-drifted
     // legs. The FIRST masked span (contiguous → a view); a name with no drift token → empty.
-    while (!name.empty() && (name.front() == ' ' || name.front() == '\t'))
+    while (!name.empty() && is_intent_trim_byte(name.front()))
         name.remove_prefix(1);
-    while (!name.empty() && (name.back() == ' ' || name.back() == '\t'))
+    while (!name.empty() && is_intent_trim_byte(name.back()))
         name.remove_suffix(1);
 
     std::size_t idx{0};
