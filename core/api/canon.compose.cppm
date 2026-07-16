@@ -101,49 +101,50 @@ class ComposedSemantics
     // console-tail markers. Consumed by map_outcome_token / scan_run_outcome / resolve_run_outcome.
     [[nodiscard]] std::span<const OutcomeTokenRow> outcome_tokens() const noexcept { return outcome_tokens_; }
     [[nodiscard]] std::span<const OutcomeMarkerRow> outcome_markers() const noexcept { return outcome_markers_; }
-    // ADR 0028 D1 — the composed SINK vocabulary: every Sink any package declares. This is the closed
-    // set a caller's `--sink` is validated against, and the list an unknown Sink's error names.
-    [[nodiscard]] std::span<const std::string_view> sinks() const noexcept { return sinks_; }
+    // ADR 0029 D5 — the composed INTENT CHANNEL vocabulary: every channel any package declares. This is
+    // the closed set a caller's `--channel` is validated against, and the list an unknown channel's error
+    // names.
+    [[nodiscard]] std::span<const std::string_view> channels() const noexcept { return channels_; }
 
-    // ── The Sink-filtered view (ADR 0028 D1/D2/D3) ──
-    // Build the vocabulary ONE stream declares, at stream open. `declared_sink` is the caller's
-    // provenance fact (D2 — never auto-detected: a content heuristic decides the Sink from a PREFIX of
+    // ── The channel-filtered view (ADR 0029 D1/D2/D5) ──
+    // Build the vocabulary ONE stream declares, at stream open. `declared_channel` is the caller's
+    // provenance fact (D2 — never auto-detected: a content heuristic decides the channel from a PREFIX of
     // the stream, so a later line can contradict an earlier decision ⇒ content non-determinism under
-    // streaming). The returned composition drops every marker row gated to a different Sink, so:
+    // streaming). The returned composition drops every marker row gated to a different channel, so:
     //
-    //   * the HOT PATH never sees a Sink — recognize() walks a plain row span, zero per-line cost, and
+    //   * the HOT PATH never sees a channel — recognize() walks a plain row span, zero per-line cost, and
     //     its signature is unchanged;
-    //   * one Sink per TREE (D3) is STRUCTURAL, not merely asserted — a sibling Sink's rows are not in
-    //     the table, so a multi-Sink tree is unrepresentable rather than rejected;
-    //   * `kAnySink` rows survive every filter, so single-materialization dialects are untouched.
+    //   * one IntentChannel per TREE (D5) is STRUCTURAL, not merely asserted — a sibling channel's rows
+    //     are not in the table, so a multi-channel tree is unrepresentable rather than rejected;
+    //   * `kAnyChannel` rows survive every filter, so single-materialization dialects are untouched.
     //
-    // `kAnySink` (empty) as the ARGUMENT means Unspecified — the caller did not declare (D5): every
+    // `kAnyChannel` (empty) as the ARGUMENT means Unspecified — the caller did not declare: every
     // concretely-gated row drops ⇒ no dialect structure ⇒ the raw-text fallback. That is fail-closed on
     // DEPTH, not on the run, and it is deliberate: never default an undeclared stream to a concrete
-    // Sink, because "both Sinks' rows live at once" IS the phantom defect this ADR exists to kill.
+    // channel, because "both channels' rows live at once" IS the phantom defect this exists to kill.
     //
-    // FATALS on an UNKNOWN Sink (a non-empty name no package declares — e.g. `--sink=annotatd`),
-    // listing the declared vocabulary. An unknown Sink is a MISTAKE; an absent Sink is a CHOICE; they
-    // must not share a code path (D1) — silently degrading a typo to the fallback is the exact
+    // FATALS on an UNKNOWN channel (a non-empty name no package declares — e.g. `--channel=annotatd`),
+    // listing the declared vocabulary. An unknown channel is a MISTAKE; an absent channel is a CHOICE;
+    // they must not share a code path — silently degrading a typo to the fallback is the exact
     // silent-fallback bug class this workstream has already paid for twice.
     //
     // Cold path by construction: called once per stream, copies ~10 POD rows. The pointed-at bytes stay
     // in package-static storage (SP-7), so the copy is trivial and the identity is preserved verbatim —
     // semantic_identity is the RULESET's identity, not a stream's view of it.
-    [[nodiscard]] ComposedSemantics for_sink(std::string_view declared_sink) const;
+    [[nodiscard]] ComposedSemantics for_channel(std::string_view declared_channel) const;
 
-    // Would declaring a Sink unlock recognition this view is withholding? (ADR 0028 D5's diagnostic.)
-    // True iff some marker row for `format` is Sink-gated to a Sink that `declared_sink` does not admit
-    // — i.e. this dialect HAS materializations and the caller has not said which one it acquired, so
-    // depth is being withheld and saying so would unlock it.
+    // Would declaring an IntentChannel unlock recognition this view is withholding? (ADR 0029 D5's
+    // diagnostic.) True iff some marker row for `format` is channel-gated to a channel that
+    // `declared_channel` does not admit — i.e. this dialect HAS materializations and the caller has not
+    // said which one it acquired, so depth is being withheld and saying so would unlock it.
     //
     // A narrow QUERY, deliberately not an `all_markers()` accessor: exposing the unfiltered table would
     // re-open the fail-open door this class exists to close (a caller could walk it and recognize
-    // against every Sink at once — the phantom defect). Returns false for a single-materialization
-    // dialect (Jenkins), so a Jenkins user is never told to declare a Sink that does not apply to them
-    // — a diagnostic that fires where it cannot help is exactly the fatigue the product is against.
+    // against every channel at once — the phantom defect). Returns false for a single-materialization
+    // dialect (Jenkins), so a Jenkins user is never told to declare a channel that does not apply to
+    // them — a diagnostic that fires where it cannot help is exactly the fatigue the product is against.
     [[nodiscard]] bool withholds_markers_for(insight::LogFormat format,
-                                             std::string_view declared_sink) const noexcept;
+                                             std::string_view declared_channel) const noexcept;
 
     // ── The code-tier seams ──
     [[nodiscard]] std::span<const StrategyFactory> strategy_factories() const noexcept { return strategies_; }
@@ -160,22 +161,23 @@ class ComposedSemantics
     friend ComposedSemantics compose(std::span<const SemanticPackageManifest>);
 
     std::vector<StructuralRoleRow> roles_;
-    // The marker rows THIS composition recognizes — already Sink-filtered (ADR 0028 D1). A freshly
-    // composed vocabulary is the UNSPECIFIED view: no caller declared a Sink, so every concretely-gated
-    // row is absent and only kAnySink rows fire (D5 fail-closed). for_sink() re-derives this from
-    // all_markers_.
+    // The marker rows THIS composition recognizes — already channel-filtered (ADR 0029 D5). A freshly
+    // composed vocabulary is the UNSPECIFIED view: no caller declared a channel, so every
+    // concretely-gated row is absent and only kAnyChannel rows fire (fail-closed). for_channel()
+    // re-derives this from all_markers_.
     std::vector<IntentMarkerRow> markers_;
-    // Every marker row the packages declared, Sink-gated or not — the SOURCE for_sink() filters, never
-    // walked by recognition. Kept private and separate on purpose: if the full set were the public
+    // Every marker row the packages declared, channel-gated or not — the SOURCE for_channel() filters,
+    // never walked by recognition. Kept private and separate on purpose: if the full set were the public
     // `markers()`, the default composition would fire BOTH GHA Step rows at once, which IS the phantom
-    // defect. Fail-closed has to be the default, not an opt-in a caller can forget.
+    // defect. Fail-closed has to be the DEFAULT, not an opt-in a caller can forget (ADR 0029 D5's
+    // promoted MUST — a safety default that must be requested is not a default).
     std::vector<IntentMarkerRow> all_markers_;
     std::vector<LevelLiftRow> level_lifts_;
     std::vector<LocationRow> locations_;
     std::vector<ValueClassRow> value_classes_;
     std::vector<OutcomeTokenRow> outcome_tokens_;
     std::vector<OutcomeMarkerRow> outcome_markers_;
-    std::vector<std::string_view> sinks_; // ADR 0028 — the composed declared Sink vocabulary
+    std::vector<std::string_view> channels_; // ADR 0029 — the composed declared channel vocabulary
     std::vector<StrategyFactory> strategies_;
     std::vector<ProvenanceHook> provenance_hooks_;
     std::vector<ComposedPackage> packages_;

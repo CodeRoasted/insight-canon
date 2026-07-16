@@ -23,15 +23,16 @@ using insight::tokenization::recognize;
 
 namespace
 {
-// The composition under test: the github package alone, viewed through ONE declared Sink (ADR 0028).
-// The Sink is REQUIRED here on purpose — GHA is the dialect that actually has two materializations, so
-// "which Sink" is part of every recognition question about it, and a test that did not say would be
-// asking an ill-posed one. `sink` names a declared Sink ("annotated" / "stripped"); kAnySink models the
+// The composition under test: the github package alone, viewed through ONE declared IntentChannel
+// (ADR 0029). The channel is REQUIRED here on purpose — GHA is the dialect that actually has two
+// materializations, so "which channel" is part of every recognition question about it, and a test that
+// did not say would be asking an ill-posed one. `channel` names a declared channel ("annotated" /
+// "stripped"); kAnyChannel models the
 // caller that declares nothing (D5 — concretely-gated rows stay dark).
-[[nodiscard]] ComposedSemantics github_only(std::string_view sink)
+[[nodiscard]] ComposedSemantics github_only(std::string_view channel)
 {
     const std::array manifests{insight::semantic::github::kManifest};
-    return insight::semantic::compose(manifests).for_sink(sink);
+    return insight::semantic::compose(manifests).for_channel(channel);
 }
 
 [[nodiscard]] std::string_view kind_str(IntentMarkerKind kind)
@@ -58,7 +59,7 @@ namespace
 // ── The two RESET-class banners open their quanta; the payload is the RAW name ──
 TEST(GithubMarkers, RecognizesJobAndStepBanners)
 {
-    const ComposedSemantics gh{github_only(insight::semantic::github::kSinkStripped)};
+    const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};
     const auto job{recognize("Complete job name: build (ubuntu-latest)", LogFormat::GitHubActions, gh)};
     EXPECT_EQ(job.kind, IntentMarkerKind::Job) << "expected Job, got " << show(job);
     EXPECT_EQ(job.name, "build (ubuntu-latest)") << "raw job payload wrong: " << show(job);
@@ -68,44 +69,44 @@ TEST(GithubMarkers, RecognizesJobAndStepBanners)
     EXPECT_EQ(step.name, "actions/checkout@v4") << "raw step payload wrong: " << show(step);
 }
 
-// ── One Step intent, two SINKS, ONE identity — materialization invariance (ADR 0028 D4/G-SINK-1) ──
-// The same step banner materializes as the runner's `##[group]Run <cmd>` in the ANNOTATED Sink and as
-// the §5.3-stripped bare `Run <cmd>` in the STRIPPED one. Each fires under ITS declared Sink and both
-// extract the IDENTICAL payload — which is what makes the Sink a materialization detail and never an
+// ── One Step intent, two CHANNELS, ONE identity — materialization invariance (ADR 0029 D5/G-SINK-1) ──
+// The same step banner materializes as the runner's `##[group]Run <cmd>` in the ANNOTATED channel and as
+// the §5.3-stripped bare `Run <cmd>` in the STRIPPED one. Each fires under ITS declared channel and both
+// extract the IDENTICAL payload — which is what makes the channel a materialization detail and never an
 // axis: an annotated and a stripped rendering of the same build reach the same step identity, so a
-// cross-Sink comparison across the pyramid axis (D4's legal case) sees no phantom churn.
+// cross-channel comparison across the pyramid axis (D5's legal case) sees no phantom churn.
 //
 // This is the unit-level statement of the property; G-SINK-1 asserts it end-to-end on real corpus pairs.
 // It REPLACES the pre-0028 claim that shipping both prefixes UNGATED delivered this invariance: the
 // payload half was true, but ungated recognition of the bare prefix is exactly what minted phantom Steps
 // out of annotated prose. Invariance is preserved here — by two gated rows, not one ungated pair.
-TEST(GithubMarkers, StepIdentityIsInvariantAcrossTheTwoSinks)
+TEST(GithubMarkers, StepIdentityIsInvariantAcrossTheTwoChannels)
 {
-    const ComposedSemantics annotated{github_only(insight::semantic::github::kSinkAnnotated)};
-    const ComposedSemantics stripped{github_only(insight::semantic::github::kSinkStripped)};
+    const ComposedSemantics annotated{github_only(insight::semantic::github::kChannelAnnotated)};
+    const ComposedSemantics stripped{github_only(insight::semantic::github::kChannelStripped)};
 
     const auto wrapped{recognize("##[group]Run yarn lint", LogFormat::GitHubActions, annotated)};
     EXPECT_EQ(wrapped.kind, IntentMarkerKind::Step)
-        << "the annotated Sink's genuine banner was not recognized: " << show(wrapped);
+        << "the annotated channel's genuine banner was not recognized: " << show(wrapped);
     EXPECT_EQ(wrapped.name, "yarn lint")
         << "the wrapped payload must strip to the bare step name: " << show(wrapped);
 
     const auto bare{recognize("Run yarn lint", LogFormat::GitHubActions, stripped)};
     EXPECT_EQ(bare.kind, IntentMarkerKind::Step)
-        << "the stripped Sink's genuine banner was not recognized: " << show(bare);
+        << "the stripped channel's genuine banner was not recognized: " << show(bare);
     EXPECT_EQ(bare.name, wrapped.name)
-        << "THE SINK BECAME AN AXIS: the two materializations of one step yielded different identities "
-           "(stripped=\"" << bare.name << "\" annotated=\"" << wrapped.name << "\") — a cross-Sink diff "
+        << "THE CHANNEL BECAME AN AXIS: the two materializations of one step yielded different identities "
+           "(stripped=\"" << bare.name << "\" annotated=\"" << wrapped.name << "\") — a cross-channel diff "
            "of the same build would report every step vanished+new";
 
-    // Each Sink's OTHER form is not a banner there — the whole point of the coordinate.
+    // Each channel's OTHER form is not a banner there — the whole point of the coordinate.
     const auto prose{recognize("Run `npm audit` for details.", LogFormat::GitHubActions, annotated)};
     EXPECT_EQ(prose.kind, IntentMarkerKind::None)
-        << "PHANTOM: bare `Run ` prose opened a Step in the ANNOTATED Sink, where the genuine banner is "
+        << "PHANTOM: bare `Run ` prose opened a Step in the ANNOTATED channel, where the genuine banner is "
            "`##[group]Run ` and this line is ordinary npm output: " << show(prose);
     const auto wrapped_in_stripped{recognize("##[group]Run yarn lint", LogFormat::GitHubActions, stripped)};
     EXPECT_EQ(wrapped_in_stripped.kind, IntentMarkerKind::None)
-        << "the annotated banner fired under the STRIPPED Sink, where `##[` cannot occur: "
+        << "the annotated banner fired under the STRIPPED channel, where `##[` cannot occur: "
         << show(wrapped_in_stripped);
 
     // `::group::Run ` is not a shipped row → it must NOT open a Step (guards against a speculative row).
@@ -113,20 +114,21 @@ TEST(GithubMarkers, StepIdentityIsInvariantAcrossTheTwoSinks)
     EXPECT_EQ(colon.kind, IntentMarkerKind::None) << "::group:: form unexpectedly recognized: " << show(colon);
 }
 
-// ── D5: an UNDECLARED Sink fails closed on DEPTH — no phantom, and no structure either ──
-// The caller that declares nothing gets the kAnySink rows (the Job banner) and NONE of the Sink-gated
+// ── D5: an UNDECLARED channel fails closed on DEPTH — no phantom, and no structure either ──
+// The caller that declares nothing gets the kAnyChannel rows (the Job banner) and NONE of the
+// channel-gated
 // Step rows: no dialect step structure, and — critically — no phantom either. Never a concrete default:
-// "both Step rows live at once" IS the defect. Declaring the Sink is the path to depth.
-TEST(GithubMarkers, UndeclaredSinkFiresNoStepRowEitherWay)
+// "both Step rows live at once" IS the defect. Declaring the channel is the path to depth.
+TEST(GithubMarkers, UndeclaredChannelFiresNoStepRowEitherWay)
 {
-    const ComposedSemantics undeclared{github_only(insight::semantic::kAnySink)};
+    const ComposedSemantics undeclared{github_only(insight::semantic::kAnyChannel)};
 
     EXPECT_EQ(recognize("Complete job name: build (ubuntu-latest)", LogFormat::GitHubActions, undeclared).kind,
               IntentMarkerKind::Job)
-        << "the Job banner is kAnySink (identical in both Sinks) and must still fire undeclared";
+        << "the Job banner is kAnyChannel (identical in both channels) and must still fire undeclared";
     EXPECT_EQ(recognize("Run yarn lint", LogFormat::GitHubActions, undeclared).kind, IntentMarkerKind::None)
-        << "a Sink-gated Step row fired with NO Sink declared — the composition defaulted to a concrete "
-           "Sink, which is exactly the fail-open defect ADR 0028 D5 closes";
+        << "a channel-gated Step row fired with NO channel declared — the composition defaulted to a "
+           "concrete channel, which is exactly the fail-open defect ADR 0029 D5 closes";
     EXPECT_EQ(recognize("##[group]Run yarn lint", LogFormat::GitHubActions, undeclared).kind,
               IntentMarkerKind::None)
         << "same, for the annotated materialization";
@@ -137,7 +139,7 @@ TEST(GithubMarkers, UndeclaredSinkFiresNoStepRowEitherWay)
 // (kMarkers[*].format_gate = GitHubActions); the walker's gate_matches enforces it.
 TEST(GithubMarkers, FormatGatedToGitHubActions)
 {
-    const ComposedSemantics gh{github_only(insight::semantic::github::kSinkStripped)};
+    const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};
     constexpr std::string_view run_line{"Run daemon started"};
     for (const LogFormat fmt : {LogFormat::Unknown, LogFormat::RawText, LogFormat::JSON, LogFormat::Syslog,
                                 LogFormat::KeyValue, LogFormat::Log4j, LogFormat::CloudWatch})
@@ -153,7 +155,7 @@ TEST(GithubMarkers, FormatGatedToGitHubActions)
 // ── No false RESET: the step prefix is `Run ` WITH the trailing space; empty opens nothing ──
 TEST(GithubMarkers, NoFalseStepOnRunningOrEmpty)
 {
-    const ComposedSemantics gh{github_only(insight::semantic::github::kSinkStripped)};
+    const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};
     const auto running{recognize("Running database migrations", LogFormat::GitHubActions, gh)};
     EXPECT_EQ(running.kind, IntentMarkerKind::None) << "\"Running …\" false-matched a Step: " << show(running);
 
@@ -166,7 +168,7 @@ TEST(GithubMarkers, NoFalseStepOnRunningOrEmpty)
 // child_order data (the level-typed alignment declaration), plus the marker carries its raw discriminant.
 TEST(GithubMarkers, JobUnorderedStepOrdered)
 {
-    const ComposedSemantics gh{github_only(insight::semantic::github::kSinkStripped)};
+    const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};
     const auto job{recognize("Complete job name: Test (ubuntu-latest)", LogFormat::GitHubActions, gh)};
     EXPECT_EQ(job.child_order, ChildOrder::Unordered) << "jobs are parallel → set-matched";
     EXPECT_EQ(job.discriminant, "(ubuntu-latest)") << "the marker carries its raw discriminant";
@@ -180,7 +182,7 @@ TEST(GithubMarkers, JobUnorderedStepOrdered)
 // that THIS package's recognition delivers the raw payload the collapse consumes — the composed contract.
 TEST(GithubMarkers, RawPayloadFeedsAlignmentClass)
 {
-    const ComposedSemantics gh{github_only(insight::semantic::github::kSinkStripped)};
+    const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};
     const auto job{recognize("Complete job name: test (win-msvc, windows-latest, nightly)",
                              LogFormat::GitHubActions, gh)};
     ASSERT_EQ(job.kind, IntentMarkerKind::Job) << show(job);

@@ -115,45 +115,56 @@ inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-2"};
 // marker, a level lift) uses its concrete LogFormat (II-6 — a dialect never fires cross-format).
 inline constexpr insight::LogFormat kAnyFormat{insight::LogFormat::Unknown};
 
-// ── The SINK coordinate (ADR 0028) ───────────────────────────────────────────────────────────────
-// `Medium = IntentFormat × Sink`. The IntentFormat is the intent's semantic STRUCTURE; the Sink is how
-// that intent is MATERIALIZED in a specific output environment. Same intent, different destination ⇒ a
-// new Sink (not a new format). The Sink vocabulary is package-declared DATA, exactly like the markers —
-// core stays semantic-unaware (ADR 0024): canon knows Sink *markers*, it does not detect, route or map.
+// ── The INTENT CHANNEL coordinate (ADR 0029) ─────────────────────────────────────────────────────
+// `Medium = IntentFormat × IntentChannel`. The IntentFormat is the intent's semantic STRUCTURE; the
+// IntentChannel is the channel through which that intent was MATERIALIZED. Same intent, different
+// channel ⇒ a new channel (not a new format). The channel vocabulary is package-declared DATA, exactly
+// like the markers — core stays semantic-unaware (ADR 0024): canon knows channel *markers*, it does not
+// detect, route or map.
+//
+// It is NOT "the sink": a sink is LogCraft's output destination (console/file/http/SHM), a
+// generator-side concept. This coordinate is a provenance fact about a STREAM, and a consumer that never
+// heard of LogCraft still has to declare it (ADR 0029 D1).
 //
 // Why the coordinate exists (measured, not theorized): GHA ships the SAME Step banner in two
 // materializations — the runner's `##[group]Run <cmd>` and the workflow-command-stripped `Run <cmd>` —
-// under ONE format_gate. In the annotated Sink a line starting with `Run ` is ordinary PROSE, so
-// without a Sink the stripped row mints a PHANTOM Step quantum out of prose: 9.05 % of 22 030 real
+// under ONE format_gate. In the annotated channel a line starting with `Run ` is ordinary PROSE, so
+// without a channel the stripped row mints a PHANTOM Step quantum out of prose: 9.05 % of 22 030 real
 // annotated logs, and the shipped Action feeds exactly that form.
 //
-// The "any sink" sentinel: the row fires regardless of the stream's declared Sink — the DEGENERATE case
-// every single-materialization dialect (Jenkins, test_frameworks) uses, so it is untouched by all of
-// this (ADR 0028 D1, minimal blast radius). The EMPTY string_view is that sentinel, mirroring
-// kAnyFormat = LogFormat::Unknown: a package may never declare an empty Sink name (all_sinks_named
-// enforces it), so empty is unambiguously "any".
+// The channel is EXTRINSIC and that is the whole reason it is declared rather than detected: no byte
+// carries it. A prose line is byte-identical across channels, and both GHA channels share one
+// format_gate — the discriminating evidence is absent from the very lines that get misrecognized. So
+// someone must SAY, and only the caller who acquired the stream knows (ADR 0029 D2/D5; never
+// auto-detect — a prefix heuristic makes content non-deterministic under streaming).
+//
+// The "any channel" sentinel: the row fires regardless of the stream's declared channel — the DEGENERATE
+// case every single-materialization dialect (Jenkins, test_frameworks) uses, so it is untouched by all
+// of this (ADR 0029 D5, minimal blast radius). The EMPTY string_view is that sentinel, mirroring
+// kAnyFormat = LogFormat::Unknown: a package may never declare an empty channel name
+// (all_channels_named enforces it), so empty is unambiguously "any".
 //
 // NOTE the deliberate asymmetry with the CALLER's declaration, which is also empty when absent: an
-// empty *row* gate means "fires on any Sink"; an empty *declaration* means "the caller did not say"
-// (ADR 0028 D5, Unspecified). sink_admits() below is where the two meet, and it is why an undeclared
-// stream keeps its kAnySink rows but loses every concretely-gated one — fail-closed on DEPTH, not on
-// the run. Never default an undeclared stream to a concrete Sink: that is precisely today's defect
-// (both GHA rows live at once).
-inline constexpr std::string_view kAnySink{};
+// empty *row* gate means "fires on any channel"; an empty *declaration* means "the caller did not say"
+// (Unspecified). channel_admits() below is where the two meet, and it is why an undeclared stream keeps
+// its kAnyChannel rows but loses every concretely-gated one — fail-closed on DEPTH, not on the run.
+// Never default an undeclared stream to a concrete channel: that is precisely the defect this killed
+// (both GHA rows living at once).
+inline constexpr std::string_view kAnyChannel{};
 
-// Does a row gated to `sink_gate` fire on a stream whose caller declared `declared_sink`?
+// Does a row gated to `channel_gate` fire on a stream whose caller declared `declared_channel`?
 // The ONE predicate the whole coordinate reduces to. Total, pure, and deliberately tiny:
-//   * kAnySink row               → always fires (the degenerate dialect is untouched)
-//   * concrete row, same sink    → fires
-//   * concrete row, other sink   → does NOT fire (this is the phantom fix)
-//   * concrete row, undeclared   → does NOT fire (D5 fail-closed — "" matches no concrete gate)
-// An UNKNOWN declared Sink (a typo) never reaches here: it is a HARD ERROR at composition, listing the
-// declared vocabulary (D1). An unknown Sink is a *mistake*; an absent Sink is a *choice* — they must
-// not share a code path.
-[[nodiscard]] constexpr bool sink_admits(std::string_view sink_gate,
-                                         std::string_view declared_sink) noexcept
+//   * kAnyChannel row              → always fires (the degenerate dialect is untouched)
+//   * concrete row, same channel   → fires
+//   * concrete row, other channel  → does NOT fire (this is the phantom fix)
+//   * concrete row, undeclared     → does NOT fire (fail-closed — "" matches no concrete gate)
+// An UNKNOWN declared channel (a typo) never reaches here: it is a HARD ERROR at composition, listing
+// the declared vocabulary. An unknown channel is a *mistake*; an absent channel is a *choice* — they
+// must not share a code path.
+[[nodiscard]] constexpr bool channel_admits(std::string_view channel_gate,
+                                            std::string_view declared_channel) noexcept
 {
-    return sink_gate == kAnySink || sink_gate == declared_sink;
+    return channel_gate == kAnyChannel || channel_gate == declared_channel;
 }
 
 // How a matched marker's payload is extracted (§2.2 — a CLOSED extractor enum; the algorithm lives in
@@ -226,18 +237,19 @@ struct IntentMarkerRow
     // data. Empty for rows without exclusions (every pre-grammar-2 row). The span points at
     // package-static constexpr storage (SP-7 lifetime); serialized into semantic_identity.
     std::span<const std::string_view> payload_excludes{};
-    // ADR 0028 D1 — the SINK gate: this row fires only on a stream the caller declared as this Sink.
-    // kAnySink (the default) = fires on any Sink, so every single-materialization dialect is untouched.
-    // REQUIRED exactly when one Sink's marker occurs as ordinary CONTENT in a sibling Sink (the GHA
-    // `Run ` case). Serialized into semantic_identity, so a sink-row change moves the digest exactly as
-    // a prefix change does.
-    std::string_view sink_gate{kAnySink};
+    // ADR 0029 D5 — the CHANNEL gate: this row fires only on a stream the caller declared as this
+    // IntentChannel. kAnyChannel (the default) = fires on any channel, so every single-materialization
+    // dialect is untouched. REQUIRED exactly when one channel's marker occurs as ordinary CONTENT in a
+    // sibling channel (the GHA `Run ` case) — which is why `Run ` needs a gate and `##[error]` does not.
+    // Serialized into semantic_identity, so a channel-row change moves the digest exactly as a prefix
+    // change does.
+    std::string_view channel_gate{kAnyChannel};
 };
 
 // A generation-template rule (studies/008, shared_intent_declaration §3.2) — the WRITER dual of
 // IntentMarkerRow. Carries the SAME dialect hierarchy (kind + child_order, the ADR 0023 declaration)
-// and the SAME medium gate (format_gate = the format+sink the line materializes into — the O2 medium
-// axis; the two GHA Step media `Run ` / `##[group]Run ` are two emit rows sharing kind, differing in
+// and the SAME medium gate (format_gate × channel_gate = the Medium the line materializes into — the O2
+// medium axis; the two GHA Step media `Run ` / `##[group]Run ` are two emit rows sharing kind, differing in
 // prefix). No payload_excludes: the writer only ever emits a real intent, never an excluded structural
 // token, so the exclusion set is a reader-side concern with no generation dual. Rows-as-data (SID-2):
 // the emit shape is the closed PayloadEmit enum, never a callable. Content-hashable exactly as
@@ -250,12 +262,16 @@ struct IntentEmitRow
     insight::tokenization::ChildOrder child_order;
     insight::LogFormat format_gate;
     PayloadEmit emit;
-    // ADR 0028 D1 — the SINK gate, symmetric to IntentMarkerRow's. The writer's dual of the reader's
-    // question: not "which prefix do I match" but "which Sink am I materializing into". This is what
-    // dissolves the apparent C2 contradiction — the writer never inspects prefixes (the SID-1 smell C2
-    // exists to kill), it applies the Sink adaptation the Medium names. Paired with the reader's gate by
-    // paired_writer_row, so the two projections cannot drift onto different Sinks.
-    std::string_view sink_gate{kAnySink};
+    // ADR 0029 D5 — the CHANNEL gate, symmetric to IntentMarkerRow's. The writer's dual of the reader's
+    // question: not "which prefix do I match" but "which IntentChannel am I materializing into". This is
+    // what dissolves the apparent C2 contradiction — the writer never inspects prefixes (the SID-1 smell
+    // C2 exists to kill), it applies the channel adaptation the Medium names. Paired with the reader's
+    // gate by paired_writer_row, so the two projections cannot drift onto different channels.
+    //
+    // It is also the MEDIUM SELECTOR's input (ADR 0029 D4): a writer picks the emit row whose
+    // channel_gate matches the channel it was told to render, never the first row that matches by array
+    // order — so `##[group]Run ` is reachable and the output does not depend on canon's row ordering.
+    std::string_view channel_gate{kAnyChannel};
 };
 
 // A level-lift rule: a prefix lifts the line's LogLevel (§1.2 — `##[error]` → Error). Consumed by the
@@ -353,13 +369,14 @@ struct SemanticPackageManifest
     // declares exactly the outcome surfaces its dialect actually has).
     std::span<const OutcomeTokenRow> outcome_tokens;
     std::span<const OutcomeMarkerRow> outcome_markers;
-    // ADR 0028 D1 — the package's declared SINK vocabulary: every materialization this dialect's intents
-    // can be rendered into ("annotated" / "stripped" for GHA). EMPTY for a single-materialization
-    // dialect (Jenkins, test_frameworks), whose rows are all kAnySink — the degenerate case.
-    // This is the vocabulary a caller's `--sink` is validated against: declared ⇒ fires; unknown ⇒ HARD
-    // ERROR listing these names. The span points at package-static constexpr storage (SP-7 lifetime);
-    // serialized into semantic_identity alongside the rows it gates.
-    std::span<const std::string_view> sinks{};
+    // ADR 0029 D5 — the package's declared INTENT CHANNEL vocabulary: every materialization this
+    // dialect's intents can be rendered into ("annotated" / "stripped" for GHA). EMPTY for a
+    // single-materialization dialect (Jenkins, test_frameworks), whose rows are all kAnyChannel — the
+    // degenerate case. Only the dialect that HAS multiple materializations declares channels.
+    // This is the vocabulary a caller's `--channel` is validated against: declared ⇒ fires; unknown ⇒
+    // HARD ERROR listing these names. The span points at package-static constexpr storage (SP-7
+    // lifetime); serialized into semantic_identity alongside the rows it gates.
+    std::span<const std::string_view> channels{};
     StrategyFactory strategy{nullptr};  // nullable — the dialect format-strategy code tier
     ProvenanceHook echoed_source{nullptr}; // nullable — the raw-line echoed-source code tier
 };
@@ -404,10 +421,10 @@ struct SemanticPackageManifest
 }
 
 // paired_writer_row — the reader→writer pairing. Given a recognition row, returns the generation row
-// that materializes into a line THAT row recognizes: same prefix, kind, and MEDIUM. Since ADR 0028 the
-// Medium is `IntentFormat × Sink`, so the pairing matches on BOTH gates — a reader row gated to one Sink
-// must pair with the writer row gated to the SAME Sink, or the two projections would silently describe
-// different materializations (a C2 violation the pairing exists to make impossible).
+// that materializes into a line THAT row recognizes: same prefix, kind, and MEDIUM. The Medium is
+// `IntentFormat × IntentChannel` (ADR 0029 D1), so the pairing matches on BOTH gates — a reader row gated
+// to one channel must pair with the writer row gated to the SAME channel, or the two projections would
+// silently describe different materializations (a C2 violation the pairing exists to make impossible).
 // Well-defined iff every reader row has exactly one paired writer row — the property all_intents_paired
 // enforces. Returns nullptr when unpaired (a violation the static check rejects; exposed so a runtime
 // closure kit can assert on it too). constexpr — usable in the consteval check and at runtime.
@@ -417,7 +434,7 @@ paired_writer_row(const IntentMarkerRow& reader, std::span<const IntentEmitRow> 
     for (const IntentEmitRow& emit : emits)
     {
         if (emit.prefix == reader.prefix && emit.kind == reader.kind &&
-            emit.format_gate == reader.format_gate && emit.sink_gate == reader.sink_gate)
+            emit.format_gate == reader.format_gate && emit.channel_gate == reader.channel_gate)
         {
             return &emit;
         }
@@ -425,19 +442,19 @@ paired_writer_row(const IntentMarkerRow& reader, std::span<const IntentEmitRow> 
     return nullptr;
 }
 
-// ── The Sink static checks (ADR 0028 D1 — fail-closed at COMPILE time) ──
-// A package's Sink vocabulary and its rows' gates must agree, and the check is consteval so the
+// ── The IntentChannel static checks (ADR 0029 D5 — fail-closed at COMPILE time) ──
+// A package's channel vocabulary and its rows' gates must agree, and the check is consteval so the
 // disagreement is a build error in the package's own TU — the same seat, and the same posture, as the
-// DialectIntent concept. This is the compile-time half of "an unknown Sink is a hard error": a gate
-// naming a Sink the package never declared cannot ship at all.
+// DialectIntent concept. This is the compile-time half of "an unknown channel is a hard error": a gate
+// naming a channel the package never declared cannot ship at all.
 
-// Every declared Sink name is non-empty. The empty name IS kAnySink, so declaring it would make "any"
-// and "this specific one" the same value — the sentinel must stay unambiguous.
-[[nodiscard]] consteval bool all_sinks_named(std::span<const std::string_view> sinks) noexcept
+// Every declared channel name is non-empty. The empty name IS kAnyChannel, so declaring it would make
+// "any" and "this specific one" the same value — the sentinel must stay unambiguous.
+[[nodiscard]] consteval bool all_channels_named(std::span<const std::string_view> channels) noexcept
 {
-    for (const std::string_view sink : sinks)
+    for (const std::string_view channel : channels)
     {
-        if (sink.empty())
+        if (channel.empty())
         {
             return false;
         }
@@ -445,21 +462,22 @@ paired_writer_row(const IntentMarkerRow& reader, std::span<const IntentEmitRow> 
     return true;
 }
 
-// Every row's sink_gate is kAnySink or one of the package's DECLARED Sinks. Catches the typo
-// (`.sink_gate = "anotated"`) at compile time, in the package that made it.
-[[nodiscard]] consteval bool all_sink_gates_declared(std::span<const IntentMarkerRow> markers,
-                                                     std::span<const IntentEmitRow> emits,
-                                                     std::span<const std::string_view> sinks) noexcept
+// Every row's channel_gate is kAnyChannel or one of the package's DECLARED channels. Catches the typo
+// (`.channel_gate = "anotated"`) at compile time, in the package that made it.
+[[nodiscard]] consteval bool
+all_channel_gates_declared(std::span<const IntentMarkerRow> markers,
+                           std::span<const IntentEmitRow> emits,
+                           std::span<const std::string_view> channels) noexcept
 {
-    const auto declared{[sinks](std::string_view gate)
+    const auto declared{[channels](std::string_view gate)
                         {
-                            if (gate == kAnySink)
+                            if (gate == kAnyChannel)
                             {
                                 return true;
                             }
-                            for (const std::string_view sink : sinks)
+                            for (const std::string_view channel : channels)
                             {
-                                if (sink == gate)
+                                if (channel == gate)
                                 {
                                     return true;
                                 }
@@ -468,14 +486,14 @@ paired_writer_row(const IntentMarkerRow& reader, std::span<const IntentEmitRow> 
                         }};
     for (const IntentMarkerRow& row : markers)
     {
-        if (!declared(row.sink_gate))
+        if (!declared(row.channel_gate))
         {
             return false;
         }
     }
     for (const IntentEmitRow& row : emits)
     {
-        if (!declared(row.sink_gate))
+        if (!declared(row.channel_gate))
         {
             return false;
         }
