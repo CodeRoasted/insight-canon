@@ -89,6 +89,9 @@ void serialize_manifest(std::string& out, const SemanticPackageManifest& pkg)
         append_u8(out, static_cast<std::uint8_t>(row.role));
         append_u8(out, static_cast<std::uint8_t>(row.format_gate));
     }
+    // ADR 0028: the package's declared Sink vocabulary is identity — it is the closed set every
+    // sink_gate below is checked against, so the digest must move if the vocabulary does.
+    append_str_span(out, pkg.sinks);
     append_u32_le(out, static_cast<std::uint32_t>(pkg.markers.size()));
     for (const IntentMarkerRow& row : pkg.markers)
     {
@@ -98,6 +101,7 @@ void serialize_manifest(std::string& out, const SemanticPackageManifest& pkg)
         append_u8(out, static_cast<std::uint8_t>(row.format_gate));
         append_u8(out, static_cast<std::uint8_t>(row.extract));
         append_str_span(out, row.payload_excludes); // grammar-2: the exclusion set is identity
+        append_str(out, row.sink_gate); // ADR 0028: the Sink gate is a recognition fact ⇒ identity
     }
     append_u32_le(out, static_cast<std::uint32_t>(pkg.level_lifts.size()));
     for (const LevelLiftRow& row : pkg.level_lifts)
@@ -168,6 +172,24 @@ void note_shadows(std::span<const Row> rows, std::string_view kind, CompositionR
     std::terminate();
 }
 
+// ADR 0028 D1 — an UNKNOWN Sink is a hard error, distinct from an absent one. Same fail-closed posture
+// as a duplicate row: a clear message naming the declared vocabulary, then terminate. Degrading a typo
+// to D5's fallback would hand back a silently structure-less analysis for what is simply a misspelling.
+[[noreturn]] void fail_unknown_sink(std::string_view declared_sink,
+                                    std::span<const std::string_view> declared)
+{
+    std::cerr << "FATAL: insight::semantic::ComposedSemantics::for_sink — unknown Sink \""
+              << declared_sink << "\". The composed packages declare: ";
+    if (declared.empty())
+        std::cerr << "<none>";
+    for (std::size_t i{0}; i < declared.size(); ++i)
+        std::cerr << (i == 0 ? "" : ", ") << '"' << declared[i] << '"';
+    std::cerr << ".\nA Sink is caller-declared provenance (ADR 0028 D2), never guessed. An unknown "
+                 "Sink is a MISTAKE and fails closed here; an ABSENT Sink is a CHOICE and degrades to "
+                 "the raw-text fallback (D5). Pass one of the declared names, or none.\n";
+    std::terminate();
+}
+
 } // namespace
 
 std::string ComposedSemantics::identity_hex() const
@@ -179,6 +201,56 @@ std::string ComposedSemantics::identity_hex() const
         out.push_back(kHexDigits[(static_cast<unsigned>(byte) >> kNibbleShift) & kNibbleMask]);
         out.push_back(kHexDigits[static_cast<unsigned>(byte) & kNibbleMask]);
     }
+    return out;
+}
+
+bool ComposedSemantics::withholds_markers_for(insight::LogFormat format,
+                                              std::string_view declared_sink) const noexcept
+{
+    return std::ranges::any_of(all_markers_,
+                               [format, declared_sink](const IntentMarkerRow& row) noexcept
+                               {
+                                   return (row.format_gate == format || row.format_gate == kAnyFormat) &&
+                                          !sink_admits(row.sink_gate, declared_sink);
+                               });
+}
+
+ComposedSemantics ComposedSemantics::for_sink(std::string_view declared_sink) const
+{
+    // An unknown Sink fails closed BEFORE any table is built — the same shape as compose's duplicate
+    // check. Empty (Unspecified) is not unknown: it is the caller declining to declare (D5).
+    if (!declared_sink.empty() && std::ranges::find(sinks_, declared_sink) == sinks_.end())
+        fail_unknown_sink(declared_sink, sinks_);
+
+    ComposedSemantics out;
+    // Everything except the marker rows is Sink-independent (D1's "does not metastasize" rule: only
+    // IntentMarkerRow/IntentEmitRow carry a sink_gate today), so it is carried over verbatim.
+    out.roles_ = roles_;
+    out.level_lifts_ = level_lifts_;
+    out.locations_ = locations_;
+    out.value_classes_ = value_classes_;
+    out.outcome_tokens_ = outcome_tokens_;
+    out.outcome_markers_ = outcome_markers_;
+    out.sinks_ = sinks_;
+    out.strategies_ = strategies_;
+    out.provenance_hooks_ = provenance_hooks_;
+    out.packages_ = packages_;
+    out.report_ = report_;
+    // The identity is carried VERBATIM: semantic_identity is the RULESET's identity (which rows exist
+    // and how they gate), not a per-stream view of it. Two streams of one binary declaring different
+    // Sinks are analyzed by the SAME ruleset, so they must report the same identity — otherwise a
+    // cross-Sink comparison (D4's legal case: BuildId N annotated ↔ N+1 stripped) would look like a
+    // comparison across two different engines.
+    out.identity_ = identity_;
+
+    // Filter from all_markers_, never from markers_: markers_ is already SOME view (the Unspecified one
+    // on a fresh composition), so filtering it would be a monotonically shrinking chain — for_sink()
+    // must be idempotent in the Sink, not cumulative.
+    out.all_markers_ = all_markers_;
+    out.markers_.reserve(all_markers_.size());
+    std::ranges::copy_if(all_markers_, std::back_inserter(out.markers_),
+                         [declared_sink](const IntentMarkerRow& row)
+                         { return sink_admits(row.sink_gate, declared_sink); });
     return out;
 }
 
@@ -206,7 +278,8 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
 
         // Concatenate rows in canonical (package-sorted, declared-within) order.
         composed.roles_.insert(composed.roles_.end(), pkg.roles.begin(), pkg.roles.end());
-        composed.markers_.insert(composed.markers_.end(), pkg.markers.begin(), pkg.markers.end());
+        composed.all_markers_.insert(composed.all_markers_.end(), pkg.markers.begin(),
+                                     pkg.markers.end());
         composed.level_lifts_.insert(composed.level_lifts_.end(), pkg.level_lifts.begin(),
                                      pkg.level_lifts.end());
         composed.locations_.insert(composed.locations_.end(), pkg.locations.begin(),
@@ -217,6 +290,12 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
                                         pkg.outcome_tokens.end());
         composed.outcome_markers_.insert(composed.outcome_markers_.end(),
                                          pkg.outcome_markers.begin(), pkg.outcome_markers.end());
+        // ADR 0028 — the composed Sink vocabulary. De-duplicated: two dialects may legitimately name
+        // the same materialization, and this set is a lookup key (validating a caller's --sink), not a
+        // per-package tally. Package order is canonical, so the result is deterministic.
+        for (const std::string_view sink : pkg.sinks)
+            if (std::ranges::find(composed.sinks_, sink) == composed.sinks_.end())
+                composed.sinks_.push_back(sink);
         if (pkg.strategy != nullptr)
             composed.strategies_.push_back(pkg.strategy);
         if (pkg.echoed_source != nullptr)
@@ -232,9 +311,19 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
     for (std::size_t i{0}; i < kIdentityBytes; ++i)
         composed.identity_[i] = static_cast<std::uint8_t>(digest[i]);
 
+    // ADR 0028 D5 — a fresh composition is the UNSPECIFIED view: nobody has declared a Sink, so every
+    // concretely-gated row stays out and only kAnySink rows fire. A caller gets dialect depth by
+    // declaring its Sink (for_sink), which is the point: declaring is the path to depth, and the
+    // default can never be a concrete Sink (both-rows-live is the defect).
+    std::ranges::copy_if(composed.all_markers_, std::back_inserter(composed.markers_),
+                         [](const IntentMarkerRow& row)
+                         { return sink_admits(row.sink_gate, kAnySink); });
+
     // Longest-match shadow notes over the composed prefix tables (the report; conflicts already fatal).
+    // Markers use the FULL set: a shadow is a property of the declared vocabulary, not of one stream's
+    // view, and reporting it only when a particular Sink is declared would make the report Sink-dependent.
     note_shadows<StructuralRoleRow>(composed.roles_, "role", composed.report_);
-    note_shadows<IntentMarkerRow>(composed.markers_, "marker", composed.report_);
+    note_shadows<IntentMarkerRow>(composed.all_markers_, "marker", composed.report_);
     note_shadows<LevelLiftRow>(composed.level_lifts_, "level_lift", composed.report_);
     note_shadows<OutcomeMarkerRow>(composed.outcome_markers_, "outcome_marker", composed.report_);
 

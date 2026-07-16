@@ -406,9 +406,16 @@ Report round_trip_report(std::span<const IntentMarkerRow> markers,
             continue;
         }
 
+        // ADR 0028: the Medium is `IntentFormat × Sink`, so the round-trip closes PER MEDIUM — a row is
+        // recognized under the Sink its writer materializes into, exactly as it is under the format its
+        // writer materializes into. Reading the Sink off the ROW keeps the kit self-adapting (zero
+        // per-package config): a kAnySink row round-trips under the undeclared view, a Sink-gated row
+        // under its own Sink. Recognizing every row against ONE composition would be asking whether the
+        // stripped banner is a banner in the annotated Sink — which is the phantom, not the closure.
         const std::string line{render_row(*writer, kProbePayload)};
+        const ComposedSemantics sink_view{composed.for_sink(writer->sink_gate)};
         const insight::tokenization::IntentMarker got{
-            insight::tokenization::recognize(line, reader.format_gate, composed)};
+            insight::tokenization::recognize(line, reader.format_gate, sink_view)};
 
         if (got.kind == reader.kind && got.child_order == reader.child_order && got.name == kProbePayload)
         {
