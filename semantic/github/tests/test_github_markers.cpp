@@ -69,18 +69,24 @@ TEST(GithubMarkers, RecognizesJobAndStepBanners)
     EXPECT_EQ(step.name, "actions/checkout@v4") << "raw step payload wrong: " << show(step);
 }
 
-// ── One Step intent, two CHANNELS, ONE identity — materialization invariance (ADR 0029 D5/G-SINK-1) ──
-// The same step banner materializes as the runner's `##[group]Run <cmd>` in the ANNOTATED channel and as
-// the §5.3-stripped bare `Run <cmd>` in the STRIPPED one. Each fires under ITS declared channel and both
+// ── One Step intent, the real channel and our ablation, ONE identity (ADR 0030 D1/D6) ──
+// The same step banner reads back to the same identity from GHA's real `##[group]Run <cmd>` and from the
+// bare `Run <cmd>` our degrade() ablation produces. Each fires under ITS declared channel and both
 // extract the IDENTICAL payload — which is what makes the channel a materialization detail and never an
-// axis: an annotated and a stripped rendering of the same build reach the same step identity, so a
-// cross-channel comparison across the pyramid axis (D5's legal case) sees no phantom churn.
+// axis (D6).
 //
-// This is the unit-level statement of the property; G-SINK-1 asserts it end-to-end on real corpus pairs.
-// It REPLACES the pre-0028 claim that shipping both prefixes UNGATED delivered this invariance: the
-// payload half was true, but ungated recognition of the bare prefix is exactly what minted phantom Steps
-// out of annotated prose. Invariance is preserved here — by two gated rows, not one ungated pair.
-TEST(GithubMarkers, StepIdentityIsInvariantAcrossTheTwoChannels)
+// ⚠ WHAT THIS IS NOT (ADR 0030 D1 — the premise correction): this is NOT "materialization invariance
+// across two real GHA materializations". The stripped arm is OUR OWN lab ablation
+// (ci_revert_corpus.transform.degrade()), not bytes GitHub ever served. The property asserted here is
+// canon reading our ablation back to the same intent as the real channel — genuinely load-bearing (the
+// template-lattice lift experiment depends on exactly this), but it must never be claimed as invariance
+// across a dialect's real materializations. Naming it so would be the endogamy trap the corpus
+// discipline exists to prevent.
+//
+// It REPLACES the pre-0028 claim that shipping both prefixes UNGATED delivered this: the payload half
+// was true, but ungated recognition of the bare prefix is exactly what minted phantom Steps out of
+// annotated prose. The property is preserved here — by two gated rows, not one ungated pair.
+TEST(GithubMarkers, StepIdentityIsInvariantAcrossTheRealChannelAndOurAblation)
 {
     const ComposedSemantics annotated{github_only(insight::semantic::github::kChannelAnnotated)};
     const ComposedSemantics stripped{github_only(insight::semantic::github::kChannelStripped)};
@@ -95,9 +101,9 @@ TEST(GithubMarkers, StepIdentityIsInvariantAcrossTheTwoChannels)
     EXPECT_EQ(bare.kind, IntentMarkerKind::Step)
         << "the stripped channel's genuine banner was not recognized: " << show(bare);
     EXPECT_EQ(bare.name, wrapped.name)
-        << "THE CHANNEL BECAME AN AXIS: the two materializations of one step yielded different identities "
-           "(stripped=\"" << bare.name << "\" annotated=\"" << wrapped.name << "\") — a cross-channel diff "
-           "of the same build would report every step vanished+new";
+        << "THE CHANNEL BECAME AN AXIS: the real channel and our ablation yielded different identities "
+           "for one step (stripped=\"" << bare.name << "\" annotated=\"" << wrapped.name << "\") — the "
+           "lattice experiment compares exactly these two arms and would see every step vanished+new";
 
     // Each channel's OTHER form is not a banner there — the whole point of the coordinate.
     const auto prose{recognize("Run `npm audit` for details.", LogFormat::GitHubActions, annotated)};

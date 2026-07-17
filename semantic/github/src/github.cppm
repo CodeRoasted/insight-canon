@@ -37,29 +37,40 @@ inline constexpr std::array<StructuralRoleRow, 6> kRoles{{
     {.prefix = "::error::", .role = insight::StructuralRole::Terminator, .format_gate = kAnyFormat},
 }};
 
-// ── The declared INTENT CHANNEL vocabulary (ADR 0029 D1) ──
-// `Medium = IntentFormat × IntentChannel`. GHA is ONE IntentFormat with TWO channels — the same job⊃step
-// intent materialized through two channels:
+// ── The declared INTENT CHANNEL vocabulary (ADR 0030 D1/D3) ──
+// `Medium = IntentFormat × IntentChannel`. GHA is ONE IntentFormat that canon receives in TWO
+// materializations — but they are NOT two channels GitHub serves, and saying so was the error ADR 0030
+// corrects:
 //
-//   annotated — the runner's raw job log (what the shipped Action fetches via
-//               downloadJobLogsForWorkflowRun): step banners are `##[group]Run <cmd>`, and the
-//               workflow-command markers (`##[error]`, `##[group]`) are present.
-//   stripped  — the §5.3 workflow-command-stripped form (the crawl corpus): step banners are the bare
-//               `Run <cmd>`, and no `##[…]` marker survives.
+//   annotated — GHA's ONE REAL CHANNEL. The runner's raw job log, which is what the API serves, what
+//               downloadJobLogsForWorkflowRun fetches, and what the shipped Action feeds. Step banners
+//               are `##[group]Run <cmd>`; the workflow-command markers (`##[error]`, `##[group]`) are
+//               present. A user's GHA log is annotated in every path we ship.
+//   stripped  — OUR OWN LAB ABLATION, not a GitHub product. Produced by
+//               ci_revert_corpus.transform.degrade(), which strips the `##[…]` workflow commands to
+//               build the structure-poor arm of the template-lattice lift experiment (it measures how
+//               much the structure buys us). Step banners are the bare `Run <cmd>`. Canon must READ it —
+//               the lattice experiment is a real consumer — so it stays a declared channel, and the
+//               G-SINK-2 control arm proves the bare `Run ` row is load-bearing for it.
 //
-// MEASURED, and the partition is clean (22 030 real annotated/stripped pairs): the annotated form NEVER
-// uses bare `Run ` as a banner, and the stripped form never contains `##[`. `::group::Run ` is not
-// attested — the runner rewrites `::` to `##[…]` — so there is no third channel and no
-// both-variants-in-one-channel case to model.
+// ⚠ DO NOT re-describe this pair as "two GHA materializations" or claim MATERIALIZATION INVARIANCE
+// across it (ADR 0030 D1). The pair tests canon against OUR OWN degrade(), which is a real and useful
+// property — but calling it invariance across two real materializations of a dialect is exactly the
+// endogamy trap the corpus discipline exists to prevent. The prior comment here asserted a "clean
+// partition MEASURED on 22 030 real annotated/stripped pairs"; only the ANNOTATED arm is real bytes.
 //
-// The NAMES are `annotated` / `stripped` and stay so (ADR 0029 D1): they name what a user can verify by
-// looking at their own file, which `api` / `download` would not.
+// What that correction does NOT touch: the annotated arm IS real GHA, so the phantom-Step defect
+// (9.05 % of 22 030 real logs) is real, and the fix below is correct and necessary.
+//
+// The NAMES are `annotated` / `stripped` and stay so (D3): they name what a user can verify by looking
+// at their own file, which `api` / `download` would not.
 //
 // EXPORTED: a package's channel vocabulary is part of its public declaration. Every caller that acquires
-// a GHA stream must name the channel it acquired (ADR 0029 D2 — caller-declared provenance), so the
-// names have to be nameable: the CLI validates `--channel` against them, the Action declares `annotated`
-// because it chose downloadJobLogsForWorkflowRun, and a test says which form it fixtures. It is also the
-// MEDIUM SELECTOR's input on the writer side (D4).
+// a GHA stream must name the channel it acquired — or derive it at Acquisition (D2: canon never infers;
+// the caller may) — so the names have to be nameable: the CLI validates `--channel` against them and
+// peeks to deduce one, the Action declares `annotated` because it chose downloadJobLogsForWorkflowRun,
+// and a test says which form it fixtures. It is also the MEDIUM SELECTOR's input on the writer side,
+// whose default is `annotated` — the real channel (D1).
 export inline constexpr std::string_view kChannelAnnotated{"annotated"};
 export inline constexpr std::string_view kChannelStripped{"stripped"};
 export inline constexpr std::array<std::string_view, 2> kChannels{{kChannelAnnotated, kChannelStripped}};
@@ -73,11 +84,14 @@ export inline constexpr std::array<std::string_view, 2> kChannels{{kChannelAnnot
 // CHANNEL-GATED per Step (ADR 0029 D5 — this is the phantom fix, and it REPLACES the reasoning that used
 // to sit here). The two Step prefixes are the same intent in two channels, so each gates to ITS channel:
 //
-//   `Run `         → stripped   — REQUIRED. In the ANNOTATED channel a line starting with `Run ` is
+//   `Run `         → stripped   — REQUIRED, and the row cannot simply be deleted: our ablation arm
+//                                 genuinely uses the bare `Run ` as its banner (G-SINK-2's control arm
+//                                 is the fence). In the ANNOTATED channel a line starting with `Run ` is
 //                                 ordinary PROSE, so an ungated row mints a phantom Step quantum out of
-//                                 it. Measured: 9.05 % of 22 030 real annotated logs, 7 752 lines, 62
-//                                 distinct payloads, EVERY ONE prose (`` `npm audit` for details. ``
-//                                 dominates). Confirmed end-to-end to fabricate a VanishedPhase.
+//                                 it. Measured on REAL annotated bytes: 9.05 % of 22 030 logs, 7 752
+//                                 lines, 62 distinct payloads, EVERY ONE prose (`` `npm audit` for
+//                                 details. `` dominates). Confirmed end-to-end to fabricate a
+//                                 VanishedPhase.
 //   `##[group]Run ` → annotated — self-gating in principle (`##[` never occurs in a stripped log), but
 //                                 gated anyway so the declared channel selects EXACTLY ONE Step row: a
 //                                 multi-channel tree becomes unrepresentable rather than merely
@@ -86,9 +100,11 @@ export inline constexpr std::array<std::string_view, 2> kChannels{{kChannelAnnot
 //
 // The superseded claim, recorded so it is not re-derived: shipping BOTH prefixes ungated was believed to
 // make the step name "materialization-INVARIANT" and to dissolve the which-form-was-Sift-fed hazard. It
-// does the opposite — invariance of the PAYLOAD is real (both yield `yarn lint`), but ungated
-// recognition of the *bare* prefix in the annotated channel is exactly the defect. Invariance is
-// preserved here, by the two rows extracting the same payload under their own channels (G-SINK-1/3).
+// does the opposite — the PAYLOAD does read back the same from both (both yield `yarn lint`), but
+// ungated recognition of the *bare* prefix in the annotated channel is exactly the defect. The two gated
+// rows preserve that same-payload property under their own channels — but note what it is and is not:
+// it is canon reading our ablation back to the same intent, NOT invariance across two real GHA
+// materializations (ADR 0030 D1).
 //
 // `Complete job name: ` stays kAnyChannel: it is the banner in BOTH channels (the strip does not touch
 // it), so it has no channel-dependent reading and needs no gate — a gate is required exactly when one
@@ -119,11 +135,11 @@ inline constexpr std::array<IntentMarkerRow, 3> kMarkers{{
 
 // ── Generation-template rows (studies/008, shared_intent_declaration §3.2) — the WRITER dual ──
 // One emit row per recognition row, paired by (prefix, kind, format_gate, channel_gate) — the MEDIUM is
-// `IntentFormat × IntentChannel` (ADR 0029 D1), so each projection names the same channel as its dual.
-// Both Step media are present: `Run <cmd>` materializes into the STRIPPED channel, `##[group]Run <cmd>`
-// into the ANNOTATED one — one Step intent, two channels, each read back to the same identity under its
-// own channel, so the round-trip closes per channel (G2). The writer picks WHICH by the declared channel
-// (the D4 medium selector), never by array order. Each emit is PayloadAfterPrefix, the exact inverse of the
+// `IntentFormat × IntentChannel` (ADR 0030 D3), so each projection names the same channel as its dual.
+// Both Step media are present: `##[group]Run <cmd>` materializes into the ANNOTATED channel (the real
+// one, and the writer's default), `Run <cmd>` into our STRIPPED ablation — each read back to the same
+// identity under its own channel, so the round-trip closes per channel (G2). The writer picks WHICH by
+// the declared channel (the medium selector), never by array order. Each emit is PayloadAfterPrefix, the exact inverse of the
 // reader's RemainderAfterPrefix: render_row(row, "yarn lint") reproduces the banner canon segments back
 // to Step "yarn lint".
 inline constexpr std::array<IntentEmitRow, 3> kEmitMarkers{{

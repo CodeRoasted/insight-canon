@@ -115,7 +115,7 @@ inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-2"};
 // marker, a level lift) uses its concrete LogFormat (II-6 — a dialect never fires cross-format).
 inline constexpr insight::LogFormat kAnyFormat{insight::LogFormat::Unknown};
 
-// ── The INTENT CHANNEL coordinate (ADR 0029) ─────────────────────────────────────────────────────
+// ── The INTENT CHANNEL coordinate (ADR 0030) ─────────────────────────────────────────────────────
 // `Medium = IntentFormat × IntentChannel`. The IntentFormat is the intent's semantic STRUCTURE; the
 // IntentChannel is the channel through which that intent was MATERIALIZED. Same intent, different
 // channel ⇒ a new channel (not a new format). The channel vocabulary is package-declared DATA, exactly
@@ -124,13 +124,19 @@ inline constexpr insight::LogFormat kAnyFormat{insight::LogFormat::Unknown};
 //
 // It is NOT "the sink": a sink is LogCraft's output destination (console/file/http/SHM), a
 // generator-side concept. This coordinate is a provenance fact about a STREAM, and a consumer that never
-// heard of LogCraft still has to declare it (ADR 0029 D1).
+// heard of LogCraft still has to declare it (ADR 0030 D3).
 //
-// Why the coordinate exists (measured, not theorized): GHA ships the SAME Step banner in two
-// materializations — the runner's `##[group]Run <cmd>` and the workflow-command-stripped `Run <cmd>` —
-// under ONE format_gate. In the annotated channel a line starting with `Run ` is ordinary PROSE, so
+// Why the coordinate exists (measured on REAL bytes, not theorized): canon receives the SAME GHA Step
+// banner in two materializations under ONE format_gate — the runner's `##[group]Run <cmd>` (GHA's real
+// channel) and the workflow-command-stripped `Run <cmd>` (our own lattice-experiment ablation, which
+// canon must also read). In the annotated channel a line starting with `Run ` is ordinary PROSE, so
 // without a channel the stripped row mints a PHANTOM Step quantum out of prose: 9.05 % of 22 030 real
-// annotated logs, and the shipped Action feeds exactly that form.
+// annotated logs, and the shipped Action feeds exactly that form. The stripped row cannot simply be
+// deleted — the ablation genuinely uses the bare prefix as its banner — so gating is the only fix.
+//
+// canon MUST NOT infer the channel: it is always TOLD (ADR 0030 D2). A CALLER may derive its own
+// declaration (Acquisition peeks a whole file — deterministic given the bytes); that inference lives at
+// the caller, never here.
 //
 // The channel is EXTRINSIC and that is the whole reason it is declared rather than detected: no byte
 // carries it. A prose line is byte-identical across channels, and both GHA channels share one
