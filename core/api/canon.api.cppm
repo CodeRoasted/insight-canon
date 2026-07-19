@@ -30,7 +30,6 @@ using Duration = std::chrono::system_clock::duration;
 
 // ── Identifiers ──
 using EventID = uint64_t;
-using WindowID = uint64_t;
 
 // ── Canonicalization-contract version (stateless_template_id.md D-TID-16) ──
 // The single canon-owned identifier of the canonicalization CONTRACT — the masking
@@ -401,9 +400,6 @@ struct OrdinalObservation
     std::int64_t value{0}; // canonical-unit fixed integer (ns for durations, bytes for sizes)
 };
 
-// ── Sequences ──
-using NGram = std::vector<EventID>;
-
 // ── Enums ──
 enum class LogLevel : uint8_t
 {
@@ -650,38 +646,6 @@ enum class StructuralRole : uint8_t
         return "Terminator"sv;
     default:
         return "None"sv;
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Severity classification
-// ─────────────────────────────────────────────────────────────────────────────
-enum class Severity : uint8_t
-{
-    None = 0,
-    Low = 1,
-    Medium = 2,
-    High = 3,
-    Critical = 4
-};
-
-[[nodiscard]] constexpr std::string_view severity_to_string(Severity sev) noexcept
-{
-    switch (sev)
-    {
-        using namespace std::literals;
-    case Severity::None:
-        return "None"sv;
-    case Severity::Low:
-        return "Low"sv;
-    case Severity::Medium:
-        return "Medium"sv;
-    case Severity::High:
-        return "High"sv;
-    case Severity::Critical:
-        return "Critical"sv;
-    default:
-        return "Unknown"sv;
     }
 }
 
