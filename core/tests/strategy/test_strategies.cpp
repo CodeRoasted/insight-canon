@@ -1,13 +1,18 @@
 // NOLINTBEGIN : Unit tests may intentionally violate some style rules for clarity or simplicity.
 // Unit tests: allow short identifiers and test-specific patterns
-// tests/1_tokenization/test_strategies.cpp
+// tests/strategy/test_strategies.cpp
 //
-// Unit tests for the eighteen IFormatStrategy implementations:
+// Unit tests for the nineteen IFormatStrategy implementations:
 //   SyslogStrategy, JsonStrategy, KVStrategy, CLFStrategy,
 //   Log4jStrategy, SparkHDFSStrategy, BGLStrategy, AndroidLogcatStrategy,
 //   ApacheErrorLogStrategy, WindowsCBSStrategy, HealthAppStrategy,
 //   ProxifierStrategy, HPCStrategy, NginxErrorStrategy, RFC5424Strategy,
-//   IISW3CStrategy, CloudWatchStrategy, SystemdJournalStrategy.
+//   IISW3CStrategy, CloudWatchStrategy, SystemdJournalStrategy, RawTextStrategy.
+//
+// Layout: per-strategy TEST_F sections carry the strategy-specific claims (happy-path
+// field extraction, edge cases, per-format confidence shapes). The four cross-strategy
+// claim families that were once copy-pasted per strategy live at the END of the file as
+// value-parameterized suites over one descriptor table (see "Table-driven families").
 
 #include <gtest/gtest.h>
 
@@ -58,11 +63,6 @@ class SyslogStrategyTest : public ::testing::Test
     SyslogStrategy strategy;
     ArenaAllocator arena{4096};
 };
-
-TEST_F(SyslogStrategyTest, FormatReturnsSyslog)
-{
-    EXPECT_EQ(strategy.format(), LogFormat::Syslog);
-}
 
 TEST_F(SyslogStrategyTest, ParsesBSDLine)
 {
@@ -123,13 +123,6 @@ TEST_F(SyslogStrategyTest, ConfidenceZeroForCLF)
     EXPECT_EQ(strategy.confidence(kCLFLine), 0.0);
 }
 
-TEST_F(SyslogStrategyTest, RawLinePreserved)
-{
-    auto result{strategy.parse(kBSDLine, arena)};
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value().raw_line, kBSDLine);
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // JsonStrategy
 // ─────────────────────────────────────────────────────────────────────────────
@@ -140,11 +133,6 @@ class JsonStrategyTest : public ::testing::Test
     JsonStrategy strategy;
     ArenaAllocator arena{4096};
 };
-
-TEST_F(JsonStrategyTest, FormatReturnsJSON)
-{
-    EXPECT_EQ(strategy.format(), LogFormat::JSON);
-}
 
 TEST_F(JsonStrategyTest, ParsesAllFields)
 {
@@ -236,11 +224,6 @@ TEST_F(JsonStrategyTest, ConfidenceOneForJSON)
     EXPECT_EQ(strategy.confidence(kJSONLine), 1.0);
 }
 
-TEST_F(JsonStrategyTest, ConfidenceZeroForSyslog)
-{
-    EXPECT_EQ(strategy.confidence(kBSDLine), 0.0);
-}
-
 TEST_F(JsonStrategyTest, LevelDebugParsed)
 {
     auto result{strategy.parse(R"({"level":"debug","message":"trace event"})", arena)};
@@ -253,13 +236,6 @@ TEST_F(JsonStrategyTest, LevelErrorParsed)
     auto result{strategy.parse(R"({"severity":"ERROR","msg":"something failed"})", arena)};
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().level, LogLevel::Error);
-}
-
-TEST_F(JsonStrategyTest, RawLinePreserved)
-{
-    auto result{strategy.parse(kJSONLine, arena)};
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value().raw_line, kJSONLine);
 }
 
 // ── OTEL/OTLP ingestion (insight_otel_epic.md O1, D-OTEL-1) ──────────────────
@@ -435,11 +411,6 @@ class KVStrategyTest : public ::testing::Test
     ArenaAllocator arena{4096};
 };
 
-TEST_F(KVStrategyTest, FormatReturnsKeyValue)
-{
-    EXPECT_EQ(strategy.format(), LogFormat::KeyValue);
-}
-
 TEST_F(KVStrategyTest, ParsesAllFields)
 {
     auto result{strategy.parse(kKVLine, arena)};
@@ -488,13 +459,6 @@ TEST_F(KVStrategyTest, ConfidenceZeroForJSON)
     EXPECT_LT(strategy.confidence(kJSONLine), 0.5);
 }
 
-TEST_F(KVStrategyTest, RawLinePreserved)
-{
-    auto result{strategy.parse(kKVLine, arena)};
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value().raw_line, kKVLine);
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // CLFStrategy
 // ─────────────────────────────────────────────────────────────────────────────
@@ -505,11 +469,6 @@ class CLFStrategyTest : public ::testing::Test
     CLFStrategy strategy;
     ArenaAllocator arena{4096};
 };
-
-TEST_F(CLFStrategyTest, FormatReturnsCLF)
-{
-    EXPECT_EQ(strategy.format(), LogFormat::CLF);
-}
 
 TEST_F(CLFStrategyTest, ParsesCommonLogFormat)
 {
@@ -558,11 +517,6 @@ TEST_F(CLFStrategyTest, ConfidenceHighForCLF)
     EXPECT_GT(strategy.confidence(kCLFLine), 0.5);
 }
 
-TEST_F(CLFStrategyTest, ConfidenceZeroForSyslog)
-{
-    EXPECT_EQ(strategy.confidence(kBSDLine), 0.0);
-}
-
 TEST_F(CLFStrategyTest, ContentContainsMethodAndStatus)
 {
     auto result{strategy.parse(kCLFLine, arena)};
@@ -577,13 +531,6 @@ TEST_F(CLFStrategyTest, TimestampParsed)
     auto result{strategy.parse(kCLFLine, arena)};
     ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result.value().timestamp.has_value());
-}
-
-TEST_F(CLFStrategyTest, RawLinePreserved)
-{
-    auto result{strategy.parse(kCLFLine, arena)};
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value().raw_line, kCLFLine);
 }
 
 TEST_F(CLFStrategyTest, ConfidenceHighForCombinedLine)
@@ -853,11 +800,6 @@ class Log4jStrategyTest : public ::testing::Test
     ArenaAllocator arena{4096};
 };
 
-TEST_F(Log4jStrategyTest, FormatReturnsLog4j)
-{
-    EXPECT_EQ(strategy.format(), LogFormat::Log4j);
-}
-
 TEST_F(Log4jStrategyTest, ParsesHadoopLine)
 {
     auto result{strategy.parse(kLog4jHadoopLine, arena)};
@@ -902,16 +844,9 @@ TEST_F(Log4jStrategyTest, ConfidenceHighForLog4j)
     EXPECT_GT(strategy.confidence(kLog4jOpenStackLine), 0.5);
 }
 
-TEST_F(Log4jStrategyTest, ConfidenceZeroForSyslog)
+TEST_F(Log4jStrategyTest, ConfidenceZeroForJSON)
 {
-    EXPECT_EQ(strategy.confidence(kBSDLine), 0.0);
-}
-
-TEST_F(Log4jStrategyTest, RawLinePreserved)
-{
-    auto result{strategy.parse(kLog4jHadoopLine, arena)};
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value().raw_line, kLog4jHadoopLine);
+    EXPECT_EQ(strategy.confidence(kJSONLine), 0.0);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -932,11 +867,6 @@ class SparkHDFSStrategyTest : public ::testing::Test
     SparkHDFSStrategy strategy;
     ArenaAllocator arena{4096};
 };
-
-TEST_F(SparkHDFSStrategyTest, FormatReturnsSparkHDFS)
-{
-    EXPECT_EQ(strategy.format(), LogFormat::SparkHDFS);
-}
 
 TEST_F(SparkHDFSStrategyTest, ParsesSparkLine)
 {
@@ -976,18 +906,6 @@ TEST_F(SparkHDFSStrategyTest, ConfidenceHighForHDFS)
     EXPECT_GT(strategy.confidence(kHDFSLine), 0.5);
 }
 
-TEST_F(SparkHDFSStrategyTest, ConfidenceZeroForSyslog)
-{
-    EXPECT_EQ(strategy.confidence(kBSDLine), 0.0);
-}
-
-TEST_F(SparkHDFSStrategyTest, RawLinePreserved)
-{
-    auto result{strategy.parse(kSparkLine, arena)};
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value().raw_line, kSparkLine);
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // BGLStrategy
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1007,11 +925,6 @@ class BGLStrategyTest : public ::testing::Test
     BGLStrategy strategy;
     ArenaAllocator arena{4096};
 };
-
-TEST_F(BGLStrategyTest, FormatReturnsBGL)
-{
-    EXPECT_EQ(strategy.format(), LogFormat::BGL);
-}
 
 TEST_F(BGLStrategyTest, ParsesBGLLine)
 {
@@ -1067,18 +980,6 @@ TEST_F(BGLStrategyTest, ConfidenceHighForBGL)
     EXPECT_GT(strategy.confidence(kThunderbirdLine), 0.5);
 }
 
-TEST_F(BGLStrategyTest, ConfidenceZeroForSyslog)
-{
-    EXPECT_EQ(strategy.confidence(kBSDLine), 0.0);
-}
-
-TEST_F(BGLStrategyTest, RawLinePreserved)
-{
-    auto result{strategy.parse(kBGLLine, arena)};
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value().raw_line, kBGLLine);
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // AndroidLogcatStrategy
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1093,11 +994,6 @@ class AndroidLogcatStrategyTest : public ::testing::Test
     AndroidLogcatStrategy strategy;
     ArenaAllocator arena{4096};
 };
-
-TEST_F(AndroidLogcatStrategyTest, FormatReturnsAndroidLogcat)
-{
-    EXPECT_EQ(strategy.format(), LogFormat::AndroidLogcat);
-}
 
 TEST_F(AndroidLogcatStrategyTest, ParsesLogcatLine)
 {
@@ -1136,18 +1032,6 @@ TEST_F(AndroidLogcatStrategyTest, ConfidenceHighForLogcat)
     EXPECT_GT(strategy.confidence(kAndroidLine), 0.5);
 }
 
-TEST_F(AndroidLogcatStrategyTest, ConfidenceZeroForSyslog)
-{
-    EXPECT_EQ(strategy.confidence(kBSDLine), 0.0);
-}
-
-TEST_F(AndroidLogcatStrategyTest, RawLinePreserved)
-{
-    auto result{strategy.parse(kAndroidLine, arena)};
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value().raw_line, kAndroidLine);
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // ApacheErrorLogStrategy
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1166,11 +1050,6 @@ class ApacheErrorLogStrategyTest : public ::testing::Test
     ApacheErrorLogStrategy strategy;
     ArenaAllocator arena{4096};
 };
-
-TEST_F(ApacheErrorLogStrategyTest, FormatReturnsApacheError)
-{
-    EXPECT_EQ(strategy.format(), LogFormat::ApacheError);
-}
 
 TEST_F(ApacheErrorLogStrategyTest, ParsesNoticeLevel)
 {
@@ -1199,18 +1078,6 @@ TEST_F(ApacheErrorLogStrategyTest, ConfidenceHighForApache)
     EXPECT_GT(strategy.confidence(kApacheErrorLine), 0.5);
 }
 
-TEST_F(ApacheErrorLogStrategyTest, ConfidenceZeroForSyslog)
-{
-    EXPECT_EQ(strategy.confidence(kBSDLine), 0.0);
-}
-
-TEST_F(ApacheErrorLogStrategyTest, RawLinePreserved)
-{
-    auto result{strategy.parse(kApacheErrorLine, arena)};
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value().raw_line, kApacheErrorLine);
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // WindowsCBSStrategy
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1226,11 +1093,6 @@ class WindowsCBSStrategyTest : public ::testing::Test
     WindowsCBSStrategy strategy;
     ArenaAllocator arena{4096};
 };
-
-TEST_F(WindowsCBSStrategyTest, FormatReturnsWindowsCBS)
-{
-    EXPECT_EQ(strategy.format(), LogFormat::WindowsCBS);
-}
 
 TEST_F(WindowsCBSStrategyTest, ParsesWindowsLine)
 {
@@ -1254,18 +1116,6 @@ TEST_F(WindowsCBSStrategyTest, ConfidenceHighForWindows)
     EXPECT_GT(strategy.confidence(kWindowsCBSLine), 0.5);
 }
 
-TEST_F(WindowsCBSStrategyTest, ConfidenceZeroForSyslog)
-{
-    EXPECT_EQ(strategy.confidence(kBSDLine), 0.0);
-}
-
-TEST_F(WindowsCBSStrategyTest, RawLinePreserved)
-{
-    auto result{strategy.parse(kWindowsCBSLine, arena)};
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value().raw_line, kWindowsCBSLine);
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // HealthAppStrategy
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1279,11 +1129,6 @@ class HealthAppStrategyTest : public ::testing::Test
     HealthAppStrategy strategy;
     ArenaAllocator arena{4096};
 };
-
-TEST_F(HealthAppStrategyTest, FormatReturnsHealthApp)
-{
-    EXPECT_EQ(strategy.format(), LogFormat::HealthApp);
-}
 
 TEST_F(HealthAppStrategyTest, ParsesHealthAppLine)
 {
@@ -1306,18 +1151,6 @@ TEST_F(HealthAppStrategyTest, ConfidenceHighForHealthApp)
     EXPECT_GT(strategy.confidence(kHealthAppLine), 0.5);
 }
 
-TEST_F(HealthAppStrategyTest, ConfidenceZeroForSyslog)
-{
-    EXPECT_EQ(strategy.confidence(kBSDLine), 0.0);
-}
-
-TEST_F(HealthAppStrategyTest, RawLinePreserved)
-{
-    auto result{strategy.parse(kHealthAppLine, arena)};
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value().raw_line, kHealthAppLine);
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // ProxifierStrategy
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1333,11 +1166,6 @@ class ProxifierStrategyTest : public ::testing::Test
     ProxifierStrategy strategy;
     ArenaAllocator arena{4096};
 };
-
-TEST_F(ProxifierStrategyTest, FormatReturnsProxifier)
-{
-    EXPECT_EQ(strategy.format(), LogFormat::Proxifier);
-}
 
 TEST_F(ProxifierStrategyTest, ParsesProxifierLine)
 {
@@ -1368,18 +1196,6 @@ TEST_F(ProxifierStrategyTest, ConfidenceHighForProxifier)
     EXPECT_GT(strategy.confidence(kProxifierLine), 0.5);
 }
 
-TEST_F(ProxifierStrategyTest, ConfidenceZeroForSyslog)
-{
-    EXPECT_EQ(strategy.confidence(kBSDLine), 0.0);
-}
-
-TEST_F(ProxifierStrategyTest, RawLinePreserved)
-{
-    auto result{strategy.parse(kProxifierLine, arena)};
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value().raw_line, kProxifierLine);
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // HPCStrategy
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1394,11 +1210,6 @@ class HPCStrategyTest : public ::testing::Test
     HPCStrategy strategy;
     ArenaAllocator arena{4096};
 };
-
-TEST_F(HPCStrategyTest, FormatReturnsHPC)
-{
-    EXPECT_EQ(strategy.format(), LogFormat::HPC);
-}
 
 TEST_F(HPCStrategyTest, ParsesHPCLine)
 {
@@ -1419,18 +1230,6 @@ TEST_F(HPCStrategyTest, RejectsNonMatchingLines)
 TEST_F(HPCStrategyTest, ConfidenceHighForHPC)
 {
     EXPECT_GT(strategy.confidence(kHPCLine), 0.5);
-}
-
-TEST_F(HPCStrategyTest, ConfidenceZeroForSyslog)
-{
-    EXPECT_EQ(strategy.confidence(kBSDLine), 0.0);
-}
-
-TEST_F(HPCStrategyTest, RawLinePreserved)
-{
-    auto result{strategy.parse(kHPCLine, arena)};
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value().raw_line, kHPCLine);
 }
 
 TEST_F(HPCStrategyTest, ParsesNonDottedFacility)
@@ -1500,69 +1299,6 @@ TEST_F(AndroidLogcatStrategyTest, ParsesSilentLevel)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Cross-format rejection tests (new strategies reject all other major formats)
-// ─────────────────────────────────────────────────────────────────────────────
-
-TEST_F(Log4jStrategyTest, RejectsCLFAndKV)
-{
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
-}
-
-TEST_F(Log4jStrategyTest, ConfidenceZeroForJSON)
-{
-    EXPECT_EQ(strategy.confidence(kJSONLine), 0.0);
-}
-
-TEST_F(SparkHDFSStrategyTest, RejectsCLFAndKV)
-{
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
-}
-
-TEST_F(BGLStrategyTest, RejectsCLFAndKV)
-{
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
-}
-
-TEST_F(AndroidLogcatStrategyTest, RejectsCLFAndKV)
-{
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
-}
-
-TEST_F(ApacheErrorLogStrategyTest, RejectsCLFAndKV)
-{
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
-}
-
-TEST_F(WindowsCBSStrategyTest, RejectsCLFAndKV)
-{
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
-}
-
-TEST_F(HealthAppStrategyTest, RejectsCLFAndKV)
-{
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
-}
-
-TEST_F(ProxifierStrategyTest, RejectsCLFAndKV)
-{
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
-}
-
-TEST_F(HPCStrategyTest, RejectsCLFAndKV)
-{
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // NginxErrorStrategy
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1582,11 +1318,6 @@ class NginxErrorStrategyTest : public ::testing::Test
     NginxErrorStrategy strategy;
     ArenaAllocator arena{4096};
 };
-
-TEST_F(NginxErrorStrategyTest, FormatReturnsNginxError)
-{
-    EXPECT_EQ(strategy.format(), LogFormat::NginxError);
-}
 
 TEST_F(NginxErrorStrategyTest, ParsesErrorLine)
 {
@@ -1629,12 +1360,6 @@ TEST_F(NginxErrorStrategyTest, RejectsJSONLine)
     EXPECT_FALSE(strategy.parse(kJSONLine, arena).has_value());
 }
 
-TEST_F(NginxErrorStrategyTest, RejectsCLFAndKV)
-{
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // RFC5424Strategy
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1655,11 +1380,6 @@ class RFC5424StrategyTest : public ::testing::Test
     RFC5424Strategy strategy;
     ArenaAllocator arena{4096};
 };
-
-TEST_F(RFC5424StrategyTest, FormatReturnsRFC5424)
-{
-    EXPECT_EQ(strategy.format(), LogFormat::RFC5424);
-}
 
 TEST_F(RFC5424StrategyTest, ParsesStandardLine)
 {
@@ -1696,17 +1416,6 @@ TEST_F(RFC5424StrategyTest, ConfidenceHighForRFC5424)
     EXPECT_GT(strategy.confidence(kRFC5424Line), 0.9);
 }
 
-TEST_F(RFC5424StrategyTest, ConfidenceZeroForBSD)
-{
-    EXPECT_EQ(strategy.confidence(kBSDLine), 0.0);
-}
-
-TEST_F(RFC5424StrategyTest, RejectsCLFAndKV)
-{
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // IISW3CStrategy
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1731,11 +1440,6 @@ class IISW3CStrategyTest : public ::testing::Test
     IISW3CStrategy strategy;
     ArenaAllocator arena{4096};
 };
-
-TEST_F(IISW3CStrategyTest, FormatReturnsIISW3C)
-{
-    EXPECT_EQ(strategy.format(), LogFormat::IISW3C);
-}
 
 TEST_F(IISW3CStrategyTest, ParsesFullLine)
 {
@@ -1777,12 +1481,6 @@ TEST_F(IISW3CStrategyTest, ConfidenceZeroForComment)
     EXPECT_EQ(strategy.confidence(kIISComment), 0.0);
 }
 
-TEST_F(IISW3CStrategyTest, RejectsCLFAndKV)
-{
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // CloudWatchStrategy
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1799,11 +1497,6 @@ class CloudWatchStrategyTest : public ::testing::Test
     CloudWatchStrategy strategy;
     ArenaAllocator arena{4096};
 };
-
-TEST_F(CloudWatchStrategyTest, FormatReturnsCloudWatch)
-{
-    EXPECT_EQ(strategy.format(), LogFormat::CloudWatch);
-}
 
 TEST_F(CloudWatchStrategyTest, ParsesFullLine)
 {
@@ -1838,12 +1531,6 @@ TEST_F(CloudWatchStrategyTest, ConfidenceZeroForPlainJSON)
     EXPECT_EQ(strategy.confidence(kJSONLine), 0.0);
 }
 
-TEST_F(CloudWatchStrategyTest, RejectsCLFAndKV)
-{
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // SystemdJournalStrategy
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1863,11 +1550,6 @@ class SystemdJournalStrategyTest : public ::testing::Test
     SystemdJournalStrategy strategy;
     ArenaAllocator arena{4096};
 };
-
-TEST_F(SystemdJournalStrategyTest, FormatReturnsSystemdJournal)
-{
-    EXPECT_EQ(strategy.format(), LogFormat::SystemdJournal);
-}
 
 TEST_F(SystemdJournalStrategyTest, ParsesFullLine)
 {
@@ -1912,12 +1594,6 @@ TEST_F(SystemdJournalStrategyTest, ConfidenceZeroForPlainJSON)
     EXPECT_EQ(strategy.confidence(kJSONLine), 0.0);
 }
 
-TEST_F(SystemdJournalStrategyTest, RejectsCLFAndKV)
-{
-    EXPECT_FALSE(strategy.parse(kCLFLine, arena).has_value());
-    EXPECT_FALSE(strategy.parse(kKVLine, arena).has_value());
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // RawTextStrategy — the last-resort catch-all for unstructured application stdout.
 // Re-homes the canon raw-path invariants of insight-playground 09 T2
@@ -1935,11 +1611,6 @@ class RawTextStrategyTest : public ::testing::Test
     RawTextStrategy strategy;
     ArenaAllocator arena{4096};
 };
-
-TEST_F(RawTextStrategyTest, FormatReturnsRawText)
-{
-    EXPECT_EQ(strategy.format(), LogFormat::RawText);
-}
 
 TEST_F(RawTextStrategyTest, InfersLeadingErrorLevel)
 {
@@ -1980,5 +1651,234 @@ TEST_F(RawTextStrategyTest, LeadingWhitespaceTrimmedForContinuationGrouping)
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().content, "at frame in module");
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Table-driven families — the four cross-strategy claim families, folded from
+// per-strategy copy-pasted TEST_F bodies into value-parameterized suites over one
+// descriptor table. Each row records which families covered its strategy BEFORE
+// the fold; the per-family row sets mirror that historical coverage exactly —
+// the fold does not blanket-extend a family to strategies it never covered.
+//
+//   FormatReturns           — format() reports the row's LogFormat tag (all rows)
+//   RawLinePreserved        — parse(canonical line) echoes raw_line verbatim
+//   RejectsCLFAndKV         — parse() fails on both the CLF and the KV sample
+//   ConfidenceZeroForSyslog — confidence(BSD syslog sample) == 0.0 (RFC5424's
+//                             identical assert was formerly ConfidenceZeroForBSD)
+// ─────────────────────────────────────────────────────────────────────────────
+
+struct StrategyCase
+{
+    // Instantiation label: failure output names the strategy ("…/Syslog").
+    const char* name;
+    std::unique_ptr<IFormatStrategy> (*make_strategy)();
+    LogFormat format;
+    // RawLinePreserved input: the canonical happy-path line whose raw_line echo is
+    // asserted. Empty ⇒ the strategy has no row in that family.
+    std::string_view canonical_line{};
+    bool rejects_clf_and_kv{false};
+    bool confidence_zero_for_syslog{false};
+};
+
+// gtest param printer: name only — the printout lands in ctest display names via test
+// discovery, so it must stay clean. The failing input LINE is printed by each family's
+// assertion message instead (verbose-on-failure without polluting the test listing).
+void PrintTo(const StrategyCase& strategy_case, std::ostream* output_stream)
+{
+    *output_stream << strategy_case.name;
+}
+
+template <std::derived_from<IFormatStrategy> StrategyType>
+[[nodiscard]] std::unique_ptr<IFormatStrategy> make_strategy_instance()
+{
+    return std::make_unique<StrategyType>();
+}
+
+static constexpr std::array kStrategyTable{
+    StrategyCase{.name = "Syslog",
+                 .make_strategy = make_strategy_instance<SyslogStrategy>,
+                 .format = LogFormat::Syslog,
+                 .canonical_line = kBSDLine},
+    StrategyCase{.name = "Json",
+                 .make_strategy = make_strategy_instance<JsonStrategy>,
+                 .format = LogFormat::JSON,
+                 .canonical_line = kJSONLine,
+                 .confidence_zero_for_syslog = true},
+    StrategyCase{.name = "KV",
+                 .make_strategy = make_strategy_instance<KVStrategy>,
+                 .format = LogFormat::KeyValue,
+                 .canonical_line = kKVLine},
+    StrategyCase{.name = "CLF",
+                 .make_strategy = make_strategy_instance<CLFStrategy>,
+                 .format = LogFormat::CLF,
+                 .canonical_line = kCLFLine,
+                 .confidence_zero_for_syslog = true},
+    StrategyCase{.name = "Log4j",
+                 .make_strategy = make_strategy_instance<Log4jStrategy>,
+                 .format = LogFormat::Log4j,
+                 .canonical_line = kLog4jHadoopLine,
+                 .rejects_clf_and_kv = true,
+                 .confidence_zero_for_syslog = true},
+    StrategyCase{.name = "SparkHDFS",
+                 .make_strategy = make_strategy_instance<SparkHDFSStrategy>,
+                 .format = LogFormat::SparkHDFS,
+                 .canonical_line = kSparkLine,
+                 .rejects_clf_and_kv = true,
+                 .confidence_zero_for_syslog = true},
+    StrategyCase{.name = "BGL",
+                 .make_strategy = make_strategy_instance<BGLStrategy>,
+                 .format = LogFormat::BGL,
+                 .canonical_line = kBGLLine,
+                 .rejects_clf_and_kv = true,
+                 .confidence_zero_for_syslog = true},
+    StrategyCase{.name = "AndroidLogcat",
+                 .make_strategy = make_strategy_instance<AndroidLogcatStrategy>,
+                 .format = LogFormat::AndroidLogcat,
+                 .canonical_line = kAndroidLine,
+                 .rejects_clf_and_kv = true,
+                 .confidence_zero_for_syslog = true},
+    StrategyCase{.name = "ApacheError",
+                 .make_strategy = make_strategy_instance<ApacheErrorLogStrategy>,
+                 .format = LogFormat::ApacheError,
+                 .canonical_line = kApacheErrorLine,
+                 .rejects_clf_and_kv = true,
+                 .confidence_zero_for_syslog = true},
+    StrategyCase{.name = "WindowsCBS",
+                 .make_strategy = make_strategy_instance<WindowsCBSStrategy>,
+                 .format = LogFormat::WindowsCBS,
+                 .canonical_line = kWindowsCBSLine,
+                 .rejects_clf_and_kv = true,
+                 .confidence_zero_for_syslog = true},
+    StrategyCase{.name = "HealthApp",
+                 .make_strategy = make_strategy_instance<HealthAppStrategy>,
+                 .format = LogFormat::HealthApp,
+                 .canonical_line = kHealthAppLine,
+                 .rejects_clf_and_kv = true,
+                 .confidence_zero_for_syslog = true},
+    StrategyCase{.name = "Proxifier",
+                 .make_strategy = make_strategy_instance<ProxifierStrategy>,
+                 .format = LogFormat::Proxifier,
+                 .canonical_line = kProxifierLine,
+                 .rejects_clf_and_kv = true,
+                 .confidence_zero_for_syslog = true},
+    StrategyCase{.name = "HPC",
+                 .make_strategy = make_strategy_instance<HPCStrategy>,
+                 .format = LogFormat::HPC,
+                 .canonical_line = kHPCLine,
+                 .rejects_clf_and_kv = true,
+                 .confidence_zero_for_syslog = true},
+    StrategyCase{.name = "NginxError",
+                 .make_strategy = make_strategy_instance<NginxErrorStrategy>,
+                 .format = LogFormat::NginxError,
+                 .rejects_clf_and_kv = true},
+    StrategyCase{.name = "RFC5424",
+                 .make_strategy = make_strategy_instance<RFC5424Strategy>,
+                 .format = LogFormat::RFC5424,
+                 .rejects_clf_and_kv = true,
+                 .confidence_zero_for_syslog = true},
+    StrategyCase{.name = "IISW3C",
+                 .make_strategy = make_strategy_instance<IISW3CStrategy>,
+                 .format = LogFormat::IISW3C,
+                 .rejects_clf_and_kv = true},
+    StrategyCase{.name = "CloudWatch",
+                 .make_strategy = make_strategy_instance<CloudWatchStrategy>,
+                 .format = LogFormat::CloudWatch,
+                 .rejects_clf_and_kv = true},
+    StrategyCase{.name = "SystemdJournal",
+                 .make_strategy = make_strategy_instance<SystemdJournalStrategy>,
+                 .format = LogFormat::SystemdJournal,
+                 .rejects_clf_and_kv = true},
+    StrategyCase{.name = "RawText",
+                 .make_strategy = make_strategy_instance<RawTextStrategy>,
+                 .format = LogFormat::RawText},
+};
+
+[[nodiscard]] std::vector<StrategyCase> rows_with_canonical_line()
+{
+    return kStrategyTable | std::views::filter([](const StrategyCase& table_row)
+                                               { return !table_row.canonical_line.empty(); }) |
+           std::ranges::to<std::vector>();
+}
+
+[[nodiscard]] std::vector<StrategyCase> rows_rejecting_clf_and_kv()
+{
+    return kStrategyTable | std::views::filter([](const StrategyCase& table_row)
+                                               { return table_row.rejects_clf_and_kv; }) |
+           std::ranges::to<std::vector>();
+}
+
+[[nodiscard]] std::vector<StrategyCase> rows_with_zero_syslog_confidence()
+{
+    return kStrategyTable | std::views::filter([](const StrategyCase& table_row)
+                                               { return table_row.confidence_zero_for_syslog; }) |
+           std::ranges::to<std::vector>();
+}
+
+[[nodiscard]] std::string strategy_case_name(const ::testing::TestParamInfo<StrategyCase>& param_info)
+{
+    return param_info.param.name;
+}
+
+// Shared param fixture: builds the row's strategy through the table factory. Families
+// that parse allocate a local arena in the body — the format/confidence families need
+// none, so the fixture does not carry one.
+class StrategyTableTest : public ::testing::TestWithParam<StrategyCase>
+{
+  protected:
+    std::unique_ptr<IFormatStrategy> strategy{GetParam().make_strategy()};
+};
+
+class FormatReturns : public StrategyTableTest
+{
+};
+class RawLinePreserved : public StrategyTableTest
+{
+};
+class RejectsCLFAndKV : public StrategyTableTest
+{
+};
+class ConfidenceZeroForSyslog : public StrategyTableTest
+{
+};
+
+TEST_P(FormatReturns, DeclaredFormatMatchesRow)
+{
+    EXPECT_EQ(strategy->format(), GetParam().format) << "strategy=" << GetParam().name;
+}
+
+TEST_P(RawLinePreserved, CanonicalLineEchoedVerbatim)
+{
+    ArenaAllocator arena{4096};
+    const std::string_view canonical_line{GetParam().canonical_line};
+    auto result{strategy->parse(canonical_line, arena)};
+    ASSERT_TRUE(result.has_value())
+        << "strategy=" << GetParam().name << " failed to parse canonical line: " << canonical_line
+        << " error: " << result.error();
+    EXPECT_EQ(result.value().raw_line, canonical_line) << "strategy=" << GetParam().name;
+}
+
+TEST_P(RejectsCLFAndKV, ParseFailsOnBothForeignSamples)
+{
+    ArenaAllocator arena{4096};
+    EXPECT_FALSE(strategy->parse(kCLFLine, arena).has_value())
+        << "strategy=" << GetParam().name << " unexpectedly parsed the CLF sample: " << kCLFLine;
+    EXPECT_FALSE(strategy->parse(kKVLine, arena).has_value())
+        << "strategy=" << GetParam().name << " unexpectedly parsed the KV sample: " << kKVLine;
+}
+
+TEST_P(ConfidenceZeroForSyslog, BSDSampleScoresZero)
+{
+    EXPECT_EQ(strategy->confidence(kBSDLine), 0.0)
+        << "strategy=" << GetParam().name << " input: " << kBSDLine;
+}
+
+INSTANTIATE_TEST_SUITE_P(Strategies, FormatReturns, ::testing::ValuesIn(kStrategyTable),
+                         strategy_case_name);
+INSTANTIATE_TEST_SUITE_P(Strategies, RawLinePreserved,
+                         ::testing::ValuesIn(rows_with_canonical_line()), strategy_case_name);
+INSTANTIATE_TEST_SUITE_P(Strategies, RejectsCLFAndKV,
+                         ::testing::ValuesIn(rows_rejecting_clf_and_kv()), strategy_case_name);
+INSTANTIATE_TEST_SUITE_P(Strategies, ConfidenceZeroForSyslog,
+                         ::testing::ValuesIn(rows_with_zero_syslog_confidence()),
+                         strategy_case_name);
 
 // NOLINTEND : Unit tests may intentionally violate some style rules for clarity or simplicity.
