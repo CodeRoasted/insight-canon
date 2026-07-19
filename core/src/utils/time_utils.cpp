@@ -45,7 +45,6 @@ namespace time_constants
     inline constexpr std::size_t kUnixNanoMaxDigits{19};
     inline constexpr std::size_t kCompactDateWidth{6};
     inline constexpr std::size_t kShortYearSlashMinLength{17};
-    inline constexpr std::size_t kDottedDateMinLength{10};
     inline constexpr std::size_t kApacheErrorMinLength{24};
     inline constexpr std::size_t kHealthAppMinLength{18};
     inline constexpr std::size_t kLog4jMinLength{23};
@@ -551,34 +550,6 @@ std::optional<Timestamp> parse_short_year_slash(std::string_view timestamp_str) 
     parsed_tm.tm_hour = hour;
     parsed_tm.tm_min = minute;
     parsed_tm.tm_sec = second;
-    return std::chrono::system_clock::from_time_t(utc_mktime(parsed_tm));
-}
-
-// BGL dotted date: "YYYY.MM.DD" (10 chars)
-std::optional<Timestamp> parse_dotted_date(std::string_view timestamp_str) noexcept
-{
-    if (timestamp_str.size() < time_constants::kDottedDateMinLength)
-        return std::nullopt;
-    const char* ptr = timestamp_str.data();
-
-    int year{0};
-    int month{0};
-    int day{0};
-    if (!parse_fixed(ptr, 4, year))
-        return std::nullopt;
-    if (ptr[4] != '.')
-        return std::nullopt;
-    if (!parse_fixed(ptr + 5, 2, month))
-        return std::nullopt;
-    if (ptr[7] != '.')
-        return std::nullopt;
-    if (!parse_fixed(ptr + 8, 2, day))
-        return std::nullopt;
-
-    std::tm parsed_tm{};
-    parsed_tm.tm_year = year - 1900;
-    parsed_tm.tm_mon = month - 1;
-    parsed_tm.tm_mday = day;
     return std::chrono::system_clock::from_time_t(utc_mktime(parsed_tm));
 }
 

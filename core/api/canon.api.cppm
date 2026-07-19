@@ -1245,9 +1245,6 @@ parse_unix_nano_timestamp(std::string_view timestamp_str) noexcept;
 [[nodiscard]] std::optional<Timestamp>
 parse_short_year_slash(std::string_view timestamp_str) noexcept;
 
-// Parse BGL dotted date: "YYYY.MM.DD" (10 chars).  No time component.
-[[nodiscard]] std::optional<Timestamp> parse_dotted_date(std::string_view timestamp_str) noexcept;
-
 // Parse Apache error-log timestamp: "Sun Dec 04 04:47:44 2005" (24 chars).
 [[nodiscard]] std::optional<Timestamp>
 parse_apache_error_ts(std::string_view timestamp_str) noexcept;
