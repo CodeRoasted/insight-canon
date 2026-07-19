@@ -216,7 +216,10 @@ TEST_F(TokenizerTest, ParamsAreArenaOwned)
 // Batch processing
 // ─────────────────────────────────────────────────────────────────────────────
 
-TEST_F(TokenizerTest, BatchReturnsOneResultPerLine)
+// NOT "one result per line" — see BatchUnpacksAnOtelSpanDocumentIntoOneResultPerSpan below. A
+// batch of ordinary lines is 1:1; an OTLP `resourceSpans` document is 1→N. Naming this test for
+// the 1:1 case alone once made it read as a guarantee AGAINST the fan-out.
+TEST_F(TokenizerTest, BatchReturnsOneResultPerNonDocumentLine)
 {
     const std::vector<std::string_view> lines = {
         R"({"msg":"line one"})",
@@ -225,6 +228,83 @@ TEST_F(TokenizerTest, BatchReturnsOneResultPerLine)
     };
     auto results{tokenizer.process_batch(lines)};
     EXPECT_EQ(results.size(), lines.size());
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Batch record-source fan-out (D-OTEL-18): ONE line, N results
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// An OTLP `resourceSpans` export is ONE input line carrying N spans, and process_batch unpacks it
+// into N canonical records before tokenizing each 1:1. test_span_unpack.cpp covers the unpacker in
+// isolation; this covers the SEAM — that process_batch actually routes a document through it.
+//
+// Without this, deleting the `is_otel_span_document` branch from process_batch left every test
+// green: the unpack tests never call process_batch, and the batch tests never feed it a document.
+// Worse, the surviving guard was named "one result per line", so a green suite actively endorsed
+// the deletion.
+
+namespace
+{
+// Two spans under one resource — the same shape as the span-unpack fixture, kept local so this
+// test states its own premise. Span 2 carries the int-form kind/status a real collector emits.
+constexpr std::string_view kSpanDocument{
+    R"({"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"checkout-svc"}}]},)"
+    R"("scopeSpans":[{"spans":[)"
+    R"({"traceId":"aabb","spanId":"0001","name":"checkout","kind":"SPAN_KIND_INTERNAL",)"
+    R"("startTimeUnixNano":"1000","endTimeUnixNano":"1500","status":{"code":"STATUS_CODE_UNSET"},)"
+    R"("attributes":[{"key":"http.method","value":{"stringValue":"GET"}}]},)"
+    R"({"traceId":"aabb","spanId":"0002","parentSpanId":"0001","name":"db_query","kind":2,)"
+    R"("startTimeUnixNano":"1100","endTimeUnixNano":"1400","status":{"code":2},"attributes":[]})"
+    R"(]}]}]})"};
+} // namespace
+
+TEST_F(TokenizerTest, BatchUnpacksAnOtelSpanDocumentIntoOneResultPerSpan)
+{
+    const std::vector<std::string_view> lines{kSpanDocument};
+    const auto results{tokenizer.process_batch(lines)};
+
+    ASSERT_EQ(results.size(), 2U)
+        << "one resourceSpans line carrying 2 spans produced " << results.size()
+        << " result(s) — process_batch is not routing the document through unpack_otel_spans, so "
+           "an entire OTLP export collapses to a single event (or none)";
+
+    // The COUNT alone is not the contract: two copies of one span would also be 2. Each result
+    // must be the span it came from.
+    ASSERT_TRUE(results[0].has_value()) << "span 0: " << results[0].error();
+    ASSERT_TRUE(results[1].has_value()) << "span 1: " << results[1].error();
+    EXPECT_EQ(results[0]->template_str, "checkout");
+    EXPECT_EQ(results[1]->template_str, "db_query");
+    EXPECT_EQ(results[0]->component, "checkout-svc") << "resource service.name must be injected";
+    EXPECT_EQ(results[1]->component, "checkout-svc");
+    // Span 2's status arrives in INT form; a collapsed fan-out that re-emitted span 0 twice would
+    // report Info here.
+    EXPECT_EQ(results[1]->level, LogLevel::Error);
+
+    EXPECT_EQ(tokenizer.events_produced(), 2U)
+        << "the produced counter must follow the fan-out, not the input line count";
+}
+
+TEST_F(TokenizerTest, BatchFanOutKeepsSurroundingLinesInPlace)
+{
+    // The fan-out is spliced IN POSITION, not appended. A branch that pushed the unpacked spans
+    // after the rest of the batch would still return 4 results and still pass a count-only check —
+    // while silently reordering every downstream event id.
+    const std::vector<std::string_view> lines{
+        R"({"msg":"before"})",
+        kSpanDocument,
+        R"({"msg":"after"})",
+    };
+    const auto results{tokenizer.process_batch(lines)};
+
+    ASSERT_EQ(results.size(), 4U) << "3 lines, one of them a 2-span document, must yield 4 results";
+    for (std::size_t index{0}; index < results.size(); ++index)
+        ASSERT_TRUE(results[index].has_value())
+            << "result " << index << ": " << results[index].error();
+
+    EXPECT_EQ(results[0]->template_str, "before");
+    EXPECT_EQ(results[1]->template_str, "checkout");
+    EXPECT_EQ(results[2]->template_str, "db_query");
+    EXPECT_EQ(results[3]->template_str, "after");
 }
 
 TEST_F(TokenizerTest, BatchCountsEventsProduced)
