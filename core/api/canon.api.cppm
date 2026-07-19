@@ -722,6 +722,11 @@ template <> struct hash<insight::SpanId>
 // Header-only; lives in insight-canon, consumed by metalog + eidos. Consuming TUs
 // build with -ffp-contract=off so the trailing fixed→double divide is
 // never fused; SSE (not x87 80-bit) is the x86-64 default and arm has no x87.
+//
+// `det` is an API-ONLY domain (like logcraft's `value` partition): inline-in-interface
+// is the determinism guarantee itself — consumers must compile these bodies under their
+// own -ffp-contract=off — so it has no src/ or detail unit BY DESIGN. Its tests live in
+// tests/math/; that dir having no src/ counterpart is the expected shape, not drift.
 
 export namespace insight::det
 {
