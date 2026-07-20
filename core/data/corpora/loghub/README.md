@@ -9,11 +9,12 @@ cube measurement, the cross-stdlib determinism measurement, and the rich-format 
 
 - **Cube measurement** (concluded): the `b_native` oracle (BGL/Thunderbird alert classes), the
   all-format structural sweep, the template-lattice / format-relative gate. *This arc is closed*
-  (the disposable `insight_cube` pkg retires at 1.6.0) — LogHub is retained for what follows.
+  (the disposable `insight_cube` pkg was deleted at the 1.6.0 verdict, adr/0018) — LogHub is
+  retained for what follows.
 - **Cross-stdlib determinism measurement**: a large, messy, real input for the gcc-15/libstdc++ ≡
   clang-21/libc++ diagonal.
-- **Rich-format AMI re-measure (decision #1)**: base-vs-lattice AMI on a genuinely rich format,
-  the still-open number that conditions where the cube ships.
+- **Rich-format AMI re-measure**: base-vs-lattice AMI on a genuinely rich format. The cube itself
+  is no longer conditioned on it — it ships always-on since 1.7.2 (no opt-in flag).
 
 ## Provenance · license
 
@@ -22,7 +23,7 @@ cube measurement, the cross-stdlib determinism measurement, and the rich-format 
 - **Pins** (the full corpus under the warehouse's gitignored `coderoast-corpora/zenodo_corpora/loghub/data/loghub-full/`; sha256 = data-input anchor):
   - `BGL.zip` — 57,489,019 B · sha256 `d67fd82a711aea0157a9b83175892c6ee60e384a2ddf5bc51f39118453816da8` **(verified 2026-06-17)**; extracts to →
   - `BGL.log` — 743,185,031 B · 4,747,963 lines · sha256 `666130b15ef44eb32fd02bd053e6c6e007c37696b5e7e8b9d8e45b729876a5d2` (4.40 M normal + ~348 k alerts / ~30 classes, labels intact).
-  - `Thunderbird_5M.log` — 868,147,617 B · 5,000,000 lines · sha256 `6e0f52d45d639c76fc2f430e6ef609a915072c2328b862cb097dc59ac5694580` (a 5 M-line head-extract of LogHub Thunderbird — exact source/extraction step **to be reconstructed**, see Acquisition).
+  - `Thunderbird_5M.log` — 868,147,617 B · 5,000,000 lines · sha256 `6e0f52d45d639c76fc2f430e6ef609a915072c2328b862cb097dc59ac5694580` (a 5 M-line head-extract of LogHub Thunderbird — extraction recipe under Acquisition below).
 - **Class:** big · **re-acquirable** (CC-BY, Zenodo `8196385`) — we store **zero bytes in git**; the pins make any (re)download verifiable.
 
 > Lesson baked into the pin: a "full" academic corpus can be silently reprocessed (labels dropped)
