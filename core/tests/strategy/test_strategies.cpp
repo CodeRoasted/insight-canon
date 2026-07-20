@@ -1792,25 +1792,27 @@ static constexpr std::array kStrategyTable{
                  .format = LogFormat::RawText},
 };
 
+// The adaptors are spelled as function calls, not `operator|`. Reaching the pipe operator through
+// `import insight.canon.test` trips a gcc-15 BMI defect: the CRTP `_Derived` of the first closure
+// type in the TU leaks into every later `_Partial`, so the second and third helpers fail to deduce
+// (`use of operator| ... before deduction of auto`). clang-21/libc++ accepts the pipe form, so this
+// only ever breaks on the ship toolchain. See [[gcc15-and-cxx-modules]].
 [[nodiscard]] std::vector<StrategyCase> rows_with_canonical_line()
 {
-    return kStrategyTable | std::views::filter([](const StrategyCase& table_row)
-                                               { return !table_row.canonical_line.empty(); }) |
-           std::ranges::to<std::vector>();
+    return std::ranges::to<std::vector>(std::views::filter(
+        kStrategyTable, [](const StrategyCase& table_row) { return !table_row.canonical_line.empty(); }));
 }
 
 [[nodiscard]] std::vector<StrategyCase> rows_rejecting_clf_and_kv()
 {
-    return kStrategyTable | std::views::filter([](const StrategyCase& table_row)
-                                               { return table_row.rejects_clf_and_kv; }) |
-           std::ranges::to<std::vector>();
+    return std::ranges::to<std::vector>(
+        std::views::filter(kStrategyTable, [](const StrategyCase& table_row) { return table_row.rejects_clf_and_kv; }));
 }
 
 [[nodiscard]] std::vector<StrategyCase> rows_with_zero_syslog_confidence()
 {
-    return kStrategyTable | std::views::filter([](const StrategyCase& table_row)
-                                               { return table_row.confidence_zero_for_syslog; }) |
-           std::ranges::to<std::vector>();
+    return std::ranges::to<std::vector>(std::views::filter(
+        kStrategyTable, [](const StrategyCase& table_row) { return table_row.confidence_zero_for_syslog; }));
 }
 
 [[nodiscard]] std::string strategy_case_name(const ::testing::TestParamInfo<StrategyCase>& param_info)
