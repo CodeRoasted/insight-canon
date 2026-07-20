@@ -6,8 +6,6 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
 
-// src/1_tokenization/strategies/syslog.cpp
-//
 // SyslogStrategy — parses BSD syslog and RFC 3339-prefixed syslog lines.
 //
 // BSD format:   "Jan 15 08:03:22 hostname process[pid]: message"

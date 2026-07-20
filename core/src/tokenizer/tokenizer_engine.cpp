@@ -8,8 +8,6 @@ import insight.canon.detail.strategy; // ParsedLine
 import insight.canon.detail.mask;     // stateless_template, StatelessTemplate
 import insight.canon.detail.parse;    // LogParser
 
-// src/1_tokenization/tokenizer_engine.cpp
-//
 // Tokenizer: Phase 1 facade that converts raw log lines into CanonicalEvents.
 //
 // Data flow per line:

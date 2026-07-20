@@ -7,8 +7,6 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
 
-// src/1_tokenization/strategies/clf.cpp
-//
 // CLFStrategy — parses Apache/Nginx Common Log Format and Combined Log Format.
 //
 // CLF:      host ident user [timestamp] "method url proto" status bytes

@@ -8,8 +8,6 @@ import insight.canon.spi;              // ProvenanceHook
 import insight.canon.compose;         // ComposedSemantics (echoed-source hooks)
 import insight.canon.detail.strategy; // IFormatStrategy, ParsedLine
 
-// src/1_tokenization/log_parser.cpp
-//
 // LogParser: orchestrates arena allocation, format detection, and strategy
 // dispatch for a stream of raw log lines.
 //

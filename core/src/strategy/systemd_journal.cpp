@@ -8,8 +8,6 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
 
-// src/1_tokenization/strategies/systemd_journal.cpp
-//
 // SystemdJournalStrategy — parses systemd journal JSON export format:
 //   {"__REALTIME_TIMESTAMP":"1705312200000000","PRIORITY":"6",
 //    "_COMM":"nginx","MESSAGE":"Worker started"}

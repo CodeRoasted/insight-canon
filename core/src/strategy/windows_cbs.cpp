@@ -6,8 +6,6 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
 
-// src/1_tokenization/strategies/windows_cbs.cpp
-//
 // WindowsCBSStrategy — parses Windows CBS/CSI log format:
 //   "2016-09-28 04:30:30, Info                  CBS    Loaded Servicing Stack v6.1..."
 //

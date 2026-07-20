@@ -6,8 +6,6 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
 
-// src/1_tokenization/strategies/bgl.cpp
-//
 // BGLStrategy — parses BlueGene/L (BGL) and Thunderbird supercomputer logs.
 //
 // BGL:         "- 1117838570 2005.06.03 R02-M1-N0 addr1 addr2 RAS KERNEL LEVEL msg"

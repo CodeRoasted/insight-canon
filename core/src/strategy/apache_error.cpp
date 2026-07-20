@@ -6,8 +6,6 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
 
-// src/1_tokenization/strategies/apache_error.cpp
-//
 // ApacheErrorLogStrategy — parses Apache httpd error-log format:
 //   "[Sun Dec 04 04:47:44 2005] [notice] workerEnv.init() ok ..."
 //   "[Sun Dec 04 04:47:44 2005] [error] [client 10.0.0.1] mod_jk child ..."

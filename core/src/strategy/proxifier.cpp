@@ -6,8 +6,6 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
 
-// src/1_tokenization/strategies/proxifier.cpp
-//
 // ProxifierStrategy — parses Proxifier network log format:
 //   "[10.30 16:49:06] chrome.exe - proxy.cse.cuhk.edu.hk:5070 open through proxy"
 //   "[10.30 16:49:07] chrome.exe *64 close, 0 bytes sent, ..."

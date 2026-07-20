@@ -8,8 +8,6 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
 
-// src/1_tokenization/strategies/json.cpp
-//
 // JsonStrategy — parses structured JSON log lines using simdjson on-demand.
 // See detail/simdjson_scratch.hpp for the thread-local zero-alloc scaffolding.
 

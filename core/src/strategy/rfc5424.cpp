@@ -6,8 +6,6 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
 
-// src/1_tokenization/strategies/rfc5424.cpp
-//
 // RFC5424Strategy — parses IETF RFC 5424 syslog format:
 //   "<PRI>VERSION TIMESTAMP HOSTNAME APP-NAME PROCID MSGID [SD] MSG"
 //   e.g. "<134>1 2024-01-15T10:30:00.003Z server sshd 1234 ID47 - Accepted password"

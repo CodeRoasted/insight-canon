@@ -5,8 +5,6 @@ module insight.canon.detail.strategy;
 import insight.canon.internal;
 import insight.canon.api;
 
-// src/1_tokenization/strategies/android_logcat.cpp
-//
 // AndroidLogcatStrategy — parses Android logcat format:
 //   "03-17 16:13:38.811  1702  2395 D WindowManager: msg"
 //

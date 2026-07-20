@@ -6,8 +6,6 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
 
-// src/1_tokenization/strategies/health_app.cpp
-//
 // HealthAppStrategy — parses pipe-delimited HealthApp logs:
 //   "20171223-22:15:29:606|Step_LSC|30002312|onStandStepChanged 3579"
 //

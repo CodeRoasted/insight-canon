@@ -6,8 +6,6 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
 
-// src/1_tokenization/strategies/nginx_error.cpp
-//
 // NginxErrorStrategy — parses Nginx error-log format:
 //   "2024/03/27 10:15:23 [error] 12345#0: *99 connect() failed"
 //

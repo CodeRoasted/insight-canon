@@ -7,8 +7,6 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
 
-// src/1_tokenization/strategies/iis_w3c.cpp
-//
 // IISW3CStrategy — parses IIS W3C Extended Log Format:
 //   "2024-01-15 10:30:00 W3SVC1 SERVER GET /index.html - 80 - 10.0.0.1 Mozilla/5.0 200 0 0 15"
 //   "2024-01-15 10:30:00 GET /index.html - 80 - 10.0.0.1 Mozilla/5.0 200 0 0 15"

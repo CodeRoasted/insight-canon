@@ -7,8 +7,6 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
 
-// src/1_tokenization/strategies/hpc.cpp
-//
 // HPCStrategy — parses HPC event logs:
 //   "134681 node-246 unix.hw state_change.unavailable 1077804742 1 Component State Change: ..."
 //

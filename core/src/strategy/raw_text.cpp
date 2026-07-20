@@ -4,8 +4,6 @@ module insight.canon.detail.strategy;
 import insight.canon.internal;
 import insight.canon.api;
 
-// src/1_tokenization/strategies/raw_text.cpp
-//
 // RawTextStrategy — last-resort catch-all for unstructured text.
 //
 // Zero-copy: the input is already arena-stable when parse() is invoked, so the

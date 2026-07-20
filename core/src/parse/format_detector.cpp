@@ -8,8 +8,6 @@ import insight.canon.spi;              // StrategyFactory
 import insight.canon.compose;         // ComposedSemantics
 import insight.canon.detail.strategy; // the 19 core representation strategies registered here
 
-// src/1_tokenization/format_detector.cpp
-//
 // FormatDetector: registers all built-in format strategies and selects the
 // best match for a given line or sample batch.
 //

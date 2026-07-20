@@ -6,8 +6,6 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
 
-// src/1_tokenization/strategies/spark_hdfs.cpp
-//
 // SparkHDFSStrategy — parses Spark and HDFS log formats.
 //
 // Spark:  "17/06/09 20:10:40 INFO executor.CoarseGrainedExecutorBackend: msg"

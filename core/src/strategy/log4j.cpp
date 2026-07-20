@@ -6,8 +6,6 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
 
-// src/1_tokenization/strategies/log4j.cpp
-//
 // Log4jStrategy — parses Java Log4j / Python logging formats.
 //
 // Standard Log4j (Hadoop):
