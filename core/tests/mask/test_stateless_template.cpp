@@ -289,6 +289,153 @@ TEST(StatelessTemplate, CurrencyMarkerNumberMasked)
     EXPECT_NE(masked("ref $42abc", arena), masked("ref $99xyz", arena));
 }
 
+// ── Constant-pinning guards (studies/011 §7) ─────────────────────────────────────
+// WHY THESE EXIST, and why the suite above does not already cover them: every test
+// above asserts a COLLAPSE (`masked(a) == masked(b)`), which stays green for ANY hash
+// floor — both sides mask, or both stay literal, either way they match. Mutation
+// testing (studies/011 §7.1) confirmed it: shipping kMinHashLen 16 → 8 left all 43
+// committed expectations green, and the floor's stated rationale ("keeps deadbeef,
+// cafe literal", mask.cpp) was asserted nowhere. Pinning a threshold requires EXACT
+// template strings on BOTH sides of the boundary — literal at floor-1, `<*>` at floor.
+//
+// kMinHashLen is declared TWICE (two independent function-local copies): in
+// `is_uuid_or_long_hash` (the standalone whole-token path, dispatch step 3) and in
+// `normalize_embedded_identity` (composite rule #7, a delimiter-bounded run inside a
+// larger token). A guard on one leaves the other free to drift, so both are pinned.
+//
+// These assert CURRENT SHIPPED BEHAVIOUR; they do not argue the floor is correct.
+// studies/011 rules the value is not tunable by a threshold study — a red here means
+// someone moved a load-bearing masking constant, which is an identity-affecting change
+// requiring a kCanonicalizationVersion bump (D-TID-16), not a test to retune.
+
+namespace
+{
+// The floor boundary, as byte-exact literals. Both are LETTER-leading on purpose: a
+// digit-leading hex run ("0123456789abcde") is masked by the digit-leading rule
+// regardless of the floor, which would make the pin vacuous.
+constexpr std::string_view kHexBelowFloor{"deadbeefcafe0ba"}; // 15 — floor - 1
+constexpr std::string_view kHexAtFloor{"deadbeefcafe0bad"};   // 16 — the shipped floor
+constexpr std::size_t kFloorLen{16};
+} // namespace
+
+// Pin the STANDALONE floor (is_uuid_or_long_hash) exactly at 16: 15 hex chars stay
+// literal, 16 mask. Together these two assertions admit exactly one value — any floor
+// ≤ 15 reddens the first, any floor ≥ 17 reddens the second.
+TEST(StatelessTemplate, HashFloorPinnedAtSixteenStandalone)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // Guard the fixtures themselves: a typo'd literal would silently move the boundary
+    // under test and quietly re-vacuate the pin.
+    ASSERT_EQ(kHexBelowFloor.size(), kFloorLen - 1U)
+        << "fixture drift: the below-floor token must be exactly " << (kFloorLen - 1U)
+        << " chars, got " << kHexBelowFloor.size() << " (" << kHexBelowFloor << ")";
+    ASSERT_EQ(kHexAtFloor.size(), kFloorLen)
+        << "fixture drift: the at-floor token must be exactly " << kFloorLen << " chars, got "
+        << kHexAtFloor.size() << " (" << kHexAtFloor << ")";
+
+    const std::string below{masked(std::string{kHexBelowFloor}, arena)};
+    EXPECT_EQ(below, kHexBelowFloor)
+        << "a " << kHexBelowFloor.size() << "-char hex run is BELOW the floor and must stay "
+        << "literal — the floor moved DOWN (masking short hex-looking words)\n"
+        << "  token    : " << kHexBelowFloor << "\n"
+        << "  expected : " << kHexBelowFloor << " (kept)\n"
+        << "  actual   : " << below;
+
+    const std::string at_floor{masked(std::string{kHexAtFloor}, arena)};
+    EXPECT_EQ(at_floor, "<*>") << "a " << kHexAtFloor.size()
+                               << "-char hex run is AT the floor and must MASK — the "
+                               << "floor moved UP (leaking high-card hashes into templates)\n"
+                               << "  token    : " << kHexAtFloor << "\n"
+                               << "  expected : <*>\n"
+                               << "  actual   : " << at_floor;
+}
+
+// The same boundary on the EMBEDDED path (composite rule #7) — a delimiter-bounded hex
+// run inside a larger path token. A separate kMinHashLen copy, so a separate pin.
+TEST(StatelessTemplate, HashFloorPinnedAtSixteenEmbedded)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // A non-ephemeral, non-versioned path so rules #1-#6 all decline and the token
+    // actually reaches embedded_identity (otherwise the pin would be vacuous).
+    const std::string below_line{std::string{"/var/cache/"} + std::string{kHexBelowFloor} + "/x"};
+    const std::string at_floor_line{std::string{"/var/cache/"} + std::string{kHexAtFloor} + "/x"};
+
+    const std::string below{masked(below_line, arena)};
+    EXPECT_EQ(below, below_line) << "an embedded " << kHexBelowFloor.size()
+                                 << "-char hex run is below the floor and must "
+                                 << "stay literal (embedded floor moved DOWN)\n"
+                                 << "  expected : " << below_line << " (kept)\n"
+                                 << "  actual   : " << below;
+
+    const std::string at_floor{masked(at_floor_line, arena)};
+    EXPECT_EQ(at_floor, "/var/cache/<*>/x")
+        << "an embedded " << kHexAtFloor.size() << "-char hex run must mask while the surrounding "
+        << "path is KEPT (embedded floor moved UP, or the run boundary broke)\n"
+        << "  input    : " << at_floor_line << "\n"
+        << "  expected : /var/cache/<*>/x\n"
+        << "  actual   : " << at_floor;
+}
+
+// The floor's STATED RATIONALE, asserted (mask.cpp: "keeps short hex-looking words
+// (deadbeef, cafe) literal"). These are real vocabulary — hex-alphabet words and
+// identifiers that carry meaning and MUST NOT collapse into `<*>`. They also ladder the
+// sub-floor range, so a floor lowered to 4/6/7/8 reddens a named token rather than an
+// abstract length.
+TEST(StatelessTemplate, HashFloorKeepsShortHexWordsLiteral)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // `LEB128` is not all-hex ('L'); the rest are, and are kept solely by the floor.
+    for (const std::string_view word : {std::string_view{"cafe"},     // 4
+                                        std::string_view{"facade"},   // 6
+                                        std::string_view{"ed25519"},  // 7
+                                        std::string_view{"deadbeef"}, // 8
+                                        std::string_view{"LEB128"}})  // 6, not hex
+    {
+        const std::string got{masked(std::string{word}, arena)};
+        EXPECT_EQ(got, word) << "a " << word.size() << "-char hex-looking WORD must stay literal — "
+                             << "the floor's stated rationale (mask.cpp) is violated\n"
+                             << "  word     : " << word << "\n"
+                             << "  expected : " << word << " (kept)\n"
+                             << "  actual   : " << got;
+    }
+}
+
+// `is_hex_char` folds ASCII case (`chr | 32`). No committed test exercised the fold
+// (studies/011 §7.2), so dropping it would leave every UPPERCASE hash unmasked — real
+// corpus content (uppercase git SHAs, checksum tables) silently over-splitting. Pin
+// both the fold AND its bound: folding must not turn non-hex letters into hex.
+TEST(StatelessTemplate, HexClassifierFoldsAsciiCase)
+{
+    ArenaAllocator arena{256U * 1024U};
+    constexpr std::string_view kUpperHex{"DEADBEEFCAFE0BAD"}; // 16, uppercase
+    constexpr std::string_view kMixedHex{"DeadBeefCafe0Bad"}; // 16, mixed case
+    constexpr std::string_view kUpperUuid{"F7F63412-B7A7-468D-BD31-1A6AE1CA2680"};
+    // 16 chars, uppercase, but NOT all-hex (X/Y/Z/W) — the fold must not over-reach.
+    constexpr std::string_view kUpperNonHex{"DEADBEEFCAFEXYZW"};
+
+    const std::string upper{masked(std::string{kUpperHex}, arena)};
+    EXPECT_EQ(upper, "<*>") << "UPPERCASE hex at the floor must mask — is_hex_char stopped folding "
+                            << "case\n  token: " << kUpperHex
+                            << "\n  expected: <*>\n  actual: " << upper;
+
+    const std::string mixed{masked(std::string{kMixedHex}, arena)};
+    EXPECT_EQ(mixed, "<*>") << "MIXED-case hex at the floor must mask\n  token: " << kMixedHex
+                            << "\n  expected: <*>\n  actual: " << mixed;
+
+    const std::string uuid{masked(std::string{kUpperUuid}, arena)};
+    EXPECT_EQ(uuid, "<*>") << "an UPPERCASE UUID must mask (the 8-4-4-4-12 hex check folds case "
+                           << "too)\n  token: " << kUpperUuid
+                           << "\n  expected: <*>\n  actual: " << uuid;
+
+    // The bound: same length, same case, but genuinely non-hex → KEPT. Guards a "fix"
+    // that masks long uppercase words wholesale instead of folding case.
+    const std::string non_hex{masked(std::string{kUpperNonHex}, arena)};
+    EXPECT_EQ(non_hex, kUpperNonHex)
+        << "a same-length UPPERCASE non-hex word must stay literal — the case fold must not "
+        << "widen the hex alphabet\n  token: " << kUpperNonHex << "\n  expected: " << kUpperNonHex
+        << " (kept)\n  actual: " << non_hex;
+}
+
 // ── Masker cardinality on a real corpus (the standing F13 re-measure instrument) ──
 // Reports the masker's distinct-template count + singleton fraction on a corpus — the
 // reading used to size F13 (the one-time over-split ratio vs the now-ripped Drain was
