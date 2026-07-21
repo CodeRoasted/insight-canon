@@ -8,8 +8,12 @@
 export module insight.canon;
 import insight.canon.internal; // std (expected/unique_ptr/vector/span/string for the Tokenizer decl)
 export import insight.canon.api; // public surface (types, det_math, arena, ...)
-export import insight.canon
-    .compose; // compose()/ComposedSemantics (ADR 0024 §3/§4) — Tokenizer takes it
+// compose()/ComposedSemantics (ADR 0024 §3/§4) — Tokenizer takes it. The comment sits ABOVE the
+// directive deliberately: as a trailing comment it pushed the line past the column limit, and the
+// formatter then wrapped the MODULE NAME across lines. gcc-15 rejects that (a module-import
+// directive is one logical line); clang-21 accepts it, so the break reaches only the ship
+// toolchain. Keep this line short enough that no formatter has a reason to touch it.
+export import insight.canon.compose;
 
 // ──────── from api/insight/tokenization/tokenizer_engine.hpp ────────
 export namespace insight::tokenization
