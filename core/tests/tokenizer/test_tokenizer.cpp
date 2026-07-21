@@ -25,8 +25,9 @@ class TokenizerTest : public ::testing::Test
     static constexpr std::size_t kArenaSize{1u << 20}; // 1 MiB
 
     ArenaAllocator arena{kArenaSize};
-    // Semantic-unaware: the universal formats tokenize with a degenerate (zero-package) composition.
-    // `composed` is declared BEFORE `tokenizer` so it outlives the const-ref the Tokenizer holds.
+    // Semantic-unaware: the universal formats tokenize with a degenerate (zero-package)
+    // composition. `composed` is declared BEFORE `tokenizer` so it outlives the const-ref the
+    // Tokenizer holds.
     insight::semantic::ComposedSemantics composed{insight::test_support::degenerate_composition()};
     Tokenizer tokenizer{arena, MaskConfig{}, composed};
 };

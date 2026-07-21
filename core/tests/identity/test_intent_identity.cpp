@@ -4,10 +4,10 @@
 // constructor: matrix legs / shards / version-parameterized jobs of ONE intent
 // canonicalize to ONE CLASS and pair across homologous runs (G1, studies/004),
 // WITHOUT over-collapsing distinct WHERE (II-2: alignment must never eat the signal).
-// canonicalize_intent is canon's SEMANTIC-UNAWARE algorithm, frozen under kCanonicalizationVersion; the
-// composed-ruleset comparability key (II-7) is now semantic_identity (ADR 0024 §4, tests/compose/
-// test_composition.cpp). A diff here is a cross-run comparability break, not a retune — fix the code,
-// never the assertion.
+// canonicalize_intent is canon's SEMANTIC-UNAWARE algorithm, frozen under kCanonicalizationVersion;
+// the composed-ruleset comparability key (II-7) is now semantic_identity (ADR 0024 §4,
+// tests/compose/ test_composition.cpp). A diff here is a cross-run comparability break, not a
+// retune — fix the code, never the assertion.
 
 #include <gtest/gtest.h>
 
@@ -33,9 +33,8 @@ struct CanonCase
 void expect_canon(const CanonCase& kase)
 {
     const std::string got{canonicalize_intent(kase.input)};
-    EXPECT_EQ(got, kase.expected)
-        << "canonicalize_intent(\"" << kase.input << "\") = \"" << got << "\"  expected \""
-        << kase.expected << '"';
+    EXPECT_EQ(got, kase.expected) << "canonicalize_intent(\"" << kase.input << "\") = \"" << got
+                                  << "\"  expected \"" << kase.expected << '"';
 }
 
 // Two names of ONE intent must ALIGN (same id). On failure print both inputs, both
@@ -44,9 +43,10 @@ void expect_same_intent(std::string_view lhs, std::string_view rhs)
 {
     EXPECT_EQ(intent_id_of(lhs), intent_id_of(rhs))
         << "intents must ALIGN but got distinct ids:\n"
-        << "  \"" << lhs << "\" -> \"" << canonicalize_intent(lhs) << "\" = " << render(intent_id_of(lhs))
-        << '\n'
-        << "  \"" << rhs << "\" -> \"" << canonicalize_intent(rhs) << "\" = " << render(intent_id_of(rhs));
+        << "  \"" << lhs << "\" -> \"" << canonicalize_intent(lhs)
+        << "\" = " << render(intent_id_of(lhs)) << '\n'
+        << "  \"" << rhs << "\" -> \"" << canonicalize_intent(rhs)
+        << "\" = " << render(intent_id_of(rhs));
 }
 
 // Two distinct WHERE must stay DISTINCT (different ids) — the II-2 over-collapse guard.
@@ -54,9 +54,10 @@ void expect_distinct_intent(std::string_view lhs, std::string_view rhs)
 {
     EXPECT_NE(intent_id_of(lhs), intent_id_of(rhs))
         << "intents must stay DISTINCT but collapsed to one id:\n"
-        << "  \"" << lhs << "\" -> \"" << canonicalize_intent(lhs) << "\" = " << render(intent_id_of(lhs))
-        << '\n'
-        << "  \"" << rhs << "\" -> \"" << canonicalize_intent(rhs) << "\" = " << render(intent_id_of(rhs));
+        << "  \"" << lhs << "\" -> \"" << canonicalize_intent(lhs)
+        << "\" = " << render(intent_id_of(lhs)) << '\n'
+        << "  \"" << rhs << "\" -> \"" << canonicalize_intent(rhs)
+        << "\" = " << render(intent_id_of(rhs));
 }
 
 } // namespace
@@ -114,10 +115,10 @@ TEST(IntentCanonicalize, FrozenRuleSet)
 }
 
 // NOTE: the II-7 comparability-version assertion (formerly RegistryVersionIsFrozen, pinning
-// kIntentRegistryVersion == "intent-gha-2") RETIRED with the constant (ADR 0024 §4.1): the composed-ruleset
-// content hash `semantic_identity` supersedes it and is pinned in tests/compose/test_composition.cpp
-// (stability + reproducibility + order-independence). canonicalize_intent below stays canon's frozen
-// semantic-unaware algorithm.
+// kIntentRegistryVersion == "intent-gha-2") RETIRED with the constant (ADR 0024 §4.1): the
+// composed-ruleset content hash `semantic_identity` supersedes it and is pinned in
+// tests/compose/test_composition.cpp (stability + reproducibility + order-independence).
+// canonicalize_intent below stays canon's frozen semantic-unaware algorithm.
 
 // ── Co-location invariant (II-1) ──
 // intent_id_of is BY DEFINITION template_id_of(canonicalize_intent(name)): the identity is
@@ -126,7 +127,8 @@ TEST(IntentIdentity, IdIsHashOfCanonicalForm)
 {
     for (const std::string_view name : {"ESLint v6", "Shard 1", "worker-42", "deploy (prod)", ""})
         EXPECT_EQ(intent_id_of(name), template_id_of(canonicalize_intent(name)))
-            << "intent_id_of diverged from template_id_of(canonicalize_intent()) for: \"" << name << '"';
+            << "intent_id_of diverged from template_id_of(canonicalize_intent()) for: \"" << name
+            << '"';
 }
 
 // NOLINTEND

@@ -200,46 +200,45 @@ namespace
         bool has_letter_anchor{false};
         std::string_view prev_core{}; // the previous segment's core — for the status carve-out
         std::size_t seg_start{0};
-        const auto flush_segment{[&](std::size_t end)
-                                 {
-                                     const std::string_view seg{tok.substr(seg_start, end - seg_start)};
-                                     // core = segment with leading/trailing non-alnum stripped
-                                     std::size_t lead{0};
-                                     while (lead < seg.size() && !is_digit(seg[lead]) &&
-                                            !is_alpha(seg[lead]))
-                                         ++lead;
-                                     std::size_t trail{seg.size()};
-                                     while (trail > lead && !is_digit(seg[trail - 1]) &&
-                                            !is_alpha(seg[trail - 1]))
-                                         --trail;
-                                     const std::string_view core{seg.substr(lead, trail - lead)};
-                                     if (core.empty())
-                                     {
-                                         out.append(seg); // pure punctuation — keep verbatim
-                                         prev_core = {};
-                                         return;
-                                     }
-                                     if (is_alpha(core.front()))
-                                     {
-                                         out.append(seg); // letter-leading → KEEP (class anchor)
-                                         has_letter_anchor = true;
-                                         prev_core = core;
-                                         return;
-                                     }
-                                     // digit-leading core: status-value carve-out, else mask.
-                                     if (is_status_keyword(prev_core) && is_all_digits(core) &&
-                                         core.size() <= kMaxStatusDigits)
-                                     {
-                                         out.append(seg); // exit:0 / status:500 → KEEP (categorical)
-                                         prev_core = core;
-                                         return;
-                                     }
-                                     out.append(seg.substr(0, lead)); // leading punct, e.g. '['
-                                     out.append(kWildcard);
-                                     out.append(seg.substr(trail)); // trailing punct, e.g. ']'
-                                     masked = true;
-                                     prev_core = core;
-                                 }};
+        const auto flush_segment{
+            [&](std::size_t end)
+            {
+                const std::string_view seg{tok.substr(seg_start, end - seg_start)};
+                // core = segment with leading/trailing non-alnum stripped
+                std::size_t lead{0};
+                while (lead < seg.size() && !is_digit(seg[lead]) && !is_alpha(seg[lead]))
+                    ++lead;
+                std::size_t trail{seg.size()};
+                while (trail > lead && !is_digit(seg[trail - 1]) && !is_alpha(seg[trail - 1]))
+                    --trail;
+                const std::string_view core{seg.substr(lead, trail - lead)};
+                if (core.empty())
+                {
+                    out.append(seg); // pure punctuation — keep verbatim
+                    prev_core = {};
+                    return;
+                }
+                if (is_alpha(core.front()))
+                {
+                    out.append(seg); // letter-leading → KEEP (class anchor)
+                    has_letter_anchor = true;
+                    prev_core = core;
+                    return;
+                }
+                // digit-leading core: status-value carve-out, else mask.
+                if (is_status_keyword(prev_core) && is_all_digits(core) &&
+                    core.size() <= kMaxStatusDigits)
+                {
+                    out.append(seg); // exit:0 / status:500 → KEEP (categorical)
+                    prev_core = core;
+                    return;
+                }
+                out.append(seg.substr(0, lead)); // leading punct, e.g. '['
+                out.append(kWildcard);
+                out.append(seg.substr(trail)); // trailing punct, e.g. ']'
+                masked = true;
+                prev_core = core;
+            }};
         for (std::size_t pos{0}; pos < tok.size(); ++pos)
             if (tok[pos] == ':' || tok[pos] == '/')
             {
@@ -434,7 +433,8 @@ namespace
     // `is_digit_leading` test misses on a leading marker. The core is digits + one optional
     // `.`-fraction; a trailing alpha/digit after a clean core rejects (`$42abc` is not a counter,
     // like `#42abc`), trailing punctuation is kept (`$463,` → `$<*>,`). `$HOME` (`$`+letter) has no
-    // digit core → returns false → kept literal. Byte-only, single-token → cross-stdlib bit-identical.
+    // digit core → returns false → kept literal. Byte-only, single-token → cross-stdlib
+    // bit-identical.
     [[nodiscard]] inline bool normalize_marker_number(std::string_view tok, std::string& out)
     {
         const std::size_t marker{marker_prefix_len(tok)};
@@ -474,19 +474,20 @@ namespace
         static constexpr std::size_t kUuidLen{36};
         static constexpr std::array<std::size_t, 4> kUuidDashes{8, 13, 18, 23};
         static constexpr std::size_t kMinHashLen{16};
-        const auto uuid_at{[&](std::size_t pos) -> bool
-                           {
-                               if (pos + kUuidLen > tok.size())
-                                   return false;
-                               for (std::size_t off{0}; off < kUuidLen; ++off)
-                               {
-                                   const bool is_dash{off == kUuidDashes[0] || off == kUuidDashes[1] ||
-                                                      off == kUuidDashes[2] || off == kUuidDashes[3]};
-                                   if (is_dash ? (tok[pos + off] != '-') : !is_hex_char(tok[pos + off]))
-                                       return false;
-                               }
-                               return true;
-                           }};
+        const auto uuid_at{
+            [&](std::size_t pos) -> bool
+            {
+                if (pos + kUuidLen > tok.size())
+                    return false;
+                for (std::size_t off{0}; off < kUuidLen; ++off)
+                {
+                    const bool is_dash{off == kUuidDashes[0] || off == kUuidDashes[1] ||
+                                       off == kUuidDashes[2] || off == kUuidDashes[3]};
+                    if (is_dash ? (tok[pos + off] != '-') : !is_hex_char(tok[pos + off]))
+                        return false;
+                }
+                return true;
+            }};
         out.clear();
         bool masked{false};
         std::size_t pos{0};
@@ -561,27 +562,29 @@ namespace
 
     // ── The composite normalizer catalog (D-TID-12 step #2) ──────────────────────────
     // The KEEP-class / mask-instance rules, as a DECLARED array whose ORDER IS THE PRECEDENCE:
-    // tried top-to-bottom, the first rule that claims the token wins (the former `||` short-circuit,
-    // now data). Each rule is a pure `bool(tok, out&)` — fills `out` with the normalized literal and
-    // returns true iff it claims the token. This catalog DEFINES the composite layer of the ruleset
-    // generation named by kCanonicalizationVersion; adding, reordering, or removing a rule is an
-    // output-affecting change that REQUIRES a version bump — the single enumerable place that rule
-    // can be stated (closing the D-TID-16 "rules changed, version didn't" gap for the rule set
-    // itself). Each entry names its governing ruling + the generation that introduced it.
+    // tried top-to-bottom, the first rule that claims the token wins (the former `||`
+    // short-circuit, now data). Each rule is a pure `bool(tok, out&)` — fills `out` with the
+    // normalized literal and returns true iff it claims the token. This catalog DEFINES the
+    // composite layer of the ruleset generation named by kCanonicalizationVersion; adding,
+    // reordering, or removing a rule is an output-affecting change that REQUIRES a version bump —
+    // the single enumerable place that rule can be stated (closing the D-TID-16 "rules changed,
+    // version didn't" gap for the rule set itself). Each entry names its governing ruling + the
+    // generation that introduced it.
     struct CompositeRule
     {
         std::string_view name; // stable rule id (diagnostics / the canon bible)
         bool (*normalize)(std::string_view tok, std::string& out); // fills out; true iff claimed
     };
     constexpr std::array<CompositeRule, 8U> kCompositeRules{{
-        {.name = "diagnostic_composite", .normalize = normalize_diagnostic_composite}, // D-MSK-1  (-4)
-        {.name = "ephemeral_root", .normalize = normalize_ephemeral_root},             // D-MSK-2  (-4)
-        {.name = "versioned_ref", .normalize = normalize_versioned_ref},               // D-TID-12 #2
-        {.name = "bracket_index", .normalize = normalize_bracket_index},               // D-TID-13(b)
-        {.name = "hash_counter", .normalize = normalize_hash_counter},                 // D-TID-13(a)
-        {.name = "marker_number", .normalize = normalize_marker_number},               // D-TID-22 (-3)
-        {.name = "embedded_identity", .normalize = normalize_embedded_identity},       // D-TID-12 #3
-        {.name = "kv_value", .normalize = normalize_kv_value},                         // D-TID-17
+        {.name = "diagnostic_composite",
+         .normalize = normalize_diagnostic_composite},                           // D-MSK-1  (-4)
+        {.name = "ephemeral_root", .normalize = normalize_ephemeral_root},       // D-MSK-2  (-4)
+        {.name = "versioned_ref", .normalize = normalize_versioned_ref},         // D-TID-12 #2
+        {.name = "bracket_index", .normalize = normalize_bracket_index},         // D-TID-13(b)
+        {.name = "hash_counter", .normalize = normalize_hash_counter},           // D-TID-13(a)
+        {.name = "marker_number", .normalize = normalize_marker_number},         // D-TID-22 (-3)
+        {.name = "embedded_identity", .normalize = normalize_embedded_identity}, // D-TID-12 #3
+        {.name = "kv_value", .normalize = normalize_kv_value},                   // D-TID-17
     }};
 
     template <typename Cb>
@@ -634,69 +637,69 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
     // The declared per-token classification in TOTAL precedence (D-TID-12 §8.2): KEEP
     // carve-outs win first, then the F13 masks. A masked position contributes a param
     // (the raw token); a kept/normalized position does not.
-    for_each_token(content,
-                   [&](std::string_view tok)
-                   {
-                       if (!first)
-                           tmpl.push_back(' ');
-                       first = false;
-                       // One pass over the token's bytes → the shape facts the dispatch below
-                       // reads, replacing the separate is_all_digits / composite-trigger any_of /
-                       // is_digit_leading scans (byte-exact equivalents → identity unchanged).
-                       const TokenShape shape{tok};
-                       const auto mask{[&]
-                                       {
-                                           tmpl.append(kWildcard);
-                                           params.push_back(tok);
-                                       }};
+    for_each_token(
+        content,
+        [&](std::string_view tok)
+        {
+            if (!first)
+                tmpl.push_back(' ');
+            first = false;
+            // One pass over the token's bytes → the shape facts the dispatch below
+            // reads, replacing the separate is_all_digits / composite-trigger any_of /
+            // is_digit_leading scans (byte-exact equivalents → identity unchanged).
+            const TokenShape shape{tok};
+            const auto mask{[&]
+                            {
+                                tmpl.append(kWildcard);
+                                params.push_back(tok);
+                            }};
 
-                       // 1. status-value KEEP (identity): "exit code 0" stays distinct
-                       //    from "exit code 1" — a green→red flip must not collapse.
-                       if (shape.all_digits && tok.size() <= kMaxStatusDigits &&
-                           is_status_keyword(prev))
-                       {
-                           tmpl.append(tok);
-                           prev = tok;
-                           return;
-                       }
-                       // 2. composite → the normalized literal (KEEP class, mask instance). The
-                       //    declared rule set AND its precedence are kCompositeRules (tried in array
-                       //    order, first claim wins — the former `||` short-circuit, now data).
-                       //    maybe_composite is the cheap pre-gate that skips the whole catalog for a
-                       //    token carrying no separator (shape) and no declared currency marker.
-                       const bool maybe_composite{marker_prefix_len(tok) != 0 || shape.has_separator};
-                       if (maybe_composite)
-                       {
-                           for (const CompositeRule& rule : kCompositeRules)
-                               if (rule.normalize(tok, composite))
-                               {
-                                   tmpl.append(composite);
-                                   prev = tok;
-                                   return;
-                               }
-                       }
-                       // 3. UUID / long hash → MASK.
-                       // 4. IPv4 / 0x-hex → MASK.
-                       // 5. digit-leading numeric (or empty) → MASK.
-                       if (shape.empty || is_uuid_or_long_hash(tok) ||
-                           (config.mask_ip_addresses && is_ipv4_token(tok)) ||
-                           (config.mask_hex_addresses && is_hex_token(tok)) || shape.digit_leading)
-                       {
-                           mask();
-                           prev = tok;
-                           return;
-                       }
-                       // 6. literal KEEP.
-                       tmpl.append(tok);
-                       prev = tok;
-                   });
+            // 1. status-value KEEP (identity): "exit code 0" stays distinct
+            //    from "exit code 1" — a green→red flip must not collapse.
+            if (shape.all_digits && tok.size() <= kMaxStatusDigits && is_status_keyword(prev))
+            {
+                tmpl.append(tok);
+                prev = tok;
+                return;
+            }
+            // 2. composite → the normalized literal (KEEP class, mask instance). The
+            //    declared rule set AND its precedence are kCompositeRules (tried in array
+            //    order, first claim wins — the former `||` short-circuit, now data).
+            //    maybe_composite is the cheap pre-gate that skips the whole catalog for a
+            //    token carrying no separator (shape) and no declared currency marker.
+            const bool maybe_composite{marker_prefix_len(tok) != 0 || shape.has_separator};
+            if (maybe_composite)
+            {
+                for (const CompositeRule& rule : kCompositeRules)
+                    if (rule.normalize(tok, composite))
+                    {
+                        tmpl.append(composite);
+                        prev = tok;
+                        return;
+                    }
+            }
+            // 3. UUID / long hash → MASK.
+            // 4. IPv4 / 0x-hex → MASK.
+            // 5. digit-leading numeric (or empty) → MASK.
+            if (shape.empty || is_uuid_or_long_hash(tok) ||
+                (config.mask_ip_addresses && is_ipv4_token(tok)) ||
+                (config.mask_hex_addresses && is_hex_token(tok)) || shape.digit_leading)
+            {
+                mask();
+                prev = tok;
+                return;
+            }
+            // 6. literal KEEP.
+            tmpl.append(tok);
+            prev = tok;
+        });
 
     const std::string_view tmpl_view{out_arena.store_string(tmpl)};
     std::span<const std::string_view> params_span{};
     if (!params.empty())
     {
-        auto* buf{static_cast<std::string_view*>(
-            out_arena.allocate(params.size() * sizeof(std::string_view), alignof(std::string_view)))};
+        auto* buf{static_cast<std::string_view*>(out_arena.allocate(
+            params.size() * sizeof(std::string_view), alignof(std::string_view)))};
         const auto buf_span{std::span<std::string_view>{buf, params.size()}};
         std::ranges::copy(params, buf_span.begin());
         params_span = buf_span;

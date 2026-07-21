@@ -240,7 +240,8 @@ TEST(FailureLexicon, RegisterAnchoredNounDemotesInProseFiresAnchored)
         << "'panic' has a benign sense (panic button), no register — demote";
     EXPECT_FALSE(contains_failure_cue("a fatal flaw in the original design"))
         << "'fatal' has a benign sense (fatal flaw), no register — demote";
-    EXPECT_TRUE(contains_failure_cue("FATAL out of memory, killing worker")) << "caps 'FATAL' fires";
+    EXPECT_TRUE(contains_failure_cue("FATAL out of memory, killing worker"))
+        << "caps 'FATAL' fires";
     EXPECT_TRUE(contains_failure_cue("panic: runtime stack overflow")) << "'panic:' colon fires";
 }
 // ── D-OUT-4a — a leading FAIL glyph (✗/✕/✖/✘) ANCHORS a RegisterAnchored word but ──
@@ -305,7 +306,8 @@ TEST(FailureLexicon, CountRegisterFailureWordIsSummaryNotVerdict)
     EXPECT_TRUE(contains_failure_cue("testSitesStats (FAILED)"))
         << "paren+caps '(FAILED)', no count predecessor — the specific verdict the summary counts";
     EXPECT_TRUE(contains_failure_cue("Build failed with 1 error"))
-        << "'failed' preceded by 'Build' (not a count) — the verdict survives elsewhere on the line";
+        << "'failed' preceded by 'Build' (not a count) — the verdict survives elsewhere on the "
+           "line";
 }
 
 // ── D-OUT-2 — a leading pass WORD demotes, but ONLY as the first significant token ──

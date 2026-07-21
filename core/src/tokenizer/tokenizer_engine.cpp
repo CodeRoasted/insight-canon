@@ -36,8 +36,9 @@ namespace
 
     // canon-internal DEBUG gate for `if constexpr` elision of the progress-log block (computation +
     // log). SPDLOG_ACTIVE_LEVEL is canon's PRIVATE build-type compile def, reaching this build-only
-    // impl unit via the textual log_macros.hpp include. Kept OFF the public insight.canon.api surface
-    // (which every consumer recompiles) so the level macro never leaks onto a consumer's command line.
+    // impl unit via the textual log_macros.hpp include. Kept OFF the public insight.canon.api
+    // surface (which every consumer recompiles) so the level macro never leaks onto a consumer's
+    // command line.
     constexpr bool kDebugLogsEnabled{SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_DEBUG};
 
 } // namespace
@@ -48,7 +49,8 @@ struct Tokenizer::Impl
                            // shares the caller-managed arena for stable string_views.
     // The composed vocabulary (ADR 0024): borrowed, not owned — must outlive the Tokenizer. NOLINT
     // for the same non-owning-ref reason as `arena`.
-    const insight::semantic::ComposedSemantics& composed; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+    const insight::semantic::ComposedSemantics&
+        composed; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     LogParser parser;
     MaskConfig config; // token-mask configuration for the stateless masker (mask IPv4/hex)
     EventID next_id{0};
@@ -56,7 +58,8 @@ struct Tokenizer::Impl
 
     Impl(ArenaAllocator& arena_ref, MaskConfig mask_config,
          const insight::semantic::ComposedSemantics& composed_ref)
-        : arena{arena_ref}, composed{composed_ref}, parser{arena_ref, composed_ref}, config{mask_config}
+        : arena{arena_ref}, composed{composed_ref}, parser{arena_ref, composed_ref},
+          config{mask_config}
     {
     }
 
@@ -76,19 +79,21 @@ struct Tokenizer::Impl
         event.id = next_id++;
         event.timestamp = parsed_line.timestamp.value_or(Timestamp{});
         event.level = parsed_line.level;
-        event.format = parser.routed_format(); // the routed winner for THIS line (set by parse_line)
+        event.format =
+            parser.routed_format(); // the routed winner for THIS line (set by parse_line)
         event.component = parsed_line.component;
         event.host = parsed_line.host;
         event.template_str = match.template_str;
         event.params = match.params;
-        event.structural_role = insight::tokenization::classify(
-            parsed_line.content, event.format, composed); // announced structural role (composed rows)
+        event.structural_role =
+            insight::tokenization::classify(parsed_line.content, event.format,
+                                            composed); // announced structural role (composed rows)
         // Identity-derived WHERE (intent_identity_model.md §5.3, II-8): populate an EMPTY component
         // WHERE axis with the recognized test-file. Semantic-unaware (SP-1): no dialect literal — a
         // format whose lines carry a native component already skips via component.empty(); a format
         // without one (GHA today, any future dialect tomorrow) gets the identity-derived WHERE, and
-        // recognize_location returns empty on non-test content so nothing is faked. Config-gated and
-        // default-OFF, so every G-SP-1 default path is byte-identical (the flag is the aligned
+        // recognize_location returns empty on non-test content so nothing is faked. Config-gated
+        // and default-OFF, so every G-SP-1 default path is byte-identical (the flag is the aligned
         // pipeline's, feeding the where_set_shift coverage verdict — §5.4).
         if (config.recognize_test_where && event.component.empty())
             event.component = insight::recognize_location(parsed_line.content, composed);
@@ -96,9 +101,10 @@ struct Tokenizer::Impl
                                          // never serialized; default-empty for non-OTEL inputs
         event.ordinals = parsed_line.ordinals; // W1 ordinal observations (D-W1-3): consumed by
                                                // metalog binning; empty span for non-ordinal lines
-        event.linked_span_ids = parsed_line.linked_span_ids; // O4b Span Links (D-OTEL-9): consumed by
-                                                             // metalog into the service topology; empty
-                                                             // for lines without links
+        event.linked_span_ids =
+            parsed_line.linked_span_ids;                 // O4b Span Links (D-OTEL-9): consumed by
+                                                         // metalog into the service topology; empty
+                                                         // for lines without links
         event.echoed_source = parsed_line.echoed_source; // D-PROV-1: echoed script source, not a
                                                          // runtime event; consumed (salience tier
                                                          // gate), never serialized; false for the

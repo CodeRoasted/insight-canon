@@ -170,8 +170,7 @@ TEST_F(JsonStrategyTest, FallsBackToJSONDumpWhenNoMessageKey)
 // top-level lookup misses, descend ONE level into "fields" and read {component, level}.
 TEST_F(JsonStrategyTest, NestedFieldsComponentExtracted)
 {
-    auto result{strategy.parse(
-        R"({"msg":"User logged in","fields":{"component":"auth"}})", arena)};
+    auto result{strategy.parse(R"({"msg":"User logged in","fields":{"component":"auth"}})", arena)};
     ASSERT_TRUE(result.has_value()) << result.error();
     EXPECT_EQ(result.value().component, "auth")
         << "component nested under \"fields\" must be recovered (was blind → cube WHERE empty)";
@@ -190,8 +189,8 @@ TEST_F(JsonStrategyTest, NestedFieldsLevelAndComponentExtracted)
 // A `source` synonym under "fields" resolves too (kComponentKeys: component/source/logger/…).
 TEST_F(JsonStrategyTest, NestedFieldsSourceSynonymExtracted)
 {
-    auto result{strategy.parse(
-        R"({"msg":"job scheduled","fields":{"source":"worker-pool"}})", arena)};
+    auto result{
+        strategy.parse(R"({"msg":"job scheduled","fields":{"source":"worker-pool"}})", arena)};
     ASSERT_TRUE(result.has_value()) << result.error();
     EXPECT_EQ(result.value().component, "worker-pool");
 }
@@ -256,9 +255,9 @@ TEST_F(JsonStrategyTest, OtelExtractsTraceContextAndBands)
     // OTLP timeUnixNano → event-time (without it the pipeline never closes a window). 1.7053122e18
     // ns = 1705312200 s; round-trip through the parsed Timestamp must recover that epoch second.
     ASSERT_TRUE(pl.timestamp.has_value());
-    EXPECT_EQ(std::chrono::duration_cast<std::chrono::seconds>(pl.timestamp->time_since_epoch())
-                  .count(),
-              1705312200);
+    EXPECT_EQ(
+        std::chrono::duration_cast<std::chrono::seconds>(pl.timestamp->time_since_epoch()).count(),
+        1705312200);
     // severityNumber 17 → band (17-1)/4 = 4 → Error (declared severity wins).
     EXPECT_EQ(pl.level, LogLevel::Error);
     // body.stringValue becomes the content (the masker templates the message, NOT the raw JSON).
@@ -318,9 +317,9 @@ TEST_F(JsonStrategyTest, OtelSpanMapsAllFields)
 
     // startTimeUnixNano → event time (a span is a POINT event at its start — D-OTEL-10).
     ASSERT_TRUE(pl.timestamp.has_value());
-    EXPECT_EQ(std::chrono::duration_cast<std::chrono::seconds>(pl.timestamp->time_since_epoch())
-                  .count(),
-              1705312200);
+    EXPECT_EQ(
+        std::chrono::duration_cast<std::chrono::seconds>(pl.timestamp->time_since_epoch()).count(),
+        1705312200);
     // name → content (the templated operation, NOT the raw JSON); status UNSET → Info (declared).
     EXPECT_EQ(pl.content, "checkout");
     EXPECT_EQ(pl.level, LogLevel::Info);
@@ -384,7 +383,7 @@ TEST_F(JsonStrategyTest, OtelSeverityNumberBands)
     };
     // (n-1)/4 banding across the 6 levels, with clamps at both ends.
     const std::vector<Case> cases{
-        {1, LogLevel::Trace}, {4, LogLevel::Trace},  {5, LogLevel::Debug}, {9, LogLevel::Info},
+        {1, LogLevel::Trace}, {4, LogLevel::Trace},  {5, LogLevel::Debug},  {9, LogLevel::Info},
         {13, LogLevel::Warn}, {17, LogLevel::Error}, {21, LogLevel::Fatal}, {24, LogLevel::Fatal},
     };
     for (const auto& cas : cases)
@@ -394,9 +393,8 @@ TEST_F(JsonStrategyTest, OtelSeverityNumberBands)
         ArenaAllocator local_arena{1024};
         auto result{strategy.parse(line, local_arena)};
         ASSERT_TRUE(result.has_value()) << "severity_number=" << cas.severity_number;
-        EXPECT_EQ(result.value().level, cas.expected)
-            << "severity_number=" << cas.severity_number
-            << " got=" << to_string(result.value().level);
+        EXPECT_EQ(result.value().level, cas.expected) << "severity_number=" << cas.severity_number
+                                                      << " got=" << to_string(result.value().level);
     }
 }
 
@@ -1799,23 +1797,27 @@ static constexpr std::array kStrategyTable{
 // only ever breaks on the ship toolchain. See [[gcc15-and-cxx-modules]].
 [[nodiscard]] std::vector<StrategyCase> rows_with_canonical_line()
 {
-    return std::ranges::to<std::vector>(std::views::filter(
-        kStrategyTable, [](const StrategyCase& table_row) { return !table_row.canonical_line.empty(); }));
+    return std::ranges::to<std::vector>(
+        std::views::filter(kStrategyTable, [](const StrategyCase& table_row)
+                           { return !table_row.canonical_line.empty(); }));
 }
 
 [[nodiscard]] std::vector<StrategyCase> rows_rejecting_clf_and_kv()
 {
     return std::ranges::to<std::vector>(
-        std::views::filter(kStrategyTable, [](const StrategyCase& table_row) { return table_row.rejects_clf_and_kv; }));
+        std::views::filter(kStrategyTable, [](const StrategyCase& table_row)
+                           { return table_row.rejects_clf_and_kv; }));
 }
 
 [[nodiscard]] std::vector<StrategyCase> rows_with_zero_syslog_confidence()
 {
-    return std::ranges::to<std::vector>(std::views::filter(
-        kStrategyTable, [](const StrategyCase& table_row) { return table_row.confidence_zero_for_syslog; }));
+    return std::ranges::to<std::vector>(
+        std::views::filter(kStrategyTable, [](const StrategyCase& table_row)
+                           { return table_row.confidence_zero_for_syslog; }));
 }
 
-[[nodiscard]] std::string strategy_case_name(const ::testing::TestParamInfo<StrategyCase>& param_info)
+[[nodiscard]] std::string
+strategy_case_name(const ::testing::TestParamInfo<StrategyCase>& param_info)
 {
     return param_info.param.name;
 }

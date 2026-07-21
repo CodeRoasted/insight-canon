@@ -8,9 +8,9 @@
 // interface holds only their declarations.
 module;
 // NB: this exported unit deliberately references NO build-config macro (SPDLOG_ACTIVE_LEVEL et al).
-// It is recompiled by every consumer, so any -D-dependent code here would force that macro PUBLIC and
-// diverge per consumer. Canon's spdlog elision level stays PRIVATE to canon's build; the one gate that
-// needed it (kDebugLogsEnabled) lives in the build-only tokenizer/parser impl units.
+// It is recompiled by every consumer, so any -D-dependent code here would force that macro PUBLIC
+// and diverge per consumer. Canon's spdlog elision level stays PRIVATE to canon's build; the one
+// gate that needed it (kDebugLogsEnabled) lives in the build-only tokenizer/parser impl units.
 #include "det/det_int128.hpp" // portable 128-bit for det_math (native __int128 on gcc/clang; pure-C++ on MSVC)
 #include <fmt/core.h>      // fmt::format_string (log_message template)
 #include <fmt/format.h>    // fmt::format (log_message template)
@@ -100,13 +100,13 @@ struct NgramId
 
 // ── Intent identity (intent_identity_model.md §5/§5.1, II-1/II-6/II-7) ──
 // kIntentRegistryVersion RETIRED (ADR 0024 §4.1): it was a dead constant (zero downstream readers),
-// and its job — the II-7 comparability identity of the recognizer/marker rule set — is now discharged
-// by the composed `semantic_identity` (insight::semantic::ComposedSemantics), a CONTENT hash over the
-// actual marker/role/level rows the packages ship (content, not a hand-bumped label). A rule change is
-// a package version bump → a new semantic_identity → re-segment-or-refuse, wired for real on the
-// MetaLogDocument RulesetIdentity block. The intent-canonicalization ALGORITHM stays below
-// (canonicalize_intent / discriminant_of); kCanonicalizationVersion (the core masking generation)
-// remains and enters the composed hash as a component.
+// and its job — the II-7 comparability identity of the recognizer/marker rule set — is now
+// discharged by the composed `semantic_identity` (insight::semantic::ComposedSemantics), a CONTENT
+// hash over the actual marker/role/level rows the packages ship (content, not a hand-bumped label).
+// A rule change is a package version bump → a new semantic_identity → re-segment-or-refuse, wired
+// for real on the MetaLogDocument RulesetIdentity block. The intent-canonicalization ALGORITHM
+// stays below (canonicalize_intent / discriminant_of); kCanonicalizationVersion (the core masking
+// generation) remains and enters the composed hash as a component.
 
 // Canonicalize a marker payload (a job or step name) to its intent CLASS: mask the
 // version-bearing / matrix / shard tokens that vary across homologous runs, keep the
@@ -123,10 +123,11 @@ struct NgramId
 // tuple rendered into a job/step display name (`Test (ubuntu-latest, Node 24.x)` → `(ubuntu-latest,
 // Node 24.x)`), returned VERBATIM (a view into `name`). This is the STABLE declared parallelism
 // coordinate that separates co-occurring siblings within one identity class — kept raw (NOT masked,
-// NOT an appearance ordinal) because matrix axes are stable by declaration, so raw keys pair exactly
-// across runs. Empty when the name carries no tuple (the aligner then falls to a retry ordinal — the
-// declared-runs-on source is stripped from Sift's input stream, so it is inert here). The complement
-// of canonicalize_intent: the class MASKS the tuple to `(M)`, the discriminant KEEPS it verbatim.
+// NOT an appearance ordinal) because matrix axes are stable by declaration, so raw keys pair
+// exactly across runs. Empty when the name carries no tuple (the aligner then falls to a retry
+// ordinal — the declared-runs-on source is stripped from Sift's input stream, so it is inert here).
+// The complement of canonicalize_intent: the class MASKS the tuple to `(M)`, the discriminant KEEPS
+// it verbatim.
 [[nodiscard]] std::string_view discriminant_of(std::string_view name) noexcept;
 
 // The intent identity: the 16-byte SHA-256 of the canonicalized name — a STRUCTURAL
@@ -174,14 +175,14 @@ struct SpanId
 // vertex/edge) and unread by O2.
 struct OtelTraceContext
 {
-    bool present{false};     // the record carried a trace_id (the O2 grouping key)
-    bool has_parent{false};  // a parent_span_id was present (O3 edge; usually absent on logs)
-    bool is_span{false};     // O3 (D-OTEL-11): a SPAN record (declared causality → observed edge),
-                             // not a log record with trace context (positional causality → O2 ring).
-                             // Set by the flat-span parser; false on the OTEL-log path. Metalog
-                             // routes spans to the observed-DAG, never the adjacency ring.
-    TraceId trace_id{};      // the transaction grouping key (O2)
-    SpanId span_id{};        // the causal vertex identity (carried for O3)
+    bool present{false};    // the record carried a trace_id (the O2 grouping key)
+    bool has_parent{false}; // a parent_span_id was present (O3 edge; usually absent on logs)
+    bool is_span{false};    // O3 (D-OTEL-11): a SPAN record (declared causality → observed edge),
+                            // not a log record with trace context (positional causality → O2 ring).
+                            // Set by the flat-span parser; false on the OTEL-log path. Metalog
+                            // routes spans to the observed-DAG, never the adjacency ring.
+    TraceId trace_id{};     // the transaction grouping key (O2)
+    SpanId span_id{};       // the causal vertex identity (carried for O3)
     SpanId parent_span_id{}; // the observed causal edge span→parent (carried for O3)
 };
 
@@ -250,11 +251,11 @@ inline constexpr std::array<OtelFieldDescriptor, 4> kOtelFieldCatalog{{
 // as a consumed-not-tokenized ordinal observation (CanonicalEvent.ordinals) — NEVER a param —
 // which metalog bins per schedule into the W1 carrier (TopKEntry.ordinal_histograms). A UNIVERSAL
 // value class → stays core (this catalog); arbitrary/client ordinals await a package ValueClassRow
-// (the ValueClassRegistry seat, ADR 0024 §5 — no package ships one in 1.7.5; we do not build dormant
-// vocabulary — the D-TID-14 anti-monster boundary). EXACT keys only — uniform across the fast/slow
-// JSON paths, no value-syntax guessing
-// (the D-W1-5 mis-route hazard); suffix/pattern matching is a future extension when a scenario
-// needs it. Unit-explicit names only, so each value's unit is unambiguous (D-W1-3).
+// (the ValueClassRegistry seat, ADR 0024 §5 — no package ships one in 1.7.5; we do not build
+// dormant vocabulary — the D-TID-14 anti-monster boundary). EXACT keys only — uniform across the
+// fast/slow JSON paths, no value-syntax guessing (the D-W1-5 mis-route hazard); suffix/pattern
+// matching is a future extension when a scenario needs it. Unit-explicit names only, so each
+// value's unit is unambiguous (D-W1-3).
 
 // Which ordinal SCHEDULE (canonical unit + log ladder) a field bins onto. The schedule is a
 // versioned catalog (D-W1-4): its stable string id is the eidos diff's comparability key.
@@ -274,8 +275,12 @@ struct OrdinalScheduleSpec
     std::uint32_t bin_count;      // B — fixed, small, bounds the carrier (D-W1-2)
 };
 inline constexpr std::array<OrdinalScheduleSpec, 2> kOrdinalScheduleCatalog{{
-    {.schedule = OrdinalSchedule::DurationLog2Ns, .schedule_id = "dur-log2-ns-v1", .bin_count = 48U},
-    {.schedule = OrdinalSchedule::SizeLog2Bytes, .schedule_id = "size-log2-bytes-v1", .bin_count = 48U},
+    {.schedule = OrdinalSchedule::DurationLog2Ns,
+     .schedule_id = "dur-log2-ns-v1",
+     .bin_count = 48U},
+    {.schedule = OrdinalSchedule::SizeLog2Bytes,
+     .schedule_id = "size-log2-bytes-v1",
+     .bin_count = 48U},
 }};
 
 [[nodiscard]] constexpr std::string_view ordinal_schedule_id(OrdinalSchedule schedule) noexcept
@@ -312,24 +317,43 @@ inline constexpr std::array<OrdinalFieldDescriptor, 15> kOrdinalFieldCatalog{{
     // startTimeUnixNano, already integer ns. Computed by the flat-span parser and emitted as
     // this declared ordinal on the shipped DurationLog2Ns ladder (activates W1 + latency_shift
     // on traces). The key also self-matches a literal span_duration_ns field if a log carries one.
-    {.key = "span_duration_ns", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = 1},
-    {.key = "latency_ms", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = kNanosPerMilli},
-    {.key = "duration_ms", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = kNanosPerMilli},
-    {.key = "elapsed_ms", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = kNanosPerMilli},
-    {.key = "response_time_ms", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = kNanosPerMilli},
-    {.key = "latency_us", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = kNanosPerMicro},
-    {.key = "duration_us", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = kNanosPerMicro},
+    {.key = "span_duration_ns",
+     .schedule = OrdinalSchedule::DurationLog2Ns,
+     .scale_to_canonical = 1},
+    {.key = "latency_ms",
+     .schedule = OrdinalSchedule::DurationLog2Ns,
+     .scale_to_canonical = kNanosPerMilli},
+    {.key = "duration_ms",
+     .schedule = OrdinalSchedule::DurationLog2Ns,
+     .scale_to_canonical = kNanosPerMilli},
+    {.key = "elapsed_ms",
+     .schedule = OrdinalSchedule::DurationLog2Ns,
+     .scale_to_canonical = kNanosPerMilli},
+    {.key = "response_time_ms",
+     .schedule = OrdinalSchedule::DurationLog2Ns,
+     .scale_to_canonical = kNanosPerMilli},
+    {.key = "latency_us",
+     .schedule = OrdinalSchedule::DurationLog2Ns,
+     .scale_to_canonical = kNanosPerMicro},
+    {.key = "duration_us",
+     .schedule = OrdinalSchedule::DurationLog2Ns,
+     .scale_to_canonical = kNanosPerMicro},
     {.key = "latency_ns", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = 1},
     {.key = "duration_ns", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = 1},
-    {.key = "duration_seconds", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = kNanosPerSecond},
-    {.key = "elapsed_seconds", .schedule = OrdinalSchedule::DurationLog2Ns, .scale_to_canonical = kNanosPerSecond},
+    {.key = "duration_seconds",
+     .schedule = OrdinalSchedule::DurationLog2Ns,
+     .scale_to_canonical = kNanosPerSecond},
+    {.key = "elapsed_seconds",
+     .schedule = OrdinalSchedule::DurationLog2Ns,
+     .scale_to_canonical = kNanosPerSecond},
     {.key = "response_bytes", .schedule = OrdinalSchedule::SizeLog2Bytes, .scale_to_canonical = 1},
     {.key = "request_bytes", .schedule = OrdinalSchedule::SizeLog2Bytes, .scale_to_canonical = 1},
     {.key = "size_bytes", .schedule = OrdinalSchedule::SizeLog2Bytes, .scale_to_canonical = 1},
     {.key = "payload_bytes", .schedule = OrdinalSchedule::SizeLog2Bytes, .scale_to_canonical = 1},
 }};
 
-[[nodiscard]] constexpr const OrdinalFieldDescriptor* match_ordinal_field(std::string_view key) noexcept
+[[nodiscard]] constexpr const OrdinalFieldDescriptor*
+match_ordinal_field(std::string_view key) noexcept
 {
     for (const auto& descriptor : kOrdinalFieldCatalog)
         if (descriptor.key == key)
@@ -342,8 +366,8 @@ inline constexpr std::array<OrdinalFieldDescriptor, 15> kOrdinalFieldCatalog{{
 // NEVER via double (D-W1-3 determinism pin). Returns nullopt on a malformed / negative / exponent /
 // overflowing token (the observation is then omitted — omit-when-absent). Fractional digits beyond
 // the scale's decimal places are truncated (deterministic). `scale` MUST be a power of ten or 1.
-[[nodiscard]] constexpr std::optional<std::int64_t> parse_decimal_scaled(std::string_view text,
-                                                                         std::int64_t scale) noexcept
+[[nodiscard]] constexpr std::optional<std::int64_t>
+parse_decimal_scaled(std::string_view text, std::int64_t scale) noexcept
 {
     constexpr std::string_view kTrim{" \t\r\n,}]"};
     while (!text.empty() && kTrim.find(text.front()) != std::string_view::npos)
@@ -504,7 +528,8 @@ enum class RunOutcome : std::uint8_t
 // over the failure_lexicon when present (declared > inferred); canon keeps its own 6-level
 // model and DISCARDS the raw 1–24 number (MetaLog ≠ OTEL — D-OTEL-8). The 24-band
 // granularity is deliberately not inherited.
-[[nodiscard]] constexpr LogLevel log_level_from_severity_number(std::int64_t severity_number) noexcept
+[[nodiscard]] constexpr LogLevel
+log_level_from_severity_number(std::int64_t severity_number) noexcept
 {
     if (severity_number < 1)
         return LogLevel::Trace;
@@ -912,11 +937,12 @@ struct CanonicalEvent
     // params. A span over arena-allocated storage (like `params`); EMPTY for every non-ordinal line
     // → zero added cost on the hot path (input-conditional, the OTEL D-OTEL-2a precedent).
     std::span<const OrdinalObservation> ordinals{};
-    // O4b Span Links (insight_otel_epic.md §5.3 / D-OTEL-9, D-OTEL-21): the span_ids this span DECLARES
-    // a cross-trace edge to (OTEL `links[]`). Consumed metalog-side — each resolves (by span_id, across
-    // traces) into the SAME distilled service topology as intra-trace parentage: component(this) →
-    // component(linked). A span over arena-allocated storage; EMPTY for every span without links (and
-    // every non-span line) → zero added cost. NEVER retained/serialized (the trace-context discipline).
+    // O4b Span Links (insight_otel_epic.md §5.3 / D-OTEL-9, D-OTEL-21): the span_ids this span
+    // DECLARES a cross-trace edge to (OTEL `links[]`). Consumed metalog-side — each resolves (by
+    // span_id, across traces) into the SAME distilled service topology as intra-trace parentage:
+    // component(this) → component(linked). A span over arena-allocated storage; EMPTY for every
+    // span without links (and every non-span line) → zero added cost. NEVER retained/serialized
+    // (the trace-context discipline).
     std::span<const SpanId> linked_span_ids{};
     // Observation-provenance attribute (D-PROV-1): the line is echoed program/script SOURCE (the
     // CI harness printing a run-step body), not an observed runtime event — recognized at the ANSI
@@ -956,9 +982,9 @@ struct MaskConfig
 } // namespace insight::tokenization
 
 // ──────── structural-role + intent-marker recognition TYPES ────────
-// The StructuralRoleRegistry / IntentMarkerRegistry CLASSES (the hardcoded GHA `starts_with` chains)
-// moved to the facade's COMPOSED walkers — insight::tokenization::classify / recognize over a
-// ComposedSemantics (ADR 0024 §3). Canon core is semantic-unaware (SP-1): it owns the recognition
+// The StructuralRoleRegistry / IntentMarkerRegistry CLASSES (the hardcoded GHA `starts_with`
+// chains) moved to the facade's COMPOSED walkers — insight::tokenization::classify / recognize over
+// a ComposedSemantics (ADR 0024 §3). Canon core is semantic-unaware (SP-1): it owns the recognition
 // ALGORITHM, the semantic packages own the rule ROWS. The result TYPES stay here — StructuralRole
 // (above) and IntentMarkerKind / ChildOrder / IntentMarker (below): the grammar's vocabulary + the
 // recognizer's return shapes, referenced by the spi rows and by every downstream consumer.
@@ -991,8 +1017,8 @@ enum class IntentMarkerKind : std::uint8_t
 // How a level's sibling nodes are matched across two runs (ADR 0023 §2, a DECLARED property of the
 // dialect level — never a runtime heuristic). GHA: jobs are parallel-by-construction (Unordered →
 // set/multiset match, no REORDERED, completion-interleave invisible); steps are sequential-by-YAML
-// (Ordered → order-respecting nominal LCS, a transposition IS a signal). child_order is package DATA
-// (an IntentMarkerRow field) → it enters the composed semantic_identity (ADR 0024).
+// (Ordered → order-respecting nominal LCS, a transposition IS a signal). child_order is package
+// DATA (an IntentMarkerRow field) → it enters the composed semantic_identity (ADR 0024).
 enum class ChildOrder : std::uint8_t
 {
     Ordered = 0, ///< sequential by construction (steps within a job)
@@ -1004,10 +1030,11 @@ struct IntentMarker
     IntentMarkerKind kind{IntentMarkerKind::None};
     std::string_view name; ///< raw payload (empty when kind == None); canonicalize_intent → class
     // The raw instance discriminant (ADR 0023 / II-9): the matrix tuple in the display name, kept
-    // VERBATIM (never masked) — the stable declared coordinate that separates co-occurring siblings.
-    // Empty when the name carries no tuple. `= discriminant_of(name)`.
+    // VERBATIM (never masked) — the stable declared coordinate that separates co-occurring
+    // siblings. Empty when the name carries no tuple. `= discriminant_of(name)`.
     std::string_view discriminant;
-    ChildOrder child_order{ChildOrder::Ordered}; ///< how THIS marker's level matches (job=Unordered)
+    ChildOrder child_order{
+        ChildOrder::Ordered}; ///< how THIS marker's level matches (job=Unordered)
     auto operator<=>(const IntentMarker&) const = default;
     bool operator==(const IntentMarker&) const = default;
 };
@@ -1156,7 +1183,8 @@ namespace detail
     // is preserved; a summary "25 passed, 5 failed" ⇒ false (a number is the first significant
     // token, not "passed"), and a prose "passed" mid-line never demotes (word must LEAD).
     // Internal/detail — NOT a public product surface (the public failure-lexicon API stays
-    // contains_failure_cue / contains_warning_cue); defined with the lexicon in failure_lexicon.cpp.
+    // contains_failure_cue / contains_warning_cue); defined with the lexicon in
+    // failure_lexicon.cpp.
     [[nodiscard]] bool leading_outcome_is_pass(std::string_view line) noexcept;
 
     // The verdict-register kernel (D-OUT-4) — true iff `token` carries the structural
@@ -1180,14 +1208,15 @@ namespace detail
     // IMMEDIATELY-PRECEDING token (under the shared canon tokenization) is a BARE INTEGER count
     // ("1 failure", "5 failed", "HTTP 500 error") that is NOT part of a numeric/temporal chain (the
     // token before the count is not itself digit-leading — so a leading ISO timestamp
-    // "2026-…T11:00:01 ERROR" is NOT count register: ERROR's predecessor `01` is a bare integer, but
-    // `01`'s predecessor `00` is the `:MM` minutes, marking `01` a timestamp second). An aggregate
-    // statistic, not a per-item verdict. Checked BEFORE the verdict anchors (a counted noun is a
-    // summary even with a trailing colon: "1 failure:" is a summary, not Fatal). The symmetric dual
-    // of the "25 passed, 5 failed" disconfirming case that forced D-OUT-1 to be glyph-gated:
-    // count-quantified outcome vocab is a summary, not a verdict. A count-register word does NOT
-    // confer an alerting level — it caps at Warn (demote, never suppress). PRECONDITION: `token` MUST
-    // be a sub-view of `line`. Pure byte/case test, order-independent ⇒ cross-stdlib + MSVC bit-identical (F5).
+    // "2026-…T11:00:01 ERROR" is NOT count register: ERROR's predecessor `01` is a bare integer,
+    // but `01`'s predecessor `00` is the `:MM` minutes, marking `01` a timestamp second). An
+    // aggregate statistic, not a per-item verdict. Checked BEFORE the verdict anchors (a counted
+    // noun is a summary even with a trailing colon: "1 failure:" is a summary, not Fatal). The
+    // symmetric dual of the "25 passed, 5 failed" disconfirming case that forced D-OUT-1 to be
+    // glyph-gated: count-quantified outcome vocab is a summary, not a verdict. A count-register
+    // word does NOT confer an alerting level — it caps at Warn (demote, never suppress).
+    // PRECONDITION: `token` MUST be a sub-view of `line`. Pure byte/case test, order-independent ⇒
+    // cross-stdlib + MSVC bit-identical (F5).
     [[nodiscard]] bool is_count_register(std::string_view line, std::string_view token) noexcept;
 
     // D-CNT-1 dual — true iff the head carries a failure-lexicon word in COUNT register (a summary
@@ -1195,7 +1224,8 @@ namespace detail
     // is not a per-item verdict); this reports their presence so infer_leading_log_level caps the
     // line at Warn (surfaced, below per-item verdicts). `scan_limit` bounds the head as for
     // contains_failure_cue. Internal/detail — NOT a public product surface. Cold path (consulted
-    // only when contains_failure_cue is false). Pure byte/case test ⇒ cross-stdlib bit-identical (F5).
+    // only when contains_failure_cue is false). Pure byte/case test ⇒ cross-stdlib bit-identical
+    // (F5).
     [[nodiscard]] bool contains_failure_summary_cue(std::string_view text,
                                                     std::size_t scan_limit = 0) noexcept;
 } // namespace detail

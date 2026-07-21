@@ -22,8 +22,8 @@ export namespace insight::tokenization
 // template differently) cannot form. The per-token KEEP / MASK / composite-normalize
 // classification (status-value KEEP, UUID/long-hash + IPv4/hex + digit-leading MASK,
 // source-location / versioned-ref / bracket-index / #-counter / embedded-identity /
-// key=<numeric-value> normalization — §8 D-TID-12/13) is DECIDED per token, never discovered from cross-line
-// data (D-TID-2: discover→decide). This is the sole identity source (the clustering tree
+// key=<numeric-value> normalization — §8 D-TID-12/13) is DECIDED per token, never discovered from
+// cross-line data (D-TID-2: discover→decide). This is the sole identity source (the clustering tree
 // it replaced is RIPPED — D-TID-3).
 //
 // Result is arena-stable until out_arena.reset() (or destruction); `params` are the
@@ -35,8 +35,7 @@ struct StatelessTemplate
     std::span<const std::string_view> params;
 };
 
-[[nodiscard]] StatelessTemplate stateless_template(std::string_view content,
-                                                   ArenaAllocator& out_arena,
-                                                   const MaskConfig& config);
+[[nodiscard]] StatelessTemplate
+stateless_template(std::string_view content, ArenaAllocator& out_arena, const MaskConfig& config);
 
 } // namespace insight::tokenization

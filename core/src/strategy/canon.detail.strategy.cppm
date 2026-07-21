@@ -105,9 +105,10 @@ class CloudWatchStrategy final : public IFormatStrategy
 } // namespace insight::tokenization
 
 // GitHubActionsStrategy — the GHA/Azure DIALECT strategy — relocated to insight_semantic_github
-// (ADR 0024 §1.3/§2.3.1: a dialect strategy is code-tier package knowledge, not a core representation
-// format). It reaches the FormatDetector as a composed StrategyFactory (register_strategy seam), so
-// canon core registers no dialect. The 19 strategies below are universal representation formats.
+// (ADR 0024 §1.3/§2.3.1: a dialect strategy is code-tier package knowledge, not a core
+// representation format). It reaches the FormatDetector as a composed StrategyFactory
+// (register_strategy seam), so canon core registers no dialect. The 19 strategies below are
+// universal representation formats.
 
 // ──────── from src/insight/tokenization/strategies/health_app.hpp ────────
 export namespace insight::tokenization

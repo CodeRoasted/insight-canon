@@ -13,15 +13,15 @@
 //     canonical serialization — the II-7 comparability key.
 //
 // Public + installed (product binaries call compose). The facade `export import`s this so
-// `import insight.canon;` yields Tokenizer + compose + ComposedSemantics. It plain-imports spi (does
-// NOT re-export it) — a consumer naming SemanticPackageManifest imports the package module (which
-// carries spi); the provider contract stays off the consumer's default surface.
+// `import insight.canon;` yields Tokenizer + compose + ComposedSemantics. It plain-imports spi
+// (does NOT re-export it) — a consumer naming SemanticPackageManifest imports the package module
+// (which carries spi); the provider contract stays off the consumer's default surface.
 module;
 
 export module insight.canon.compose;
 import insight.canon.internal; // std + global C fixed-width types
 import insight.canon.api;      // StructuralRole/IntentMarkerKind/LogFormat/…
-import insight.canon.spi;      // the grammar rows + SemanticPackageManifest (plain import — not re-exported)
+import insight.canon.spi; // the grammar rows + SemanticPackageManifest (plain import — not re-exported)
 
 export namespace insight::semantic
 {
@@ -29,14 +29,14 @@ export namespace insight::semantic
 // The truncated-SHA-256 width of semantic_identity (§4.1 — the TemplateId 16-byte precedent).
 inline constexpr std::size_t kSemanticIdentityBytes{16};
 
-// A composed package's identity, carried for the wire block's legibility (§4.2 — an operator can read
-// what vocabulary a report understood). The hash (§4.1) is the key; this list is the label.
+// A composed package's identity, carried for the wire block's legibility (§4.2 — an operator can
+// read what vocabulary a report understood). The hash (§4.1) is the key; this list is the label.
 struct ComposedPackage
 {
     std::string_view name;
     std::string_view version;
-    bool has_strategy;       // the package shipped a dialect format strategy (code tier)
-    bool has_echoed_source;  // the package shipped an echoed-source provenance hook (code tier)
+    bool has_strategy;      // the package shipped a dialect format strategy (code tier)
+    bool has_echoed_source; // the package shipped an echoed-source provenance hook (code tier)
 };
 
 // A non-fatal shadowing note (§3 — prefix shadowing that is NOT an exact duplicate resolves
@@ -44,7 +44,7 @@ struct ComposedPackage
 // nested prefixes), but the mechanism is real.
 struct ShadowNote
 {
-    std::string_view kind;          // "role" | "marker" | "level_lift"
+    std::string_view kind;           // "role" | "marker" | "level_lift"
     std::string_view shorter_prefix; // the shadowed (shorter) prefix
     std::string_view longer_prefix;  // the shadowing (longer) prefix — wins on a line matching both
 };
@@ -69,13 +69,14 @@ struct ConflictInfo
 
 // Scan the manifest set for an exact-duplicate match key. Pure over the manifest DATA (constexpr:
 // string_view compare + span iteration), so usable in a static_assert AND by the runtime compose.
-[[nodiscard]] constexpr ConflictInfo find_conflict(std::span<const SemanticPackageManifest> packages) noexcept;
+[[nodiscard]] constexpr ConflictInfo
+find_conflict(std::span<const SemanticPackageManifest> packages) noexcept;
 
-// The composed rule set: the canonically-ordered, conflict-free tables the core mechanisms walk, the
-// code-tier seams (strategy factories + provenance hooks), the package list, and the content hash.
-// Owns its row storage (small POD copied from the manifest spans in canonical order; the pointed-at
-// bytes stay alive in package static storage — SP-7). Built once per binary; passed by const-ref to
-// every Tokenizer. Move-only.
+// The composed rule set: the canonically-ordered, conflict-free tables the core mechanisms walk,
+// the code-tier seams (strategy factories + provenance hooks), the package list, and the content
+// hash. Owns its row storage (small POD copied from the manifest spans in canonical order; the
+// pointed-at bytes stay alive in package static storage — SP-7). Built once per binary; passed by
+// const-ref to every Tokenizer. Move-only.
 class ComposedSemantics
 {
   public:
@@ -86,91 +87,139 @@ class ComposedSemantics
     ~ComposedSemantics() = default;
 
     // ── The composed tables (canonical order) ──
-    [[nodiscard]] std::span<const StructuralRoleRow> roles() const noexcept { return roles_; }
-    [[nodiscard]] std::span<const IntentMarkerRow> markers() const noexcept { return markers_; }
-    [[nodiscard]] std::span<const LevelLiftRow> level_lifts() const noexcept { return level_lifts_; }
-    [[nodiscard]] std::span<const LocationRow> locations() const noexcept { return locations_; }
+    [[nodiscard]] std::span<const StructuralRoleRow> roles() const noexcept
+    {
+        return roles_;
+    }
+    [[nodiscard]] std::span<const IntentMarkerRow> markers() const noexcept
+    {
+        return markers_;
+    }
+    [[nodiscard]] std::span<const LevelLiftRow> level_lifts() const noexcept
+    {
+        return level_lifts_;
+    }
+    [[nodiscard]] std::span<const LocationRow> locations() const noexcept
+    {
+        return locations_;
+    }
     // The christened ValueClassRegistry (ADR 0024 §5): the composed view over the package
-    // ValueClassRow seat. In 1.7.5 no package ships a value class (we do not build dormant vocabulary),
-    // so this is empty — the UNIVERSAL value concepts (kOrdinalFieldCatalog / kOtelFieldCatalog / the
-    // KEEP lexicons) stay core (the ratified rule), consumed directly. The registry is the point where
-    // a future package's client-ordinal / domain value classes compose in — the grammar seat exists,
-    // its unification with the core catalogs waits for a real consumer.
-    [[nodiscard]] std::span<const ValueClassRow> value_classes() const noexcept { return value_classes_; }
+    // ValueClassRow seat. In 1.7.5 no package ships a value class (we do not build dormant
+    // vocabulary), so this is empty — the UNIVERSAL value concepts (kOrdinalFieldCatalog /
+    // kOtelFieldCatalog / the KEEP lexicons) stay core (the ratified rule), consumed directly. The
+    // registry is the point where a future package's client-ordinal / domain value classes compose
+    // in — the grammar seat exists, its unification with the core catalogs waits for a real
+    // consumer.
+    [[nodiscard]] std::span<const ValueClassRow> value_classes() const noexcept
+    {
+        return value_classes_;
+    }
     // The run-outcome vocabulary (grammar-2, ADR 0025): the composed dialect verdict maps + the
     // console-tail markers. Consumed by map_outcome_token / scan_run_outcome / resolve_run_outcome.
-    [[nodiscard]] std::span<const OutcomeTokenRow> outcome_tokens() const noexcept { return outcome_tokens_; }
-    [[nodiscard]] std::span<const OutcomeMarkerRow> outcome_markers() const noexcept { return outcome_markers_; }
-    // ADR 0029 D5 — the composed INTENT CHANNEL vocabulary: every channel any package declares. This is
-    // the closed set a caller's `--channel` is validated against, and the list an unknown channel's error
-    // names.
-    [[nodiscard]] std::span<const std::string_view> channels() const noexcept { return channels_; }
+    [[nodiscard]] std::span<const OutcomeTokenRow> outcome_tokens() const noexcept
+    {
+        return outcome_tokens_;
+    }
+    [[nodiscard]] std::span<const OutcomeMarkerRow> outcome_markers() const noexcept
+    {
+        return outcome_markers_;
+    }
+    // ADR 0029 D5 — the composed INTENT CHANNEL vocabulary: every channel any package declares.
+    // This is the closed set a caller's `--channel` is validated against, and the list an unknown
+    // channel's error names.
+    [[nodiscard]] std::span<const std::string_view> channels() const noexcept
+    {
+        return channels_;
+    }
 
     // ── The channel-filtered view (ADR 0029 D1/D2/D5) ──
     // Build the vocabulary ONE stream declares, at stream open. `declared_channel` is the caller's
-    // provenance fact (D2 — never auto-detected: a content heuristic decides the channel from a PREFIX of
-    // the stream, so a later line can contradict an earlier decision ⇒ content non-determinism under
-    // streaming). The returned composition drops every marker row gated to a different channel, so:
+    // provenance fact (D2 — never auto-detected: a content heuristic decides the channel from a
+    // PREFIX of the stream, so a later line can contradict an earlier decision ⇒ content
+    // non-determinism under streaming). The returned composition drops every marker row gated to a
+    // different channel, so:
     //
-    //   * the HOT PATH never sees a channel — recognize() walks a plain row span, zero per-line cost, and
+    //   * the HOT PATH never sees a channel — recognize() walks a plain row span, zero per-line
+    //   cost, and
     //     its signature is unchanged;
-    //   * one IntentChannel per TREE (D5) is STRUCTURAL, not merely asserted — a sibling channel's rows
+    //   * one IntentChannel per TREE (D5) is STRUCTURAL, not merely asserted — a sibling channel's
+    //   rows
     //     are not in the table, so a multi-channel tree is unrepresentable rather than rejected;
-    //   * `kAnyChannel` rows survive every filter, so single-materialization dialects are untouched.
+    //   * `kAnyChannel` rows survive every filter, so single-materialization dialects are
+    //   untouched.
     //
     // `kAnyChannel` (empty) as the ARGUMENT means Unspecified — the caller did not declare: every
-    // concretely-gated row drops ⇒ no dialect structure ⇒ the raw-text fallback. That is fail-closed on
-    // DEPTH, not on the run, and it is deliberate: never default an undeclared stream to a concrete
-    // channel, because "both channels' rows live at once" IS the phantom defect this exists to kill.
+    // concretely-gated row drops ⇒ no dialect structure ⇒ the raw-text fallback. That is
+    // fail-closed on DEPTH, not on the run, and it is deliberate: never default an undeclared
+    // stream to a concrete channel, because "both channels' rows live at once" IS the phantom
+    // defect this exists to kill.
     //
-    // FATALS on an UNKNOWN channel (a non-empty name no package declares — e.g. `--channel=annotatd`),
-    // listing the declared vocabulary. An unknown channel is a MISTAKE; an absent channel is a CHOICE;
-    // they must not share a code path — silently degrading a typo to the fallback is the exact
-    // silent-fallback bug class this workstream has already paid for twice.
+    // FATALS on an UNKNOWN channel (a non-empty name no package declares — e.g.
+    // `--channel=annotatd`), listing the declared vocabulary. An unknown channel is a MISTAKE; an
+    // absent channel is a CHOICE; they must not share a code path — silently degrading a typo to
+    // the fallback is the exact silent-fallback bug class this workstream has already paid for
+    // twice.
     //
-    // Cold path by construction: called once per stream, copies ~10 POD rows. The pointed-at bytes stay
-    // in package-static storage (SP-7), so the copy is trivial and the identity is preserved verbatim —
-    // semantic_identity is the RULESET's identity, not a stream's view of it.
+    // Cold path by construction: called once per stream, copies ~10 POD rows. The pointed-at bytes
+    // stay in package-static storage (SP-7), so the copy is trivial and the identity is preserved
+    // verbatim — semantic_identity is the RULESET's identity, not a stream's view of it.
     [[nodiscard]] ComposedSemantics for_channel(std::string_view declared_channel) const;
 
     // Would declaring an IntentChannel unlock recognition this view is withholding? (ADR 0029 D5's
     // diagnostic.) True iff some marker row for `format` is channel-gated to a channel that
-    // `declared_channel` does not admit — i.e. this dialect HAS materializations and the caller has not
-    // said which one it acquired, so depth is being withheld and saying so would unlock it.
+    // `declared_channel` does not admit — i.e. this dialect HAS materializations and the caller has
+    // not said which one it acquired, so depth is being withheld and saying so would unlock it.
     //
-    // A narrow QUERY, deliberately not an `all_markers()` accessor: exposing the unfiltered table would
-    // re-open the fail-open door this class exists to close (a caller could walk it and recognize
-    // against every channel at once — the phantom defect). Returns false for a single-materialization
-    // dialect (Jenkins), so a Jenkins user is never told to declare a channel that does not apply to
-    // them — a diagnostic that fires where it cannot help is exactly the fatigue the product is against.
+    // A narrow QUERY, deliberately not an `all_markers()` accessor: exposing the unfiltered table
+    // would re-open the fail-open door this class exists to close (a caller could walk it and
+    // recognize against every channel at once — the phantom defect). Returns false for a
+    // single-materialization dialect (Jenkins), so a Jenkins user is never told to declare a
+    // channel that does not apply to them — a diagnostic that fires where it cannot help is exactly
+    // the fatigue the product is against.
     [[nodiscard]] bool withholds_markers_for(insight::LogFormat format,
                                              std::string_view declared_channel) const noexcept;
 
     // ── The code-tier seams ──
-    [[nodiscard]] std::span<const StrategyFactory> strategy_factories() const noexcept { return strategies_; }
-    [[nodiscard]] std::span<const ProvenanceHook> provenance_hooks() const noexcept { return provenance_hooks_; }
+    [[nodiscard]] std::span<const StrategyFactory> strategy_factories() const noexcept
+    {
+        return strategies_;
+    }
+    [[nodiscard]] std::span<const ProvenanceHook> provenance_hooks() const noexcept
+    {
+        return provenance_hooks_;
+    }
 
     // ── Identity + legibility (§4) ──
-    [[nodiscard]] const std::array<std::uint8_t, kSemanticIdentityBytes>& identity() const noexcept { return identity_; }
-    [[nodiscard]] std::string identity_hex() const;                        // rendered hex, only at seams
-    [[nodiscard]] std::span<const ComposedPackage> packages() const noexcept { return packages_; }
-    [[nodiscard]] const CompositionReport& report() const noexcept { return report_; }
+    [[nodiscard]] const std::array<std::uint8_t, kSemanticIdentityBytes>& identity() const noexcept
+    {
+        return identity_;
+    }
+    [[nodiscard]] std::string identity_hex() const; // rendered hex, only at seams
+    [[nodiscard]] std::span<const ComposedPackage> packages() const noexcept
+    {
+        return packages_;
+    }
+    [[nodiscard]] const CompositionReport& report() const noexcept
+    {
+        return report_;
+    }
 
   private:
     ComposedSemantics() = default;
     friend ComposedSemantics compose(std::span<const SemanticPackageManifest>);
 
     std::vector<StructuralRoleRow> roles_;
-    // The marker rows THIS composition recognizes — already channel-filtered (ADR 0029 D5). A freshly
-    // composed vocabulary is the UNSPECIFIED view: no caller declared a channel, so every
+    // The marker rows THIS composition recognizes — already channel-filtered (ADR 0029 D5). A
+    // freshly composed vocabulary is the UNSPECIFIED view: no caller declared a channel, so every
     // concretely-gated row is absent and only kAnyChannel rows fire (fail-closed). for_channel()
     // re-derives this from all_markers_.
     std::vector<IntentMarkerRow> markers_;
-    // Every marker row the packages declared, channel-gated or not — the SOURCE for_channel() filters,
-    // never walked by recognition. Kept private and separate on purpose: if the full set were the public
-    // `markers()`, the default composition would fire BOTH GHA Step rows at once, which IS the phantom
-    // defect. Fail-closed has to be the DEFAULT, not an opt-in a caller can forget (ADR 0029 D5's
-    // promoted MUST — a safety default that must be requested is not a default).
+    // Every marker row the packages declared, channel-gated or not — the SOURCE for_channel()
+    // filters, never walked by recognition. Kept private and separate on purpose: if the full set
+    // were the public `markers()`, the default composition would fire BOTH GHA Step rows at once,
+    // which IS the phantom defect. Fail-closed has to be the DEFAULT, not an opt-in a caller can
+    // forget (ADR 0029 D5's promoted MUST — a safety default that must be requested is not a
+    // default).
     std::vector<IntentMarkerRow> all_markers_;
     std::vector<LevelLiftRow> level_lifts_;
     std::vector<LocationRow> locations_;
@@ -186,18 +235,20 @@ class ComposedSemantics
 };
 
 // Compose the manifest set. Sorts packages by name (canonical order — independent of the caller's
-// argument order), concatenates rows in declared order, FATALS on an exact-duplicate key (the startup
-// fail-closed invariant — a clear message then std::terminate), records longest-match shadow notes,
-// and computes semantic_identity over the canonical serialization (§4). The degenerate case (empty
-// span) is a defined, runnable state: no rows, no strategies, the hash of just
-// (grammar-version + kCanonicalizationVersion).
+// argument order), concatenates rows in declared order, FATALS on an exact-duplicate key (the
+// startup fail-closed invariant — a clear message then std::terminate), records longest-match
+// shadow notes, and computes semantic_identity over the canonical serialization (§4). The
+// degenerate case (empty span) is a defined, runnable state: no rows, no strategies, the hash of
+// just (grammar-version + kCanonicalizationVersion).
 [[nodiscard]] ComposedSemantics compose(std::span<const SemanticPackageManifest> packages);
 
 // ── find_conflict — constexpr definition (inline so it is usable in static_assert at any TU) ──
 namespace detail
 {
-    // Two format gates INTERSECT when a single line could satisfy both: equal, or either is kAnyFormat.
-    [[nodiscard]] constexpr bool gates_intersect(insight::LogFormat lhs, insight::LogFormat rhs) noexcept
+    // Two format gates INTERSECT when a single line could satisfy both: equal, or either is
+    // kAnyFormat.
+    [[nodiscard]] constexpr bool gates_intersect(insight::LogFormat lhs,
+                                                 insight::LogFormat rhs) noexcept
     {
         return lhs == rhs || lhs == kAnyFormat || rhs == kAnyFormat;
     }
@@ -205,11 +256,11 @@ namespace detail
 
 namespace detail
 {
-    // Every unordered (package,row) pair exactly ONCE: pkg_b>pkg_a, or pkg_b==pkg_a with idx_j>idx_i.
-    // Never a row against itself, and address-independent — detects an intra-package duplicate AND two
-    // packages that happen to share the same static row array (position, not address, is the key).
-    // Keyed on the shared .prefix + .format_gate members (roles / markers / level-lifts). Returns the
-    // duplicated prefix, or nullopt.
+    // Every unordered (package,row) pair exactly ONCE: pkg_b>pkg_a, or pkg_b==pkg_a with
+    // idx_j>idx_i. Never a row against itself, and address-independent — detects an intra-package
+    // duplicate AND two packages that happen to share the same static row array (position, not
+    // address, is the key). Keyed on the shared .prefix + .format_gate members (roles / markers /
+    // level-lifts). Returns the duplicated prefix, or nullopt.
     template <typename Row>
     [[nodiscard]] constexpr std::optional<std::string_view>
     first_prefix_dup(std::span<const SemanticPackageManifest> packages,
@@ -263,14 +314,14 @@ constexpr ConflictInfo find_conflict(std::span<const SemanticPackageManifest> pa
 {
     // An exact duplicate is same key + (for prefix rows) intersecting format gate. Each unordered
     // (package,row) pair is checked once; O(rows²) over a handful of rows at compile time.
-    if (const auto key{detail::first_prefix_dup<StructuralRoleRow>(packages,
-                                                                   &SemanticPackageManifest::roles)})
-        return {.has_conflict = true, .kind = "role", .key = *key};
-    if (const auto key{detail::first_prefix_dup<IntentMarkerRow>(packages,
-                                                                 &SemanticPackageManifest::markers)})
-        return {.has_conflict = true, .kind = "marker", .key = *key};
     if (const auto key{
-            detail::first_prefix_dup<LevelLiftRow>(packages, &SemanticPackageManifest::level_lifts)})
+            detail::first_prefix_dup<StructuralRoleRow>(packages, &SemanticPackageManifest::roles)})
+        return {.has_conflict = true, .kind = "role", .key = *key};
+    if (const auto key{
+            detail::first_prefix_dup<IntentMarkerRow>(packages, &SemanticPackageManifest::markers)})
+        return {.has_conflict = true, .kind = "marker", .key = *key};
+    if (const auto key{detail::first_prefix_dup<LevelLiftRow>(
+            packages, &SemanticPackageManifest::level_lifts)})
         return {.has_conflict = true, .kind = "level_lift", .key = *key};
     if (const auto key{detail::first_outcome_token_dup(packages)})
         return {.has_conflict = true, .kind = "outcome_token", .key = *key};

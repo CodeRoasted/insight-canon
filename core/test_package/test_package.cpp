@@ -47,9 +47,10 @@ TEST(InsightCanonPackage, CoreIso8601ParserAcceptsUtc)
 TEST(InsightCanonPackage, TokenizesJsonLine)
 {
     insight::tokenization::ArenaAllocator arena{kArenaCapacity};
-    // The degenerate composition (ADR 0024 §3): core-only, zero packages — a defined, runnable state.
-    // This install smoke tokenizes universal representation formats (JSON / Syslog), which need no
-    // dialect vocabulary; test_package cannot depend on the semantic packages (they depend on canon).
+    // The degenerate composition (ADR 0024 §3): core-only, zero packages — a defined, runnable
+    // state. This install smoke tokenizes universal representation formats (JSON / Syslog), which
+    // need no dialect vocabulary; test_package cannot depend on the semantic packages (they depend
+    // on canon).
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};
     insight::tokenization::Tokenizer tokenizer{arena, {}, composed};
 
@@ -66,9 +67,10 @@ TEST(InsightCanonPackage, TokenizesJsonLine)
 TEST(InsightCanonPackage, TokenizesSyslogLine)
 {
     insight::tokenization::ArenaAllocator arena{kArenaCapacity};
-    // The degenerate composition (ADR 0024 §3): core-only, zero packages — a defined, runnable state.
-    // This install smoke tokenizes universal representation formats (JSON / Syslog), which need no
-    // dialect vocabulary; test_package cannot depend on the semantic packages (they depend on canon).
+    // The degenerate composition (ADR 0024 §3): core-only, zero packages — a defined, runnable
+    // state. This install smoke tokenizes universal representation formats (JSON / Syslog), which
+    // need no dialect vocabulary; test_package cannot depend on the semantic packages (they depend
+    // on canon).
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};
     insight::tokenization::Tokenizer tokenizer{arena, {}, composed};
 

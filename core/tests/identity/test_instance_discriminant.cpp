@@ -3,9 +3,9 @@
 // canonicalize_intent (ADR 0023, the third role on the identity spine, II-9). The class MASKS drift
 // tokens to group siblings; the discriminant KEEPS the raw declared coordinate verbatim to SEPARATE
 // co-occurring / cross-run-drifted siblings — same R1–R4 scan, first masked span kept raw.
-// Runner-agnostic by construction (it reads the declared tuple, never a hardcoded runner lexicon). A
-// diff here re-draws alignment (II-7) — it rides the composed semantic_identity (ADR 0024 §4); fix the
-// code, never the assertion.
+// Runner-agnostic by construction (it reads the declared tuple, never a hardcoded runner lexicon).
+// A diff here re-draws alignment (II-7) — it rides the composed semantic_identity (ADR 0024 §4);
+// fix the code, never the assertion.
 
 #include <gtest/gtest.h>
 
@@ -19,8 +19,8 @@ namespace
 void expect_disc(std::string_view name, std::string_view expected)
 {
     const std::string_view got{discriminant_of(name)};
-    EXPECT_EQ(got, expected) << "discriminant_of(\"" << name << "\") = \"" << got << "\"  expected \""
-                             << expected << '"';
+    EXPECT_EQ(got, expected) << "discriminant_of(\"" << name << "\") = \"" << got
+                             << "\"  expected \"" << expected << '"';
 }
 } // namespace
 
@@ -30,7 +30,8 @@ TEST(InstanceDiscriminant, KeepsRawDeclaredCoordinateVerbatim)
     // Matrix tuple: class masks it to (M), discriminant keeps it raw → distinct legs separable.
     expect_disc("Test (ubuntu-latest, Node 24.x)", "(ubuntu-latest, Node 24.x)");
     expect_disc("Test (windows-latest, Node 24.x)", "(windows-latest, Node 24.x)");
-    EXPECT_EQ(canonicalize_intent("Test (ubuntu-latest, Node 24.x)"), "Test (M)"); // the class collapses…
+    EXPECT_EQ(canonicalize_intent("Test (ubuntu-latest, Node 24.x)"),
+              "Test (M)"); // the class collapses…
     EXPECT_NE(discriminant_of("Test (ubuntu-latest, Node 24.x)"),
               discriminant_of("Test (windows-latest, Node 24.x)")); // …but the legs stay distinct
 
@@ -47,13 +48,13 @@ TEST(InstanceDiscriminant, KeepsRawDeclaredCoordinateVerbatim)
 // ── Runner-agnostic: a user's self-hosted runner is captured with no hardcoded lexicon ──
 TEST(InstanceDiscriminant, RunnerAgnosticNoHardcodedNames)
 {
-    expect_disc("Test (my-gpu-box)", "(my-gpu-box)");                 // custom self-hosted runner
+    expect_disc("Test (my-gpu-box)", "(my-gpu-box)"); // custom self-hosted runner
     expect_disc("bench (arm64-metal, cuda-12)", "(arm64-metal, cuda-12)");
     // distinct custom runners stay distinct (the whole point — align leg-to-homolog, any runner)
     EXPECT_NE(discriminant_of("Test (my-gpu-box)"), discriminant_of("Test (my-cpu-box)"));
 }
 
-// NOTE: the child_order marker-row property (job=Unordered, step=Ordered — ADR 0023 §2) migrated with the
-// GitHub-Actions marker VOCABULARY to the github package suite (test_github_markers::JobUnorderedStepOrdered);
-// discriminant_of / canonicalize_intent above are canon's SEMANTIC-UNAWARE algorithm and stay core.
-// NOLINTEND
+// NOTE: the child_order marker-row property (job=Unordered, step=Ordered — ADR 0023 §2) migrated
+// with the GitHub-Actions marker VOCABULARY to the github package suite
+// (test_github_markers::JobUnorderedStepOrdered); discriminant_of / canonicalize_intent above are
+// canon's SEMANTIC-UNAWARE algorithm and stay core. NOLINTEND

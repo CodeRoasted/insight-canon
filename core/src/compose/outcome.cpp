@@ -53,8 +53,9 @@ namespace
 
     // Does any composed OutcomeTokenRow declare this format as its gate? (The dialect latch: the
     // side-input resolves under the log's first outcome-bearing routed format.)
-    [[nodiscard]] bool format_bears_outcomes(LogFormat format,
-                                             const insight::semantic::ComposedSemantics& composed) noexcept
+    [[nodiscard]] bool
+    format_bears_outcomes(LogFormat format,
+                          const insight::semantic::ComposedSemantics& composed) noexcept
     {
         if (format == LogFormat::Unknown)
             return false;
@@ -65,8 +66,9 @@ namespace
     }
 } // namespace
 
-std::optional<RunOutcome> map_outcome_token(std::string_view token, LogFormat format,
-                                            const insight::semantic::ComposedSemantics& composed) noexcept
+std::optional<RunOutcome>
+map_outcome_token(std::string_view token, LogFormat format,
+                  const insight::semantic::ComposedSemantics& composed) noexcept
 {
     for (const insight::semantic::OutcomeTokenRow& row : composed.outcome_tokens())
         if (row.token == token && gate_matches(row.format_gate, format))
@@ -94,7 +96,8 @@ RunOutcomeScan scan_run_outcome(std::span<const std::string> lines,
             if (scan.dialect == LogFormat::Unknown && format_bears_outcomes(format, composed))
                 scan.dialect = format;
             for (const insight::semantic::OutcomeMarkerRow& row : composed.outcome_markers())
-                if (gate_matches(row.format_gate, format) && parsed->content.starts_with(row.prefix))
+                if (gate_matches(row.format_gate, format) &&
+                    parsed->content.starts_with(row.prefix))
                 {
                     const std::string_view token{parsed->content.substr(row.prefix.size())};
                     if (is_verdict_word(token))
@@ -153,12 +156,12 @@ RunOutcomeResolution resolve_run_outcome(std::string_view side_input_token,
             return resolution;
         }
         // Provided but unmapped — surfaced, never silent (fail-closed); the ladder continues.
-        resolution.note = "run-outcome: side-input '" + std::string{side_input_token} +
-                          (scan.dialect == LogFormat::Unknown
-                               ? "' cannot resolve: no outcome-bearing dialect detected in the log"
-                               : std::string{"' is not in the '"} +
-                                     std::string{to_string(scan.dialect)} +
-                                     "' outcome vocabulary (fail-closed: falling back)");
+        resolution.note =
+            "run-outcome: side-input '" + std::string{side_input_token} +
+            (scan.dialect == LogFormat::Unknown
+                 ? "' cannot resolve: no outcome-bearing dialect detected in the log"
+                 : std::string{"' is not in the '"} + std::string{to_string(scan.dialect)} +
+                       "' outcome vocabulary (fail-closed: falling back)");
     }
 
     // Rung 2 — the console-tail marker's last match, if present AND it maps.

@@ -17,332 +17,347 @@ namespace insight::tokenization
 namespace
 {
 
-// Route the declared OTEL field-map (D-OTEL-4a) over the parsed OTLP object: severity_number
-// → the LogLevel band (declared > inferred — it runs after the level-string route, so it
-// overrides), and traceId/spanId/parentSpanId → the consumed trace context. Returns true iff
-// the record is OTEL (a severityNumber or traceId was present), which the caller uses to route
-// the message to the nested body.stringValue. Trace ids are hashed to scalar PODs and never
-// retained as values (OR1). Kept separate so JsonStrategy::parse stays within its complexity
-// budget.
-[[nodiscard]] bool extract_otel_fields(simdjson::ondemand::object& root, ParsedLine& parsed_line)
-{
-    bool is_otel{false};
-    std::string_view scratch_view;
-    // OTLP timeUnixNano → event-time. Not one of the four classified fields, but required so OTEL
-    // inputs carry a timestamp and window like any other format (without it the whole pipeline
-    // never closes a window). A quoted epoch-nanoseconds string per the OTLP/JSON mapping.
-    static constexpr std::string_view kTimeUnixNanoKey{"timeUnixNano"};
-    if (try_get_string(root, std::span<const std::string_view>{&kTimeUnixNanoKey, 1}, scratch_view))
-        if (auto timestamp{utils::parse_unix_nano_timestamp(scratch_view)})
-        {
-            parsed_line.timestamp = timestamp;
-            is_otel = true;
-        }
-    for (const auto& descriptor : kOtelFieldCatalog)
+    // Route the declared OTEL field-map (D-OTEL-4a) over the parsed OTLP object: severity_number
+    // → the LogLevel band (declared > inferred — it runs after the level-string route, so it
+    // overrides), and traceId/spanId/parentSpanId → the consumed trace context. Returns true iff
+    // the record is OTEL (a severityNumber or traceId was present), which the caller uses to route
+    // the message to the nested body.stringValue. Trace ids are hashed to scalar PODs and never
+    // retained as values (OR1). Kept separate so JsonStrategy::parse stays within its complexity
+    // budget.
+    [[nodiscard]] bool extract_otel_fields(simdjson::ondemand::object& root,
+                                           ParsedLine& parsed_line)
     {
-        const std::span<const std::string_view> key_span{&descriptor.key, 1};
-        switch (descriptor.field_class)
-        {
-        case OtelFieldClass::SeverityNumber:
-            if (std::int64_t severity_number{}; try_get_int64(root, key_span, severity_number))
+        bool is_otel{false};
+        std::string_view scratch_view;
+        // OTLP timeUnixNano → event-time. Not one of the four classified fields, but required so
+        // OTEL inputs carry a timestamp and window like any other format (without it the whole
+        // pipeline never closes a window). A quoted epoch-nanoseconds string per the OTLP/JSON
+        // mapping.
+        static constexpr std::string_view kTimeUnixNanoKey{"timeUnixNano"};
+        if (try_get_string(root, std::span<const std::string_view>{&kTimeUnixNanoKey, 1},
+                           scratch_view))
+            if (auto timestamp{utils::parse_unix_nano_timestamp(scratch_view)})
             {
-                parsed_line.level = log_level_from_severity_number(severity_number);
+                parsed_line.timestamp = timestamp;
                 is_otel = true;
             }
-            break;
-        case OtelFieldClass::TraceId:
-            if (try_get_string(root, key_span, scratch_view))
+        for (const auto& descriptor : kOtelFieldCatalog)
+        {
+            const std::span<const std::string_view> key_span{&descriptor.key, 1};
+            switch (descriptor.field_class)
             {
-                parsed_line.trace.present = true;
-                parsed_line.trace.trace_id = trace_id_from_hex(scratch_view);
-                is_otel = true;
-            }
-            break;
-        case OtelFieldClass::SpanId:
-            if (try_get_string(root, key_span, scratch_view))
-                parsed_line.trace.span_id = span_id_from_hex(scratch_view);
-            break;
-        case OtelFieldClass::ParentSpanId:
-            if (try_get_string(root, key_span, scratch_view))
-            {
-                parsed_line.trace.has_parent = true;
-                parsed_line.trace.parent_span_id = span_id_from_hex(scratch_view);
-            }
-            break;
-        }
-    }
-    return is_otel;
-}
-
-// Forward decl: parse_otel_span (just below) stores its span_duration_ns ordinal through this, which
-// is defined further down alongside the other ordinal helpers.
-[[nodiscard]] std::span<const OrdinalObservation>
-store_ordinals(std::span<const OrdinalObservation> observations, ArenaAllocator& arena);
-
-// True iff the raw line is a flat OTLP/JSON span (D-OTEL-10 shape 2 / D-OTEL-18) — detected by the
-// span-specific startTimeUnixNano key (logs carry timeUnixNano), excluding a resourceSpans DOCUMENT
-// (the record-source unpack handles those before the strategy — D-OTEL-18). A cheap raw-byte check,
-// no simdjson cursor spent.
-[[nodiscard]] bool is_otel_span_line(std::string_view line) noexcept
-{
-    return line.contains(R"("startTimeUnixNano")") && !line.contains(R"("resourceSpans")");
-}
-
-// Parse an OTLP quoted decimal-ns string → int64. Digit byte-loop (no float, no charconv dep);
-// stops at the first non-digit. Deterministic, cross-stdlib bit-identical.
-[[nodiscard]] std::int64_t parse_span_nano(std::string_view text) noexcept
-{
-    std::int64_t value{0};
-    for (const char character : text)
-    {
-        if (character < '0' || character > '9')
-            break;
-        value = (value * 10) + (character - '0');
-    }
-    return value;
-}
-
-// Parse a flat OTLP/JSON span (D-OTEL-10 / D-OTEL-18) in ONE forward pass over the object — the
-// on-demand idiom that descends into status/attributes inline with no rewind. The §13.1 mapping:
-// name→content (the templated operation), startTimeUnixNano→event time, end−start→the
-// span_duration_ns ordinal (D-OTEL-12, integer ns by construction), status.code→level (ERROR→Error
-// else Info; declared > inferred), service.name (from attributes[])→component (the WHERE tier),
-// traceId/spanId/parentSpanId→the consumed trace context (OR1). `kind` is a deferred diagnostic
-// field (D-OTEL-18b — it needs a categorical-field→value_counts channel canon lacks today; not
-// load-bearing for the structural exhibits).
-// O4b Span Links (D-OTEL-9): copy the collected linked span_ids into arena-stable storage (mirrors
-// store_ordinals). Empty in → empty out (no allocation) so a span without links stays zero-cost.
-[[nodiscard]] std::span<const SpanId> store_span_ids(std::span<const SpanId> ids, ArenaAllocator& arena)
-{
-    if (ids.empty())
-        return {};
-    void* const mem{arena.allocate(ids.size() * sizeof(SpanId), alignof(SpanId))};
-    auto* const dst{static_cast<SpanId*>(mem)};
-    for (std::size_t i{0}; i < ids.size(); ++i)
-        dst[i] = ids[i];
-    return std::span<const SpanId>{dst, ids.size()};
-}
-
-void parse_otel_span(simdjson::ondemand::object& root, ParsedLine& parsed_line, ArenaAllocator& arena)
-{
-    std::string_view start_nano;
-    std::string_view end_nano;
-    std::string_view name_view;
-    std::string_view service_name;
-    bool is_error{false};
-    std::vector<SpanId> linked; // O4b Span Links (D-OTEL-9): the declared cross-trace edge targets
-
-    for (auto field : root)
-    {
-        std::string_view key;
-        if (field.unescaped_key().get(key) != simdjson::SUCCESS)
-            continue;
-        std::string_view hex;
-        if (key == "startTimeUnixNano")
-        {
-            read_string_or_keep(field.value(), start_nano);
-        }
-        else if (key == "endTimeUnixNano")
-        {
-            read_string_or_keep(field.value(), end_nano);
-        }
-        else if (key == "name")
-        {
-            read_string_or_keep(field.value(), name_view);
-        }
-        else if (key == "traceId")
-        {
-            if (field.value().get_string().get(hex) == simdjson::SUCCESS)
-            {
-                parsed_line.trace.present = true;
-                parsed_line.trace.trace_id = trace_id_from_hex(hex);
-            }
-        }
-        else if (key == "spanId")
-        {
-            if (field.value().get_string().get(hex) == simdjson::SUCCESS)
-                parsed_line.trace.span_id = span_id_from_hex(hex);
-        }
-        else if (key == "parentSpanId")
-        {
-            if (field.value().get_string().get(hex) == simdjson::SUCCESS)
-            {
-                parsed_line.trace.has_parent = true;
-                parsed_line.trace.parent_span_id = span_id_from_hex(hex);
-            }
-        }
-        else if (key == "status")
-        {
-            simdjson::ondemand::object status_obj;
-            if (field.value().get_object().get(status_obj) == simdjson::SUCCESS)
-            {
-                std::string_view code;
-                if (status_obj.find_field_unordered("code").get_string().get(code) ==
-                    simdjson::SUCCESS)
-                    is_error = code.contains("ERROR"); // STATUS_CODE_ERROR (or the int-2 form's text)
-            }
-        }
-        else if (key == "attributes")
-        {
-            simdjson::ondemand::array attributes;
-            if (field.value().get_array().get(attributes) == simdjson::SUCCESS)
-            {
-                for (auto element : attributes)
+            case OtelFieldClass::SeverityNumber:
+                if (std::int64_t severity_number{}; try_get_int64(root, key_span, severity_number))
                 {
-                    simdjson::ondemand::object attr;
-                    if (element.get_object().get(attr) != simdjson::SUCCESS)
-                        continue;
-                    std::string_view attr_key;
-                    if (attr.find_field_unordered("key").get_string().get(attr_key) !=
-                            simdjson::SUCCESS ||
-                        attr_key != "service.name")
-                        continue;
-                    simdjson::ondemand::object value_obj;
-                    if (attr.find_field_unordered("value").get_object().get(value_obj) ==
-                        simdjson::SUCCESS)
-                        read_string_or_keep(value_obj.find_field_unordered("stringValue"),
-                                            service_name);
+                    parsed_line.level = log_level_from_severity_number(severity_number);
+                    is_otel = true;
+                }
+                break;
+            case OtelFieldClass::TraceId:
+                if (try_get_string(root, key_span, scratch_view))
+                {
+                    parsed_line.trace.present = true;
+                    parsed_line.trace.trace_id = trace_id_from_hex(scratch_view);
+                    is_otel = true;
+                }
+                break;
+            case OtelFieldClass::SpanId:
+                if (try_get_string(root, key_span, scratch_view))
+                    parsed_line.trace.span_id = span_id_from_hex(scratch_view);
+                break;
+            case OtelFieldClass::ParentSpanId:
+                if (try_get_string(root, key_span, scratch_view))
+                {
+                    parsed_line.trace.has_parent = true;
+                    parsed_line.trace.parent_span_id = span_id_from_hex(scratch_view);
+                }
+                break;
+            }
+        }
+        return is_otel;
+    }
+
+    // Forward decl: parse_otel_span (just below) stores its span_duration_ns ordinal through this,
+    // which is defined further down alongside the other ordinal helpers.
+    [[nodiscard]] std::span<const OrdinalObservation>
+    store_ordinals(std::span<const OrdinalObservation> observations, ArenaAllocator& arena);
+
+    // True iff the raw line is a flat OTLP/JSON span (D-OTEL-10 shape 2 / D-OTEL-18) — detected by
+    // the span-specific startTimeUnixNano key (logs carry timeUnixNano), excluding a resourceSpans
+    // DOCUMENT (the record-source unpack handles those before the strategy — D-OTEL-18). A cheap
+    // raw-byte check, no simdjson cursor spent.
+    [[nodiscard]] bool is_otel_span_line(std::string_view line) noexcept
+    {
+        return line.contains(R"("startTimeUnixNano")") && !line.contains(R"("resourceSpans")");
+    }
+
+    // Parse an OTLP quoted decimal-ns string → int64. Digit byte-loop (no float, no charconv dep);
+    // stops at the first non-digit. Deterministic, cross-stdlib bit-identical.
+    [[nodiscard]] std::int64_t parse_span_nano(std::string_view text) noexcept
+    {
+        std::int64_t value{0};
+        for (const char character : text)
+        {
+            if (character < '0' || character > '9')
+                break;
+            value = (value * 10) + (character - '0');
+        }
+        return value;
+    }
+
+    // Parse a flat OTLP/JSON span (D-OTEL-10 / D-OTEL-18) in ONE forward pass over the object — the
+    // on-demand idiom that descends into status/attributes inline with no rewind. The §13.1
+    // mapping: name→content (the templated operation), startTimeUnixNano→event time, end−start→the
+    // span_duration_ns ordinal (D-OTEL-12, integer ns by construction), status.code→level
+    // (ERROR→Error else Info; declared > inferred), service.name (from attributes[])→component (the
+    // WHERE tier), traceId/spanId/parentSpanId→the consumed trace context (OR1). `kind` is a
+    // deferred diagnostic field (D-OTEL-18b — it needs a categorical-field→value_counts channel
+    // canon lacks today; not load-bearing for the structural exhibits). O4b Span Links (D-OTEL-9):
+    // copy the collected linked span_ids into arena-stable storage (mirrors store_ordinals). Empty
+    // in → empty out (no allocation) so a span without links stays zero-cost.
+    [[nodiscard]] std::span<const SpanId> store_span_ids(std::span<const SpanId> ids,
+                                                         ArenaAllocator& arena)
+    {
+        if (ids.empty())
+            return {};
+        void* const mem{arena.allocate(ids.size() * sizeof(SpanId), alignof(SpanId))};
+        auto* const dst{static_cast<SpanId*>(mem)};
+        for (std::size_t i{0}; i < ids.size(); ++i)
+            dst[i] = ids[i];
+        return std::span<const SpanId>{dst, ids.size()};
+    }
+
+    void parse_otel_span(simdjson::ondemand::object& root, ParsedLine& parsed_line,
+                         ArenaAllocator& arena)
+    {
+        std::string_view start_nano;
+        std::string_view end_nano;
+        std::string_view name_view;
+        std::string_view service_name;
+        bool is_error{false};
+        std::vector<SpanId>
+            linked; // O4b Span Links (D-OTEL-9): the declared cross-trace edge targets
+
+        for (auto field : root)
+        {
+            std::string_view key;
+            if (field.unescaped_key().get(key) != simdjson::SUCCESS)
+                continue;
+            std::string_view hex;
+            if (key == "startTimeUnixNano")
+            {
+                read_string_or_keep(field.value(), start_nano);
+            }
+            else if (key == "endTimeUnixNano")
+            {
+                read_string_or_keep(field.value(), end_nano);
+            }
+            else if (key == "name")
+            {
+                read_string_or_keep(field.value(), name_view);
+            }
+            else if (key == "traceId")
+            {
+                if (field.value().get_string().get(hex) == simdjson::SUCCESS)
+                {
+                    parsed_line.trace.present = true;
+                    parsed_line.trace.trace_id = trace_id_from_hex(hex);
                 }
             }
-        }
-        else if (key == "links")
-        {
-            // O4b Span Links (D-OTEL-9): each link declares a cross-trace edge to another span. Collect
-            // the linked span_ids; metalog resolves them (by span_id, across traces) into the distilled
-            // service topology (component(this) → component(linked)). The link's trace_id/attributes are
-            // consumed-not-retained like the parent context.
-            simdjson::ondemand::array links_array;
-            if (field.value().get_array().get(links_array) == simdjson::SUCCESS)
-                for (auto element : links_array)
+            else if (key == "spanId")
+            {
+                if (field.value().get_string().get(hex) == simdjson::SUCCESS)
+                    parsed_line.trace.span_id = span_id_from_hex(hex);
+            }
+            else if (key == "parentSpanId")
+            {
+                if (field.value().get_string().get(hex) == simdjson::SUCCESS)
                 {
-                    simdjson::ondemand::object link;
-                    if (element.get_object().get(link) != simdjson::SUCCESS)
-                        continue;
-                    std::string_view link_span_hex;
-                    if (link.find_field_unordered("spanId").get_string().get(link_span_hex) ==
-                        simdjson::SUCCESS)
-                        linked.push_back(span_id_from_hex(link_span_hex));
+                    parsed_line.trace.has_parent = true;
+                    parsed_line.trace.parent_span_id = span_id_from_hex(hex);
                 }
+            }
+            else if (key == "status")
+            {
+                simdjson::ondemand::object status_obj;
+                if (field.value().get_object().get(status_obj) == simdjson::SUCCESS)
+                {
+                    std::string_view code;
+                    if (status_obj.find_field_unordered("code").get_string().get(code) ==
+                        simdjson::SUCCESS)
+                        is_error =
+                            code.contains("ERROR"); // STATUS_CODE_ERROR (or the int-2 form's text)
+                }
+            }
+            else if (key == "attributes")
+            {
+                simdjson::ondemand::array attributes;
+                if (field.value().get_array().get(attributes) == simdjson::SUCCESS)
+                {
+                    for (auto element : attributes)
+                    {
+                        simdjson::ondemand::object attr;
+                        if (element.get_object().get(attr) != simdjson::SUCCESS)
+                            continue;
+                        std::string_view attr_key;
+                        if (attr.find_field_unordered("key").get_string().get(attr_key) !=
+                                simdjson::SUCCESS ||
+                            attr_key != "service.name")
+                            continue;
+                        simdjson::ondemand::object value_obj;
+                        if (attr.find_field_unordered("value").get_object().get(value_obj) ==
+                            simdjson::SUCCESS)
+                            read_string_or_keep(value_obj.find_field_unordered("stringValue"),
+                                                service_name);
+                    }
+                }
+            }
+            else if (key == "links")
+            {
+                // O4b Span Links (D-OTEL-9): each link declares a cross-trace edge to another span.
+                // Collect the linked span_ids; metalog resolves them (by span_id, across traces)
+                // into the distilled service topology (component(this) → component(linked)). The
+                // link's trace_id/attributes are consumed-not-retained like the parent context.
+                simdjson::ondemand::array links_array;
+                if (field.value().get_array().get(links_array) == simdjson::SUCCESS)
+                    for (auto element : links_array)
+                    {
+                        simdjson::ondemand::object link;
+                        if (element.get_object().get(link) != simdjson::SUCCESS)
+                            continue;
+                        std::string_view link_span_hex;
+                        if (link.find_field_unordered("spanId").get_string().get(link_span_hex) ==
+                            simdjson::SUCCESS)
+                            linked.push_back(span_id_from_hex(link_span_hex));
+                    }
+            }
         }
+
+        // Apply the mapping. Event time + duration are integer ns (D-OTEL-3, by construction).
+        parsed_line.trace.is_span = true; // O3 (D-OTEL-11): declared causality → the observed DAG
+        parsed_line.timestamp = utils::parse_unix_nano_timestamp(start_nano);
+        parsed_line.level = is_error ? LogLevel::Error : LogLevel::Info;
+        if (!service_name.empty())
+            parsed_line.component = arena.store_string(service_name);
+        parsed_line.content =
+            arena.store_string(name_view.empty() ? parsed_line.raw_line : name_view);
+
+        // span_duration_ns → the declared DurationLog2Ns ordinal (D-OTEL-12). end < start (skew /
+        // absent end) → 0-duration (the smallest bin), never negative.
+        const std::int64_t start_value{parse_span_nano(start_nano)};
+        const std::int64_t end_value{parse_span_nano(end_nano)};
+        const std::int64_t duration_ns{end_value > start_value ? end_value - start_value : 0};
+        if (const OrdinalFieldDescriptor* const descriptor{match_ordinal_field("span_duration_ns")})
+        {
+            const std::array<OrdinalObservation, 1> observation{{{.field_name = descriptor->key,
+                                                                  .schedule = descriptor->schedule,
+                                                                  .value = duration_ns}}};
+            parsed_line.ordinals = store_ordinals(observation, arena);
+        }
+
+        // O4b Span Links (D-OTEL-9): publish the declared cross-trace edge targets (empty ⇒ no
+        // allocation).
+        parsed_line.linked_span_ids = store_span_ids(linked, arena);
     }
 
-    // Apply the mapping. Event time + duration are integer ns (D-OTEL-3, by construction).
-    parsed_line.trace.is_span = true; // O3 (D-OTEL-11): declared causality → the observed DAG
-    parsed_line.timestamp = utils::parse_unix_nano_timestamp(start_nano);
-    parsed_line.level = is_error ? LogLevel::Error : LogLevel::Info;
-    if (!service_name.empty())
-        parsed_line.component = arena.store_string(service_name);
-    parsed_line.content = arena.store_string(name_view.empty() ? parsed_line.raw_line : name_view);
-
-    // span_duration_ns → the declared DurationLog2Ns ordinal (D-OTEL-12). end < start (skew / absent
-    // end) → 0-duration (the smallest bin), never negative.
-    const std::int64_t start_value{parse_span_nano(start_nano)};
-    const std::int64_t end_value{parse_span_nano(end_nano)};
-    const std::int64_t duration_ns{end_value > start_value ? end_value - start_value : 0};
-    if (const OrdinalFieldDescriptor* const descriptor{match_ordinal_field("span_duration_ns")})
+    // Copy the matched ordinal observations (W1, D-W1-3) into arena-stable storage and return a
+    // span over them. Empty in → empty out (no allocation) so a non-ordinal line stays zero-cost.
+    // The observations' `field_name` views point at the declared catalog's static keys (stable for
+    // the program lifetime), so only the small POD array is arena-copied.
+    [[nodiscard]] std::span<const OrdinalObservation>
+    store_ordinals(std::span<const OrdinalObservation> observations, ArenaAllocator& arena)
     {
-        const std::array<OrdinalObservation, 1> observation{{{.field_name = descriptor->key,
+        if (observations.empty())
+            return {};
+        void* const mem{arena.allocate(observations.size() * sizeof(OrdinalObservation),
+                                       alignof(OrdinalObservation))};
+        auto* const dst{static_cast<OrdinalObservation*>(mem)};
+        for (std::size_t i{0}; i < observations.size(); ++i)
+            dst[i] = observations[i];
+        return std::span<const OrdinalObservation>{dst, observations.size()};
+    }
+
+    // W1 fast-path field-route (D-W1-3): match the scanner's numeric candidates against the
+    // declared catalog; each hit → a consumed ordinal observation. The decimal TEXT → int64 (no
+    // float→int).
+    [[nodiscard]] std::span<const OrdinalObservation>
+    extract_ordinals_fast(const FastJsonResult& fast, ArenaAllocator& arena)
+    {
+        if (fast.numeric_field_count == 0)
+            return {};
+        std::array<OrdinalObservation, kFastJsonMaxNumericFields> matched{};
+        std::size_t matched_count{0};
+        for (std::size_t k{0}; k < fast.numeric_field_count; ++k)
+        {
+            const FastJsonNumericField& candidate{fast.numeric_fields[k]};
+            const OrdinalFieldDescriptor* const descriptor{match_ordinal_field(candidate.key)};
+            if (descriptor == nullptr)
+                continue;
+            const std::optional<std::int64_t> value{
+                parse_decimal_scaled(candidate.text, descriptor->scale_to_canonical)};
+            if (value)
+                matched[matched_count++] = OrdinalObservation{.field_name = descriptor->key,
                                                               .schedule = descriptor->schedule,
-                                                              .value = duration_ns}}};
-        parsed_line.ordinals = store_ordinals(observation, arena);
+                                                              .value = *value};
+        }
+        return store_ordinals(std::span<const OrdinalObservation>{matched.data(), matched_count},
+                              arena);
     }
 
-    // O4b Span Links (D-OTEL-9): publish the declared cross-trace edge targets (empty ⇒ no allocation).
-    parsed_line.linked_span_ids = store_span_ids(linked, arena);
-}
-
-// Copy the matched ordinal observations (W1, D-W1-3) into arena-stable storage and return a span
-// over them. Empty in → empty out (no allocation) so a non-ordinal line stays zero-cost. The
-// observations' `field_name` views point at the declared catalog's static keys (stable for the
-// program lifetime), so only the small POD array is arena-copied.
-[[nodiscard]] std::span<const OrdinalObservation>
-store_ordinals(std::span<const OrdinalObservation> observations, ArenaAllocator& arena)
-{
-    if (observations.empty())
-        return {};
-    void* const mem{arena.allocate(observations.size() * sizeof(OrdinalObservation),
-                                   alignof(OrdinalObservation))};
-    auto* const dst{static_cast<OrdinalObservation*>(mem)};
-    for (std::size_t i{0}; i < observations.size(); ++i)
-        dst[i] = observations[i];
-    return std::span<const OrdinalObservation>{dst, observations.size()};
-}
-
-// W1 fast-path field-route (D-W1-3): match the scanner's numeric candidates against the declared
-// catalog; each hit → a consumed ordinal observation. The decimal TEXT → int64 (no float→int).
-[[nodiscard]] std::span<const OrdinalObservation>
-extract_ordinals_fast(const FastJsonResult& fast, ArenaAllocator& arena)
-{
-    if (fast.numeric_field_count == 0)
-        return {};
-    std::array<OrdinalObservation, kFastJsonMaxNumericFields> matched{};
-    std::size_t matched_count{0};
-    for (std::size_t k{0}; k < fast.numeric_field_count; ++k)
+    // W1 slow-path field-route (D-W1-3): find_field_unordered per declared key (the OTEL-route
+    // pattern); the value's raw decimal TOKEN → int64 (never get_double() — the D-W1-3 pin). MUST
+    // run before the OTLP body descent below (which spends the on-demand cursor).
+    [[nodiscard]] std::span<const OrdinalObservation>
+    extract_ordinals_slow(simdjson::ondemand::object& root, ArenaAllocator& arena)
     {
-        const FastJsonNumericField& candidate{fast.numeric_fields[k]};
-        const OrdinalFieldDescriptor* const descriptor{match_ordinal_field(candidate.key)};
-        if (descriptor == nullptr)
-            continue;
-        const std::optional<std::int64_t> value{
-            parse_decimal_scaled(candidate.text, descriptor->scale_to_canonical)};
-        if (value)
-            matched[matched_count++] = OrdinalObservation{
-                .field_name = descriptor->key, .schedule = descriptor->schedule, .value = *value};
+        std::array<OrdinalObservation, kOrdinalFieldCatalog.size()> matched{};
+        std::size_t matched_count{0};
+        for (const auto& descriptor : kOrdinalFieldCatalog)
+        {
+            simdjson::ondemand::value field;
+            if (root.find_field_unordered(descriptor.key).get(field) != simdjson::SUCCESS)
+                continue;
+            const std::optional<std::int64_t> value{
+                parse_decimal_scaled(field.raw_json_token(), descriptor.scale_to_canonical)};
+            if (value)
+                matched[matched_count++] = OrdinalObservation{
+                    .field_name = descriptor.key, .schedule = descriptor.schedule, .value = *value};
+        }
+        return store_ordinals(std::span<const OrdinalObservation>{matched.data(), matched_count},
+                              arena);
     }
-    return store_ordinals(std::span<const OrdinalObservation>{matched.data(), matched_count}, arena);
-}
 
-// W1 slow-path field-route (D-W1-3): find_field_unordered per declared key (the OTEL-route
-// pattern); the value's raw decimal TOKEN → int64 (never get_double() — the D-W1-3 pin). MUST run
-// before the OTLP body descent below (which spends the on-demand cursor).
-[[nodiscard]] std::span<const OrdinalObservation>
-extract_ordinals_slow(simdjson::ondemand::object& root, ArenaAllocator& arena)
-{
-    std::array<OrdinalObservation, kOrdinalFieldCatalog.size()> matched{};
-    std::size_t matched_count{0};
-    for (const auto& descriptor : kOrdinalFieldCatalog)
+    // The escape-free fast path (no simdjson): a single byte scan. Returns nullopt when the scan
+    // cannot complete (escapes / nesting / malformed) so the caller falls back to full simdjson.
+    // Split out of parse() to keep it within the cognitive-complexity budget (the
+    // extract_otel_fields rule).
+    [[nodiscard]] std::optional<ParsedLine> try_fast_parse(std::string_view line,
+                                                           ArenaAllocator& arena)
     {
-        simdjson::ondemand::value field;
-        if (root.find_field_unordered(descriptor.key).get(field) != simdjson::SUCCESS)
-            continue;
-        const std::optional<std::int64_t> value{
-            parse_decimal_scaled(field.raw_json_token(), descriptor.scale_to_canonical)};
-        if (value)
-            matched[matched_count++] = OrdinalObservation{
-                .field_name = descriptor.key, .schedule = descriptor.schedule, .value = *value};
+        const FastJsonResult fast{try_fast_json(line)};
+        if (!fast.has_result)
+            return std::nullopt;
+        ParsedLine parsed_line;
+        parsed_line.raw_line = line;
+        if (!fast.timestamp_str.empty())
+        {
+            parsed_line.timestamp = utils::parse_iso8601(fast.timestamp_str);
+            if (!parsed_line.timestamp)
+                parsed_line.timestamp = utils::parse_bsd_syslog_ts(fast.timestamp_str);
+        }
+        if (!fast.level_str.empty())
+            parsed_line.level = utils::parse_log_level(fast.level_str);
+        if (!fast.component_str.empty())
+            parsed_line.component = arena.store_string(fast.component_str);
+        parsed_line.content = fast.message_str.empty() ? arena.store_string(line)
+                                                       : arena.store_string(fast.message_str);
+        parsed_line.ordinals = extract_ordinals_fast(fast, arena); // W1 (D-W1-3)
+        INSIGHT_LOG_DEBUG(logging::strategy_logger(),
+                          "strategy=JSON fast_path component={} level={} has_timestamp={}",
+                          parsed_line.component, to_string(parsed_line.level),
+                          parsed_line.timestamp.has_value());
+        return parsed_line;
     }
-    return store_ordinals(std::span<const OrdinalObservation>{matched.data(), matched_count}, arena);
-}
-
-// The escape-free fast path (no simdjson): a single byte scan. Returns nullopt when the scan
-// cannot complete (escapes / nesting / malformed) so the caller falls back to full simdjson. Split
-// out of parse() to keep it within the cognitive-complexity budget (the extract_otel_fields rule).
-[[nodiscard]] std::optional<ParsedLine> try_fast_parse(std::string_view line, ArenaAllocator& arena)
-{
-    const FastJsonResult fast{try_fast_json(line)};
-    if (!fast.has_result)
-        return std::nullopt;
-    ParsedLine parsed_line;
-    parsed_line.raw_line = line;
-    if (!fast.timestamp_str.empty())
-    {
-        parsed_line.timestamp = utils::parse_iso8601(fast.timestamp_str);
-        if (!parsed_line.timestamp)
-            parsed_line.timestamp = utils::parse_bsd_syslog_ts(fast.timestamp_str);
-    }
-    if (!fast.level_str.empty())
-        parsed_line.level = utils::parse_log_level(fast.level_str);
-    if (!fast.component_str.empty())
-        parsed_line.component = arena.store_string(fast.component_str);
-    parsed_line.content = fast.message_str.empty() ? arena.store_string(line)
-                                                   : arena.store_string(fast.message_str);
-    parsed_line.ordinals = extract_ordinals_fast(fast, arena); // W1 (D-W1-3)
-    INSIGHT_LOG_DEBUG(logging::strategy_logger(),
-                      "strategy=JSON fast_path component={} level={} has_timestamp={}",
-                      parsed_line.component, to_string(parsed_line.level),
-                      parsed_line.timestamp.has_value());
-    return parsed_line;
-}
 
 } // namespace
 

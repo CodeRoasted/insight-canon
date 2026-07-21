@@ -1,13 +1,14 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_github_strategy.cpp — the GitHub-Actions dialect CODE TIER (ADR 0024 §2.3): the format strategy
-// (make_strategy) + its LEVEL-LIFT vocabulary (kLevelLifts). Migrated from the GitHubActionsStrategyTest
-// block of canon tests/strategy/test_strategies.cpp: the strategy class moved into this package
-// (github_strategy.cpp, exposed only via make_strategy()), so its tests home with it. Drives the strategy
-// directly against the spi IFormatStrategy contract. Determinism: byte-only parse, no RNG/clock/float.
+// test_github_strategy.cpp — the GitHub-Actions dialect CODE TIER (ADR 0024 §2.3): the format
+// strategy (make_strategy) + its LEVEL-LIFT vocabulary (kLevelLifts). Migrated from the
+// GitHubActionsStrategyTest block of canon tests/strategy/test_strategies.cpp: the strategy class
+// moved into this package (github_strategy.cpp, exposed only via make_strategy()), so its tests
+// home with it. Drives the strategy directly against the spi IFormatStrategy contract. Determinism:
+// byte-only parse, no RNG/clock/float.
 #include <gtest/gtest.h>
 
 import std;
-import insight.canon;          // ArenaAllocator / LogFormat / LogLevel / Tokenizer / compose
+import insight.canon;           // ArenaAllocator / LogFormat / LogLevel / Tokenizer / compose
 import insight.semantic.github; // make_strategy + (via export import spi) IFormatStrategy / ParsedLine
 
 using insight::LogFormat;
@@ -28,16 +29,21 @@ namespace
 constexpr std::string_view kGHALine{
     "2026-05-27T15:26:41.7842152Z   CODEROAST_IPC_REPO: CodeRoasted/coderoast-ipc"};
 // A whole-second RFC3339 syslog line (no 7-digit fraction) and a JSON line — NOT GHA.
-constexpr std::string_view kRFC3339Line{"2024-01-15T10:30:00Z myhost app[42]: User alice logged in"};
+constexpr std::string_view kRFC3339Line{
+    "2024-01-15T10:30:00Z myhost app[42]: User alice logged in"};
 constexpr std::string_view kJSONLine{
     R"({"ts":"2024-01-15T10:30:00Z","level":"INFO","component":"auth","message":"User logged in"})"};
 constexpr std::string_view kGHAError{
     "2026-05-27T15:26:41.7842152Z ##[error]connection refused to db host 10.0.0.5"};
-// Bare, UNMARKED bodies — the strategy falls back to canon's failure-cue inference. Only the 2-token
-// "segmentation fault" adjacency is a cue; the distractors carry the words non-adjacently and stay benign.
-constexpr std::string_view kGHASegfault{"2026-05-27T15:26:41.7842152Z Segmentation fault (core dumped)"};
-constexpr std::string_view kGHASegPipe{"2026-05-27T15:26:41.7842152Z image segmentation pipeline complete"};
-constexpr std::string_view kGHAPageFault{"2026-05-27T15:26:41.7842152Z page fault handler registered"};
+// Bare, UNMARKED bodies — the strategy falls back to canon's failure-cue inference. Only the
+// 2-token "segmentation fault" adjacency is a cue; the distractors carry the words non-adjacently
+// and stay benign.
+constexpr std::string_view kGHASegfault{
+    "2026-05-27T15:26:41.7842152Z Segmentation fault (core dumped)"};
+constexpr std::string_view kGHASegPipe{
+    "2026-05-27T15:26:41.7842152Z image segmentation pipeline complete"};
+constexpr std::string_view kGHAPageFault{
+    "2026-05-27T15:26:41.7842152Z page fault handler registered"};
 // A timestamp with no body is a blank line — declined (never collapsed into an empty "" template).
 constexpr std::string_view kGHABlankWithSpace{"2026-05-27T15:26:41.7842152Z "};
 constexpr std::string_view kGHABlankNoSpace{"2026-05-27T15:26:41.7842152Z"};
@@ -110,7 +116,8 @@ TEST(GithubStrategy, ConfidenceHighForGHAShape)
     EXPECT_GT(strategy->confidence(kGHALine), 0.85);
 }
 
-// ── Confidence is ZERO on non-GHA shapes (a strict subset of RFC3339 — 7 fractional digits + 'Z') ──
+// ── Confidence is ZERO on non-GHA shapes (a strict subset of RFC3339 — 7 fractional digits + 'Z')
+// ──
 TEST(GithubStrategy, ConfidenceZeroForNonGhaShapes)
 {
     const auto strategy{insight::semantic::github::make_strategy()};
@@ -124,13 +131,15 @@ TEST(GithubStrategy, ConfidenceZeroForNonGhaShapes)
 TEST(GithubStrategy, ConfidenceRespectsGhaPrefixSubset)
 {
     const auto strategy{insight::semantic::github::make_strategy()};
-    EXPECT_GT(strategy->confidence("2024-04-27T10:15:00.1234567Z ##[group]Run actions/checkout"), 0.0)
+    EXPECT_GT(strategy->confidence("2024-04-27T10:15:00.1234567Z ##[group]Run actions/checkout"),
+              0.0)
         << "exactly 7 fractional digits + 'Z' is the GHA shape";
     EXPECT_GT(strategy->confidence("2024-04-27T10:15:00.1234567Z"), 0.0)
         << "a blank GHA line is exactly the 28-char timestamp";
     EXPECT_EQ(strategy->confidence("2024-04-27T10:15:00.123456Z six fractional digits"), 0.0)
         << "6 fractional digits is NOT the GHA subset (100-ns ticks = exactly 7)";
-    EXPECT_EQ(strategy->confidence("2024-04-27T10:15:00.1234567+00:00 not Z"), 0.0) << "must end in 'Z'";
+    EXPECT_EQ(strategy->confidence("2024-04-27T10:15:00.1234567+00:00 not Z"), 0.0)
+        << "must end in 'Z'";
     EXPECT_EQ(strategy->confidence("2024-04-27T10:15:00.1234567Zx"), 0.0)
         << "the timestamp must be the whole line or followed by a space";
 }
@@ -144,10 +153,11 @@ TEST(GithubStrategy, RawLinePreserved)
     EXPECT_EQ(result.value().raw_line, kGHALine);
 }
 
-// ── Composed detection: the GHA strategy OUTRANKS the RFC3339-claiming representation strategies on a
-// genuine GHA line — the composed FormatDetector routes it to GitHubActions. (Pre-split this was a raw
-// confidence() vs SyslogStrategy comparison; post-split SyslogStrategy is sealed, so the composed
-// FormatDetector outcome — event.format — is the honest, public-surface assertion of the same property.)
+// ── Composed detection: the GHA strategy OUTRANKS the RFC3339-claiming representation strategies
+// on a genuine GHA line — the composed FormatDetector routes it to GitHubActions. (Pre-split this
+// was a raw confidence() vs SyslogStrategy comparison; post-split SyslogStrategy is sealed, so the
+// composed FormatDetector outcome — event.format — is the honest, public-surface assertion of the
+// same property.)
 TEST(GithubStrategy, DetectionRoutesGhaLineToGitHubActions)
 {
     ArenaAllocator arena{64U * 1024U};
@@ -156,10 +166,12 @@ TEST(GithubStrategy, DetectionRoutesGhaLineToGitHubActions)
     const auto event{tokenizer.process_line(kGHALine)};
     ASSERT_TRUE(event.has_value()) << event.error();
     EXPECT_EQ(event->format, LogFormat::GitHubActions)
-        << "the composed GHA strategy must win over the RFC3339 representation strategies on a GHA line";
+        << "the composed GHA strategy must win over the RFC3339 representation strategies on a GHA "
+           "line";
 }
 
-// ── …but the GHA strategy does NOT steal a whole-second RFC3339 syslog line (no 7-digit fraction) ──
+// ── …but the GHA strategy does NOT steal a whole-second RFC3339 syslog line (no 7-digit fraction)
+// ──
 TEST(GithubStrategy, DetectionLeavesWholeSecondRfc3339AsSyslog)
 {
     ArenaAllocator arena{64U * 1024U};

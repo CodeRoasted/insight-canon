@@ -9,7 +9,7 @@
 #include <gtest/gtest.h>
 
 import std;
-import insight.canon;           // ArenaAllocator / LogFormat / Tokenizer / compose
+import insight.canon;            // ArenaAllocator / LogFormat / Tokenizer / compose
 import insight.semantic.jenkins; // make_strategy + (via export import spi) IFormatStrategy / ParsedLine
 
 using insight::LogFormat;
@@ -43,7 +43,8 @@ TEST(JenkinsStrategy, ClaimsExactlyTheDialectMarkedShapes)
     const auto strategy{insight::semantic::jenkins::make_strategy()};
     EXPECT_GT(strategy->confidence(kTimestamped), 0.0);
     EXPECT_GT(strategy->confidence(kTimestampedPlain), 0.0)
-        << "a timestamper-prefixed line is claimed regardless of its content (the strip IS the win)";
+        << "a timestamper-prefixed line is claimed regardless of its content (the strip IS the "
+           "win)";
     EXPECT_GT(strategy->confidence(kTimestampedOffset), 0.0) << "±HH:MM zone form";
     EXPECT_GT(strategy->confidence(kBarePipeline), 0.0);
     EXPECT_GT(strategy->confidence(kFinished), 0.0);
@@ -67,9 +68,9 @@ TEST(JenkinsStrategy, StripsAndParsesTheTimestamperPrefix)
         << "the timestamper prefix must be stripped from the templated content";
     ASSERT_TRUE(parsed->timestamp.has_value()) << "the bracket interior is the event timestamp";
     // 2025-06-25T14:31:12(.339)Z — second-precision UTC check (parse_iso8601 truncates sub-second).
-    const auto secs{std::chrono::duration_cast<std::chrono::seconds>(
-                        parsed->timestamp->time_since_epoch())
-                        .count()};
+    const auto secs{
+        std::chrono::duration_cast<std::chrono::seconds>(parsed->timestamp->time_since_epoch())
+            .count()};
     EXPECT_EQ(secs, 1750861872) << "expected 2025-06-25T14:31:12Z as epoch seconds";
 }
 
@@ -103,7 +104,8 @@ TEST(JenkinsStrategy, RoutesThroughTheComposedDetector)
     const std::array manifests{insight::semantic::jenkins::kManifest};
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose(manifests)};
     ArenaAllocator arena{64U * 1024U};
-    insight::tokenization::Tokenizer tokenizer{arena, insight::tokenization::MaskConfig{}, composed};
+    insight::tokenization::Tokenizer tokenizer{arena, insight::tokenization::MaskConfig{},
+                                               composed};
 
     const auto pipeline{tokenizer.process_line(std::string{kBarePipeline})};
     ASSERT_TRUE(pipeline.has_value()) << pipeline.error();

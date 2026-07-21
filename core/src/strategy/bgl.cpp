@@ -43,10 +43,11 @@ std::expected<ParsedLine, std::string> BGLStrategy::parse(std::string_view line,
 
     if (!after_node.empty() && is_digit(after_node[0]))
     {
-        (void)sv_take_token(rest);                             // ts2 (secondary timestamp)
-        (void)sv_take_token(rest);                             // node2 (repeated node)
-        (void)sv_take_token(rest);                             // FACILITY — RAS or NULL (not a dim)
-        const std::string_view subsystem{sv_take_token(rest)}; // F3b: the low-card functional source
+        (void)sv_take_token(rest); // ts2 (secondary timestamp)
+        (void)sv_take_token(rest); // node2 (repeated node)
+        (void)sv_take_token(rest); // FACILITY — RAS or NULL (not a dim)
+        const std::string_view subsystem{
+            sv_take_token(rest)}; // F3b: the low-card functional source
         const std::string_view level_sv{sv_take_token(rest)};
 
         ParsedLine parsed_line;
@@ -68,10 +69,10 @@ std::expected<ParsedLine, std::string> BGLStrategy::parse(std::string_view line,
     // host = the node; level = a pure-rule severity token-scan over the message (a characterized
     // proxy, blind to contextual severity — D-F3b-3). Degrades gracefully on a short tail.
     std::string_view tail{after_node};
-    (void)sv_take_token(tail); // syslog month
-    (void)sv_take_token(tail); // syslog day
-    (void)sv_take_token(tail); // syslog HH:MM:SS
-    (void)sv_take_token(tail); // syslog host (redundant with `node`)
+    (void)sv_take_token(tail);                               // syslog month
+    (void)sv_take_token(tail);                               // syslog day
+    (void)sv_take_token(tail);                               // syslog HH:MM:SS
+    (void)sv_take_token(tail);                               // syslog host (redundant with `node`)
     const std::string_view daemon{extract_syslog_tag(tail)}; // tail now = the message body
 
     ParsedLine parsed_line;
@@ -81,11 +82,10 @@ std::expected<ParsedLine, std::string> BGLStrategy::parse(std::string_view line,
     parsed_line.component = daemon;
     parsed_line.host = node;
     parsed_line.content = tail;
-    INSIGHT_LOG_DEBUG(
-        logging::strategy_logger(),
-        "strategy=BGL/syslog parsed component={} host={} level={} has_timestamp={}",
-        parsed_line.component, parsed_line.host, to_string(parsed_line.level),
-        parsed_line.timestamp.has_value());
+    INSIGHT_LOG_DEBUG(logging::strategy_logger(),
+                      "strategy=BGL/syslog parsed component={} host={} level={} has_timestamp={}",
+                      parsed_line.component, parsed_line.host, to_string(parsed_line.level),
+                      parsed_line.timestamp.has_value());
     return std::expected<ParsedLine, std::string>{parsed_line};
 }
 

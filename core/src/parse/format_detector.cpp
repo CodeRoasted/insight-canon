@@ -4,7 +4,7 @@ module;
 module insight.canon.detail.parse;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.spi;              // StrategyFactory
+import insight.canon.spi;             // StrategyFactory
 import insight.canon.compose;         // ComposedSemantics
 import insight.canon.detail.strategy; // the 19 core representation strategies registered here
 
@@ -184,11 +184,12 @@ namespace
         {
             if (line.size() > kTimestampSeparatorIndex && line[kTimestampSeparatorIndex] == 'T')
             {
-                // Syslog is the core representation-format candidate for an RFC3339+T line. A composed
-                // GitHub-Actions dialect strategy (if present) is probed via custom_strategies_ on
-                // every line and outranks Syslog by confidence (0.92 vs 0.80) on its precise
-                // 7-digit-fractional/'Z' shape — so canon names no dialect here (ADR 0024 §1.3), and a
-                // real RFC3339 syslog line (GHA confidence 0.0) still routes to Syslog. Byte-identical.
+                // Syslog is the core representation-format candidate for an RFC3339+T line. A
+                // composed GitHub-Actions dialect strategy (if present) is probed via
+                // custom_strategies_ on every line and outranks Syslog by confidence (0.92 vs 0.80)
+                // on its precise 7-digit-fractional/'Z' shape — so canon names no dialect here (ADR
+                // 0024 §1.3), and a real RFC3339 syslog line (GHA confidence 0.0) still routes to
+                // Syslog. Byte-identical.
                 candidates.add(LogFormat::Syslog);
             }
             else
@@ -227,9 +228,9 @@ FormatDetector::FormatDetector(const insight::semantic::ComposedSemantics& compo
         by_format_.at(index) = strategies_.back().get();
     };
 
-    // The core REPRESENTATION-format strategies (semantic-unaware — how data is represented, not what
-    // an ecosystem means). The GitHub-Actions DIALECT strategy is no longer a builtin; it arrives via
-    // the composition below (ADR 0024 §1.3/§3).
+    // The core REPRESENTATION-format strategies (semantic-unaware — how data is represented, not
+    // what an ecosystem means). The GitHub-Actions DIALECT strategy is no longer a builtin; it
+    // arrives via the composition below (ADR 0024 §1.3/§3).
     add_builtin(std::make_unique<JsonStrategy>());
     add_builtin(std::make_unique<SyslogStrategy>());
     add_builtin(std::make_unique<CLFStrategy>());
@@ -252,8 +253,9 @@ FormatDetector::FormatDetector(const insight::semantic::ComposedSemantics& compo
 
     // Composed DIALECT strategies (ADR 0024 §3): each factory the composition carries produces one
     // strategy, registered through the existing injection seam (probed once-per-line via
-    // custom_strategies_). In 1.7.5 this is the GitHub-Actions strategy from insight_semantic_github;
-    // canon core names no dialect. The factories are in canonical (package-sorted) order.
+    // custom_strategies_). In 1.7.5 this is the GitHub-Actions strategy from
+    // insight_semantic_github; canon core names no dialect. The factories are in canonical
+    // (package-sorted) order.
     for (const insight::semantic::StrategyFactory factory : composed.strategy_factories())
         register_strategy(factory());
 
@@ -369,9 +371,9 @@ IFormatStrategy* FormatDetector::detect_from_batch(std::span<const std::string_v
     }
 
     // `auto` (not `auto*`): max_element returns an ITERATOR — a raw pointer on libstdc++/libc++ but
-    // a wrapper class on MSVC's STL, so forcing pointer deduction breaks there. *it and std::distance
-    // below work for any random-access iterator. NOLINT: clang-tidy's qualified-auto wants `auto*`,
-    // which is the very libstdc++-ism that broke MSVC — keep `auto`.
+    // a wrapper class on MSVC's STL, so forcing pointer deduction breaks there. *it and
+    // std::distance below work for any random-access iterator. NOLINT: clang-tidy's qualified-auto
+    // wants `auto*`, which is the very libstdc++-ism that broke MSVC — keep `auto`.
     // NOLINTNEXTLINE(readability-qualified-auto)
     const auto max_score_it{std::ranges::max_element(scores)};
     if (*max_score_it == 0.0)

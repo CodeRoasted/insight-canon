@@ -93,8 +93,8 @@ TEST(GithubOutcome, NoMarkerMeansTheConsolePathIsHonestlyUnknown)
     const auto degenerate{resolve_run_outcome("", scan, composed)};
     EXPECT_EQ(degenerate.outcome, RunOutcome::Unknown)
         << "only-a-console-log GHA is Unknown — never a guess from per-step exit codes";
-    EXPECT_TRUE(degenerate.note.empty()) << "absence is the default, not an error: "
-                                         << degenerate.note;
+    EXPECT_TRUE(degenerate.note.empty())
+        << "absence is the default, not an error: " << degenerate.note;
 }
 
 TEST(GithubOutcome, AuthoritativeSideInputCarriesTheGhaVerdict)

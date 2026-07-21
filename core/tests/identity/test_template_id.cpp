@@ -12,17 +12,23 @@ using insight::ngram_id_of;
 using insight::NgramId;
 using insight::parse_template_id;
 using insight::render;
-using insight::TemplateId;
 using insight::template_id_of;
+using insight::TemplateId;
 
 namespace
 {
 
 // A spread of representative masked templates (the kind the masker emits).
 const std::vector<std::string> kSamples{
-    "GET <*> -> <*>",       "user <*> logged in",  "charge order total",
-    "verify session token", "took alternate cache path", "ERROR db connect failed code=<*>",
-    "",                     "a",                   "the quick brown fox jumps",
+    "GET <*> -> <*>",
+    "user <*> logged in",
+    "charge order total",
+    "verify session token",
+    "took alternate cache path",
+    "ERROR db connect failed code=<*>",
+    "",
+    "a",
+    "the quick brown fox jumps",
 };
 
 } // namespace
@@ -66,7 +72,8 @@ TEST(TemplateIdInvariants, ByteOrderMatchesHexStringOrder)
             const TemplateId lhs_id{template_id_of(lhs)};
             const TemplateId rhs_id{template_id_of(rhs)};
             EXPECT_EQ(lhs_id < rhs_id, render(lhs_id) < render(rhs_id))
-                << "POD order diverged from hex-string order: \"" << lhs << "\" vs \"" << rhs << '"';
+                << "POD order diverged from hex-string order: \"" << lhs << "\" vs \"" << rhs
+                << '"';
         }
 }
 

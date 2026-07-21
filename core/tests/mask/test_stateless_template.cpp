@@ -41,9 +41,8 @@ TEST(StatelessTemplate, PureFunctionOfContentNotOrderOrStream)
     masked("yet another unrelated message 42", arena);
     const std::string after_priming{masked(line, arena)};
     const std::string fresh{masked(line, arena)};
-    EXPECT_EQ(after_priming, fresh)
-        << "stateless_template must depend ONLY on its own content\n"
-        << "after_priming=" << after_priming << "\nfresh=" << fresh;
+    EXPECT_EQ(after_priming, fresh) << "stateless_template must depend ONLY on its own content\n"
+                                    << "after_priming=" << after_priming << "\nfresh=" << fresh;
 }
 
 TEST(StatelessTemplate, LogicallyIdenticalLinesShareTemplate)
@@ -123,9 +122,10 @@ TEST(StatelessTemplate, DiagnosticCompositeCollapsesChromiumPrefix)
 {
     ArenaAllocator arena{256U * 1024U};
     // The exact P6 pair — only PID / date / time differ → ONE template.
-    EXPECT_EQ(
-        masked("[6226:0609/094020.430910:ERROR:dbus/bus.cc:408] Failed to connect to the bus", arena),
-        masked("[6225:0528/144005.901629:ERROR:dbus/bus.cc:408] Failed to connect to the bus", arena))
+    EXPECT_EQ(masked("[6226:0609/094020.430910:ERROR:dbus/bus.cc:408] Failed to connect to the bus",
+                     arena),
+              masked("[6225:0528/144005.901629:ERROR:dbus/bus.cc:408] Failed to connect to the bus",
+                     arena))
         << "Chromium PID/date/time segments mask; ERROR/dbus/bus.cc kept → baseline ≡ changed";
     // The letter-leading class anchor is KEPT: a different file in the prefix stays distinct.
     EXPECT_NE(masked("[6226:0609/094020.430910:ERROR:dbus/bus.cc:408] x", arena),
@@ -190,7 +190,8 @@ TEST(StatelessTemplate, NonEphemeralPathsAndSourcePathsUntouched)
         << "/usr/bin is NOT ephemeral — distinct binaries stay distinct";
     EXPECT_NE(masked("at /tmp/build/foo.cc:42 oops", arena),
               masked("at /tmp/build/bar.cc:42 oops", arena))
-        << "a /tmp SOURCE path (:line) is a diagnostic composite first — file kept, only :line masks";
+        << "a /tmp SOURCE path (:line) is a diagnostic composite first — file kept, only :line "
+           "masks";
 }
 
 // ── F13 strengthening (§8 / D-TID-11..13) — the re-measure rule set ──────────────
@@ -215,11 +216,13 @@ TEST(StatelessTemplate, DigitLeadingTokensMask)
     ArenaAllocator arena{256U * 1024U};
     // One rule subsumes numbers-with-separators, decimals, number+unit, versions —
     // no unit lexicon. Each pair differs only in a digit-leading token → one template.
-    EXPECT_EQ(masked("built in 6.2s", arena), masked("built in 11.9s", arena));        // duration
-    EXPECT_EQ(masked("done 76.5%", arena), masked("done 100.0%", arena));              // percent
-    EXPECT_EQ(masked("compiled 31,260 targets", arena), masked("compiled 9 targets", arena)); // grouped
-    EXPECT_EQ(masked("installing pkg 0.25.5-3", arena), masked("installing pkg 1.2.11", arena)); // version
-    EXPECT_EQ(masked("freed 512MB", arena), masked("freed 8GB", arena));               // number+unit
+    EXPECT_EQ(masked("built in 6.2s", arena), masked("built in 11.9s", arena)); // duration
+    EXPECT_EQ(masked("done 76.5%", arena), masked("done 100.0%", arena));       // percent
+    EXPECT_EQ(masked("compiled 31,260 targets", arena),
+              masked("compiled 9 targets", arena)); // grouped
+    EXPECT_EQ(masked("installing pkg 0.25.5-3", arena),
+              masked("installing pkg 1.2.11", arena));                   // version
+    EXPECT_EQ(masked("freed 512MB", arena), masked("freed 8GB", arena)); // number+unit
 }
 
 TEST(StatelessTemplate, LetterLeadingKeptUuidAndHashMasked)
@@ -228,7 +231,8 @@ TEST(StatelessTemplate, LetterLeadingKeptUuidAndHashMasked)
     // Letter-leading words are KEPT (the F13 boundary — D-TID-14): a word is not a number.
     EXPECT_NE(masked("decode utf8 stream", arena), masked("decode ascii stream", arena));
     EXPECT_EQ(masked("decode utf8 stream", arena), masked("decode utf8 stream", arena));
-    EXPECT_NE(masked("hash sha256 ok", arena), masked("hash sha512 ok", arena)); // short, letter-leading → kept
+    EXPECT_NE(masked("hash sha256 ok", arena),
+              masked("hash sha512 ok", arena)); // short, letter-leading → kept
     // UUID + long hash collapse (high-card identity).
     EXPECT_EQ(masked("temp f7f63412-b7a7-468d-bd31-1a6ae1ca2680 ready", arena),
               masked("temp 8b4537c3-1dd0-411a-a760-2aeb13934993 ready", arena));
@@ -239,8 +243,9 @@ TEST(StatelessTemplate, LetterLeadingKeptUuidAndHashMasked)
 TEST(StatelessTemplate, HashCounterAndWorkerBracketCollapse)
 {
     ArenaAllocator arena{256U * 1024U};
-    EXPECT_EQ(masked("step #26 done", arena), masked("step #7 done", arena));     // #-counter
-    EXPECT_EQ(masked("[gw0] PASSED test_x", arena), masked("[gw3] PASSED test_x", arena)); // xdist worker
+    EXPECT_EQ(masked("step #26 done", arena), masked("step #7 done", arena)); // #-counter
+    EXPECT_EQ(masked("[gw0] PASSED test_x", arena),
+              masked("[gw3] PASSED test_x", arena)); // xdist worker
     // The class marker is kept (a counter ≠ a worker bracket).
     EXPECT_NE(masked("#26", arena), masked("[gw26]", arena));
 }
@@ -458,9 +463,10 @@ TEST(StatelessTemplate, CardinalityOnCorpus)
 
     constexpr std::size_t kMaxLines{300000};
     ArenaAllocator arena{8U * 1024U * 1024U};
-    // Generic corpus masking is semantic-unaware — a degenerate (zero-package) composition. `composed`
-    // precedes `parser` so it outlives the const-ref LogParser holds.
-    const insight::semantic::ComposedSemantics composed{insight::test_support::degenerate_composition()};
+    // Generic corpus masking is semantic-unaware — a degenerate (zero-package) composition.
+    // `composed` precedes `parser` so it outlives the const-ref LogParser holds.
+    const insight::semantic::ComposedSemantics composed{
+        insight::test_support::degenerate_composition()};
     LogParser parser{arena, composed};
     std::unordered_map<std::string, std::uint64_t> stateless_templates;
     std::size_t lines{0};
@@ -505,7 +511,8 @@ TEST(StatelessTemplate, CardinalityOnCorpus)
     // candidates — tokens that varied but no rule masked).
     std::vector<std::pair<std::string, std::uint64_t>> by_count{stateless_templates.begin(),
                                                                 stateless_templates.end()};
-    std::ranges::sort(by_count, [](const auto& lhs, const auto& rhs) { return lhs.second > rhs.second; });
+    std::ranges::sort(by_count,
+                      [](const auto& lhs, const auto& rhs) { return lhs.second > rhs.second; });
     std::cout << "--- top 15 by count ---\n";
     for (std::size_t i{0}; i < std::min<std::size_t>(15, by_count.size()); ++i)
         std::cout << by_count[i].second << "  " << by_count[i].first.substr(0, 120) << "\n";

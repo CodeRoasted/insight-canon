@@ -148,9 +148,9 @@ namespace
 
     int parse_month_name(std::string_view month_str) noexcept
     {
-        // `const auto` (not `const auto*`): ranges::find returns an ITERATOR, which is a raw pointer
-        // on libstdc++/libc++ but a wrapper class on MSVC's STL — forcing pointer deduction breaks
-        // there. std::distance works for any random-access iterator. NOLINT: clang-tidy's
+        // `const auto` (not `const auto*`): ranges::find returns an ITERATOR, which is a raw
+        // pointer on libstdc++/libc++ but a wrapper class on MSVC's STL — forcing pointer deduction
+        // breaks there. std::distance works for any random-access iterator. NOLINT: clang-tidy's
         // qualified-auto wants `auto*`, the very libstdc++-ism that broke MSVC — keep `auto`.
         // NOLINTNEXTLINE(readability-qualified-auto)
         const auto month_it{std::ranges::find(kMonthNames, month_str)};
@@ -762,13 +762,13 @@ LogLevel parse_log_level(std::string_view level_str) noexcept
 
 namespace
 {
-// An alerting tier (Warn/Error/Fatal) is the only severity a pass-glyph-led line can FALSELY
-// earn (D-OUT-1b): Info/Debug/Trace never alert, so the outcome guard below is paid only on a
-// would-be-positive result — the D-OUT-1 hot-path discipline.
-[[nodiscard]] constexpr bool is_alerting_level(LogLevel level) noexcept
-{
-    return level == LogLevel::Warn || level == LogLevel::Error || level == LogLevel::Fatal;
-}
+    // An alerting tier (Warn/Error/Fatal) is the only severity a pass-glyph-led line can FALSELY
+    // earn (D-OUT-1b): Info/Debug/Trace never alert, so the outcome guard below is paid only on a
+    // would-be-positive result — the D-OUT-1 hot-path discipline.
+    [[nodiscard]] constexpr bool is_alerting_level(LogLevel level) noexcept
+    {
+        return level == LogLevel::Warn || level == LogLevel::Error || level == LogLevel::Fatal;
+    }
 } // namespace
 
 // Only throw path is for_each_token's substr(begin, ...) with begin <= line.size()
@@ -826,7 +826,8 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
                              const LogLevel level{parse_log_level(token)};
                              if (level == LogLevel::Unknown)
                                  return false;
-                             leading = level; // first level token wins; keep scanning for a follower
+                             leading =
+                                 level; // first level token wins; keep scanning for a follower
                              level_token = token;
                              return false;
                          });

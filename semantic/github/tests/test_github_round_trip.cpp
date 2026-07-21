@@ -1,12 +1,13 @@
 // test_github_round_trip.cpp — studies/008 G2 round-trip closure on the GitHub Actions dialect.
-// The RUNTIME (value) half of the C2 bidirectionality obligation the DialectIntent concept enforces at
-// compile time (shared_intent_declaration §3.2/§6): for every recognition marker, materialize its PAIRED
-// generation row (render_row) and assert canon recognizes the declared (kind, child_order, payload) back —
-// recognize(render_row(W)) == R. The kit is package-agnostic (canon-shipped, self-adapting over the row
-// spans); this file is the ~10-line GitHub instantiation. Verbose-on-failure: each check prints the
-// rendered line + the expected-vs-got intent tuple. Determinism: seedless, single-threaded, pure byte
-// functions over the composed manifest — no RNG, no wall-clock. Target: 100% (studies/008 §5 G2).
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
+// The RUNTIME (value) half of the C2 bidirectionality obligation the DialectIntent concept enforces
+// at compile time (shared_intent_declaration §3.2/§6): for every recognition marker, materialize
+// its PAIRED generation row (render_row) and assert canon recognizes the declared (kind,
+// child_order, payload) back — recognize(render_row(W)) == R. The kit is package-agnostic
+// (canon-shipped, self-adapting over the row spans); this file is the ~10-line GitHub
+// instantiation. Verbose-on-failure: each check prints the rendered line + the expected-vs-got
+// intent tuple. Determinism: seedless, single-threaded, pure byte functions over the composed
+// manifest — no RNG, no wall-clock. Target: 100% (studies/008 §5 G2). NOLINTBEGIN — unit test:
+// short identifiers and string literals are fine.
 #include <gtest/gtest.h>
 
 import std;
@@ -16,18 +17,22 @@ import insight.semantic.github;   // kManifest + Dialect (markers / emit_markers
 
 TEST(GithubRoundTrip, RecognizeRendersBackToDeclaredIntent)
 {
-    // The recognizer is the SHIPPED reader (compose the package manifest); the generation rows come from
-    // the dialect TYPE (Dialect::emit_markers) — the two projections of the one declaration close here.
-    const std::array<insight::semantic::SemanticPackageManifest, 1> one{insight::semantic::github::kManifest};
+    // The recognizer is the SHIPPED reader (compose the package manifest); the generation rows come
+    // from the dialect TYPE (Dialect::emit_markers) — the two projections of the one declaration
+    // close here.
+    const std::array<insight::semantic::SemanticPackageManifest, 1> one{
+        insight::semantic::github::kManifest};
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose(one)};
 
     const auto report{insight::semantic::conformance::round_trip_report(
-        insight::semantic::github::Dialect::markers, insight::semantic::github::Dialect::emit_markers,
-        composed)};
+        insight::semantic::github::Dialect::markers,
+        insight::semantic::github::Dialect::emit_markers, composed)};
 
-    // Every intent marker (Job, both Step media `Run ` / `##[group]Run `) must round-trip — the two GHA
-    // Step media closing proves materialization-invariance on read == medium-multiplicity on write.
-    ASSERT_FALSE(report.checks.empty()) << "no round-trip checks ran — the dialect declared no markers?";
+    // Every intent marker (Job, both Step media `Run ` / `##[group]Run `) must round-trip — the two
+    // GHA Step media closing proves materialization-invariance on read == medium-multiplicity on
+    // write.
+    ASSERT_FALSE(report.checks.empty())
+        << "no round-trip checks ran — the dialect declared no markers?";
     for (const auto& check : report.checks)
         EXPECT_TRUE(check.passed) << "[" << check.name << "] " << check.detail;
     EXPECT_TRUE(report.all_passed()) << report.summary();

@@ -1,9 +1,9 @@
 // insight.semantic.github — the GitHub Actions / Azure Pipelines dialect semantic package
-// (ADR 0024). VOCABULARY as DATA in the closed semantic-grammar-1 (structural roles, intent markers,
-// level lifts) + the CODE tier (the dialect format strategy + the echoed-source provenance hook).
-// Fully self-contained: imports only insight.canon.api (types + utils) + insight.canon.spi (the
-// provider contract) — never a sealed detail shard. The composition (insight::semantic::compose)
-// statically links this package's kManifest into a binary.
+// (ADR 0024). VOCABULARY as DATA in the closed semantic-grammar-1 (structural roles, intent
+// markers, level lifts) + the CODE tier (the dialect format strategy + the echoed-source provenance
+// hook). Fully self-contained: imports only insight.canon.api (types + utils) + insight.canon.spi
+// (the provider contract) — never a sealed detail shard. The composition
+// (insight::semantic::compose) statically links this package's kManifest into a binary.
 //
 // `export import insight.canon.spi` so a consumer that imports this module can name
 // SemanticPackageManifest (the type of kManifest) without a separate spi import.
@@ -25,93 +25,104 @@ export std::unique_ptr<insight::tokenization::IFormatStrategy> make_strategy();
 export bool is_echoed_source(std::string_view raw_line) noexcept;
 
 // ── Structural-role rows (§1.2) ──
-// The announced GitHub-Actions/Azure markers. format_gate = kAnyFormat: these fire regardless of the
-// routed format, reproducing the pre-split UNGATED StructuralRoleRegistry::classify EXACTLY (a
+// The announced GitHub-Actions/Azure markers. format_gate = kAnyFormat: these fire regardless of
+// the routed format, reproducing the pre-split UNGATED StructuralRoleRegistry::classify EXACTLY (a
 // `##[group]` on a RawText CI line still classifies — byte-identity, G-SP-1).
 inline constexpr std::array<StructuralRoleRow, 6> kRoles{{
     {.prefix = "##[group]", .role = insight::StructuralRole::GroupBegin, .format_gate = kAnyFormat},
     {.prefix = "::group::", .role = insight::StructuralRole::GroupBegin, .format_gate = kAnyFormat},
-    {.prefix = "##[endgroup]", .role = insight::StructuralRole::GroupEnd, .format_gate = kAnyFormat},
-    {.prefix = "::endgroup::", .role = insight::StructuralRole::GroupEnd, .format_gate = kAnyFormat},
+    {.prefix = "##[endgroup]",
+     .role = insight::StructuralRole::GroupEnd,
+     .format_gate = kAnyFormat},
+    {.prefix = "::endgroup::",
+     .role = insight::StructuralRole::GroupEnd,
+     .format_gate = kAnyFormat},
     {.prefix = "##[error]", .role = insight::StructuralRole::Terminator, .format_gate = kAnyFormat},
     {.prefix = "::error::", .role = insight::StructuralRole::Terminator, .format_gate = kAnyFormat},
 }};
 
 // ── The declared INTENT CHANNEL vocabulary (ADR 0030 D1/D3) ──
 // `Medium = IntentFormat × IntentChannel`. GHA is ONE IntentFormat that canon receives in TWO
-// materializations — but they are NOT two channels GitHub serves, and saying so was the error ADR 0030
-// corrects:
+// materializations — but they are NOT two channels GitHub serves, and saying so was the error ADR
+// 0030 corrects:
 //
-//   annotated — GHA's ONE REAL CHANNEL. The runner's raw job log, which is what the API serves, what
-//               downloadJobLogsForWorkflowRun fetches, and what the shipped Action feeds. Step banners
-//               are `##[group]Run <cmd>`; the workflow-command markers (`##[error]`, `##[group]`) are
-//               present. A user's GHA log is annotated in every path we ship.
+//   annotated — GHA's ONE REAL CHANNEL. The runner's raw job log, which is what the API serves,
+//   what
+//               downloadJobLogsForWorkflowRun fetches, and what the shipped Action feeds. Step
+//               banners are `##[group]Run <cmd>`; the workflow-command markers (`##[error]`,
+//               `##[group]`) are present. A user's GHA log is annotated in every path we ship.
 //   stripped  — OUR OWN LAB ABLATION, not a GitHub product. Produced by
 //               ci_revert_corpus.transform.degrade(), which strips the `##[…]` workflow commands to
-//               build the structure-poor arm of the template-lattice lift experiment (it measures how
-//               much the structure buys us). Step banners are the bare `Run <cmd>`. Canon must READ it —
-//               the lattice experiment is a real consumer — so it stays a declared channel, and the
-//               G-SINK-2 control arm proves the bare `Run ` row is load-bearing for it.
+//               build the structure-poor arm of the template-lattice lift experiment (it measures
+//               how much the structure buys us). Step banners are the bare `Run <cmd>`. Canon must
+//               READ it — the lattice experiment is a real consumer — so it stays a declared
+//               channel, and the G-SINK-2 control arm proves the bare `Run ` row is load-bearing
+//               for it.
 //
 // ⚠ DO NOT re-describe this pair as "two GHA materializations" or claim MATERIALIZATION INVARIANCE
-// across it (ADR 0030 D1). The pair tests canon against OUR OWN degrade(), which is a real and useful
-// property — but calling it invariance across two real materializations of a dialect is exactly the
-// endogamy trap the corpus discipline exists to prevent. The prior comment here asserted a "clean
-// partition MEASURED on 22 030 real annotated/stripped pairs"; only the ANNOTATED arm is real bytes.
+// across it (ADR 0030 D1). The pair tests canon against OUR OWN degrade(), which is a real and
+// useful property — but calling it invariance across two real materializations of a dialect is
+// exactly the endogamy trap the corpus discipline exists to prevent. The prior comment here
+// asserted a "clean partition MEASURED on 22 030 real annotated/stripped pairs"; only the ANNOTATED
+// arm is real bytes.
 //
 // What that correction does NOT touch: the annotated arm IS real GHA, so the phantom-Step defect
 // (9.05 % of 22 030 real logs) is real, and the fix below is correct and necessary.
 //
-// The NAMES are `annotated` / `stripped` and stay so (D3): they name what a user can verify by looking
-// at their own file, which `api` / `download` would not.
+// The NAMES are `annotated` / `stripped` and stay so (D3): they name what a user can verify by
+// looking at their own file, which `api` / `download` would not.
 //
-// EXPORTED: a package's channel vocabulary is part of its public declaration. Every caller that acquires
-// a GHA stream must name the channel it acquired — or derive it at Acquisition (D2: canon never infers;
-// the caller may) — so the names have to be nameable: the CLI validates `--channel` against them and
-// peeks to deduce one, the Action declares `annotated` because it chose downloadJobLogsForWorkflowRun,
-// and a test says which form it fixtures. It is also the MEDIUM SELECTOR's input on the writer side,
-// whose default is `annotated` — the real channel (D1).
+// EXPORTED: a package's channel vocabulary is part of its public declaration. Every caller that
+// acquires a GHA stream must name the channel it acquired — or derive it at Acquisition (D2: canon
+// never infers; the caller may) — so the names have to be nameable: the CLI validates `--channel`
+// against them and peeks to deduce one, the Action declares `annotated` because it chose
+// downloadJobLogsForWorkflowRun, and a test says which form it fixtures. It is also the MEDIUM
+// SELECTOR's input on the writer side, whose default is `annotated` — the real channel (D1).
 export inline constexpr std::string_view kChannelAnnotated{"annotated"};
 export inline constexpr std::string_view kChannelStripped{"stripped"};
-export inline constexpr std::array<std::string_view, 2> kChannels{{kChannelAnnotated, kChannelStripped}};
+export inline constexpr std::array<std::string_view, 2> kChannels{
+    {kChannelAnnotated, kChannelStripped}};
 
 // ── Intent-marker rows (§1.2/§2.2) ──
 // FORMAT-GATED to GitHubActions (II-6 — `Run ` is GHA-runner-specific and would misfire elsewhere).
-// The hierarchy rides the rows: Job = Unordered (jobs parallel-by-construction), Step = Ordered (steps
-// sequential-by-YAML) — the ADR 0023 level-typed alignment declaration. The payload is the content
-// after the prefix, verbatim (core's canonicalize_intent/discriminant_of derive the class + instance).
+// The hierarchy rides the rows: Job = Unordered (jobs parallel-by-construction), Step = Ordered
+// (steps sequential-by-YAML) — the ADR 0023 level-typed alignment declaration. The payload is the
+// content after the prefix, verbatim (core's canonicalize_intent/discriminant_of derive the class +
+// instance).
 //
-// CHANNEL-GATED per Step (ADR 0029 D5 — this is the phantom fix, and it REPLACES the reasoning that used
-// to sit here). The two Step prefixes are the same intent in two channels, so each gates to ITS channel:
+// CHANNEL-GATED per Step (ADR 0029 D5 — this is the phantom fix, and it REPLACES the reasoning that
+// used to sit here). The two Step prefixes are the same intent in two channels, so each gates to
+// ITS channel:
 //
 //   `Run `         → stripped   — REQUIRED, and the row cannot simply be deleted: our ablation arm
-//                                 genuinely uses the bare `Run ` as its banner (G-SINK-2's control arm
-//                                 is the fence). In the ANNOTATED channel a line starting with `Run ` is
-//                                 ordinary PROSE, so an ungated row mints a phantom Step quantum out of
-//                                 it. Measured on REAL annotated bytes: 9.05 % of 22 030 logs, 7 752
-//                                 lines, 62 distinct payloads, EVERY ONE prose (`` `npm audit` for
-//                                 details. `` dominates). Confirmed end-to-end to fabricate a
-//                                 VanishedPhase.
-//   `##[group]Run ` → annotated — self-gating in principle (`##[` never occurs in a stripped log), but
-//                                 gated anyway so the declared channel selects EXACTLY ONE Step row: a
-//                                 multi-channel tree becomes unrepresentable rather than merely
-//                                 unattested (D5), fail-closed is symmetric across both forms, and the
-//                                 writer's medium selector (D4) has a gate to select ON.
+//                                 genuinely uses the bare `Run ` as its banner (G-SINK-2's control
+//                                 arm is the fence). In the ANNOTATED channel a line starting with
+//                                 `Run ` is ordinary PROSE, so an ungated row mints a phantom Step
+//                                 quantum out of it. Measured on REAL annotated bytes: 9.05 % of 22
+//                                 030 logs, 7 752 lines, 62 distinct payloads, EVERY ONE prose (``
+//                                 `npm audit` for details. `` dominates). Confirmed end-to-end to
+//                                 fabricate a VanishedPhase.
+//   `##[group]Run ` → annotated — self-gating in principle (`##[` never occurs in a stripped log),
+//   but
+//                                 gated anyway so the declared channel selects EXACTLY ONE Step
+//                                 row: a multi-channel tree becomes unrepresentable rather than
+//                                 merely unattested (D5), fail-closed is symmetric across both
+//                                 forms, and the writer's medium selector (D4) has a gate to select
+//                                 ON.
 //
-// The superseded claim, recorded so it is not re-derived: shipping BOTH prefixes ungated was believed to
-// make the step name "materialization-INVARIANT" and to dissolve the which-form-was-Sift-fed hazard. It
-// does the opposite — the PAYLOAD does read back the same from both (both yield `yarn lint`), but
-// ungated recognition of the *bare* prefix in the annotated channel is exactly the defect. The two gated
-// rows preserve that same-payload property under their own channels — but note what it is and is not:
-// it is canon reading our ablation back to the same intent, NOT invariance across two real GHA
-// materializations (ADR 0030 D1).
+// The superseded claim, recorded so it is not re-derived: shipping BOTH prefixes ungated was
+// believed to make the step name "materialization-INVARIANT" and to dissolve the
+// which-form-was-Sift-fed hazard. It does the opposite — the PAYLOAD does read back the same from
+// both (both yield `yarn lint`), but ungated recognition of the *bare* prefix in the annotated
+// channel is exactly the defect. The two gated rows preserve that same-payload property under their
+// own channels — but note what it is and is not: it is canon reading our ablation back to the same
+// intent, NOT invariance across two real GHA materializations (ADR 0030 D1).
 //
-// `Complete job name: ` stays kAnyChannel: it is the banner in BOTH channels (the strip does not touch
-// it), so it has no channel-dependent reading and needs no gate — a gate is required exactly when one
-// channel's marker occurs as ordinary content in a sibling channel, which is why `Run ` needs one and
-// this does not (the "does not metastasize" rule).
-// The two Step prefixes never shadow: neither is a proper prefix of the other, so compose's
-// longest-match note stays empty.
+// `Complete job name: ` stays kAnyChannel: it is the banner in BOTH channels (the strip does not
+// touch it), so it has no channel-dependent reading and needs no gate — a gate is required exactly
+// when one channel's marker occurs as ordinary content in a sibling channel, which is why `Run `
+// needs one and this does not (the "does not metastasize" rule). The two Step prefixes never
+// shadow: neither is a proper prefix of the other, so compose's longest-match note stays empty.
 inline constexpr std::array<IntentMarkerRow, 3> kMarkers{{
     {.prefix = "Complete job name: ",
      .kind = insight::tokenization::IntentMarkerKind::Job,
@@ -134,14 +145,14 @@ inline constexpr std::array<IntentMarkerRow, 3> kMarkers{{
 }};
 
 // ── Generation-template rows (studies/008, shared_intent_declaration §3.2) — the WRITER dual ──
-// One emit row per recognition row, paired by (prefix, kind, format_gate, channel_gate) — the MEDIUM is
-// `IntentFormat × IntentChannel` (ADR 0030 D3), so each projection names the same channel as its dual.
-// Both Step media are present: `##[group]Run <cmd>` materializes into the ANNOTATED channel (the real
-// one, and the writer's default), `Run <cmd>` into our STRIPPED ablation — each read back to the same
-// identity under its own channel, so the round-trip closes per channel (G2). The writer picks WHICH by
-// the declared channel (the medium selector), never by array order. Each emit is PayloadAfterPrefix, the exact inverse of the
-// reader's RemainderAfterPrefix: render_row(row, "yarn lint") reproduces the banner canon segments back
-// to Step "yarn lint".
+// One emit row per recognition row, paired by (prefix, kind, format_gate, channel_gate) — the
+// MEDIUM is `IntentFormat × IntentChannel` (ADR 0030 D3), so each projection names the same channel
+// as its dual. Both Step media are present: `##[group]Run <cmd>` materializes into the ANNOTATED
+// channel (the real one, and the writer's default), `Run <cmd>` into our STRIPPED ablation — each
+// read back to the same identity under its own channel, so the round-trip closes per channel (G2).
+// The writer picks WHICH by the declared channel (the medium selector), never by array order. Each
+// emit is PayloadAfterPrefix, the exact inverse of the reader's RemainderAfterPrefix:
+// render_row(row, "yarn lint") reproduces the banner canon segments back to Step "yarn lint".
 inline constexpr std::array<IntentEmitRow, 3> kEmitMarkers{{
     {.prefix = "Complete job name: ",
      .kind = insight::tokenization::IntentMarkerKind::Job,
@@ -163,22 +174,26 @@ inline constexpr std::array<IntentEmitRow, 3> kEmitMarkers{{
      .channel_gate = kChannelAnnotated},
 }};
 
-// The C2 bidirectionality obligation: this dialect exposes BOTH projections, and every recognition row
-// is paired with a generation row. DialectIntent fails to compile if a reader ships without a writer.
+// The C2 bidirectionality obligation: this dialect exposes BOTH projections, and every recognition
+// row is paired with a generation row. DialectIntent fails to compile if a reader ships without a
+// writer.
 export struct Dialect
 {
     static constexpr std::span<const IntentMarkerRow> markers{kMarkers};
     static constexpr std::span<const IntentEmitRow> emit_markers{kEmitMarkers};
 };
-static_assert(insight::semantic::DialectIntent<Dialect>,
-              "github: a recognition marker has no paired generation row (reader without a writer), or "
-              "a reader/writer pair straddles two IntentChannels (ADR 0029 D1 — the projections must "
-              "name the same Medium)");
+static_assert(
+    insight::semantic::DialectIntent<Dialect>,
+    "github: a recognition marker has no paired generation row (reader without a writer), or "
+    "a reader/writer pair straddles two IntentChannels (ADR 0029 D1 — the projections must "
+    "name the same Medium)");
 
-// ADR 0029 D5 — the channel vocabulary and the rows that gate to it must agree, at COMPILE time, here.
-static_assert(insight::semantic::all_channels_named(kChannels),
-              "github: a declared IntentChannel name is empty — the empty name IS kAnyChannel, so it may "
-              "not also name a concrete channel");
+// ADR 0029 D5 — the channel vocabulary and the rows that gate to it must agree, at COMPILE time,
+// here.
+static_assert(
+    insight::semantic::all_channels_named(kChannels),
+    "github: a declared IntentChannel name is empty — the empty name IS kAnyChannel, so it may "
+    "not also name a concrete channel");
 static_assert(insight::semantic::all_channel_gates_declared(kMarkers, kEmitMarkers, kChannels),
               "github: a row gates to an IntentChannel this package never declared (a typo in "
               ".channel_gate?) — the declared vocabulary is kChannels");
@@ -188,14 +203,30 @@ static_assert(insight::semantic::all_channel_gates_declared(kMarkers, kEmitMarke
 // dialect strategy (level_from_message walks these, inside parse(), before raw-text inference — the
 // pre-split ordering, byte-identical). Also serialized into semantic_identity.
 inline constexpr std::array<LevelLiftRow, 8> kLevelLifts{{
-    {.prefix = "##[error]", .level = insight::LogLevel::Error, .format_gate = insight::LogFormat::GitHubActions},
-    {.prefix = "::error::", .level = insight::LogLevel::Error, .format_gate = insight::LogFormat::GitHubActions},
-    {.prefix = "##[warning]", .level = insight::LogLevel::Warn, .format_gate = insight::LogFormat::GitHubActions},
-    {.prefix = "::warning::", .level = insight::LogLevel::Warn, .format_gate = insight::LogFormat::GitHubActions},
-    {.prefix = "##[debug]", .level = insight::LogLevel::Debug, .format_gate = insight::LogFormat::GitHubActions},
-    {.prefix = "::debug::", .level = insight::LogLevel::Debug, .format_gate = insight::LogFormat::GitHubActions},
-    {.prefix = "##[notice]", .level = insight::LogLevel::Info, .format_gate = insight::LogFormat::GitHubActions},
-    {.prefix = "::notice::", .level = insight::LogLevel::Info, .format_gate = insight::LogFormat::GitHubActions},
+    {.prefix = "##[error]",
+     .level = insight::LogLevel::Error,
+     .format_gate = insight::LogFormat::GitHubActions},
+    {.prefix = "::error::",
+     .level = insight::LogLevel::Error,
+     .format_gate = insight::LogFormat::GitHubActions},
+    {.prefix = "##[warning]",
+     .level = insight::LogLevel::Warn,
+     .format_gate = insight::LogFormat::GitHubActions},
+    {.prefix = "::warning::",
+     .level = insight::LogLevel::Warn,
+     .format_gate = insight::LogFormat::GitHubActions},
+    {.prefix = "##[debug]",
+     .level = insight::LogLevel::Debug,
+     .format_gate = insight::LogFormat::GitHubActions},
+    {.prefix = "::debug::",
+     .level = insight::LogLevel::Debug,
+     .format_gate = insight::LogFormat::GitHubActions},
+    {.prefix = "##[notice]",
+     .level = insight::LogLevel::Info,
+     .format_gate = insight::LogFormat::GitHubActions},
+    {.prefix = "::notice::",
+     .level = insight::LogLevel::Info,
+     .format_gate = insight::LogFormat::GitHubActions},
 }};
 
 // ── Run-outcome token rows (grammar-2, ADR 0025 §4 — the GitHub reshape) ──
@@ -208,29 +239,43 @@ inline constexpr std::array<LevelLiftRow, 8> kLevelLifts{{
 // a guess). NO OutcomeMarkerRow: GHA emits no single run-verdict console line (`Process completed
 // with exit code N` is per-step) — the degenerate console path is correctly Unknown (§3.2).
 inline constexpr std::array<OutcomeTokenRow, 7> kOutcomeTokens{{
-    {.token = "success", .outcome = insight::RunOutcome::Success, .format_gate = insight::LogFormat::GitHubActions},
-    {.token = "failure", .outcome = insight::RunOutcome::Failure, .format_gate = insight::LogFormat::GitHubActions},
-    {.token = "cancelled", .outcome = insight::RunOutcome::Aborted, .format_gate = insight::LogFormat::GitHubActions},
-    {.token = "timed_out", .outcome = insight::RunOutcome::Aborted, .format_gate = insight::LogFormat::GitHubActions},
-    {.token = "skipped", .outcome = insight::RunOutcome::Unknown, .format_gate = insight::LogFormat::GitHubActions},
-    {.token = "neutral", .outcome = insight::RunOutcome::Unknown, .format_gate = insight::LogFormat::GitHubActions},
-    {.token = "action_required", .outcome = insight::RunOutcome::Unknown, .format_gate = insight::LogFormat::GitHubActions},
+    {.token = "success",
+     .outcome = insight::RunOutcome::Success,
+     .format_gate = insight::LogFormat::GitHubActions},
+    {.token = "failure",
+     .outcome = insight::RunOutcome::Failure,
+     .format_gate = insight::LogFormat::GitHubActions},
+    {.token = "cancelled",
+     .outcome = insight::RunOutcome::Aborted,
+     .format_gate = insight::LogFormat::GitHubActions},
+    {.token = "timed_out",
+     .outcome = insight::RunOutcome::Aborted,
+     .format_gate = insight::LogFormat::GitHubActions},
+    {.token = "skipped",
+     .outcome = insight::RunOutcome::Unknown,
+     .format_gate = insight::LogFormat::GitHubActions},
+    {.token = "neutral",
+     .outcome = insight::RunOutcome::Unknown,
+     .format_gate = insight::LogFormat::GitHubActions},
+    {.token = "action_required",
+     .outcome = insight::RunOutcome::Unknown,
+     .format_gate = insight::LogFormat::GitHubActions},
 }};
 
 // ── The manifest (§2.5) — the package's single composed contribution ──
 // name "github", version "1.3.0" — bumped from 1.2.0 for the IntentChannel coordinate (the declared
 // channel vocabulary + the channel-gated Step rows). SP-7 immutable-release discipline: a released
 // version's rows are frozen, a content change is a new version; the bump also rides the II-7
-// semantic_identity hash, an honest comparability boundary — a diff across this boundary is comparing
-// two different recognition rulesets, and the digest says so.
+// semantic_identity hash, an honest comparability boundary — a diff across this boundary is
+// comparing two different recognition rulesets, and the digest says so.
 //
-// ADR 0029's rename (Sink → IntentChannel) did NOT bump this, deliberately: it renamed C++ identifiers,
-// and what enters the digest is the channel NAMES ("annotated"/"stripped" — ruled unchanged) and the row
-// content, neither of which moved. SP-7 keys on CONTENT, not on spelling; bumping for a rename would
-// declare a new ruleset that recognizes exactly what the old one did, and make two identical rulesets
-// look incomparable.
-// Ships no locations (that is the test_frameworks package) and no value classes (none has a consumer
-// yet). Code tier: the dialect strategy + the echoed-source hook.
+// ADR 0029's rename (Sink → IntentChannel) did NOT bump this, deliberately: it renamed C++
+// identifiers, and what enters the digest is the channel NAMES ("annotated"/"stripped" — ruled
+// unchanged) and the row content, neither of which moved. SP-7 keys on CONTENT, not on spelling;
+// bumping for a rename would declare a new ruleset that recognizes exactly what the old one did,
+// and make two identical rulesets look incomparable. Ships no locations (that is the
+// test_frameworks package) and no value classes (none has a consumer yet). Code tier: the dialect
+// strategy + the echoed-source hook.
 export inline constexpr SemanticPackageManifest kManifest{
     .name = "github",
     .version = "1.3.0",

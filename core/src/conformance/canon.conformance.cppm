@@ -1,34 +1,37 @@
-// insight.canon.conformance — the permanent, package-agnostic CONFORMANCE KIT (ADR 0024 §2.3, SP-2).
-// The canon-shipped harness EVERY semantic package (ours or an external author's) must pass. A package's
-// test target instantiates it in one line:
+// insight.canon.conformance — the permanent, package-agnostic CONFORMANCE KIT (ADR 0024 §2.3,
+// SP-2). The canon-shipped harness EVERY semantic package (ours or an external author's) must pass.
+// A package's test target instantiates it in one line:
 //
 //     import insight.canon.conformance;
 //     import insight.semantic.github;
 //     TEST(Conformance, GithubPackagePassesTheKit) {
-//         const auto report{insight::semantic::conformance::run(insight::semantic::github::kManifest)};
-//         for (const auto& check : report.checks)
+//         const auto
+//         report{insight::semantic::conformance::run(insight::semantic::github::kManifest)}; for
+//         (const auto& check : report.checks)
 //             EXPECT_TRUE(check.passed) << "[" << check.name << "] " << check.detail;
 //     }
 //
 // It is the OPEN-SOURCE HONESTY MECHANISM (SP-2): the identical kit ships installed so an external
-// package author runs the same gate CodeRoast's own packages are held to. Verbose-on-failure matters
-// doubly here — a failing check must diagnose itself for someone who has never read canon's internals.
+// package author runs the same gate CodeRoast's own packages are held to. Verbose-on-failure
+// matters doubly here — a failing check must diagnose itself for someone who has never read canon's
+// internals.
 //
-// PURE by design: imports only the facade (compose/ComposedSemantics + the recognition walkers) + spi
-// (the row grammar + manifest). NO gtest dependency (a package's ~10-line test file adapts the report
-// to its own framework), and — deliberately — NO global `operator new` override (that must never ship in
-// the canon library). The DYNAMIC heap/float-freedom guard is homed where a `new` override is legitimate
-// (the canon core test binary, tests/compose/test_semantic_walkers.cpp): allocation-freedom is a
-// canon-ALGORITHM property, proven once over the walkers, not re-proven per data-only package.
+// PURE by design: imports only the facade (compose/ComposedSemantics + the recognition walkers) +
+// spi (the row grammar + manifest). NO gtest dependency (a package's ~10-line test file adapts the
+// report to its own framework), and — deliberately — NO global `operator new` override (that must
+// never ship in the canon library). The DYNAMIC heap/float-freedom guard is homed where a `new`
+// override is legitimate (the canon core test binary, tests/compose/test_semantic_walkers.cpp):
+// allocation-freedom is a canon-ALGORITHM property, proven once over the walkers, not re-proven per
+// data-only package.
 //
-// The probe corpus is DERIVED FROM THE MANIFEST (each row's own key becomes a probe line), so the kit is
-// self-adapting — it works for any package's vocabulary with zero per-package configuration.
+// The probe corpus is DERIVED FROM THE MANIFEST (each row's own key becomes a probe line), so the
+// kit is self-adapting — it works for any package's vocabulary with zero per-package configuration.
 module;
 
 export module insight.canon.conformance;
 import insight.canon.internal; // std
-import insight.canon;          // compose / ComposedSemantics / classify / recognize / recognize_location + enums
-import insight.canon.spi;      // SemanticPackageManifest + the grammar rows + kAnyFormat + find_conflict
+import insight.canon; // compose / ComposedSemantics / classify / recognize / recognize_location + enums
+import insight.canon.spi; // SemanticPackageManifest + the grammar rows + kAnyFormat + find_conflict
 
 export namespace insight::semantic::conformance
 {
@@ -49,10 +52,12 @@ struct Report
 
     [[nodiscard]] bool all_passed() const noexcept
     {
-        return std::ranges::all_of(checks, [](const CheckResult& check) noexcept { return check.passed; });
+        return std::ranges::all_of(checks,
+                                   [](const CheckResult& check) noexcept { return check.passed; });
     }
 
-    // "K/N checks passed" + the names of any failures — a one-line summary for the top-level assertion.
+    // "K/N checks passed" + the names of any failures — a one-line summary for the top-level
+    // assertion.
     [[nodiscard]] std::string summary() const
     {
         std::size_t passed{0};
@@ -69,27 +74,29 @@ struct Report
         }
         if (!failed.empty())
             failed += ')';
-        return std::to_string(passed) + '/' + std::to_string(checks.size()) + " conformance checks passed" +
-               failed;
+        return std::to_string(passed) + '/' + std::to_string(checks.size()) +
+               " conformance checks passed" + failed;
     }
 };
 
-// Run the full conformance kit over one package manifest. Deterministic, single-threaded, seedless — the
-// recognizers are pure byte functions, so every check is a pure function of the manifest data.
+// Run the full conformance kit over one package manifest. Deterministic, single-threaded, seedless
+// — the recognizers are pure byte functions, so every check is a pure function of the manifest
+// data.
 [[nodiscard]] Report run(const SemanticPackageManifest& manifest);
 
 // The studies/008 G2 round-trip closure kit — the RUNTIME (value) half of the C2 bidirectionality
-// obligation the DialectIntent concept enforces at COMPILE time (shared_intent_declaration §3.2/§6, G2).
-// For every recognition marker, materialize its PAIRED generation row (render_row) with a probe payload
-// and assert canon recognizes the declared (kind, child_order, payload) back — recognize(render_row(W))==R.
-// Pure, deterministic, seedless, self-adapting over ANY dialect's row spans (zero per-package config, the
-// same honesty-kit spirit as run()). Target: 100% — a miss is a declaration-expressivity bug, never a knob
-// (studies/008 §5 G2). Homed here (not folded into run(manifest)) because the generation rows live on the
-// dialect TYPE, not the SemanticPackageManifest, until the identity wiring lands with the ADR at
-// ratification (G4); a package passes its `Dialect::markers` / `Dialect::emit_markers` spans directly.
+// obligation the DialectIntent concept enforces at COMPILE time (shared_intent_declaration §3.2/§6,
+// G2). For every recognition marker, materialize its PAIRED generation row (render_row) with a
+// probe payload and assert canon recognizes the declared (kind, child_order, payload) back —
+// recognize(render_row(W))==R. Pure, deterministic, seedless, self-adapting over ANY dialect's row
+// spans (zero per-package config, the same honesty-kit spirit as run()). Target: 100% — a miss is a
+// declaration-expressivity bug, never a knob (studies/008 §5 G2). Homed here (not folded into
+// run(manifest)) because the generation rows live on the dialect TYPE, not the
+// SemanticPackageManifest, until the identity wiring lands with the ADR at ratification (G4); a
+// package passes its `Dialect::markers` / `Dialect::emit_markers` spans directly.
 [[nodiscard]] Report round_trip_report(std::span<const IntentMarkerRow> markers,
-                                        std::span<const IntentEmitRow> emits,
-                                        const ComposedSemantics& composed);
+                                       std::span<const IntentEmitRow> emits,
+                                       const ComposedSemantics& composed);
 
 } // namespace insight::semantic::conformance
 
@@ -102,245 +109,308 @@ namespace insight::semantic::conformance
 namespace
 {
 
-// A byte is ASCII when its high bit is clear (< 0x80). Locale-safety is structural: every row key is
-// ASCII and every matcher is a byte comparison, so no locale-sensitive path exists (the II-6 / ASCII-only
-// determinism hazard — det_math musts). We ASSERT the ASCII property rather than argue it.
-[[nodiscard]] bool is_ascii(std::string_view str) noexcept
-{
-    return std::ranges::all_of(str, [](char chr) noexcept { return static_cast<unsigned char>(chr) < 0x80U; });
-}
-
-// Two concrete formats distinct from `gate`, for the "does NOT fire cross-format" leg. GitHubActions and
-// JSON cover a dialect gate and a representation gate; whichever equals `gate` is skipped by the caller.
-constexpr std::array<insight::LogFormat, 4> kProbeFormats{insight::LogFormat::GitHubActions,
-                                                          insight::LogFormat::JSON,
-                                                          insight::LogFormat::Syslog,
-                                                          insight::LogFormat::RawText};
-
-// A probe line for a prefix row: the key verbatim + a trailing payload token so payload-extract has
-// content to return. The key is line-anchored, so `key + " probe"` matches iff the row fires.
-[[nodiscard]] std::string probe_for(std::string_view prefix) { return std::string{prefix} + " probe"; }
-
-// ── Check 1: determinism — identical identity + identical recognizer output across independent runs ──
-CheckResult check_determinism(const SemanticPackageManifest& manifest)
-{
-    const std::array<SemanticPackageManifest, 1> one{manifest};
-    const ComposedSemantics first{compose(one)};
-    const ComposedSemantics second{compose(one)};
-    if (first.identity() != second.identity())
-        return {.name = "determinism.identity",
-                .passed = false,
-                .detail = "compose({manifest}) produced two DIFFERENT semantic_identity hashes across "
-                          "independent runs: " +
-                          first.identity_hex() + " vs " + second.identity_hex() +
-                          " — composition is not a pure function of the manifest (SP-6 violated)."};
-
-    // Recognizer output must be bit-identical run-to-run for every derived probe.
-    for (const IntentMarkerRow& row : manifest.markers)
+    // A byte is ASCII when its high bit is clear (< 0x80). Locale-safety is structural: every row
+    // key is ASCII and every matcher is a byte comparison, so no locale-sensitive path exists (the
+    // II-6 / ASCII-only determinism hazard — det_math musts). We ASSERT the ASCII property rather
+    // than argue it.
+    [[nodiscard]] bool is_ascii(std::string_view str) noexcept
     {
-        const std::string probe{probe_for(row.prefix)};
-        const auto lhs{insight::tokenization::recognize(probe, row.format_gate, first)};
-        const auto rhs{insight::tokenization::recognize(probe, row.format_gate, second)};
-        if (lhs.kind != rhs.kind || lhs.name != rhs.name || lhs.discriminant != rhs.discriminant)
-            return {.name = "determinism.recognize",
-                    .passed = false,
-                    .detail = "recognize(\"" + probe + "\") diverged across identical compositions for "
-                              "marker key \"" +
-                              std::string{row.prefix} + "\"."};
+        return std::ranges::all_of(str, [](char chr) noexcept
+                                   { return static_cast<unsigned char>(chr) < 0x80U; });
     }
-    return {.name = "determinism", .passed = true, .detail = {}};
-}
 
-// ── Check 2: format-gate honesty — a gated row is inert outside its format; kAnyFormat fires anywhere ──
-CheckResult check_format_gate_honesty(const SemanticPackageManifest& manifest, const ComposedSemantics& composed)
-{
-    // Structural roles.
-    for (const StructuralRoleRow& row : manifest.roles)
+    // Two concrete formats distinct from `gate`, for the "does NOT fire cross-format" leg.
+    // GitHubActions and JSON cover a dialect gate and a representation gate; whichever equals
+    // `gate` is skipped by the caller.
+    constexpr std::array<insight::LogFormat, 4> kProbeFormats{
+        insight::LogFormat::GitHubActions, insight::LogFormat::JSON, insight::LogFormat::Syslog,
+        insight::LogFormat::RawText};
+
+    // A probe line for a prefix row: the key verbatim + a trailing payload token so payload-extract
+    // has content to return. The key is line-anchored, so `key + " probe"` matches iff the row
+    // fires.
+    [[nodiscard]] std::string probe_for(std::string_view prefix)
     {
-        const std::string probe{probe_for(row.prefix)};
-        if (row.format_gate == kAnyFormat)
+        return std::string{prefix} + " probe";
+    }
+
+    // ── Check 1: determinism — identical identity + identical recognizer output across independent
+    // runs ──
+    CheckResult check_determinism(const SemanticPackageManifest& manifest)
+    {
+        const std::array<SemanticPackageManifest, 1> one{manifest};
+        const ComposedSemantics first{compose(one)};
+        const ComposedSemantics second{compose(one)};
+        if (first.identity() != second.identity())
+            return {
+                .name = "determinism.identity",
+                .passed = false,
+                .detail =
+                    "compose({manifest}) produced two DIFFERENT semantic_identity hashes across "
+                    "independent runs: " +
+                    first.identity_hex() + " vs " + second.identity_hex() +
+                    " — composition is not a pure function of the manifest (SP-6 violated)."};
+
+        // Recognizer output must be bit-identical run-to-run for every derived probe.
+        for (const IntentMarkerRow& row : manifest.markers)
         {
-            // Must fire regardless of routed format — check two distinct formats.
-            for (const insight::LogFormat fmt : {insight::LogFormat::JSON, insight::LogFormat::Syslog})
-                if (insight::tokenization::classify(probe, fmt, composed) != row.role)
-                    return {.name = "format_gate.role_any",
-                            .passed = false,
-                            .detail = "kAnyFormat role key \"" + std::string{row.prefix} +
-                                      "\" failed to fire under " + std::string{insight::to_string(fmt)} +
-                                      " — an ungated row must fire on every format."};
+            const std::string probe{probe_for(row.prefix)};
+            const auto lhs{insight::tokenization::recognize(probe, row.format_gate, first)};
+            const auto rhs{insight::tokenization::recognize(probe, row.format_gate, second)};
+            if (lhs.kind != rhs.kind || lhs.name != rhs.name ||
+                lhs.discriminant != rhs.discriminant)
+                return {.name = "determinism.recognize",
+                        .passed = false,
+                        .detail = "recognize(\"" + probe +
+                                  "\") diverged across identical compositions for "
+                                  "marker key \"" +
+                                  std::string{row.prefix} + "\"."};
         }
-        else
+        return {.name = "determinism", .passed = true, .detail = {}};
+    }
+
+    // ── Check 2: format-gate honesty — a gated row is inert outside its format; kAnyFormat fires
+    // anywhere ──
+    CheckResult check_format_gate_honesty(const SemanticPackageManifest& manifest,
+                                          const ComposedSemantics& composed)
+    {
+        // Structural roles.
+        for (const StructuralRoleRow& row : manifest.roles)
         {
-            // Must be inert under a DIFFERENT concrete format.
+            const std::string probe{probe_for(row.prefix)};
+            if (row.format_gate == kAnyFormat)
+            {
+                // Must fire regardless of routed format — check two distinct formats.
+                for (const insight::LogFormat fmt :
+                     {insight::LogFormat::JSON, insight::LogFormat::Syslog})
+                    if (insight::tokenization::classify(probe, fmt, composed) != row.role)
+                        return {.name = "format_gate.role_any",
+                                .passed = false,
+                                .detail = "kAnyFormat role key \"" + std::string{row.prefix} +
+                                          "\" failed to fire under " +
+                                          std::string{insight::to_string(fmt)} +
+                                          " — an ungated row must fire on every format."};
+            }
+            else
+            {
+                // Must be inert under a DIFFERENT concrete format.
+                for (const insight::LogFormat fmt : kProbeFormats)
+                {
+                    if (fmt == row.format_gate)
+                        continue;
+                    if (insight::tokenization::classify(probe, fmt, composed) !=
+                        insight::StructuralRole::None)
+                        return {.name = "format_gate.role_leak",
+                                .passed = false,
+                                .detail =
+                                    "role key \"" + std::string{row.prefix} + "\" (gated to " +
+                                    std::string{insight::to_string(row.format_gate)} +
+                                    ") FIRED cross-format under " +
+                                    std::string{insight::to_string(fmt)} + " — II-6 gate leak."};
+                }
+            }
+        }
+        // Intent markers (always concretely gated by construction — II-6). Inert under any other
+        // format.
+        for (const IntentMarkerRow& row : manifest.markers)
+        {
+            const std::string probe{probe_for(row.prefix)};
             for (const insight::LogFormat fmt : kProbeFormats)
             {
-                if (fmt == row.format_gate)
+                if (fmt == row.format_gate || row.format_gate == kAnyFormat)
                     continue;
-                if (insight::tokenization::classify(probe, fmt, composed) != insight::StructuralRole::None)
-                    return {.name = "format_gate.role_leak",
+                if (insight::tokenization::recognize(probe, fmt, composed).kind !=
+                    insight::tokenization::IntentMarkerKind::None)
+                    return {.name = "format_gate.marker_leak",
                             .passed = false,
-                            .detail = "role key \"" + std::string{row.prefix} + "\" (gated to " +
+                            .detail = "marker key \"" + std::string{row.prefix} + "\" (gated to " +
                                       std::string{insight::to_string(row.format_gate)} +
                                       ") FIRED cross-format under " +
                                       std::string{insight::to_string(fmt)} + " — II-6 gate leak."};
             }
         }
+        // Outcome tokens (grammar-2, always concretely gated — a dialect's verdict string never
+        // resolves under another format, ADR 0025 §3.1).
+        for (const OutcomeTokenRow& row : manifest.outcome_tokens)
+            for (const insight::LogFormat fmt : kProbeFormats)
+            {
+                if (fmt == row.format_gate || row.format_gate == kAnyFormat)
+                    continue;
+                if (insight::map_outcome_token(row.token, fmt, composed).has_value())
+                    return {.name = "format_gate.outcome_leak",
+                            .passed = false,
+                            .detail = "outcome token \"" + std::string{row.token} +
+                                      "\" (gated to " +
+                                      std::string{insight::to_string(row.format_gate)} +
+                                      ") RESOLVED cross-format under " +
+                                      std::string{insight::to_string(fmt)} + " — II-6 gate leak."};
+            }
+        return {.name = "format_gate_honesty", .passed = true, .detail = {}};
     }
-    // Intent markers (always concretely gated by construction — II-6). Inert under any other format.
-    for (const IntentMarkerRow& row : manifest.markers)
+
+    // ── Check 3: ASCII / locale safety — every row key is ASCII (byte-only matching ⇒
+    // locale-independent) ──
+    CheckResult check_ascii_safety(const SemanticPackageManifest& manifest)
     {
-        const std::string probe{probe_for(row.prefix)};
-        for (const insight::LogFormat fmt : kProbeFormats)
-        {
-            if (fmt == row.format_gate || row.format_gate == kAnyFormat)
-                continue;
-            if (insight::tokenization::recognize(probe, fmt, composed).kind != insight::tokenization::IntentMarkerKind::None)
-                return {.name = "format_gate.marker_leak",
+        const auto span_ok{[](std::span<const std::string_view> strings) noexcept
+                           { return std::ranges::all_of(strings, is_ascii); }};
+        for (const StructuralRoleRow& row : manifest.roles)
+            if (!is_ascii(row.prefix))
+                return {.name = "ascii.role",
                         .passed = false,
-                        .detail = "marker key \"" + std::string{row.prefix} + "\" (gated to " +
-                                  std::string{insight::to_string(row.format_gate)} + ") FIRED cross-format under " +
-                                  std::string{insight::to_string(fmt)} + " — II-6 gate leak."};
-        }
-    }
-    // Outcome tokens (grammar-2, always concretely gated — a dialect's verdict string never resolves
-    // under another format, ADR 0025 §3.1).
-    for (const OutcomeTokenRow& row : manifest.outcome_tokens)
-        for (const insight::LogFormat fmt : kProbeFormats)
-        {
-            if (fmt == row.format_gate || row.format_gate == kAnyFormat)
-                continue;
-            if (insight::map_outcome_token(row.token, fmt, composed).has_value())
-                return {.name = "format_gate.outcome_leak",
+                        .detail = "role key contains a non-ASCII byte: \"" +
+                                  std::string{row.prefix} + "\"."};
+        for (const IntentMarkerRow& row : manifest.markers)
+            if (!is_ascii(row.prefix) || !span_ok(row.payload_excludes))
+                return {.name = "ascii.marker",
                         .passed = false,
-                        .detail = "outcome token \"" + std::string{row.token} + "\" (gated to " +
-                                  std::string{insight::to_string(row.format_gate)} +
-                                  ") RESOLVED cross-format under " +
-                                  std::string{insight::to_string(fmt)} + " — II-6 gate leak."};
-        }
-    return {.name = "format_gate_honesty", .passed = true, .detail = {}};
-}
+                        .detail =
+                            "marker key or payload-exclusion entry contains a non-ASCII byte: \"" +
+                            std::string{row.prefix} + "\"."};
+        for (const OutcomeTokenRow& row : manifest.outcome_tokens)
+            if (!is_ascii(row.token))
+                return {.name = "ascii.outcome_token",
+                        .passed = false,
+                        .detail = "outcome token contains a non-ASCII byte: \"" +
+                                  std::string{row.token} + "\"."};
+        for (const OutcomeMarkerRow& row : manifest.outcome_markers)
+            if (!is_ascii(row.prefix))
+                return {.name = "ascii.outcome_marker",
+                        .passed = false,
+                        .detail = "outcome-marker key contains a non-ASCII byte: \"" +
+                                  std::string{row.prefix} + "\"."};
+        for (const LevelLiftRow& row : manifest.level_lifts)
+            if (!is_ascii(row.prefix))
+                return {.name = "ascii.level_lift",
+                        .passed = false,
+                        .detail = "level-lift key contains a non-ASCII byte: \"" +
+                                  std::string{row.prefix} + "\"."};
+        for (const LocationRow& row : manifest.locations)
+            if (!span_ok(row.infixes) || !span_ok(row.extensions) || !span_ok(row.prefixes) ||
+                !span_ok(row.suffixes))
+                return {.name = "ascii.location",
+                        .passed = false,
+                        .detail =
+                            "a location row carries a non-ASCII vocabulary token (locale-unsafe)."};
+        return {.name = "ascii_safety", .passed = true, .detail = {}};
+    }
 
-// ── Check 3: ASCII / locale safety — every row key is ASCII (byte-only matching ⇒ locale-independent) ──
-CheckResult check_ascii_safety(const SemanticPackageManifest& manifest)
-{
-    const auto span_ok{[](std::span<const std::string_view> strings) noexcept
-                       { return std::ranges::all_of(strings, is_ascii); }};
-    for (const StructuralRoleRow& row : manifest.roles)
-        if (!is_ascii(row.prefix))
-            return {.name = "ascii.role", .passed = false,
-                    .detail = "role key contains a non-ASCII byte: \"" + std::string{row.prefix} + "\"."};
-    for (const IntentMarkerRow& row : manifest.markers)
-        if (!is_ascii(row.prefix) || !span_ok(row.payload_excludes))
-            return {.name = "ascii.marker", .passed = false,
-                    .detail = "marker key or payload-exclusion entry contains a non-ASCII byte: \"" +
-                              std::string{row.prefix} + "\"."};
-    for (const OutcomeTokenRow& row : manifest.outcome_tokens)
-        if (!is_ascii(row.token))
-            return {.name = "ascii.outcome_token", .passed = false,
-                    .detail = "outcome token contains a non-ASCII byte: \"" + std::string{row.token} + "\"."};
-    for (const OutcomeMarkerRow& row : manifest.outcome_markers)
-        if (!is_ascii(row.prefix))
-            return {.name = "ascii.outcome_marker", .passed = false,
-                    .detail = "outcome-marker key contains a non-ASCII byte: \"" + std::string{row.prefix} + "\"."};
-    for (const LevelLiftRow& row : manifest.level_lifts)
-        if (!is_ascii(row.prefix))
-            return {.name = "ascii.level_lift", .passed = false,
-                    .detail = "level-lift key contains a non-ASCII byte: \"" + std::string{row.prefix} + "\"."};
-    for (const LocationRow& row : manifest.locations)
-        if (!span_ok(row.infixes) || !span_ok(row.extensions) || !span_ok(row.prefixes) || !span_ok(row.suffixes))
-            return {.name = "ascii.location", .passed = false,
-                    .detail = "a location row carries a non-ASCII vocabulary token (locale-unsafe)."};
-    return {.name = "ascii_safety", .passed = true, .detail = {}};
-}
-
-// ── Check 4: grammar well-formedness — non-empty keys, no self-conflict, LocationRow param/kind match ──
-CheckResult check_grammar_wellformed(const SemanticPackageManifest& manifest)
-{
-    for (const StructuralRoleRow& row : manifest.roles)
-        if (row.prefix.empty())
-            return {.name = "grammar.empty_role", .passed = false, .detail = "a structural-role row has an empty prefix."};
-    for (const IntentMarkerRow& row : manifest.markers)
-        if (row.prefix.empty())
-            return {.name = "grammar.empty_marker", .passed = false, .detail = "an intent-marker row has an empty prefix."};
-    for (const LevelLiftRow& row : manifest.level_lifts)
-        if (row.prefix.empty())
-            return {.name = "grammar.empty_level_lift", .passed = false, .detail = "a level-lift row has an empty prefix."};
-    for (const OutcomeTokenRow& row : manifest.outcome_tokens)
-        if (row.token.empty())
-            return {.name = "grammar.empty_outcome_token", .passed = false, .detail = "an outcome-token row has an empty token."};
-    for (const OutcomeMarkerRow& row : manifest.outcome_markers)
-        if (row.prefix.empty())
-            return {.name = "grammar.empty_outcome_marker", .passed = false, .detail = "an outcome-marker row has an empty prefix."};
-    for (const IntentMarkerRow& row : manifest.markers)
-        for (const std::string_view exclude : row.payload_excludes)
-            if (exclude.empty())
-                return {.name = "grammar.empty_payload_exclude", .passed = false,
-                        .detail = "marker key \"" + std::string{row.prefix} +
-                                  "\" carries an empty payload-exclusion entry (would exclude every payload)."};
-
-    // Self-conflict: a package must not carry an exact-duplicate key within itself (the runtime compose
-    // would fatal on it — the kit catches it as a well-formedness failure, not a crash).
-    const std::array<SemanticPackageManifest, 1> one{manifest};
-    if (const ConflictInfo conflict{find_conflict(one)}; conflict.has_conflict)
-        return {.name = "grammar.self_conflict", .passed = false,
-                .detail = "the package carries an exact-duplicate " + std::string{conflict.kind} +
-                          " key \"" + std::string{conflict.key} + "\" within its own rows (would fatal at compose)."};
-
-    // LocationRow: the selected LocationMatchKind must be parameterized by the params that algorithm reads.
-    for (const LocationRow& row : manifest.locations)
+    // ── Check 4: grammar well-formedness — non-empty keys, no self-conflict, LocationRow
+    // param/kind match ──
+    CheckResult check_grammar_wellformed(const SemanticPackageManifest& manifest)
     {
-        const auto fail{[&](std::string_view why)
-                        { return CheckResult{.name = "grammar.location_params", .passed = false,
-                                             .detail = std::string{why}}; }};
-        switch (row.kind)
+        for (const StructuralRoleRow& row : manifest.roles)
+            if (row.prefix.empty())
+                return {.name = "grammar.empty_role",
+                        .passed = false,
+                        .detail = "a structural-role row has an empty prefix."};
+        for (const IntentMarkerRow& row : manifest.markers)
+            if (row.prefix.empty())
+                return {.name = "grammar.empty_marker",
+                        .passed = false,
+                        .detail = "an intent-marker row has an empty prefix."};
+        for (const LevelLiftRow& row : manifest.level_lifts)
+            if (row.prefix.empty())
+                return {.name = "grammar.empty_level_lift",
+                        .passed = false,
+                        .detail = "a level-lift row has an empty prefix."};
+        for (const OutcomeTokenRow& row : manifest.outcome_tokens)
+            if (row.token.empty())
+                return {.name = "grammar.empty_outcome_token",
+                        .passed = false,
+                        .detail = "an outcome-token row has an empty token."};
+        for (const OutcomeMarkerRow& row : manifest.outcome_markers)
+            if (row.prefix.empty())
+                return {.name = "grammar.empty_outcome_marker",
+                        .passed = false,
+                        .detail = "an outcome-marker row has an empty prefix."};
+        for (const IntentMarkerRow& row : manifest.markers)
+            for (const std::string_view exclude : row.payload_excludes)
+                if (exclude.empty())
+                    return {.name = "grammar.empty_payload_exclude",
+                            .passed = false,
+                            .detail = "marker key \"" + std::string{row.prefix} +
+                                      "\" carries an empty payload-exclusion entry (would exclude "
+                                      "every payload)."};
+
+        // Self-conflict: a package must not carry an exact-duplicate key within itself (the runtime
+        // compose would fatal on it — the kit catches it as a well-formedness failure, not a
+        // crash).
+        const std::array<SemanticPackageManifest, 1> one{manifest};
+        if (const ConflictInfo conflict{find_conflict(one)}; conflict.has_conflict)
+            return {.name = "grammar.self_conflict",
+                    .passed = false,
+                    .detail = "the package carries an exact-duplicate " +
+                              std::string{conflict.kind} + " key \"" + std::string{conflict.key} +
+                              "\" within its own rows (would fatal at compose)."};
+
+        // LocationRow: the selected LocationMatchKind must be parameterized by the params that
+        // algorithm reads.
+        for (const LocationRow& row : manifest.locations)
         {
-        case LocationMatchKind::TestSpecExtension:
-            if (row.infixes.empty() || row.extensions.empty())
-                return fail("TestSpecExtension row needs non-empty infixes AND extensions.");
-            break;
-        case LocationMatchKind::PrefixAndExtension:
-            if (row.extensions.empty() || (row.prefixes.empty() && row.suffixes.empty()))
-                return fail("PrefixAndExtension row needs extensions AND at least one of prefixes/suffixes.");
-            break;
-        case LocationMatchKind::SuffixSet:
-            if (row.suffixes.empty())
-                return fail("SuffixSet row needs a non-empty suffixes set.");
-            break;
+            const auto fail{[&](std::string_view why)
+                            {
+                                return CheckResult{.name = "grammar.location_params",
+                                                   .passed = false,
+                                                   .detail = std::string{why}};
+                            }};
+            switch (row.kind)
+            {
+            case LocationMatchKind::TestSpecExtension:
+                if (row.infixes.empty() || row.extensions.empty())
+                    return fail("TestSpecExtension row needs non-empty infixes AND extensions.");
+                break;
+            case LocationMatchKind::PrefixAndExtension:
+                if (row.extensions.empty() || (row.prefixes.empty() && row.suffixes.empty()))
+                    return fail("PrefixAndExtension row needs extensions AND at least one of "
+                                "prefixes/suffixes.");
+                break;
+            case LocationMatchKind::SuffixSet:
+                if (row.suffixes.empty())
+                    return fail("SuffixSet row needs a non-empty suffixes set.");
+                break;
+            }
         }
+        return {.name = "grammar_wellformed", .passed = true, .detail = {}};
     }
-    return {.name = "grammar_wellformed", .passed = true, .detail = {}};
-}
 
-// ── Check 5: code-tier well-behaved — the strategy/hook (if any) are deterministic + in-range ──
-CheckResult check_code_tier(const SemanticPackageManifest& manifest)
-{
-    if (manifest.strategy != nullptr)
+    // ── Check 5: code-tier well-behaved — the strategy/hook (if any) are deterministic + in-range
+    // ──
+    CheckResult check_code_tier(const SemanticPackageManifest& manifest)
     {
-        const std::unique_ptr<insight::tokenization::IFormatStrategy> strategy{manifest.strategy()};
-        if (strategy == nullptr)
-            return {.name = "code_tier.strategy_null", .passed = false,
-                    .detail = "the strategy factory returned nullptr."};
-        if (strategy->format() == insight::LogFormat::Unknown)
-            return {.name = "code_tier.strategy_format", .passed = false,
-                    .detail = "the dialect strategy reports LogFormat::Unknown — a dialect must own a concrete format."};
-        // confidence() must be O(1), in [0,1], and deterministic (same line → same score).
-        constexpr std::string_view kProbe{"2026-01-01T00:00:00.0000000Z probe line"};
-        const double first{strategy->confidence(kProbe)};
-        const double second{strategy->confidence(kProbe)};
-        if (!(first >= 0.0 && first <= 1.0) || first != second)
-            return {.name = "code_tier.confidence", .passed = false,
-                    .detail = "confidence() is out of [0,1] or non-deterministic (" + std::to_string(first) +
-                              " then " + std::to_string(second) + ")."};
+        if (manifest.strategy != nullptr)
+        {
+            const std::unique_ptr<insight::tokenization::IFormatStrategy> strategy{
+                manifest.strategy()};
+            if (strategy == nullptr)
+                return {.name = "code_tier.strategy_null",
+                        .passed = false,
+                        .detail = "the strategy factory returned nullptr."};
+            if (strategy->format() == insight::LogFormat::Unknown)
+                return {.name = "code_tier.strategy_format",
+                        .passed = false,
+                        .detail = "the dialect strategy reports LogFormat::Unknown — a dialect "
+                                  "must own a concrete format."};
+            // confidence() must be O(1), in [0,1], and deterministic (same line → same score).
+            constexpr std::string_view kProbe{"2026-01-01T00:00:00.0000000Z probe line"};
+            const double first{strategy->confidence(kProbe)};
+            const double second{strategy->confidence(kProbe)};
+            if (!(first >= 0.0 && first <= 1.0) || first != second)
+                return {.name = "code_tier.confidence",
+                        .passed = false,
+                        .detail = "confidence() is out of [0,1] or non-deterministic (" +
+                                  std::to_string(first) + " then " + std::to_string(second) + ")."};
+        }
+        if (manifest.echoed_source != nullptr)
+        {
+            constexpr std::string_view kProbe{"plain unwrapped line"};
+            if (manifest.echoed_source(kProbe) != manifest.echoed_source(kProbe))
+                return {.name = "code_tier.echoed_source",
+                        .passed = false,
+                        .detail = "the echoed-source hook is non-deterministic on a fixed line."};
+        }
+        return {.name = "code_tier", .passed = true, .detail = {}};
     }
-    if (manifest.echoed_source != nullptr)
-    {
-        constexpr std::string_view kProbe{"plain unwrapped line"};
-        if (manifest.echoed_source(kProbe) != manifest.echoed_source(kProbe))
-            return {.name = "code_tier.echoed_source", .passed = false,
-                    .detail = "the echoed-source hook is non-deterministic on a fixed line."};
-    }
-    return {.name = "code_tier", .passed = true, .detail = {}};
-}
 
 } // namespace
 
@@ -361,33 +431,38 @@ Report run(const SemanticPackageManifest& manifest)
 namespace
 {
 
-// Verbose-on-failure enum names (no canon to_string exists for these two — G2's diagnostic needs them).
-[[nodiscard]] std::string_view kind_name(insight::tokenization::IntentMarkerKind kind) noexcept
-{
-    using insight::tokenization::IntentMarkerKind;
-    switch (kind)
+    // Verbose-on-failure enum names (no canon to_string exists for these two — G2's diagnostic
+    // needs them).
+    [[nodiscard]] std::string_view kind_name(insight::tokenization::IntentMarkerKind kind) noexcept
     {
-    case IntentMarkerKind::None: return "None";
-    case IntentMarkerKind::Job:  return "Job";
-    case IntentMarkerKind::Step: return "Step";
+        using insight::tokenization::IntentMarkerKind;
+        switch (kind)
+        {
+        case IntentMarkerKind::None:
+            return "None";
+        case IntentMarkerKind::Job:
+            return "Job";
+        case IntentMarkerKind::Step:
+            return "Step";
+        }
+        return "?";
     }
-    return "?";
-}
 
-[[nodiscard]] std::string_view order_name(insight::tokenization::ChildOrder order) noexcept
-{
-    using insight::tokenization::ChildOrder;
-    return order == ChildOrder::Unordered ? "Unordered" : "Ordered";
-}
+    [[nodiscard]] std::string_view order_name(insight::tokenization::ChildOrder order) noexcept
+    {
+        using insight::tokenization::ChildOrder;
+        return order == ChildOrder::Unordered ? "Unordered" : "Ordered";
+    }
 
 } // namespace
 
 Report round_trip_report(std::span<const IntentMarkerRow> markers,
                          std::span<const IntentEmitRow> emits, const ComposedSemantics& composed)
 {
-    // A benign single-token ASCII payload valid for every POC row: not a Jenkins kStepExcludes structural
-    // token, no parens/whitespace that a payload extractor would trim — so a closure miss is a real
-    // expressivity failure, never an artifact of the probe. Deterministic (a fixed literal, no RNG).
+    // A benign single-token ASCII payload valid for every POC row: not a Jenkins kStepExcludes
+    // structural token, no parens/whitespace that a payload extractor would trim — so a closure
+    // miss is a real expressivity failure, never an artifact of the probe. Deterministic (a fixed
+    // literal, no RNG).
     constexpr std::string_view kProbePayload{"probe"};
 
     Report report;
@@ -397,43 +472,49 @@ Report round_trip_report(std::span<const IntentMarkerRow> markers,
         if (writer == nullptr)
         {
             // The DialectIntent concept should have rejected this at compile time; the runtime kit
-            // asserts it too so an external author who bypassed the concept still gets a legible failure.
+            // asserts it too so an external author who bypassed the concept still gets a legible
+            // failure.
             report.checks.push_back(
-                {.name = "round_trip.unpaired", .passed = false,
-                 .detail = "recognition marker \"" + std::string{reader.prefix} +
-                           "\" has NO paired generation row — a reader without a writer (SID / G2). "
-                           "DialectIntent<Dialect> should have refused to compile."});
+                {.name = "round_trip.unpaired",
+                 .passed = false,
+                 .detail =
+                     "recognition marker \"" + std::string{reader.prefix} +
+                     "\" has NO paired generation row — a reader without a writer (SID / G2). "
+                     "DialectIntent<Dialect> should have refused to compile."});
             continue;
         }
 
         // ADR 0029 D1: the Medium is `IntentFormat × IntentChannel`, so the round-trip closes PER
-        // MEDIUM — a row is recognized under the channel its writer materializes into, exactly as it is
-        // under the format its writer materializes into. Reading the channel off the ROW keeps the kit
-        // self-adapting (zero per-package config): a kAnyChannel row round-trips under the undeclared
-        // view, a channel-gated row under its own channel. Recognizing every row against ONE composition
-        // would be asking whether the stripped banner is a banner in the annotated channel — which is
-        // the phantom, not the closure.
+        // MEDIUM — a row is recognized under the channel its writer materializes into, exactly as
+        // it is under the format its writer materializes into. Reading the channel off the ROW
+        // keeps the kit self-adapting (zero per-package config): a kAnyChannel row round-trips
+        // under the undeclared view, a channel-gated row under its own channel. Recognizing every
+        // row against ONE composition would be asking whether the stripped banner is a banner in
+        // the annotated channel — which is the phantom, not the closure.
         const std::string line{render_row(*writer, kProbePayload)};
         const ComposedSemantics channel_view{composed.for_channel(writer->channel_gate)};
         const insight::tokenization::IntentMarker got{
             insight::tokenization::recognize(line, reader.format_gate, channel_view)};
 
-        if (got.kind == reader.kind && got.child_order == reader.child_order && got.name == kProbePayload)
+        if (got.kind == reader.kind && got.child_order == reader.child_order &&
+            got.name == kProbePayload)
         {
             report.checks.push_back({.name = "round_trip", .passed = true, .detail = {}});
             continue;
         }
 
         report.checks.push_back(
-            {.name = "round_trip.closure", .passed = false,
+            {.name = "round_trip.closure",
+             .passed = false,
              .detail = "recognize(render_row(\"" + std::string{reader.prefix} + "\", \"" +
                        std::string{kProbePayload} + "\")) over line \"" + line +
                        "\" did NOT recover the declared intent. expected {kind=" +
-                       std::string{kind_name(reader.kind)} + ", child_order=" +
-                       std::string{order_name(reader.child_order)} + ", payload=\"" +
-                       std::string{kProbePayload} + "\"} got {kind=" + std::string{kind_name(got.kind)} +
-                       ", child_order=" + std::string{order_name(got.child_order)} + ", payload=\"" +
-                       std::string{got.name} + "\"}."});
+                       std::string{kind_name(reader.kind)} +
+                       ", child_order=" + std::string{order_name(reader.child_order)} +
+                       ", payload=\"" + std::string{kProbePayload} +
+                       "\"} got {kind=" + std::string{kind_name(got.kind)} +
+                       ", child_order=" + std::string{order_name(got.child_order)} +
+                       ", payload=\"" + std::string{got.name} + "\"}."});
     }
     return report;
 }

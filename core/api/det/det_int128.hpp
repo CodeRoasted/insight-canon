@@ -16,20 +16,22 @@
 //     division, subtraction as a + ~b + 1). A strict value-equivalent, not an approximation.
 //   - INSIGHT_DET_FORCE_PORTABLE_INT128 forces the struct even on gcc/clang, so a Linux unit test
 //     (test_det_math.cpp) asserts struct ≡ native bit-for-bit — the MSVC-equivalence oracle that
-//     runs WITHOUT an MSVC box. This is how we MEASURE cross-OS bit-identity instead of assuming it.
+//     runs WITHOUT an MSVC box. This is how we MEASURE cross-OS bit-identity instead of assuming
+//     it.
 //
 // Scope is deliberately minimal: only the operators the det core AND its downstream consumers
-// (metalog's HLL harmonic-sum + stats accumulators) invoke are provided — native `__int128` supplies
-// them ALL for free, so a missing one only ever surfaces on MSVC. Adding an op is a consumer-driven
-// change that MUST also extend the oracle (test_det_int128_portable.cpp), so the gap can't recur
-// silently; it moves a digest golden only if it changes an existing computed value (a new operator on
-// a new consumer path does not — canon's det_public_proof golden is untouched by +=/<).
+// (metalog's HLL harmonic-sum + stats accumulators) invoke are provided — native `__int128`
+// supplies them ALL for free, so a missing one only ever surfaces on MSVC. Adding an op is a
+// consumer-driven change that MUST also extend the oracle (test_det_int128_portable.cpp), so the
+// gap can't recur silently; it moves a digest golden only if it changes an existing computed value
+// (a new operator on a new consumer path does not — canon's det_public_proof golden is untouched by
+// +=/<).
 #ifndef INSIGHT_CANON_DET_INT128_HPP
 #define INSIGHT_CANON_DET_INT128_HPP
 
 #include <cstdint>
 
-#if (defined(__SIZEOF_INT128__) || defined(__GNUC__) || defined(__clang__)) && \
+#if (defined(__SIZEOF_INT128__) || defined(__GNUC__) || defined(__clang__)) &&                     \
     !defined(INSIGHT_DET_FORCE_PORTABLE_INT128)
 #define INSIGHT_DET_HAS_NATIVE_INT128 1
 #endif
@@ -60,14 +62,16 @@ struct u128
     // Implicit widening, matching `unsigned __int128`, so det_math call sites are byte-identical
     // (u64 counts, the `u128{1}` literals, `static_cast<u128>(value)`). Single u64 ctor only —
     // an extra `int` overload makes `u128{1ULL}` ambiguous (both viable).
-    constexpr u128(std::uint64_t value) noexcept : lo{value} {} // NOLINT(google-explicit-constructor)
+    constexpr u128(std::uint64_t value) noexcept
+        : lo{value} {} // NOLINT(google-explicit-constructor)
 
     [[nodiscard]] constexpr bool operator>=(const u128& o) const noexcept
     {
         return hi != o.hi ? hi > o.hi : lo >= o.lo;
     }
-    // < : metalog's HLL small-range branch (`raw < kSmallRangeThreshold`, threshold a u64 that widens
-    // via the implicit u64 ctor). Mirror of >=, inverted; native `unsigned __int128` provides it free.
+    // < : metalog's HLL small-range branch (`raw < kSmallRangeThreshold`, threshold a u64 that
+    // widens via the implicit u64 ctor). Mirror of >=, inverted; native `unsigned __int128`
+    // provides it free.
     [[nodiscard]] constexpr bool operator<(const u128& o) const noexcept
     {
         return hi != o.hi ? hi < o.hi : lo < o.lo;
@@ -75,8 +79,14 @@ struct u128
     // == / != : used by the decimal serializer's `while (magnitude != 0)` loop (the proof digest
     // prints FixedReducer::raw() this way; native `unsigned __int128` provides these built-in, so
     // the fixture code is identical on both paths).
-    [[nodiscard]] constexpr bool operator==(const u128& o) const noexcept { return lo == o.lo && hi == o.hi; }
-    [[nodiscard]] constexpr bool operator!=(const u128& o) const noexcept { return !(*this == o); }
+    [[nodiscard]] constexpr bool operator==(const u128& o) const noexcept
+    {
+        return lo == o.lo && hi == o.hi;
+    }
+    [[nodiscard]] constexpr bool operator!=(const u128& o) const noexcept
+    {
+        return !(*this == o);
+    }
 
     [[nodiscard]] constexpr u128 operator+(const u128& o) const noexcept
     {
@@ -85,8 +95,14 @@ struct u128
     }
     // += : metalog's HLL harmonic sum (`sum_fixed += 1<<(kHllFrac-reg)`). Same +-then-assign the
     // native type does; mirrors the existing >>= idiom.
-    constexpr u128& operator+=(const u128& o) noexcept { return *this = *this + o, *this; }
-    [[nodiscard]] constexpr u128 operator~() const noexcept { return u128{~lo, ~hi}; }
+    constexpr u128& operator+=(const u128& o) noexcept
+    {
+        return *this = *this + o, *this;
+    }
+    [[nodiscard]] constexpr u128 operator~() const noexcept
+    {
+        return u128{~lo, ~hi};
+    }
     [[nodiscard]] constexpr u128 operator-(const u128& o) const noexcept
     {
         return *this + (~o) + u128{1ULL}; // a - b = a + (~b + 1)
@@ -112,19 +128,24 @@ struct u128
             return u128{0, lo << (s - 64U)};
         return u128{lo << s, (hi << s) | (lo >> (64U - s))};
     }
-    constexpr u128& operator>>=(unsigned s) noexcept { return *this = *this >> s, *this; }
+    constexpr u128& operator>>=(unsigned s) noexcept
+    {
+        return *this = *this >> s, *this;
+    }
 
     // 128×128 → low 128 bits (two's-complement wrap, matching __int128). det_math products always
     // fit in 128 bits, so the high truncation is never observed.
     //
     // Schoolbook over four 32-bit limbs into four 32-bit result limbs r0..r3 (r0 = bits 0..31, …).
-    // The carry between columns can EXCEED 32 bits (a column sums up to four 32×32 products ≈ 2^66),
-    // so it is threaded as a full 64-bit `carry` — the earlier bug was carrying only `>>32`, dropping
-    // the overflow above bit 64 (the oracle test caught it: hi word off by a multiple of 2^32).
+    // The carry between columns can EXCEED 32 bits (a column sums up to four 32×32 products ≈
+    // 2^66), so it is threaded as a full 64-bit `carry` — the earlier bug was carrying only `>>32`,
+    // dropping the overflow above bit 64 (the oracle test caught it: hi word off by a multiple of
+    // 2^32).
     [[nodiscard]] constexpr u128 operator*(const u128& o) const noexcept
     {
         const std::uint64_t a[4]{lo & 0xFFFFFFFFULL, lo >> 32, hi & 0xFFFFFFFFULL, hi >> 32};
-        const std::uint64_t b[4]{o.lo & 0xFFFFFFFFULL, o.lo >> 32, o.hi & 0xFFFFFFFFULL, o.hi >> 32};
+        const std::uint64_t b[4]{o.lo & 0xFFFFFFFFULL, o.lo >> 32, o.hi & 0xFFFFFFFFULL,
+                                 o.hi >> 32};
         std::uint64_t r[4]{0, 0, 0, 0}; // result limbs (low 128 bits)
         for (int i{0}; i < 4; ++i)
         {
@@ -166,10 +187,19 @@ struct u128
         }
         return want_remainder ? rem : quot;
     }
-    [[nodiscard]] constexpr u128 operator/(const u128& den) const noexcept { return div_or_mod(den, false); }
-    [[nodiscard]] constexpr u128 operator%(const u128& den) const noexcept { return div_or_mod(den, true); }
+    [[nodiscard]] constexpr u128 operator/(const u128& den) const noexcept
+    {
+        return div_or_mod(den, false);
+    }
+    [[nodiscard]] constexpr u128 operator%(const u128& den) const noexcept
+    {
+        return div_or_mod(den, true);
+    }
 
-    [[nodiscard]] explicit constexpr operator std::uint64_t() const noexcept { return lo; }
+    [[nodiscard]] explicit constexpr operator std::uint64_t() const noexcept
+    {
+        return lo;
+    }
     [[nodiscard]] explicit constexpr operator std::int64_t() const noexcept
     {
         return static_cast<std::int64_t>(lo);
@@ -188,9 +218,18 @@ struct i128
     }
     constexpr i128(int v) noexcept : i128{static_cast<std::int64_t>(v)} {} // NOLINT
 
-    [[nodiscard]] constexpr bool is_negative() const noexcept { return (bits.hi >> 63) != 0; }
-    [[nodiscard]] constexpr i128 operator-() const noexcept { return i128{(~bits) + u128{1ULL}}; }
-    [[nodiscard]] constexpr u128 magnitude() const noexcept { return is_negative() ? (-*this).bits : bits; }
+    [[nodiscard]] constexpr bool is_negative() const noexcept
+    {
+        return (bits.hi >> 63) != 0;
+    }
+    [[nodiscard]] constexpr i128 operator-() const noexcept
+    {
+        return i128{(~bits) + u128{1ULL}};
+    }
+    [[nodiscard]] constexpr u128 magnitude() const noexcept
+    {
+        return is_negative() ? (-*this).bits : bits;
+    }
 
     [[nodiscard]] constexpr bool operator>=(const i128& o) const noexcept
     {
@@ -198,8 +237,14 @@ struct i128
         return ln != rn ? rn /* neg < non-neg */ : bits >= o.bits; // same sign ⇒ unsigned order
     }
 
-    [[nodiscard]] constexpr i128 operator+(const i128& o) const noexcept { return i128{bits + o.bits}; }
-    constexpr i128& operator+=(const i128& o) noexcept { return bits = bits + o.bits, *this; }
+    [[nodiscard]] constexpr i128 operator+(const i128& o) const noexcept
+    {
+        return i128{bits + o.bits};
+    }
+    constexpr i128& operator+=(const i128& o) noexcept
+    {
+        return bits = bits + o.bits, *this;
+    }
 
     [[nodiscard]] constexpr i128 operator*(const i128& o) const noexcept
     {
@@ -218,7 +263,10 @@ struct i128
     {
         return static_cast<std::int64_t>(bits.lo);
     }
-    [[nodiscard]] explicit constexpr operator u128() const noexcept { return bits; }
+    [[nodiscard]] explicit constexpr operator u128() const noexcept
+    {
+        return bits;
+    }
 };
 
 #endif // INSIGHT_DET_HAS_NATIVE_INT128

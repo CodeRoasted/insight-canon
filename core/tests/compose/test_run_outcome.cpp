@@ -1,8 +1,8 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_run_outcome.cpp — the grammar-2 run-outcome MECHANISMS (ADR 0025 / insight_run_outcome_model.md
-// §3–§4) over SYNTHETIC manifests (canon core stays semantic-unaware — no dialect literal here; the
-// Jenkins/GHA vocabularies are package data, tested in their packages; the G-OUT-* gate suite is
-// Kleio's homing). What CORE owns and this file guards:
+// test_run_outcome.cpp — the grammar-2 run-outcome MECHANISMS (ADR 0025 /
+// insight_run_outcome_model.md §3–§4) over SYNTHETIC manifests (canon core stays semantic-unaware —
+// no dialect literal here; the Jenkins/GHA vocabularies are package data, tested in their packages;
+// the G-OUT-* gate suite is Kleio's homing). What CORE owns and this file guards:
 //   • map_outcome_token — format-gated, byte-exact; "no row" (nullopt) is distinct from "a row that
 //     maps to Unknown" (the NOT_BUILT shape).
 //   • the IntentMarkerRow grammar-2 shapes — RemainderToClosingParen strictness + the payload
@@ -78,14 +78,14 @@ constexpr SemanticPackageManifest kOutcomePkg{.name = "synthetic_outcome",
                                               .outcome_markers = kMarkers};
 
 // A second package duplicating a token under an intersecting gate — the SP-3 conflict fixture.
-constexpr std::array<OutcomeTokenRow, 1> kDupToken{{
-    {.token = "GOOD", .outcome = RunOutcome::Failure, .format_gate = LogFormat::RawText}}};
+constexpr std::array<OutcomeTokenRow, 1> kDupToken{
+    {{.token = "GOOD", .outcome = RunOutcome::Failure, .format_gate = LogFormat::RawText}}};
 constexpr SemanticPackageManifest kDupPkg{
     .name = "synthetic_dup", .version = "1.0.0", .outcome_tokens = kDupToken};
 // The same token under a NON-intersecting gate is NOT a duplicate (a different dialect naming the
 // same string is legal — the side-input resolves under one detected dialect).
-constexpr std::array<OutcomeTokenRow, 1> kOtherGateToken{{
-    {.token = "GOOD", .outcome = RunOutcome::Success, .format_gate = LogFormat::JSON}}};
+constexpr std::array<OutcomeTokenRow, 1> kOtherGateToken{
+    {{.token = "GOOD", .outcome = RunOutcome::Success, .format_gate = LogFormat::JSON}}};
 constexpr SemanticPackageManifest kOtherGatePkg{
     .name = "synthetic_other", .version = "1.0.0", .outcome_tokens = kOtherGateToken};
 
@@ -157,7 +157,8 @@ TEST(RunOutcomeGrammar2, PayloadExcludesAreWordBounded)
               IntentMarkerKind::None);
     // …but the boundary is a WORD boundary: a verb merely PREFIXED by an entry is a real step.
     const auto step{recognize("[Mark] {}able", LogFormat::RawText, composed)};
-    EXPECT_EQ(step.kind, IntentMarkerKind::Step) << "exclusion must not over-reach past the boundary";
+    EXPECT_EQ(step.kind, IntentMarkerKind::Step)
+        << "exclusion must not over-reach past the boundary";
     // The ordinary verb form is a step with the verbatim remainder payload.
     const auto verb{recognize("[Mark] compile", LogFormat::RawText, composed)};
     EXPECT_EQ(verb.kind, IntentMarkerKind::Step);

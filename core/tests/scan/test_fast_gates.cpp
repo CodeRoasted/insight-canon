@@ -105,16 +105,17 @@ TEST(FastGatesPrefix, IsoDateAndTimeAtOffset)
     EXPECT_FALSE(match_time_at("10:15:0", 0));
 }
 
-// The core RFC3339 scan primitive stays here. The GitHub-Actions prefix SUBSET (is_github_actions_prefix,
-// exactly-7-fractional-digits-'Z') moved with the dialect strategy into insight_semantic_github (a
-// package-PRIVATE helper); its boundary discipline is now covered by that package's strategy confidence()
-// tests (test_github_strategy::ConfidenceRespectsGhaPrefixSubset).
+// The core RFC3339 scan primitive stays here. The GitHub-Actions prefix SUBSET
+// (is_github_actions_prefix, exactly-7-fractional-digits-'Z') moved with the dialect strategy into
+// insight_semantic_github (a package-PRIVATE helper); its boundary discipline is now covered by
+// that package's strategy confidence() tests
+// (test_github_strategy::ConfidenceRespectsGhaPrefixSubset).
 TEST(FastGatesPrefix, Rfc3339Prefix)
 {
     EXPECT_TRUE(is_rfc3339_prefix("2024-04-27T10:15:00Z payload"));
     EXPECT_FALSE(is_rfc3339_prefix("2024-04-27 10:15:00 space separator is not RFC 3339"));
-    // A hi-res fractional 'Z' timestamp (the GHA line shape) is still an RFC 3339 prefix — the subset
-    // relation, asserted at the core-primitive level, independent of any dialect.
+    // A hi-res fractional 'Z' timestamp (the GHA line shape) is still an RFC 3339 prefix — the
+    // subset relation, asserted at the core-primitive level, independent of any dialect.
     EXPECT_TRUE(is_rfc3339_prefix("2024-04-27T10:15:00.1234567Z ##[group]Run actions/checkout"));
 }
 
@@ -298,7 +299,10 @@ struct ShapeOracle
     bool has_separator{};
 };
 
-[[nodiscard]] constexpr bool ascii_digit(char chr) noexcept { return chr >= '0' && chr <= '9'; }
+[[nodiscard]] constexpr bool ascii_digit(char chr) noexcept
+{
+    return chr >= '0' && chr <= '9';
+}
 
 [[nodiscard]] ShapeOracle reference_shape(std::string_view tok) noexcept
 {
@@ -323,19 +327,23 @@ TEST(FastGatesTokenShape, FieldsAreByteExactWithReplacedPredicates)
 {
     // Edge cases the handoff calls out, plus the byte-trap rows the scan must survive.
     const std::string_view cases[]{
-        "",          // empty token — early-out branch
-        "+",         // sign only: not empty, not a digit, '+' is NOT in the separator set
-        "-",         // sign only AND a separator ('-' is in the composite set)
-        "5",         // single pure digit
-        "0",         // single zero (boundary of is_digit's unsigned trick)
-        "12345",     // pure-digit run → all_digits
-        "+5",        // signed digit-leading, NOT all_digits (sign byte)
-        "-42",       // signed digit-leading
-        "+a",        // sign then non-digit → digit_leading false
-        "-=",        // sign then separator → digit_leading false, has_separator true
-        "a1",        // letter-leading, not all_digits
-        "1a",        // digit-leading, not all_digits
-        ":",  "/",  "[",  "#",  "=", // each separator in isolation
+        "",      // empty token — early-out branch
+        "+",     // sign only: not empty, not a digit, '+' is NOT in the separator set
+        "-",     // sign only AND a separator ('-' is in the composite set)
+        "5",     // single pure digit
+        "0",     // single zero (boundary of is_digit's unsigned trick)
+        "12345", // pure-digit run → all_digits
+        "+5",    // signed digit-leading, NOT all_digits (sign byte)
+        "-42",   // signed digit-leading
+        "+a",    // sign then non-digit → digit_leading false
+        "-=",    // sign then separator → digit_leading false, has_separator true
+        "a1",    // letter-leading, not all_digits
+        "1a",    // digit-leading, not all_digits
+        ":",
+        "/",
+        "[",
+        "#",
+        "=",         // each separator in isolation
         "10:15:00",  // separators interleaved with digits
         "512MB",     // digit-leading, not all_digits, no separator
         "6.2s",      // '.' is NOT a separator in this set
@@ -343,7 +351,8 @@ TEST(FastGatesTokenShape, FieldsAreByteExactWithReplacedPredicates)
         "user-name", // letter-leading with a '-' separator
         "v1.2",      // letter-leading, no separator
         "\xB0\xB0",  // high-bit bytes: not empty, no digits, no separators (signed-char trap)
-        "\xFF" "9",  // high-bit then digit: all_digits false, digit_leading false
+        "\xFF"
+        "9", // high-bit then digit: all_digits false, digit_leading false
     };
 
     for (const std::string_view tok : cases)
@@ -353,8 +362,10 @@ TEST(FastGatesTokenShape, FieldsAreByteExactWithReplacedPredicates)
         SCOPED_TRACE(::testing::Message() << "token=\"" << tok << "\" (len=" << tok.size() << ")");
         EXPECT_EQ(got.empty, ref.empty) << "empty mismatch";
         EXPECT_EQ(got.all_digits, ref.all_digits) << "all_digits mismatch (== is_all_digits)";
-        EXPECT_EQ(got.digit_leading, ref.digit_leading) << "digit_leading mismatch (== is_digit_leading)";
-        EXPECT_EQ(got.has_separator, ref.has_separator) << "has_separator mismatch (== maybe_composite)";
+        EXPECT_EQ(got.digit_leading, ref.digit_leading)
+            << "digit_leading mismatch (== is_digit_leading)";
+        EXPECT_EQ(got.has_separator, ref.has_separator)
+            << "has_separator mismatch (== maybe_composite)";
     }
 }
 

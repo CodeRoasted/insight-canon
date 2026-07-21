@@ -8,26 +8,29 @@
 export module insight.canon;
 import insight.canon.internal; // std (expected/unique_ptr/vector/span/string for the Tokenizer decl)
 export import insight.canon.api; // public surface (types, det_math, arena, ...)
-export import insight.canon.compose; // compose()/ComposedSemantics (ADR 0024 §3/§4) — Tokenizer takes it
+export import insight.canon
+    .compose; // compose()/ComposedSemantics (ADR 0024 §3/§4) — Tokenizer takes it
 
 // ──────── from api/insight/tokenization/tokenizer_engine.hpp ────────
 export namespace insight::tokenization
 {
 
 // ── Composed-semantics walkers (ADR 0024 §3/§4) ──────────────────────────────────────────────────
-// The dialect-recognition mechanisms, homed in the facade (not api) because they consume the composed
-// tables — ComposedSemantics lives in insight.canon.compose, which imports api, so a walker in api
-// would close a cycle. Canon owns the ALGORITHM; the composed rows are the DATA. Byte-for-byte
-// equivalent to the pre-split hardcoded StructuralRoleRegistry / IntentMarkerRegistry / recognize_location.
+// The dialect-recognition mechanisms, homed in the facade (not api) because they consume the
+// composed tables — ComposedSemantics lives in insight.canon.compose, which imports api, so a
+// walker in api would close a cycle. Canon owns the ALGORITHM; the composed rows are the DATA.
+// Byte-for-byte equivalent to the pre-split hardcoded StructuralRoleRegistry / IntentMarkerRegistry
+// / recognize_location.
 
-// Classify a LINE's structural role from the composed role rows (longest-match; a row fires when its
-// gate is kAnyFormat or equals `format`). None when no row matches.
-[[nodiscard]] StructuralRole classify(std::string_view content, LogFormat format,
-                                      const insight::semantic::ComposedSemantics& composed) noexcept;
+// Classify a LINE's structural role from the composed role rows (longest-match; a row fires when
+// its gate is kAnyFormat or equals `format`). None when no row matches.
+[[nodiscard]] StructuralRole
+classify(std::string_view content, LogFormat format,
+         const insight::semantic::ComposedSemantics& composed) noexcept;
 
-// Recognize an intent marker from the composed marker rows (format-gated, longest-match). The payload
-// is the content after the matched prefix; the alignment class + instance discriminant are derived by
-// canon's canonicalize_intent / discriminant_of. None when no gated row matches.
+// Recognize an intent marker from the composed marker rows (format-gated, longest-match). The
+// payload is the content after the matched prefix; the alignment class + instance discriminant are
+// derived by canon's canonicalize_intent / discriminant_of. None when no gated row matches.
 [[nodiscard]] IntentMarker recognize(std::string_view content, LogFormat format,
                                      const insight::semantic::ComposedSemantics& composed) noexcept;
 
@@ -36,8 +39,9 @@ export namespace insight::tokenization
 class Tokenizer
 {
   public:
-    // No default composition in core (ADR 0024 §3): every binary declares its package set and threads
-    // the ComposedSemantics (which the Tokenizer does NOT own — it must outlive the Tokenizer).
+    // No default composition in core (ADR 0024 §3): every binary declares its package set and
+    // threads the ComposedSemantics (which the Tokenizer does NOT own — it must outlive the
+    // Tokenizer).
     explicit Tokenizer(ArenaAllocator& arena, MaskConfig mask_config,
                        const insight::semantic::ComposedSemantics& composed);
     ~Tokenizer();
@@ -92,7 +96,7 @@ map_outcome_token(std::string_view token, LogFormat format,
 // gated on — the gate the side-input token resolves under.
 struct RunOutcomeScan
 {
-    LogFormat dialect{LogFormat::Unknown};       // first outcome-bearing routed format; Unknown = none
+    LogFormat dialect{LogFormat::Unknown}; // first outcome-bearing routed format; Unknown = none
     LogFormat marker_format{LogFormat::Unknown}; // the matched marker line's routed format
     bool marker_present{false};
     std::string token; // the last console-tail verdict token (empty when !marker_present)
@@ -108,15 +112,16 @@ struct RunOutcomeScan
 // When rung 1 resolves, a present-but-DISAGREEING console tail is NOT consulted (Accumulo #498 —
 // a local/nested/caught outcome, not a competing whole-run verdict): the divergence is surfaced as
 // a kept trace-level log + the `divergent` flag, the authoritative value stands. A token that is
-// provided but does not map is never a silent misclassification: it surfaces in `note` (fail-closed,
-// the SP-3/SP-4 discipline applied to values) and resolution falls down the ladder.
+// provided but does not map is never a silent misclassification: it surfaces in `note`
+// (fail-closed, the SP-3/SP-4 discipline applied to values) and resolution falls down the ladder.
 struct RunOutcomeResolution
 {
     RunOutcome outcome{RunOutcome::Unknown};
-    RunOutcome console{RunOutcome::Unknown}; // the console candidate's mapped value (Unknown otherwise)
-    bool authoritative{false};               // rung 1 resolved
-    bool divergent{false};                   // rung 1 resolved AND a mapped console tail disagrees
-    std::string note;                        // surfaced fail-closed note ("" = clean)
+    RunOutcome console{
+        RunOutcome::Unknown};  // the console candidate's mapped value (Unknown otherwise)
+    bool authoritative{false}; // rung 1 resolved
+    bool divergent{false};     // rung 1 resolved AND a mapped console tail disagrees
+    std::string note;          // surfaced fail-closed note ("" = clean)
 };
 
 [[nodiscard]] RunOutcomeResolution
@@ -125,10 +130,11 @@ resolve_run_outcome(std::string_view side_input_token, const RunOutcomeScan& sca
 
 // Location recognition (intent_identity_model.md §5.3/§5.4, II-8) — the test-file WHERE coordinate,
 // homed in the facade because it walks the composed location rows (ComposedSemantics is in
-// insight.canon.compose). Canon owns the three LocationMatchKind algorithms; the composed rows are the
-// dialect-independent file-naming vocabulary. Returns a view into `content`, or empty. Byte-for-byte
-// equivalent to the pre-split hardcoded recognize_location.
-[[nodiscard]] std::string_view recognize_location(std::string_view content,
-                                                  const insight::semantic::ComposedSemantics& composed) noexcept;
+// insight.canon.compose). Canon owns the three LocationMatchKind algorithms; the composed rows are
+// the dialect-independent file-naming vocabulary. Returns a view into `content`, or empty.
+// Byte-for-byte equivalent to the pre-split hardcoded recognize_location.
+[[nodiscard]] std::string_view
+recognize_location(std::string_view content,
+                   const insight::semantic::ComposedSemantics& composed) noexcept;
 
 } // namespace insight

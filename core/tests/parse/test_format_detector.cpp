@@ -19,9 +19,10 @@ using namespace insight::tokenization;
 class FormatDetectorTest : public ::testing::Test
 {
   protected:
-    // Degenerate (zero-package) composition: the detector registers its 18 core REPRESENTATION-format
-    // strategies (ADR 0024 — the GitHub-Actions DIALECT strategy is no longer a builtin; it arrives via
-    // the composition, so GHA detection is now a github-package property, tested in that suite).
+    // Degenerate (zero-package) composition: the detector registers its 18 core
+    // REPRESENTATION-format strategies (ADR 0024 — the GitHub-Actions DIALECT strategy is no longer
+    // a builtin; it arrives via the composition, so GHA detection is now a github-package property,
+    // tested in that suite).
     FormatDetector detector{insight::test_support::degenerate_composition()};
 };
 
@@ -31,7 +32,8 @@ class FormatDetectorTest : public ::testing::Test
 
 TEST_F(FormatDetectorTest, HasEighteenBuiltInRepresentationStrategies)
 {
-    // 18 core representation strategies (dialect strategies register into custom_strategies_, not here).
+    // 18 core representation strategies (dialect strategies register into custom_strategies_, not
+    // here).
     EXPECT_EQ(detector.strategies().size(), 18u);
 }
 
@@ -60,10 +62,11 @@ TEST_F(FormatDetectorTest, DetectsRFC3339Syslog)
     EXPECT_EQ(s->format(), LogFormat::Syslog);
 }
 
-// NOTE: GHA format DETECTION (DetectsGitHubActions) and the "GHA does not steal whole-second RFC3339
-// syslog" guard migrated with the dialect strategy to the github package suite (test_github_strategy:
-// DetectionRoutesGhaLineToGitHubActions + DetectionLeavesWholeSecondRfc3339AsSyslog). With a degenerate
-// composition core has no GHA strategy, so those properties are only meaningful once github is composed.
+// NOTE: GHA format DETECTION (DetectsGitHubActions) and the "GHA does not steal whole-second
+// RFC3339 syslog" guard migrated with the dialect strategy to the github package suite
+// (test_github_strategy: DetectionRoutesGhaLineToGitHubActions +
+// DetectionLeavesWholeSecondRfc3339AsSyslog). With a degenerate composition core has no GHA
+// strategy, so those properties are only meaningful once github is composed.
 
 TEST_F(FormatDetectorTest, DetectsCLF)
 {

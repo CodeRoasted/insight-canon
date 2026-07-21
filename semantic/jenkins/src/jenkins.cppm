@@ -59,10 +59,10 @@ inline constexpr std::array<IntentMarkerRow, 2> kMarkers{{
 // ── Generation-template rows (studies/008, shared_intent_declaration §3.2) — the WRITER dual ──
 // One emit row per recognition row, paired by (prefix, kind, format_gate). The STAGE emit is
 // PayloadThenClosingParen, the exact inverse of the reader's RemainderToClosingParen:
-// render_row(stage_row, "Build") reproduces `[Pipeline] { (Build)`, which canon segments back to the
-// named STAGE "Build". The STEP emit is PayloadAfterPrefix — the writer only ever emits a REAL step
-// verb (`sh`, `echo`, …), never a kStepExcludes structural token, so the reader's exclusion set has no
-// generation dual and the round-trip closes (G2).
+// render_row(stage_row, "Build") reproduces `[Pipeline] { (Build)`, which canon segments back to
+// the named STAGE "Build". The STEP emit is PayloadAfterPrefix — the writer only ever emits a REAL
+// step verb (`sh`, `echo`, …), never a kStepExcludes structural token, so the reader's exclusion
+// set has no generation dual and the round-trip closes (G2).
 inline constexpr std::array<IntentEmitRow, 2> kEmitMarkers{{
     {.prefix = "[Pipeline] { (",
      .kind = insight::tokenization::IntentMarkerKind::Job,
@@ -76,15 +76,17 @@ inline constexpr std::array<IntentEmitRow, 2> kEmitMarkers{{
      .emit = PayloadEmit::PayloadAfterPrefix},
 }};
 
-// The C2 bidirectionality obligation: this dialect exposes BOTH projections, and every recognition row
-// is paired with a generation row. DialectIntent fails to compile if a reader ships without a writer.
+// The C2 bidirectionality obligation: this dialect exposes BOTH projections, and every recognition
+// row is paired with a generation row. DialectIntent fails to compile if a reader ships without a
+// writer.
 export struct Dialect
 {
     static constexpr std::span<const IntentMarkerRow> markers{kMarkers};
     static constexpr std::span<const IntentEmitRow> emit_markers{kEmitMarkers};
 };
-static_assert(insight::semantic::DialectIntent<Dialect>,
-              "jenkins: a recognition marker has no paired generation row (reader without a writer)");
+static_assert(
+    insight::semantic::DialectIntent<Dialect>,
+    "jenkins: a recognition marker has no paired generation row (reader without a writer)");
 
 // ── Run-outcome rows (ADR 0025 §4, studies/006 Table 4) ──
 // The five native Jenkins `result` strings → the core four-class vocabulary. NOT_BUILT maps to
@@ -92,11 +94,21 @@ static_assert(insight::semantic::DialectIntent<Dialect>,
 // `Finished: <RESULT>` epilogue — the DEGENERATE fallback source only (truncation-fragile, and it
 // can be present-but-divergent: Accumulo #498 — the authoritative side-input always wins).
 inline constexpr std::array<OutcomeTokenRow, 5> kOutcomeTokens{{
-    {.token = "SUCCESS", .outcome = insight::RunOutcome::Success, .format_gate = insight::LogFormat::Jenkins},
-    {.token = "FAILURE", .outcome = insight::RunOutcome::Failure, .format_gate = insight::LogFormat::Jenkins},
-    {.token = "UNSTABLE", .outcome = insight::RunOutcome::Unstable, .format_gate = insight::LogFormat::Jenkins},
-    {.token = "ABORTED", .outcome = insight::RunOutcome::Aborted, .format_gate = insight::LogFormat::Jenkins},
-    {.token = "NOT_BUILT", .outcome = insight::RunOutcome::Unknown, .format_gate = insight::LogFormat::Jenkins},
+    {.token = "SUCCESS",
+     .outcome = insight::RunOutcome::Success,
+     .format_gate = insight::LogFormat::Jenkins},
+    {.token = "FAILURE",
+     .outcome = insight::RunOutcome::Failure,
+     .format_gate = insight::LogFormat::Jenkins},
+    {.token = "UNSTABLE",
+     .outcome = insight::RunOutcome::Unstable,
+     .format_gate = insight::LogFormat::Jenkins},
+    {.token = "ABORTED",
+     .outcome = insight::RunOutcome::Aborted,
+     .format_gate = insight::LogFormat::Jenkins},
+    {.token = "NOT_BUILT",
+     .outcome = insight::RunOutcome::Unknown,
+     .format_gate = insight::LogFormat::Jenkins},
 }};
 
 inline constexpr std::array<OutcomeMarkerRow, 1> kOutcomeMarkers{{

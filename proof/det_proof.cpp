@@ -27,8 +27,8 @@
 #include <string>
 #include <vector>
 #if defined(_WIN32)
-#include <fcntl.h>  // _O_BINARY
-#include <io.h>     // _setmode, _fileno
+#include <fcntl.h> // _O_BINARY
+#include <io.h>    // _setmode, _fileno
 #endif
 
 // 1.5.1 unwrap (Approach B): the textual public headers are gone — the canon module's
@@ -48,9 +48,10 @@ namespace
 {
 // det::i128 → decimal string (no std::to_string overload exists). Works on BOTH det_math 128-bit
 // representations (native __int128 on gcc/clang, the portable struct on MSVC) — det::i128/u128 are
-// the aliases from det_int128.hpp, and the ops used here (sign via is_negative()-equivalent compare,
-// magnitude(), %/÷ by ten, != 0) are provided on both. This output IS part of the canonical digest,
-// so it must be byte-identical across compilers — hence it goes through the same portable shim.
+// the aliases from det_int128.hpp, and the ops used here (sign via is_negative()-equivalent
+// compare, magnitude(), %/÷ by ten, != 0) are provided on both. This output IS part of the
+// canonical digest, so it must be byte-identical across compilers — hence it goes through the same
+// portable shim.
 std::string i128_to_dec(insight::det::i128 value)
 {
     using insight::det::i128;
@@ -62,7 +63,8 @@ std::string i128_to_dec(insight::det::i128 value)
     u128 rest{magnitude};
     while (rest != u128{0})
     {
-        out.push_back(static_cast<char>('0' + static_cast<int>(static_cast<std::uint64_t>(rest % u128{10}))));
+        out.push_back(
+            static_cast<char>('0' + static_cast<int>(static_cast<std::uint64_t>(rest % u128{10}))));
         rest = rest / u128{10};
     }
     if (out.empty())
@@ -78,8 +80,8 @@ std::string basename_of(const std::string& path)
     // Strip BOTH separators: the gate passes POSIX paths on Linux ('/') and Windows paths on MSVC
     // ('\\', e.g. D:\...\corpus\ci_build.log). Splitting on '/' only left the full drive path on
     // Windows, so the digest's `## file` header — and ONLY that header — diverged cross-OS while
-    // every templates/events/det_math payload was already byte-identical. The digest must encode the
-    // basename, never the platform-specific input path.
+    // every templates/events/det_math payload was already byte-identical. The digest must encode
+    // the basename, never the platform-specific input path.
     const auto slash{path.find_last_of("/\\")};
     return slash == std::string::npos ? path : path.substr(slash + 1);
 }
@@ -126,11 +128,12 @@ int main(int argc, char** argv)
 
     // G-SP-4 (ADR 0024 §10.4): the composed `semantic_identity` content hash must be bit-identical
     // across independent builds and every OS/ISA leg (no paths/timestamps/link-order in its input —
-    // by construction, verified anyway). Emitting it into THIS canonical digest folds G-SP-4 into the
-    // existing 5-leg byte-identity compare — a divergent identity byte diverges the digest and fails
-    // the gate. This is a REAL, non-redundant surface: the behavioral rows below could match while the
-    // hash serialization itself diverges cross-toolchain (endianness, string_view ordering) — exactly
-    // what this line catches. The package list rides for legibility (the wire block's §4.2 label).
+    // by construction, verified anyway). Emitting it into THIS canonical digest folds G-SP-4 into
+    // the existing 5-leg byte-identity compare — a divergent identity byte diverges the digest and
+    // fails the gate. This is a REAL, non-redundant surface: the behavioral rows below could match
+    // while the hash serialization itself diverges cross-toolchain (endianness, string_view
+    // ordering) — exactly what this line catches. The package list rides for legibility (the wire
+    // block's §4.2 label).
     std::cout << "# semantic_identity " << composed.identity_hex() << '\n';
     std::cout << "# semantic_packages";
     for (const auto& pkg : composed.packages())

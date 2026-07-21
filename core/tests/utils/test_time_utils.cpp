@@ -508,7 +508,8 @@ TEST(InferLeadingLogLevel, LeadingBareLevelWordDemotedWhenUnanchored)
 // (Error/Fatal), but it still surfaces — capped at Warn (demote, never suppress). This is
 // the P5 root: `There was 1 failure:` was Fatal (colon anchor) and outranked the named
 // `testSitesStats (FAILED)` it summarized. `25 passed, 5 failed` → Warn is the dual,
-// already pinned by GenuineLeadingFailureSurvivesWithoutPassGlyph. [[sift-failure-lexicon-must-be-outcome-aware]]
+// already pinned by GenuineLeadingFailureSurvivesWithoutPassGlyph.
+// [[sift-failure-lexicon-must-be-outcome-aware]]
 TEST(InferLeadingLogLevel, CountRegisterSummaryCapsAtWarn)
 {
     EXPECT_EQ(infer_leading_log_level("There was 1 failure:"), LogLevel::Warn)

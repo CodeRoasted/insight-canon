@@ -75,10 +75,10 @@ TEST_F(OrdinalFieldTest, FastPathDecimalParsedWithoutDouble)
 
 TEST_F(OrdinalFieldTest, FastPathUnitScaling)
 {
-    EXPECT_EQ(find(tokenizer.process_line(R"({"message":"x","latency_us":1500})").value(),
-                   "latency_us")
-                  ->value,
-              1'500'000); // 1500 µs → 1_500_000 ns
+    EXPECT_EQ(
+        find(tokenizer.process_line(R"({"message":"x","latency_us":1500})").value(), "latency_us")
+            ->value,
+        1'500'000); // 1500 µs → 1_500_000 ns
     arena.reset();
     EXPECT_EQ(
         find(tokenizer.process_line(R"({"message":"x","latency_ns":42})").value(), "latency_ns")
@@ -93,9 +93,8 @@ TEST_F(OrdinalFieldTest, FastPathUnitScaling)
 
 TEST_F(OrdinalFieldTest, FastPathBytesSchedule)
 {
-    const auto* obs{
-        find(tokenizer.process_line(R"({"message":"x","response_bytes":4096})").value(),
-             "response_bytes")};
+    const auto* obs{find(tokenizer.process_line(R"({"message":"x","response_bytes":4096})").value(),
+                         "response_bytes")};
     ASSERT_NE(obs, nullptr);
     EXPECT_EQ(obs->value, 4096);
     EXPECT_EQ(obs->schedule, OrdinalSchedule::SizeLog2Bytes);
@@ -103,8 +102,8 @@ TEST_F(OrdinalFieldTest, FastPathBytesSchedule)
 
 TEST_F(OrdinalFieldTest, FastPathMultipleOrdinalsOneLine)
 {
-    const auto result{tokenizer.process_line(
-        R"({"message":"x","latency_ms":10,"response_bytes":2048})")};
+    const auto result{
+        tokenizer.process_line(R"({"message":"x","latency_ms":10,"response_bytes":2048})")};
     ASSERT_TRUE(result.has_value());
     const auto& ev{result.value()};
     EXPECT_EQ(ev.ordinals.size(), 2u) << dump(ev);
@@ -138,8 +137,8 @@ TEST_F(OrdinalFieldTest, MessageBodyNumberIsNotAnOrdinal)
 TEST_F(OrdinalFieldTest, SlowPathLatencyMsViaSimdjson)
 {
     // The backslash escape in the message defeats the fast scanner → slow path.
-    const auto result{tokenizer.process_line(
-        R"({"message":"a \"quoted\" value","latency_ms":250})")};
+    const auto result{
+        tokenizer.process_line(R"({"message":"a \"quoted\" value","latency_ms":250})")};
     ASSERT_TRUE(result.has_value());
     const auto* obs{find(result.value(), "latency_ms")};
     ASSERT_NE(obs, nullptr) << dump(result.value());

@@ -27,8 +27,8 @@ constexpr std::string_view kDocument{
     R"(]}]}]})"};
 
 // The canonical flat-span records the unpack MUST emit — the exact bytes the LogCraft lab emits
-// for the same spans (fixed field order; service.name injected first, then span attributes verbatim;
-// int kind/status normalized). Span 1 (root) omits parentSpanId; span 2 carries it.
+// for the same spans (fixed field order; service.name injected first, then span attributes
+// verbatim; int kind/status normalized). Span 1 (root) omits parentSpanId; span 2 carries it.
 constexpr std::string_view kExpectedSpan0{
     R"({"traceId":"aabb","spanId":"0001","name":"checkout","kind":"SPAN_KIND_INTERNAL",)"
     R"("startTimeUnixNano":"1000","endTimeUnixNano":"1500","status":{"code":"STATUS_CODE_UNSET"},)"
@@ -94,8 +94,8 @@ TEST(SpanUnpack, FlatSpanLinksPopulateLinkedSpanIdsInOrder)
     EXPECT_EQ(span->trace.span_id, span_id_from_hex("0001"));
 }
 
-// A span without a links[] array carries no cross-trace edges — empty in ⇒ empty out (store_span_ids
-// allocates nothing), so a non-linking span stays byte-identical to pre-links.
+// A span without a links[] array carries no cross-trace edges — empty in ⇒ empty out
+// (store_span_ids allocates nothing), so a non-linking span stays byte-identical to pre-links.
 TEST(SpanUnpack, FlatSpanWithoutLinksHasEmptyLinkedSpanIds)
 {
     JsonStrategy strategy;

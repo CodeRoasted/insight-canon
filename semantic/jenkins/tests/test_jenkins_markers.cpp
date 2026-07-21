@@ -32,7 +32,8 @@ TEST(JenkinsMarkers, NamedBlockOpenIsAStage)
 {
     const ComposedSemantics composed{jenkins_only()};
     const auto stage{recognize("[Pipeline] { (Build)", LogFormat::Jenkins, composed)};
-    EXPECT_EQ(stage.kind, IntentMarkerKind::Job) << "STAGE is the container level (GHA Job ≡ stage)";
+    EXPECT_EQ(stage.kind, IntentMarkerKind::Job)
+        << "STAGE is the container level (GHA Job ≡ stage)";
     EXPECT_EQ(stage.name, "Build");
     EXPECT_EQ(stage.child_order, ChildOrder::Unordered)
         << "stages/branches co-occur (parallel/matrix) — the level matches UNORDERED (ADR 0023)";
@@ -54,7 +55,8 @@ TEST(JenkinsMarkers, DeclarativeSyntheticStageRecognized)
 {
     const ComposedSemantics composed{jenkins_only()};
     // The declarative engine's synthetic stages are console-visible named blocks — real stages for
-    // the recognizer (studies/006: the over-granularity vs the flat wfapi oracle, richer-not-wrong).
+    // the recognizer (studies/006: the over-granularity vs the flat wfapi oracle,
+    // richer-not-wrong).
     const auto synthetic{
         recognize("[Pipeline] { (Declarative: Checkout SCM)", LogFormat::Jenkins, composed)};
     EXPECT_EQ(synthetic.kind, IntentMarkerKind::Job);
@@ -64,14 +66,16 @@ TEST(JenkinsMarkers, DeclarativeSyntheticStageRecognized)
 TEST(JenkinsMarkers, VerbAnnotationIsAStep)
 {
     const ComposedSemantics composed{jenkins_only()};
-    for (const std::string_view verb : {"sh", "echo", "junit", "checkout", "withEnv", "readMavenPom"})
+    for (const std::string_view verb :
+         {"sh", "echo", "junit", "checkout", "withEnv", "readMavenPom"})
     {
         // The line outlives the returned marker (its name is a view into the content).
         const std::string line{std::string{"[Pipeline] "} + std::string{verb}};
         const auto step{recognize(line, LogFormat::Jenkins, composed)};
         EXPECT_EQ(step.kind, IntentMarkerKind::Step) << "verb: " << verb;
         EXPECT_EQ(step.name, verb);
-        EXPECT_EQ(step.child_order, ChildOrder::Ordered) << "steps are sequential within their stage";
+        EXPECT_EQ(step.child_order, ChildOrder::Ordered)
+            << "steps are sequential within their stage";
     }
 }
 
@@ -94,7 +98,9 @@ TEST(JenkinsMarkers, FormatGatedToJenkinsOnly)
     // II-6: a `[Pipeline]` line in a NON-Jenkins-routed stream fires nothing.
     EXPECT_EQ(recognize("[Pipeline] { (Build)", LogFormat::GitHubActions, composed).kind,
               IntentMarkerKind::None);
-    EXPECT_EQ(recognize("[Pipeline] sh", LogFormat::RawText, composed).kind, IntentMarkerKind::None);
-    EXPECT_EQ(recognize("[Pipeline] sh", LogFormat::Unknown, composed).kind, IntentMarkerKind::None);
+    EXPECT_EQ(recognize("[Pipeline] sh", LogFormat::RawText, composed).kind,
+              IntentMarkerKind::None);
+    EXPECT_EQ(recognize("[Pipeline] sh", LogFormat::Unknown, composed).kind,
+              IntentMarkerKind::None);
 }
 // NOLINTEND

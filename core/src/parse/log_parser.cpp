@@ -4,7 +4,7 @@ module;
 module insight.canon.detail.parse;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.spi;              // ProvenanceHook
+import insight.canon.spi;             // ProvenanceHook
 import insight.canon.compose;         // ComposedSemantics (echoed-source hooks)
 import insight.canon.detail.strategy; // IFormatStrategy, ParsedLine
 
@@ -33,12 +33,14 @@ LogParser::LogParser(ArenaAllocator& arena, const insight::semantic::ComposedSem
 }
 
 // D-PROV-1 echoed-source register: the GHA command-echo SGR wrapper is destroyed by
-// strip_escape_sequences before any strategy sees the line, so the composed provenance hooks classify
-// the RAW (ANSI-bearing) line — the only place it survives. Strategy-INDEPENDENT (a wrapped line is
-// echoed source whatever it routed to), reproducing the pre-split is_echoed_source_line exactly. In
-// 1.7.5 the single hook is the GitHub-Actions one from insight_semantic_github.
-[[nodiscard]] static bool is_echoed_source(std::string_view raw_line,
-                                           const insight::semantic::ComposedSemantics& composed) noexcept
+// strip_escape_sequences before any strategy sees the line, so the composed provenance hooks
+// classify the RAW (ANSI-bearing) line — the only place it survives. Strategy-INDEPENDENT (a
+// wrapped line is echoed source whatever it routed to), reproducing the pre-split
+// is_echoed_source_line exactly. In 1.7.5 the single hook is the GitHub-Actions one from
+// insight_semantic_github.
+[[nodiscard]] static bool
+is_echoed_source(std::string_view raw_line,
+                 const insight::semantic::ComposedSemantics& composed) noexcept
 {
     for (const insight::semantic::ProvenanceHook hook : composed.provenance_hooks())
         if (hook(raw_line))
@@ -128,7 +130,8 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
         if (escape_scratch_.empty()) // the line was all escape bytes
         {
             ++failed_count_;
-            INSIGHT_LOG_TRACE(logging::parser_logger(), "parse: line was all escape bytes, skipped");
+            INSIGHT_LOG_TRACE(logging::parser_logger(),
+                              "parse: line was all escape bytes, skipped");
             return std::unexpected(std::string("LogParser: empty line"));
         }
         line = escape_scratch_;
@@ -163,7 +166,8 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
     if (result.has_value())
     {
         ++parsed_count_;
-        last_format_ = strategy->format(); // the routed winner for this event (per-line observability)
+        last_format_ =
+            strategy->format(); // the routed winner for this event (per-line observability)
         // D-PROV-1 (echoed-source register): the GHA command-echo SGR wrapper was destroyed
         // by strip_escape_sequences above, so detect it on the RAW (ANSI-bearing) line — the
         // only place it survives. An echoed-source line is run-step SCRIPT text, not an
@@ -243,7 +247,8 @@ std::expected<ParsedLine, std::string> LogParser::parse_stable(std::string_view 
     if (result.has_value())
     {
         ++parsed_count_;
-        last_format_ = strategy->format(); // the routed winner for this event (per-line observability)
+        last_format_ =
+            strategy->format(); // the routed winner for this event (per-line observability)
         // D-PROV-1: echoed-source demotion (see parse_line). Detect on the supplied line; a
         // pre-ANSI-stripped stable line carries no wrapper, so this is a no-op there.
         if (is_echoed_source(stable_line, composed_))

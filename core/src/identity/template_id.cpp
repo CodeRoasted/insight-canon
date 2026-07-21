@@ -15,22 +15,22 @@ namespace insight
 {
 namespace
 {
-constexpr std::size_t kSha256Bytes{32};
-constexpr std::size_t kTemplateIdBytes{16}; // spec §3.2: first 16 SHA-256 bytes
-constexpr unsigned kNibbleMask{0xFU};
-constexpr std::array<char, 16> kHexDigits{'0', '1', '2', '3', '4', '5', '6', '7',
-                                          '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+    constexpr std::size_t kSha256Bytes{32};
+    constexpr std::size_t kTemplateIdBytes{16}; // spec §3.2: first 16 SHA-256 bytes
+    constexpr unsigned kNibbleMask{0xFU};
+    constexpr std::array<char, 16> kHexDigits{'0', '1', '2', '3', '4', '5', '6', '7',
+                                              '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
-[[nodiscard]] std::uint8_t hex_nibble(char chr) noexcept
-{
-    if (chr >= '0' && chr <= '9')
-        return static_cast<std::uint8_t>(chr - '0');
-    if (chr >= 'a' && chr <= 'f')
-        return static_cast<std::uint8_t>(chr - 'a' + 10);
-    if (chr >= 'A' && chr <= 'F')
-        return static_cast<std::uint8_t>(chr - 'A' + 10);
-    return 0;
-}
+    [[nodiscard]] std::uint8_t hex_nibble(char chr) noexcept
+    {
+        if (chr >= '0' && chr <= '9')
+            return static_cast<std::uint8_t>(chr - '0');
+        if (chr >= 'a' && chr <= 'f')
+            return static_cast<std::uint8_t>(chr - 'a' + 10);
+        if (chr >= 'A' && chr <= 'F')
+            return static_cast<std::uint8_t>(chr - 'A' + 10);
+        return 0;
+    }
 } // namespace
 
 TemplateId template_id_of(std::string_view canonical_template) noexcept
@@ -65,8 +65,8 @@ TemplateId parse_template_id(std::string_view rendered)
     if (hex.size() >= 2 && hex[0] == 'h' && hex[1] == ':')
         hex.remove_prefix(2);
     for (std::size_t i{0}; i < kTemplateIdBytes && (2 * i + 1) < hex.size(); ++i)
-        out.bytes[i] = static_cast<std::uint8_t>((hex_nibble(hex[2 * i]) << 4) |
-                                                 hex_nibble(hex[2 * i + 1]));
+        out.bytes[i] =
+            static_cast<std::uint8_t>((hex_nibble(hex[2 * i]) << 4) | hex_nibble(hex[2 * i + 1]));
     return out;
 }
 

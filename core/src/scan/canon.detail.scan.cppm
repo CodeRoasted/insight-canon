@@ -9,8 +9,9 @@ module;
 // gcc/clang define __SSE2__ (here implied by -march=x86-64-v2); MSVC never does — it signals x64
 // via _M_X64 (and 32-bit SSE2 via _M_IX86_FP>=2). Detect the x86-64 target portably, then pull the
 // SSE2 intrinsics from each toolchain's header (<emmintrin.h> on gcc/clang/MSVC; <intrin.h> is the
-// MSVC umbrella that includes it). INSIGHT_CANON_SSE2 then gates BOTH the include AND the use below,
-// so a non-x86 target compiles the scalar fallback rather than failing on undeclared intrinsics.
+// MSVC umbrella that includes it). INSIGHT_CANON_SSE2 then gates BOTH the include AND the use
+// below, so a non-x86 target compiles the scalar fallback rather than failing on undeclared
+// intrinsics.
 #if defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
 #define INSIGHT_CANON_SSE2 1
 #include <emmintrin.h> // SSE2 intrinsics (fast_gates)
@@ -90,10 +91,12 @@ export namespace insight::tokenization
 // this is the shared primitive for the common-case dispatch, and the seam A2's rule catalog reads.
 struct TokenShape
 {
-    bool empty{true};         // the token has no bytes
-    bool all_digits{false};   // non-empty AND every byte is an ASCII digit (== is_all_digits)
-    bool digit_leading{false};// first byte after an optional +/- sign is a digit (== is_digit_leading)
-    bool has_separator{false};// contains a composite separator : / [ # - =  (the maybe_composite gate)
+    bool empty{true};       // the token has no bytes
+    bool all_digits{false}; // non-empty AND every byte is an ASCII digit (== is_all_digits)
+    bool digit_leading{
+        false}; // first byte after an optional +/- sign is a digit (== is_digit_leading)
+    bool has_separator{
+        false}; // contains a composite separator : / [ # - =  (the maybe_composite gate)
 
     explicit constexpr TokenShape(std::string_view tok) noexcept
     {
@@ -108,8 +111,8 @@ struct TokenShape
         for (const char chr : tok)
         {
             all_digits = all_digits && is_digit(chr);
-            has_separator = has_separator || chr == ':' || chr == '/' || chr == '[' ||
-                            chr == '#' || chr == '-' || chr == '=';
+            has_separator = has_separator || chr == ':' || chr == '/' || chr == '[' || chr == '#' ||
+                            chr == '-' || chr == '=';
         }
     }
 };
@@ -594,7 +597,8 @@ namespace simd_detail
             ptr += kSseWidth;
         }
 #endif
-        // Scalar path: SIMD remainder, or the whole range on a non-SSE2 target (see find_non_ws_ptr).
+        // Scalar path: SIMD remainder, or the whole range on a non-SSE2 target (see
+        // find_non_ws_ptr).
         while (ptr < end && !is_space(*ptr))
             ++ptr;
         return ptr;

@@ -12,8 +12,8 @@
 // MSVC would have produced; catching it on Linux is the point.
 //
 // If this TU is built where the platform has no native __int128 at all, it degrades to a tautology
-// (both halves are the portable struct) and still passes — the gcc/clang CI legs are where it bites.
-// NOLINTBEGIN
+// (both halves are the portable struct) and still passes — the gcc/clang CI legs are where it
+// bites. NOLINTBEGIN
 
 #include <gtest/gtest.h>
 
@@ -23,7 +23,8 @@
 // 1) native view (only meaningful where __int128 exists)
 #if defined(__SIZEOF_INT128__) || defined(__GNUC__) || defined(__clang__)
 #define ORACLE_HAS_NATIVE 1
-namespace nat {
+namespace nat
+{
 using u128 = unsigned __int128;
 using i128 = __int128;
 } // namespace nat
@@ -40,26 +41,53 @@ namespace
 #ifdef ORACLE_HAS_NATIVE
 
 // Helpers: extract the low/high 64-bit words from each representation, to compare bit-for-bit.
-constexpr std::uint64_t lo_of(nat::u128 v) noexcept { return static_cast<std::uint64_t>(v); }
-constexpr std::uint64_t hi_of(nat::u128 v) noexcept { return static_cast<std::uint64_t>(v >> 64); }
-constexpr std::uint64_t lo_of(port::u128 v) noexcept { return v.lo; }
-constexpr std::uint64_t hi_of(port::u128 v) noexcept { return v.hi; }
-constexpr std::uint64_t lo_of(nat::i128 v) noexcept { return static_cast<std::uint64_t>(static_cast<nat::u128>(v)); }
-constexpr std::uint64_t hi_of(nat::i128 v) noexcept { return static_cast<std::uint64_t>(static_cast<nat::u128>(v) >> 64); }
-constexpr std::uint64_t lo_of(port::i128 v) noexcept { return v.bits.lo; }
-constexpr std::uint64_t hi_of(port::i128 v) noexcept { return v.bits.hi; }
+constexpr std::uint64_t lo_of(nat::u128 v) noexcept
+{
+    return static_cast<std::uint64_t>(v);
+}
+constexpr std::uint64_t hi_of(nat::u128 v) noexcept
+{
+    return static_cast<std::uint64_t>(v >> 64);
+}
+constexpr std::uint64_t lo_of(port::u128 v) noexcept
+{
+    return v.lo;
+}
+constexpr std::uint64_t hi_of(port::u128 v) noexcept
+{
+    return v.hi;
+}
+constexpr std::uint64_t lo_of(nat::i128 v) noexcept
+{
+    return static_cast<std::uint64_t>(static_cast<nat::u128>(v));
+}
+constexpr std::uint64_t hi_of(nat::i128 v) noexcept
+{
+    return static_cast<std::uint64_t>(static_cast<nat::u128>(v) >> 64);
+}
+constexpr std::uint64_t lo_of(port::i128 v) noexcept
+{
+    return v.bits.lo;
+}
+constexpr std::uint64_t hi_of(port::i128 v) noexcept
+{
+    return v.bits.hi;
+}
 
 // A spread of u64 operands: edges, powers of two, primes, and the ≥2^63 region (the value-
 // preservation hazard for the signed-widening of weights).
 constexpr std::array<std::uint64_t, 18> kSamples{
-    0ULL, 1ULL, 2ULL, 3ULL, 7ULL, 255ULL, 256ULL, 1000ULL, 65535ULL,
-    (1ULL << 32), (1ULL << 40), (1ULL << 42) + 7, (1ULL << 52), (1ULL << 62),
-    (1ULL << 63), (1ULL << 63) + 12345, ~0ULL - 1ULL, ~0ULL};
+    0ULL,         1ULL,         2ULL,         3ULL,
+    7ULL,         255ULL,       256ULL,       1000ULL,
+    65535ULL,     (1ULL << 32), (1ULL << 40), (1ULL << 42) + 7,
+    (1ULL << 52), (1ULL << 62), (1ULL << 63), (1ULL << 63) + 12345,
+    ~0ULL - 1ULL, ~0ULL};
 
-#define EXPECT_SAME_U128(N, P)                                                      \
-    do {                                                                            \
-        EXPECT_EQ(lo_of(N), lo_of(P)) << "lo mismatch";                             \
-        EXPECT_EQ(hi_of(N), hi_of(P)) << "hi mismatch";                             \
+#define EXPECT_SAME_U128(N, P)                                                                     \
+    do                                                                                             \
+    {                                                                                              \
+        EXPECT_EQ(lo_of(N), lo_of(P)) << "lo mismatch";                                            \
+        EXPECT_EQ(hi_of(N), hi_of(P)) << "hi mismatch";                                            \
     } while (0)
 #define EXPECT_SAME_I128(N, P) EXPECT_SAME_U128(N, P)
 
@@ -86,7 +114,8 @@ TEST(DetInt128Portable, UnsignedCompareMatchesNative)
                       port::u128{a} >= port::u128{b})
                 << a << " >= " << b;
             // < : metalog's HLL small-range branch. Also drive the MIXED u128 < u64 form (the
-            // threshold is a u64 that widens through the implicit ctor) — the exact call-site shape.
+            // threshold is a u64 that widens through the implicit ctor) — the exact call-site
+            // shape.
             EXPECT_EQ(static_cast<nat::u128>(a) < static_cast<nat::u128>(b),
                       port::u128{a} < port::u128{b})
                 << a << " < " << b;
@@ -103,7 +132,8 @@ TEST(DetInt128Portable, UnsignedAddSubMatchesNative)
                              port::u128{a} + port::u128{b});
             EXPECT_SAME_U128(static_cast<nat::u128>(a) - static_cast<nat::u128>(b),
                              port::u128{a} - port::u128{b});
-            // += : metalog's HLL harmonic-sum accumulator. Must equal the +-then-assign native does.
+            // += : metalog's HLL harmonic-sum accumulator. Must equal the +-then-assign native
+            // does.
             nat::u128 nacc{static_cast<nat::u128>(a)};
             port::u128 pacc{a};
             nacc += static_cast<nat::u128>(b);
@@ -122,7 +152,8 @@ TEST(DetInt128Portable, UnsignedDivMatchesNative)
                 const nat::u128 n{(static_cast<nat::u128>(hi) << 64) | lo};
                 const port::u128 p{lo, hi};
                 EXPECT_SAME_U128(n / static_cast<nat::u128>(den), p / port::u128{den});
-                EXPECT_SAME_U128(n % static_cast<nat::u128>(den), p % port::u128{den}); // serializer's %
+                EXPECT_SAME_U128(n % static_cast<nat::u128>(den),
+                                 p % port::u128{den}); // serializer's %
             }
 }
 
@@ -141,9 +172,18 @@ TEST(DetInt128Portable, UnsignedEqualityMatchesNative)
 TEST(DetInt128Portable, SignedMulDivAddMatchesNative)
 {
     // The det_ln / FixedReducer / round_div signed surface: i64×i64, +=, /, unary -, ≥.
-    constexpr std::array<std::int64_t, 12> kS{
-        0, 1, -1, 2, -2, 1000, -1000, 762123384786LL, -762123384786LL,
-        (1LL << 46), -(1LL << 46), (1LL << 60)};
+    constexpr std::array<std::int64_t, 12> kS{0,
+                                              1,
+                                              -1,
+                                              2,
+                                              -2,
+                                              1000,
+                                              -1000,
+                                              762123384786LL,
+                                              -762123384786LL,
+                                              (1LL << 46),
+                                              -(1LL << 46),
+                                              (1LL << 60)};
     for (auto a : kS)
         for (auto b : kS)
         {
@@ -173,7 +213,10 @@ TEST(DetInt128Portable, WeightWideningIsValuePreserving)
 }
 
 #else
-TEST(DetInt128Portable, NoNativeInt128OnThisPlatform) { GTEST_SKIP() << "no native __int128 to compare against"; }
+TEST(DetInt128Portable, NoNativeInt128OnThisPlatform)
+{
+    GTEST_SKIP() << "no native __int128 to compare against";
+}
 #endif
 
 } // namespace

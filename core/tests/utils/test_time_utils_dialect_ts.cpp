@@ -57,8 +57,8 @@ namespace
     do                                                                                             \
     {                                                                                              \
         const auto parsed_{(expr)};                                                                \
-        ASSERT_TRUE(parsed_.has_value()) << #expr << " returned nullopt, expected epoch "           \
-                                         << (expected_epoch);                                      \
+        ASSERT_TRUE(parsed_.has_value())                                                           \
+            << #expr << " returned nullopt, expected epoch " << (expected_epoch);                  \
         EXPECT_EQ(epoch_of(*parsed_), (expected_epoch))                                            \
             << #expr << "\n  actual epoch   : " << epoch_of(*parsed_)                              \
             << "\n  expected epoch : " << (expected_epoch)                                         \
@@ -151,8 +151,7 @@ TEST(ParseCompactDateTime, TwoDigitYearPivotsAt70)
     // invisible in any happy-path strategy test — both sides of the boundary are pinned.
     EXPECT_PARSES_TO(parse_compact_date_time("691231", "235959"),
                      utc_epoch(2069, 12, 31, 23, 59, 59));
-    EXPECT_PARSES_TO(parse_compact_date_time("700101", "000000"),
-                     utc_epoch(1970, 1, 1, 0, 0, 0));
+    EXPECT_PARSES_TO(parse_compact_date_time("700101", "000000"), utc_epoch(1970, 1, 1, 0, 0, 0));
 }
 
 TEST(ParseCompactDateTime, WidthIsExactOnBothFields)
@@ -182,8 +181,7 @@ TEST(ParseShortYearSlash, TwoDigitYearPivotsAt70)
 {
     EXPECT_PARSES_TO(parse_short_year_slash("69/12/31 23:59:59"),
                      utc_epoch(2069, 12, 31, 23, 59, 59));
-    EXPECT_PARSES_TO(parse_short_year_slash("70/01/01 00:00:00"),
-                     utc_epoch(1970, 1, 1, 0, 0, 0));
+    EXPECT_PARSES_TO(parse_short_year_slash("70/01/01 00:00:00"), utc_epoch(1970, 1, 1, 0, 0, 0));
 }
 
 TEST(ParseShortYearSlash, IgnoresTrailingLineContent)
@@ -259,8 +257,7 @@ TEST(ParseHealthAppTs, SingleDigitHourAndSecondParsed)
                      utc_epoch(2017, 12, 23, 9, 15, 29));
     EXPECT_PARSES_TO(parse_health_app_ts("20171223-22:15:9:606"),
                      utc_epoch(2017, 12, 23, 22, 15, 9));
-    EXPECT_PARSES_TO(parse_health_app_ts("20171223-9:15:9:606"),
-                     utc_epoch(2017, 12, 23, 9, 15, 9));
+    EXPECT_PARSES_TO(parse_health_app_ts("20171223-9:15:9:606"), utc_epoch(2017, 12, 23, 9, 15, 9));
 }
 
 TEST(ParseHealthAppTs, MillisecondsAreConsumedButNotRetained)
@@ -376,16 +373,12 @@ TEST(DialectTimestampCalendar, LeapDayAndYearBoundariesAgreeWithTheCivilCalendar
     // utc_mktime is hand-rolled (no timegm, for cross-stdlib determinism). These pin its
     // leap-year rule against std::chrono for the three cases the naive rule gets wrong:
     // 2024 (÷4, leap), 2000 (÷400, leap), 2100 (÷100 not ÷400, NOT leap).
-    EXPECT_PARSES_TO(parse_nginx_error_ts("2024/02/29 12:00:00"),
-                     utc_epoch(2024, 2, 29, 12, 0, 0));
-    EXPECT_PARSES_TO(parse_nginx_error_ts("2000/02/29 12:00:00"),
-                     utc_epoch(2000, 2, 29, 12, 0, 0));
-    EXPECT_PARSES_TO(parse_nginx_error_ts("2100/03/01 00:00:00"),
-                     utc_epoch(2100, 3, 1, 0, 0, 0));
+    EXPECT_PARSES_TO(parse_nginx_error_ts("2024/02/29 12:00:00"), utc_epoch(2024, 2, 29, 12, 0, 0));
+    EXPECT_PARSES_TO(parse_nginx_error_ts("2000/02/29 12:00:00"), utc_epoch(2000, 2, 29, 12, 0, 0));
+    EXPECT_PARSES_TO(parse_nginx_error_ts("2100/03/01 00:00:00"), utc_epoch(2100, 3, 1, 0, 0, 0));
     EXPECT_PARSES_TO(parse_nginx_error_ts("1999/12/31 23:59:59"),
                      utc_epoch(1999, 12, 31, 23, 59, 59));
-    EXPECT_PARSES_TO(parse_nginx_error_ts("2000/01/01 00:00:00"),
-                     utc_epoch(2000, 1, 1, 0, 0, 0));
+    EXPECT_PARSES_TO(parse_nginx_error_ts("2000/01/01 00:00:00"), utc_epoch(2000, 1, 1, 0, 0, 0));
 }
 
 // NOLINTEND
