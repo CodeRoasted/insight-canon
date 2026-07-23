@@ -197,7 +197,7 @@ bool is_otel_span_document(std::string_view line) noexcept
     return line.contains(R"("resourceSpans")");
 }
 
-std::size_t unpack_otel_spans(std::string_view document, std::vector<std::string>& out)
+std::size_t unpack_otel_spans(std::string_view document, std::vector<std::string>& out) // NOLINT(readability-function-cognitive-complexity): one coherent traversal of the OTLP resourceSpans→scopeSpans→spans nesting emitting one line per span; splitting the nested walk fragments a single-responsibility unpacker.
 {
     if (!is_otel_span_document(document))
         return 0;
