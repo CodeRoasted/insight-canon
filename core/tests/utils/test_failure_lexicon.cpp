@@ -40,13 +40,21 @@ TEST(FailureLexicon, StandaloneWordIsACue)
     EXPECT_TRUE(contains_failure_cue("kernel: segfault at 0x0 ip ...")) << "'segfault'";
 }
 
-// ── CamelCase exception types match even with no other error word ──────────────
-TEST(FailureLexicon, CamelCaseTypeIsACue)
+// ── CamelCase exception types are a cue ONLY in verdict register (D-MSK-4 ruling) ──
+// D-OUT-4b re-baselined 2026-07-21: error_type_anchors == is_verdict_anchored. A …Error/
+// …Exception type fires when it carries verdict register (a `:` verdict colon, caps, a
+// [bracket], or a ✗-led line); a BARE type in prose / a source-echo (`raise ValueError`,
+// no register) does NOT — the actual thrown line `ValueError: …` carries the colon and still
+// fires, so the lost recall is on non-verdict echoes only (precision-first, ADR 0013).
+TEST(FailureLexicon, CamelCaseTypeIsACueOnlyInVerdictRegister)
 {
-    EXPECT_TRUE(contains_failure_cue("raise ValueError")) << "lowercase-before suffix";
-    EXPECT_TRUE(contains_failure_cue("E   sqlalchemy.exc.OperationalError: bad")) << "dotted type";
-    EXPECT_TRUE(contains_failure_cue("IOError: disk full")) << "uppercase-before suffix";
-    EXPECT_TRUE(contains_failure_cue("threw a RuntimeException")) << "Exception suffix";
+    EXPECT_TRUE(contains_failure_cue("E   sqlalchemy.exc.OperationalError: bad")) << "dotted type:";
+    EXPECT_TRUE(contains_failure_cue("IOError: disk full")) << "uppercase-before suffix, colon";
+    EXPECT_FALSE(contains_failure_cue("raise ValueError"))
+        << "a BARE type with no verdict register (source echo) no longer fires — the actual "
+           "`ValueError: …` verdict line still does";
+    EXPECT_FALSE(contains_failure_cue("threw a RuntimeException"))
+        << "a bare …Exception in prose, no register — not a verdict";
     EXPECT_FALSE(contains_failure_cue("see error-report.json for the ErrorBudget"))
         << "'Error' as a PREFIX (ErrorBudget) is not a cue — only the type suffix is";
 }
@@ -70,8 +78,10 @@ TEST(FailureLexicon, CamelCaseErrorTypeDemotedInDescriptiveRegister)
     // Recall preserved — the SAME token fires in verdict register (register, not token):
     EXPECT_TRUE(contains_failure_cue("FrameworkError: connection reset by peer"))
         << "a `:`-bound thrown type is a verdict — still fires (no ▶ lead)";
-    EXPECT_TRUE(contains_failure_cue("raise FrameworkError"))
-        << "a non-▶ line with the same token still anchors — the discriminator is the register";
+    EXPECT_FALSE(contains_failure_cue("raise FrameworkError"))
+        << "D-MSK-4: a bare non-▶ echo with no verdict register no longer fires — the "
+           "discriminator "
+           "is register (is_verdict_anchored), and the actual `FrameworkError: …` line still fires";
     EXPECT_TRUE(contains_failure_cue("\xE2\x9C\x97 teardown threw FrameworkError"))
         << "a ✗-led FAIL line confirms the verdict even with a …Error type name";
 }
@@ -88,8 +98,8 @@ TEST(FailureLexicon, NegatedErrorTypeIsNotACue)
         << "the exact dogfood false match — '…NotError' is a negation, not an error type";
     EXPECT_FALSE(contains_failure_cue("status NoError after retry")) << "'NoError' negates";
     EXPECT_FALSE(contains_failure_cue("assert HandlesNonError path")) << "'NonError' negates";
-    EXPECT_TRUE(contains_failure_cue("raises a ValueError here"))
-        << "control: a real type ('Value' before 'Error') is still a cue";
+    EXPECT_TRUE(contains_failure_cue("raises ValueError: bad value"))
+        << "control: a real type ('Value' before 'Error') in verdict register (colon) is a cue";
 }
 
 // ── A declared PASS verdict demotes a bare error-TYPE NAME (Guard 2) ───────────
@@ -202,8 +212,10 @@ TEST(FailureLexicon, VerdictAnchoredFailureSurvives)
     EXPECT_TRUE(contains_failure_cue("testSitesStats (FAILED)")) << "paren+caps '(FAILED)'";
     EXPECT_TRUE(contains_failure_cue("##[error]Process completed with exit code 1"))
         << "bracket-bound '[error]' (GitHub Actions marker)";
-    // CamelCase error TYPE (is_camel_error_type, existing) — a self-evident verdict shape
-    EXPECT_TRUE(contains_failure_cue("raise ValueError(\"bad input\")")) << "CamelCase error TYPE";
+    // CamelCase error TYPE in verdict register (a `:` verdict colon) — D-MSK-4: the type is a
+    // cue only in register; the `raise ValueError("bad input")` source echo (shape `Type(`, no
+    // colon) is NOT verdict register and no longer fires, but the thrown `ValueError:` line does.
+    EXPECT_TRUE(contains_failure_cue("ValueError: bad input")) << "CamelCase error TYPE, colon";
     // the crash phrase (kFailurePhrases, existing)
     EXPECT_TRUE(contains_failure_cue("Segmentation fault (core dumped)")) << "the crash phrase";
     // self-anchoring outcome VERBS — fire bare lowercase (the minimal-pair survivors:
@@ -382,8 +394,9 @@ TEST(FailureLexicon, ScanLimitBoundsTheHead)
     EXPECT_TRUE(contains_failure_cue(line, 0)) << "whole-line scan sees the late caps 'ERROR'";
     EXPECT_FALSE(contains_failure_cue(line, 20))
         << "the late 'ERROR' STARTS past a 20-char head — out of head, not unanchored";
-    // A token that STARTS within the head but extends past it is fully captured.
-    EXPECT_TRUE(contains_failure_cue("OperationalError happened later", 5))
+    // A token that STARTS within the head but extends past it is fully captured. Uses a
+    // verdict-register cue (colon) — D-MSK-4: a bare `OperationalError` echo is no longer a cue.
+    EXPECT_TRUE(contains_failure_cue("OperationalError: happened later", 5))
         << "the cue token starts at offset 0, within the head";
 }
 

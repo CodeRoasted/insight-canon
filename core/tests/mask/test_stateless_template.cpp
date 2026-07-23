@@ -529,4 +529,92 @@ TEST(StatelessTemplate, CardinalityOnCorpus)
     EXPECT_GT(lines, 0u);
 }
 
+// ── D-MSK-4 gates: ephemeral-root masking (canon_ephemeral_root_masking.md §7) ──
+// The ROOT — not a hex/length heuristic (study 011 falsified that) — is the decidable thing. A
+// path component directly under a declared ephemeral root is a per-run instance and masks to <*>;
+// the location tail is protected. G-MSK-1..7 are the builder's contract.
+
+TEST(EphemeralRootMask, G1_ReportedConanPairCollapses)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // The exact defect: two conan build-dir hashes for one logical diagnostic line.
+    const std::string first{masked(
+        "/home/runner/.conan2/p/b/insig247e3d1dffc33/p/include/insight/span_unpack.cpp:72:5:",
+        arena)};
+    const std::string second{masked(
+        "/home/runner/.conan2/p/b/insigea56199c0f87b/p/include/insight/span_unpack.cpp:72:5:",
+        arena)};
+    EXPECT_EQ(first, second) << "the phantom pair must collapse\nfirst=" << first
+                             << "\nsecond=" << second;
+    EXPECT_EQ(first, "/home/runner/.conan2/p/b/<*>/p/include/insight/span_unpack.cpp:<*>:<*>:")
+        << "instance masked, structure + tail kept\nfirst=" << first;
+}
+
+TEST(EphemeralRootMask, G2_TailSurvives)
+{
+    ArenaAllocator arena{256U * 1024U};
+    const std::string tmpl{masked(
+        "/home/runner/.conan2/p/b/insig247e3d1dffc33/p/include/insight/span_unpack.cpp:72:5:",
+        arena)};
+    EXPECT_NE(tmpl.find("span_unpack.cpp"), std::string::npos)
+        << "the file:line tail is what makes a finding actionable — never mask it\ntmpl=" << tmpl;
+}
+
+TEST(EphemeralRootMask, G3_ContentClassStaysLiteral)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // None of these sits under a catalogued root, so D-MSK-4 must not touch them (over-mask check).
+    // A pinned action SHA path (its change is drift we WANT surfaced) keeps its class anchors and
+    // gains NO ephemeral artifact.
+    const std::string sha{masked("_actions/actions/create-github-app-token/"
+                                 "bcd2ba49abf26b56dd0dd2eb1c9dd5c77b096d4c/dist/main.cjs",
+                                 arena)};
+    EXPECT_NE(sha.find("_actions"), std::string::npos) << "sha=" << sha;
+    EXPECT_NE(sha.find("main.cjs"), std::string::npos) << "sha=" << sha;
+    EXPECT_EQ(sha.find(".conan2"), std::string::npos)
+        << "no ephemeral artifact leaked in\nsha=" << sha;
+    // A container image digest — `sha256:` is colon-LETTER, not `:digit`, so not a composite.
+    const std::string dig{
+        masked("alpine@sha256:ff6bdca1a26e4cf3f60c76e9f6f8bb2adb1e5a5b6c7d8e9f0", arena)};
+    EXPECT_NE(dig.find("alpine"), std::string::npos)
+        << "the image-name class anchor survives\ndig=" << dig;
+}
+
+TEST(EphemeralRootMask, G4_TmpSubtreeRegressionByteIdentical)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // D-MSK-2 regression: a /tmp subtree collapses exactly as under -5.
+    EXPECT_EQ(masked("/tmp/pw-electron-userdata-Kw9v4a", arena), "/tmp/<*>");
+}
+
+TEST(EphemeralRootMask, G5_ClampKeepsTailUnderTmpDiagnostic)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // A /tmp-ROOTED diagnostic: the instance masks AND the tail survives (the clamp, M4). This
+    // output CHANGES vs -5 (an improvement: the old ordering knowingly kept the phantom).
+    const std::string tmpl{masked("/tmp/build-x/src/foo.cpp:42:5", arena)};
+    EXPECT_EQ(tmpl, "/tmp/<*>/src/foo.cpp:<*>:<*>") << "tmpl=" << tmpl;
+    EXPECT_NE(tmpl.find("foo.cpp"), std::string::npos) << "tail kept\ntmpl=" << tmpl;
+}
+
+TEST(EphemeralRootMask, G6_AnchorIsReal_MidPathTmpUntouched)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // `tmp` is TokenStart, so a mid-path `tmp` is NOT a root: a user file under it is untouched…
+    EXPECT_EQ(masked("/home/user/tmp/notes.txt", arena), "/home/user/tmp/notes.txt");
+    // …and in a diagnostic, the child of a mid-path `tmp` is KEPT (not masked as an instance).
+    const std::string diag{masked("/home/user/tmp/build.log:5:1", arena)};
+    EXPECT_NE(diag.find("build.log"), std::string::npos)
+        << "a mid-path tmp must not float and mask its child\ndiag=" << diag;
+}
+
+TEST(EphemeralRootMask, G7_NoCatalogedRootNoOverFire)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // Blast-radius floor: a diagnostic under NO catalogued root masks exactly as -5 — only the
+    // :line:col, every path component kept. A moved golden with no catalogued root = over-fire.
+    EXPECT_EQ(masked("/home/user/project/src/main.cpp:10:5", arena),
+              "/home/user/project/src/main.cpp:<*>:<*>");
+}
+
 // NOLINTEND

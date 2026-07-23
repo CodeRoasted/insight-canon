@@ -350,15 +350,16 @@ TEST(InferLeadingLogLevel, EmbeddedFailureSubstringIsNotError)
     EXPECT_EQ(infer_leading_log_level("page fault handler registered"), LogLevel::Unknown)
         << "'fault' is not a standalone failure cue (only 'segfault' is)";
 }
-// Recall guard: a CamelCase exception type is the failure cue even with no other
-// error word on the line (the substring scan caught these incidentally; the
-// token matcher catches them by design via the `…Error`/`…Exception` suffix).
+// Recall guard: a CamelCase exception type in verdict register is the failure cue even with
+// no other error word on the line. D-MSK-4 (2026-07-21): the type anchors ONLY in verdict
+// register (colon/caps/bracket/✗-led); a bare `raise ValueError(...)` source echo no longer
+// promotes to Error — but the thrown `ValueError: …` verdict line still does.
 TEST(InferLeadingLogLevel, CamelCaseErrorTypeIsError)
 {
-    EXPECT_EQ(infer_leading_log_level("  raise ValueError(\"bad input\")"), LogLevel::Error)
-        << "ValueError type name";
+    EXPECT_EQ(infer_leading_log_level("  ValueError: bad input"), LogLevel::Error)
+        << "ValueError type name in verdict register (colon)";
     EXPECT_EQ(infer_leading_log_level("IOError: disk full"), LogLevel::Error)
-        << "IOError type name";
+        << "IOError type name, colon";
 }
 // A bare OS/shell crash carries no level keyword, so the failure lexicon is the
 // only signal — "Segmentation fault" must be recovered as Error (as the adjacent

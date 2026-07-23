@@ -150,6 +150,125 @@ namespace
                equals_ascii_lower(tok, "exit") || equals_ascii_lower(tok, "signal");
     }
 
+    // ── Ephemeral-root catalog + matcher (D-MSK-4) ───────────────────────────
+    // A path component sitting DIRECTLY under a declared ephemeral root is a per-run instance by
+    // construction (a conan build dir `.conan2/p/b/insig247e3d1dffc33`, a nix store hash, a random
+    // `/tmp/pw-electron-userdata-Kw9v4a`). study 011 proved NO hex/length rule can separate
+    // ephemeral from content — a 40-char SHA is a pinned dependency in one path and per-run junk in
+    // another, same length/alphabet. The DECIDABLE thing is the ROOT: an enumerable, byte-exact
+    // catalog. It is the single source of truth, consulted as a per-segment PREDICATE from BOTH the
+    // diagnostic-composite segment walk (call site A, below) and the standalone
+    // `normalize_ephemeral_root` (call site B) — adding a root here extends both with no second
+    // edit (the kCurrencyMarkers discipline). Masking-only, no semantics ⇒ canon CORE, not a
+    // dialect package (ADR 0024 cl.4: kCanonicalizationVersion IS the core masking generation).
+    // See technical_docs/architecture/canon_ephemeral_root_masking.md.
+
+    enum class RootAnchor : std::uint8_t
+    {
+        TokenStart, // the root's first component is the first component after a leading '/'
+        Floating,   // the root matches at ANY '/' component boundary (a mid-path root)
+    };
+    enum class RootScope : std::uint8_t
+    {
+        Subtree,  // everything under the root is ephemeral (a namespace of ephemeral trees: /tmp)
+        Instance, // exactly the ONE component under the root is ephemeral; the tail resumes normal
+                  // classification (a content-addressed store whose subtree is stable: conan, nix)
+    };
+
+    struct EphemeralRoot
+    {
+        std::span<const std::string_view> segments; // the root as ordered path components
+        RootAnchor anchor;
+        RootScope scope;
+    };
+
+    // The declared roots, segment-wise (a root is components, never a string containing '/', so it
+    // matches segment-wise). Each backing array has static storage so the spans are
+    // constexpr-valid. `anchor`/`scope` are EXPLICIT, never inferred: a mis-spelled root that
+    // silently floated would over-mask, and over-masking destroys signal irrecoverably (ADR 0013) —
+    // the dangerous axes are named on purpose.
+    inline constexpr std::array<std::string_view, 1> kRootTmp{{std::string_view{"tmp"}}};
+    inline constexpr std::array<std::string_view, 2> kRootVarTmp{
+        {std::string_view{"var"}, std::string_view{"tmp"}}};
+    inline constexpr std::array<std::string_view, 2> kRootVarFolders{
+        {std::string_view{"var"}, std::string_view{"folders"}}};
+    inline constexpr std::array<std::string_view, 3> kRootConan{
+        {std::string_view{".conan2"}, std::string_view{"p"}, std::string_view{"b"}}};
+    inline constexpr std::array<std::string_view, 2> kRootNixStore{
+        {std::string_view{"nix"}, std::string_view{"store"}}};
+
+    // `bazel-out` is deliberately ABSENT: its component is the build CONFIGURATION (`k8-fastbuild`,
+    // `ppc-opt`) — stable per config, carries no hash, and masking it would destroy which-config
+    // signal to fix nothing (canon_ephemeral_root_masking.md §3 M7).
+    inline constexpr std::array<EphemeralRoot, 5> kEphemeralRoots{{
+        {.segments = kRootTmp, .anchor = RootAnchor::TokenStart, .scope = RootScope::Subtree},
+        {.segments = kRootVarTmp, .anchor = RootAnchor::TokenStart, .scope = RootScope::Subtree},
+        {.segments = kRootVarFolders,
+         .anchor = RootAnchor::TokenStart,
+         .scope = RootScope::Subtree},
+        {.segments = kRootConan, .anchor = RootAnchor::Floating, .scope = RootScope::Instance},
+        {.segments = kRootNixStore, .anchor = RootAnchor::TokenStart, .scope = RootScope::Instance},
+    }};
+
+    inline constexpr std::size_t kMaxRootSegments{3U}; // longest declared root = look-back window
+
+    // One path component seen by a segment walk: its core text, the separator byte immediately
+    // before it ('/' , ':' , or '\0' at token start), and whether it is the first component after a
+    // leading '/' (needed to decide a TokenStart anchor).
+    struct PathComponent
+    {
+        std::string_view text;
+        char sep_before{'\0'};
+        bool at_token_start{false};
+    };
+
+    // THE MATCHER (D-MSK-4 M2). Given the trailing window of up to kMaxRootSegments components
+    // ending at the CURRENT one (window.back()), does a declared root END here, and with what
+    // scope? Longest declared root ending here wins (order-independent). Returns nullopt otherwise.
+    [[nodiscard]] inline std::optional<RootScope>
+    root_scope_ending_at(std::span<const PathComponent> window) noexcept
+    {
+        if (window.empty())
+            return std::nullopt;
+        std::optional<RootScope> best{};
+        std::size_t best_len{0};
+        for (const EphemeralRoot& root : kEphemeralRoots)
+        {
+            const std::size_t klen{root.segments.size()};
+            // Hot-path gate (§5 MUST): the current component must be the root's LAST segment — a
+            // size-then-byte string compare that rejects almost every component in ~one length
+            // check. Only a strictly longer match than one already found can win.
+            if (klen > window.size() || klen <= best_len ||
+                window.back().text != root.segments[klen - 1U])
+                continue;
+            const std::size_t first{window.size() - klen}; // window index of the root's 1st comp
+            bool matched{true};
+            for (std::size_t seg{0}; seg + 1U < klen; ++seg) // last segment already matched
+                if (window[first + seg].text != root.segments[seg])
+                {
+                    matched = false;
+                    break;
+                }
+            if (!matched)
+                continue;
+            // MUST: consecutive AND '/'-separated — every separator from the root's first component
+            // through its last must be '/', so a ':'-coincidence (`foo:tmp:bar`) never matches.
+            for (std::size_t idx{first}; idx < window.size(); ++idx)
+                if (window[idx].sep_before != '/')
+                {
+                    matched = false;
+                    break;
+                }
+            if (!matched)
+                continue;
+            if (root.anchor == RootAnchor::TokenStart && !window[first].at_token_start)
+                continue;
+            best = root.scope;
+            best_len = klen;
+        }
+        return best;
+    }
+
     // Composite-token masking, DIAGNOSTIC_COMPOSITE class (D-MSK-1).
     //
     // The fixed masks mask only WHOLE tokens that are digit-leading / IPv4 / hex. A
@@ -182,6 +301,11 @@ namespace
     // Pure, byte-only, single-token (a function of the token bytes — I5) → cross-stdlib + MSVC
     // bit-identical. Returns true and fills `out` only when ≥1 segment was masked AND an anchor
     // exists; false (leaving the dispatch to fall through) otherwise.
+    // One coherent per-token masking routine: the `:`/`/` segment walk, the letter-KEEP /
+    // digit-MASK / status carve-out classification, and the D-MSK-4 ephemeral-root instance masking
+    // all share the same left-to-right pass over `out`/prev_core/window — a split fragments the
+    // single scan and its determinism.
+    // NOLINTNEXTLINE(readability-function-cognitive-complexity)
     [[nodiscard]] inline bool normalize_diagnostic_composite(std::string_view tok, std::string& out)
     {
         // TRIGGER: a ':' immediately followed by a digit (subsumes source-location).
@@ -200,11 +324,40 @@ namespace
         bool has_letter_anchor{false};
         std::string_view prev_core{}; // the previous segment's core — for the status carve-out
         std::size_t seg_start{0};
+        // D-MSK-4 M3/M4: the ephemeral-root matcher over the SAME catalog as call site B. When a
+        // declared root ends at a component, the NEXT component is a per-run instance and masks to
+        // <*> regardless of its leading char (overriding the letter-leading KEEP); scope is CLAMPED
+        // to Instance here so the file:line tail is never masked, and classification resumes from
+        // the component after the instance. Root matching uses the FULL segment (`.conan2` keeps
+        // its dot), not the alnum-stripped `core`.
+        bool mask_next{false};
+        std::array<PathComponent, kMaxRootSegments> window{};
+        std::size_t window_len{0};
+        const auto push_component{[&](std::string_view text, char sep_before, bool at_token_start)
+                                  {
+                                      const PathComponent comp{.text = text,
+                                                               .sep_before = sep_before,
+                                                               .at_token_start = at_token_start};
+                                      if (window_len < kMaxRootSegments)
+                                      {
+                                          window[window_len++] = comp;
+                                          return;
+                                      }
+                                      for (std::size_t idx{1}; idx < kMaxRootSegments; ++idx)
+                                          window[idx - 1U] = window[idx];
+                                      window[kMaxRootSegments - 1U] = comp;
+                                  }};
+        const auto root_ends_here{[&]
+                                  {
+                                      return root_scope_ending_at(std::span<const PathComponent>{
+                                                                      window.data(), window_len})
+                                          .has_value();
+                                  }};
         const auto flush_segment{
             [&](std::size_t end)
             {
                 const std::string_view seg{tok.substr(seg_start, end - seg_start)};
-                // core = segment with leading/trailing non-alnum stripped
+                // core = segment with leading/trailing non-alnum stripped (for classification only)
                 std::size_t lead{0};
                 while (lead < seg.size() && !is_digit(seg[lead]) && !is_alpha(seg[lead]))
                     ++lead;
@@ -212,32 +365,54 @@ namespace
                 while (trail > lead && !is_digit(seg[trail - 1]) && !is_alpha(seg[trail - 1]))
                     --trail;
                 const std::string_view core{seg.substr(lead, trail - lead)};
+                const char sep_before{seg_start == 0 ? '\0' : tok[seg_start - 1U]};
+                const bool at_token_start{seg_start == 1U && !tok.empty() && tok.front() == '/'};
+
                 if (core.empty())
                 {
                     out.append(seg); // pure punctuation — keep verbatim
                     prev_core = {};
+                    // an empty/punct-only component is never a root segment: it neither ends a root
+                    // nor consumes mask_next (a stray `//` leaves the instance to the next real
+                    // component). Leave the window and flags untouched.
                     return;
                 }
+
+                if (mask_next)
+                {
+                    // this component is the per-run instance directly under a declared root → mask
+                    // it whole (M3), regardless of its leading character.
+                    out.append(seg.substr(0, lead));
+                    out.append(kWildcard);
+                    out.append(seg.substr(trail));
+                    masked = true;
+                    prev_core = core;
+                    push_component(seg, sep_before, at_token_start);
+                    mask_next = root_ends_here(); // resumes normally unless (pathologically) the
+                                                  // instance itself also ends a root
+                    return;
+                }
+
                 if (is_alpha(core.front()))
                 {
                     out.append(seg); // letter-leading → KEEP (class anchor)
                     has_letter_anchor = true;
-                    prev_core = core;
-                    return;
                 }
-                // digit-leading core: status-value carve-out, else mask.
-                if (is_status_keyword(prev_core) && is_all_digits(core) &&
-                    core.size() <= kMaxStatusDigits)
+                else if (is_status_keyword(prev_core) && is_all_digits(core) &&
+                         core.size() <= kMaxStatusDigits)
                 {
                     out.append(seg); // exit:0 / status:500 → KEEP (categorical)
-                    prev_core = core;
-                    return;
                 }
-                out.append(seg.substr(0, lead)); // leading punct, e.g. '['
-                out.append(kWildcard);
-                out.append(seg.substr(trail)); // trailing punct, e.g. ']'
-                masked = true;
+                else
+                {
+                    out.append(seg.substr(0, lead)); // leading punct, e.g. '['
+                    out.append(kWildcard);
+                    out.append(seg.substr(trail)); // trailing punct, e.g. ']'
+                    masked = true;
+                }
                 prev_core = core;
+                push_component(seg, sep_before, at_token_start);
+                mask_next = root_ends_here();
             }};
         for (std::size_t pos{0}; pos < tok.size(); ++pos)
             if (tok[pos] == ':' || tok[pos] == '/')
@@ -250,33 +425,79 @@ namespace
         return masked && has_letter_anchor;
     }
 
-    // Ephemeral-root path catalog (D-MSK-2). A path token under a declared ephemeral root is a
-    // per-run instance by construction (a randomized temp dir `/tmp/pw-electron-userdata-Kw9v4a`,
-    // base-62 suffix — letter-leading, not hex/UUID, so the existing masks keep it literal → a new
-    // template per run → false novelty). The random SUFFIX is undecidable (D-TID-18), but the
-    // ROOT is an enumerable, byte-exact catalog (the kCurrencyMarkers discipline) — there is no
-    // low-card stable keyword "child of /tmp" worth protecting, and a stable temp file is itself
-    // non-diffable, so masking the post-root remainder is lossless for diffing. Mask `<root>/<*>`.
+    // EPHEMERAL_ROOT standalone rule (D-MSK-2, re-expressed for D-MSK-4 M5). Reached only for
+    // tokens rule #1 did not claim (no ':digit'). Split the path on '/', run the shared matcher
+    // (kEphemeralRoots above), and honor the DECLARED scope: `Subtree` collapses the whole
+    // remainder (`<root>/<*>`, byte-identical to -5 for every existing entry); `Instance` masks the
+    // one component under the root and KEEPS the tail (`<root>/<*>/<tail…>`). Being segment-
+    // anchored (not `starts_with`) is what lets a mid-path Floating root like `.conan2/p/b` match.
     // NOT a random-string classifier and NOT a general absolute-path masker (`/etc/hosts`,
-    // `/usr/bin/foo` untouched). Checked AFTER the diagnostic composite, so a `/tmp/…:42` source
-    // path keeps its `file:line` shape; a `/tmp/…` dir without `:digit` falls to this rule.
-    inline constexpr std::array<std::string_view, 3> kEphemeralRoots{
-        std::string_view{"/tmp"}, std::string_view{"/var/tmp"}, std::string_view{"/var/folders"}};
-
+    // `/usr/bin/foo` untouched — no declared root). Checked AFTER the diagnostic composite, so a
+    // `/tmp/…:42` source path keeps its `file:line` shape; a `/tmp/…` dir without `:digit` lands
+    // here.
     [[nodiscard]] inline bool normalize_ephemeral_root(std::string_view tok, std::string& out)
     {
-        for (const std::string_view root : kEphemeralRoots)
-            // `<root>/<non-empty remainder>` — the '/' guard rejects `/tmpfoo`; the size guard
-            // requires a remainder (a bare `/tmp` / `/tmp/` is not collapsed).
-            if (tok.size() > root.size() + 1U && tok.starts_with(root) && tok[root.size()] == '/')
+        std::array<PathComponent, kMaxRootSegments> window{};
+        std::size_t window_len{0};
+        const auto push{[&](const PathComponent& comp)
+                        {
+                            if (window_len < kMaxRootSegments)
+                            {
+                                window[window_len++] = comp;
+                                return;
+                            }
+                            for (std::size_t idx{1}; idx < kMaxRootSegments; ++idx)
+                                window[idx - 1U] = window[idx];
+                            window[kMaxRootSegments - 1U] = comp;
+                        }};
+
+        std::size_t comp_start{0};
+        std::size_t root_end{std::string_view::npos}; // byte index of the '/' after the root
+        RootScope scope{RootScope::Subtree};
+        for (std::size_t pos{0}; pos <= tok.size(); ++pos)
+            if (pos == tok.size() || tok[pos] == '/')
             {
-                out.clear();
-                out.append(root);
-                out.push_back('/');
-                out.append(kWildcard);
-                return true;
+                const std::string_view comp{tok.substr(comp_start, pos - comp_start)};
+                const char sep_before{comp_start == 0 ? '\0' : tok[comp_start - 1U]};
+                const bool at_token_start{comp_start == 1U && !tok.empty() && tok.front() == '/'};
+                push(PathComponent{
+                    .text = comp, .sep_before = sep_before, .at_token_start = at_token_start});
+                if (const std::optional<RootScope> hit{root_scope_ending_at(
+                        std::span<const PathComponent>{window.data(), window_len})};
+                    hit.has_value())
+                {
+                    root_end = pos;
+                    scope = *hit;
+                    break;
+                }
+                comp_start = pos + 1U;
             }
-        return false;
+
+        if (root_end == std::string_view::npos)
+            return false; // no declared root in this token
+
+        // Require a non-empty INSTANCE component directly under the root (`<root>/<x>`), so a bare
+        // `/tmp` / `/tmp/` and a `//` are not collapsed (preserves the -5 size guard).
+        if (root_end >= tok.size() || tok[root_end] != '/')
+            return false;
+        const std::size_t inst_start{root_end + 1U};
+        if (inst_start >= tok.size() || tok[inst_start] == '/')
+            return false;
+
+        out.clear();
+        out.append(tok.substr(0, root_end)); // `<root…>`
+        out.push_back('/');
+        out.append(kWildcard);
+        if (scope == RootScope::Instance)
+        {
+            // keep the tail after the ONE masked instance component (M5 Instance form)
+            std::size_t inst_end{inst_start};
+            while (inst_end < tok.size() && tok[inst_end] != '/')
+                ++inst_end;
+            out.append(tok.substr(inst_end)); // `/…tail`, or empty if the instance is last
+        }
+        // Subtree: the whole remainder is already the single `<*>` just appended (M5 Subtree form).
+        return true;
     }
 
     // VERSIONED_REF composite: `<name>/<numeric-version>[trailing punct]`.

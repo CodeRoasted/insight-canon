@@ -7,3 +7,8 @@ order completed total=$199
 order completed total=$4999
 order completed total=$42
 order completed total=$1000000
+/home/runner/.conan2/p/b/insig247e3d1dffc33/p/include/insight/span_unpack.cpp:72:5: warning: unused variable
+/home/runner/.conan2/p/b/insigea56199c0f87b/p/include/insight/span_unpack.cpp:72:5: warning: unused variable
+/tmp/build-abc123/src/foo.cpp:42:5: error: expected ';' before token
+/tmp/pw-electron-userdata-Kw9v4a
+/nix/store/abc123def456ghi789jkl012mno345pq-source/bin/tool started ok
