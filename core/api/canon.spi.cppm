@@ -497,8 +497,7 @@ all_channel_gates_declared(std::span<const IntentMarkerRow> markers,
 {
     const auto declared{[channels](std::string_view gate) noexcept
                         { return gate == kAnyChannel || std::ranges::contains(channels, gate); }};
-    return std::ranges::all_of(markers,
-                               [&declared](const IntentMarkerRow& row) noexcept
+    return std::ranges::all_of(markers, [&declared](const IntentMarkerRow& row) noexcept
                                { return declared(row.channel_gate); }) &&
            std::ranges::all_of(emits, [&declared](const IntentEmitRow& row) noexcept
                                { return declared(row.channel_gate); });

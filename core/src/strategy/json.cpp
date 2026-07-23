@@ -127,7 +127,11 @@ namespace
         return std::span<const SpanId>{dst, ids.size()};
     }
 
-    void parse_otel_span(simdjson::ondemand::object& root, ParsedLine& parsed_line, // NOLINT(readability-function-cognitive-complexity): single-pass OTel span-object field dispatch — the branch count is OTel's field set (startTimeUnixNano…status/attributes/links); a coherent deterministic parser whose else-if dispatch is not safely re-expressible as a handler map.
+    // single-pass OTel span-object field dispatch — the branch count is OTel's field set
+    // (startTimeUnixNano…status/attributes/links); a coherent deterministic parser whose else-if
+    // dispatch is not safely re-expressible as a handler map.
+    // NOLINTNEXTLINE(readability-function-cognitive-complexity)
+    void parse_otel_span(simdjson::ondemand::object& root, ParsedLine& parsed_line,
                          ArenaAllocator& arena)
     {
         std::string_view start_nano;
@@ -361,7 +365,11 @@ namespace
 
 } // namespace
 
-std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line, // NOLINT(readability-function-cognitive-complexity): the JSON strategy entry — fast-path scan, then guarded simdjson slow path routing to span vs log-record parse; a coherent single-responsibility parser whose early-return error handling is its structure.
+// the JSON strategy entry — fast-path scan, then guarded simdjson slow path routing to span vs
+// log-record parse; a coherent single-responsibility parser whose early-return error handling is
+// its structure.
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line,
                                                            ArenaAllocator& arena) const
 {
     if (line.empty())

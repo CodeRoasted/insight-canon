@@ -67,7 +67,10 @@ namespace
     // the closing `]`, or 0 when the line does not carry the prefix. Strictness is the anti-phantom
     // guard: a Proxifier `[10.20.30.40]`, an ApacheError `[Mon Oct 03 …]`, or a bare `[12:34:56]`
     // never match.
-    [[nodiscard]] constexpr std::size_t timestamper_prefix_end(std::string_view line) noexcept // NOLINT(readability-function-cognitive-complexity): a single coherent constexpr character scan recognizing the Jenkins timestamper prefix shape; the branch count is the grammar it accepts, not separable logic.
+    // a single coherent constexpr character scan recognizing the Jenkins timestamper prefix
+    // shape; the branch count is the grammar it accepts, not separable logic.
+    // NOLINTNEXTLINE(readability-function-cognitive-complexity)
+    [[nodiscard]] constexpr std::size_t timestamper_prefix_end(std::string_view line) noexcept
     {
         constexpr std::size_t kDateLen{10U};
         constexpr std::size_t kTimeLen{8U};

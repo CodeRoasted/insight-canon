@@ -42,7 +42,8 @@ namespace
         if (token.empty())
             return false;
         return std::ranges::all_of(token,
-                                   [](const char chr) noexcept {
+                                   [](const char chr) noexcept
+                                   {
                                        return (chr >= 'a' && chr <= 'z') ||
                                               (chr >= 'A' && chr <= 'Z') ||
                                               (chr >= '0' && chr <= '9') || chr == '_';

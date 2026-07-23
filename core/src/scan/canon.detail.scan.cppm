@@ -707,7 +707,8 @@ inline void sv_skip_ws(std::string_view& str) noexcept
         return tag;
     }
     // `delim` is a found index (< size), so these are noexcept in-place trims rather than `substr`,
-    // whose out-of-range `throw` path the analyzer cannot rule out here (bugprone-exception-escape).
+    // whose out-of-range `throw` path the analyzer cannot rule out here
+    // (bugprone-exception-escape).
     std::string_view tag{str};
     tag.remove_suffix(str.size() - delim); // keep bytes [0, delim)
     while (!tag.empty() && is_space(tag.back()))

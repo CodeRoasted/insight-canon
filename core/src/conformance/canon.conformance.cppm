@@ -171,7 +171,10 @@ namespace
 
     // ── Check 2: format-gate honesty — a gated row is inert outside its format; kAnyFormat fires
     // anywhere ──
-    CheckResult check_format_gate_honesty(const SemanticPackageManifest& manifest, // NOLINT(readability-function-cognitive-complexity): one conformance property verified end-to-end (format-gate honesty); the sequence of guarded assertions is the check — splitting it scatters a single verdict across helpers.
+    // one conformance property verified end-to-end (format-gate honesty); the sequence of guarded
+    // assertions is the check — splitting it scatters a single verdict across helpers.
+    // NOLINTNEXTLINE(readability-function-cognitive-complexity)
+    CheckResult check_format_gate_honesty(const SemanticPackageManifest& manifest,
                                           const ComposedSemantics& composed)
     {
         // Structural roles.
@@ -297,7 +300,10 @@ namespace
 
     // ── Check 4: grammar well-formedness — non-empty keys, no self-conflict, LocationRow
     // param/kind match ──
-    CheckResult check_grammar_wellformed(const SemanticPackageManifest& manifest) // NOLINT(readability-function-cognitive-complexity): one conformance property verified end-to-end (grammar well-formedness); the guarded-assertion sequence is the check, not decomposable sprawl.
+    // one conformance property verified end-to-end (grammar well-formedness); the guarded-assertion
+    // sequence is the check, not decomposable sprawl.
+    // NOLINTNEXTLINE(readability-function-cognitive-complexity)
+    CheckResult check_grammar_wellformed(const SemanticPackageManifest& manifest)
     {
         for (const StructuralRoleRow& row : manifest.roles)
             if (row.prefix.empty())
