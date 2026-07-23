@@ -43,7 +43,7 @@ Every classification and masking rule in this library obeys the same constraints
 
 ## 3. The `canonicalization_version` gate
 
-`canonicalization_version` (currently **`stateless-masks-5`**) is the contract that makes templates
+`canonicalization_version` (currently **`stateless-masks-6`**) is the contract that makes templates
 **comparable across runs**. It identifies the exact set of masking/identity rules that produced a template.
 
 - **When it bumps:** any change to the **masking** rules or template identity — a new mask class, a changed
