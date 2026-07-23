@@ -199,7 +199,12 @@ namespace tokenization
         extract_payload(std::string_view content,
                         const insight::semantic::IntentMarkerRow& row) noexcept
         {
-            const std::string_view remainder{content.substr(row.prefix.size())};
+            // The caller (`recognize`) only reaches here after `content.starts_with(row.prefix)`,
+            // so `prefix.size() <= content.size()` — `remove_prefix`/`remove_suffix` are the
+            // noexcept in-place equivalents of the `substr` calls whose out-of-range `throw` path
+            // the analyzer cannot rule out inter-procedurally (bugprone-exception-escape).
+            std::string_view remainder{content};
+            remainder.remove_prefix(row.prefix.size());
             switch (row.extract)
             {
             case insight::semantic::PayloadExtract::None:
@@ -213,7 +218,8 @@ namespace tokenization
                 // parens kept.
                 if (remainder.size() < 2U || remainder.back() != ')')
                     return std::nullopt;
-                return remainder.substr(0, remainder.size() - 1U);
+                remainder.remove_suffix(1U); // drop the required line-final ')'
+                return remainder;
             }
             return std::nullopt;
         }
@@ -225,11 +231,13 @@ namespace tokenization
         [[nodiscard]] bool payload_excluded(std::string_view payload,
                                             const insight::semantic::IntentMarkerRow& row) noexcept
         {
-            for (const std::string_view entry : row.payload_excludes)
-                if (payload.starts_with(entry) &&
-                    (payload.size() == entry.size() || payload[entry.size()] == ' '))
-                    return true;
-            return false;
+            return std::ranges::any_of(row.payload_excludes,
+                                       [payload](std::string_view entry) noexcept
+                                       {
+                                           return payload.starts_with(entry) &&
+                                                  (payload.size() == entry.size() ||
+                                                   payload[entry.size()] == ' ');
+                                       });
         }
     } // namespace
 

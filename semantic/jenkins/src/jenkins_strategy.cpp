@@ -121,7 +121,11 @@ namespace
         {
             if (!content.starts_with(row.prefix))
                 continue;
-            const std::string_view token{content.substr(row.prefix.size())};
+            // `starts_with` guarantees `prefix.size() <= content.size()`, so this is the noexcept
+            // in-place form of `substr(prefix.size())` — no `throw` path for the analyzer to flag
+            // (bugprone-exception-escape).
+            std::string_view token{content};
+            token.remove_prefix(row.prefix.size());
             if (token.empty())
                 continue;
             bool all_word{true};

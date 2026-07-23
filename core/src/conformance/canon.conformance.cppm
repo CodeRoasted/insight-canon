@@ -395,7 +395,11 @@ namespace
             constexpr std::string_view kProbe{"2026-01-01T00:00:00.0000000Z probe line"};
             const double first{strategy->confidence(kProbe)};
             const double second{strategy->confidence(kProbe)};
-            if (!(first >= 0.0 && first <= 1.0) || first != second)
+            // Written as the negation of an in-range test, NOT `first < 0.0 || first > 1.0`: a NaN
+            // confidence fails `>= 0.0 && <= 1.0` (⇒ out of range, caught), but passes neither
+            // `< 0.0` nor `> 1.0`, so the DeMorgan form would let NaN slip through.
+            const bool confidence_in_range{first >= 0.0 && first <= 1.0};
+            if (!confidence_in_range || first != second)
                 return {.name = "code_tier.confidence",
                         .passed = false,
                         .detail = "confidence() is out of [0,1] or non-deterministic (" +

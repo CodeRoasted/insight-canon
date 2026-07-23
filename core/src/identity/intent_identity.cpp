@@ -73,9 +73,9 @@ namespace
     };
 
     [[nodiscard]] std::optional<NumericClaim> claim_numeric(std::string_view str,
-                                                            std::size_t i) noexcept
+                                                            std::size_t start) noexcept
     {
-        std::size_t pos{i};
+        std::size_t pos{start};
         const bool has_v{str[pos] == 'v'};
         if (has_v)
             ++pos;
@@ -139,20 +139,20 @@ std::string canonicalize_intent(std::string_view name)
 
     std::string out;
     out.reserve(name.size());
-    std::size_t i{0};
+    std::size_t idx{0};
     bool prev_is_word{false}; // start-of-string is a boundary
-    while (i < name.size())
+    while (idx < name.size())
     {
-        const char chr{name[i]};
+        const char chr{name[idx]};
 
         // R4: a paren group → (M). Non-greedy: to the FIRST ')'. Unbalanced '(' stays literal.
         if (chr == '(')
         {
-            const std::size_t close{name.find(')', i + 1)};
+            const std::size_t close{name.find(')', idx + 1)};
             if (close != std::string_view::npos)
             {
                 out.append(kParenMask);
-                i = close + 1;
+                idx = close + 1;
                 prev_is_word = false; // ')' is non-word
                 continue;
             }
@@ -161,10 +161,10 @@ std::string canonicalize_intent(std::string_view name)
         // R1/R2/R3 fire only at a leading word boundary, on a 'v' or digit anchor.
         if (!prev_is_word && (chr == 'v' || is_digit(chr)))
         {
-            if (const std::optional<NumericClaim> claim{claim_numeric(name, i)}; claim)
+            if (const std::optional<NumericClaim> claim{claim_numeric(name, idx)}; claim)
             {
                 out.append(claim->mask);
-                i = claim->end;
+                idx = claim->end;
                 prev_is_word = true; // last emitted char ('X'/'N') is a word char
                 continue;
             }
@@ -172,7 +172,7 @@ std::string canonicalize_intent(std::string_view name)
 
         out.push_back(chr);
         prev_is_word = is_word(chr);
-        ++i;
+        ++idx;
     }
     return out;
 }

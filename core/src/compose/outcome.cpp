@@ -25,7 +25,7 @@ namespace
 {
     // The scan's per-line arena: parse-only (raw-line copy + strategy scalar fields), reset per
     // line, so a small block suffices and never grows unbounded.
-    constexpr std::size_t kScanArenaCapacity{64U * 1024U};
+    constexpr std::size_t kScanArenaCapacity{std::size_t{64U} * 1024U}; // 64 KiB, widened operand
 
     // A row's gate matches the line's routed format when equal, or when the gate is the kAnyFormat
     // sentinel (mirrors semantic_walkers gate_matches — a line routed Unknown must NOT trigger a
@@ -41,14 +41,12 @@ namespace
     {
         if (token.empty())
             return false;
-        for (const char chr : token)
-        {
-            const bool word{(chr >= 'a' && chr <= 'z') || (chr >= 'A' && chr <= 'Z') ||
-                            (chr >= '0' && chr <= '9') || chr == '_'};
-            if (!word)
-                return false;
-        }
-        return true;
+        return std::ranges::all_of(token,
+                                   [](const char chr) noexcept {
+                                       return (chr >= 'a' && chr <= 'z') ||
+                                              (chr >= 'A' && chr <= 'Z') ||
+                                              (chr >= '0' && chr <= '9') || chr == '_';
+                                   });
     }
 
     // Does any composed OutcomeTokenRow declare this format as its gate? (The dialect latch: the
@@ -59,10 +57,9 @@ namespace
     {
         if (format == LogFormat::Unknown)
             return false;
-        for (const insight::semantic::OutcomeTokenRow& row : composed.outcome_tokens())
-            if (row.format_gate == format)
-                return true;
-        return false;
+        return std::ranges::any_of(composed.outcome_tokens(),
+                                   [format](const insight::semantic::OutcomeTokenRow& row) noexcept
+                                   { return row.format_gate == format; });
     }
 } // namespace
 

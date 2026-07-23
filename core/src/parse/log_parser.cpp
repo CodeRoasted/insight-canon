@@ -42,10 +42,9 @@ LogParser::LogParser(ArenaAllocator& arena, const insight::semantic::ComposedSem
 is_echoed_source(std::string_view raw_line,
                  const insight::semantic::ComposedSemantics& composed) noexcept
 {
-    for (const insight::semantic::ProvenanceHook hook : composed.provenance_hooks())
-        if (hook(raw_line))
-            return true;
-    return false;
+    return std::ranges::any_of(composed.provenance_hooks(),
+                               [raw_line](insight::semantic::ProvenanceHook hook)
+                               { return hook(raw_line); });
 }
 
 // O(1) fast path: tries sticky strategy first; falls back to full detect.

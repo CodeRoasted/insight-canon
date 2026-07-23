@@ -13,7 +13,9 @@ module;
 // below, so a non-x86 target compiles the scalar fallback rather than failing on undeclared
 // intrinsics.
 #if defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
-#define INSIGHT_CANON_SSE2 1
+// A pure feature-test gate consumed only by `#ifdef INSIGHT_CANON_SSE2` (never as a value),
+// so it carries no `1` — that is what makes it a compile-time switch rather than a constant.
+#define INSIGHT_CANON_SSE2
 #include <emmintrin.h> // SSE2 intrinsics (fast_gates)
 #endif
 
@@ -98,9 +100,8 @@ struct TokenShape
     bool has_separator{
         false}; // contains a composite separator : / [ # - =  (the maybe_composite gate)
 
-    explicit constexpr TokenShape(std::string_view tok) noexcept
+    explicit constexpr TokenShape(std::string_view tok) noexcept : empty(tok.empty())
     {
-        empty = tok.empty();
         if (empty)
             return;
         std::size_t lead{0};
@@ -705,14 +706,17 @@ inline void sv_skip_ws(std::string_view& str) noexcept
         str = {};
         return tag;
     }
-    std::string_view tag{str.substr(0, delim)};
+    // `delim` is a found index (< size), so these are noexcept in-place trims rather than `substr`,
+    // whose out-of-range `throw` path the analyzer cannot rule out here (bugprone-exception-escape).
+    std::string_view tag{str};
+    tag.remove_suffix(str.size() - delim); // keep bytes [0, delim)
     while (!tag.empty() && is_space(tag.back()))
         tag.remove_suffix(1U);
-    str = str.substr(delim);
+    str.remove_prefix(delim);
     if (!str.empty() && str[0] == '[')
     {
         const auto rbracket{str.find(']')};
-        str = str.substr(rbracket != std::string_view::npos ? rbracket + 1U : 1U);
+        str.remove_prefix(rbracket != std::string_view::npos ? rbracket + 1U : 1U);
     }
     if (!str.empty() && str[0] == ':')
         str.remove_prefix(1U);

@@ -534,11 +534,11 @@ namespace
     // (§8) did not surface this — CI tokens are space-separated, LogCraft wraps in `key=`.
     [[nodiscard]] inline bool normalize_kv_value(std::string_view tok, std::string& out)
     {
-        const std::size_t eq{tok.find('=')};
-        if (eq == 0 || eq == std::string_view::npos || eq + 1 >= tok.size())
+        const std::size_t eq_pos{tok.find('=')};
+        if (eq_pos == 0 || eq_pos == std::string_view::npos || eq_pos + 1 >= tok.size())
             return false;
-        const std::string_view key{tok.substr(0, eq)};
-        const std::string_view raw_value{tok.substr(eq + 1)};
+        const std::string_view key{tok.substr(0, eq_pos)};
+        const std::string_view raw_value{tok.substr(eq_pos + 1)};
         // D-TID-22: strip a declared currency marker off the value before the digit-leading gate,
         // so `total=$463 → total=$<*>` (keep key AND marker, mask the amount). marker=0 for a bare
         // value → `total=463 → total=<*>` unchanged. A non-numeric core (`total=$HOME`) fails the

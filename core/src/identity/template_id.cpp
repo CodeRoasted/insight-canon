@@ -64,9 +64,9 @@ TemplateId parse_template_id(std::string_view rendered)
     std::string_view hex{rendered};
     if (hex.size() >= 2 && hex[0] == 'h' && hex[1] == ':')
         hex.remove_prefix(2);
-    for (std::size_t i{0}; i < kTemplateIdBytes && (2 * i + 1) < hex.size(); ++i)
-        out.bytes[i] =
-            static_cast<std::uint8_t>((hex_nibble(hex[2 * i]) << 4) | hex_nibble(hex[2 * i + 1]));
+    for (std::size_t idx{0}; idx < kTemplateIdBytes && ((2 * idx) + 1) < hex.size(); ++idx)
+        out.bytes[idx] = static_cast<std::uint8_t>((hex_nibble(hex[2 * idx]) << 4) |
+                                                   hex_nibble(hex[(2 * idx) + 1]));
     return out;
 }
 
@@ -82,16 +82,16 @@ NgramId ngram_id_of(const std::vector<TemplateId>& sequence) noexcept
     constexpr std::uint64_t kPrime1{0xff51afd7ed558ccdULL}; // murmur3 finalizer mult
     std::uint64_t acc0{kBasis0};
     std::uint64_t acc1{kBasis1};
-    for (const TemplateId& id : sequence)
+    for (const TemplateId& tid : sequence)
     {
-        std::uint64_t lo{};
-        std::uint64_t hi{};
-        std::memcpy(&lo, id.bytes.data(), sizeof lo);
-        std::memcpy(&hi, id.bytes.data() + sizeof lo, sizeof hi);
-        acc0 = (acc0 ^ lo) * kPrime0;
-        acc0 = (acc0 ^ hi) * kPrime0;
-        acc1 = (acc1 ^ hi) * kPrime1;
-        acc1 = (acc1 ^ lo) * kPrime1;
+        std::uint64_t low{};
+        std::uint64_t high{};
+        std::memcpy(&low, tid.bytes.data(), sizeof low);
+        std::memcpy(&high, tid.bytes.data() + sizeof low, sizeof high);
+        acc0 = (acc0 ^ low) * kPrime0;
+        acc0 = (acc0 ^ high) * kPrime0;
+        acc1 = (acc1 ^ high) * kPrime1;
+        acc1 = (acc1 ^ low) * kPrime1;
     }
     NgramId out;
     std::memcpy(out.bytes.data(), &acc0, sizeof acc0);

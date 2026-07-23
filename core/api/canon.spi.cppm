@@ -57,12 +57,12 @@ struct ParsedLine
     // structured numeric fields (today: JsonStrategy via kOrdinalFieldCatalog). A span over
     // arena-stable storage; empty for every non-ordinal line. Consumed metalog-side (W1 binning),
     // never tokenized into the template.
-    std::span<const OrdinalObservation> ordinals{};
+    std::span<const OrdinalObservation> ordinals;
     // O4b Span Links (D-OTEL-9/21): the span_ids this span declares a cross-trace edge to (OTLP
     // `links[]`), populated by the span strategy. A span over arena-stable storage; empty for every
     // line without links. Consumed metalog-side (distilled into the service topology), never
     // tokenized.
-    std::span<const SpanId> linked_span_ids{};
+    std::span<const SpanId> linked_span_ids;
 };
 
 // The format-strategy interface — a representation-format parser (core) OR a dialect strategy
@@ -255,7 +255,7 @@ struct IntentMarkerRow
     // prefix (`{`, `}`, `stage`, `node`, `parallel`, `//`, `End of Pipeline`) are closed dialect
     // data. Empty for rows without exclusions (every pre-grammar-2 row). The span points at
     // package-static constexpr storage (SP-7 lifetime); serialized into semantic_identity.
-    std::span<const std::string_view> payload_excludes{};
+    std::span<const std::string_view> payload_excludes;
     // ADR 0029 D5 — the CHANNEL gate: this row fires only on a stream the caller declared as this
     // IntentChannel. kAnyChannel (the default) = fires on any channel, so every
     // single-materialization dialect is untouched. REQUIRED exactly when one channel's marker
@@ -404,7 +404,7 @@ struct SemanticPackageManifest
     // This is the vocabulary a caller's `--channel` is validated against: declared ⇒ fires; unknown
     // ⇒ HARD ERROR listing these names. The span points at package-static constexpr storage (SP-7
     // lifetime); serialized into semantic_identity alongside the rows it gates.
-    std::span<const std::string_view> channels{};
+    std::span<const std::string_view> channels;
     StrategyFactory strategy{nullptr};     // nullable — the dialect format-strategy code tier
     ProvenanceHook echoed_source{nullptr}; // nullable — the raw-line echoed-source code tier
 };
@@ -483,14 +483,8 @@ paired_writer_row(const IntentMarkerRow& reader, std::span<const IntentEmitRow> 
 // make "any" and "this specific one" the same value — the sentinel must stay unambiguous.
 [[nodiscard]] consteval bool all_channels_named(std::span<const std::string_view> channels) noexcept
 {
-    for (const std::string_view channel : channels)
-    {
-        if (channel.empty())
-        {
-            return false;
-        }
-    }
-    return true;
+    return std::ranges::all_of(channels,
+                               [](std::string_view channel) noexcept { return !channel.empty(); });
 }
 
 // Every row's channel_gate is kAnyChannel or one of the package's DECLARED channels. Catches the
@@ -501,36 +495,13 @@ all_channel_gates_declared(std::span<const IntentMarkerRow> markers,
                            std::span<const IntentEmitRow> emits,
                            std::span<const std::string_view> channels) noexcept
 {
-    const auto declared{[channels](std::string_view gate)
-                        {
-                            if (gate == kAnyChannel)
-                            {
-                                return true;
-                            }
-                            for (const std::string_view channel : channels)
-                            {
-                                if (channel == gate)
-                                {
-                                    return true;
-                                }
-                            }
-                            return false;
-                        }};
-    for (const IntentMarkerRow& row : markers)
-    {
-        if (!declared(row.channel_gate))
-        {
-            return false;
-        }
-    }
-    for (const IntentEmitRow& row : emits)
-    {
-        if (!declared(row.channel_gate))
-        {
-            return false;
-        }
-    }
-    return true;
+    const auto declared{[channels](std::string_view gate) noexcept
+                        { return gate == kAnyChannel || std::ranges::contains(channels, gate); }};
+    return std::ranges::all_of(markers,
+                               [&declared](const IntentMarkerRow& row) noexcept
+                               { return declared(row.channel_gate); }) &&
+           std::ranges::all_of(emits, [&declared](const IntentEmitRow& row) noexcept
+                               { return declared(row.channel_gate); });
 }
 
 // all_intents_paired — the bidirectionality predicate (SID: no reader without a writer). consteval
@@ -539,14 +510,8 @@ all_channel_gates_declared(std::span<const IntentMarkerRow> markers,
 [[nodiscard]] consteval bool all_intents_paired(std::span<const IntentMarkerRow> markers,
                                                 std::span<const IntentEmitRow> emits) noexcept
 {
-    for (const IntentMarkerRow& reader : markers)
-    {
-        if (paired_writer_row(reader, emits) == nullptr)
-        {
-            return false;
-        }
-    }
-    return true;
+    return std::ranges::all_of(markers, [emits](const IntentMarkerRow& reader) noexcept
+                               { return paired_writer_row(reader, emits) != nullptr; });
 }
 
 // The DialectIntent concept (§3.2) — bidirectionality as a TYPE obligation. A type models
