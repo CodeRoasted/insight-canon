@@ -71,13 +71,33 @@ Consuming `v1` happens **only on a trusted runner with the Argos credential** (�
 never fetches it. Fetch from the private store, verify the asset, extract, then verify the extracted
 tree against the content manifest — never trust an un-verified materialization.
 
+**The recipe below is the MEASURED one** (re-materialized and re-verified 2026-07-26, Argos). The
+previous text claimed `tar -x -C data/` yields `data/ci-revert/v1/full/`; it does not — **v1's archive
+carries a single top-level `ci-revert-corpus/`**, frozen before the `data/vN/full` layout existed, so the
+rename is a required step, not a cosmetic one. Following the old text left the tree at a path nothing
+reads and then `cd`'d into one that does not exist.
+
 ```bash
-# (trusted runner) fetch ci-revert-v1.tar.zst + .sha256 + .manifest.sha256 from the private store
-sha256sum -c ci-revert-v1.tar.zst.sha256                       # verify the asset bytes
-zstd -dc ci-revert-v1.tar.zst | tar -x -C data/                # re-materialize data/ci-revert/v1/full/
-cd data/ci-revert/v1/full \
-  && sha256sum -c /path/to/ci-revert-v1.manifest.sha256 --quiet   # verify every file vs the anchor
+# (trusted runner) fetch the three assets from the PRIVATE store — never a public Release (§2a)
+gh release download ci-revert-v1 -R CodeRoasted/coderoast-corpora
+sha256sum -c ci-revert-v1.tar.zst.sha256                        # asset bytes: 26d3d3d6…
+sha256sum ci-revert-v1.manifest.sha256                          # content anchor = the REGISTRY pin 3054b158…
+
+# extract (top-level dir is `ci-revert-corpus/`) then rename to the layout every consumer reads
+ROOT=<warehouse>/github_corpora/revert_corpus/data/v1           # → /home/windows/corpora-data/github/revert/v1
+zstd -dc ci-revert-v1.tar.zst | tar -x -C "$ROOT" && mv "$ROOT/ci-revert-corpus" "$ROOT/full"
+
+cd "$ROOT/full" && sha256sum -c /path/to/ci-revert-v1.manifest.sha256 --quiet   # 8171 files vs the anchor
 ```
+
+**`data/v1/sample` is NOT a subsample of `data/v1/full`** — verified by name and by content hash, and
+load-bearing for anything comparing a sample measurement to a full-corpus one. They are **two separate
+crawls 44 minutes apart** on the same seed (`0xD11C15E1EC7`): the sample queried at `08:28:52Z` over
+**3 repos** (react/react, ollama/ollama, microsoft/markitdown — 250 API requests, 60 logs), the frozen
+full at `09:12:08Z` over **25 repos** (12 734 requests, 4 082 logs). **38 of the sample's 60 logs are
+absent from `full/` by name and 37 of those by content**; of the sample's three repos only `react/react`
+is in the frozen population at all. A "same measurement at larger n" reading of a full-corpus re-run is
+therefore wrong — the population changes with the scale.
 
 ## Acquisition
 
