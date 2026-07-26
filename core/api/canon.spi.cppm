@@ -1,7 +1,8 @@
 // insight.canon.spi — the PROVIDER contract (ADR 0024 §2.4). The public, installed, versioned
-// surface a semantic package implements: the closed rule grammar (semantic-grammar-1), the format-
-// strategy interface + its ParsedLine intermediate (the code tier, §2.3), the package manifest, and
-// the curated scan primitives a dialect strategy needs. Consumers of insight.canon never import
+// surface a semantic package implements: the closed rule grammar (versioned by
+// kSemanticGrammarVersion), the format-strategy interface + its ParsedLine intermediate (the code
+// tier, §2.3), the package manifest, and the curated scan primitives a dialect strategy needs.
+// Consumers of insight.canon never import
 // this (the facade does NOT re-export it); the sealed insight.canon.detail.* shards stay sealed. A
 // package
 // (`insight.semantic.github`, …) imports THIS + insight.canon.api, never a detail shard.
@@ -98,7 +99,7 @@ class IFormatStrategy
 } // namespace insight::tokenization
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════
-// The closed rule grammar (semantic-grammar-1, §2.2) — POD rows, constexpr-constructible,
+// The closed rule grammar (kSemanticGrammarVersion, §2.2) — POD rows, constexpr-constructible,
 // canonically serializable for the composed identity hash. Canon owns every matcher ALGORITHM; a
 // package owns only DATA (rows). A new matching capability is a grammar-version bump, never
 // package-local parsing code.
@@ -111,7 +112,26 @@ export namespace insight::semantic
 // grammar-2 (ADR 0025, the first anticipated growth): the run-outcome row kinds (OutcomeTokenRow /
 // OutcomeMarkerRow), the IntentMarkerRow payload-exclusion set, and the RemainderToClosingParen
 // extractor — the shapes the Jenkins dialect genuinely needs.
-inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-2"};
+// grammar-3 (ADR 0044 §7): the manifest gains `emits`, so the GENERATION projection enters the
+// canonical serialization. A pure SERIALIZATION-COVERAGE change — no package's rows moved, no row
+// kind is new (IntentEmitRow already existed and was already required by the DialectIntent concept)
+// — but the serialization is part of the grammar shape, so it bumps here and the composed digest
+// moves with it. That bump is DELIBERATE and documented (SID-3): before it, a generation-side
+// change did not move semantic_identity at all, so two writers could claim one RulesetIdentity.
+//
+// The bump is NOT redundant with the `emits` content entering the digest, even though both move it
+// here. The version is the SAFE guard: a future serialization change that adds no bytes (a field
+// reorder, a widened enum) would move nothing on its own, and this string is the only thing that
+// would. Keep bumping it on any serialization change, including one that also moves content.
+//
+// NUMBER COLLISION, recorded so it is not re-derived: adr/0026 (Accepted 2026-07-10, the gcc/make
+// dialect) also names "grammar-2 → grammar-3" for ITS growth, and architecture/
+// insight_gcc_make_dialect_model.md §4 repeats it. That package does not exist — semantic/ ships
+// github, jenkins and test_frameworks only — so grammar-3 was RESERVED by a plan, not taken by a
+// ship. Assigned here on first-to-ship; the gcc/make growth takes the next free number when it
+// lands. The string is hashed, so this is not a free choice after goldens exist — reconciling
+// adr/0026's claim is Daidalos's (an ADR is frozen; it supersedes, it does not get edited).
+inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-3"};
 
 // The "any format" sentinel for a row's format gate: the rule fires regardless of the line's routed
 // format. `LogFormat::Unknown` is that sentinel (no real routed line carries Unknown — RawText is
@@ -390,6 +410,17 @@ struct SemanticPackageManifest
     std::string_view version; // "1.0.0" — immutable release discipline (SP-7)
     std::span<const StructuralRoleRow> roles;
     std::span<const IntentMarkerRow> markers;
+    // grammar-3 (ADR 0044 §7): the GENERATION projection — the writer dual of `markers`, declared
+    // here so it enters `semantic_identity`. `IntentEmitRow` and the DialectIntent concept already
+    // made a package ship these rows; what was missing is that the manifest — the object compose()
+    // serializes into the identity — had no member for them, so a generation-side change did NOT
+    // move the comparability hash and two documents from DIFFERENT writers could claim the same
+    // RulesetIdentity. That is the silent divergence SID-2 exists to forbid. EMPTY for a package
+    // that ships no markers (test_frameworks: pure location data, no intents to recognize OR
+    // generate). Every package with markers declares the SAME span its Dialect type exposes as
+    // `emit_markers` — one array, two views, so the pairing the concept static_asserts is the
+    // pairing the identity hashes.
+    std::span<const IntentEmitRow> emits;
     std::span<const LevelLiftRow> level_lifts;
     std::span<const LocationRow> locations;
     std::span<const ValueClassRow> value_classes;

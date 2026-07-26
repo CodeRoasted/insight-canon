@@ -15,7 +15,7 @@ class InsightSemanticJenkinsConan(ConanFile):
     description = (
         "InSight Canon semantic package: the Jenkins Pipeline dialect (ADR 0024/0025). "
         "Intent-marker (stage/step skeleton) + run-outcome rule rows in the closed "
-        "semantic-grammar-2, plus the dialect format strategy (timestamper strip, [Pipeline] "
+        "canon rule grammar, plus the dialect format strategy (timestamper strip, [Pipeline] "
         "annotations, the Finished: epilogue — the code tier). Statically composed into a "
         "binary via insight::semantic::compose()."
     )

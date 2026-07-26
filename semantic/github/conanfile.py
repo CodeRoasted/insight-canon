@@ -15,7 +15,7 @@ class InsightSemanticGithubConan(ConanFile):
     description = (
         "InSight Canon semantic package: the GitHub Actions / Azure Pipelines dialect "
         "(ADR 0024). Structural-role / intent-marker / level-lift rule rows in the closed "
-        "semantic-grammar-1, plus the dialect format strategy + echoed-source provenance hook "
+        "canon rule grammar, plus the dialect format strategy + echoed-source provenance hook "
         "(the code tier). Statically composed into a binary via insight::semantic::compose()."
     )
     settings = "os", "arch", "compiler", "build_type"

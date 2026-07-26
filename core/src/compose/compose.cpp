@@ -154,6 +154,24 @@ namespace
             append_str(out, row.prefix);
             append_u8(out, static_cast<std::uint8_t>(row.format_gate));
         }
+        // grammar-3 (ADR 0044 §7): the GENERATION projection enters the identity,
+        // field-for-field as the recognition markers do. This closes the SID-2/G4 gap — before
+        // it, changing how a
+        // dialect MATERIALIZES an intent left the digest untouched, so two writers could claim one
+        // RulesetIdentity. Appended after the grammar-2 sections, the same discipline grammar-2
+        // used (fixed field order per generation; the version string above segregates the
+        // generations). Content only, never the C++ spelling of the fields that carry it — a pure
+        // rename is not a ruleset change and must not move the digest.
+        append_u32_le(out, static_cast<std::uint32_t>(pkg.emits.size()));
+        for (const IntentEmitRow& row : pkg.emits)
+        {
+            append_str(out, row.prefix);
+            append_u8(out, static_cast<std::uint8_t>(row.kind));
+            append_u8(out, static_cast<std::uint8_t>(row.child_order));
+            append_u8(out, static_cast<std::uint8_t>(row.format_gate));
+            append_u8(out, static_cast<std::uint8_t>(row.emit));
+            append_str(out, row.channel_gate);
+        }
     }
 
     // Record longest-match shadow notes among a set of prefix rows: when one prefix is a PROPER

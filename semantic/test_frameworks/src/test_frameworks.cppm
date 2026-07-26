@@ -1,6 +1,6 @@
 // insight.semantic.test_frameworks — test-framework file-location semantic package (ADR 0024).
 // VOCABULARY as DATA: the jest/vitest/playwright/pytest/go/ruby test-file naming families, as
-// LocationRows in the closed semantic-grammar-1. NO code tier — the matching ALGORITHM lives in
+// LocationRows in the closed canon rule grammar. NO code tier — the matching ALGORITHM lives in
 // canon core (recognize_location walks these composed rows via the closed LocationMatchKind
 // families); framework file-naming is CI-dialect-independent, so this is pure data. Composed via
 // insight::semantic::compose().
@@ -58,6 +58,7 @@ export inline constexpr SemanticPackageManifest kManifest{
     .version = "1.0.0",
     .roles = {},
     .markers = {},
+    .emits = {}, // no markers ⇒ no intents to generate (ADR 0044 §7)
     .level_lifts = {},
     .locations = kLocations,
     .value_classes = {},

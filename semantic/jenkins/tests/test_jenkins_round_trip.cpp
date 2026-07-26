@@ -14,17 +14,18 @@
 import std;
 import insight.canon;             // compose / ComposedSemantics
 import insight.canon.conformance; // round_trip_report
-import insight.semantic.jenkins;  // kManifest + Dialect (markers / emit_markers)
+import insight.semantic.jenkins;  // kManifest (markers + emits)
 
 TEST(JenkinsRoundTrip, RecognizeRendersBackToDeclaredIntent)
 {
+    // BOTH projections come off the ONE manifest (ADR 0044 §7) — the same `emits` span
+    // `semantic_identity` hashes.
     const std::array<insight::semantic::SemanticPackageManifest, 1> one{
         insight::semantic::jenkins::kManifest};
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose(one)};
 
     const auto report{insight::semantic::conformance::round_trip_report(
-        insight::semantic::jenkins::Dialect::markers,
-        insight::semantic::jenkins::Dialect::emit_markers, composed)};
+        insight::semantic::jenkins::kManifest, composed)};
 
     ASSERT_FALSE(report.checks.empty())
         << "no round-trip checks ran — the dialect declared no markers?";

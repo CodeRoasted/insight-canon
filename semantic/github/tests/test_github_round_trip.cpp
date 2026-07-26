@@ -13,20 +13,19 @@
 import std;
 import insight.canon;             // compose / ComposedSemantics
 import insight.canon.conformance; // round_trip_report
-import insight.semantic.github;   // kManifest + Dialect (markers / emit_markers)
+import insight.semantic.github;   // kManifest (markers + emits)
 
 TEST(GithubRoundTrip, RecognizeRendersBackToDeclaredIntent)
 {
-    // The recognizer is the SHIPPED reader (compose the package manifest); the generation rows come
-    // from the dialect TYPE (Dialect::emit_markers) — the two projections of the one declaration
-    // close here.
+    // BOTH projections come off the ONE manifest (ADR 0044 §7): the recognizer is the shipped
+    // reader composed from it, and the generation rows are the same `emits` span
+    // `semantic_identity` hashes — so what closes here is what the digest claims.
     const std::array<insight::semantic::SemanticPackageManifest, 1> one{
         insight::semantic::github::kManifest};
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose(one)};
 
     const auto report{insight::semantic::conformance::round_trip_report(
-        insight::semantic::github::Dialect::markers,
-        insight::semantic::github::Dialect::emit_markers, composed)};
+        insight::semantic::github::kManifest, composed)};
 
     // Every intent marker (Job, both Step media `Run ` / `##[group]Run `) must round-trip — the two
     // GHA Step media closing proves materialization-invariance on read == medium-multiplicity on

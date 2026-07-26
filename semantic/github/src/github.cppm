@@ -1,5 +1,5 @@
 // insight.semantic.github — the GitHub Actions / Azure Pipelines dialect semantic package
-// (ADR 0024). VOCABULARY as DATA in the closed semantic-grammar-1 (structural roles, intent
+// (ADR 0024). VOCABULARY as DATA in the closed canon rule grammar (structural roles, intent
 // markers, level lifts) + the CODE tier (the dialect format strategy + the echoed-source provenance
 // hook). Fully self-contained: imports only insight.canon.api (types + utils) + insight.canon.spi
 // (the provider contract) — never a sealed detail shard. The composition
@@ -281,6 +281,7 @@ export inline constexpr SemanticPackageManifest kManifest{
     .version = "1.3.0",
     .roles = kRoles,
     .markers = kMarkers,
+    .emits = kEmitMarkers, // ADR 0044 §7 — the generation projection is identity-bearing
     .level_lifts = kLevelLifts,
     .locations = {},
     .value_classes = {},

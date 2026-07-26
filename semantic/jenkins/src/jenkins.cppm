@@ -1,5 +1,5 @@
 // insight.semantic.jenkins — the Jenkins Pipeline dialect semantic package (ADR 0024/0025,
-// studies/006). VOCABULARY as DATA in the closed semantic-grammar-2 (intent markers + run-outcome
+// studies/006). VOCABULARY as DATA in the closed canon rule grammar (intent markers + run-outcome
 // rows) + the CODE tier (the dialect format strategy). Fully self-contained: imports only
 // insight.canon.api (types) + insight.canon.spi (the provider contract) — never a sealed detail
 // shard. The composition (insight::semantic::compose) statically links this package's kManifest
@@ -126,6 +126,7 @@ export inline constexpr SemanticPackageManifest kManifest{
     .version = "1.0.0",
     .roles = {},
     .markers = kMarkers,
+    .emits = kEmitMarkers, // ADR 0044 §7 — the generation projection is identity-bearing
     .level_lifts = {},
     .locations = {},
     .value_classes = {},

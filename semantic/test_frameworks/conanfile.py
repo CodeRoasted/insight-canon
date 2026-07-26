@@ -15,7 +15,7 @@ class InsightSemanticTestFrameworksConan(ConanFile):
     description = (
         "InSight Canon semantic package: test-framework file-location vocabulary (ADR 0024). "
         "Location rule rows (jest/vitest/playwright/pytest/go/ruby test-file families) in the closed "
-        "semantic-grammar-1 — DATA only, no code tier. The core recognizer walks these composed rows; "
+        "canon rule grammar — DATA only, no code tier. The core recognizer walks these composed rows; "
         "framework file-naming is CI-dialect-independent. Statically composed via compose()."
     )
     settings = "os", "arch", "compiler", "build_type"

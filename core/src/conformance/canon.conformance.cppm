@@ -90,12 +90,16 @@ struct Report
 // probe payload and assert canon recognizes the declared (kind, child_order, payload) back —
 // recognize(render_row(W))==R. Pure, deterministic, seedless, self-adapting over ANY dialect's row
 // spans (zero per-package config, the same honesty-kit spirit as run()). Target: 100% — a miss is a
-// declaration-expressivity bug, never a knob (studies/008 §5 G2). Homed here (not folded into
-// run(manifest)) because the generation rows live on the dialect TYPE, not the
-// SemanticPackageManifest, until the identity wiring lands with the ADR at ratification (G4); a
-// package passes its `Dialect::markers` / `Dialect::emit_markers` spans directly.
-[[nodiscard]] Report round_trip_report(std::span<const IntentMarkerRow> markers,
-                                       std::span<const IntentEmitRow> emits,
+// declaration-expressivity bug, never a knob (studies/008 §5 G2).
+//
+// Reads BOTH projections off the MANIFEST (ADR 0044 §7 — the G4 identity wiring this signature was
+// waiting on: `emits` is now a manifest member, so the rows the kit round-trips are the same rows
+// `semantic_identity` hashes). It formerly took the two spans separately, from the dialect TYPE,
+// because the manifest had no emit member; that split meant the kit could have closed over one
+// array while the digest covered another — precisely the two-writers-one-identity divergence SID-2
+// forbids. Kept a SEPARATE entry point from run(): it needs the recognizer composition, and a
+// package may want the closure report on its own.
+[[nodiscard]] Report round_trip_report(const SemanticPackageManifest& manifest,
                                        const ComposedSemantics& composed);
 
 } // namespace insight::semantic::conformance
@@ -270,6 +274,14 @@ namespace
                         .detail =
                             "marker key or payload-exclusion entry contains a non-ASCII byte: \"" +
                             std::string{row.prefix} + "\"."};
+        // ADR 0044 §7: the generation projection is manifest data and identity-bearing, so it is
+        // held to the same locale-safety property as the recognition rows it is the dual of.
+        for (const IntentEmitRow& row : manifest.emits)
+            if (!is_ascii(row.prefix))
+                return {.name = "ascii.emit",
+                        .passed = false,
+                        .detail = "emit key contains a non-ASCII byte: \"" +
+                                  std::string{row.prefix} + "\"."};
         for (const OutcomeTokenRow& row : manifest.outcome_tokens)
             if (!is_ascii(row.token))
                 return {.name = "ascii.outcome_token",
@@ -315,6 +327,26 @@ namespace
                 return {.name = "grammar.empty_marker",
                         .passed = false,
                         .detail = "an intent-marker row has an empty prefix."};
+        for (const IntentEmitRow& row : manifest.emits)
+            if (row.prefix.empty())
+                return {.name = "grammar.empty_emit",
+                        .passed = false,
+                        .detail = "an intent-emit row has an empty prefix."};
+        // ADR 0044 §7 / SID-2: with `emits` on the manifest, "a reader without a writer" is a
+        // MANIFEST property and the runtime kit can state it as one. The DialectIntent concept
+        // already refuses it at compile time for a package that models the concept — this catches
+        // the package that declares markers on its manifest but wires `.emits` to a different (or
+        // absent) array, which the concept cannot see and which would make the identity hash cover
+        // a generation projection nothing round-trips.
+        for (const IntentMarkerRow& row : manifest.markers)
+            if (paired_writer_row(row, manifest.emits) == nullptr)
+                return {.name = "grammar.unpaired_marker",
+                        .passed = false,
+                        .detail = "marker key \"" + std::string{row.prefix} +
+                                  "\" has no paired emit row in the MANIFEST (same prefix, kind, "
+                                  "format_gate and channel_gate). A reader without a writer — the "
+                                  "manifest's `emits` may be wired to a different array than the "
+                                  "dialect type's `emit_markers`."};
         for (const LevelLiftRow& row : manifest.level_lifts)
             if (row.prefix.empty())
                 return {.name = "grammar.empty_level_lift",
@@ -466,9 +498,11 @@ namespace
 
 } // namespace
 
-Report round_trip_report(std::span<const IntentMarkerRow> markers,
-                         std::span<const IntentEmitRow> emits, const ComposedSemantics& composed)
+Report round_trip_report(const SemanticPackageManifest& manifest, const ComposedSemantics& composed)
 {
+    const std::span<const IntentMarkerRow> markers{manifest.markers};
+    const std::span<const IntentEmitRow> emits{manifest.emits};
+
     // A benign single-token ASCII payload valid for every POC row: not a Jenkins kStepExcludes
     // structural token, no parens/whitespace that a payload extractor would trim — so a closure
     // miss is a real expressivity failure, never an artifact of the probe. Deterministic (a fixed
