@@ -94,10 +94,23 @@ cd "$ROOT/full" && sha256sum -c /path/to/ci-revert-v1.manifest.sha256 --quiet   
 load-bearing for anything comparing a sample measurement to a full-corpus one. They are **two separate
 crawls 44 minutes apart** on the same seed (`0xD11C15E1EC7`): the sample queried at `08:28:52Z` over
 **3 repos** (react/react, ollama/ollama, microsoft/markitdown — 250 API requests, 60 logs), the frozen
-full at `09:12:08Z` over **25 repos** (12 734 requests, 4 082 logs). **38 of the sample's 60 logs are
-absent from `full/` by name and 37 of those by content**; of the sample's three repos only `react/react`
-is in the frozen population at all. A "same measurement at larger n" reading of a full-corpus re-run is
-therefore wrong — the population changes with the scale.
+full at `09:12:08Z` over **25 queried repos** (12 734 requests, 4 082 logs). **Queried and contributing
+are different denominators, and only the second is the population:** `manifest/repos_used.txt` and
+`summary.json`'s `repos: 25` count the *pinned query set* (`repo_errors: 0`), while **19 repos actually
+carry rows** in `corpus.jsonl` — six of the pinned 25 yielded zero samples under the selection policy
+(termux/termux-app, harry0703/MoneyPrinterTurbo, realworld-apps/realworld, Genymobile/scrcpy,
+doocs/advanced-java, ChatGPTNextWeb/NextChat) and are absent from `summary.json`'s
+`per_repo_diagnostics` (19 entries). Quote **19** whenever the sentence is about population; quote 25
+only about the pin. On the sample side the two denominators coincide — 3 queried, 3 contributing.
+**38 of the sample's 60 logs are absent from `full/` by name and 37 of those by content**; of the
+sample's three repos only `react/react` is in the frozen population at all. A "same measurement at
+larger n" reading of a full-corpus re-run is therefore wrong — the population changes with the scale.
+
+**Row counts vs log-file counts** (both corpora internally consistent, cross-checked against disk):
+`corpus.jsonl` carries one row per sampled run whether or not its log survived, and the discriminant is
+the row's **`log_status`** field — `full` 4 132 rows = 4 082 `ok` + 48 `log_expired` + 2 `log_error`,
+`sample` 63 rows = 60 `ok` + 3 `log_expired`. Every non-`ok` row has a null `log_annotated`/`log_stripped`
+reference, and **zero rows reference a file that is not on disk** in either corpus.
 
 ## Acquisition
 
