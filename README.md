@@ -170,6 +170,7 @@ insight-canon/
 │   └── test_package/       Conan consumer smoke test (zero-init, import insight.canon only)
 ├── semantic/               The vocabulary packages (statically composed, Apache-2.0)
 │   ├── github/             insight_semantic_github — GitHub Actions / Azure dialect (rows + strategy)
+│   ├── jenkins/            insight_semantic_jenkins — Jenkins dialect (rows + strategy)
 │   └── test_frameworks/    insight_semantic_test_frameworks — test-file location families
 ├── bench/                  insight_canon_bench — the composed perf harness (SP-5 gate)
 ├── proof/                  Public determinism proof gate (composes core + both packages)
@@ -280,7 +281,7 @@ INSIGHT_TOKENIZER_REGRESSION_MIN_SUCCESS_RATE=0.90 ctest --output-on-failure -R 
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `ci.yml` | PRs to main | Dependency-ordered `conan create` of all four packages (core → semantic/* → bench) + tests + the test_package smoke test |
+| `ci.yml` | PRs to main | Dependency-ordered `conan create` of all five packages (core → semantic/* → bench) + tests + the test_package smoke test |
 | `release.yaml` | Push of a `vX.Y.Z` tag (or manual dispatch) | Lint → CI → 5-leg determinism golden gate → measures the composed benchmark → verifies recipe versions, exports `conan cache save` tarballs, attaches them + the golden to the GitHub Release |
 | `workflow-lint.yml` | PR touching `.github/workflows/**` | Runs actionlint on all workflow files |
 
