@@ -215,9 +215,25 @@ TEST(JenkinsPayloadStampMeasurement, CounterCanReportAnExplosion)
            "lines";
 }
 
-// What the real masker does to the real token, run through the real chain — the fact adr/0046
-// clause 3 says the shipped comment must state. Documented as an executable claim, not prose.
-TEST(JenkinsPayloadStampMeasurement, WhatTheMaskerDoesToTheTimestamperToken)
+// What the real masker does to the real token, run through the real chain — MEASURED, and the
+// answer is the one adr/0046 clause 3 routes into the shipped comment.
+//
+// It is NOT the one clause (c)'s re-derivation predicted. That re-derivation had
+// `normalize_diagnostic_composite` (kCompositeRules rule #1, first-claim-wins) claiming the token
+// because `15:11` satisfies its `':'`-then-digit TRIGGER. It stops one gate short: D-MSK-1 also
+// requires an ANCHOR — at least one LETTER-LEADING sub-segment (mask.cpp, the rule's own contract:
+// "Returns true … only when ≥1 segment was masked AND an anchor exists"). Splitting
+// `[2026-06-23T15:11:09.020Z]` on `:`/`/` yields `[2026-06-23T15`, `11`, `09.020Z]` — not one of
+// them letter-leading — so rule #1 DECLINES. `normalize_bracket_index` declines too (digits then
+// `-`, not `]`), and the whole-token digit mask (dispatch rule 5) never sees it because the leading
+// byte is `[`, not a digit. The token therefore reaches dispatch rule 6: LITERAL KEEP, verbatim,
+// stamp and all.
+//
+// This is a CHARACTERIZATION test: it asserts what the masker does today, not what it should do.
+// It is deliberately the tripwire for the T5 masker work — the day the masker claims `[<RFC3339>]`
+// to a stable normal form, this test goes RED and must be rewritten to the new normal form. That is
+// the intended failure, not a regression.
+TEST(JenkinsPayloadStampMeasurement, TheMaskerKeepsTheTimestamperTokenVerbatim)
 {
     const insight::semantic::ComposedSemantics none{
         insight::semantic::compose(std::span<const insight::semantic::SemanticPackageManifest>{})};
@@ -231,12 +247,40 @@ TEST(JenkinsPayloadStampMeasurement, WhatTheMaskerDoesToTheTimestamperToken)
     {
         ASSERT_TRUE(outcomes[index].produced) << "line " << index << " produced no event";
         std::cout << "  unstripped[" << index << "] = \"" << outcomes[index].template_str << "\"\n";
+        EXPECT_EQ(outcomes[index].template_str, stamped[index])
+            << "the bracketed RFC3339 token survives the masker VERBATIM — no rule claims it";
     }
-    EXPECT_EQ(outcomes[0].template_str, outcomes[1].template_str)
-        << "same-shape lines differing only in the stamp must land on ONE template if the masker "
-           "claims the token to a stable normal form";
-    EXPECT_EQ(outcomes[0].template_str, outcomes[2].template_str)
-        << "a different DAY must not fork the template either";
+    EXPECT_NE(outcomes[0].template_str, outcomes[1].template_str)
+        << "two lines differing ONLY in the stamp's milliseconds template APART: this is the "
+           "collapse loss the strip prevents, and it is why adr/0046's branch 2 fires";
+    EXPECT_NE(outcomes[0].template_str, outcomes[2].template_str)
+        << "a different day forks the template too";
+
+    // The mechanism, pinned AT THE MASK LAYER: the same token WITHOUT its brackets is
+    // digit-leading, so dispatch rule 5 masks it and the two lines collapse to one template. The
+    // token sits mid-line in both probes so neither line's strategy routing can change — the ONLY
+    // difference reaching the masker is the pair of brackets. That is the whole of it, and it gives
+    // a T5 masker fix a short, named target.
+    const std::array<std::string, 2> unbracketed{"fetched at 2026-06-23T15:11:09.020Z ok",
+                                                 "fetched at 2026-06-24T09:02:44.001Z ok"};
+    std::vector<std::string> bare{unbracketed.begin(), unbracketed.end()};
+    const auto bare_outcomes{run_arm(bare, none)};
+    ASSERT_EQ(bare_outcomes.size(), unbracketed.size());
+    ASSERT_TRUE(bare_outcomes[0].produced);
+    ASSERT_TRUE(bare_outcomes[1].produced);
+    std::cout << "  unbracketed[0] = \"" << bare_outcomes[0].template_str << "\"\n";
+    EXPECT_EQ(bare_outcomes[0].template_str, bare_outcomes[1].template_str)
+        << "the same timestamp WITHOUT brackets is digit-leading → masked → collapses; the "
+           "bracket is the whole difference";
+    const std::array<std::string, 2> bracketed{"fetched at [2026-06-23T15:11:09.020Z] ok",
+                                               "fetched at [2026-06-24T09:02:44.001Z] ok"};
+    std::vector<std::string> kept{bracketed.begin(), bracketed.end()};
+    const auto kept_outcomes{run_arm(kept, none)};
+    ASSERT_TRUE(kept_outcomes[0].produced);
+    ASSERT_TRUE(kept_outcomes[1].produced);
+    std::cout << "  bracketed[0]   = \"" << kept_outcomes[0].template_str << "\"\n";
+    EXPECT_NE(kept_outcomes[0].template_str, kept_outcomes[1].template_str)
+        << "re-bracket the SAME token, same position, same routing — and collapse is lost again";
 }
 
 // The measurement. Corpus-gated: skips cleanly without the private corpus.
