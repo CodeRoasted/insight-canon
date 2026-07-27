@@ -43,6 +43,12 @@ set(CANON_PUBLIC_MODULE_UNITS
     # re-exported by the facade (canon.cppm). A semantic package imports spi + api; consumers of
     # insight.canon never see it.
     ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.spi.cppm
+    # insight.canon.transport — the transport vocabulary (ADR 0044): the canon-shipped transform
+    # catalogue, IngestDeclaration, and the stream-scoped peel. Installed + public; re-exported by
+    # the facade. ORTHOGONAL to the semantic packages by construction (§3) — imports api only, and
+    # nothing in it may reach the tokenizer's identity path (§4). Listed before compose, which
+    # imports it to fold the catalogue version + rows into semantic_identity.
+    ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.transport.cppm
     # insight.canon.compose — static composition (ADR 0024 §3/§4): compose()/ComposedSemantics.
     # Installed + public; re-exported by the facade so `import insight.canon;` yields it alongside
     # Tokenizer. Imports spi (plain — the provider surface stays off the consumer default path).

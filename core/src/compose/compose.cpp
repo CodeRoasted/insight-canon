@@ -5,6 +5,7 @@ module insight.canon.compose;
 import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.spi;
+import insight.canon.transport;
 
 // compose.cpp — the runtime composition (ADR 0024 §3/§4). Sorts the manifest set by name (canonical
 // order, argument-order-independent), concatenates rows in declared order into the
@@ -225,7 +226,41 @@ namespace
         std::terminate();
     }
 
+    // ADR 0044 §6 — an UNKNOWN declared dialect is a hard error, symmetric with an unknown channel
+    // (ADR 0029 D5) and an unknown transform. Same reasoning, three coordinates: an unknown name is
+    // a MISTAKE and must not share a code path with an ABSENT one, which is a CHOICE.
+    [[noreturn]] void fail_unknown_dialect(std::string_view declared_dialect,
+                                           std::span<const ComposedPackage> packages)
+    {
+        std::cerr << "FATAL: insight::semantic::resolve_stream — unknown dialect \""
+                  << declared_dialect << "\". The composed packages are: ";
+        if (packages.empty())
+            std::cerr << "<none>";
+        for (std::size_t i{0}; i < packages.size(); ++i)
+            std::cerr << (i == 0 ? "" : ", ") << '"' << packages[i].name << '"';
+        std::cerr << ".\nA dialect is caller-declared provenance (ADR 0044 §6), never guessed: "
+                     "canon VERIFIES, it does not infer. An unknown dialect is a MISTAKE and fails "
+                     "closed here; an ABSENT dialect is a CHOICE and asserts nothing. Pass one of "
+                     "the names above, or none.\n";
+        std::terminate();
+    }
+
 } // namespace
+
+ResolvedStream resolve_stream(const ComposedSemantics& composed,
+                              const insight::transport::IngestDeclaration& declaration)
+{
+    // Verify the dialect BEFORE any view is built — the same ordering for_channel uses, so a
+    // mistake is reported before work is done on its behalf.
+    if (!declaration.dialect.empty() &&
+        std::ranges::none_of(composed.packages(),
+                             [&declaration](const ComposedPackage& pkg) noexcept
+                             { return pkg.name == declaration.dialect; }))
+        fail_unknown_dialect(declaration.dialect, composed.packages());
+
+    return ResolvedStream{.semantics = composed.for_channel(declaration.channel),
+                          .transport = insight::transport::resolve_transport_stack(declaration)};
+}
 
 std::string ComposedSemantics::identity_hex() const
 {
@@ -303,12 +338,33 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
 
     ComposedSemantics composed;
 
-    // ── Canonical serialization → semantic_identity (§4.1). Prefix the two version components,
-    // then each package in canonical order. No addresses / link order in the input ⇒ reproducible
+    // ── Canonical serialization → semantic_identity (§4.1). Prefix the version components, then
+    // each package in canonical order. No addresses / link order in the input ⇒ reproducible
     // (G-SP-4).
     std::string serialized;
     append_str(serialized, kSemanticGrammarVersion);
     append_str(serialized, insight::kCanonicalizationVersion);
+
+    // ADR 0044 §6 — the TRANSPORT CATALOGUE is identity, and the per-run DECLARATION is not. This
+    // is 0031's hash split and it is the whole quotient: the transform GRAMMAR (which transforms
+    // exist and what bytes they own) is a property of the analyzing binary and belongs in the
+    // comparability key; which transforms a given STREAM declared is provenance and rides to
+    // MetaLog instead. Two runs ±a declared transform MUST therefore carry the same
+    // `semantic_identity` — otherwise transport-invariance is not being built, it is only being
+    // asserted. Canon-shipped and closed, so it enters here as a fixed component rather than as a
+    // compose() parameter: it is core vocabulary like the ordinal/OTEL catalogs, not package data.
+    append_str(serialized, insight::transport::kTransportCatalogVersion);
+    append_u32_le(serialized,
+                  static_cast<std::uint32_t>(insight::transport::kTransportCatalogRows.size()));
+    for (const insight::transport::TransportTransformRow& row :
+         insight::transport::kTransportCatalogRows)
+    {
+        append_str(serialized, row.name);
+        append_u8(serialized, static_cast<std::uint8_t>(row.kind));
+        append_u8(serialized, static_cast<std::uint8_t>(row.extract));
+        append_u32_le(serialized, row.prefix_width);
+        append_u8(serialized, row.strip_leading_space ? 1U : 0U);
+    }
 
     for (const std::size_t idx : order)
     {

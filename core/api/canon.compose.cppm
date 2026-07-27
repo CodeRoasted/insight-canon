@@ -22,6 +22,7 @@ export module insight.canon.compose;
 import insight.canon.internal; // std + global C fixed-width types
 import insight.canon.api;      // StructuralRole/IntentMarkerKind/LogFormat/…
 import insight.canon.spi; // the grammar rows + SemanticPackageManifest (plain import — not re-exported)
+import insight.canon.transport; // the transform catalogue — its version + rows are identity (0044 §6)
 
 export namespace insight::semantic
 {
@@ -233,6 +234,41 @@ class ComposedSemantics
     CompositionReport report_;
     std::array<std::uint8_t, kSemanticIdentityBytes> identity_{};
 };
+
+// ── The per-stream resolution of an IngestDeclaration (ADR 0044 §6) ──────────────────────────────
+// What ONE stream analyzes with: the channel-filtered vocabulary and the resolved transport stack.
+// Move-only, because ComposedSemantics is.
+struct ResolvedStream
+{
+    ComposedSemantics semantics;                  // the declared channel's view of the ruleset
+    insight::transport::TransportStack transport; // resolved once, before the first line (§4)
+};
+
+// Resolve a declaration against a composition — the ONE call a caller makes at stream open, and the
+// only place the three declared coordinates are checked together.
+//
+// CANON VERIFIES, NEVER INFERS (ADR 0030's split, not reopened). Each coordinate fails closed on an
+// UNKNOWN value, naming the known vocabulary, and degrades on an ABSENT one:
+//   * `dialect`   — must name a composed package; unknown ⇒ hard error listing the composed names.
+//                   Absent ⇒ no dialect assertion (today's behavior). Verified, not yet GATING:
+//                   it becomes the successor to per-row `format_gate` at T4. Verification alone
+//                   already earns its place — it turns `--dialect=guthub` into a named error
+//                   instead of a silently structure-less analysis.
+//   * `channel`   — delegated to for_channel(), whose fail-closed posture is ADR 0029 D5's and is
+//                   unchanged here.
+//   * `stack`     — delegated to resolve_transport_stack(); unknown transform ⇒ hard error listing
+//                   the catalogue.
+//
+// A DEFAULT-CONSTRUCTED DECLARATION IS EXACTLY TODAY'S BEHAVIOR — empty stack (the peel is the
+// identity function), no dialect assertion, the Unspecified channel view. That is the G1 case, and
+// it is what makes declaring purely SUBTRACTIVE: a caller who says nothing loses nothing.
+//
+// Note what this function does NOT return: anything the tokenizer takes. The stack is handed back
+// to the CALLER, who peels and passes `PeeledLine::content` on. There is deliberately no path from
+// here into the identity path (§4).
+[[nodiscard]] ResolvedStream
+resolve_stream(const ComposedSemantics& composed,
+               const insight::transport::IngestDeclaration& declaration);
 
 // Compose the manifest set. Sorts packages by name (canonical order — independent of the caller's
 // argument order), concatenates rows in declared order, FATALS on an exact-duplicate key (the

@@ -14,6 +14,11 @@ export import insight.canon.api; // public surface (types, det_math, arena, ...)
 // directive is one logical line); clang-21 accepts it, so the break reaches only the ship
 // toolchain. Keep this line short enough that no formatter has a reason to touch it.
 export import insight.canon.compose;
+// The transport vocabulary (ADR 0044): IngestDeclaration, the catalogue, and the stream-scoped
+// peel. Re-exported because a CONSUMER declares the stack — it is the caller's provenance, not a
+// package's data. Same short-line discipline as the directive above (gcc-15 rejects a module name
+// wrapped across lines).
+export import insight.canon.transport;
 
 // ──────── from api/insight/tokenization/tokenizer_engine.hpp ────────
 export namespace insight::tokenization
