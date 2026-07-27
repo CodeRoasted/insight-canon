@@ -2,10 +2,9 @@
 // surface a semantic package implements: the closed rule grammar (versioned by
 // kSemanticGrammarVersion), the format-strategy interface + its ParsedLine intermediate (the code
 // tier, §2.3), the package manifest, and the curated scan primitives a dialect strategy needs.
-// Consumers of insight.canon never import
-// this (the facade does NOT re-export it); the sealed insight.canon.detail.* shards stay sealed. A
-// package
-// (`insight.semantic.github`, …) imports THIS + insight.canon.api, never a detail shard.
+// Consumers of insight.canon never import this (the facade does NOT re-export it); the sealed
+// insight.canon.detail.* shards stay sealed. A package (`insight.semantic.github`, …) imports
+// THIS + insight.canon.api, never a detail shard.
 //
 // Homed in api/ (public, installed) alongside the facade. Imports api (the enums/types the grammar
 // rows reference) + internal (std). Provider types (IFormatStrategy, ParsedLine) live HERE — they
@@ -124,13 +123,15 @@ export namespace insight::semantic
 // reorder, a widened enum) would move nothing on its own, and this string is the only thing that
 // would. Keep bumping it on any serialization change, including one that also moves content.
 //
-// NUMBER COLLISION, recorded so it is not re-derived: adr/0026 (Accepted 2026-07-10, the gcc/make
-// dialect) also names "grammar-2 → grammar-3" for ITS growth, and architecture/
-// insight_gcc_make_dialect_model.md §4 repeats it. That package does not exist — semantic/ ships
-// github, jenkins and test_frameworks only — so grammar-3 was RESERVED by a plan, not taken by a
-// ship. Assigned here on first-to-ship; the gcc/make growth takes the next free number when it
-// lands. The string is hashed, so this is not a free choice after goldens exist — reconciling
-// adr/0026's claim is Daidalos's (an ADR is frozen; it supersedes, it does not get edited).
+// THIS TOKEN IS ASSIGNED AT SHIP, NEVER RESERVED — adr/0047 clause 1, NORMATIVE, and it binds every
+// token of this class (semantic-grammar-N, transport-catalog-N, canonicalization_version, wire
+// versions). The value means "the Nth shape of this grammar", and WHICH feature causes the Nth
+// shape is not knowable in advance: ship order is not plan order, so a growth can be gated,
+// descoped or never built while an unrelated change lands tomorrow. adr/0026 had named "grammar-2 →
+// grammar-3" for the gcc/make growth; that package does not exist, so the number was reserved by a
+// plan and was never assignable. `emits` moved the shape and shipped, so it takes the token.
+// adr/0047 carries the errata to 0026 (its substantive claim is untouched — it names the GROWTH,
+// not a number).
 inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-3"};
 
 // The "any format" sentinel for a row's format gate: the rule fires regardless of the line's routed

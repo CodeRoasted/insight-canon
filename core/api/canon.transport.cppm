@@ -27,10 +27,35 @@ export namespace insight::transport
 {
 
 // The catalogue's version — a component of the composed identity, exactly as the semantic grammar
-// version is. Bump on ANY change to the catalogue's shape OR content: a new kind, a new row, a
-// changed parameter, a changed serialization. A stream analyzed under two different transport
-// vocabularies is not comparable, and the digest must say so.
+// version is. A stream analyzed under two different transport vocabularies is not comparable, and
+// the digest must say so.
+//
+// THE BUMP RULE (adr/0047 clause 2.3, which SHARPENED the over-broad rule this comment first
+// carried):
+//
+//     Bump on a change to what the catalogue SERIALIZES — plus any change to its serialization
+//     SHAPE, even when the bytes happen to coincide.
+//
+// The second half is the token's whole reason to exist (adr/0047 clause 1): a shape change whose
+// bytes happen not to move is exactly the collision a content hash cannot catch. The first half is
+// why "a new kind" is NOT on the list: `kind` is serialized only as a value ON a row, so an enum
+// member with no row serializes ZERO bytes and changes no behavior — bumping on it would move every
+// golden for nothing. That cannot happen anyway, since a kind never lands without its row (below):
+// "a new kind" and "a new row" always co-fire, and two criteria that always agree are one
+// criterion.
+//
+// LIKE EVERY MONOTONIC TOKEN HERE, THIS IS ASSIGNED AT SHIP AND NEVER RESERVED (adr/0047 clause 1,
+// NORMATIVE): the value means "the Nth shape", and which change causes the Nth shape is not
+// knowable in advance. `-1` moves next when a SECOND transform lands with its row.
 inline constexpr std::string_view kTransportCatalogVersion{"transport-catalog-1"};
+
+// ⚠ NORMATIVE — CATALOGUE ENUM VALUES ARE IDENTITY-BEARING: NEW MEMBERS APPEND (adr/0047
+// clause 2.2). A value is never renumbered and never inserted mid-enum. Both enums below serialize
+// as their `uint8_t` VALUE on every row (`compose.cpp`), so inserting a member in the middle shifts
+// the serialized byte of EVERY EXISTING ROW — the digest moves for rows nobody touched, and it
+// moves SILENTLY: the diff is one line, the compiler says nothing, and no reviewer would attribute
+// the golden churn to it. The explicit `= 0` on each first member is the anchor; append after the
+// last.
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 // §3 — the closed transform vocabulary. Rows-as-data, NEVER a callable (SID-2 applied to transport,
@@ -40,12 +65,22 @@ inline constexpr std::string_view kTransportCatalogVersion{"transport-catalog-1"
 
 // Which transform ALGORITHM a row selects and parameterizes.
 //
-// ONE member today, deliberately. ADR 0044 §3 sketches the anticipated vocabulary — FramingLine,
-// AnsiEchoWrap, StreamTag, Truncation, Chunking, Encoding — but this workspace does not ship enum
-// members with no algorithm, no row and no gate: that is the dormant plumbing we rip rather than
-// extend, and the ADR's own Consequences say so about the catalogue. Each grows in with its
-// algorithm and its gate, as `PayloadExtract` and `LocationMatchKind` grew — a catalogue-version
-// bump, part of the identity.
+// ONE member today, and the narrowing is RATIFIED (adr/0047 clause 2.1). ADR 0044 §3 listed a wider
+// anticipated vocabulary — FramingLine, AnsiEchoWrap, StreamTag, Truncation, Chunking, Encoding —
+// and **§3's enum bodies are to be read as a SKETCH, never as a normative closed set**; §3's
+// normative content is the row shape, the rows-as-data rule and the ternary extract routing, all of
+// which shipped intact.
+//
+// The decisive argument is not anti-dormant, it is arithmetic: an enum member with no row
+// serializes zero bytes, so declaring the full set up front either moves no digest (and buys
+// nothing — the members are unreachable) or costs one gratuitous identity bump and golden re-derive
+// for zero capability. Growing in makes the bump CO-FIRE with the row that makes the kind real,
+// which is the irreducible cost either way. It changes no error message either: `find_transform`
+// resolves a declaration by NAME against the rows, so an unused sibling kind would not improve the
+// hard error.
+//
+// Each further member grows in WITH ITS ALGORITHM, ITS ROW AND ITS GATE, as `PayloadExtract` and
+// `LocationMatchKind` grew — and it APPENDS (see the identity-bearing note above).
 enum class TransportTransformKind : std::uint8_t
 {
     // A fixed-width timestamp stamped at the head of EVERY line by the delivery layer. The GHA API
@@ -61,7 +96,7 @@ enum class TransportTransformKind : std::uint8_t
 // dropped.
 //
 // `StreamLabel` from ADR 0044 §3's sketch is not shipped: no transform produces one today (same
-// rule as the kinds above).
+// rule as the kinds above, ratified by adr/0047 clause 2.1). It APPENDS if it ever lands.
 enum class TransportExtract : std::uint8_t
 {
     None = 0, ///< the peel yields nothing but the shortened line
