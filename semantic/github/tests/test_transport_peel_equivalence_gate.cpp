@@ -85,7 +85,7 @@ namespace
 // A `const char*`, not a string_view: it is handed to getenv, and string_view::data() carries no
 // null-termination guarantee.
 constexpr const char* kSliceDirVar{"CORPUS_D11_SLICE_DIR"};
-constexpr std::string_view kGhaTransform{"gha-api-line-prefix"};
+constexpr std::string_view kGhaTransform{"api-rfc3339-line-prefix"};
 constexpr std::array<std::string_view, 1> kDeclaredGha{{kGhaTransform}};
 constexpr std::string_view kUtf8Bom{"\xEF\xBB\xBF"};
 

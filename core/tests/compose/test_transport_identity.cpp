@@ -52,7 +52,7 @@ using insight::transport::IngestDeclaration;
 namespace
 {
 
-constexpr std::string_view kGhaTransform{"gha-api-line-prefix"};
+constexpr std::string_view kGhaTransform{"api-rfc3339-line-prefix"};
 
 // The declared stack's backing array — `IngestDeclaration::stack` is a span, so this must outlive
 // every declaration built from it.

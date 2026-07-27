@@ -131,15 +131,24 @@ struct TransportTransformRow
     bool strip_leading_space;
 };
 
-// The GHA API per-line RFC 3339 prefix — `YYYY-MM-DDTHH:MM:SS.fffffffZ` + a separator space.
-// TOTAL scope (every line the API serves carries it), so it is admissible transport under ADR 0044
-// §1, and it is the one transform that has BOTH a corpus (22 030 real logs) and an INDEPENDENT
-// oracle (the shipped `GitHubActionsStrategy` peel) to score against — which is what makes it
-// shippable where Timestamper is not.
+// A per-line RFC 3339 prefix — `YYYY-MM-DDTHH:MM:SS.fffffffZ` + a separator space.
+// TOTAL scope (every line the serving API stamps carries it), so it is admissible transport under
+// ADR 0044 §1, and it is the one transform that has BOTH a corpus (22 030 real logs) and an
+// INDEPENDENT oracle (the shipped `GitHubActionsStrategy` peel) to score against — which is what
+// makes it shippable where Timestamper is not.
+//
+// THE NAME IS DELIVERY-SHAPED, NOT ECOSYSTEM-SHAPED, and that is load-bearing twice over. ADR 0044
+// §3 is the reason the row lives here at all: the catalogue is orthogonal to the dialect packages
+// because this prefix is a property of the *delivery*, not of the GHA *dialect* — so naming the row
+// after an ecosystem would contradict the argument that placed it in core. ADR 0024 §9.1 (SP-1)
+// independently forbids an ecosystem literal in the core mechanism, and the two together leave
+// exactly one coherent name: the byte grammar it peels. Any serving API that stamps this shape
+// declares this same row. Provenance stays in prose, where a reference belongs; the identifier
+// below still records where the 28-byte width was measured.
 inline constexpr std::uint32_t kGhaApiPrefixWidth{28U}; // "YYYY-MM-DDTHH:MM:SS.fffffffZ"
 
 inline constexpr std::array<TransportTransformRow, 1> kTransportCatalogRows{{
-    {.name = "gha-api-line-prefix",
+    {.name = "api-rfc3339-line-prefix",
      .kind = TransportTransformKind::LinePrefixTimestamp,
      .extract = TransportExtract::EventObservationTime,
      .prefix_width = kGhaApiPrefixWidth,

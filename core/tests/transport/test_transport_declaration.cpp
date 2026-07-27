@@ -58,7 +58,7 @@ namespace
 // The shipped catalogue name. Spelled as a literal rather than read from the catalogue: a test that
 // looks the name up from the thing under test cannot notice the name changing, which is the
 // SUT==ORACLE tautology one layer down ([[synthetic-gate-vacuity-vs-judgment]]).
-constexpr std::string_view kGhaTransform{"gha-api-line-prefix"};
+constexpr std::string_view kGhaTransform{"api-rfc3339-line-prefix"};
 
 // ── The line table ────────────────────────────────────────────────────────────────────────────
 // Authored to be ADVERSARIAL to "the empty stack is the identity", not merely representative. Each
@@ -69,7 +69,7 @@ struct LineCase
 {
     std::string_view label;
     std::string_view bytes;
-    bool carries_stamp; // does a DECLARED gha-api-line-prefix stack actually shorten this line?
+    bool carries_stamp; // does a DECLARED api-rfc3339-line-prefix stack actually shorten this line?
 };
 
 // A GHA stamp is exactly 28 bytes: "YYYY-MM-DDTHH:MM:SS.fffffffZ".
@@ -233,7 +233,7 @@ TEST(TransportDeclaration, DeclaredStackActuallyPeels)
             ++shortened;
             EXPECT_LT(peeled.content.size(), line.bytes.size())
                 << "case [" << idx << "] '" << line.label
-                << "': a declared gha-api-line-prefix stack must SHORTEN a stamped line. If this "
+                << "': a declared api-rfc3339-line-prefix stack must SHORTEN a stamped line. If this "
                    "is green while DegenerateStackPeelIsByteIdentity is also green, `peel` is a "
                    "no-op for every stack and the transport vocabulary does nothing.\n"
                 << "  in : \"" << escape(line.bytes) << "\"\n"
@@ -363,7 +363,7 @@ TEST(TransportDeclarationDeathTest, UnknownTransformFailsClosedNamingTheCatalog)
 
     // The message must NAME the vocabulary — a fail-closed error the operator cannot act on is
     // only half the posture.
-    EXPECT_DEATH({ (void)resolve_transport_stack(declaration); }, "gha-api-line-prefix");
+    EXPECT_DEATH({ (void)resolve_transport_stack(declaration); }, "api-rfc3339-line-prefix");
     EXPECT_DEATH({ (void)resolve_transport_stack(declaration); }, "transport-catalog-1");
 }
 
