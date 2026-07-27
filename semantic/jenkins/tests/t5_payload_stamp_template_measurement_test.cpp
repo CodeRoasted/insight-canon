@@ -46,7 +46,8 @@
 // when the manifest env is unset/missing — green in CI and on every clone.
 //   JENKINS_T5_MANIFEST  one absolute log path per line (the 19 payload-stamped logs of
 //                        jenkins-markers/v2; the class definition is studies/010 §6.2's triage,
-//                        reused via coderoast-corpora .../scripts/t0_transport.py — never re-invented)
+//                        reused via coderoast-corpora .../scripts/t0_transport.py — never
+//                        re-invented)
 //   JENKINS_T5_OUT       (optional) directory for a per-line TSV dump, for the offline cross-check
 //
 // BYTE FIDELITY. Every read is binary; lines are split on '\n' ONLY and no '\r' is trimmed
@@ -57,7 +58,7 @@
 #include <gtest/gtest.h>
 
 import std;
-import insight.canon;            // Tokenizer / ArenaAllocator / MaskConfig / compose / template_id_of
+import insight.canon; // Tokenizer / ArenaAllocator / MaskConfig / compose / template_id_of
 import insight.semantic.jenkins; // kManifest + make_strategy
 
 namespace
@@ -421,10 +422,10 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
               << "logs                         : " << logs.size() << "\n"
               << "lines (raw, '\\n'-split)      : " << total_lines << "\n"
               << "stamped lines                : " << stamped_lines << "\n"
-              << "events A (+strip)            : " << total_events_a << "  declined "
-              << declined_a << "\n"
-              << "events B (-strip)            : " << total_events_b << "  declined "
-              << declined_b << "\n"
+              << "events A (+strip)            : " << total_events_a << "  declined " << declined_a
+              << "\n"
+              << "events B (-strip)            : " << total_events_b << "  declined " << declined_b
+              << "\n"
               << "distinct templates  +strip   : " << all_a.templates.size() << "\n"
               << "distinct templates  -strip   : " << all_b.templates.size() << "\n"
               << "distinct template_id +strip  : " << all_a.ids.size() << "\n"
@@ -434,8 +435,8 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
               << "stamped-subset templates  B  : " << stamped_b.templates.size() << "\n"
               << "  stamped ids shared         : " << shared_stamped_ids << "\n"
               << "no-collapse CEILING (distinct raw stamped lines): " << stamped_raw.size() << "\n"
-              << "lines whose template moved   : " << moved_lines << "  (unstamped among them: "
-              << unstamped_moved << ")\n";
+              << "lines whose template moved   : " << moved_lines
+              << "  (unstamped among them: " << unstamped_moved << ")\n";
 
     // Arm B measures the STRIP, not the package removal — the construction premise, asserted.
     EXPECT_EQ(unstamped_moved, 0U)
@@ -448,12 +449,11 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
     EXPECT_EQ(all_b.templates.size(), all_b.ids.size());
 
     const bool stable{all_b.templates.size() == all_a.templates.size()};
-    const bool explodes{
-        all_b.templates.size() >=
-            static_cast<std::size_t>(kExplosionCountRatio *
-                                     static_cast<double>(all_a.templates.size())) ||
-        static_cast<double>(stamped_b.templates.size()) >=
-            kExplosionCeilingShare * static_cast<double>(stamped_raw.size())};
+    const bool explodes{all_b.templates.size() >=
+                            static_cast<std::size_t>(kExplosionCountRatio *
+                                                     static_cast<double>(all_a.templates.size())) ||
+                        static_cast<double>(stamped_b.templates.size()) >=
+                            kExplosionCeilingShare * static_cast<double>(stamped_raw.size())};
     std::cout << "VERDICT: "
               << (explodes ? "EXPLODES (adr/0046 branch 2 — precision-first regression, T5 BLOCKED)"
                            : (stable ? "COUNT STABLE (adr/0046 branch 1 — honesty-only + "

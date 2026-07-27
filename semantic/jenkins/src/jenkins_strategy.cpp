@@ -146,8 +146,22 @@ namespace
 
     // Does the strategy claim this line? The three dialect-marked shapes, after an optional
     // timestamper strip (a timestamper-prefixed line is claimed REGARDLESS of its content — the
-    // strip itself is the dialect knowledge, and it is what restores template collapse on
-    // ci.jenkins.io consoles).
+    // strip itself is the dialect knowledge, and it is what restores template collapse).
+    //
+    // The collapse claim is MEASURED, not asserted — adr/0046 Part 2 clause 2, on the ratified
+    // `jenkins-markers/v2` corpus; the harness is
+    // `tests/t5_payload_stamp_template_measurement_test.cpp`, re-runnable. Without the strip the
+    // masker keeps the whole `[<RFC3339>]` token VERBATIM (it is not merely normalized to some
+    // other stable form): the diagnostic-composite rule declines it for want of a letter-leading
+    // sub-segment, `normalize_bracket_index` declines it at the `-`, and the leading `[` hides it
+    // from the digit-leading whole-token mask, so it falls through to literal KEEP. Distinct
+    // templates, with the strip → without it:
+    //   whole-stream    (ci.jenkins.io, 12 logs, 127 502 stamped lines):   7 256 → 118 376
+    //   payload-stamped (2 other instances, 19 logs, 6 416 stamped lines): 3 425 →   6 094
+    // Restricted to the stamped lines themselves, the un-stripped arm reaches 97.1 % / 95.9 % of
+    // the no-collapse ceiling (the distinct RAW stamped-line count) — a near-total loss of
+    // collapse. The claim therefore holds on BOTH stamped classes; it is not confined to
+    // ci.jenkins.io.
     [[nodiscard]] constexpr bool claims(std::string_view line) noexcept
     {
         if (timestamper_prefix_end(line) != 0)
