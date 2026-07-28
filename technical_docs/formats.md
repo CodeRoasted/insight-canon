@@ -60,7 +60,7 @@ fall through to the level-inference path in [classification.md](classification.m
 | **NginxError** | `YYYY/MM/DD HH:MM:SS` | `[level]` bracket | — | — | nginx error log. |
 | **ApacheError** | `[Wkd Mon DD HH:MM:SS YYYY]` | `[level]` bracket | `"httpd"` (constant) | — | apache error log. |
 | **AndroidLogcat** | `MM-DD HH:MM:SS.mmm` | priority letter → level | tag | — | Zero-copy fast scan. |
-| **GitHubActions** | RFC3339 (100-ns / `Z`) | `##[error]` / `::error::` markers | — | — | Strips the leading timestamp + marker. (Note: ANSI colour already removed at ingest, §1.) |
+| **GitHubActions** | RFC3339 (100-ns / `Z`) | inferred from content (the `##[error]` / `::error::` LIFT is applied above the strategy — see below) | — | — | Strips the leading timestamp; the workflow-command marker is KEPT in the content. (Note: ANSI colour already removed at ingest, §1.) |
 | **WindowsCBS** | `YYYY-MM-DD HH:MM:SS` | explicit level word | component | — | Windows Component-Based Servicing. |
 | **SystemdJournal** | `__REALTIME_TIMESTAMP` (µs) | `PRIORITY` | `_COMM` | — | journal export (JSON-shaped). |
 | **CloudWatch** | millis field | (JSON path) | (JSON path) | — | AWS CloudWatch JSON. |
@@ -72,6 +72,14 @@ fall through to the level-inference path in [classification.md](classification.m
 `component` is the **low-cardinality functional source** (a subsystem/daemon, a small stable set — the useful
 grouping dimension); `host` is the **high-cardinality node identity**, kept separate so it never explodes the
 grouping. Only BGL and RFC5424 populate `host` today.
+
+> **The DECLARED level lift is not a strategy's read.** A semantic package may declare `LevelLiftRow`s —
+> a prefix that lifts the line's level (`##[error]` → Error). Those rows are **data**; the walk is canon's
+> (`insight::tokenization::lift_level` over `ComposedSemantics::level_lifts()`), and `LogParser` applies it
+> to every parsed line right after the strategy returns, gated on the routed format. So the lift **overrides**
+> whatever the strategy put in `level`, and the table column above describes only what the strategy itself
+> reads. Exactly one rule outranks the lift in turn: the echoed-source demotion (D-PROV-1), which drives an
+> echoed script line to `Unknown` whatever any earlier stage decided.
 
 > **Known gap (JSON nested fields):** the JSON strategy reads `component`/`level` only at the **top level**.
 > Loggers that nest custom fields under a `"fields": { … }` object leave `component` empty. The descent

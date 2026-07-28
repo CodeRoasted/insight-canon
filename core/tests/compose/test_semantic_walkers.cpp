@@ -16,6 +16,7 @@
 import insight.canon.test; // facade (compose / walkers / enums) + spi (row grammar) — white-box aggregate
 
 using insight::LogFormat;
+using insight::LogLevel;
 using insight::recognize_location;
 using insight::StructuralRole;
 using insight::semantic::compose;
@@ -32,6 +33,7 @@ using insight::semantic::ValueClassRow;
 using insight::tokenization::ChildOrder;
 using insight::tokenization::classify;
 using insight::tokenization::IntentMarkerKind;
+using insight::tokenization::lift_level;
 using insight::tokenization::recognize;
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -147,12 +149,31 @@ constexpr std::array<LocationRow, 3> kSynthLocations{{
      .suffixes = kSufSet},
 }};
 
+// Level lifts: a FIRST-MATCH discriminator pair + one ungated row + one gated to a second format.
+// The pair is the load-bearing part: "<LVL>" is a proper prefix of "<LVL>-LONG" and is declared
+// FIRST, so a line matching both resolves to the FIRST row's level under the declared first-match
+// rule, and to the SECOND row's level under a longest-match rule. The two rules are therefore
+// distinguishable here — which is the whole reason the pair exists, since the eight real GHA rows
+// have no nesting and cannot tell them apart.
+constexpr std::array<LevelLiftRow, 4> kSynthLevelLifts{{
+    {.prefix = "<LVL>", .level = LogLevel::Warn, .format_gate = LogFormat::Syslog},
+    {.prefix = "<LVL>-LONG", .level = LogLevel::Error, .format_gate = LogFormat::Syslog},
+    {.prefix = "<ANY-LVL>", .level = LogLevel::Debug, .format_gate = kAnyFormat},
+    {.prefix = "<OTHER-LVL>", .level = LogLevel::Fatal, .format_gate = LogFormat::JSON},
+}};
+
+// Lines no level-lift row claims, each for a distinct reason: ordinary text; the empty content; a
+// proper PREFIX of a row key (shorter than the key, so starts_with is false in the other
+// direction); and a row key that occurs but does not START the content.
+constexpr std::array<std::string_view, 4> kUnclaimedLines{
+    {"plain body text", "", "<LVL", " <LVL> leading"}};
+
 constexpr SemanticPackageManifest kSynthManifest{
     .name = "synth",
     .version = "1.0.0",
     .roles = kSynthRoles,
     .markers = kSynthMarkers,
-    .level_lifts = {},
+    .level_lifts = kSynthLevelLifts,
     .locations = kSynthLocations,
     .value_classes = {},
     .strategy = nullptr,
@@ -226,6 +247,65 @@ TEST(SemanticWalkers, LocationFamiliesAndTokenBoundaries)
     EXPECT_EQ(recognize_location("nothing here.txt", sc), "");
 }
 
+// ── lift_level(): FIRST match in declared order wins — NOT longest match ──
+// ADR 0063 clause 2 relocates the level-lift walk from the GHA package into core "with the rows,
+// their order and the first-match rule unchanged". This is the assertion that the first-match rule
+// actually survived the move: a longest-match walker (the rule classify/recognize use, and the
+// natural thing to "fix" this to) returns Error here and fails.
+TEST(SemanticWalkers, LevelLiftFirstDeclaredMatchWins)
+{
+    const ComposedSemantics sc{synth()};
+    const LogLevel both{lift_level("<LVL>-LONG boom", LogFormat::Syslog, sc)};
+    EXPECT_EQ(both, LogLevel::Warn)
+        << "\"<LVL>-LONG boom\" matches BOTH \"<LVL>\" (declared 1st, Warn) and \"<LVL>-LONG\" "
+           "(declared 2nd, Error). First-match-in-declared-order must win: expected Warn, got "
+        << insight::to_string(both)
+        << (both == LogLevel::Error
+                ? " — that is the LONGEST-match answer, so the walk changed rule"
+                : "");
+    // The shorter row alone still resolves to its own level (the pair is not an artifact).
+    EXPECT_EQ(lift_level("<LVL> plain", LogFormat::Syslog, sc), LogLevel::Warn);
+}
+
+// ── lift_level(): the format gate is the SAME predicate classify/recognize use ──
+TEST(SemanticWalkers, LevelLiftFormatGateSemantics)
+{
+    const ComposedSemantics sc{synth()};
+    // kAnyFormat row fires under every routed format, Unknown included.
+    for (const LogFormat fmt :
+         {LogFormat::Unknown, LogFormat::JSON, LogFormat::Syslog, LogFormat::RawText})
+    {
+        const LogLevel got{lift_level("<ANY-LVL> body", fmt, sc)};
+        EXPECT_EQ(got, LogLevel::Debug)
+            << "kAnyFormat level lift must fire under " << insight::to_string(fmt) << ", got "
+            << insight::to_string(got);
+    }
+    // A concretely-gated row fires only under its own format — never under a sibling's, and never
+    // under Unknown (the pre-split `format != X → {}` guard, which is why gate_matches is not
+    // gates_intersect).
+    EXPECT_EQ(lift_level("<OTHER-LVL> body", LogFormat::JSON, sc), LogLevel::Fatal);
+    for (const LogFormat fmt : {LogFormat::Syslog, LogFormat::RawText, LogFormat::Unknown})
+    {
+        const LogLevel got{lift_level("<OTHER-LVL> body", fmt, sc)};
+        EXPECT_EQ(got, LogLevel::Unknown)
+            << "a JSON-gated level lift must stay inert under " << insight::to_string(fmt)
+            << ", got " << insight::to_string(got);
+    }
+}
+
+// ── lift_level(): no row claims the line ⇒ Unknown, which means ABSENCE, not a level ──
+TEST(SemanticWalkers, LevelLiftUnclaimedLineIsUnknown)
+{
+    const ComposedSemantics sc{synth()};
+    for (const std::string_view line : kUnclaimedLines)
+    {
+        const LogLevel got{lift_level(line, LogFormat::Syslog, sc)};
+        EXPECT_EQ(got, LogLevel::Unknown)
+            << "no declared row claims \"" << line << "\" — expected Unknown, got "
+            << insight::to_string(got);
+    }
+}
+
 // ── SP-5: the recognizer probe path performs ZERO heap allocations (byte-scan pure) ──
 TEST(SemanticWalkers, RecognizersDoNotHeapAllocate)
 {
@@ -237,6 +317,8 @@ TEST(SemanticWalkers, RecognizersDoNotHeapAllocate)
         (void)classify("<OPEN>x", LogFormat::JSON, sc);
         (void)classify("GATED>x", LogFormat::Syslog, sc);
         (void)recognize("STEP build the widget", LogFormat::Syslog, sc);
+        (void)lift_level("<LVL>-LONG boom", LogFormat::Syslog, sc);
+        (void)lift_level("plain body text", LogFormat::Syslog, sc);
         (void)recognize_location("PASS dir/thing.chk.aa:42", sc);
         (void)recognize_location("ok src/pre_widget.zz", sc);
         (void)recognize_location("a/b/module_end.qq", sc);

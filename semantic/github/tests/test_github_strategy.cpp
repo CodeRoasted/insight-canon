@@ -1,6 +1,7 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_github_strategy.cpp — the GitHub-Actions dialect CODE TIER (ADR 0024 §2.3): the format
-// strategy (make_strategy) + its LEVEL-LIFT vocabulary (kLevelLifts). Migrated from the
+// strategy (make_strategy) + this package's LEVEL-LIFT vocabulary (kLevelLifts, whose WALK is
+// canon's — the vocabulary cases below therefore drive the composed pipeline). Migrated from the
 // GitHubActionsStrategyTest block of canon tests/strategy/test_strategies.cpp: the strategy class
 // moved into this package (github_strategy.cpp, exposed only via make_strategy()), so its tests
 // home with it. Drives the strategy directly against the spi IFormatStrategy contract. Determinism:
@@ -67,16 +68,113 @@ TEST(GithubStrategy, StripsTimestampAndTemplatesRealContent)
         << "the whole message must survive, leading GHA indentation stripped";
 }
 
-// ── Level lift: the ##[error] workflow-command → Error (the kLevelLifts vocabulary) ──
-TEST(GithubStrategy, LiftsErrorLevelFromWorkflowCommand)
+// ── Level lift: the workflow-command vocabulary (kLevelLifts) → LogLevel, over the PRODUCTION path
+// ──
+// The rows are this package's DATA; the walk is canon's (`insight::tokenization::lift_level` over
+// the composed table, applied by LogParser — ADR 0063 clause 2). So the gate drives the composed
+// pipeline end to end rather than the strategy in isolation: that is the only place the declared
+// rows now reach a decision, and it is the path a product binary takes.
+//
+// All EIGHT rows, because the `::…::` half and `##[notice]` are the ones with no safety net — a
+// line that loses its lift falls through to `infer_leading_log_level`, whose vocabulary has no
+// `notice` at all, so `##[notice]`/`::notice::` → Info is unrecoverable by inference.
+TEST(GithubStrategy, LiftsDeclaredLevelsFromWorkflowCommands)
+{
+    struct LiftCase
+    {
+        std::string_view marker;
+        LogLevel expected;
+    };
+    constexpr std::array<LiftCase, 8> kCases{{
+        {.marker = "##[error]", .expected = LogLevel::Error},
+        {.marker = "::error::", .expected = LogLevel::Error},
+        {.marker = "##[warning]", .expected = LogLevel::Warn},
+        {.marker = "::warning::", .expected = LogLevel::Warn},
+        {.marker = "##[debug]", .expected = LogLevel::Debug},
+        {.marker = "::debug::", .expected = LogLevel::Debug},
+        {.marker = "##[notice]", .expected = LogLevel::Info},
+        {.marker = "::notice::", .expected = LogLevel::Info},
+    }};
+
+    ArenaAllocator arena{64U * 1024U};
+    const ComposedSemantics gh{github_only()};
+    Tokenizer tokenizer{arena, MaskConfig{}, gh};
+    for (const LiftCase& probe : kCases)
+    {
+        // A neutral body: no level token, no failure cue — so the level can ONLY come from the
+        // declared lift. If the lift stops firing this reads Unknown, never the right answer by
+        // accident.
+        const std::string line{std::string{"2026-05-27T15:26:41.7842152Z "} +
+                               std::string{probe.marker} + "the quick brown fox"};
+        const auto event{tokenizer.process_line(line)};
+        ASSERT_TRUE(event.has_value()) << "marker=" << probe.marker << " line=\"" << line
+                                       << "\" parse failed: " << event.error();
+        EXPECT_EQ(event->format, LogFormat::GitHubActions)
+            << "marker=" << probe.marker << " must route to the GHA strategy, got "
+            << insight::to_string(event->format);
+        EXPECT_EQ(event->level, probe.expected)
+            << "marker=" << probe.marker << " expected " << insight::to_string(probe.expected)
+            << ", got " << insight::to_string(event->level) << " (template=\""
+            << event->template_str << "\")";
+        EXPECT_TRUE(event->template_str.starts_with(probe.marker))
+            << "the marker stays in the templated content; template=\"" << event->template_str
+            << "\"";
+    }
+}
+
+// ── …and the LIFT beats the body inference, exactly as it did when the walk lived in parse() ──
+// `##[notice]` on a body whose leading token would infer Error: the declared row must win. This is
+// the precedence the relocation had to preserve — LogParser applies the lift AFTER the strategy has
+// already inferred, so an implementation that let the inference stand would pass every case above
+// and fail only here.
+TEST(GithubStrategy, DeclaredLiftOutranksBodyInference)
+{
+    ArenaAllocator arena{64U * 1024U};
+    const ComposedSemantics gh{github_only()};
+    Tokenizer tokenizer{arena, MaskConfig{}, gh};
+
+    const auto lifted{tokenizer.process_line(
+        "2026-05-27T15:26:41.7842152Z ##[notice]ERROR the deploy step was skipped")};
+    ASSERT_TRUE(lifted.has_value()) << lifted.error();
+    EXPECT_EQ(lifted->level, LogLevel::Info)
+        << "the declared ##[notice] row must outrank the leading ERROR token the body inference "
+           "would read; got "
+        << insight::to_string(lifted->level);
+
+    // The control: the SAME body without the marker does infer Error — so the case above is a
+    // genuine contest between the two sources, not a body the inference ignores anyway.
+    const auto unlifted{
+        tokenizer.process_line("2026-05-27T15:26:41.7842152Z ERROR the deploy step was skipped")};
+    ASSERT_TRUE(unlifted.has_value()) << unlifted.error();
+    EXPECT_EQ(unlifted->level, LogLevel::Error)
+        << "control: the unmarked body must infer Error, else the contest above is vacuous; got "
+        << insight::to_string(unlifted->level);
+}
+
+// ── The algorithm left the PACKAGE: the strategy alone no longer decides a lifted level ──
+// ADR 0063 clause 2: LevelLiftRow was the last row kind whose matching algorithm lived in a
+// package, and that is what made the rows invisible to two scope passes while still feeding
+// `semantic_identity`. This pins the relocation itself — re-adding a package-local walk to
+// `parse()` would restore the inconsistency and turn the composed reader back into dead weight.
+TEST(GithubStrategy, StrategyAloneDoesNotWalkTheLevelLiftRows)
 {
     ArenaAllocator arena{4096};
     const auto strategy{insight::semantic::github::make_strategy()};
     const auto result{strategy->parse(kGHAError, arena)};
     ASSERT_TRUE(result.has_value()) << result.error();
-    const auto& pl{result.value()};
-    EXPECT_EQ(pl.level, LogLevel::Error);
-    EXPECT_TRUE(pl.content.starts_with("##[error]")) << "the marker stays in the templated content";
+    const auto& parsed{result.value()};
+    EXPECT_TRUE(parsed.content.starts_with("##[error]"))
+        << "the marker stays in the content; content=\"" << parsed.content << "\"";
+    // `##[error]connection refused …` carries a failure CUE ("connection refused"), so the
+    // strategy's own inference still reaches Error here — the discriminating probe is a marker with
+    // a neutral body, which must come back Unmarked from the strategy alone.
+    const auto neutral{
+        strategy->parse("2026-05-27T15:26:41.7842152Z ##[notice]the quick brown fox", arena)};
+    ASSERT_TRUE(neutral.has_value()) << neutral.error();
+    EXPECT_EQ(neutral.value().level, LogLevel::Unknown)
+        << "the strategy must not walk kLevelLifts — that walk is canon's lift_level over the "
+           "composed rows; got "
+        << insight::to_string(neutral.value().level);
 }
 
 // ── Unmarked body: falls back to canon's failure-cue inference (level-escaping crash recovery) ──

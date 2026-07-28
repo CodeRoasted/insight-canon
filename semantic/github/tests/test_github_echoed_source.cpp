@@ -90,6 +90,37 @@ TEST(GithubEchoedSource, TokenizerDemotesEchoedFailureLevelToUnknown)
         << static_cast<int>(echoed->level) << ")";
 }
 
+// ── The demotion outranks the DECLARED level lift, not merely the body inference ──
+// An echoed script line that echoes a workflow command (`echo "##[error]…"`) is still SCRIPT TEXT,
+// so D-PROV-1 drives it to Unknown. This pins the ORDER of two things that both write
+// `ParsedLine::level` in LogParser: the composed level-lift walk (ADR 0063 clause 2) runs FIRST and
+// the echoed-source demotion overwrites it. That was the order when the lift lived inside the GHA
+// strategy's parse(), and the relocation had to preserve it — swap the two and this line comes back
+// Error, alerting on a string that only ever appeared inside a shell command echo.
+TEST(GithubEchoedSource, EchoedSourceDemotionOutranksTheDeclaredLevelLift)
+{
+    ArenaAllocator arena{256U * 1024U};
+    const ComposedSemantics gh{github_only()};
+    Tokenizer tokenizer{arena, MaskConfig{}, gh};
+
+    const auto echoed{tokenizer.process_line(gha("\x1b[36;1m##[error]deploy step failed\x1b[0m"))};
+    ASSERT_TRUE(echoed.has_value()) << "process_line failed: " << echoed.error();
+    EXPECT_TRUE(echoed->echoed_source) << "the command-echo wrapper must set echoed_source";
+    EXPECT_EQ(echoed->level, LogLevel::Unknown)
+        << "an echoed `##[error]` is script text, so the demotion must overwrite the declared lift "
+           "(got "
+        << insight::to_string(echoed->level) << ")";
+
+    // The disconfirming control: the SAME content UNWRAPPED does lift to Error, so the case above
+    // is a real contest between the lift and the demotion rather than a line the lift ignores.
+    const auto plain{tokenizer.process_line(gha("##[error]deploy step failed"))};
+    ASSERT_TRUE(plain.has_value()) << "process_line failed: " << plain.error();
+    EXPECT_FALSE(plain->echoed_source);
+    EXPECT_EQ(plain->level, LogLevel::Error)
+        << "control: unwrapped, the declared ##[error] row must lift to Error (got "
+        << insight::to_string(plain->level) << ")";
+}
+
 // ── The disconfirming minimal pair: a REAL coloured error keeps Error, echoed_source stays false
 // ──
 TEST(GithubEchoedSource, TokenizerKeepsRealColouredErrorAsError)

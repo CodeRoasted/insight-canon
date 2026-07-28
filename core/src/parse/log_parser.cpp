@@ -47,6 +47,31 @@ is_echoed_source(std::string_view raw_line,
                                { return hook(raw_line); });
 }
 
+// The DECLARED level lift (ADR 0063 clause 2): the composed LevelLiftRow set is canon-walked here,
+// against the routed format, and OVERRIDES whatever level the strategy inferred — reproducing the
+// pre-relocation precedence exactly, where the GHA strategy consulted its own kLevelLifts array
+// first and fell back to `infer_leading_log_level` only when no row matched.
+//
+// PLACEMENT IS LOAD-BEARING, twice over:
+//   * AFTER the strategy — the lift keys on `ParsedLine::content`, the strategy's own product (for
+//     a dialect with a line prefix, the content past it). There is no earlier point where that
+//     exists.
+//   * BEFORE the echoed-source demotion — an echoed-source line is script text, not an observed
+//     event, so D-PROV-1 drives its level to Unknown unconditionally. That demotion outranked the
+//     lift when the lift lived inside parse(), and it must keep outranking it.
+// A non-GHA line costs one enum compare per level-lift row (the gate is tested first) and no
+// string compare, which is the same shape the composed classify/recognize walks already pay.
+//
+// Unknown from the walk means "no declared row claims this line" — it is the ABSENCE of a lift, not
+// a level, so it must never overwrite the strategy's inference.
+static void apply_level_lift(ParsedLine& parsed, LogFormat format,
+                             const insight::semantic::ComposedSemantics& composed) noexcept
+{
+    if (const LogLevel lifted{lift_level(parsed.content, format, composed)};
+        lifted != LogLevel::Unknown)
+        parsed.level = lifted;
+}
+
 // O(1) fast path: tries sticky strategy first; falls back to full detect.
 // Updates sticky_strategy_ / active_strategy_ as a side-effect.
 IFormatStrategy* LogParser::select_strategy(std::string_view line)
@@ -167,6 +192,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
         ++parsed_count_;
         last_format_ =
             strategy->format(); // the routed winner for this event (per-line observability)
+        apply_level_lift(*result, last_format_, composed_);
         // D-PROV-1 (echoed-source register): the GHA command-echo SGR wrapper was destroyed
         // by strip_escape_sequences above, so detect it on the RAW (ANSI-bearing) line — the
         // only place it survives. An echoed-source line is run-step SCRIPT text, not an
@@ -248,6 +274,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_stable(std::string_view 
         ++parsed_count_;
         last_format_ =
             strategy->format(); // the routed winner for this event (per-line observability)
+        apply_level_lift(*result, last_format_, composed_);
         // D-PROV-1: echoed-source demotion (see parse_line). Detect on the supplied line; a
         // pre-ANSI-stripped stable line carries no wrapper, so this is a no-op there.
         if (is_echoed_source(stable_line, composed_))

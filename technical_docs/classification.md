@@ -54,6 +54,13 @@ on would-be-alerting lines, and it fires on a leading pass *glyph* (an unambiguo
 > A declared OTEL `severityNumber` ([formats.md](formats.md) §4.1) is stronger than any inferred level and
 > overrides it.
 
+> **A declared level lift also overrides inference**, and by the same reasoning: a composed `LevelLiftRow`
+> (`##[error]` → Error) is a rule a dialect *declared*, not a level this file *inferred*. `LogParser` walks
+> the composed rows (`insight::tokenization::lift_level`) after the strategy and overwrites the level when a
+> gated row matches — so nothing in §1.1's two stages, including the outcome guard, applies to a lifted level.
+> That asymmetry is deliberate: the guards exist to stop an inference from over-claiming, and a declaration is
+> not an inference. See [formats.md](formats.md) §3.
+
 ---
 
 ## 2. The failure / warning lexicon

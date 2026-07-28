@@ -17,14 +17,10 @@ namespace insight
 {
 namespace
 {
-    // A row's format gate matches the line's routed format when the gate is kAnyFormat (fire on any
-    // format — the pre-split ungated behavior) or equals the concrete format (II-6 dialect gating).
-    // NOT gates_intersect: a line whose routed format is Unknown must NOT trigger a
-    // concretely-gated dialect row (the pre-split `format != GitHubActions → {}` guard).
-    [[nodiscard]] constexpr bool gate_matches(LogFormat row_gate, LogFormat line_format) noexcept
-    {
-        return row_gate == insight::semantic::kAnyFormat || row_gate == line_format;
-    }
+    // The row-gate predicate (II-6 dialect gating) is shared with the level-lift walker
+    // (level_lift.cpp), so it lives beside its composition-time sibling `gates_intersect` in
+    // canon.compose.cppm — where the comment explains why the two must not be confused.
+    using insight::semantic::detail::gate_matches;
 
     // ── Location matching (ported from location_recognizer.cpp) — the three closed families ──
     [[nodiscard]] constexpr bool loc_is_lower(char chr) noexcept

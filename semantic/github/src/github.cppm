@@ -199,9 +199,13 @@ static_assert(insight::semantic::all_channel_gates_declared(kMarkers, kEmitMarke
               ".channel_gate?) — the declared vocabulary is kChannels");
 
 // ── Level-lift rows (§1.2) ──
-// The GHA workflow-command level lift. FORMAT-GATED to GitHubActions; consumed by THIS package's
-// dialect strategy (level_from_message walks these, inside parse(), before raw-text inference — the
-// pre-split ordering, byte-identical). Also serialized into semantic_identity.
+// The GHA workflow-command level lift. FORMAT-GATED to GitHubActions. Pure DATA: the package
+// declares the rows, canon walks them — `insight::tokenization::lift_level` over the composed
+// `level_lifts()` table, applied by LogParser to every parsed line (ADR 0063 clause 2). Until then
+// this package's own strategy walked the array itself, which made LevelLiftRow the last row kind
+// whose algorithm lived in a package and left these rows feeding `semantic_identity` from a
+// single package-local reader. First match in DECLARED order wins, so order is content here.
+// Also serialized into semantic_identity.
 inline constexpr std::array<LevelLiftRow, 8> kLevelLifts{{
     {.prefix = "##[error]",
      .level = insight::LogLevel::Error,

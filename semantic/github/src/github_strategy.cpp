@@ -86,19 +86,6 @@ namespace
         return str.size() == kGhaPrefixLen || is_space(str[kGhaPrefixLen]);
     }
 
-    // ── Level lift (was github_actions.cpp level_from_message) — walks the PACKAGE'S level-lift
-    // rows ── Data-driven: the prefixes/levels live in kLevelLifts (github.cppm), also serialized
-    // into semantic_identity. First-match walk in declared order (no nested prefixes) == the
-    // pre-split ordered if-chain, byte-identical. The marker is KEPT in the templated content; only
-    // the level is lifted.
-    [[nodiscard]] insight::LogLevel level_from_message(std::string_view message) noexcept
-    {
-        for (const LevelLiftRow& row : kLevelLifts)
-            if (message.starts_with(row.prefix))
-                return row.level;
-        return insight::LogLevel::Unknown;
-    }
-
     // ── Echoed-source detection (was src/scan/… kCommandEchoSgrParams / is_echoed_source_line) ──
     constexpr unsigned char kEsc{0x1bU};
     inline constexpr std::array<std::string_view, 2> kCommandEchoSgrParams{
@@ -152,12 +139,13 @@ namespace
             insight::tokenization::ParsedLine parsed;
             parsed.raw_line = line;
             parsed.timestamp = insight::utils::parse_iso8601(line.substr(0U, kGhaPrefixLen));
-            // A workflow-command marker is authoritative when present; otherwise the body is raw
-            // stdout — fall back to the same leading-level / failure-cue inference RawTextStrategy
-            // uses.
-            parsed.level = level_from_message(content);
-            if (parsed.level == insight::LogLevel::Unknown)
-                parsed.level = insight::utils::infer_leading_log_level(content);
+            // The body is raw stdout: infer the level from a leading level token / failure cue,
+            // exactly as RawTextStrategy does. The workflow-command LEVEL LIFT (`##[error]` →
+            // Error) is NOT applied here — it is a DECLARED rule (kLevelLifts, github.cppm) walked
+            // by canon's `insight::tokenization::lift_level` over the composed rows, and LogParser
+            // applies it to this ParsedLine right after parse() returns (ADR 0063 clause 2). It
+            // still WINS over this inference, because a matching lift overwrites the level there.
+            parsed.level = insight::utils::infer_leading_log_level(content);
             parsed.component = {}; // GHA lines carry no component / tag
             parsed.content = arena.store_string(content);
             return std::expected<insight::tokenization::ParsedLine, std::string>{parsed};

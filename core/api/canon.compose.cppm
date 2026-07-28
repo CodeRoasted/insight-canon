@@ -282,11 +282,27 @@ resolve_stream(const ComposedSemantics& composed,
 namespace detail
 {
     // Two format gates INTERSECT when a single line could satisfy both: equal, or either is
-    // kAnyFormat.
+    // kAnyFormat. The COMPOSITION-time predicate: it answers "could these two rows ever both
+    // claim one line?" and drives the fail-closed duplicate check.
     [[nodiscard]] constexpr bool gates_intersect(insight::LogFormat lhs,
                                                  insight::LogFormat rhs) noexcept
     {
         return lhs == rhs || lhs == kAnyFormat || rhs == kAnyFormat;
+    }
+
+    // A row's format gate MATCHES a line's routed format when the gate is kAnyFormat (fire on any
+    // format — the pre-split ungated behavior) or equals the concrete format. The RECOGNITION-time
+    // predicate every composed-row walker shares (classify / recognize / lift_level), homed here so
+    // the two gate questions sit side by side and cannot drift apart in separate copies.
+    //
+    // Deliberately NOT gates_intersect: a line whose routed format is Unknown must NOT trigger a
+    // concretely-gated dialect row (the pre-split `format != GitHubActions → {}` guard).
+    // gates_intersect would fire it, because Unknown is a concrete enumerator and the intersect
+    // question is the wrong one at recognition time.
+    [[nodiscard]] constexpr bool gate_matches(insight::LogFormat row_gate,
+                                              insight::LogFormat line_format) noexcept
+    {
+        return row_gate == kAnyFormat || row_gate == line_format;
     }
 } // namespace detail
 
@@ -379,3 +395,35 @@ constexpr ConflictInfo find_conflict(std::span<const SemanticPackageManifest> pa
 }
 
 } // namespace insight::semantic
+
+// ── The level-lift walker (ADR 0063 clause 2) ────────────────────────────────────────────────────
+// The last row kind whose matching algorithm lived in a semantic PACKAGE: `LevelLiftRow` was walked
+// by the GitHub-Actions strategy over its own `kLevelLifts` array, inside `parse()`. Canon owns the
+// ALGORITHM for every other row kind (classify / recognize / recognize_location / map_outcome_token
+// over the composed tables), and this one now joins them — so `ComposedSemantics::level_lifts()`,
+// which was serialized into `semantic_identity` while no production code read it, has a reader.
+//
+// WHY IT IS DECLARED HERE and not in the facade beside `classify`/`recognize`: its production
+// consumer is `LogParser` (`insight.canon.detail.parse`), a SEALED shard that sits BELOW the
+// facade. The level is decided at the parse stage — that is where the pre-existing echoed-source
+// demotion (D-PROV-1) overrides it, and the lift must be applied BEFORE that demotion to reproduce
+// the pre-relocation order exactly. A walker declared in `insight.canon` is unreachable from there
+// without inverting the facade↔detail dependency arrow, so it is declared in the module that owns
+// the composed tables. The facade `export import`s this module, so `import insight.canon;` still
+// yields it alongside the other walkers.
+export namespace insight::tokenization
+{
+
+// Lift a line's LogLevel from the composed level-lift rows: the FIRST row whose gate matches
+// `format` and whose prefix the content carries wins. Unknown when no gated row matches — which is
+// the caller's signal to keep whatever level the strategy inferred, never a level in its own right.
+//
+// FIRST-match, not longest-match (the rule `classify`/`recognize` use), because first-match in
+// declared order is what the pre-relocation package walk did and this relocation is
+// output-neutral by construction. Composition already surfaces the only case where the two rules
+// could differ: a prefix nesting among level-lift rows is reported as a `ShadowNote` (kind
+// "level_lift") and an exact duplicate fails composition closed.
+[[nodiscard]] LogLevel lift_level(std::string_view content, LogFormat format,
+                                  const insight::semantic::ComposedSemantics& composed) noexcept;
+
+} // namespace insight::tokenization
