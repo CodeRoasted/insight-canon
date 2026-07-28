@@ -58,7 +58,7 @@ struct CompositionReport
 };
 
 // An exact-duplicate conflict (§3, fail-closed): same rule class + same key (prefix) + intersecting
-// format gate across two rows. `has_conflict == false` is the empty sentinel. constexpr so a
+// dialect gate across two rows. `has_conflict == false` is the empty sentinel. constexpr so a
 // composition TU can `static_assert(!find_conflict(pkgs).has_conflict, …)` — the build-time half of
 // G-SP-5; the runtime compose fatals on the same condition (defense in depth).
 struct ConflictInfo
@@ -133,43 +133,61 @@ class ComposedSemantics
         return channels_;
     }
 
-    // ── The channel-filtered view (ADR 0029 D1/D2/D5) ──
-    // Build the vocabulary ONE stream declares, at stream open. `declared_channel` is the caller's
-    // provenance fact (D2 — never auto-detected: a content heuristic decides the channel from a
-    // PREFIX of the stream, so a later line can contradict an earlier decision ⇒ content
-    // non-determinism under streaming). The returned composition drops every marker row gated to a
-    // different channel, so:
+    // ── The STREAM view: dialect × channel, filtered ONCE (ADR 0029 D1/D2/D5, ADR 0065 clause 2) ──
+    // Build the vocabulary ONE stream declares, at stream open. Both coordinates are the caller's
+    // provenance facts, never auto-detected (canon VERIFIES, it does not infer — ADR 0030 D2): a
+    // content heuristic decides from a PREFIX of the stream, so a later line can contradict an
+    // earlier decision ⇒ content non-determinism the moment the stream is chunked.
     //
-    //   * the HOT PATH never sees a channel — recognize() walks a plain row span, zero per-line
-    //   cost, and
-    //     its signature is unchanged;
-    //   * one IntentChannel per TREE (D5) is STRUCTURAL, not merely asserted — a sibling channel's
-    //   rows
-    //     are not in the table, so a multi-channel tree is unrepresentable rather than rejected;
-    //   * `kAnyChannel` rows survive every filter, so single-materialization dialects are
-    //   untouched.
+    // The returned composition drops every row gated to a different dialect, and every marker row
+    // gated to a different channel. Consequences, all structural rather than asserted:
     //
-    // `kAnyChannel` (empty) as the ARGUMENT means Unspecified — the caller did not declare: every
-    // concretely-gated row drops ⇒ no dialect structure ⇒ the raw-text fallback. That is
-    // fail-closed on DEPTH, not on the run, and it is deliberate: never default an undeclared
-    // stream to a concrete channel, because "both channels' rows live at once" IS the phantom
-    // defect this exists to kill.
+    //   * the HOT PATH never sees either coordinate — classify / recognize / lift_level /
+    //     map_outcome_token walk a plain row span with no gate parameter at all, zero per-line cost;
+    //   * one dialect and one IntentChannel per TREE (D5) are UNREPRESENTABLE otherwise — a sibling
+    //     dialect's or channel's rows are not in the table, so the bad state cannot be built;
+    //   * `kAnyDialect` / `kAnyChannel` rows survive every filter, so a universal role row and a
+    //     single-materialization dialect are untouched.
     //
-    // FATALS on an UNKNOWN channel (a non-empty name no package declares — e.g.
-    // `--channel=annotatd`), listing the declared vocabulary. An unknown channel is a MISTAKE; an
-    // absent channel is a CHOICE; they must not share a code path — silently degrading a typo to
+    // ⚠ THE DIALECT FILTER IS A DETERMINISM FIX, not tidiness (ADR 0065 clause 2). Before T4 the
+    // gate was `LogParser::routed_format()` — the per-line detector winner, served by a STICKY
+    // strategy — so WHICH DECLARED ROWS FIRED WAS A FUNCTION OF CONTENT. Under a stream-scoped
+    // declaration it is fixed before the first line. Anything that reintroduces a per-line format
+    // input to a declared row's gate has undone this, however green the tests are.
+    //
+    // EMPTY as an ARGUMENT means Unspecified — the caller did not declare: every concretely-gated
+    // row drops ⇒ no dialect structure ⇒ the raw-text fallback. Fail-closed on DEPTH, not on the
+    // run. Never default an undeclared stream to a concrete dialect or channel: "both GHA Step rows
+    // live at once" IS the phantom defect this exists to kill, and "both dialects' rows live at
+    // once" is the same defect one axis over.
+    //
+    // FATALS on an UNKNOWN name in either coordinate — a non-empty dialect no composed package
+    // carries (`--dialect=guthub`), or a non-empty channel no package declares
+    // (`--channel=annotatd`) — listing the known vocabulary. An unknown name is a MISTAKE; an
+    // absent one is a CHOICE; they must not share a code path, because silently degrading a typo to
     // the fallback is the exact silent-fallback bug class this workstream has already paid for
     // twice.
     //
-    // Cold path by construction: called once per stream, copies ~10 POD rows. The pointed-at bytes
+    // IDEMPOTENT AND ORDER-FREE by construction: every filter is re-derived from the private
+    // UNFILTERED tables, so `v.for_stream(a, b).for_stream(c, d) == v.for_stream(c, d)`. A
+    // monotonically shrinking chain — the shape a separate `for_dialect` / `for_channel` pair would
+    // have had — is what makes a second call silently wrong, so there is exactly one door.
+    //
+    // Cold path by construction: called once per stream, copies ~30 POD rows. The pointed-at bytes
     // stay in package-static storage (SP-7), so the copy is trivial and the identity is preserved
     // verbatim — semantic_identity is the RULESET's identity, not a stream's view of it.
-    [[nodiscard]] ComposedSemantics for_channel(std::string_view declared_channel) const;
+    [[nodiscard]] ComposedSemantics for_stream(std::string_view declared_dialect,
+                                               std::string_view declared_channel) const;
 
     // Would declaring an IntentChannel unlock recognition this view is withholding? (ADR 0029 D5's
-    // diagnostic.) True iff some marker row for `format` is channel-gated to a channel that
-    // `declared_channel` does not admit — i.e. this dialect HAS materializations and the caller has
-    // not said which one it acquired, so depth is being withheld and saying so would unlock it.
+    // diagnostic.) True iff some marker row of THIS VIEW'S DECLARED DIALECT is channel-gated to a
+    // channel that `declared_channel` does not admit — i.e. this dialect HAS materializations and
+    // the caller has not said which one it acquired, so depth is being withheld and saying so would
+    // unlock it.
+    //
+    // The dialect is no longer a parameter: it is the coordinate this view was resolved for
+    // (ADR 0065 clause 2). Asking the question against a view resolved for a DIFFERENT dialect was
+    // never meaningful, and passing it separately made that mistake expressible.
     //
     // A narrow QUERY, deliberately not an `all_markers()` accessor: exposing the unfiltered table
     // would re-open the fail-open door this class exists to close (a caller could walk it and
@@ -177,8 +195,7 @@ class ComposedSemantics
     // single-materialization dialect (Jenkins), so a Jenkins user is never told to declare a
     // channel that does not apply to them — a diagnostic that fires where it cannot help is exactly
     // the fatigue the product is against.
-    [[nodiscard]] bool withholds_markers_for(insight::LogFormat format,
-                                             std::string_view declared_channel) const noexcept;
+    [[nodiscard]] bool withholds_markers_for(std::string_view declared_channel) const noexcept;
 
     // ── The code-tier seams ──
     [[nodiscard]] std::span<const StrategyFactory> strategy_factories() const noexcept
@@ -209,24 +226,40 @@ class ComposedSemantics
     ComposedSemantics() = default;
     friend ComposedSemantics compose(std::span<const SemanticPackageManifest>);
 
+    // ── The VIEW: what this stream's walkers see. Every one of these five is already filtered by
+    // the declared (dialect, channel); a freshly composed vocabulary is the UNSPECIFIED view on
+    // BOTH axes, so only kAnyDialect / kAnyChannel rows fire until a caller declares.
+    //
+    // Fail-closed has to be the DEFAULT, not an opt-in a caller can forget (ADR 0029 D5's promoted
+    // MUST — a safety default that must be requested is not a default). That is why the accessors
+    // expose the VIEW and the unfiltered tables below are private: if the full set were the public
+    // `markers()`, the default composition would fire BOTH GHA Step rows at once (the phantom
+    // defect) and, one axis over, every dialect's rows on every stream.
     std::vector<StructuralRoleRow> roles_;
-    // The marker rows THIS composition recognizes — already channel-filtered (ADR 0029 D5). A
-    // freshly composed vocabulary is the UNSPECIFIED view: no caller declared a channel, so every
-    // concretely-gated row is absent and only kAnyChannel rows fire (fail-closed). for_channel()
-    // re-derives this from all_markers_.
     std::vector<IntentMarkerRow> markers_;
-    // Every marker row the packages declared, channel-gated or not — the SOURCE for_channel()
-    // filters, never walked by recognition. Kept private and separate on purpose: if the full set
-    // were the public `markers()`, the default composition would fire BOTH GHA Step rows at once,
-    // which IS the phantom defect. Fail-closed has to be the DEFAULT, not an opt-in a caller can
-    // forget (ADR 0029 D5's promoted MUST — a safety default that must be requested is not a
-    // default).
-    std::vector<IntentMarkerRow> all_markers_;
     std::vector<LevelLiftRow> level_lifts_;
-    std::vector<LocationRow> locations_;
-    std::vector<ValueClassRow> value_classes_;
     std::vector<OutcomeTokenRow> outcome_tokens_;
     std::vector<OutcomeMarkerRow> outcome_markers_;
+
+    // ── The UNFILTERED tables: every row the packages declared, gated or not. The SOURCE
+    // `for_stream()` re-derives each view from, never walked by recognition. Keeping them makes
+    // `for_stream` IDEMPOTENT and order-free: filtering a view would be a monotonically shrinking
+    // chain, so a second declaration could only ever remove rows the first one kept.
+    std::vector<StructuralRoleRow> all_roles_;
+    std::vector<IntentMarkerRow> all_markers_;
+    std::vector<LevelLiftRow> all_level_lifts_;
+    std::vector<OutcomeTokenRow> all_outcome_tokens_;
+    std::vector<OutcomeMarkerRow> all_outcome_markers_;
+
+    // The dialect this view was resolved for; empty = Unspecified. Not a copy of caller state for
+    // its own sake — `withholds_markers_for` needs it to ask its question about the RIGHT dialect
+    // now that the dialect has stopped being a per-call parameter (ADR 0065 clause 2).
+    std::string_view declared_dialect_;
+
+    // Dialect-independent (no gate on these row kinds), so they are carried verbatim through every
+    // view.
+    std::vector<LocationRow> locations_;
+    std::vector<ValueClassRow> value_classes_;
     std::vector<std::string_view> channels_; // ADR 0029 — the composed declared channel vocabulary
     std::vector<StrategyFactory> strategies_;
     std::vector<ProvenanceHook> provenance_hooks_;
@@ -250,18 +283,19 @@ struct ResolvedStream
 // CANON VERIFIES, NEVER INFERS (ADR 0030's split, not reopened). Each coordinate fails closed on an
 // UNKNOWN value, naming the known vocabulary, and degrades on an ABSENT one:
 //   * `dialect`   — must name a composed package; unknown ⇒ hard error listing the composed names.
-//                   Absent ⇒ no dialect assertion (today's behavior). Verified, not yet GATING:
-//                   it becomes the successor to per-row `format_gate` at T4. Verification alone
-//                   already earns its place — it turns `--dialect=guthub` into a named error
-//                   instead of a silently structure-less analysis.
-//   * `channel`   — delegated to for_channel(), whose fail-closed posture is ADR 0029 D5's and is
+//                   VERIFIED and GATING since T4 (ADR 0065): the row-level dialect gate is applied
+//                   HERE, once, and filtered into the view, so no walker below ever sees a dialect
+//                   coordinate. Absent ⇒ every concretely-gated row drops — fail-closed on DEPTH.
+//   * `channel`   — same construction, same call; the fail-closed posture is ADR 0029 D5's and is
 //                   unchanged here.
 //   * `stack`     — delegated to resolve_transport_stack(); unknown transform ⇒ hard error listing
 //                   the catalogue.
 //
-// A DEFAULT-CONSTRUCTED DECLARATION IS EXACTLY TODAY'S BEHAVIOR — empty stack (the peel is the
-// identity function), no dialect assertion, the Unspecified channel view. That is the G1 case, and
-// it is what makes declaring purely SUBTRACTIVE: a caller who says nothing loses nothing.
+// A DEFAULT-CONSTRUCTED DECLARATION IS THE UNSPECIFIED STREAM — empty stack (the peel is the
+// identity function), no dialect and no channel, so only kAnyDialect / kAnyChannel rows fire. That
+// is the G1 case. Declaring is purely ADDITIVE in depth: a caller who says nothing gets the
+// raw-text reading, and a caller who says the wrong thing gets a named error rather than a quietly
+// different answer.
 //
 // Note what this function does NOT return: anything the tokenizer takes. The stack is handed back
 // to the CALLER, who peels and passes `PeeledLine::content` on. There is deliberately no path from
@@ -281,28 +315,24 @@ resolve_stream(const ComposedSemantics& composed,
 // ── find_conflict — constexpr definition (inline so it is usable in static_assert at any TU) ──
 namespace detail
 {
-    // Two format gates INTERSECT when a single line could satisfy both: equal, or either is
-    // kAnyFormat. The COMPOSITION-time predicate: it answers "could these two rows ever both
+    // Two dialect gates INTERSECT when a single line could satisfy both: equal, or either is
+    // kAnyDialect. The COMPOSITION-time predicate: it answers "could these two rows ever both
     // claim one line?" and drives the fail-closed duplicate check.
-    [[nodiscard]] constexpr bool gates_intersect(insight::LogFormat lhs,
-                                                 insight::LogFormat rhs) noexcept
-    {
-        return lhs == rhs || lhs == kAnyFormat || rhs == kAnyFormat;
-    }
-
-    // A row's format gate MATCHES a line's routed format when the gate is kAnyFormat (fire on any
-    // format — the pre-split ungated behavior) or equals the concrete format. The RECOGNITION-time
-    // predicate every composed-row walker shares (classify / recognize / lift_level), homed here so
-    // the two gate questions sit side by side and cannot drift apart in separate copies.
     //
-    // Deliberately NOT gates_intersect: a line whose routed format is Unknown must NOT trigger a
-    // concretely-gated dialect row (the pre-split `format != GitHubActions → {}` guard).
-    // gates_intersect would fire it, because Unknown is a concrete enumerator and the intersect
-    // question is the wrong one at recognition time.
-    [[nodiscard]] constexpr bool gate_matches(insight::LogFormat row_gate,
-                                              insight::LogFormat line_format) noexcept
+    // ⚠ NOT `insight::semantic::dialect_admits`, its RESOLUTION-time sibling, and the two must not
+    // be swapped. This one is SYMMETRIC and asks about two ROWS; that one is ASYMMETRIC and asks
+    // about one row against a CALLER's declaration, where an ABSENT declaration must admit nothing
+    // concrete. Answering either question with the other's predicate fails closed in one direction
+    // and fails OPEN in the other.
+    //
+    // There is no longer a RECOGNITION-time gate predicate at all (ADR 0065 clause 2): the dialect
+    // is evaluated ONCE, at stream resolution, and filtered into the view, so the walkers walk a
+    // plain row span with no gate left to test. The `gate_matches` that used to live here — the
+    // per-line `row_gate == kAnyFormat || row_gate == line_format` every walker shared — is gone
+    // with the coordinate it tested.
+    [[nodiscard]] constexpr bool gates_intersect(std::string_view lhs, std::string_view rhs) noexcept
     {
-        return row_gate == kAnyFormat || row_gate == line_format;
+        return lhs == rhs || lhs == kAnyDialect || rhs == kAnyDialect;
     }
 } // namespace detail
 
@@ -311,7 +341,7 @@ namespace detail
     // Every unordered (package,row) pair exactly ONCE: pkg_b>pkg_a, or pkg_b==pkg_a with
     // idx_j>idx_i. Never a row against itself, and address-independent — detects an intra-package
     // duplicate AND two packages that happen to share the same static row array (position, not
-    // address, is the key). Keyed on the shared .prefix + .format_gate members (roles / markers /
+    // address, is the key). Keyed on the shared .prefix + .dialect_gate members (roles / markers /
     // level-lifts). Returns the duplicated prefix, or nullopt.
     template <typename Row>
     [[nodiscard]] constexpr std::optional<std::string_view>
@@ -328,7 +358,8 @@ namespace detail
                     for (std::size_t idx_j{(pkg_b == pkg_a) ? idx_i + 1 : 0}; idx_j < rows_b.size();
                          ++idx_j)
                         if (rows_a[idx_i].prefix == rows_b[idx_j].prefix &&
-                            gates_intersect(rows_a[idx_i].format_gate, rows_b[idx_j].format_gate))
+                            gates_intersect(rows_a[idx_i].dialect_gate,
+                                            rows_b[idx_j].dialect_gate))
                             return rows_a[idx_i].prefix;
                 }
         }
@@ -354,7 +385,8 @@ namespace detail
                     for (std::size_t idx_j{(pkg_b == pkg_a) ? idx_i + 1 : 0}; idx_j < rows_b.size();
                          ++idx_j)
                         if (rows_a[idx_i].token == rows_b[idx_j].token &&
-                            gates_intersect(rows_a[idx_i].format_gate, rows_b[idx_j].format_gate))
+                            gates_intersect(rows_a[idx_i].dialect_gate,
+                                            rows_b[idx_j].dialect_gate))
                             return rows_a[idx_i].token;
                 }
         }
@@ -364,7 +396,7 @@ namespace detail
 
 constexpr ConflictInfo find_conflict(std::span<const SemanticPackageManifest> packages) noexcept
 {
-    // An exact duplicate is same key + (for prefix rows) intersecting format gate. Each unordered
+    // An exact duplicate is same key + (for prefix rows) intersecting dialect gate. Each unordered
     // (package,row) pair is checked once; O(rows²) over a handful of rows at compile time.
     if (const auto key{
             detail::first_prefix_dup<StructuralRoleRow>(packages, &SemanticPackageManifest::roles)})
@@ -414,16 +446,21 @@ constexpr ConflictInfo find_conflict(std::span<const SemanticPackageManifest> pa
 export namespace insight::tokenization
 {
 
-// Lift a line's LogLevel from the composed level-lift rows: the FIRST row whose gate matches
-// `format` and whose prefix the content carries wins. Unknown when no gated row matches — which is
-// the caller's signal to keep whatever level the strategy inferred, never a level in its own right.
+// Lift a line's LogLevel from the composed level-lift rows: the FIRST row whose prefix the content
+// carries wins. Unknown when no row matches — which is the caller's signal to keep whatever level
+// the strategy inferred, never a level in its own right.
+//
+// No dialect parameter (ADR 0065 clause 2): `composed` is already the resolved stream's view, so a
+// row that is present is a row that fires. This is what removed the live determinism hazard — the
+// gate used to be `LogParser::routed_format()`, a per-line detector winner under a sticky strategy,
+// so which DECLARED rows fired was a function of content.
 //
 // FIRST-match, not longest-match (the rule `classify`/`recognize` use), because first-match in
 // declared order is what the pre-relocation package walk did and this relocation is
 // output-neutral by construction. Composition already surfaces the only case where the two rules
 // could differ: a prefix nesting among level-lift rows is reported as a `ShadowNote` (kind
 // "level_lift") and an exact duplicate fails composition closed.
-[[nodiscard]] LogLevel lift_level(std::string_view content, LogFormat format,
+[[nodiscard]] LogLevel lift_level(std::string_view content,
                                   const insight::semantic::ComposedSemantics& composed) noexcept;
 
 } // namespace insight::tokenization

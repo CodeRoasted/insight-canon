@@ -26,7 +26,7 @@ using insight::semantic::compose;
 using insight::semantic::ComposedSemantics;
 using insight::semantic::find_conflict;
 using insight::semantic::IntentMarkerRow;
-using insight::semantic::kAnyFormat;
+using insight::semantic::kAnyDialect;
 using insight::semantic::SemanticPackageManifest;
 using insight::semantic::StructuralRoleRow;
 using insight::tokenization::ArenaAllocator;
@@ -40,13 +40,13 @@ namespace
 {
 // ── Synthetic packages A and B (distinct names, distinct rows) + A' (A with one prefix mutated) ──
 constexpr std::array<StructuralRoleRow, 1> kRolesA{
-    {{.prefix = "<AAA>", .role = StructuralRole::GroupBegin, .format_gate = kAnyFormat}}};
+    {{.prefix = "<AAA>", .role = StructuralRole::GroupBegin, .dialect_gate = kAnyDialect}}};
 constexpr std::array<StructuralRoleRow, 1> kRolesAMut{
     {{.prefix = "<AAB>",
       .role = StructuralRole::GroupBegin,
-      .format_gate = kAnyFormat}}}; // one byte changed
+      .dialect_gate = kAnyDialect}}}; // one byte changed
 constexpr std::array<StructuralRoleRow, 1> kRolesB{
-    {{.prefix = "<BBB>", .role = StructuralRole::GroupEnd, .format_gate = kAnyFormat}}};
+    {{.prefix = "<BBB>", .role = StructuralRole::GroupEnd, .dialect_gate = kAnyDialect}}};
 
 constexpr SemanticPackageManifest kPkgA{.name = "alpha",
                                         .version = "1.0.0",
@@ -77,11 +77,11 @@ constexpr SemanticPackageManifest kPkgB{.name = "beta",
                                         .echoed_source = nullptr};
 
 // ── A deliberate cross-package DUPLICATE: two packages sharing an exact role key with intersecting
-// gates (kAnyFormat intersects everything). The G-SP-5 fixture. ──
+// gates (kAnyDialect intersects everything). The G-SP-5 fixture. ──
 constexpr std::array<StructuralRoleRow, 1> kDupRoleX{
-    {{.prefix = "##DUP##", .role = StructuralRole::GroupBegin, .format_gate = kAnyFormat}}};
+    {{.prefix = "##DUP##", .role = StructuralRole::GroupBegin, .dialect_gate = kAnyDialect}}};
 constexpr std::array<StructuralRoleRow, 1> kDupRoleY{
-    {{.prefix = "##DUP##", .role = StructuralRole::Terminator, .format_gate = LogFormat::JSON}}};
+    {{.prefix = "##DUP##", .role = StructuralRole::Terminator, .dialect_gate = "dup_b"}}};
 constexpr SemanticPackageManifest kDupA{.name = "dup_a",
                                         .version = "1.0.0",
                                         .roles = kDupRoleX,
@@ -133,9 +133,8 @@ TEST(Composition, DegenerateCoreOnlyRuns)
 
     // No dialect row fires — a would-be GHA marker classifies to None, no marker, no test-file
     // WHERE.
-    EXPECT_EQ(classify("##[error]boom", LogFormat::GitHubActions, core), StructuralRole::None);
-    EXPECT_EQ(recognize("Run something", LogFormat::GitHubActions, core).kind,
-              IntentMarkerKind::None);
+    EXPECT_EQ(classify("##[error]boom", core), StructuralRole::None);
+    EXPECT_EQ(recognize("Run something", core).kind, IntentMarkerKind::None);
     EXPECT_EQ(recognize_location("src/auth/login.test.ts", core), "");
 
     // But the universal formats still tokenize (core is runnable semantic-unaware).

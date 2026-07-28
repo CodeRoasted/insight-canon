@@ -31,16 +31,22 @@ export namespace insight::tokenization
 // Byte-for-byte equivalent to the pre-split hardcoded StructuralRoleRegistry / IntentMarkerRegistry
 // / recognize_location.
 
-// Classify a LINE's structural role from the composed role rows (longest-match; a row fires when
-// its gate is kAnyFormat or equals `format`). None when no row matches.
+// ⚠ NO DIALECT COORDINATE, ON ANY OF THEM (ADR 0065 clause 2). `composed` is the RESOLVED STREAM's
+// view — `resolve_stream` filtered the declared dialect and channel into it once, before the first
+// line — so a row that is in the table is a row that fires. Re-introducing a per-line format or
+// dialect argument here would restore the content dependence T4 removed: the argument used to be
+// `LogParser::routed_format()`, the per-line detector winner under a sticky-strategy fast path.
+
+// Classify a LINE's structural role from the resolved view's role rows (longest-match). None when
+// no row matches.
 [[nodiscard]] StructuralRole
-classify(std::string_view content, LogFormat format,
+classify(std::string_view content,
          const insight::semantic::ComposedSemantics& composed) noexcept;
 
-// Recognize an intent marker from the composed marker rows (format-gated, longest-match). The
-// payload is the content after the matched prefix; the alignment class + instance discriminant are
-// derived by canon's canonicalize_intent / discriminant_of. None when no gated row matches.
-[[nodiscard]] IntentMarker recognize(std::string_view content, LogFormat format,
+// Recognize an intent marker from the resolved view's marker rows (longest-match). The payload is
+// the content after the matched prefix; the alignment class + instance discriminant are derived by
+// canon's canonicalize_intent / discriminant_of. None when no row matches.
+[[nodiscard]] IntentMarker recognize(std::string_view content,
                                      const insight::semantic::ComposedSemantics& composed) noexcept;
 
 // Phase 1 facade: raw log line → CanonicalEvent.
@@ -91,22 +97,26 @@ export namespace insight
 // precedence resolver); the composed OutcomeTokenRow/OutcomeMarkerRow sets are the DATA. Homed in
 // the facade (they consume ComposedSemantics; the scan drives the sealed LogParser).
 
-// Map a native verdict token through the composed OutcomeTokenRow set, gated to `format` (a Jenkins
-// token resolves against Jenkins rows only — II-6). nullopt = no row claims the token under that
-// gate (distinct from a row that maps it TO RunOutcome::Unknown, e.g. Jenkins NOT_BUILT).
+// Map a native verdict token through the RESOLVED VIEW's OutcomeTokenRow set. The dialect gate was
+// applied at stream resolution (II-6 still holds — a Jenkins token is simply not in a GHA stream's
+// view), so an undeclared stream carries no concretely-gated row and nothing resolves: fail-closed
+// on depth. nullopt = no row in this view claims the token (distinct from a row that maps it TO
+// RunOutcome::Unknown, e.g. Jenkins NOT_BUILT).
 [[nodiscard]] std::optional<RunOutcome>
-map_outcome_token(std::string_view token, LogFormat format,
+map_outcome_token(std::string_view token,
                   const insight::semantic::ComposedSemantics& composed) noexcept;
 
 // The whole-log console-tail scan (§3.2 — the degenerate "only a console log" source). One
-// parse-only pass (no masking): per line, the routed format gates the composed OutcomeMarkerRow
-// walk; a match extracts the remainder token (a single ASCII word, strict) and the LAST match wins.
-// Also latches the log's outcome-bearing DIALECT: the first routed format any OutcomeTokenRow is
-// gated on — the gate the side-input token resolves under.
+// parse-only pass (no masking): per line, the resolved view's OutcomeMarkerRow set is walked; a
+// match extracts the remainder token (a single ASCII word, strict) and the LAST match wins.
+//
+// It no longer LATCHES a dialect. It used to carry two `LogFormat` fields — the first
+// outcome-bearing routed format, and the matched marker line's routed format — whose only job was
+// to gate `map_outcome_token` afterwards. Both were per-line detector outputs, so the resolution a
+// side-input token got depended on the stream's CONTENT; under a declared dialect the vocabulary is
+// fixed before the first line and the fields have nothing left to carry (ADR 0065 clause 2).
 struct RunOutcomeScan
 {
-    LogFormat dialect{LogFormat::Unknown}; // first outcome-bearing routed format; Unknown = none
-    LogFormat marker_format{LogFormat::Unknown}; // the matched marker line's routed format
     bool marker_present{false};
     std::string token; // the last console-tail verdict token (empty when !marker_present)
 };

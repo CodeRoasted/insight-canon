@@ -132,15 +132,74 @@ export namespace insight::semantic
 // plan and was never assignable. `emits` moved the shape and shipped, so it takes the token.
 // adr/0047 carries the errata to 0026 (its substantive claim is untouched — it names the GROWTH,
 // not a number).
-inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-3"};
+//
+// grammar-4 (ADR 0065 clause 1, T4): the per-row `format_gate : insight::LogFormat` becomes
+// `dialect_gate : std::string_view` on all six gated row kinds, so six preimage sites move from a
+// single `append_u8` to a length-prefixed `append_str`. That is a SERIALIZATION SHAPE change on the
+// nose — the case the paragraph above says to keep bumping for, "including one that also moves
+// content" — and adr/0047 clause 2.3 sharpened exactly it for the sibling transport token.
+//
+// ⚠ ADR 0065 clause 6 says T4 "spends no version token". That reading is right about the two tokens
+// it measured — `canonicalization_version` (the MASKING token, still `stateless-masks-7`) and the
+// MetaLog wire version, neither of which T4 touches — and it did not enumerate THIS one. The bump
+// costs Eqya's sequencing nothing: `kSemanticGrammarVersion` appears at exactly one site, inside
+// the `semantic_identity` preimage (compose.cpp), reaches no wire field and no MetaLog block, and
+// the digest it feeds is moving anyway. It is not reserved by a plan — the shape shipped, so it
+// takes the token (adr/0047 clause 1).
+inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-4"};
 
-// The "any format" sentinel for a row's format gate: the rule fires regardless of the line's routed
-// format. `LogFormat::Unknown` is that sentinel (no real routed line carries Unknown — RawText is
-// the catch-all), so a universal structural-role row (`##[group]`, fired on any content today)
-// reproduces the pre-split UNGATED StructuralRoleRegistry::classify EXACTLY. A dialect-specific row
-// (an intent marker, a level lift) uses its concrete LogFormat (II-6 — a dialect never fires
-// cross-format).
-inline constexpr insight::LogFormat kAnyFormat{insight::LogFormat::Unknown};
+// ── The DIALECT coordinate (ADR 0064 / ADR 0065) ─────────────────────────────────────────────────
+// A DIALECT is a VOCABULARY over a HOST FORMAT (0064 clause 1): the format owns the LAYOUT rule
+// (where one record's fields begin and end), the dialect owns the NAMES inside a layout another
+// layer already delimited. `GitHub Actions` is `RawText` + the GHA workflow-command markers;
+// `Jenkins` is `RawText` + the `[Pipeline]` markers. The host format is a `LogFormat`; the dialect
+// is NOT, and never was.
+//
+// ⚠ THE GATE IS A NAME, NOT AN ENUM, and that is the whole point (0065 clause 1). A row's dialect
+// gate is a COMPOSED PACKAGE NAME — "github", "jenkins" — checked against `ComposedPackage::name`.
+// A canon-owned `Dialect` enum was refused in writing: it means every new dialect edits canon,
+// which is the dependency this coordinate exists to invert, moved one type to the left and made
+// HARDER to see because the new type's name would assert the problem was solved. A bare
+// `bool requires_declared_dialect` was refused too — it is the right information content and the
+// wrong encoding: `find_conflict`/`gates_intersect` would then collide two packages'
+// identically-prefixed concrete rows and fatal composition on a duplicate that is not one. The name
+// is redundant at the MANIFEST and load-bearing at the COMPOSED TABLE, because composition FLATTENS
+// (`ComposedSemantics` exposes flat spans with no edge back to the contributing package).
+//
+// canon knows the FIELD and knows NO VALUE. The values arrive as package names, so canon knows
+// there ARE dialects and must not know them.
+
+// The "any dialect" sentinel: the rule fires regardless of the stream's declared dialect. The EMPTY
+// string_view is that sentinel, exactly as `kAnyChannel` is on the channel axis — a package may
+// never be named "" , so empty is unambiguously "any". A universal structural-role row (`##[group]`,
+// fired on any content today) reproduces the pre-split UNGATED StructuralRoleRegistry::classify
+// EXACTLY. A dialect-specific row (an intent marker, a level lift) names its OWN package (II-6 — a
+// dialect never fires cross-dialect).
+//
+// NOTE the deliberate asymmetry with the CALLER's declaration, which is also empty when absent, and
+// it is `kAnyChannel`'s verbatim: an empty *row* gate means "fires on any dialect"; an empty
+// *declaration* means "the caller did not say" (Unspecified), which drops every concretely-gated
+// row. Fail-closed on DEPTH, not on the run.
+inline constexpr std::string_view kAnyDialect{};
+
+// Does a row gated to `dialect_gate` fire on a stream whose caller declared `declared_dialect`?
+// Deliberately a SECOND predicate beside `channel_admits` rather than one shared helper, on the
+// house precedent that `gates_intersect` and `gate_matches` are kept apart with a comment saying
+// why: the two coordinates answer different questions against different vocabularies (0029 D5's
+// materialization vs 0064's vocabulary-over-a-host), each is documented against its own ADR, and a
+// merged predicate would make a call site read as if the two axes were one.
+//   * kAnyDialect row              → always fires (a universal role row is untouched)
+//   * concrete row, same dialect   → fires
+//   * concrete row, other dialect  → does NOT fire (a Jenkins row never fires on a GHA stream)
+//   * concrete row, undeclared     → does NOT fire (fail-closed — "" matches no concrete gate)
+// An UNKNOWN declared dialect (a typo) never reaches here: it is a HARD ERROR at stream resolution,
+// listing the composed package names. An unknown dialect is a *mistake*; an absent one is a
+// *choice* — they must not share a code path (ADR 0044 §6).
+[[nodiscard]] constexpr bool dialect_admits(std::string_view dialect_gate,
+                                            std::string_view declared_dialect) noexcept
+{
+    return dialect_gate == kAnyDialect || dialect_gate == declared_dialect;
+}
 
 // ── The INTENT CHANNEL coordinate (ADR 0030) ─────────────────────────────────────────────────────
 // `Medium = IntentFormat × IntentChannel`. The IntentFormat is the intent's semantic STRUCTURE; the
@@ -255,8 +314,9 @@ struct StructuralRoleRow
 {
     std::string_view prefix;
     insight::StructuralRole role;
-    insight::LogFormat
-        format_gate; // kAnyFormat = fire on any format (the pre-split ungated behavior)
+    // kAnyDialect = fire on any dialect (the pre-split ungated behavior); otherwise the OWNING
+    // package's name. Filtered into the stream view once, at resolution — never consulted per line.
+    std::string_view dialect_gate{kAnyDialect};
 };
 
 // An intent-marker rule: a prefix opens a behavioural quantum (§1.2 — `Complete job name: ` → Job).
@@ -267,7 +327,9 @@ struct IntentMarkerRow
     std::string_view prefix;
     insight::tokenization::IntentMarkerKind kind;
     insight::tokenization::ChildOrder child_order;
-    insight::LogFormat format_gate;
+    // ADR 0065 clause 1 — the DIALECT gate: the owning package's name (an intent marker is always
+    // concretely gated by construction, II-6). Filtered into the stream view at resolution.
+    std::string_view dialect_gate{kAnyDialect};
     PayloadExtract extract;
     // grammar-2 (ADR 0025 / studies/006): a CLOSED exclusion set over the extracted payload — the
     // row does NOT fire when the payload's leading token matches an entry (entry == payload, or
@@ -301,7 +363,9 @@ struct IntentEmitRow
     std::string_view prefix;
     insight::tokenization::IntentMarkerKind kind;
     insight::tokenization::ChildOrder child_order;
-    insight::LogFormat format_gate;
+    // ADR 0065 clause 1 — the DIALECT gate, symmetric to IntentMarkerRow's: the Medium the line
+    // materializes into is `dialect × channel`, so both projections name the same pair.
+    std::string_view dialect_gate{kAnyDialect};
     PayloadEmit emit;
     // ADR 0029 D5 — the CHANNEL gate, symmetric to IntentMarkerRow's. The writer's dual of the
     // reader's question: not "which prefix do I match" but "which IntentChannel am I materializing
@@ -324,7 +388,7 @@ struct LevelLiftRow
 {
     std::string_view prefix;
     insight::LogLevel level;
-    insight::LogFormat format_gate;
+    std::string_view dialect_gate{kAnyDialect}; // ADR 0065 clause 1 — the owning package's name
 };
 
 // A location rule: recognizes a test-file WHERE coordinate (§5.3/II-8). `kind` selects the core
@@ -357,7 +421,7 @@ struct OutcomeTokenRow
 {
     std::string_view token; // the native dialect verdict string, verbatim ("UNSTABLE", "cancelled")
     insight::RunOutcome outcome;
-    insight::LogFormat format_gate;
+    std::string_view dialect_gate{kAnyDialect}; // ADR 0065 clause 1 — the owning package's name
 };
 
 // The console-tail terminal-verdict line (Jenkins: `Finished: `). Core matches it line-anchored on
@@ -367,7 +431,7 @@ struct OutcomeTokenRow
 struct OutcomeMarkerRow
 {
     std::string_view prefix;
-    insight::LogFormat format_gate;
+    std::string_view dialect_gate{kAnyDialect}; // ADR 0065 clause 1 — the owning package's name
 };
 
 // A value-class rule (the grammar SEAT for package value classes, §5). No package ships domain
@@ -455,7 +519,7 @@ struct SemanticPackageManifest
 // render_row — the writer-row expansion. PURE: a function of (row, payload) ONLY — no RNG, no
 // envelope, no engine state, no wall-clock — so it lives on the canon (recognition) side and
 // LogCraft merely calls it to materialize. The exact inverse of the PayloadExtract algorithm: for
-// every emit shape, recognize(render_row(row, payload), row.format_gate, composed) recovers
+// every emit shape, recognize(render_row(row, payload), composed) recovers
 // (row.kind, row.child_order, payload) — the G2 round-trip. Allocates the result string (the only
 // allocation; caller-owned).
 [[nodiscard]] inline std::string render_row(const IntentEmitRow& row, std::string_view payload)
@@ -484,7 +548,8 @@ struct SemanticPackageManifest
 
 // paired_writer_row — the reader→writer pairing. Given a recognition row, returns the generation
 // row that materializes into a line THAT row recognizes: same prefix, kind, and MEDIUM. The Medium
-// is `IntentFormat × IntentChannel` (ADR 0029 D1), so the pairing matches on BOTH gates — a reader
+// is `dialect × IntentChannel` (ADR 0029 D1 / ADR 0065 clause 1), so the pairing matches on BOTH
+// gates — a reader
 // row gated to one channel must pair with the writer row gated to the SAME channel, or the two
 // projections would silently describe different materializations (a C2 violation the pairing exists
 // to make impossible). Well-defined iff every reader row has exactly one paired writer row — the
@@ -497,7 +562,7 @@ paired_writer_row(const IntentMarkerRow& reader, std::span<const IntentEmitRow> 
     for (const IntentEmitRow& emit : emits)
     {
         if (emit.prefix == reader.prefix && emit.kind == reader.kind &&
-            emit.format_gate == reader.format_gate && emit.channel_gate == reader.channel_gate)
+            emit.dialect_gate == reader.dialect_gate && emit.channel_gate == reader.channel_gate)
         {
             return &emit;
         }
@@ -533,6 +598,41 @@ all_channel_gates_declared(std::span<const IntentMarkerRow> markers,
                                { return declared(row.channel_gate); }) &&
            std::ranges::all_of(emits, [&declared](const IntentEmitRow& row) noexcept
                                { return declared(row.channel_gate); });
+}
+
+// ── The DIALECT static check (ADR 0065 clause 1 — fail-closed at COMPILE time) ──
+// Every gated row's `dialect_gate` is either kAnyDialect or the package's OWN name. Both halves are
+// load-bearing:
+//   * a gate naming a package this manifest is not — even a real, composed one — is a package
+//     reaching across a boundary it does not own, and `ComposedSemantics` flattens, so nothing
+//     downstream could tell that apart from a legitimate row;
+//   * a TYPO (`.dialect_gate = "gihub"`) becomes a build error in the package that made it, rather
+//     than a row that silently never fires under any declaration.
+// Symmetric with `all_channel_gates_declared`, and for its reason: an unknown NAME must fail at the
+// earliest seat that can see it, and for a package's own rows that seat is its own TU.
+//
+// Takes the MANIFEST rather than six spans: the check's whole content is "every gated row against
+// `.name`", and threading the six spans by hand would let a package add a row kind to the manifest
+// and forget it here — the omission being invisible, which is the failure mode the check exists to
+// remove.
+[[nodiscard]] consteval bool
+all_dialect_gates_owned(const SemanticPackageManifest& manifest) noexcept
+{
+    const auto owned{[&manifest](std::string_view gate) noexcept
+                     { return gate == kAnyDialect || gate == manifest.name; }};
+    return std::ranges::all_of(manifest.roles, [&owned](const StructuralRoleRow& row) noexcept
+                               { return owned(row.dialect_gate); }) &&
+           std::ranges::all_of(manifest.markers, [&owned](const IntentMarkerRow& row) noexcept
+                               { return owned(row.dialect_gate); }) &&
+           std::ranges::all_of(manifest.emits, [&owned](const IntentEmitRow& row) noexcept
+                               { return owned(row.dialect_gate); }) &&
+           std::ranges::all_of(manifest.level_lifts, [&owned](const LevelLiftRow& row) noexcept
+                               { return owned(row.dialect_gate); }) &&
+           std::ranges::all_of(manifest.outcome_tokens, [&owned](const OutcomeTokenRow& row) noexcept
+                               { return owned(row.dialect_gate); }) &&
+           std::ranges::all_of(manifest.outcome_markers,
+                               [&owned](const OutcomeMarkerRow& row) noexcept
+                               { return owned(row.dialect_gate); });
 }
 
 // all_intents_paired — the bidirectionality predicate (SID: no reader without a writer). consteval

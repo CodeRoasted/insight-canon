@@ -15,14 +15,13 @@
 
 import insight.canon.test; // facade (compose / walkers / enums) + spi (row grammar) — white-box aggregate
 
-using insight::LogFormat;
 using insight::LogLevel;
 using insight::recognize_location;
 using insight::StructuralRole;
 using insight::semantic::compose;
 using insight::semantic::ComposedSemantics;
 using insight::semantic::IntentMarkerRow;
-using insight::semantic::kAnyFormat;
+using insight::semantic::kAnyDialect;
 using insight::semantic::LevelLiftRow;
 using insight::semantic::LocationMatchKind;
 using insight::semantic::LocationRow;
@@ -106,14 +105,22 @@ void operator delete[](void* ptr, std::size_t) noexcept
 // ════════════════════════════════════════════════════════════════════════════════════════════════════
 namespace
 {
-// Roles: one ungated (kAnyFormat) + a longest-match pair (one prefix a proper prefix of the other)
-// + one concretely gated to Syslog (to prove role gating, which real github rows never exercise —
-// they are all kAnyFormat).
+// TWO synthetic packages, because after T4 the gate is a composed package NAME (ADR 0065 clause 1)
+// and the "does not leak across dialects" leg needs a real, different, composed name to declare.
+// `synth` carries the rows under test; `synth_other` carries one level-lift row and exists so a
+// FOREIGN declaration is expressible without fatalling the unknown-dialect path.
+constexpr std::string_view kSynth{"synth"};
+constexpr std::string_view kSynthOther{"synth_other"};
+constexpr std::string_view kUndeclared{}; // the caller declined to declare
+
+// Roles: three ungated (kAnyDialect) — one plain + a longest-match pair (one prefix a proper prefix
+// of the other) — + one concretely gated to `synth` (to prove role gating, which real github rows
+// never exercise: they are all kAnyDialect).
 constexpr std::array<StructuralRoleRow, 4> kSynthRoles{{
-    {.prefix = "<OPEN>", .role = StructuralRole::GroupBegin, .format_gate = kAnyFormat},
-    {.prefix = "<G>", .role = StructuralRole::GroupBegin, .format_gate = kAnyFormat},
-    {.prefix = "<G-LONGER>", .role = StructuralRole::GroupEnd, .format_gate = kAnyFormat},
-    {.prefix = "GATED>", .role = StructuralRole::Terminator, .format_gate = LogFormat::Syslog},
+    {.prefix = "<OPEN>", .role = StructuralRole::GroupBegin, .dialect_gate = kAnyDialect},
+    {.prefix = "<G>", .role = StructuralRole::GroupBegin, .dialect_gate = kAnyDialect},
+    {.prefix = "<G-LONGER>", .role = StructuralRole::GroupEnd, .dialect_gate = kAnyDialect},
+    {.prefix = "GATED>", .role = StructuralRole::Terminator, .dialect_gate = kSynth},
 }};
 
 // One intent marker, concretely gated (II-6), RemainderAfterPrefix payload.
@@ -121,7 +128,7 @@ constexpr std::array<IntentMarkerRow, 1> kSynthMarkers{{
     {.prefix = "STEP ",
      .kind = IntentMarkerKind::Step,
      .child_order = ChildOrder::Ordered,
-     .format_gate = LogFormat::Syslog,
+     .dialect_gate = kSynth,
      .extract = PayloadExtract::RemainderAfterPrefix},
 }};
 
@@ -155,11 +162,17 @@ constexpr std::array<LocationRow, 3> kSynthLocations{{
 // rule, and to the SECOND row's level under a longest-match rule. The two rules are therefore
 // distinguishable here — which is the whole reason the pair exists, since the eight real GHA rows
 // have no nesting and cannot tell them apart.
-constexpr std::array<LevelLiftRow, 4> kSynthLevelLifts{{
-    {.prefix = "<LVL>", .level = LogLevel::Warn, .format_gate = LogFormat::Syslog},
-    {.prefix = "<LVL>-LONG", .level = LogLevel::Error, .format_gate = LogFormat::Syslog},
-    {.prefix = "<ANY-LVL>", .level = LogLevel::Debug, .format_gate = kAnyFormat},
-    {.prefix = "<OTHER-LVL>", .level = LogLevel::Fatal, .format_gate = LogFormat::JSON},
+constexpr std::array<LevelLiftRow, 3> kSynthLevelLifts{{
+    {.prefix = "<LVL>", .level = LogLevel::Warn, .dialect_gate = kSynth},
+    {.prefix = "<LVL>-LONG", .level = LogLevel::Error, .dialect_gate = kSynth},
+    {.prefix = "<ANY-LVL>", .level = LogLevel::Debug, .dialect_gate = kAnyDialect},
+}};
+
+// The FOREIGN package's single row: same shape, another owner. A row may only ever gate to its own
+// package or to kAnyDialect (all_dialect_gates_owned), so the cross-dialect leg has to be built out
+// of two manifests rather than out of one manifest carrying a foreign gate.
+constexpr std::array<LevelLiftRow, 1> kOtherLevelLifts{{
+    {.prefix = "<OTHER-LVL>", .level = LogLevel::Fatal, .dialect_gate = kSynthOther},
 }};
 
 // Lines no level-lift row claims, each for a distinct reason: ordinary text; the empty content; a
@@ -180,29 +193,62 @@ constexpr SemanticPackageManifest kSynthManifest{
     .echoed_source = nullptr,
 };
 
+constexpr SemanticPackageManifest kOtherManifest{
+    .name = kSynthOther,
+    .version = "1.0.0",
+    .level_lifts = kOtherLevelLifts,
+};
+
+// The three views every leg below is scored under. All three are re-derived from ONE composition,
+// so the legs exercise the FILTER rather than three separately-built tables.
+[[nodiscard]] ComposedSemantics compose_both()
+{
+    const std::array manifests{kSynthManifest, kOtherManifest};
+    return compose(manifests);
+}
 [[nodiscard]] ComposedSemantics synth()
 {
-    const std::array manifests{kSynthManifest};
-    return compose(manifests);
+    return compose_both().for_stream(kSynth, {});
+}
+[[nodiscard]] ComposedSemantics other()
+{
+    return compose_both().for_stream(kSynthOther, {});
+}
+[[nodiscard]] ComposedSemantics undeclared()
+{
+    return compose_both().for_stream(kUndeclared, {});
 }
 } // namespace
 
-// ── gate_matches: kAnyFormat fires on ANY format; a concrete gate fires ONLY on its exact format
-// (and NOT on an Unknown-routed line — the pre-split `format != X → {}` guard) ──
-TEST(SemanticWalkers, FormatGateSemantics)
+// ── The DIALECT gate (ADR 0065 clauses 1–2): kAnyDialect fires under EVERY declaration; a concrete
+// gate fires only on a stream declaring ITS package — and NOT on an undeclared stream, which is the
+// fail-closed half.
+//
+// ⚠ WHAT THIS TEST IS ABOUT, so it is not "simplified" back later. Before T4 the equivalent test
+// passed a `LogFormat` per call, sourced in production from `LogParser::routed_format()` — the
+// per-line detector winner under a sticky-strategy fast path. Which DECLARED rows fired was
+// therefore a function of the stream's CONTENT. There is no per-call coordinate any more: the views
+// are built once, and the walkers below take a line and a table. A change that reintroduces a
+// per-line gate argument has undone the fix even if every assertion here still passes.
+TEST(SemanticWalkers, DialectGateSemantics)
 {
-    const ComposedSemantics sc{synth()};
-    // Ungated role fires regardless of routed format.
-    for (const LogFormat fmt :
-         {LogFormat::Unknown, LogFormat::JSON, LogFormat::Syslog, LogFormat::RawText})
-        EXPECT_EQ(classify("<OPEN>x", fmt, sc), StructuralRole::GroupBegin)
-            << "kAnyFormat role must fire under " << insight::to_string(fmt);
-    // Concretely-gated role fires ONLY on its format, never on a mismatch or Unknown.
-    EXPECT_EQ(classify("GATED>x", LogFormat::Syslog, sc), StructuralRole::Terminator);
-    EXPECT_EQ(classify("GATED>x", LogFormat::JSON, sc), StructuralRole::None)
-        << "concrete gate must not leak";
-    EXPECT_EQ(classify("GATED>x", LogFormat::Unknown, sc), StructuralRole::None)
-        << "an Unknown-routed line must not trigger a concretely-gated row";
+    const ComposedSemantics own{synth()};
+    const ComposedSemantics foreign{other()};
+    const ComposedSemantics none{undeclared()};
+
+    // Ungated role fires under EVERY declaration, the undeclared stream included.
+    for (const auto& [view, label] : {std::pair{std::cref(own), "the OWN dialect"},
+                                      std::pair{std::cref(foreign), "a FOREIGN dialect"},
+                                      std::pair{std::cref(none), "an UNDECLARED stream"}})
+        EXPECT_EQ(classify("<OPEN>x", view.get()), StructuralRole::GroupBegin)
+            << "kAnyDialect role must fire under " << label;
+
+    // Concretely-gated role fires ONLY on a stream declaring its package.
+    EXPECT_EQ(classify("GATED>x", own), StructuralRole::Terminator);
+    EXPECT_EQ(classify("GATED>x", foreign), StructuralRole::None)
+        << "a concrete gate must not leak into another dialect's view";
+    EXPECT_EQ(classify("GATED>x", none), StructuralRole::None)
+        << "an UNDECLARED stream must fire no concretely-gated row (fail-closed on depth)";
 }
 
 // ── Longest-match: when two prefixes both match, the LONGER wins (declaration-order-free) ──
@@ -211,21 +257,22 @@ TEST(SemanticWalkers, LongestPrefixWins)
     const ComposedSemantics sc{synth()};
     // "<G>" (GroupBegin) is a proper prefix of "<G-LONGER>" (GroupEnd); a line matching both
     // resolves to the longer rule's role regardless of the rows' declared order.
-    EXPECT_EQ(classify("<G-LONGER> details", LogFormat::JSON, sc), StructuralRole::GroupEnd);
-    EXPECT_EQ(classify("<G> details", LogFormat::JSON, sc), StructuralRole::GroupBegin);
+    EXPECT_EQ(classify("<G-LONGER> details", sc), StructuralRole::GroupEnd);
+    EXPECT_EQ(classify("<G> details", sc), StructuralRole::GroupBegin);
 }
 
 // ── recognize(): RemainderAfterPrefix payload = the content after the matched prefix, verbatim ──
 TEST(SemanticWalkers, PayloadExtractionRemainderAfterPrefix)
 {
     const ComposedSemantics sc{synth()};
-    const auto mark{recognize("STEP build the widget", LogFormat::Syslog, sc)};
+    const auto mark{recognize("STEP build the widget", sc)};
     EXPECT_EQ(mark.kind, IntentMarkerKind::Step);
     EXPECT_EQ(mark.name, "build the widget")
         << "payload must be the verbatim remainder after \"STEP \"";
     EXPECT_EQ(mark.child_order, ChildOrder::Ordered);
-    // Gated: inert under a different format.
-    EXPECT_EQ(recognize("STEP build the widget", LogFormat::JSON, sc).kind, IntentMarkerKind::None);
+    // Gated: inert on a stream declaring another dialect, and on an undeclared one.
+    EXPECT_EQ(recognize("STEP build the widget", other()).kind, IntentMarkerKind::None);
+    EXPECT_EQ(recognize("STEP build the widget", undeclared()).kind, IntentMarkerKind::None);
 }
 
 // ── The three LocationMatchKind families + token-boundary mechanics (whitespace skip,
@@ -255,7 +302,7 @@ TEST(SemanticWalkers, LocationFamiliesAndTokenBoundaries)
 TEST(SemanticWalkers, LevelLiftFirstDeclaredMatchWins)
 {
     const ComposedSemantics sc{synth()};
-    const LogLevel both{lift_level("<LVL>-LONG boom", LogFormat::Syslog, sc)};
+    const LogLevel both{lift_level("<LVL>-LONG boom", sc)};
     EXPECT_EQ(both, LogLevel::Warn)
         << "\"<LVL>-LONG boom\" matches BOTH \"<LVL>\" (declared 1st, Warn) and \"<LVL>-LONG\" "
            "(declared 2nd, Error). First-match-in-declared-order must win: expected Warn, got "
@@ -264,32 +311,34 @@ TEST(SemanticWalkers, LevelLiftFirstDeclaredMatchWins)
                 ? " — that is the LONGEST-match answer, so the walk changed rule"
                 : "");
     // The shorter row alone still resolves to its own level (the pair is not an artifact).
-    EXPECT_EQ(lift_level("<LVL> plain", LogFormat::Syslog, sc), LogLevel::Warn);
+    EXPECT_EQ(lift_level("<LVL> plain", sc), LogLevel::Warn);
 }
 
-// ── lift_level(): the format gate is the SAME predicate classify/recognize use ──
-TEST(SemanticWalkers, LevelLiftFormatGateSemantics)
+// ── lift_level(): the dialect gate is applied by the SAME filter classify/recognize see ──
+TEST(SemanticWalkers, LevelLiftDialectGateSemantics)
 {
-    const ComposedSemantics sc{synth()};
-    // kAnyFormat row fires under every routed format, Unknown included.
-    for (const LogFormat fmt :
-         {LogFormat::Unknown, LogFormat::JSON, LogFormat::Syslog, LogFormat::RawText})
+    const ComposedSemantics own{synth()};
+    const ComposedSemantics foreign{other()};
+    const ComposedSemantics none{undeclared()};
+
+    // kAnyDialect row fires under every declaration, the undeclared stream included.
+    for (const auto& [view, label] : {std::pair{std::cref(own), "the OWN dialect"},
+                                      std::pair{std::cref(foreign), "a FOREIGN dialect"},
+                                      std::pair{std::cref(none), "an UNDECLARED stream"}})
     {
-        const LogLevel got{lift_level("<ANY-LVL> body", fmt, sc)};
-        EXPECT_EQ(got, LogLevel::Debug)
-            << "kAnyFormat level lift must fire under " << insight::to_string(fmt) << ", got "
-            << insight::to_string(got);
+        const LogLevel got{lift_level("<ANY-LVL> body", view.get())};
+        EXPECT_EQ(got, LogLevel::Debug) << "kAnyDialect level lift must fire under " << label
+                                        << ", got " << insight::to_string(got);
     }
-    // A concretely-gated row fires only under its own format — never under a sibling's, and never
-    // under Unknown (the pre-split `format != X → {}` guard, which is why gate_matches is not
-    // gates_intersect).
-    EXPECT_EQ(lift_level("<OTHER-LVL> body", LogFormat::JSON, sc), LogLevel::Fatal);
-    for (const LogFormat fmt : {LogFormat::Syslog, LogFormat::RawText, LogFormat::Unknown})
+    // A concretely-gated row fires only on a stream declaring its own package.
+    EXPECT_EQ(lift_level("<OTHER-LVL> body", foreign), LogLevel::Fatal);
+    for (const auto& [view, label] : {std::pair{std::cref(own), "a SIBLING dialect"},
+                                      std::pair{std::cref(none), "an UNDECLARED stream"}})
     {
-        const LogLevel got{lift_level("<OTHER-LVL> body", fmt, sc)};
+        const LogLevel got{lift_level("<OTHER-LVL> body", view.get())};
         EXPECT_EQ(got, LogLevel::Unknown)
-            << "a JSON-gated level lift must stay inert under " << insight::to_string(fmt)
-            << ", got " << insight::to_string(got);
+            << "a `synth_other`-gated level lift must stay inert under " << label << ", got "
+            << insight::to_string(got);
     }
 }
 
@@ -299,7 +348,7 @@ TEST(SemanticWalkers, LevelLiftUnclaimedLineIsUnknown)
     const ComposedSemantics sc{synth()};
     for (const std::string_view line : kUnclaimedLines)
     {
-        const LogLevel got{lift_level(line, LogFormat::Syslog, sc)};
+        const LogLevel got{lift_level(line, sc)};
         EXPECT_EQ(got, LogLevel::Unknown)
             << "no declared row claims \"" << line << "\" — expected Unknown, got "
             << insight::to_string(got);
@@ -314,11 +363,11 @@ TEST(SemanticWalkers, RecognizersDoNotHeapAllocate)
     {
         const AllocGuard guard;
         // Drive every walker over a representative probe set.
-        (void)classify("<OPEN>x", LogFormat::JSON, sc);
-        (void)classify("GATED>x", LogFormat::Syslog, sc);
-        (void)recognize("STEP build the widget", LogFormat::Syslog, sc);
-        (void)lift_level("<LVL>-LONG boom", LogFormat::Syslog, sc);
-        (void)lift_level("plain body text", LogFormat::Syslog, sc);
+        (void)classify("<OPEN>x", sc);
+        (void)classify("GATED>x", sc);
+        (void)recognize("STEP build the widget", sc);
+        (void)lift_level("<LVL>-LONG boom", sc);
+        (void)lift_level("plain body text", sc);
         (void)recognize_location("PASS dir/thing.chk.aa:42", sc);
         (void)recognize_location("ok src/pre_widget.zz", sc);
         (void)recognize_location("a/b/module_end.qq", sc);

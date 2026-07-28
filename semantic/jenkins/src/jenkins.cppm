@@ -31,8 +31,15 @@ namespace insight::semantic::jenkins
 // wrapper (that is the GHA SGR command-echo), so no provenance hook.
 export std::unique_ptr<insight::tokenization::IFormatStrategy> make_strategy();
 
+// The dialect NAME every gated row below carries, and the name a caller declares
+// (`IngestDeclaration::dialect` / `--dialect`). ADR 0065 clause 1: the gate is a composed package
+// name, never an enum, so canon knows the field and knows no value. Exported so a caller can name
+// this dialect without spelling a literal; `all_dialect_gates_owned` static_asserts it against the
+// manifest's `.name`.
+export inline constexpr std::string_view kDialect{"jenkins"};
+
 // ── Intent-marker rows (studies/006 §Reproduction, grammar-2) ──
-// FORMAT-GATED to Jenkins (II-6 — `[Pipeline] ` is Jenkins-runner-specific). The hierarchy rides
+// DIALECT-GATED to this package (II-6 — `[Pipeline] ` is Jenkins-runner-specific). The hierarchy rides
 // the rows (ADR 0023): STAGE is the container level (kind=Job — declared stages AND parallel/matrix
 // `Branch:` legs co-occur, so the level matches UNORDERED, exactly like GHA matrix jobs); STEP is
 // the leaf level (Ordered — steps are sequential within their stage). The two prefixes nest, so
@@ -46,18 +53,18 @@ inline constexpr std::array<IntentMarkerRow, 2> kMarkers{{
     {.prefix = "[Pipeline] { (", // the NAMED block open: `{ (<name>)` — stage or Branch: leg
      .kind = insight::tokenization::IntentMarkerKind::Job,
      .child_order = insight::tokenization::ChildOrder::Unordered,
-     .format_gate = insight::LogFormat::Jenkins,
+     .dialect_gate = kDialect,
      .extract = PayloadExtract::RemainderToClosingParen},
     {.prefix = "[Pipeline] ", // the step annotation: `<verb>` (sh, echo, junit, checkout, …)
      .kind = insight::tokenization::IntentMarkerKind::Step,
      .child_order = insight::tokenization::ChildOrder::Ordered,
-     .format_gate = insight::LogFormat::Jenkins,
+     .dialect_gate = kDialect,
      .extract = PayloadExtract::RemainderAfterPrefix,
      .payload_excludes = kStepExcludes},
 }};
 
 // ── Generation-template rows (studies/008, shared_intent_declaration §3.2) — the WRITER dual ──
-// One emit row per recognition row, paired by (prefix, kind, format_gate). The STAGE emit is
+// One emit row per recognition row, paired by (prefix, kind, dialect_gate). The STAGE emit is
 // PayloadThenClosingParen, the exact inverse of the reader's RemainderToClosingParen:
 // render_row(stage_row, "Build") reproduces `[Pipeline] { (Build)`, which canon segments back to
 // the named STAGE "Build". The STEP emit is PayloadAfterPrefix — the writer only ever emits a REAL
@@ -67,12 +74,12 @@ inline constexpr std::array<IntentEmitRow, 2> kEmitMarkers{{
     {.prefix = "[Pipeline] { (",
      .kind = insight::tokenization::IntentMarkerKind::Job,
      .child_order = insight::tokenization::ChildOrder::Unordered,
-     .format_gate = insight::LogFormat::Jenkins,
+     .dialect_gate = kDialect,
      .emit = PayloadEmit::PayloadThenClosingParen},
     {.prefix = "[Pipeline] ",
      .kind = insight::tokenization::IntentMarkerKind::Step,
      .child_order = insight::tokenization::ChildOrder::Ordered,
-     .format_gate = insight::LogFormat::Jenkins,
+     .dialect_gate = kDialect,
      .emit = PayloadEmit::PayloadAfterPrefix},
 }};
 
@@ -96,23 +103,23 @@ static_assert(
 inline constexpr std::array<OutcomeTokenRow, 5> kOutcomeTokens{{
     {.token = "SUCCESS",
      .outcome = insight::RunOutcome::Success,
-     .format_gate = insight::LogFormat::Jenkins},
+     .dialect_gate = kDialect},
     {.token = "FAILURE",
      .outcome = insight::RunOutcome::Failure,
-     .format_gate = insight::LogFormat::Jenkins},
+     .dialect_gate = kDialect},
     {.token = "UNSTABLE",
      .outcome = insight::RunOutcome::Unstable,
-     .format_gate = insight::LogFormat::Jenkins},
+     .dialect_gate = kDialect},
     {.token = "ABORTED",
      .outcome = insight::RunOutcome::Aborted,
-     .format_gate = insight::LogFormat::Jenkins},
+     .dialect_gate = kDialect},
     {.token = "NOT_BUILT",
      .outcome = insight::RunOutcome::Unknown,
-     .format_gate = insight::LogFormat::Jenkins},
+     .dialect_gate = kDialect},
 }};
 
 inline constexpr std::array<OutcomeMarkerRow, 1> kOutcomeMarkers{{
-    {.prefix = "Finished: ", .format_gate = insight::LogFormat::Jenkins},
+    {.prefix = "Finished: ", .dialect_gate = kDialect},
 }};
 
 // ── The manifest (§2.5) — the package's single composed contribution ──
@@ -135,5 +142,15 @@ export inline constexpr SemanticPackageManifest kManifest{
     .strategy = &make_strategy,
     .echoed_source = nullptr,
 };
+
+// ADR 0065 clause 1 — every gated row names THIS package or kAnyDialect, checked at COMPILE time,
+// here. A gate naming another package would reach across a boundary this package does not own, and
+// a typo would produce a row that silently never fires under any declaration.
+static_assert(insight::semantic::all_dialect_gates_owned(kManifest),
+              "jenkins: a row's dialect_gate is neither kAnyDialect nor this package's own name (a "
+              "typo in .dialect_gate, or a row reaching for another package's vocabulary?)");
+static_assert(kManifest.name == kDialect,
+              "jenkins: kDialect and the manifest name must be the same string — kDialect is what a "
+              "caller declares and what every gated row carries");
 
 } // namespace insight::semantic::jenkins

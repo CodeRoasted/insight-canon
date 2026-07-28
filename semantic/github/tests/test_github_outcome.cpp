@@ -12,7 +12,6 @@ import std;
 import insight.canon;
 import insight.semantic.github;
 
-using insight::LogFormat;
 using insight::map_outcome_token;
 using insight::resolve_run_outcome;
 using insight::RunOutcome;
@@ -22,10 +21,20 @@ using insight::semantic::ComposedSemantics;
 
 namespace
 {
+// The RESOLVED view of a stream that declared this dialect (ADR 0065 clause 2) — after T4 the
+// outcome vocabulary is reachable only through a declaration.
 [[nodiscard]] ComposedSemantics github_only()
 {
     const std::array manifests{insight::semantic::github::kManifest};
-    return insight::semantic::compose(manifests);
+    return insight::semantic::compose(manifests).for_stream(insight::semantic::github::kDialect,
+                                                            {});
+}
+
+// The same composition on a stream that declared no dialect — the fail-closed arm.
+[[nodiscard]] ComposedSemantics undeclared_stream()
+{
+    const std::array manifests{insight::semantic::github::kManifest};
+    return insight::semantic::compose(manifests).for_stream(insight::semantic::kAnyDialect, {});
 }
 
 // A genuine GHA console slice: the 7-digit-fractional-Z timestamper + workflow commands — the
@@ -49,31 +58,35 @@ TEST(GithubOutcome, TheSevenNativeConclusionStringsMap)
 {
     const ComposedSemantics composed{github_only()};
     // The pass↔fail axis.
-    EXPECT_EQ(map_outcome_token("success", LogFormat::GitHubActions, composed),
+    EXPECT_EQ(map_outcome_token("success", composed),
               RunOutcome::Success);
-    EXPECT_EQ(map_outcome_token("failure", LogFormat::GitHubActions, composed),
+    EXPECT_EQ(map_outcome_token("failure", composed),
               RunOutcome::Failure);
     // Both non-completion conclusions are the SAME class: an incomplete run (log truncated at the
     // stop point) — the §6.3 suppression semantics apply to either.
-    EXPECT_EQ(map_outcome_token("cancelled", LogFormat::GitHubActions, composed),
+    EXPECT_EQ(map_outcome_token("cancelled", composed),
               RunOutcome::Aborted);
-    EXPECT_EQ(map_outcome_token("timed_out", LogFormat::GitHubActions, composed),
+    EXPECT_EQ(map_outcome_token("timed_out", composed),
               RunOutcome::Aborted);
     // The no-verdict conclusions MAP (engaged optional) to Unknown — a resolution, not a miss:
     // rung 1 resolves and a stale console tail is never consulted (the NOT_BUILT shape).
     for (const std::string_view token : {"skipped", "neutral", "action_required"})
     {
-        const auto mapped{map_outcome_token(token, LogFormat::GitHubActions, composed)};
+        const auto mapped{map_outcome_token(token, composed)};
         ASSERT_TRUE(mapped.has_value()) << "'" << token << "' must MAP (to Unknown), not miss";
         EXPECT_EQ(*mapped, RunOutcome::Unknown) << "'" << token << "' carries no pass/fail verdict";
     }
     // GHA has no native UNSTABLE string — the category is core, this dialect ships no row for it,
     // and the Jenkins literal must NOT leak in (fail-closed upstream surfaces the note).
-    EXPECT_FALSE(map_outcome_token("UNSTABLE", LogFormat::GitHubActions, composed).has_value());
+    EXPECT_FALSE(map_outcome_token("UNSTABLE", composed).has_value());
     // Byte-exact + format-gated (II-6): the GHA strings are lowercase and GHA-only.
-    EXPECT_FALSE(map_outcome_token("SUCCESS", LogFormat::GitHubActions, composed).has_value())
+    EXPECT_FALSE(map_outcome_token("SUCCESS", composed).has_value())
         << "GHA conclusions are lowercase — the uppercase form is Jenkins data, not GHA data";
-    EXPECT_FALSE(map_outcome_token("success", LogFormat::Jenkins, composed).has_value());
+    // II-6, now STRUCTURAL: on a stream that declared no dialect the row is not in the view at all,
+    // so the token cannot resolve however unambiguous it looks (fail-closed on DEPTH).
+    const ComposedSemantics undeclared{undeclared_stream()};
+    EXPECT_FALSE(map_outcome_token("success", undeclared).has_value())
+        << "a dialect's verdict token resolved on an UNDECLARED stream — the gate is fail-open";
 }
 
 TEST(GithubOutcome, NoMarkerMeansTheConsolePathIsHonestlyUnknown)
@@ -87,9 +100,8 @@ TEST(GithubOutcome, NoMarkerMeansTheConsolePathIsHonestlyUnknown)
         << "GHA must ship NO console-tail marker (there is no run-verdict line to read) — got "
            "token '"
         << scan.token << "'";
-    // …but the dialect still latches (the side-input needs it), and rung 2 falls to Unknown.
-    EXPECT_EQ(scan.dialect, LogFormat::GitHubActions)
-        << "the dialect latch must fire off the routed GHA lines";
+    // …and rung 2 falls to Unknown. (There is no dialect LATCH any more: the dialect is declared,
+    // so `RunOutcomeScan` carries no LogFormat at all — ADR 0065 clause 2.)
     const auto degenerate{resolve_run_outcome("", scan, composed)};
     EXPECT_EQ(degenerate.outcome, RunOutcome::Unknown)
         << "only-a-console-log GHA is Unknown — never a guess from per-step exit codes";

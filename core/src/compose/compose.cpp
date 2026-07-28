@@ -93,7 +93,7 @@ namespace
         {
             append_str(out, row.prefix);
             append_u8(out, static_cast<std::uint8_t>(row.role));
-            append_u8(out, static_cast<std::uint8_t>(row.format_gate));
+            append_str(out, row.dialect_gate);
         }
         // ADR 0029: the package's declared IntentChannel vocabulary is identity — it is the closed
         // set every channel_gate below is checked against, so the digest must move if the
@@ -107,7 +107,7 @@ namespace
             append_str(out, row.prefix);
             append_u8(out, static_cast<std::uint8_t>(row.kind));
             append_u8(out, static_cast<std::uint8_t>(row.child_order));
-            append_u8(out, static_cast<std::uint8_t>(row.format_gate));
+            append_str(out, row.dialect_gate);
             append_u8(out, static_cast<std::uint8_t>(row.extract));
             append_str_span(out, row.payload_excludes); // grammar-2: the exclusion set is identity
             append_str(
@@ -119,7 +119,7 @@ namespace
         {
             append_str(out, row.prefix);
             append_u8(out, static_cast<std::uint8_t>(row.level));
-            append_u8(out, static_cast<std::uint8_t>(row.format_gate));
+            append_str(out, row.dialect_gate);
         }
         append_u32_le(out, static_cast<std::uint32_t>(pkg.locations.size()));
         for (const LocationRow& row : pkg.locations)
@@ -147,13 +147,13 @@ namespace
         {
             append_str(out, row.token);
             append_u8(out, static_cast<std::uint8_t>(row.outcome));
-            append_u8(out, static_cast<std::uint8_t>(row.format_gate));
+            append_str(out, row.dialect_gate);
         }
         append_u32_le(out, static_cast<std::uint32_t>(pkg.outcome_markers.size()));
         for (const OutcomeMarkerRow& row : pkg.outcome_markers)
         {
             append_str(out, row.prefix);
-            append_u8(out, static_cast<std::uint8_t>(row.format_gate));
+            append_str(out, row.dialect_gate);
         }
         // grammar-3 (ADR 0044 §7): the GENERATION projection enters the identity,
         // field-for-field as the recognition markers do. This closes the SID-2/G4 gap — before
@@ -169,7 +169,7 @@ namespace
             append_str(out, row.prefix);
             append_u8(out, static_cast<std::uint8_t>(row.kind));
             append_u8(out, static_cast<std::uint8_t>(row.child_order));
-            append_u8(out, static_cast<std::uint8_t>(row.format_gate));
+            append_str(out, row.dialect_gate);
             append_u8(out, static_cast<std::uint8_t>(row.emit));
             append_str(out, row.channel_gate);
         }
@@ -188,7 +188,7 @@ namespace
                 if (&lhs == &rhs || lhs.prefix.size() >= rhs.prefix.size())
                     continue;
                 if (rhs.prefix.starts_with(lhs.prefix) &&
-                    detail::gates_intersect(lhs.format_gate, rhs.format_gate))
+                    detail::gates_intersect(lhs.dialect_gate, rhs.dialect_gate))
                     report.shadows.push_back(
                         {.kind = kind, .shorter_prefix = lhs.prefix, .longer_prefix = rhs.prefix});
             }
@@ -250,16 +250,14 @@ namespace
 ResolvedStream resolve_stream(const ComposedSemantics& composed,
                               const insight::transport::IngestDeclaration& declaration)
 {
-    // Verify the dialect BEFORE any view is built — the same ordering for_channel uses, so a
-    // mistake is reported before work is done on its behalf.
-    if (!declaration.dialect.empty() &&
-        std::ranges::none_of(composed.packages(),
-                             [&declaration](const ComposedPackage& pkg) noexcept
-                             { return pkg.name == declaration.dialect; }))
-        fail_unknown_dialect(declaration.dialect, composed.packages());
-
-    return ResolvedStream{.semantics = composed.for_channel(declaration.channel),
-                          .transport = insight::transport::resolve_transport_stack(declaration)};
+    // Both semantic coordinates are verified and APPLIED in one construction (ADR 0065 clause 2):
+    // `for_stream` fails closed on an unknown name in either, then filters the view. This is the
+    // ONE evaluation point of the dialect gate in the whole engine — nothing below the view sees
+    // the coordinate, which is what makes the per-line content dependence structurally impossible
+    // rather than merely absent.
+    return ResolvedStream{
+        .semantics = composed.for_stream(declaration.dialect, declaration.channel),
+        .transport = insight::transport::resolve_transport_stack(declaration)};
 }
 
 std::string ComposedSemantics::identity_hex() const
@@ -274,36 +272,39 @@ std::string ComposedSemantics::identity_hex() const
     return out;
 }
 
-bool ComposedSemantics::withholds_markers_for(insight::LogFormat format,
-                                              std::string_view declared_channel) const noexcept
+bool ComposedSemantics::withholds_markers_for(std::string_view declared_channel) const noexcept
 {
+    // The dialect is THIS VIEW'S (`declared_dialect_`), not a parameter: the question is whether
+    // declaring a channel would unlock depth on the stream this view was resolved for. A row of
+    // another dialect could never fire here whatever the caller declares, so counting it would
+    // produce advice that cannot help — the fatigue the diagnostic exists to avoid.
     return std::ranges::any_of(all_markers_,
-                               [format, declared_channel](const IntentMarkerRow& row) noexcept
+                               [this, declared_channel](const IntentMarkerRow& row) noexcept
                                {
-                                   return (row.format_gate == format ||
-                                           row.format_gate == kAnyFormat) &&
+                                   return dialect_admits(row.dialect_gate, declared_dialect_) &&
                                           !channel_admits(row.channel_gate, declared_channel);
                                });
 }
 
-ComposedSemantics ComposedSemantics::for_channel(std::string_view declared_channel) const
+ComposedSemantics ComposedSemantics::for_stream(std::string_view declared_dialect,
+                                                std::string_view declared_channel) const
 {
-    // An unknown channel fails closed BEFORE any table is built — the same shape as compose's
-    // duplicate check. Empty (Unspecified) is not unknown: it is the caller declining to declare.
+    // An unknown name in either coordinate fails closed BEFORE any table is built — the same shape
+    // as compose's duplicate check, and in declaration order so the first mistake is the one
+    // reported. Empty (Unspecified) is not unknown: it is the caller declining to declare.
+    if (!declared_dialect.empty() &&
+        std::ranges::none_of(packages_, [declared_dialect](const ComposedPackage& pkg) noexcept
+                             { return pkg.name == declared_dialect; }))
+        fail_unknown_dialect(declared_dialect, packages_);
     if (!declared_channel.empty() &&
         std::ranges::find(channels_, declared_channel) == channels_.end())
         fail_unknown_channel(declared_channel, channels_);
 
     ComposedSemantics out;
-    // Everything except the marker rows is channel-independent (the "does not metastasize" rule:
-    // only IntentMarkerRow/IntentEmitRow carry a channel_gate today), so it is carried over
-    // verbatim.
-    out.roles_ = roles_;
-    out.level_lifts_ = level_lifts_;
+    // Dialect-independent tables (no gate on these row kinds — the "does not metastasize" rule),
+    // carried over verbatim.
     out.locations_ = locations_;
     out.value_classes_ = value_classes_;
-    out.outcome_tokens_ = outcome_tokens_;
-    out.outcome_markers_ = outcome_markers_;
     out.channels_ = channels_;
     out.strategies_ = strategies_;
     out.provenance_hooks_ = provenance_hooks_;
@@ -311,19 +312,47 @@ ComposedSemantics ComposedSemantics::for_channel(std::string_view declared_chann
     out.report_ = report_;
     // The identity is carried VERBATIM: semantic_identity is the RULESET's identity (which rows
     // exist and how they gate), not a per-stream view of it. Two streams of one binary declaring
-    // different IntentChannels are analyzed by the SAME ruleset, so they must report the same
-    // identity — otherwise a cross-channel comparison (D5's legal case: BuildId N annotated ↔ N+1
-    // stripped) would look like a comparison across two different engines.
+    // different dialects or IntentChannels are analyzed by the SAME ruleset, so they must report the
+    // same identity — otherwise a cross-channel comparison (D5's legal case: BuildId N annotated ↔
+    // N+1 stripped) would look like a comparison across two different engines.
     out.identity_ = identity_;
 
-    // Filter from all_markers_, never from markers_: markers_ is already SOME view (the Unspecified
-    // one on a fresh composition), so filtering it would be a monotonically shrinking chain —
-    // for_channel() must be idempotent in the channel, not cumulative.
+    // Every filter is re-derived from the UNFILTERED tables, never from this view's own: a view is
+    // already SOME resolution (the doubly-Unspecified one on a fresh composition), so filtering it
+    // would be a monotonically shrinking chain and a second declaration could only remove rows the
+    // first one kept. Re-deriving makes `for_stream` idempotent and order-free.
+    out.all_roles_ = all_roles_;
     out.all_markers_ = all_markers_;
+    out.all_level_lifts_ = all_level_lifts_;
+    out.all_outcome_tokens_ = all_outcome_tokens_;
+    out.all_outcome_markers_ = all_outcome_markers_;
+    out.declared_dialect_ = declared_dialect;
+
+    const auto admits{[declared_dialect](std::string_view dialect_gate) noexcept
+                      { return dialect_admits(dialect_gate, declared_dialect); }};
+
+    out.roles_.reserve(all_roles_.size());
+    std::ranges::copy_if(all_roles_, std::back_inserter(out.roles_),
+                         [&admits](const StructuralRoleRow& row)
+                         { return admits(row.dialect_gate); });
+    out.level_lifts_.reserve(all_level_lifts_.size());
+    std::ranges::copy_if(all_level_lifts_, std::back_inserter(out.level_lifts_),
+                         [&admits](const LevelLiftRow& row) { return admits(row.dialect_gate); });
+    out.outcome_tokens_.reserve(all_outcome_tokens_.size());
+    std::ranges::copy_if(all_outcome_tokens_, std::back_inserter(out.outcome_tokens_),
+                         [&admits](const OutcomeTokenRow& row) { return admits(row.dialect_gate); });
+    out.outcome_markers_.reserve(all_outcome_markers_.size());
+    std::ranges::copy_if(all_outcome_markers_, std::back_inserter(out.outcome_markers_),
+                         [&admits](const OutcomeMarkerRow& row)
+                         { return admits(row.dialect_gate); });
+    // Markers carry BOTH gates — the Medium is `dialect × IntentChannel` — so both apply here.
     out.markers_.reserve(all_markers_.size());
     std::ranges::copy_if(all_markers_, std::back_inserter(out.markers_),
-                         [declared_channel](const IntentMarkerRow& row)
-                         { return channel_admits(row.channel_gate, declared_channel); });
+                         [&admits, declared_channel](const IntentMarkerRow& row)
+                         {
+                             return admits(row.dialect_gate) &&
+                                    channel_admits(row.channel_gate, declared_channel);
+                         });
     return out;
 }
 
@@ -371,20 +400,22 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
         const SemanticPackageManifest& pkg{packages[idx]};
         serialize_manifest(serialized, pkg);
 
-        // Concatenate rows in canonical (package-sorted, declared-within) order.
-        composed.roles_.insert(composed.roles_.end(), pkg.roles.begin(), pkg.roles.end());
+        // Concatenate rows in canonical (package-sorted, declared-within) order, into the
+        // UNFILTERED tables — the views are derived from them at the end, once.
+        composed.all_roles_.insert(composed.all_roles_.end(), pkg.roles.begin(), pkg.roles.end());
         composed.all_markers_.insert(composed.all_markers_.end(), pkg.markers.begin(),
                                      pkg.markers.end());
-        composed.level_lifts_.insert(composed.level_lifts_.end(), pkg.level_lifts.begin(),
-                                     pkg.level_lifts.end());
+        composed.all_level_lifts_.insert(composed.all_level_lifts_.end(), pkg.level_lifts.begin(),
+                                         pkg.level_lifts.end());
         composed.locations_.insert(composed.locations_.end(), pkg.locations.begin(),
                                    pkg.locations.end());
         composed.value_classes_.insert(composed.value_classes_.end(), pkg.value_classes.begin(),
                                        pkg.value_classes.end());
-        composed.outcome_tokens_.insert(composed.outcome_tokens_.end(), pkg.outcome_tokens.begin(),
-                                        pkg.outcome_tokens.end());
-        composed.outcome_markers_.insert(composed.outcome_markers_.end(),
-                                         pkg.outcome_markers.begin(), pkg.outcome_markers.end());
+        composed.all_outcome_tokens_.insert(composed.all_outcome_tokens_.end(),
+                                            pkg.outcome_tokens.begin(), pkg.outcome_tokens.end());
+        composed.all_outcome_markers_.insert(composed.all_outcome_markers_.end(),
+                                             pkg.outcome_markers.begin(),
+                                             pkg.outcome_markers.end());
         // ADR 0029 — the composed IntentChannel vocabulary. De-duplicated: two dialects may
         // legitimately name the same materialization, and this set is a lookup key (validating a
         // caller's --channel), not a per-package tally. Package order is canonical, so the result
@@ -407,26 +438,28 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
     for (std::size_t i{0}; i < kIdentityBytes; ++i)
         composed.identity_[i] = static_cast<std::uint8_t>(digest[i]);
 
-    // ADR 0029 D5 — a fresh composition IS the UNSPECIFIED view: nobody has declared a channel, so
-    // every concretely-gated row stays out and only kAnyChannel rows fire. A caller gets dialect
-    // depth by declaring its channel (for_channel), which is the point: declaring is the path to
-    // depth, and the default can never be a concrete channel (both-rows-live is the defect).
-    // Fail-closed is the DEFAULT, not an opt-in — a safety default that must be requested is not a
-    // default.
-    std::ranges::copy_if(composed.all_markers_, std::back_inserter(composed.markers_),
-                         [](const IntentMarkerRow& row)
-                         { return channel_admits(row.channel_gate, kAnyChannel); });
-
     // Longest-match shadow notes over the composed prefix tables (the report; conflicts already
-    // fatal). Markers use the FULL set: a shadow is a property of the declared vocabulary, not of
-    // one stream's view, and reporting it only when a particular channel is declared would make the
-    // report channel-dependent.
-    note_shadows<StructuralRoleRow>(composed.roles_, "role", composed.report_);
+    // fatal). They use the FULL sets: a shadow is a property of the declared vocabulary, not of one
+    // stream's view, and reporting it only when a particular dialect or channel is declared would
+    // make the report declaration-dependent.
+    note_shadows<StructuralRoleRow>(composed.all_roles_, "role", composed.report_);
     note_shadows<IntentMarkerRow>(composed.all_markers_, "marker", composed.report_);
-    note_shadows<LevelLiftRow>(composed.level_lifts_, "level_lift", composed.report_);
-    note_shadows<OutcomeMarkerRow>(composed.outcome_markers_, "outcome_marker", composed.report_);
+    note_shadows<LevelLiftRow>(composed.all_level_lifts_, "level_lift", composed.report_);
+    note_shadows<OutcomeMarkerRow>(composed.all_outcome_markers_, "outcome_marker",
+                                   composed.report_);
 
-    return composed;
+    // ADR 0029 D5 + ADR 0065 clause 2 — a fresh composition IS the UNSPECIFIED view on BOTH axes:
+    // nobody has declared a dialect or a channel, so every concretely-gated row stays out and only
+    // kAnyDialect / kAnyChannel rows fire. A caller gets dialect depth by DECLARING (resolve_stream
+    // / for_stream), which is the point: declaring is the path to depth, and the default can never
+    // be a concrete dialect or channel — "both GHA Step rows live at once" is the phantom defect on
+    // the channel axis, and "every dialect's rows live at once" is the same defect on the dialect
+    // axis. Fail-closed is the DEFAULT, not an opt-in — a safety default that must be requested is
+    // not a default.
+    //
+    // Derived through the SAME function a caller uses, so the default view and a declared one can
+    // never be two different filters that drift.
+    return composed.for_stream(kAnyDialect, kAnyChannel);
 }
 
 } // namespace insight::semantic

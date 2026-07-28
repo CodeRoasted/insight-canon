@@ -17,10 +17,12 @@ namespace insight
 {
 namespace
 {
-    // The row-gate predicate (II-6 dialect gating) is shared with the level-lift walker
-    // (level_lift.cpp), so it lives beside its composition-time sibling `gates_intersect` in
-    // canon.compose.cppm — where the comment explains why the two must not be confused.
-    using insight::semantic::detail::gate_matches;
+    // NO row-gate predicate here any more (ADR 0065 clause 2). The dialect gate is evaluated ONCE,
+    // at `resolve_stream`, and filtered into the view these walkers receive — so a row that is in
+    // the table is a row that fires, and there is nothing left to test per line. What this removed
+    // is not a compare: it is a DETERMINISM hazard. The old gate argument was
+    // `LogParser::routed_format()`, the per-line detector winner under a sticky-strategy fast path,
+    // so which DECLARED rows fired was a function of content.
 
     // ── Location matching (ported from location_recognizer.cpp) — the three closed families ──
     [[nodiscard]] constexpr bool loc_is_lower(char chr) noexcept
@@ -167,7 +169,7 @@ std::string_view recognize_location(std::string_view content,
 namespace tokenization
 {
 
-    StructuralRole classify(std::string_view content, LogFormat format,
+    StructuralRole classify(std::string_view content,
                             const insight::semantic::ComposedSemantics& composed) noexcept
     {
         // Longest-match: the row with the longest matching prefix wins (deterministic,
@@ -176,8 +178,7 @@ namespace tokenization
         StructuralRole best{StructuralRole::None};
         std::size_t best_len{0};
         for (const insight::semantic::StructuralRoleRow& row : composed.roles())
-            if (gate_matches(row.format_gate, format) && content.starts_with(row.prefix) &&
-                row.prefix.size() > best_len)
+            if (content.starts_with(row.prefix) && row.prefix.size() > best_len)
             {
                 best = row.role;
                 best_len = row.prefix.size();
@@ -237,14 +238,14 @@ namespace tokenization
         }
     } // namespace
 
-    IntentMarker recognize(std::string_view content, LogFormat format,
+    IntentMarker recognize(std::string_view content,
                            const insight::semantic::ComposedSemantics& composed) noexcept
     {
         const insight::semantic::IntentMarkerRow* best{nullptr};
         std::string_view best_payload;
         for (const insight::semantic::IntentMarkerRow& row : composed.markers())
         {
-            if (!gate_matches(row.format_gate, format) || !content.starts_with(row.prefix) ||
+            if (!content.starts_with(row.prefix) ||
                 (best != nullptr && row.prefix.size() <= best->prefix.size()))
                 continue;
             // A row matches only when its extractor's shape holds AND the payload is not excluded

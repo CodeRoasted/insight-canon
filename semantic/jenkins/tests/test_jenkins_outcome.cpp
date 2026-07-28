@@ -11,7 +11,6 @@ import std;
 import insight.canon;
 import insight.semantic.jenkins;
 
-using insight::LogFormat;
 using insight::map_outcome_token;
 using insight::resolve_run_outcome;
 using insight::RunOutcome;
@@ -21,27 +20,39 @@ using insight::semantic::ComposedSemantics;
 
 namespace
 {
+// The RESOLVED view of a stream that declared this dialect (ADR 0065 clause 2) — after T4 the
+// concretely-gated rows are reachable only through a declaration.
 [[nodiscard]] ComposedSemantics jenkins_only()
 {
     const std::array manifests{insight::semantic::jenkins::kManifest};
-    return insight::semantic::compose(manifests);
+    return insight::semantic::compose(manifests).for_stream(insight::semantic::jenkins::kDialect,
+                                                            {});
+}
+
+// The same composition on a stream that declared NO dialect — the fail-closed arm.
+[[nodiscard]] ComposedSemantics undeclared_stream()
+{
+    const std::array manifests{insight::semantic::jenkins::kManifest};
+    return insight::semantic::compose(manifests).for_stream(insight::semantic::kAnyDialect, {});
 }
 } // namespace
 
 TEST(JenkinsOutcome, TheFiveNativeResultStringsMap)
 {
     const ComposedSemantics composed{jenkins_only()};
-    EXPECT_EQ(map_outcome_token("SUCCESS", LogFormat::Jenkins, composed), RunOutcome::Success);
-    EXPECT_EQ(map_outcome_token("FAILURE", LogFormat::Jenkins, composed), RunOutcome::Failure);
-    EXPECT_EQ(map_outcome_token("UNSTABLE", LogFormat::Jenkins, composed), RunOutcome::Unstable)
+    EXPECT_EQ(map_outcome_token("SUCCESS", composed), RunOutcome::Success);
+    EXPECT_EQ(map_outcome_token("FAILURE", composed), RunOutcome::Failure);
+    EXPECT_EQ(map_outcome_token("UNSTABLE", composed), RunOutcome::Unstable)
         << "UNSTABLE is its own class — never folded to Failure or Success";
-    EXPECT_EQ(map_outcome_token("ABORTED", LogFormat::Jenkins, composed), RunOutcome::Aborted);
-    const auto not_built{map_outcome_token("NOT_BUILT", LogFormat::Jenkins, composed)};
+    EXPECT_EQ(map_outcome_token("ABORTED", composed), RunOutcome::Aborted);
+    const auto not_built{map_outcome_token("NOT_BUILT", composed)};
     ASSERT_TRUE(not_built.has_value()) << "NOT_BUILT is a MAPPING (to Unknown), not a miss";
     EXPECT_EQ(*not_built, RunOutcome::Unknown);
-    // Unmapped stays unmapped (fail-closed upstream), and the map is format-gated (II-6).
-    EXPECT_FALSE(map_outcome_token("GREEN", LogFormat::Jenkins, composed).has_value());
-    EXPECT_FALSE(map_outcome_token("SUCCESS", LogFormat::GitHubActions, composed).has_value());
+    // Unmapped stays unmapped (fail-closed upstream), and the map is DIALECT-gated (II-6): on a
+    // stream that declared no dialect the row is not in the view at all.
+    EXPECT_FALSE(map_outcome_token("GREEN", composed).has_value());
+    EXPECT_FALSE(map_outcome_token("SUCCESS", undeclared_stream()).has_value())
+        << "a dialect's verdict token resolved on an UNDECLARED stream — the gate is fail-open";
 }
 
 TEST(JenkinsOutcome, ConsoleTailRecoveredFromARealisticConsole)
@@ -58,8 +69,6 @@ TEST(JenkinsOutcome, ConsoleTailRecoveredFromARealisticConsole)
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
     ASSERT_TRUE(scan.marker_present) << "the timestamper-prefixed epilogue must be recognized";
     EXPECT_EQ(scan.token, "UNSTABLE");
-    EXPECT_EQ(scan.marker_format, LogFormat::Jenkins);
-    EXPECT_EQ(scan.dialect, LogFormat::Jenkins) << "the dialect latches off the first Jenkins line";
 
     const auto res{resolve_run_outcome("", scan, composed)};
     EXPECT_EQ(res.outcome, RunOutcome::Unstable)
@@ -74,7 +83,6 @@ TEST(JenkinsOutcome, BareFreestyleEpilogueStillResolves)
     const std::vector<std::string> lines{"checking out sources", "compiling", "Finished: ABORTED"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
     ASSERT_TRUE(scan.marker_present);
-    EXPECT_EQ(scan.dialect, LogFormat::Jenkins);
     EXPECT_EQ(resolve_run_outcome("", scan, composed).outcome, RunOutcome::Aborted);
 }
 

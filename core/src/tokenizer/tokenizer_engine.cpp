@@ -85,9 +85,8 @@ struct Tokenizer::Impl
         event.host = parsed_line.host;
         event.template_str = match.template_str;
         event.params = match.params;
-        event.structural_role =
-            insight::tokenization::classify(parsed_line.content, event.format,
-                                            composed); // announced structural role (composed rows)
+        event.structural_role = insight::tokenization::classify(
+            parsed_line.content, composed); // announced structural role (the resolved view's rows)
         // Identity-derived WHERE (intent_identity_model.md §5.3, II-8): populate an EMPTY component
         // WHERE axis with the recognized test-file. Semantic-unaware (SP-1): no dialect literal — a
         // format whose lines carry a native component already skips via component.empty(); a format

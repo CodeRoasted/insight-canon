@@ -47,10 +47,10 @@ is_echoed_source(std::string_view raw_line,
                                { return hook(raw_line); });
 }
 
-// The DECLARED level lift (ADR 0063 clause 2): the composed LevelLiftRow set is canon-walked here,
-// against the routed format, and OVERRIDES whatever level the strategy inferred — reproducing the
-// pre-relocation precedence exactly, where the GHA strategy consulted its own kLevelLifts array
-// first and fell back to `infer_leading_log_level` only when no row matched.
+// The DECLARED level lift (ADR 0063 clause 2): the resolved view's LevelLiftRow set is canon-walked
+// here and OVERRIDES whatever level the strategy inferred — reproducing the pre-relocation
+// precedence exactly, where the GHA strategy consulted its own kLevelLifts array first and fell
+// back to `infer_leading_log_level` only when no row matched.
 //
 // PLACEMENT IS LOAD-BEARING, twice over:
 //   * AFTER the strategy — the lift keys on `ParsedLine::content`, the strategy's own product (for
@@ -59,16 +59,17 @@ is_echoed_source(std::string_view raw_line,
 //   * BEFORE the echoed-source demotion — an echoed-source line is script text, not an observed
 //     event, so D-PROV-1 drives its level to Unknown unconditionally. That demotion outranked the
 //     lift when the lift lived inside parse(), and it must keep outranking it.
-// A non-GHA line costs one enum compare per level-lift row (the gate is tested first) and no
-// string compare, which is the same shape the composed classify/recognize walks already pay.
+// An UNDECLARED stream's view carries no concretely-gated level-lift row at all (ADR 0065 clause
+// 2), so the walk is over an empty span and costs nothing — the dialect gate is not tested here,
+// because it was tested once at `resolve_stream` and the row is either in this view or it is not.
+// That is what makes the lift independent of per-line format detection.
 //
 // Unknown from the walk means "no declared row claims this line" — it is the ABSENCE of a lift, not
 // a level, so it must never overwrite the strategy's inference.
-static void apply_level_lift(ParsedLine& parsed, LogFormat format,
+static void apply_level_lift(ParsedLine& parsed,
                              const insight::semantic::ComposedSemantics& composed) noexcept
 {
-    if (const LogLevel lifted{lift_level(parsed.content, format, composed)};
-        lifted != LogLevel::Unknown)
+    if (const LogLevel lifted{lift_level(parsed.content, composed)}; lifted != LogLevel::Unknown)
         parsed.level = lifted;
 }
 
@@ -192,7 +193,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
         ++parsed_count_;
         last_format_ =
             strategy->format(); // the routed winner for this event (per-line observability)
-        apply_level_lift(*result, last_format_, composed_);
+        apply_level_lift(*result, composed_);
         // D-PROV-1 (echoed-source register): the GHA command-echo SGR wrapper was destroyed
         // by strip_escape_sequences above, so detect it on the RAW (ANSI-bearing) line — the
         // only place it survives. An echoed-source line is run-step SCRIPT text, not an
@@ -274,7 +275,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_stable(std::string_view 
         ++parsed_count_;
         last_format_ =
             strategy->format(); // the routed winner for this event (per-line observability)
-        apply_level_lift(*result, last_format_, composed_);
+        apply_level_lift(*result, composed_);
         // D-PROV-1: echoed-source demotion (see parse_line). Detect on the supplied line; a
         // pre-ANSI-stripped stable line carries no wrapper, so this is a no-op there.
         if (is_echoed_source(stable_line, composed_))

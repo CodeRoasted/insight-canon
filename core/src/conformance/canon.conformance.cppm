@@ -31,7 +31,7 @@ module;
 export module insight.canon.conformance;
 import insight.canon.internal; // std
 import insight.canon; // compose / ComposedSemantics / classify / recognize / recognize_location + enums
-import insight.canon.spi; // SemanticPackageManifest + the grammar rows + kAnyFormat + find_conflict
+import insight.canon.spi; // SemanticPackageManifest + the grammar rows + kAnyDialect + find_conflict
 
 export namespace insight::semantic::conformance
 {
@@ -123,12 +123,18 @@ namespace
                                    { return static_cast<unsigned char>(chr) < 0x80U; });
     }
 
-    // Two concrete formats distinct from `gate`, for the "does NOT fire cross-format" leg.
-    // GitHubActions and JSON cover a dialect gate and a representation gate; whichever equals
-    // `gate` is skipped by the caller.
-    constexpr std::array<insight::LogFormat, 4> kProbeFormats{
-        insight::LogFormat::GitHubActions, insight::LogFormat::JSON, insight::LogFormat::Syslog,
-        insight::LogFormat::RawText};
+    // Declared dialects distinct from a row's own gate, for the "does NOT fire cross-dialect" leg
+    // (ADR 0065 clause 1 — the gate is a composed package NAME). Two are enough and they are
+    // deliberately different in kind: `kUndeclaredDialect` is the caller declining to declare (the
+    // fail-closed leg, which a `kAnyDialect` row must still survive), and `kForeignDialect` is a
+    // real, different, composed package name.
+    //
+    // ⚠ The foreign name must be one the SUT manifest is not. `run()` composes ONE manifest at a
+    // time, so a name no package carries would fatal `for_stream` on the unknown-dialect path
+    // before any probe ran; the checks below therefore build the foreign view from a second,
+    // synthetic manifest carrying only that name. See `dialect_leak_view`.
+    constexpr std::string_view kUndeclaredDialect{};
+    constexpr std::string_view kForeignDialect{"conformance-foreign-dialect"};
 
     // A probe line for a prefix row: the key verbatim + a trailing payload token so payload-extract
     // has content to return. The key is line-anchored, so `key + " probe"` matches iff the row
@@ -159,8 +165,10 @@ namespace
         for (const IntentMarkerRow& row : manifest.markers)
         {
             const std::string probe{probe_for(row.prefix)};
-            const auto lhs{insight::tokenization::recognize(probe, row.format_gate, first)};
-            const auto rhs{insight::tokenization::recognize(probe, row.format_gate, second)};
+            const ComposedSemantics first_view{first.for_stream(manifest.name, row.channel_gate)};
+            const ComposedSemantics second_view{second.for_stream(manifest.name, row.channel_gate)};
+            const auto lhs{insight::tokenization::recognize(probe, first_view)};
+            const auto rhs{insight::tokenization::recognize(probe, second_view)};
             if (lhs.kind != rhs.kind || lhs.name != rhs.name ||
                 lhs.discriminant != rhs.discriminant)
                 return {.name = "determinism.recognize",
@@ -173,86 +181,140 @@ namespace
         return {.name = "determinism", .passed = true, .detail = {}};
     }
 
-    // ── Check 2: format-gate honesty — a gated row is inert outside its format; kAnyFormat fires
-    // anywhere ──
-    // one conformance property verified end-to-end (format-gate honesty); the sequence of guarded
+    // ── Check 2: dialect-gate honesty — a gated row is inert outside its dialect; kAnyDialect
+    // fires under every declaration ──
+    //
+    // The FOREIGN view. `run()` composes ONE manifest, so `for_stream("some-other-name", …)` would
+    // fatal on the unknown-dialect path before any probe ran — canon verifies names, and that is
+    // the behavior, not an obstacle to route around. So the leak leg composes the manifest under
+    // test WITH a synthetic, row-less second package whose only content is a name, and resolves to
+    // THAT name. Every concretely-gated row of the manifest is then legitimately absent, and every
+    // kAnyDialect row is legitimately present — which is exactly the two-sided property this check
+    // asserts.
+    [[nodiscard]] ComposedSemantics dialect_leak_view(const SemanticPackageManifest& manifest)
+    {
+        const SemanticPackageManifest foreign{.name = kForeignDialect, .version = "0.0.0"};
+        const std::array<SemanticPackageManifest, 2> pair{manifest, foreign};
+        return compose(pair).for_stream(kForeignDialect, kAnyChannel);
+    }
+
+    // one conformance property verified end-to-end (dialect-gate honesty); the sequence of guarded
     // assertions is the check — splitting it scatters a single verdict across helpers.
     // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-    CheckResult check_format_gate_honesty(const SemanticPackageManifest& manifest,
-                                          const ComposedSemantics& composed)
+    CheckResult check_dialect_gate_honesty(const SemanticPackageManifest& manifest,
+                                           const ComposedSemantics& composed)
     {
+        // The two views the legs are scored under, both built ONCE (ADR 0065 clause 2 — the gate is
+        // a stream-scoped resolution, so the probe has to be one too; probing a row against a
+        // per-call coordinate is the shape T4 removed).
+        const ComposedSemantics own{composed.for_stream(manifest.name, kAnyChannel)};
+        const ComposedSemantics foreign{dialect_leak_view(manifest)};
+
         // Structural roles.
         for (const StructuralRoleRow& row : manifest.roles)
         {
             const std::string probe{probe_for(row.prefix)};
-            if (row.format_gate == kAnyFormat)
+            if (row.dialect_gate == kAnyDialect)
             {
-                // Must fire regardless of routed format — check two distinct formats.
-                for (const insight::LogFormat fmt :
-                     {insight::LogFormat::JSON, insight::LogFormat::Syslog})
-                    if (insight::tokenization::classify(probe, fmt, composed) != row.role)
-                        return {.name = "format_gate.role_any",
+                // Must fire under EVERY declaration — check the undeclared view and a foreign one.
+                for (const auto& [view, label] :
+                     {std::pair{std::cref(composed), std::string_view{"the UNDECLARED view"}},
+                      std::pair{std::cref(foreign), kForeignDialect}})
+                    if (insight::tokenization::classify(probe, view.get()) != row.role)
+                        return {.name = "dialect_gate.role_any",
                                 .passed = false,
-                                .detail = "kAnyFormat role key \"" + std::string{row.prefix} +
-                                          "\" failed to fire under " +
-                                          std::string{insight::to_string(fmt)} +
-                                          " — an ungated row must fire on every format."};
+                                .detail = "kAnyDialect role key \"" + std::string{row.prefix} +
+                                          "\" failed to fire under " + std::string{label} +
+                                          " — an ungated row must fire whatever the caller "
+                                          "declared."};
             }
             else
             {
-                // Must be inert under a DIFFERENT concrete format.
-                for (const insight::LogFormat fmt : kProbeFormats)
-                {
-                    if (fmt == row.format_gate)
-                        continue;
-                    if (insight::tokenization::classify(probe, fmt, composed) !=
-                        insight::StructuralRole::None)
-                        return {.name = "format_gate.role_leak",
-                                .passed = false,
-                                .detail =
-                                    "role key \"" + std::string{row.prefix} + "\" (gated to " +
-                                    std::string{insight::to_string(row.format_gate)} +
-                                    ") FIRED cross-format under " +
-                                    std::string{insight::to_string(fmt)} + " — II-6 gate leak."};
-                }
+                // Must be present under its OWN dialect and inert under a foreign one.
+                if (insight::tokenization::classify(probe, own) != row.role)
+                    return {.name = "dialect_gate.role_own",
+                            .passed = false,
+                            .detail = "role key \"" + std::string{row.prefix} + "\" (gated to \"" +
+                                      std::string{row.dialect_gate} +
+                                      "\") did NOT fire on a stream declaring \"" +
+                                      std::string{manifest.name} +
+                                      "\" — the row is unreachable under any declaration."};
+                if (insight::tokenization::classify(probe, foreign) !=
+                    insight::StructuralRole::None)
+                    return {.name = "dialect_gate.role_leak",
+                            .passed = false,
+                            .detail = "role key \"" + std::string{row.prefix} + "\" (gated to \"" +
+                                      std::string{row.dialect_gate} +
+                                      "\") FIRED on a stream declaring \"" +
+                                      std::string{kForeignDialect} + "\" — II-6 gate leak."};
             }
         }
-        // Intent markers (always concretely gated by construction — II-6). Inert under any other
-        // format.
+        // Intent markers (always concretely gated by construction — II-6). Inert under a foreign
+        // declaration. NB the OWN-view leg is NOT asserted here: a channel-gated marker is
+        // legitimately absent from the kAnyChannel view, and the round-trip report (G2) already
+        // proves every marker reachable under its own Medium.
         for (const IntentMarkerRow& row : manifest.markers)
         {
+            if (row.dialect_gate == kAnyDialect)
+                continue;
             const std::string probe{probe_for(row.prefix)};
-            for (const insight::LogFormat fmt : kProbeFormats)
-            {
-                if (fmt == row.format_gate || row.format_gate == kAnyFormat)
-                    continue;
-                if (insight::tokenization::recognize(probe, fmt, composed).kind !=
-                    insight::tokenization::IntentMarkerKind::None)
-                    return {.name = "format_gate.marker_leak",
-                            .passed = false,
-                            .detail = "marker key \"" + std::string{row.prefix} + "\" (gated to " +
-                                      std::string{insight::to_string(row.format_gate)} +
-                                      ") FIRED cross-format under " +
-                                      std::string{insight::to_string(fmt)} + " — II-6 gate leak."};
-            }
+            if (insight::tokenization::recognize(probe, foreign).kind !=
+                insight::tokenization::IntentMarkerKind::None)
+                return {.name = "dialect_gate.marker_leak",
+                        .passed = false,
+                        .detail = "marker key \"" + std::string{row.prefix} + "\" (gated to \"" +
+                                  std::string{row.dialect_gate} +
+                                  "\") FIRED on a stream declaring \"" +
+                                  std::string{kForeignDialect} + "\" — II-6 gate leak."};
         }
         // Outcome tokens (grammar-2, always concretely gated — a dialect's verdict string never
-        // resolves under another format, ADR 0025 §3.1).
+        // resolves under another dialect, ADR 0025 §3.1).
         for (const OutcomeTokenRow& row : manifest.outcome_tokens)
-            for (const insight::LogFormat fmt : kProbeFormats)
-            {
-                if (fmt == row.format_gate || row.format_gate == kAnyFormat)
-                    continue;
-                if (insight::map_outcome_token(row.token, fmt, composed).has_value())
-                    return {.name = "format_gate.outcome_leak",
-                            .passed = false,
-                            .detail = "outcome token \"" + std::string{row.token} +
-                                      "\" (gated to " +
-                                      std::string{insight::to_string(row.format_gate)} +
-                                      ") RESOLVED cross-format under " +
-                                      std::string{insight::to_string(fmt)} + " — II-6 gate leak."};
-            }
-        return {.name = "format_gate_honesty", .passed = true, .detail = {}};
+        {
+            if (row.dialect_gate == kAnyDialect)
+                continue;
+            if (!insight::map_outcome_token(row.token, own).has_value())
+                return {.name = "dialect_gate.outcome_own",
+                        .passed = false,
+                        .detail = "outcome token \"" + std::string{row.token} + "\" (gated to \"" +
+                                  std::string{row.dialect_gate} +
+                                  "\") did NOT resolve on a stream declaring \"" +
+                                  std::string{manifest.name} +
+                                  "\" — the row is unreachable under any declaration."};
+            if (insight::map_outcome_token(row.token, foreign).has_value())
+                return {.name = "dialect_gate.outcome_leak",
+                        .passed = false,
+                        .detail = "outcome token \"" + std::string{row.token} + "\" (gated to \"" +
+                                  std::string{row.dialect_gate} +
+                                  "\") RESOLVED on a stream declaring \"" +
+                                  std::string{kForeignDialect} + "\" — II-6 gate leak."};
+        }
+        // The UNDECLARED stream is fail-closed on DEPTH: no concretely-gated row of any kind may
+        // fire. This is the leg that would have caught "the filter was never applied", which the
+        // foreign-view legs cannot — a filter that silently kept everything would still drop the
+        // manifest's rows under a foreign NAME only if the filter runs at all.
+        for (const OutcomeTokenRow& row : manifest.outcome_tokens)
+            if (row.dialect_gate != kAnyDialect &&
+                insight::map_outcome_token(row.token, composed).has_value())
+                return {.name = "dialect_gate.undeclared_leak",
+                        .passed = false,
+                        .detail = "outcome token \"" + std::string{row.token} + "\" (gated to \"" +
+                                  std::string{row.dialect_gate} +
+                                  "\") RESOLVED on an UNDECLARED stream — an absent declaration "
+                                  "must withhold every concretely-gated row (fail-closed on "
+                                  "depth), never fall open."};
+        for (const IntentMarkerRow& row : manifest.markers)
+            if (row.dialect_gate != kAnyDialect &&
+                insight::tokenization::recognize(probe_for(row.prefix), composed).kind !=
+                    insight::tokenization::IntentMarkerKind::None)
+                return {.name = "dialect_gate.undeclared_leak",
+                        .passed = false,
+                        .detail = "marker key \"" + std::string{row.prefix} + "\" (gated to \"" +
+                                  std::string{row.dialect_gate} +
+                                  "\") FIRED on an UNDECLARED stream — an absent declaration must "
+                                  "withhold every concretely-gated row (fail-closed on depth), "
+                                  "never fall open."};
+        return {.name = "dialect_gate_honesty", .passed = true, .detail = {}};
     }
 
     // ── Check 3: ASCII / locale safety — every row key is ASCII (byte-only matching ⇒
@@ -344,7 +406,7 @@ namespace
                         .passed = false,
                         .detail = "marker key \"" + std::string{row.prefix} +
                                   "\" has no paired emit row in the MANIFEST (same prefix, kind, "
-                                  "format_gate and channel_gate). A reader without a writer — the "
+                                  "dialect_gate and channel_gate). A reader without a writer — the "
                                   "manifest's `emits` may be wired to a different array than the "
                                   "dialect type's `emit_markers`."};
         for (const LevelLiftRow& row : manifest.level_lifts)
@@ -463,7 +525,7 @@ Report run(const SemanticPackageManifest& manifest)
 
     Report report;
     report.checks.push_back(check_determinism(manifest));
-    report.checks.push_back(check_format_gate_honesty(manifest, composed));
+    report.checks.push_back(check_dialect_gate_honesty(manifest, composed));
     report.checks.push_back(check_ascii_safety(manifest));
     report.checks.push_back(check_grammar_wellformed(manifest));
     report.checks.push_back(check_code_tier(manifest));
@@ -528,17 +590,18 @@ Report round_trip_report(const SemanticPackageManifest& manifest, const Composed
             continue;
         }
 
-        // ADR 0029 D1: the Medium is `IntentFormat × IntentChannel`, so the round-trip closes PER
-        // MEDIUM — a row is recognized under the channel its writer materializes into, exactly as
-        // it is under the format its writer materializes into. Reading the channel off the ROW
-        // keeps the kit self-adapting (zero per-package config): a kAnyChannel row round-trips
-        // under the undeclared view, a channel-gated row under its own channel. Recognizing every
-        // row against ONE composition would be asking whether the stripped banner is a banner in
-        // the annotated channel — which is the phantom, not the closure.
+        // ADR 0029 D1 / ADR 0065 clause 1: the Medium is `dialect × IntentChannel`, so the
+        // round-trip closes PER MEDIUM — a row is recognized under the stream view its writer
+        // materializes into. Reading BOTH coordinates off the ROW keeps the kit self-adapting (zero
+        // per-package config): a kAnyChannel row round-trips under the undeclared channel view, a
+        // channel-gated row under its own channel, and every row under its own dialect. Recognizing
+        // every row against ONE composition would be asking whether the stripped banner is a banner
+        // in the annotated channel — which is the phantom, not the closure.
         const std::string line{render_row(*writer, kProbePayload)};
-        const ComposedSemantics channel_view{composed.for_channel(writer->channel_gate)};
+        const ComposedSemantics medium_view{
+            composed.for_stream(writer->dialect_gate, writer->channel_gate)};
         const insight::tokenization::IntentMarker got{
-            insight::tokenization::recognize(line, reader.format_gate, channel_view)};
+            insight::tokenization::recognize(line, medium_view)};
 
         if (got.kind == reader.kind && got.child_order == reader.child_order &&
             got.name == kProbePayload)

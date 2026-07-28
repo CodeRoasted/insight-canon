@@ -24,6 +24,8 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <optional>
+#include <span>
 #include <string>
 #include <vector>
 #if defined(_WIN32)
@@ -117,7 +119,11 @@ int main(int argc, char** argv)
     // whose encoding varies by toolchain/locale. Plain '--'.
     // v2: the grammar-2 cut (ADR 0025) — jenkins joins the composed set and every file section
     // gains a `### run_outcome` line (the console-tail scan surface the compare must cover).
-    std::cout << "# canon public determinism proof -- v2\n";
+    // v3: T4 (ADR 0065) — the dialect and the transport peel are DECLARED, so every file is scored
+    // once per declared ARM (below) instead of once. The compare covers only what the fixture
+    // EMITS, and after T4 an undeclared stream sees no concretely-gated row at all: without the
+    // declared arms this proof would still be green while covering none of the dialect walkers.
+    std::cout << "# canon public determinism proof -- v3\n";
 
     // The composition is loop-invariant (the SAME package set tokenizes every file), so build it
     // ONCE here and thread it into each file's per-file arena/Tokenizer below.
@@ -140,6 +146,33 @@ int main(int argc, char** argv)
         std::cout << ' ' << pkg.name << '@' << pkg.version;
     std::cout << '\n';
 
+    // ── The declared ARMS (ADR 0044 §6 / ADR 0065). ──
+    //
+    // EVERY arm is applied to EVERY file, on purpose. Choosing an arm per file would be inference —
+    // "this one looks like GHA" — which is precisely the per-line content dependence T4 deleted, and
+    // a proof binary that re-introduced it to look tidy would be proving the wrong thing. Applying
+    // all arms to all files also gives the compare the NEGATIVE cells for free: a Jenkins fixture
+    // read under the `github` declaration must produce no GHA structure, byte-identically, on every
+    // leg.
+    //
+    // The stamped arm declares `api-rfc3339-line-prefix` because GitHub's serving API stamps every
+    // line it returns; that peel used to be DETECTED by a strategy in the github package and is now
+    // the caller's declaration.
+    struct Arm
+    {
+        std::string_view label; // what the `## file` header records; "-" is the undeclared stream
+        std::string_view dialect;
+        std::span<const std::string_view> stack;
+    };
+    static constexpr std::array<std::string_view, 1> kRfc3339Stack{{"api-rfc3339-line-prefix"}};
+    const std::array<Arm, 3> arms{
+        Arm{.label = "-", .dialect = {}, .stack = {}},
+        Arm{.label = "github+api-rfc3339-line-prefix",
+            .dialect = insight::semantic::github::kDialect,
+            .stack = kRfc3339Stack},
+        Arm{.label = "jenkins", .dialect = insight::semantic::jenkins::kDialect, .stack = {}},
+    };
+
     for (int arg = 1; arg < argc; ++arg)
     {
         std::ifstream input{argv[arg], std::ios::binary};
@@ -158,72 +191,106 @@ int main(int argc, char** argv)
             line.clear();
         }
 
-        constexpr std::size_t kArenaBytes{std::size_t{1} << 22};
-        tk::ArenaAllocator arena{kArenaBytes};
-        tk::Tokenizer tokenizer{arena, tk::MaskConfig{}, composed};
-
-        std::map<std::string, std::uint64_t> templates; // ordered → deterministic iteration
-        struct Row
+        for (const Arm& arm : arms)
         {
-            std::string level;
-            std::string role;
-            std::string tmpl;
-            bool failure;
-            bool warning;
-        };
-        std::vector<Row> rows;
-        rows.reserve(lines.size());
+            // The ONE call a caller makes at stream open (ADR 0044 §6): both semantic coordinates
+            // verified and filtered into the view, and the transport stack resolved — all before
+            // the first line, so nothing downstream can depend on content.
+            const insight::semantic::ResolvedStream stream{insight::semantic::resolve_stream(
+                composed, insight::transport::IngestDeclaration{
+                              .stack = arm.stack, .dialect = arm.dialect, .channel = {}})};
 
-        for (const auto& raw : lines)
-        {
-            const auto event{tokenizer.process_line(raw)};
-            std::string tmpl{event ? std::string{event->template_str}
-                                   : std::string{"<<parse-error>>"}};
-            std::string level{event ? std::string{insight::to_string(event->level)}
-                                    : std::string{"Unknown"}};
-            std::string role{event ? std::string{insight::to_string(event->structural_role)}
-                                   : std::string{"None"}};
-            const bool failure{insight::utils::contains_failure_cue(raw)};
-            const bool warning{insight::utils::contains_warning_cue(raw)};
-            ++templates[tmpl];
-            rows.push_back({std::move(level), std::move(role), std::move(tmpl), failure, warning});
+            // The peel runs at the CALLER, outside the tokenizer, and only `content` crosses (§4 —
+            // line identity is a pure function of peeled content). `peeled_lines` is materialized
+            // because the run-outcome scan takes a whole-log span; it also keeps the peel applied
+            // exactly once per line rather than once per consumer.
+            std::vector<std::string> peeled_lines;
+            peeled_lines.reserve(lines.size());
+            std::vector<std::optional<insight::Timestamp>> observation_times;
+            observation_times.reserve(lines.size());
+            for (const auto& raw : lines)
+            {
+                const insight::transport::PeeledLine peeled{stream.transport.peel(raw)};
+                peeled_lines.emplace_back(peeled.content);
+                observation_times.push_back(peeled.observation_time);
+            }
+
+            constexpr std::size_t kArenaBytes{std::size_t{1} << 22};
+            tk::ArenaAllocator arena{kArenaBytes};
+            tk::Tokenizer tokenizer{arena, tk::MaskConfig{}, stream.semantics};
+
+            std::map<std::string, std::uint64_t> templates; // ordered → deterministic iteration
+            struct Row
+            {
+                std::string level;
+                std::string role;
+                std::string tmpl;
+                bool failure;
+                bool warning;
+                bool observed; // the peel extracted an observation time for this line
+            };
+            std::vector<Row> rows;
+            rows.reserve(lines.size());
+
+            for (std::size_t idx{0}; idx < peeled_lines.size(); ++idx)
+            {
+                auto event{tokenizer.process_line(peeled_lines[idx])};
+                // THE TIMESTAMP HANDOVER (ADR 0044 §8 item 4 / ADR 0063 clause 3): the extract is
+                // the CALLER's to inject, because §4 forbids handing the stack to the Tokenizer.
+                // ⚠ An OBSERVATION time, never an ordering key and never a replay input.
+                if (event && observation_times[idx])
+                    event->timestamp = *observation_times[idx];
+                std::string tmpl{event ? std::string{event->template_str}
+                                       : std::string{"<<parse-error>>"}};
+                std::string level{event ? std::string{insight::to_string(event->level)}
+                                        : std::string{"Unknown"}};
+                std::string role{event ? std::string{insight::to_string(event->structural_role)}
+                                       : std::string{"None"}};
+                const bool failure{insight::utils::contains_failure_cue(lines[idx])};
+                const bool warning{insight::utils::contains_warning_cue(lines[idx])};
+                ++templates[tmpl];
+                rows.push_back({std::move(level), std::move(role), std::move(tmpl), failure,
+                                warning, observation_times[idx].has_value()});
+            }
+
+            std::cout << "## file " << basename_of(argv[arg]) << " declared=" << arm.label << "\n";
+            std::cout << "### templates (" << templates.size() << ")\n";
+            std::uint64_t total{0};
+            insight::det::FixedReducer reducer;
+            for (const auto& [tmpl, count] : templates)
+            {
+                std::cout << count << '\t' << tmpl << '\n';
+                total += count;
+                reducer.add_weighted_log2(count, count); // Σ c·log2(c), the det_math entropy term
+            }
+
+            std::cout << "### events\n";
+            for (const auto& row : rows)
+            {
+                std::cout << row.level << '\t' << (row.failure ? 'F' : '-')
+                          << (row.warning ? 'W' : '-') << (row.observed ? 'T' : '-') << '\t'
+                          << row.role << '\t' << row.tmpl << '\n';
+            }
+
+            std::cout << "### det_math total=" << total
+                      << " sum_c_log2c_qk=" << i128_to_dec(reducer.raw()) << '\n';
+
+            // G-OUT-6 behavioral arm: the console-tail run-outcome scan + the degenerate (no
+            // side-input) resolution, per file and per declared arm. The composed identity line
+            // above already pins the grammar-2 HASH; this pins the outcome-scan BYTES — the compare
+            // covers only what the fixture emits, so the surface must be emitted to be proven.
+            // Byte-exact ASCII walk + last-match-wins integer line index ⇒ deterministic by
+            // construction; any cross-leg divergence here is an engine bug the gate must catch.
+            const insight::RunOutcomeScan outcome_scan{
+                insight::scan_run_outcome(peeled_lines, stream.semantics)};
+            const insight::RunOutcomeResolution outcome_resolution{
+                insight::resolve_run_outcome("", outcome_scan, stream.semantics)};
+            std::cout << "### run_outcome marker="
+                      << (outcome_scan.marker_present ? '1' : '0') << " token="
+                      << (outcome_scan.marker_present ? std::string_view{outcome_scan.token}
+                                                      : std::string_view{"-"})
+                      << " resolved=" << insight::to_string(outcome_resolution.outcome) << '\n';
         }
-
-        std::cout << "## file " << basename_of(argv[arg]) << "\n";
-        std::cout << "### templates (" << templates.size() << ")\n";
-        std::uint64_t total{0};
-        insight::det::FixedReducer reducer;
-        for (const auto& [tmpl, count] : templates)
-        {
-            std::cout << count << '\t' << tmpl << '\n';
-            total += count;
-            reducer.add_weighted_log2(count, count); // Σ c·log2(c), the det_math entropy term
-        }
-
-        std::cout << "### events\n";
-        for (const auto& row : rows)
-        {
-            std::cout << row.level << '\t' << (row.failure ? 'F' : '-') << (row.warning ? 'W' : '-')
-                      << '\t' << row.role << '\t' << row.tmpl << '\n';
-        }
-
-        std::cout << "### det_math total=" << total
-                  << " sum_c_log2c_qk=" << i128_to_dec(reducer.raw()) << '\n';
-
-        // G-OUT-6 behavioral arm: the console-tail run-outcome scan + the degenerate (no
-        // side-input) resolution, per file. The composed identity line above already pins the
-        // grammar-2 HASH; this pins the outcome-scan BYTES — the compare covers only what the
-        // fixture emits, so the new grammar-2 surface must be emitted to be proven. Byte-exact
-        // ASCII walk + last-match-wins integer line index ⇒ deterministic by construction; any
-        // cross-leg divergence here is an engine bug the gate must catch.
-        const insight::RunOutcomeScan outcome_scan{insight::scan_run_outcome(lines, composed)};
-        const insight::RunOutcomeResolution outcome_resolution{
-            insight::resolve_run_outcome("", outcome_scan, composed)};
-        std::cout << "### run_outcome dialect=" << insight::to_string(outcome_scan.dialect)
-                  << " marker=" << (outcome_scan.marker_present ? '1' : '0') << " token="
-                  << (outcome_scan.marker_present ? std::string_view{outcome_scan.token}
-                                                  : std::string_view{"-"})
-                  << " resolved=" << insight::to_string(outcome_resolution.outcome) << '\n';
     }
 
     return 0;

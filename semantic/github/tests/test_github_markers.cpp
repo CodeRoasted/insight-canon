@@ -14,7 +14,6 @@ import insight.canon; // compose / ComposedSemantics / recognize / canonicalize_
 import insight.semantic.github; // kManifest
 
 using insight::canonicalize_intent;
-using insight::LogFormat;
 using insight::to_string;
 using insight::semantic::ComposedSemantics;
 using insight::tokenization::ChildOrder;
@@ -24,16 +23,26 @@ using insight::tokenization::recognize;
 
 namespace
 {
-// The composition under test: the github package alone, viewed through ONE declared IntentChannel
-// (ADR 0029). The channel is REQUIRED here on purpose — GHA is the dialect that actually has two
-// materializations, so "which channel" is part of every recognition question about it, and a test
-// that did not say would be asking an ill-posed one. `channel` names a declared channel
-// ("annotated" / "stripped"); kAnyChannel models the caller that declares nothing (D5 —
+// The composition under test: the github package alone, RESOLVED for a stream that declared this
+// dialect and ONE IntentChannel (ADR 0029 / ADR 0065 clause 2). Both coordinates are REQUIRED here
+// on purpose — GHA is the dialect that actually has two materializations, so "which channel" is
+// part of every recognition question about it, and after T4 "which dialect" is part of every one
+// too. A test that did not say would be asking an ill-posed question. `channel` names a declared
+// channel ("annotated" / "stripped"); kAnyChannel models the caller that declares no channel (D5 —
 // concretely-gated rows stay dark).
 [[nodiscard]] ComposedSemantics github_only(std::string_view channel)
 {
     const std::array manifests{insight::semantic::github::kManifest};
-    return insight::semantic::compose(manifests).for_channel(channel);
+    return insight::semantic::compose(manifests).for_stream(insight::semantic::github::kDialect,
+                                                            channel);
+}
+
+// The same composition on a stream that declared NO dialect — the fail-closed arm.
+[[nodiscard]] ComposedSemantics undeclared_dialect(std::string_view channel)
+{
+    const std::array manifests{insight::semantic::github::kManifest};
+    return insight::semantic::compose(manifests).for_stream(insight::semantic::kAnyDialect,
+                                                            channel);
 }
 
 [[nodiscard]] std::string_view kind_str(IntentMarkerKind kind)
@@ -62,11 +71,11 @@ TEST(GithubMarkers, RecognizesJobAndStepBanners)
 {
     const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};
     const auto job{
-        recognize("Complete job name: build (ubuntu-latest)", LogFormat::GitHubActions, gh)};
+        recognize("Complete job name: build (ubuntu-latest)", gh)};
     EXPECT_EQ(job.kind, IntentMarkerKind::Job) << "expected Job, got " << show(job);
     EXPECT_EQ(job.name, "build (ubuntu-latest)") << "raw job payload wrong: " << show(job);
 
-    const auto step{recognize("Run actions/checkout@v4", LogFormat::GitHubActions, gh)};
+    const auto step{recognize("Run actions/checkout@v4", gh)};
     EXPECT_EQ(step.kind, IntentMarkerKind::Step) << "expected Step, got " << show(step);
     EXPECT_EQ(step.name, "actions/checkout@v4") << "raw step payload wrong: " << show(step);
 }
@@ -93,13 +102,13 @@ TEST(GithubMarkers, StepIdentityIsInvariantAcrossTheRealChannelAndOurAblation)
     const ComposedSemantics annotated{github_only(insight::semantic::github::kChannelAnnotated)};
     const ComposedSemantics stripped{github_only(insight::semantic::github::kChannelStripped)};
 
-    const auto wrapped{recognize("##[group]Run yarn lint", LogFormat::GitHubActions, annotated)};
+    const auto wrapped{recognize("##[group]Run yarn lint", annotated)};
     EXPECT_EQ(wrapped.kind, IntentMarkerKind::Step)
         << "the annotated channel's genuine banner was not recognized: " << show(wrapped);
     EXPECT_EQ(wrapped.name, "yarn lint")
         << "the wrapped payload must strip to the bare step name: " << show(wrapped);
 
-    const auto bare{recognize("Run yarn lint", LogFormat::GitHubActions, stripped)};
+    const auto bare{recognize("Run yarn lint", stripped)};
     EXPECT_EQ(bare.kind, IntentMarkerKind::Step)
         << "the stripped channel's genuine banner was not recognized: " << show(bare);
     EXPECT_EQ(bare.name, wrapped.name) << "THE CHANNEL BECAME AN AXIS: the real channel and our "
@@ -112,21 +121,21 @@ TEST(GithubMarkers, StepIdentityIsInvariantAcrossTheRealChannelAndOurAblation)
 
     // Each channel's OTHER form is not a banner there — the whole point of the coordinate.
     const auto prose{
-        recognize("Run `npm audit` for details.", LogFormat::GitHubActions, annotated)};
+        recognize("Run `npm audit` for details.", annotated)};
     EXPECT_EQ(prose.kind, IntentMarkerKind::None)
         << "PHANTOM: bare `Run ` prose opened a Step in the ANNOTATED channel, where the genuine "
            "banner is "
            "`##[group]Run ` and this line is ordinary npm output: "
         << show(prose);
     const auto wrapped_in_stripped{
-        recognize("##[group]Run yarn lint", LogFormat::GitHubActions, stripped)};
+        recognize("##[group]Run yarn lint", stripped)};
     EXPECT_EQ(wrapped_in_stripped.kind, IntentMarkerKind::None)
         << "the annotated banner fired under the STRIPPED channel, where `##[` cannot occur: "
         << show(wrapped_in_stripped);
 
     // `::group::Run ` is not a shipped row → it must NOT open a Step (guards against a speculative
     // row).
-    const auto colon{recognize("::group::Run yarn lint", LogFormat::GitHubActions, annotated)};
+    const auto colon{recognize("::group::Run yarn lint", annotated)};
     EXPECT_EQ(colon.kind, IntentMarkerKind::None)
         << "::group:: form unexpectedly recognized: " << show(colon);
 }
@@ -141,49 +150,57 @@ TEST(GithubMarkers, UndeclaredChannelFiresNoStepRowEitherWay)
     const ComposedSemantics undeclared{github_only(insight::semantic::kAnyChannel)};
 
     EXPECT_EQ(
-        recognize("Complete job name: build (ubuntu-latest)", LogFormat::GitHubActions, undeclared)
+        recognize("Complete job name: build (ubuntu-latest)", undeclared)
             .kind,
         IntentMarkerKind::Job)
         << "the Job banner is kAnyChannel (identical in both channels) and must still fire "
            "undeclared";
-    EXPECT_EQ(recognize("Run yarn lint", LogFormat::GitHubActions, undeclared).kind,
+    EXPECT_EQ(recognize("Run yarn lint", undeclared).kind,
               IntentMarkerKind::None)
         << "a channel-gated Step row fired with NO channel declared — the composition defaulted to "
            "a "
            "concrete channel, which is exactly the fail-open defect ADR 0029 D5 closes";
-    EXPECT_EQ(recognize("##[group]Run yarn lint", LogFormat::GitHubActions, undeclared).kind,
+    EXPECT_EQ(recognize("##[group]Run yarn lint", undeclared).kind,
               IntentMarkerKind::None)
         << "same, for the annotated materialization";
 }
 
-// ── II-6: format-gated to GitHubActions — the dialect never fires cross-format ──
-// The gate is the ONLY difference (proven by the GHA sanity line). Post-split the gate is a ROW
-// field (kMarkers[*].format_gate = GitHubActions); the walker's gate_matches enforces it.
-TEST(GithubMarkers, FormatGatedToGitHubActions)
+// ── II-6: DIALECT-gated to this package — the dialect never fires on a stream that did not declare
+// it (ADR 0065 clause 1). The gate is the ONLY difference (proven by the declared sanity line).
+//
+// ⚠ WHAT CHANGED AND WHY IT MATTERS. This test used to loop over `LogFormat` values, passing each
+// as `recognize`'s gate — and in production that argument was `LogParser::routed_format()`, the
+// per-line detector winner under a sticky-strategy fast path. So "does the GHA dialect fire?" was
+// answered by the line's own CONTENT. It is now answered by the stream's DECLARATION, once, before
+// the first line. The undeclared arm is the one that would catch a filter that silently kept
+// everything.
+TEST(GithubMarkers, DialectGatedToTheDeclaringStream)
 {
     const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};
     constexpr std::string_view run_line{"Run daemon started"};
-    for (const LogFormat fmt :
-         {LogFormat::Unknown, LogFormat::RawText, LogFormat::JSON, LogFormat::Syslog,
-          LogFormat::KeyValue, LogFormat::Log4j, LogFormat::CloudWatch})
-    {
-        const auto mark{recognize(run_line, fmt, gh)};
-        EXPECT_EQ(mark.kind, IntentMarkerKind::None)
-            << "dialect fired cross-format on " << to_string(fmt) << ": " << show(mark);
-    }
-    EXPECT_EQ(recognize(run_line, LogFormat::GitHubActions, gh).kind, IntentMarkerKind::Step)
-        << "the SAME line must open a Step under GHA — the format gate is the sole difference";
+
+    const auto undeclared{
+        recognize(run_line, undeclared_dialect(insight::semantic::github::kChannelStripped))};
+    EXPECT_EQ(undeclared.kind, IntentMarkerKind::None)
+        << "a dialect-gated Step row fired on a stream that declared NO dialect — fail-closed on "
+           "depth is not optional: "
+        << show(undeclared);
+
+    EXPECT_EQ(recognize(run_line, gh).kind, IntentMarkerKind::Step)
+        << "the SAME line must open a Step once the stream declares \""
+        << insight::semantic::github::kDialect
+        << "\" — the dialect declaration is the sole difference";
 }
 
 // ── No false RESET: the step prefix is `Run ` WITH the trailing space; empty opens nothing ──
 TEST(GithubMarkers, NoFalseStepOnRunningOrEmpty)
 {
     const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};
-    const auto running{recognize("Running database migrations", LogFormat::GitHubActions, gh)};
+    const auto running{recognize("Running database migrations", gh)};
     EXPECT_EQ(running.kind, IntentMarkerKind::None)
         << "\"Running …\" false-matched a Step: " << show(running);
 
-    const auto empty{recognize("", LogFormat::GitHubActions, gh)};
+    const auto empty{recognize("", gh)};
     EXPECT_EQ(empty.kind, IntentMarkerKind::None)
         << "empty content opened a quantum: " << show(empty);
 }
@@ -196,11 +213,11 @@ TEST(GithubMarkers, JobUnorderedStepOrdered)
 {
     const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};
     const auto job{
-        recognize("Complete job name: Test (ubuntu-latest)", LogFormat::GitHubActions, gh)};
+        recognize("Complete job name: Test (ubuntu-latest)", gh)};
     EXPECT_EQ(job.child_order, ChildOrder::Unordered) << "jobs are parallel → set-matched";
     EXPECT_EQ(job.discriminant, "(ubuntu-latest)") << "the marker carries its raw discriminant";
 
-    const auto step{recognize("Run yarn build", LogFormat::GitHubActions, gh)};
+    const auto step{recognize("Run yarn build", gh)};
     EXPECT_EQ(step.child_order, ChildOrder::Ordered) << "steps are sequential → LCS-matched";
 }
 
@@ -211,13 +228,13 @@ TEST(GithubMarkers, JobUnorderedStepOrdered)
 TEST(GithubMarkers, RawPayloadFeedsAlignmentClass)
 {
     const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};
-    const auto job{recognize("Complete job name: test (win-msvc, windows-latest, nightly)",
-                             LogFormat::GitHubActions, gh)};
+    const auto job{
+        recognize("Complete job name: test (win-msvc, windows-latest, nightly)", gh)};
     ASSERT_EQ(job.kind, IntentMarkerKind::Job) << show(job);
     EXPECT_EQ(canonicalize_intent(job.name), "test (M)")
         << "raw \"" << job.name << "\" did not collapse to the matrix class";
 
-    const auto step{recognize("Run actions/checkout@v4", LogFormat::GitHubActions, gh)};
+    const auto step{recognize("Run actions/checkout@v4", gh)};
     ASSERT_EQ(step.kind, IntentMarkerKind::Step) << show(step);
     EXPECT_EQ(canonicalize_intent(step.name), "actions/checkout@vX")
         << "raw \"" << step.name << "\" did not collapse to the versioned-action class";

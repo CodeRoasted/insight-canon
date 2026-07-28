@@ -31,10 +31,25 @@ constexpr std::string_view kGhaTs{"2026-06-09T09:40:20.4309100Z "};
     return std::string{kGhaTs} + std::string{body};
 }
 
+// GitHub's serving API stamps every line it returns; a caller that fetched a job log DECLARES it.
+constexpr std::array<std::string_view, 1> kGhaStack{{"api-rfc3339-line-prefix"}};
+
 [[nodiscard]] ComposedSemantics github_only()
 {
     const std::array manifests{insight::semantic::github::kManifest};
     return insight::semantic::compose(manifests);
+}
+
+// The ONE call a caller makes at stream open. The peel runs BEFORE the tokenizer, so the line the
+// provenance hook sees starts at the visible content — which is exactly why the hook's own
+// leading-stamp skip could be RIPPED at T4 (ADR 0044 §8 item 5).
+[[nodiscard]] insight::semantic::ResolvedStream gha_stream(const ComposedSemantics& composed)
+{
+    return insight::semantic::resolve_stream(
+        composed, insight::transport::IngestDeclaration{
+                      .stack = kGhaStack,
+                      .dialect = insight::semantic::github::kDialect,
+                      .channel = insight::semantic::github::kChannelAnnotated});
 }
 } // namespace
 
@@ -46,8 +61,12 @@ TEST(GithubEchoedSource, CommandEchoWrappedLineIsRecognized)
         << "the GHA command-echo of an `echo \"… failed …\"` script line";
     EXPECT_TRUE(is_echoed_source("\x1b[36;1mset -e\x1b[0m"))
         << "a wrapped script line, no timestamp";
-    EXPECT_TRUE(is_echoed_source(gha("\x1b[36;1m    exit 1\x1b[0m")))
-        << "GHA timestamp prefix skipped, then the wrapped span recognized";
+    EXPECT_FALSE(is_echoed_source(gha("\x1b[36;1m    exit 1\x1b[0m")))
+        << "⚠ T4 (ADR 0044 §8 item 5): the hook's own leading-stamp skip is RIPPED. It used to call "
+           "is_github_actions_prefix and skip 28 bytes — a per-line CONTENT test deciding where the "
+           "visible content starts, i.e. a second, undeclared transport strip hidden inside a "
+           "provenance predicate. A still-stamped line is now correctly NOT recognized; the caller "
+           "declares the transform and peels first (see the Tokenizer gates below).";
     EXPECT_TRUE(is_echoed_source("\x1b[1;36mif [ $i -eq 3 ]; then\x1b[0m"))
         << "the `1;36` parameter ordering is the equivalent command-echo SGR";
     EXPECT_TRUE(is_echoed_source("\x1b[36;1m\x1b[0m"))
@@ -79,10 +98,13 @@ TEST(GithubEchoedSource, TokenizerDemotesEchoedFailureLevelToUnknown)
 {
     ArenaAllocator arena{256U * 1024U};
     const ComposedSemantics gh{github_only()};
-    Tokenizer tokenizer{arena, MaskConfig{}, gh};
+    const insight::semantic::ResolvedStream stream{gha_stream(gh)};
+    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
 
     const auto echoed{tokenizer.process_line(
-        gha("\x1b[36;1m    echo \"Download failed after 3 attempts\" >&2\x1b[0m"))};
+        stream.transport
+            .peel(gha("\x1b[36;1m    echo \"Download failed after 3 attempts\" >&2\x1b[0m"))
+            .content)};
     ASSERT_TRUE(echoed.has_value()) << "process_line failed: " << echoed.error();
     EXPECT_TRUE(echoed->echoed_source) << "the command-echo wrapper must set echoed_source";
     EXPECT_EQ(echoed->level, LogLevel::Unknown)
@@ -101,9 +123,11 @@ TEST(GithubEchoedSource, EchoedSourceDemotionOutranksTheDeclaredLevelLift)
 {
     ArenaAllocator arena{256U * 1024U};
     const ComposedSemantics gh{github_only()};
-    Tokenizer tokenizer{arena, MaskConfig{}, gh};
+    const insight::semantic::ResolvedStream stream{gha_stream(gh)};
+    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
 
-    const auto echoed{tokenizer.process_line(gha("\x1b[36;1m##[error]deploy step failed\x1b[0m"))};
+    const auto echoed{tokenizer.process_line(
+        stream.transport.peel(gha("\x1b[36;1m##[error]deploy step failed\x1b[0m")).content)};
     ASSERT_TRUE(echoed.has_value()) << "process_line failed: " << echoed.error();
     EXPECT_TRUE(echoed->echoed_source) << "the command-echo wrapper must set echoed_source";
     EXPECT_EQ(echoed->level, LogLevel::Unknown)
@@ -113,7 +137,8 @@ TEST(GithubEchoedSource, EchoedSourceDemotionOutranksTheDeclaredLevelLift)
 
     // The disconfirming control: the SAME content UNWRAPPED does lift to Error, so the case above
     // is a real contest between the lift and the demotion rather than a line the lift ignores.
-    const auto plain{tokenizer.process_line(gha("##[error]deploy step failed"))};
+    const auto plain{
+        tokenizer.process_line(stream.transport.peel(gha("##[error]deploy step failed")).content)};
     ASSERT_TRUE(plain.has_value()) << "process_line failed: " << plain.error();
     EXPECT_FALSE(plain->echoed_source);
     EXPECT_EQ(plain->level, LogLevel::Error)
@@ -127,9 +152,11 @@ TEST(GithubEchoedSource, TokenizerKeepsRealColouredErrorAsError)
 {
     ArenaAllocator arena{256U * 1024U};
     const ComposedSemantics gh{github_only()};
-    Tokenizer tokenizer{arena, MaskConfig{}, gh};
+    const insight::semantic::ResolvedStream stream{gha_stream(gh)};
+    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
 
-    const auto real{tokenizer.process_line(gha("\x1b[31mERROR\x1b[0m: db connection refused"))};
+    const auto real{tokenizer.process_line(
+        stream.transport.peel(gha("\x1b[31mERROR\x1b[0m: db connection refused")).content)};
     ASSERT_TRUE(real.has_value()) << "process_line failed: " << real.error();
     EXPECT_FALSE(real->echoed_source) << "a red (`31`) coloured line is not echoed-source";
     EXPECT_EQ(real->level, LogLevel::Error)

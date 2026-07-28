@@ -17,28 +17,42 @@ export import insight.canon.spi;
 namespace insight::semantic::github
 {
 
-// ── The code-tier seams (defined in github_strategy.cpp, this module's impl unit) ──
-// The dialect format strategy factory (matches spi::StrategyFactory) and the echoed-source raw-line
-// provenance hook (matches spi::ProvenanceHook — pure bool(string_view) noexcept). Declared here so
-// kManifest can take their addresses; kManifest is the module's single export.
-export std::unique_ptr<insight::tokenization::IFormatStrategy> make_strategy();
+// ── The code-tier seam (defined in github_provenance.cpp, this module's impl unit) ──
+// The echoed-source raw-line provenance hook (matches spi::ProvenanceHook — pure
+// bool(string_view) noexcept). Declared here so kManifest can take its address.
+//
+// There is NO strategy factory any more (T4): `GitHubActionsStrategy` detected and peeled GitHub's
+// per-line delivery stamp, and that peel is now DECLARED transport (ADR 0044 §3/§8 —
+// `api-rfc3339-line-prefix`). This package's code tier is one byte predicate, so the dialect is
+// DATA: rows plus canon's walkers ARE the GHA parser (ADR 0065 clause 5).
 export bool is_echoed_source(std::string_view raw_line) noexcept;
 
+// The dialect NAME every gated row below carries, and the name a caller declares
+// (`IngestDeclaration::dialect` / `--dialect`). Exported because a caller has to be able to name it
+// without spelling a literal, exactly as the channel names are exported: the value is this
+// package's manifest `.name`, and `all_dialect_gates_owned` static_asserts the two agree.
+export inline constexpr std::string_view kDialect{"github"};
+
 // ── Structural-role rows (§1.2) ──
-// The announced GitHub-Actions/Azure markers. format_gate = kAnyFormat: these fire regardless of
-// the routed format, reproducing the pre-split UNGATED StructuralRoleRegistry::classify EXACTLY (a
-// `##[group]` on a RawText CI line still classifies — byte-identity, G-SP-1).
+// The announced GitHub-Actions/Azure markers. dialect_gate = kAnyDialect: these fire whatever the
+// caller declared, reproducing the pre-split UNGATED StructuralRoleRegistry::classify EXACTLY (a
+// `##[group]` on an undeclared CI line still classifies — byte-identity, G-SP-1).
+//
+// ⚠ THE UNGATED READING IS DELIBERATE AND IS NOT AN OVERSIGHT. T4 changed the gate's TYPE, never a
+// row's VALUE: these six were `kAnyFormat` and are now `kAnyDialect`, which is the same claim in
+// the new vocabulary. Narrowing them to \"github\" would be a recognition change riding a
+// type change — a different decision, with its own gate, and not this cut's.
 inline constexpr std::array<StructuralRoleRow, 6> kRoles{{
-    {.prefix = "##[group]", .role = insight::StructuralRole::GroupBegin, .format_gate = kAnyFormat},
-    {.prefix = "::group::", .role = insight::StructuralRole::GroupBegin, .format_gate = kAnyFormat},
+    {.prefix = "##[group]", .role = insight::StructuralRole::GroupBegin, .dialect_gate = kAnyDialect},
+    {.prefix = "::group::", .role = insight::StructuralRole::GroupBegin, .dialect_gate = kAnyDialect},
     {.prefix = "##[endgroup]",
      .role = insight::StructuralRole::GroupEnd,
-     .format_gate = kAnyFormat},
+     .dialect_gate = kAnyDialect},
     {.prefix = "::endgroup::",
      .role = insight::StructuralRole::GroupEnd,
-     .format_gate = kAnyFormat},
-    {.prefix = "##[error]", .role = insight::StructuralRole::Terminator, .format_gate = kAnyFormat},
-    {.prefix = "::error::", .role = insight::StructuralRole::Terminator, .format_gate = kAnyFormat},
+     .dialect_gate = kAnyDialect},
+    {.prefix = "##[error]", .role = insight::StructuralRole::Terminator, .dialect_gate = kAnyDialect},
+    {.prefix = "::error::", .role = insight::StructuralRole::Terminator, .dialect_gate = kAnyDialect},
 }};
 
 // ── The declared INTENT CHANNEL vocabulary (ADR 0030 D1/D3) ──
@@ -84,7 +98,7 @@ export inline constexpr std::array<std::string_view, 2> kChannels{
     {kChannelAnnotated, kChannelStripped}};
 
 // ── Intent-marker rows (§1.2/§2.2) ──
-// FORMAT-GATED to GitHubActions (II-6 — `Run ` is GHA-runner-specific and would misfire elsewhere).
+// DIALECT-GATED to this package (II-6 — `Run ` is GHA-runner-specific and would misfire elsewhere).
 // The hierarchy rides the rows: Job = Unordered (jobs parallel-by-construction), Step = Ordered
 // (steps sequential-by-YAML) — the ADR 0023 level-typed alignment declaration. The payload is the
 // content after the prefix, verbatim (core's canonicalize_intent/discriminant_of derive the class +
@@ -127,27 +141,27 @@ inline constexpr std::array<IntentMarkerRow, 3> kMarkers{{
     {.prefix = "Complete job name: ",
      .kind = insight::tokenization::IntentMarkerKind::Job,
      .child_order = insight::tokenization::ChildOrder::Unordered,
-     .format_gate = insight::LogFormat::GitHubActions,
+     .dialect_gate = kDialect,
      .extract = PayloadExtract::RemainderAfterPrefix,
      .channel_gate = kAnyChannel}, // the job banner is identical in both channels
     {.prefix = "Run ",
      .kind = insight::tokenization::IntentMarkerKind::Step,
      .child_order = insight::tokenization::ChildOrder::Ordered,
-     .format_gate = insight::LogFormat::GitHubActions,
+     .dialect_gate = kDialect,
      .extract = PayloadExtract::RemainderAfterPrefix,
      .channel_gate = kChannelStripped}, // in the annotated channel this prefix is PROSE
     {.prefix = "##[group]Run ", // the runner-wrapped materialization of the same step banner
      .kind = insight::tokenization::IntentMarkerKind::Step,
      .child_order = insight::tokenization::ChildOrder::Ordered,
-     .format_gate = insight::LogFormat::GitHubActions,
+     .dialect_gate = kDialect,
      .extract = PayloadExtract::RemainderAfterPrefix,
      .channel_gate = kChannelAnnotated},
 }};
 
 // ── Generation-template rows (studies/008, shared_intent_declaration §3.2) — the WRITER dual ──
-// One emit row per recognition row, paired by (prefix, kind, format_gate, channel_gate) — the
-// MEDIUM is `IntentFormat × IntentChannel` (ADR 0030 D3), so each projection names the same channel
-// as its dual. Both Step media are present: `##[group]Run <cmd>` materializes into the ANNOTATED
+// One emit row per recognition row, paired by (prefix, kind, dialect_gate, channel_gate) — the
+// MEDIUM is `dialect × IntentChannel` (ADR 0030 D3 / ADR 0065 clause 1), so each projection names
+// the same dialect and channel as its dual. Both Step media are present: `##[group]Run <cmd>` materializes into the ANNOTATED
 // channel (the real one, and the writer's default), `Run <cmd>` into our STRIPPED ablation — each
 // read back to the same identity under its own channel, so the round-trip closes per channel (G2).
 // The writer picks WHICH by the declared channel (the medium selector), never by array order. Each
@@ -157,19 +171,19 @@ inline constexpr std::array<IntentEmitRow, 3> kEmitMarkers{{
     {.prefix = "Complete job name: ",
      .kind = insight::tokenization::IntentMarkerKind::Job,
      .child_order = insight::tokenization::ChildOrder::Unordered,
-     .format_gate = insight::LogFormat::GitHubActions,
+     .dialect_gate = kDialect,
      .emit = PayloadEmit::PayloadAfterPrefix,
      .channel_gate = kAnyChannel},
     {.prefix = "Run ",
      .kind = insight::tokenization::IntentMarkerKind::Step,
      .child_order = insight::tokenization::ChildOrder::Ordered,
-     .format_gate = insight::LogFormat::GitHubActions,
+     .dialect_gate = kDialect,
      .emit = PayloadEmit::PayloadAfterPrefix,
      .channel_gate = kChannelStripped},
     {.prefix = "##[group]Run ", // the runner-wrapped medium of the same step banner
      .kind = insight::tokenization::IntentMarkerKind::Step,
      .child_order = insight::tokenization::ChildOrder::Ordered,
-     .format_gate = insight::LogFormat::GitHubActions,
+     .dialect_gate = kDialect,
      .emit = PayloadEmit::PayloadAfterPrefix,
      .channel_gate = kChannelAnnotated},
 }};
@@ -199,7 +213,7 @@ static_assert(insight::semantic::all_channel_gates_declared(kMarkers, kEmitMarke
               ".channel_gate?) — the declared vocabulary is kChannels");
 
 // ── Level-lift rows (§1.2) ──
-// The GHA workflow-command level lift. FORMAT-GATED to GitHubActions. Pure DATA: the package
+// The GHA workflow-command level lift. DIALECT-GATED to this package. Pure DATA: the package
 // declares the rows, canon walks them — `insight::tokenization::lift_level` over the composed
 // `level_lifts()` table, applied by LogParser to every parsed line (ADR 0063 clause 2). Until then
 // this package's own strategy walked the array itself, which made LevelLiftRow the last row kind
@@ -209,28 +223,28 @@ static_assert(insight::semantic::all_channel_gates_declared(kMarkers, kEmitMarke
 inline constexpr std::array<LevelLiftRow, 8> kLevelLifts{{
     {.prefix = "##[error]",
      .level = insight::LogLevel::Error,
-     .format_gate = insight::LogFormat::GitHubActions},
+     .dialect_gate = kDialect},
     {.prefix = "::error::",
      .level = insight::LogLevel::Error,
-     .format_gate = insight::LogFormat::GitHubActions},
+     .dialect_gate = kDialect},
     {.prefix = "##[warning]",
      .level = insight::LogLevel::Warn,
-     .format_gate = insight::LogFormat::GitHubActions},
+     .dialect_gate = kDialect},
     {.prefix = "::warning::",
      .level = insight::LogLevel::Warn,
-     .format_gate = insight::LogFormat::GitHubActions},
+     .dialect_gate = kDialect},
     {.prefix = "##[debug]",
      .level = insight::LogLevel::Debug,
-     .format_gate = insight::LogFormat::GitHubActions},
+     .dialect_gate = kDialect},
     {.prefix = "::debug::",
      .level = insight::LogLevel::Debug,
-     .format_gate = insight::LogFormat::GitHubActions},
+     .dialect_gate = kDialect},
     {.prefix = "##[notice]",
      .level = insight::LogLevel::Info,
-     .format_gate = insight::LogFormat::GitHubActions},
+     .dialect_gate = kDialect},
     {.prefix = "::notice::",
      .level = insight::LogLevel::Info,
-     .format_gate = insight::LogFormat::GitHubActions},
+     .dialect_gate = kDialect},
 }};
 
 // ── Run-outcome token rows (grammar-2, ADR 0025 §4 — the GitHub reshape) ──
@@ -245,29 +259,32 @@ inline constexpr std::array<LevelLiftRow, 8> kLevelLifts{{
 inline constexpr std::array<OutcomeTokenRow, 7> kOutcomeTokens{{
     {.token = "success",
      .outcome = insight::RunOutcome::Success,
-     .format_gate = insight::LogFormat::GitHubActions},
+     .dialect_gate = kDialect},
     {.token = "failure",
      .outcome = insight::RunOutcome::Failure,
-     .format_gate = insight::LogFormat::GitHubActions},
+     .dialect_gate = kDialect},
     {.token = "cancelled",
      .outcome = insight::RunOutcome::Aborted,
-     .format_gate = insight::LogFormat::GitHubActions},
+     .dialect_gate = kDialect},
     {.token = "timed_out",
      .outcome = insight::RunOutcome::Aborted,
-     .format_gate = insight::LogFormat::GitHubActions},
+     .dialect_gate = kDialect},
     {.token = "skipped",
      .outcome = insight::RunOutcome::Unknown,
-     .format_gate = insight::LogFormat::GitHubActions},
+     .dialect_gate = kDialect},
     {.token = "neutral",
      .outcome = insight::RunOutcome::Unknown,
-     .format_gate = insight::LogFormat::GitHubActions},
+     .dialect_gate = kDialect},
     {.token = "action_required",
      .outcome = insight::RunOutcome::Unknown,
-     .format_gate = insight::LogFormat::GitHubActions},
+     .dialect_gate = kDialect},
 }};
 
 // ── The manifest (§2.5) — the package's single composed contribution ──
-// name "github", version "1.3.0" — bumped from 1.2.0 for the IntentChannel coordinate (the declared
+// name "github", version "1.4.0" — bumped from 1.3.0 for T4: the package's CODE TIER lost its
+// format strategy (`.strategy` is serialized as a presence byte, so the manifest's content genuinely
+// moved) and every gated row's coordinate became the package NAME. 1.3.0 was the IntentChannel
+// coordinate (the declared
 // channel vocabulary + the channel-gated Step rows). SP-7 immutable-release discipline: a released
 // version's rows are frozen, a content change is a new version; the bump also rides the II-7
 // semantic_identity hash, an honest comparability boundary — a diff across this boundary is
@@ -278,11 +295,11 @@ inline constexpr std::array<OutcomeTokenRow, 7> kOutcomeTokens{{
 // unchanged) and the row content, neither of which moved. SP-7 keys on CONTENT, not on spelling;
 // bumping for a rename would declare a new ruleset that recognizes exactly what the old one did,
 // and make two identical rulesets look incomparable. Ships no locations (that is the
-// test_frameworks package) and no value classes (none has a consumer yet). Code tier: the dialect
-// strategy + the echoed-source hook.
+// test_frameworks package) and no value classes (none has a consumer yet). Code tier: the
+// echoed-source hook, and nothing else.
 export inline constexpr SemanticPackageManifest kManifest{
     .name = "github",
-    .version = "1.3.0",
+    .version = "1.4.0",
     .roles = kRoles,
     .markers = kMarkers,
     .emits = kEmitMarkers, // ADR 0044 §7 — the generation projection is identity-bearing
@@ -292,8 +309,18 @@ export inline constexpr SemanticPackageManifest kManifest{
     .outcome_tokens = kOutcomeTokens,
     .outcome_markers = {},
     .channels = kChannels, // ADR 0029 D1 — the two GHA materializations
-    .strategy = &make_strategy,
-    .echoed_source = &is_echoed_source,
+    .echoed_source = &is_echoed_source, // the only code tier left: a byte predicate, not a grammar
 };
+
+// ADR 0065 clause 1 — every gated row names THIS package or kAnyDialect, checked at COMPILE time,
+// here. A gate naming another package would reach across a boundary this package does not own, and
+// a typo would produce a row that silently never fires under any declaration; composition FLATTENS,
+// so nothing downstream could tell either apart from a legitimate row.
+static_assert(insight::semantic::all_dialect_gates_owned(kManifest),
+              "github: a row's dialect_gate is neither kAnyDialect nor this package's own name (a "
+              "typo in .dialect_gate, or a row reaching for another package's vocabulary?)");
+static_assert(kManifest.name == kDialect,
+              "github: kDialect and the manifest name must be the same string — kDialect is what a "
+              "caller declares and what every gated row carries");
 
 } // namespace insight::semantic::github

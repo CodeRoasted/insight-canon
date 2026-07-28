@@ -11,13 +11,18 @@ import insight.canon.spi; // LevelLiftRow
 // recognize_location.
 //
 // Ported byte-for-byte from `insight::semantic::github`'s package-local `level_from_message`
-// (github_strategy.cpp), which walked that package's own `kLevelLifts` array inside `parse()`. Two
-// things changed and nothing else: the rows come from `ComposedSemantics` instead of one package's
-// static array, and the walk consults each row's `format_gate` — which the package walk did not
-// need, because the only way to reach it was through the GHA strategy, so the gate was satisfied
-// structurally. Both preserve the observable result exactly: the composed table holds the same rows
-// in the same declared order, and a row gated to GitHubActions can only fire on a GHA-routed line
-// either way.
+// (github_strategy.cpp), which walked that package's own `kLevelLifts` array inside `parse()`. One
+// thing changed and nothing else: the rows come from `ComposedSemantics` instead of one package's
+// static array. The observable result is preserved exactly — the resolved view holds the same rows
+// in the same declared order, and a row gated to the `github` dialect is only in the view of a
+// stream that declared it, which is the structural equivalent of the package walk being reachable
+// only through the GHA strategy.
+//
+// NO GATE PARAMETER (ADR 0065 clause 2). The dialect is evaluated once, at `resolve_stream`, and
+// filtered into this view. The intermediate shape — a `format` argument fed from
+// `LogParser::routed_format()` — was a live determinism hazard: the routed format is the per-line
+// detector winner under a sticky-strategy fast path, so which DECLARED rows fired was a function of
+// content.
 //
 // Homed in its own impl unit rather than folded into compose.cpp: composition (sort, concatenate,
 // fail closed, hash) and recognition (walk a table for one line) are different responsibilities,
@@ -26,12 +31,11 @@ import insight.canon.spi; // LevelLiftRow
 namespace insight::tokenization
 {
 
-LogLevel lift_level(std::string_view content, LogFormat format,
+LogLevel lift_level(std::string_view content,
                     const insight::semantic::ComposedSemantics& composed) noexcept
 {
     for (const insight::semantic::LevelLiftRow& row : composed.level_lifts())
-        if (insight::semantic::detail::gate_matches(row.format_gate, format) &&
-            content.starts_with(row.prefix))
+        if (content.starts_with(row.prefix))
             return row.level;
     return LogLevel::Unknown;
 }

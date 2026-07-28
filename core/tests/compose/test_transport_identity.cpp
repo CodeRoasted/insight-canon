@@ -42,7 +42,7 @@ import insight.canon.test; // facade (compose / resolve_stream / transport) + sp
 using insight::StructuralRole;
 using insight::semantic::compose;
 using insight::semantic::ComposedSemantics;
-using insight::semantic::kAnyFormat;
+using insight::semantic::kAnyDialect;
 using insight::semantic::resolve_stream;
 using insight::semantic::ResolvedStream;
 using insight::semantic::SemanticPackageManifest;
@@ -63,9 +63,9 @@ constexpr std::array<std::string_view, 1> kDeclaredGha{{kGhaTransform}};
 // §2.4). `kRolesMutated` differs from `kRoles` in exactly one character of one prefix — the
 // smallest change that must still move the digest.
 constexpr std::array<StructuralRoleRow, 1> kRoles{
-    {{.prefix = "<TRANSPORT-A>", .role = StructuralRole::GroupBegin, .format_gate = kAnyFormat}}};
+    {{.prefix = "<TRANSPORT-A>", .role = StructuralRole::GroupBegin, .dialect_gate = kAnyDialect}}};
 constexpr std::array<StructuralRoleRow, 1> kRolesMutated{
-    {{.prefix = "<TRANSPORT-B>", .role = StructuralRole::GroupBegin, .format_gate = kAnyFormat}}};
+    {{.prefix = "<TRANSPORT-B>", .role = StructuralRole::GroupBegin, .dialect_gate = kAnyDialect}}};
 
 constexpr SemanticPackageManifest kPackage{
     .name = "transport_identity_fixture", .version = "1.0.0", .roles = kRoles};
