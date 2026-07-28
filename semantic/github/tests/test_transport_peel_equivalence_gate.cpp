@@ -1,12 +1,38 @@
 // NOLINTBEGIN — integration gate: literals and printed diagnostics are intended.
 // test_transport_peel_equivalence_gate.cpp — G1's CORPUS arm + G1-PEEL (ADR 0044 §9), homed here.
 //
-// HOMING (Kleio). This is the third of G1's three grains; the other two are unit tests in canon
-// core (`core/tests/transport/`, `core/tests/compose/`). This one is a PACKAGE INTEGRATION GATE and
-// belongs in this package for one structural reason: it needs BOTH implementations in scope at
-// once. The SUT (`insight::transport::TransportStack::peel`, canon core) and the ORACLE
-// (`GitHubActionsStrategy::parse`, reached through this package's `make_strategy()`) meet HERE and
-// nowhere lower — the dependency arrow runs core → semantic/github and never back.
+// ⚠ THE ORACLE IS FROZEN, AND THIS GATE HAS CHANGED KIND (ADR 0062 clauses 1/2/4). Read this before
+// citing anything below.
+//
+//   * THE ORACLE IS A FROZEN COPY, taken VERBATIM from `semantic/github/src/github_strategy.cpp` at
+//     insight-canon commit `ac94aff` — the last commit before T4 deleted that detection from
+//     production. Its provenance lives HERE, in the gate, and not only in the `git log` of a
+//     deleted file. It is FROZEN: an "improvement" to it is a DEFECT, not maintenance.
+//   * ONLY THE DECISION FUNCTION `line ↦ (claimed?, content)` TRAVELLED. The level lift,
+//     `parse_iso8601`, `confidence()`, `format()`, the echoed-source SGR machinery and the arena
+//     did NOT (0062 clause 2) — the gate reads `has_value()` and `content` and nothing else, and a
+//     frozen oracle carrying limbs no assertion exercises is the dormant-code smell reproduced
+//     inside a test. The SIGNATURE changed (`std::optional<std::string_view>` instead of
+//     `std::expected<ParsedLine, std::string>`, which existed only to serve `IFormatStrategy`); the
+//     BYTE LOGIC did not, and may not.
+//   * THIS GATE CERTIFIED A MIGRATION; IT NOW PINS A CHARACTERIZATION. Before T4 it proved the
+//     declared transform behavior-preserving against a SHIPPED detector. After T4
+//     `TransportStack::peel` is the SOLE implementation of the GHA peel, and this frozen,
+//     independently-authored oracle over 22 490 937 lines is what catches an unintended change to
+//     a sole implementation — the one thing a self-consistent codebase cannot catch about itself.
+//   * "WRITTEN YEARS BEFORE THE SUT" IS A FACT ABOUT THE ORIGINAL CERTIFICATION, NEVER AN ONGOING
+//     INDEPENDENCE CLAIM. Two independently authored implementations agreed on 22 490 937 lines of
+//     third-party logs; that event happened, and it is a fact of git history, not of this file's
+//     location. Copying bytes cannot manufacture provenance. What relocation preserves is the
+//     ability to RE-RUN the same comparison — nothing more, and no document may read it as more.
+//
+// HOMING (Kleio's, and it is now resting on a RETIRED premise — 0062 clause 6). This is the third
+// of G1's three grains; the other two are unit tests in canon core (`core/tests/transport/`,
+// `core/tests/compose/`). It was homed in this package for one structural reason: it needed BOTH
+// implementations in scope at once, and the dependency arrow runs core → semantic/github and never
+// back. With the oracle inlined that reason has expired — this file now depends only on
+// `insight.canon` plus an env-var corpus path. Re-homing is a TEST-HOMING decision and belongs to
+// Kleio, not to the commit that made it possible.
 //   • NOT insight-eidos, which already has the `CORPUS_D11_*` plumbing. Reusing that wiring would
 //     home a canon-internal refactor-equivalence claim inside a downstream consumer — homing by
 //     convenience past the package that owns the property.
@@ -14,8 +40,9 @@
 //     value: the oracle is an implementation written years before the SUT, scored on third-party
 //     logs neither was tuned against.
 //
-// WHAT IS BEING CLAIMED, AND WHAT IS NOT (ADR 0044 §9 block-quotes this; it will be tempting to
-// overstate, so it is restated at the top of the instrument that produces the number):
+// WHAT IS BEING CLAIMED, AND WHAT IS NOT (ADR 0044 §9 block-quotes this, UNCHANGED and UNWEAKENED;
+// it will be tempting to overstate, so it is restated at the top of the instrument that produces
+// the number):
 //
 //     G1-PEEL is REFACTOR-EQUIVALENCE, never external validity. Zero mismatches proves the declared
 //     transform is behavior-preserving against the shipped detector. It proves NOTHING about the
@@ -31,11 +58,11 @@
 // Same manifest ⇒ same population ⇒ same numbers, on any machine, forever.
 //
 // THE EQUIVALENCE DEFINITION IS THE WHOLE DESIGN, and the naive one is WRONG. Asserting
-// `strategy.parse().content == peel().content` over ALL lines reports thousands of "disagreements"
-// that are all artifacts of scoring lines the strategy never claimed. The claim is scored on CELL A
-// ONLY — the lines the strategy claims. The other cells are lines the strategy DECLINES, and each
+// `oracle_claim() == peel().content` over ALL lines reports thousands of "disagreements"
+// that are all artifacts of scoring lines the oracle never claimed. The claim is scored on CELL A
+// ONLY — the lines the oracle claims. The other cells are lines the oracle DECLINES, and each
 // decline has a different cause that must be counted separately, not summed into a failure rate:
-//   A            the strategy claims the line          ⇒ peeled content MUST be byte-identical
+//   A            the oracle claims the line            ⇒ peeled content MUST be byte-identical
 //   blank        timestamp-only; peels to empty        ⇒ §8 bundled behavior (3) surviving the move
 //   empty-input  the source line was already empty     ⇒ split out from `blank`; see below
 //   B            declined solely for a leading BOM     ⇒ a REAL SHIPPED DEFECT (bugs.md 2026-07-27)
@@ -71,10 +98,8 @@
 #include <gtest/gtest.h>
 
 import std;
-import insight.canon;           // insight::transport::* + ArenaAllocator
-import insight.semantic.github; // make_strategy (the ORACLE)
+import insight.canon; // insight::transport::* — the SUT. The ORACLE is frozen below.
 
-using insight::tokenization::ArenaAllocator;
 using insight::transport::IngestDeclaration;
 using insight::transport::PeeledLine;
 using insight::transport::TransportStack;
@@ -89,8 +114,103 @@ constexpr std::string_view kGhaTransform{"api-rfc3339-line-prefix"};
 constexpr std::array<std::string_view, 1> kDeclaredGha{{kGhaTransform}};
 constexpr std::string_view kUtf8Bom{"\xEF\xBB\xBF"};
 
-// Arena block size for the oracle's `store_string`. Reset per line, so this bounds a single line.
-constexpr std::size_t kArenaBlockBytes{1U << 16U};
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+// THE FROZEN ORACLE (ADR 0062 clauses 1–2) — `GitHubActionsStrategy`'s peel decision, byte-for-byte
+// as it stood in `semantic/github/src/github_strategy.cpp` at insight-canon `ac94aff`, the last
+// commit before T4 removed that detection from production.
+//
+// ⚠ FROZEN. Do not tidy, do not modernize, do not "fix" the BOM wart (cell B below exists precisely
+// so the wart is measured rather than absorbed). A change here is a defect: it silently redefines
+// the very thing this gate certifies. The one thing that legitimately changed on relocation is the
+// SIGNATURE — `std::optional<std::string_view>` in place of `std::expected<ParsedLine,
+// std::string>`, because the latter existed only to satisfy `IFormatStrategy`, whose only
+// implementor on this path is gone, and the gate never reads the error string, the timestamp, the
+// level, the component or the raw line. Dropping the arena is safe by inspection and was checked:
+// the production `parse` copied the content into an arena and returned a view OF THE COPY, so
+// content EQUALITY is unaffected; this returns a view into the input line instead.
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+
+[[nodiscard]] constexpr bool oracle_is_digit(char chr) noexcept
+{
+    return static_cast<unsigned>(chr) - '0' < 10U;
+}
+[[nodiscard]] constexpr bool oracle_is_space(char chr) noexcept
+{
+    return chr == ' ' || chr == '\t';
+}
+
+constexpr std::size_t kOracleGhaPrefixLen{28U}; // "YYYY-MM-DDTHH:MM:SS.fffffffZ"
+
+// "YYYY-MM-DD" at offset `pos`.
+[[nodiscard]] constexpr bool oracle_match_iso_date_at(std::string_view str, std::size_t pos) noexcept
+{
+    if (pos + 10U > str.size())
+        return false;
+    return oracle_is_digit(str[pos]) && oracle_is_digit(str[pos + 1]) &&
+           oracle_is_digit(str[pos + 2]) && oracle_is_digit(str[pos + 3]) && str[pos + 4] == '-' &&
+           oracle_is_digit(str[pos + 5]) && oracle_is_digit(str[pos + 6]) && str[pos + 7] == '-' &&
+           oracle_is_digit(str[pos + 8]) && oracle_is_digit(str[pos + 9]);
+}
+
+// "HH:MM:SS" at offset `pos`.
+[[nodiscard]] constexpr bool oracle_match_time_at(std::string_view str, std::size_t pos) noexcept
+{
+    if (pos + 8U > str.size())
+        return false;
+    return oracle_is_digit(str[pos]) && oracle_is_digit(str[pos + 1]) && str[pos + 2] == ':' &&
+           oracle_is_digit(str[pos + 3]) && oracle_is_digit(str[pos + 4]) && str[pos + 5] == ':' &&
+           oracle_is_digit(str[pos + 6]) && oracle_is_digit(str[pos + 7]);
+}
+
+// "YYYY-MM-DDTHH:MM:SS" — RFC 3339 prefix (T separator).
+[[nodiscard]] constexpr bool oracle_is_rfc3339_prefix(std::string_view str) noexcept
+{
+    return oracle_match_iso_date_at(str, 0) && str.size() > 10U && str[10] == 'T' &&
+           oracle_match_time_at(str, 11U);
+}
+
+// "YYYY-MM-DDTHH:MM:SS.fffffffZ" — GHA / Azure Pipelines line prefix (exactly 7 fractional
+// digits + 'Z'). A strict subset of RFC 3339 so the strategy outranked Syslog only on genuine
+// GHA lines.
+[[nodiscard]] constexpr bool oracle_is_github_actions_prefix(std::string_view str) noexcept
+{
+    constexpr std::size_t kDotAt{19U};
+    constexpr std::size_t kFracAt{20U};
+    constexpr std::size_t kFracLen{7U};
+    constexpr std::size_t kZAt{27U};
+    if (str.size() < kOracleGhaPrefixLen)
+        return false;
+    if (!oracle_is_rfc3339_prefix(str))
+        return false;
+    if (str[kDotAt] != '.')
+        return false;
+    for (std::size_t pos{kFracAt}; pos < kFracAt + kFracLen; ++pos)
+        if (!oracle_is_digit(str[pos]))
+            return false;
+    if (str[kZAt] != 'Z')
+        return false;
+    return str.size() == kOracleGhaPrefixLen || oracle_is_space(str[kOracleGhaPrefixLen]);
+}
+
+// The decision function the gate scores against: does the shipped detector CLAIM this line, and
+// with what content? `nullopt` is a decline — the gate partitions declines by cause afterwards and
+// never reads a cause string, which is why the `std::expected` error half did not travel.
+[[nodiscard]] std::optional<std::string_view> oracle_claim(std::string_view line)
+{
+    if (!oracle_is_github_actions_prefix(line))
+        return std::nullopt; // "GitHubActionsStrategy: missing GHA timestamp prefix"
+
+    // Everything past the fixed-width timestamp; drop the separator space + any GHA indentation.
+    std::string_view content{line.substr(kOracleGhaPrefixLen)};
+    while (!content.empty() && oracle_is_space(content.front()))
+        content.remove_prefix(1U);
+
+    // A timestamp-only line is a blank line: decline it (make_event drops it, never an empty "").
+    if (content.empty())
+        return std::nullopt; // "GitHubActionsStrategy: blank GHA line (timestamp only)"
+
+    return content;
+}
 
 // How many disagreeing lines to print before truncating. Enough to see the SHAPE of a failure
 // without burying it; the totals are always printed in full.
@@ -200,6 +320,11 @@ struct ManifestField
 // Re-derived from `github_strategy.cpp`'s `is_github_actions_prefix`, deliberately NOT by calling
 // it: cell B asks "would this line have been claimed but for the BOM?", which the strategy cannot
 // answer about itself. Spelled out here so the two never collapse into one implementation.
+//
+// It stays a SECOND, separately-spelled derivation now that the frozen oracle lives in the same
+// file (ADR 0062 clause 3 cites this pre-existing duplication as the precedent for freezing the
+// oracle here at all). Collapsing it into `oracle_is_github_actions_prefix` would answer cell B's
+// counterfactual with the very implementation the counterfactual is about.
 [[nodiscard]] bool is_gha_stamp(std::string_view str) noexcept
 {
     constexpr std::size_t kPrefixLen{28};
@@ -327,11 +452,8 @@ class TransportPeelEquivalenceGate : public ::testing::Test
 
     [[nodiscard]] static Score score_slice(const std::vector<std::filesystem::path>& paths)
     {
-        const std::unique_ptr<insight::tokenization::IFormatStrategy> strategy{
-            insight::semantic::github::make_strategy()};
         const TransportStack stack{insight::transport::resolve_transport_stack(
             IngestDeclaration{.stack = kDeclaredGha, .dialect = {}, .channel = {}})};
-        ArenaAllocator arena{kArenaBlockBytes};
 
         Score score;
         for (const std::filesystem::path& path : paths)
@@ -353,14 +475,13 @@ class TransportPeelEquivalenceGate : public ::testing::Test
                 ++line_no;
                 ++score.lines;
 
-                arena.reset(); // bound the arena to ONE line
-                const auto parsed{strategy->parse(line, arena)};
+                const std::optional<std::string_view> parsed{oracle_claim(line)};
                 const PeeledLine peeled{stack.peel(line)};
 
                 if (parsed.has_value())
                 {
                     // ── CELL A — the claim ──
-                    if (parsed->content == peeled.content)
+                    if (*parsed == peeled.content)
                     {
                         ++score.claimed_equal;
                         continue;
@@ -370,12 +491,12 @@ class TransportPeelEquivalenceGate : public ::testing::Test
                         score.reported.push_back(
                             std::string{"CELL-A MISMATCH "} + path.filename().string() + ":" +
                             std::to_string(line_no) + "\n    raw      : \"" + escape(line) +
-                            "\"\n    strategy : \"" + escape(parsed->content) +
-                            "\"\n    peel     : \"" + escape(peeled.content) + "\"");
+                            "\"\n    oracle   : \"" + escape(*parsed) + "\"\n    peel     : \"" +
+                            escape(peeled.content) + "\"");
                     continue;
                 }
 
-                // ── The strategy DECLINED. Partition by CAUSE, most specific first. ──
+                // ── The oracle DECLINED. Partition by CAUSE, most specific first. ──
                 if (line.empty())
                 {
                     ++score.empty_input;
