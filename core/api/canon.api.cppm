@@ -49,8 +49,15 @@ using EventID = uint64_t;
 // ephemeral-root path catalog (`/tmp/…` → `/tmp/<*>`), and D-MSK-3 JSON nested-`fields`
 // component/level descent (a cube-axis change folded into the same bump). The -4 content changes
 // ONLY for inputs carrying a diagnostic-composite / ephemeral-root token or a nested-`fields` JSON
-// record; every other document is byte-identical except this version string.
-inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-6"};
+// record; every other document is byte-identical except this version string. -5 = D-OTEL-15
+// (`4e46af0`); -6 = the D-MSK-4 batch — canon ephemeral-root masking + the lexicon-context
+// precision fix (`9c5db20`); -7 = D-NOTE-1, the NOTE register: a failure word inside a compiler
+// note's message (`<path>:<line>:<col>: note: … failed:`) no longer confers a failure verdict, so
+// the serialized `dominant_level` of a gcc/clang cascade's note lines moves Error → Unknown.
+// `template_str` and `template_id` do NOT move under -7 — the masker is untouched — but
+// `dominant_level` is serialized and gates NewErrorPattern and diff polarity, so it is an
+// output-affecting canonicalization change and takes the bump.
+inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-7"};
 
 // ── Template identity (insight_perf_template_id.md D-TIR-1) ──
 // The structural identity of a canonicalised template: the first 16 bytes of
@@ -1228,6 +1235,28 @@ namespace detail
     // (F5).
     [[nodiscard]] bool contains_failure_summary_cue(std::string_view text,
                                                     std::size_t scan_limit = 0) noexcept;
+
+    // ── The NOTE register (D-NOTE-1) — the FOURTH register, beside verdict (D-OUT-4), count
+    // (D-CNT-1) and echoed-source (D-PROV-1). It has NO declaration here on purpose: unlike the
+    // three above it has no cross-TU consumer, so its kernel stays private to
+    // failure_lexicon.cpp, where BOTH of its consumers live (contains_failure_cue and its
+    // count-summary dual). Named here so a reader enumerating the registers from this header does
+    // not conclude there are three.
+    //
+    // WHAT IT SAYS: a token inside the MESSAGE of a compiler NOTE diagnostic — after the
+    // structural diagnostic-kind position `<path>:<line>:<col>: note: ` — carries no failure
+    // verdict, because a note asserts none. Measured on 3 real green→red gcc cascade pairs: 28 of
+    // 29 ranked `note:` findings (96.6 %) were emitted under an ERROR-class label, naming the
+    // wrong file, because `note: template argument deduction/substitution failed:` contains
+    // `failed` and `failed` is SelfAnchoring by design.
+    //
+    // THE ANCHOR IS STRUCTURAL, NEVER A BARE WORD. Prose "Note: the deploy failed" keeps its cue:
+    // demoting on a bare word would turn a LABELLING defect into a DETECTION defect, which is
+    // strictly worse. It is REGISTER-scoped, not LINE-scoped — a verdict anchored EARLIER on the
+    // same line (an `##[error]` wrapper) is a different author's claim and survives. And it
+    // DEMOTES, NEVER SUPPRESSES: the cue does not fire, the line lands at Unknown and still
+    // surfaces (the D-OUT-1 / D-PROV-1 precedent). The lexicon is untouched — the defect is
+    // CONTEXT, not vocabulary.
 } // namespace detail
 
 } // namespace insight::utils

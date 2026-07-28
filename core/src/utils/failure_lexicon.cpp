@@ -161,6 +161,22 @@ namespace
     }};
     constexpr std::array<std::string_view, 2U> kWarningWords{"warn", "warning"};
 
+    // One token's verdict against the lexicon. `matched` says the token IS lexicon vocabulary
+    // (whether or not it fired) — the CamelCase error-TYPE check is skipped for those, since a
+    // lexicon word that declined its register must not be re-admitted through the weaker signal.
+    // Extracted from contains_failure_cue's token lambda so each carries one decision; the
+    // lexicon walk still runs exactly once per token.
+    struct LexiconHit
+    {
+        bool fired{false};
+        bool matched{false};
+    };
+
+    // Defined below the register kernels it consults (is_verdict_anchored / is_count_preceded);
+    // declared here so contains_failure_cue's lambda can name it.
+    [[nodiscard]] LexiconHit lexicon_hit(std::string_view text, std::string_view token,
+                                         std::string_view prev, std::string_view prev_prev) noexcept;
+
     // Caps register (D-OUT-4 anchor #1): the token's raw bytes are ALL-UPPERCASE ASCII
     // letters, ≥2 of them — the decoration CI/test tooling uses to mark an outcome
     // (ERROR, FAILED, FATAL, PANIC). A pre-casefold byte fact; the matched token keeps
@@ -451,6 +467,59 @@ namespace detail
         }
     }
 
+    // D-NOTE-1 — the note-register kernel's single implementation; see canon.api.cppm for the
+    // contract. Returns the offset of the first byte of a NOTE diagnostic's MESSAGE — one past the
+    // structural `<path>:<line>:<col>: note: ` marker — or npos when the line carries no such
+    // marker. FIRST occurrence wins: it is the line's diagnostic-kind slot, and anything after it
+    // belongs to the note's own claim.
+    //
+    // The shape is validated BACKWARDS from the marker so the scan is one forward find plus a
+    // bounded walk: locate `": note: "`, then require `<digits>` `:` `<digits>` immediately to its
+    // left, itself preceded by the path's own `:`. That is what makes it structural rather than
+    // lexical — `"Note: the deploy failed"` and `"see note: below"` both fail it, and must, or a
+    // labelling fix becomes a detection defect.
+    //
+    // Pure byte walk, alloc-free, noexcept, no case folding (the compilers emit lowercase `note:`;
+    // matching case-insensitively would start admitting prose). F5-bit-identical by construction.
+    [[nodiscard]] std::size_t note_register_begin(std::string_view line) noexcept
+    {
+        constexpr std::string_view kNoteMarker{": note: "};
+        const std::size_t marker{line.find(kNoteMarker)};
+        if (marker == std::string_view::npos)
+            return std::string_view::npos;
+        // Walk left over the column digits, then its ':', then the line digits, then the path's
+        // ':'. Every step is required — a missing one means this is not the diagnostic-kind slot.
+        std::size_t pos{marker};
+        const auto take_digits{[line, &pos]() noexcept
+                               {
+                                   const std::size_t end{pos};
+                                   while (pos > 0U && line[pos - 1U] >= '0' && line[pos - 1U] <= '9')
+                                       --pos;
+                                   return end != pos; // at least one digit consumed
+                               }};
+        const auto take_colon{[line, &pos]() noexcept
+                              {
+                                  if (pos == 0U || line[pos - 1U] != ':')
+                                      return false;
+                                  --pos;
+                                  return true;
+                              }};
+        if (!take_digits() || !take_colon() || !take_digits() || !take_colon())
+            return std::string_view::npos;
+        return marker + kNoteMarker.size();
+    }
+
+    // D-NOTE-1 — the register, expressed over ONE token: is this token inside the note's message?
+    // A thin view on note_register_begin so the per-token predicate and the once-per-line offset
+    // can never drift into two implementations of one property. PRECONDITION: `token` is a
+    // sub-view of `line` (a for_each_token token), as for every register kernel here.
+    [[nodiscard]] bool token_in_note_message(std::string_view line, std::string_view token,
+                                             std::size_t message_at) noexcept
+    {
+        return message_at != std::string_view::npos &&
+               static_cast<std::size_t>(token.data() - line.data()) >= message_at;
+    }
+
     // D-CNT-1 — the DUAL of contains_failure_cue: true iff the head carries a failure-lexicon
     // word in COUNT register (immediately preceded by a digit-leading numeric — "1 failure",
     // "5 failed"): an aggregate SUMMARY, not a per-item verdict. contains_failure_cue treats
@@ -465,22 +534,56 @@ namespace detail
     {
         std::string_view prev{};
         std::string_view prev_prev{};
+        // D-NOTE-1 applies to the dual as well: a counted failure word inside a note's message
+        // ("note: 5 candidates failed") is still the NOTE's word, and the note asserts nothing.
+        // Without this the demotion would only move the line from Error to Warn, and the ruling's
+        // target level is Unknown.
+        const std::size_t note_message_at{note_register_begin(text)};
         return for_each_token(text, scan_limit,
                               [&](std::string_view token) noexcept
                               {
                                   bool summary{false};
-                                  for (const FailureWord& entry : kFailureLexicon)
-                                      if (iequals(token, entry.word))
-                                      {
-                                          summary = is_count_preceded(prev, prev_prev);
-                                          break;
-                                      }
+                                  if (!token_in_note_message(text, token, note_message_at))
+                                      for (const FailureWord& entry : kFailureLexicon)
+                                          if (iequals(token, entry.word))
+                                          {
+                                              summary = is_count_preceded(prev, prev_prev);
+                                              break;
+                                          }
                                   prev_prev = prev;
                                   prev = token;
                                   return summary;
                               });
     }
 } // namespace detail
+
+namespace
+{
+    LexiconHit lexicon_hit(std::string_view text, std::string_view token, std::string_view prev,
+                           std::string_view prev_prev) noexcept
+    {
+        for (const FailureWord& entry : kFailureLexicon)
+        {
+            if (!iequals(token, entry.word))
+                continue;
+            // D-CNT-1: a count-register failure word (immediately preceded by a bare-integer
+            // count — "1 failure", "5 failed" — that is not a timestamp chain) is a SUMMARY, not
+            // a per-item verdict, so it does NOT fire as a cue (checked BEFORE the verdict
+            // anchors: a counted noun is a summary even with a trailing colon — "1 failure:").
+            // The line still surfaces, demoted to Warn by the level path; it just stops
+            // outranking the specific verdicts it summarizes (the "25 passed, 5 failed" dual). On
+            // a masked TEMPLATE the digit is `<*>` (not a bare integer) so the metalog salience
+            // path is unaffected.
+            if (is_count_preceded(prev, prev_prev))
+                return {.fired = false, .matched = true};
+            // zero-collision token self-anchors; collision-prone token needs verdict register
+            return {.fired = entry.role == FailureRole::SelfAnchoring ||
+                             detail::is_verdict_anchored(text, token),
+                    .matched = true};
+        }
+        return {};
+    }
+} // namespace
 
 // Only throw path is for_each_token / any_standalone_word, whose substr has begin <= text.size()
 // (see token_scan.hpp); the noexcept body cannot throw.
@@ -495,45 +598,34 @@ bool contains_failure_cue(std::string_view text, std::size_t scan_limit) noexcep
     bool saw_error_type{false};
     std::string_view prev{};
     std::string_view prev_prev{};
+    // D-NOTE-1 (the fourth register): resolved ONCE per line, not per token — the offset where a
+    // compiler NOTE diagnostic's message begins, or npos. Every cue form below (phrase, lexicon
+    // word, CamelCase error TYPE) is demoted uniformly inside that message, because they are all
+    // the note's own words and a note asserts no verdict. Tokens BEFORE the marker keep their
+    // authority: an `##[error]` wrapper or a CI prefix on the same line is not the note's claim.
+    const std::size_t note_message_at{detail::note_register_begin(text)};
     const bool saw_failure_word{for_each_token(
         text, scan_limit,
         [&](std::string_view token) noexcept
         {
+            if (detail::token_in_note_message(text, token, note_message_at))
+            {
+                prev_prev = prev; // the window still shifts: the token exists, it just does not fire
+                prev = token;
+                return false;
+            }
             for (const Phrase& phrase : kFailurePhrases)
                 if (iequals(prev, phrase[0]) && iequals(token, phrase[1]))
                     return true; // phrase completes — a strong cue
-            bool fired{false};
-            bool matched{false};
-            for (const FailureWord& entry : kFailureLexicon)
-                if (iequals(token, entry.word))
-                {
-                    matched = true;
-                    // D-CNT-1: a count-register failure word (immediately
-                    // preceded by a bare-integer count — "1 failure", "5 failed"
-                    // — that is not a timestamp chain) is a SUMMARY, not a per-item
-                    // verdict, so it does NOT fire as a cue (checked BEFORE the
-                    // verdict anchors: a counted noun is a summary even with a
-                    // trailing colon — "1 failure:"). The line still surfaces,
-                    // demoted to Warn by the level path; it just stops outranking
-                    // the specific verdicts it summarizes (the "25 passed, 5 failed"
-                    // dual). On a masked TEMPLATE the digit is `<*>` (not a bare
-                    // integer) so the metalog salience path is unaffected.
-                    if (is_count_preceded(prev, prev_prev))
-                        break;
-                    // zero-collision token self-anchors; collision-prone
-                    // token needs verdict register
-                    fired = entry.role == FailureRole::SelfAnchoring ||
-                            detail::is_verdict_anchored(text, token);
-                    break;
-                }
+            const LexiconHit hit{lexicon_hit(text, token, prev, prev_prev)};
             // D-OUT-4b: the CamelCase error-TYPE anchors only in verdict
             // register; a ▶-led node:test suite-NAME line referencing a
             // …Error type does not (register/position, not the token).
-            if (!matched && is_camel_error_type(token) && error_type_anchors(text, token))
+            if (!hit.matched && is_camel_error_type(token) && error_type_anchors(text, token))
                 saw_error_type = true;
             prev_prev = prev; // shift the two-token window for the next adjacency
             prev = token;     // check (count register needs prev AND prev-prev)
-            return fired;
+            return hit.fired;
         })};
     // A strong failure WORD fires unconditionally; a weak error-TYPE name (no failure
     // word) is demoted by any success WORD anywhere — scanned across the WHOLE text, as a

@@ -384,6 +384,65 @@ TEST(FailureLexicon, AnsiColourWrappedCueIsExtracted)
         << "ANSI-wrapped PASSED is not a failure";
 }
 
+// ── The NOTE register (D-NOTE-1) — a compiler note asserts no verdict ──────────
+// A gcc/clang failure is ONE `error:` line plus N `note:` lines, and the notes carry the
+// outcome vocabulary: `note: template argument deduction/substitution failed:`. `failed`
+// is SelfAnchoring — it fires bare, by design — so every such note was classified as a
+// failure cue and emitted under an ERROR-class label, naming the wrong file. Measured on
+// 3 real green→red cascade pairs: 28 of 29 ranked `note:` findings (96.6 %) carried an
+// ERROR-class label; rank inversions were 0/3, so this is a CLASSIFICATION defect, not a
+// ranking one.
+//
+// The demotion is anchored at the STRUCTURAL diagnostic-kind position
+// `<path>:<line>:<col>: note: ` and nowhere else. That constraint is the whole design: a
+// bare-word demoter would suppress legitimate `failed` findings — turning a labelling
+// defect into a detection defect, which is strictly worse — so the two-sidedness arms
+// below are not decoration, they are what keeps the fix from going too far.
+//
+// The lexicon is NOT touched: `{"failed", SelfAnchoring}` is unchanged. The defect is
+// CONTEXT, not vocabulary.
+TEST(FailureLexicon, CompilerNoteDiagnosticCarriesNoFailureVerdict)
+{
+    // The origin line, verbatim from the v1.8.1 release red that surfaced the defect.
+    EXPECT_FALSE(contains_failure_cue("/opt/gcc-15.3/include/c++/15.3.0/bits/random.tcc:910:5: "
+                                      "note: template argument deduction/substitution failed:"))
+        << "the note's own 'failed' must not confer a verdict — this is the line Sift blamed";
+    EXPECT_FALSE(contains_failure_cue(
+        "/opt/gcc-15.3/include/c++/15.3.0/bits/fs_path.h:542:14: note: there are 102 candidates"))
+        << "a note carrying no failure word stays silent (the trivial control)";
+    // The CamelCase error-TYPE path, isolated: the type is colon-anchored (D-OUT-4b would fire it)
+    // and the line carries no lexicon word, so this row is red without the register and green with
+    // it — it is not a restatement of the row above.
+    EXPECT_FALSE(contains_failure_cue("/src/parser.cpp:88:12: note: candidate function not viable: "
+                                      "ValueError: no known conversion from 'int'"))
+        << "a verdict-anchored CamelCase error TYPE inside a note message is the note's word too";
+
+    // ── Two-sidedness. Without these the demoter could be a blanket suppressor and this
+    // test would still be green ([[synthetic-gate-vacuity-vs-judgment]] — green-BLIND).
+    EXPECT_TRUE(contains_failure_cue("/opt/gcc-15.3/include/c++/15.3.0/bits/fs_path.h:542:14: "
+                                     "error: no match for ‘operator<<’"))
+        << "the REAL error line in the same cascade must still fire — that is the whole point";
+    EXPECT_TRUE(contains_failure_cue("Note: the deploy failed"))
+        << "bare prose 'Note' is not the diagnostic-kind position and must NOT demote";
+    EXPECT_TRUE(contains_failure_cue("see note: the upload failed"))
+        << "a lexical 'note:' with no <line>:<col> is not the diagnostic-kind position";
+}
+
+// ── The note register is REGISTER-scoped, never LINE-scoped (D-NOTE-1) ─────────
+// It removes the NOTE's authority over its own message; a verdict anchored EARLIER on the
+// same line is a different claim by a different author and survives untouched. This is
+// what makes it a fourth register beside verdict / count / echoed-source rather than a
+// suppression path.
+TEST(FailureLexicon, NoteRegisterDoesNotReachAVerdictAnchoredEarlierOnTheLine)
+{
+    EXPECT_TRUE(contains_failure_cue(
+        "##[error]/src/foo.cpp:12:3: note: template argument deduction/substitution failed:"))
+        << "the runner's own ##[error] wrapper precedes the note marker and keeps its verdict";
+    EXPECT_TRUE(contains_failure_cue(
+        "build failed -- /src/foo.cpp:12:3: note: candidate template ignored"))
+        << "a verdict word before the diagnostic-kind position is not the note's word";
+}
+
 // ── scan_limit bounds where a token may START (it may extend past the limit) ────
 TEST(FailureLexicon, ScanLimitBoundsTheHead)
 {

@@ -3,7 +3,7 @@
 Masking turns a line's `content` into a **stable template** (`template_str`) and its identity
 (`template_id`). It is what lets the engine say "this is the same *kind* of line as before" while a request id,
 a timestamp, or a latency value varies. This doc is the authoritative current-state reference for **what canon
-masks, what it keeps, and which markers it knows** (`canonicalization_version = stateless-masks-6`).
+masks, what it keeps, and which markers it knows** (`canonicalization_version = stateless-masks-7`).
 
 ---
 
