@@ -213,7 +213,7 @@ inline constexpr std::string_view kAnyDialect{};
 // never heard of LogCraft still has to declare it (ADR 0030 D3).
 //
 // Why the coordinate exists (measured on REAL bytes, not theorized): canon receives the SAME GHA
-// Step banner in two materializations under ONE format_gate — the runner's `##[group]Run <cmd>`
+// Step banner in two materializations under ONE dialect gate — the runner's `##[group]Run <cmd>`
 // (GHA's real channel) and the workflow-command-stripped `Run <cmd>` (our own lattice-experiment
 // ablation, which canon must also read). In the annotated channel a line starting with `Run ` is
 // ordinary PROSE, so without a channel the stripped row mints a PHANTOM Step quantum out of
@@ -227,14 +227,14 @@ inline constexpr std::string_view kAnyDialect{};
 //
 // The channel is EXTRINSIC and that is the whole reason it is declared rather than detected: no
 // byte carries it. A prose line is byte-identical across channels, and both GHA channels share one
-// format_gate — the discriminating evidence is absent from the very lines that get misrecognized.
+// dialect gate — the discriminating evidence is absent from the very lines that get misrecognized.
 // So someone must SAY, and only the caller who acquired the stream knows (ADR 0029 D2/D5; never
 // auto-detect — a prefix heuristic makes content non-deterministic under streaming).
 //
 // The "any channel" sentinel: the row fires regardless of the stream's declared channel — the
 // DEGENERATE case every single-materialization dialect (Jenkins, test_frameworks) uses, so it is
 // untouched by all of this (ADR 0029 D5, minimal blast radius). The EMPTY string_view is that
-// sentinel, mirroring kAnyFormat = LogFormat::Unknown: a package may never declare an empty channel
+// sentinel, mirroring kAnyDialect = the empty view: a package may never declare an empty channel
 // name (all_channels_named enforces it), so empty is unambiguously "any".
 //
 // NOTE the deliberate asymmetry with the CALLER's declaration, which is also empty when absent: an
@@ -350,7 +350,7 @@ struct IntentMarkerRow
 
 // A generation-template rule (studies/008, shared_intent_declaration §3.2) — the WRITER dual of
 // IntentMarkerRow. Carries the SAME dialect hierarchy (kind + child_order, the ADR 0023
-// declaration) and the SAME medium gate (format_gate × channel_gate = the Medium the line
+// declaration) and the SAME medium gate (dialect_gate × channel_gate = the Medium the line
 // materializes into — the O2 medium axis; the two GHA Step media `Run ` / `##[group]Run ` are two
 // emit rows sharing kind, differing in prefix). No payload_excludes: the writer only ever emits a
 // real intent, never an excluded structural token, so the exclusion set is a reader-side concern

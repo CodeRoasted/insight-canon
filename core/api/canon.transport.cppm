@@ -134,8 +134,9 @@ struct TransportTransformRow
 // A per-line RFC 3339 prefix — `YYYY-MM-DDTHH:MM:SS.fffffffZ` + a separator space.
 // TOTAL scope (every line the serving API stamps carries it), so it is admissible transport under
 // ADR 0044 §1, and it is the one transform that has BOTH a corpus (22 030 real logs) and an
-// INDEPENDENT oracle (the shipped `GitHubActionsStrategy` peel) to score against — which is what
-// makes it shippable where Timestamper is not.
+// INDEPENDENT oracle to score against — which is what makes it shippable where Timestamper is not.
+// That oracle was `GitHubActionsStrategy`'s peel; T4 deleted the detection, and the oracle is now
+// FROZEN inside G1-PEEL itself (adr/0062), where it still scores this row over 22 490 937 lines.
 //
 // THE NAME IS DELIVERY-SHAPED, NOT ECOSYSTEM-SHAPED, and that is load-bearing twice over. ADR 0044
 // §3 is the reason the row lives here at all: the catalogue is orthogonal to the dialect packages
@@ -190,10 +191,12 @@ struct IngestDeclaration
     // ORDERED, outside-in — the order the delivery layers were applied, so the peel unwinds them
     // in declaration order. Empty = the degenerate case.
     std::span<const std::string_view> stack;
-    // The declared dialect (a composed package name). Verified, not yet gating: it becomes the
-    // successor to per-row `format_gate` at T4. Verification alone is live and worth having — it
-    // turns `--dialect=guthub` into a named error instead of a silently structure-less analysis,
-    // the same posture ADR 0029 D5 gives an unknown channel.
+    // The declared dialect (a composed package name). VERIFIED and GATING since T4 (ADR 0065):
+    // `resolve_stream` checks it against the composed packages, then filters every dialect-gated
+    // row into the stream's view — so no walker below ever sees a dialect coordinate, and which
+    // declared rows fire stopped being a function of the stream's content. An unknown name is a
+    // named error rather than a silently structure-less analysis, the same posture ADR 0029 D5
+    // gives an unknown channel; an ABSENT one withholds every concretely-gated row.
     std::string_view dialect;
     // Today's IntentChannel (ADR 0029 D5 / 0030 D7), unchanged in meaning. Verified and applied by
     // `ComposedSemantics::for_channel`.
