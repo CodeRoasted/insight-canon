@@ -210,9 +210,10 @@ inline constexpr std::string_view kAnyDialect{};
 }
 
 // ── The INTENT CHANNEL coordinate (ADR 0030) ─────────────────────────────────────────────────────
-// `Medium = IntentFormat × IntentChannel`. The IntentFormat is the intent's semantic STRUCTURE; the
+// `Medium = Dialect × IntentChannel` (ADR 0066 — the first factor is the DIALECT, not the format;
+// the medium gate below and the row-firing rule already read `dialect × channel`). The
 // IntentChannel is the channel through which that intent was MATERIALIZED. Same intent, different
-// channel ⇒ a new channel (not a new format). The channel vocabulary is package-declared DATA,
+// channel ⇒ a new channel (not a new dialect). The channel vocabulary is package-declared DATA,
 // exactly like the markers — core stays semantic-unaware (ADR 0024): canon knows channel *markers*,
 // it does not detect, route or map.
 //
