@@ -5,13 +5,19 @@
 // shard. The composition (insight::semantic::compose) statically links this package's kManifest
 // into a binary.
 //
-// The depth claim this vocabulary carries is scoped to the MODERN leg — GitLab runner >= 18.9, the
-// generation whose own stamper splits a packed `\r` line into one line per marker. Pre-18.8 output
-// packs several markers onto one `\n`-line separated by `\r`, canon splits lines on `\n` only, and
-// `recognize()` returns one marker per line — so a line-anchored row sees the leading `section_end:`
-// and the `section_start:` behind it is invisible. Measured recall over marker_corpus_v1: modern
-// 3193/3231 = 98.8%, old 294/1054 = 27.9%. Lifting the old leg means splitting lines on `\r`, which
-// is line DELIMITATION — delivery, not vocabulary — and belongs to the transport axis, never here.
+// The depth claim this vocabulary carries is scoped to the modern runner generation, and its
+// recall legs are cut on the STAMPED axis — the 32-byte transport prefix is present — NOT on the
+// runner-banner axis the same words usually evoke (corpus_backed_gates.md § 4.9(e): three
+// populations wear the words "modern leg"). Measured recall over marker_corpus_v1: stamped
+// 3193/3231 = 98.8%, unstamped 294/1054 = 27.9%. Re-cut on the banner axis (runner >= 18.9) the
+// claim holds at 2963/3001 = 98.7% — every banner-modern trace is stamped, and the 37 stamped
+// traces carrying an old banner are the contaminant cell the corpus gate pins separately.
+// The mechanism behind the split: the modern stamper emits one line per marker, while pre-18.8
+// output packs several markers onto one `\n`-line separated by `\r`; canon splits lines on `\n`
+// only and `recognize()` returns one marker per line — so a line-anchored row sees the leading
+// `section_end:` and the `section_start:` behind it is invisible. Lifting that leg means splitting
+// lines on `\r`, which is line DELIMITATION — delivery, not vocabulary — and belongs to the
+// transport axis, never here.
 //
 // Ships NO structural-role / level-lift / location / value-class rows and NO channel vocabulary:
 // GitLab has one materialization (the degenerate kAnyChannel case, ADR 0029 D5), and studies/012
