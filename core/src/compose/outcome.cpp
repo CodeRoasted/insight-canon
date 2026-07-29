@@ -42,6 +42,38 @@ namespace
                                    });
     }
 
+    /// The best outcome row seen so far within one line, across all of its `\r`-anchored segments.
+    /// `token` is OWNED because the parse arena is reset between segments, so the `content` the
+    /// match borrowed from does not outlive the segment that produced it.
+    struct OutcomeMarkerMatch
+    {
+        const insight::semantic::OutcomeMarkerRow* row{nullptr};
+        std::string token;
+    };
+
+    /// Longest VALID prefix wins within the line — "valid" because a row whose own shape
+    /// requirement fails must fall through so a shorter row can still claim the line, the same rule
+    /// `recognize` applies to its extractors. A segment that produces no winner leaves `best`
+    /// untouched, so a mid-log `Finished: SUCCESS (took 3s)` never displaces an earlier real
+    /// verdict.
+    void improve_match(OutcomeMarkerMatch& best, std::string_view content,
+                       const insight::semantic::ComposedSemantics& composed)
+    {
+        for (const insight::semantic::OutcomeMarkerRow& row : composed.outcome_markers())
+        {
+            if (!content.starts_with(row.prefix) ||
+                (best.row != nullptr && row.prefix.size() <= best.row->prefix.size()))
+                continue;
+            std::string_view token{content};
+            token.remove_prefix(row.prefix.size());
+            if (row.shape == insight::semantic::OutcomeMarkerShape::RemainderToken &&
+                !is_verdict_word(token))
+                continue;
+            best.row = &row;
+            best.token.assign(token);
+        }
+    }
+
 } // namespace
 
 std::optional<RunOutcome>
@@ -67,46 +99,52 @@ RunOutcomeScan scan_run_outcome(std::span<const std::string> lines,
     {
         if (line.empty())
             continue;
-        const auto parsed{parser.parse_line(line)};
-        if (parsed.has_value())
+        // A line start is not only where the caller's splitter put one. Runners built before
+        // GitLab 18.9 frame the epilogue with a BARE `\r`, so the terminal verdict of such a trace
+        // sits mid-element in any `\n`-split line vector and an at-offset-0 test can never see it —
+        // silently, as a missing verdict rather than an error. Anchoring after a lone `\r` as well
+        // is the same widening the corpus scorer already carries.
+        //
+        // It is deliberately done HERE, on where a row may MATCH, and not by teaching the splitter
+        // to break on `\r`: the `\r` is CONTENT. In the `after_script` warning shape it is the one
+        // byte keeping `after_script` and `WARNING` from fusing into a token that reads as a
+        // failure, so a read path that folds or strips it re-manufactures a false positive. This
+        // widening rewrites no bytes and changes no caller's segmentation.
+        //
+        // Each `\r`-separated segment is re-parsed rather than merely offset into, because the
+        // per-line prefix a strategy peels (timestamp, ANSI escape run) recurs after the `\r` on
+        // exactly these traces — the anchor has to compose with that peel, not bypass it.
+        OutcomeMarkerMatch best;
+        std::string_view remaining{line};
+        while (true)
         {
-            // Longest VALID prefix wins within the line — "valid" because a row whose own shape
-            // requirement fails must fall through so a shorter row can still claim the line, the
-            // same rule `recognize` applies to its extractors. A line that produces no winner leaves
-            // the scan untouched, so a mid-log `Finished: SUCCESS (took 3s)` never displaces an
-            // earlier real verdict.
-            const insight::semantic::OutcomeMarkerRow* best{nullptr};
-            std::string_view best_token;
-            for (const insight::semantic::OutcomeMarkerRow& row : composed.outcome_markers())
+            const auto carriage_return{remaining.find('\r')};
+            if (const std::string_view segment{remaining.substr(0, carriage_return)};
+                !segment.empty())
             {
-                if (!parsed->content.starts_with(row.prefix) ||
-                    (best != nullptr && row.prefix.size() <= best->prefix.size()))
-                    continue;
-                std::string_view token{parsed->content};
-                token.remove_prefix(row.prefix.size());
-                if (row.shape == insight::semantic::OutcomeMarkerShape::RemainderToken &&
-                    !is_verdict_word(token))
-                    continue;
-                best = &row;
-                best_token = token;
+                if (const auto parsed{parser.parse_line(segment)}; parsed.has_value())
+                    improve_match(best, parsed->content, composed);
+                arena.reset();
             }
-            if (best != nullptr)
+            if (carriage_return == std::string_view::npos)
+                break;
+            remaining.remove_prefix(carriage_return + 1);
+        }
+        if (best.row != nullptr)
+        {
+            // LAST matching line wins (a run has one terminal verdict; deterministic).
+            scan.marker_present = true;
+            if (best.row->shape == insight::semantic::OutcomeMarkerShape::PrefixIsVerdict)
             {
-                // LAST matching line wins (a run has one terminal verdict; deterministic).
-                scan.marker_present = true;
-                if (best->shape == insight::semantic::OutcomeMarkerShape::PrefixIsVerdict)
-                {
-                    scan.verdict = best->outcome;
-                    scan.token.clear();
-                }
-                else
-                {
-                    scan.verdict.reset();
-                    scan.token.assign(best_token); // copied before the per-line arena reset
-                }
+                scan.verdict = best.row->outcome;
+                scan.token.clear();
+            }
+            else
+            {
+                scan.verdict.reset();
+                scan.token = std::move(best.token);
             }
         }
-        arena.reset();
     }
     return scan;
 }

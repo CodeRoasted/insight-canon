@@ -356,6 +356,93 @@ TEST(RunOutcomeGrammar5, PrefixIsVerdictReadsTheVerdictOffTheRowNotTheRemainder)
               RunOutcome::Success);
 }
 
+// ── The `\r`-anchored outcome line ──────────────────────────────────────────────────────────────
+// Runners predating GitLab 18.9 frame the epilogue with a BARE `\r`, so a `\n`-split line vector
+// carries the terminal verdict MID-ELEMENT. An at-offset-0 test cannot see it, and the miss is
+// silent — the trace reads as having no verdict rather than raising anything. These arms are
+// two-sided: the first was RED before the anchor was widened, the last two are what keeps the
+// widening from being a blanket "search anywhere in the line".
+
+TEST(RunOutcomeGrammar5, AVerdictFramedByABareCarriageReturnIsAnchored)
+{
+    const ComposedSemantics composed{composed_numeric()};
+    // One `\n`-line, exactly as a byte-faithful splitter hands it over: the verdict is not at
+    // offset 0, it is behind a lone `\r`. CRLF would MASK this — the `\r` here is deliberately bare.
+    const std::vector<std::string> old_leg{"$ run tests\rFATAL: Run broke: code 1"};
+    const RunOutcomeScan scan{scan_run_outcome(old_leg, composed)};
+    ASSERT_TRUE(scan.marker_present)
+        << "a verdict behind a lone \\r was not anchored; line=" << old_leg[0];
+    ASSERT_TRUE(scan.verdict.has_value());
+    EXPECT_EQ(*scan.verdict, RunOutcome::Failure);
+    EXPECT_EQ(resolve_run_outcome({}, scan, composed).outcome, RunOutcome::Failure);
+
+    // The longest-prefix rule composes with the new anchor rather than being bypassed by it.
+    const std::vector<std::string> aborted{"cleanup\rFATAL: Run broke: stopped"};
+    EXPECT_EQ(resolve_run_outcome({}, scan_run_outcome(aborted, composed), composed).outcome,
+              RunOutcome::Aborted);
+
+    // CRLF is the masking case: a `\n`-splitter has already cut there, leaving the `\r` trailing on
+    // the previous element. That empty trailing segment must anchor nothing, and the verdict must
+    // resolve exactly once off the next element.
+    const std::vector<std::string> crlf{"$ run tests\r", "Run finished"};
+    EXPECT_EQ(resolve_run_outcome({}, scan_run_outcome(crlf, composed), composed).outcome,
+              RunOutcome::Success);
+}
+
+TEST(RunOutcomeGrammar5, TheCarriageReturnAnchorDoesNotBecomeASubstringSearch)
+{
+    const ComposedSemantics composed{composed_numeric()};
+    // The widening admits an anchor after `\r` and NOWHERE else. A prefix sitting mid-line with no
+    // delimiter in front of it is prose and must stay unmatched — otherwise the fix would trade a
+    // silent miss for a silent false verdict, which is the worse direction.
+    const std::vector<std::string> prose{"see also FATAL: Run broke: code 1 in the docs"};
+    EXPECT_FALSE(scan_run_outcome(prose, composed).marker_present)
+        << "a mid-line prefix with no \\r before it was matched; the anchor became a substring "
+           "search. line="
+        << prose[0];
+
+    // The anchor is a POSITION, not a second recognizer: whatever a segment resolves to after a
+    // `\r` is exactly what those same bytes resolve to as a line of their own. Asserting the
+    // equivalence rather than a hand-written verdict is what keeps this arm honest — it cannot
+    // drift from the line-start behaviour it is supposed to mirror, including the prefix peel
+    // (timestamp / ANSI / leading space) that `parse_line` applies identically in both positions.
+    for (const std::string_view segment : {"FATAL: Run broke: code 1", " FATAL: Run broke",
+                                           "Run finished", "not a verdict at all", ""})
+    {
+        const std::vector<std::string> alone{std::string{segment}};
+        const std::vector<std::string> anchored{"building\r" + std::string{segment}};
+        const RunOutcomeScan at_line_start{scan_run_outcome(alone, composed)};
+        const RunOutcomeScan after_carriage_return{scan_run_outcome(anchored, composed)};
+        EXPECT_EQ(at_line_start.marker_present, after_carriage_return.marker_present)
+            << "segment '" << segment << "' resolves differently after a \\r ("
+            << after_carriage_return.marker_present << ") than at line start ("
+            << at_line_start.marker_present << ")";
+        EXPECT_EQ(at_line_start.verdict.has_value(), after_carriage_return.verdict.has_value())
+            << "segment '" << segment << "'";
+        if (at_line_start.verdict.has_value() && after_carriage_return.verdict.has_value())
+            EXPECT_EQ(*at_line_start.verdict, *after_carriage_return.verdict)
+                << "segment '" << segment << "'";
+    }
+}
+
+TEST(RunOutcomeGrammar5, TheCarriageReturnAnchorDoesNotFoldTheByteItAnchorsAfter)
+{
+    const ComposedSemantics composed{composed_numeric()};
+    // The `\r` is CONTENT, and anchoring after it must not consume, strip or fold it. The marker
+    // payload extractor treats the same byte as its TERMINATOR, so if the scan had rewritten the
+    // line the recognizer sharing these bytes would see a different string.
+    constexpr std::string_view kSectionThenWarning{
+        "mark:1784657178:after_script\rWARNING: after_script failed, but job will continue"};
+    EXPECT_EQ(recognize(kSectionThenWarning, composed).name, "after_script")
+        << "the \\r-anchored scan altered bytes the marker extractor depends on";
+
+    // And that same line carries no verdict: `WARNING: …` is not one of the declared prefixes.
+    // Fusing it with what precedes the `\r` is what would re-manufacture the false positive.
+    const std::vector<std::string> warning{std::string{kSectionThenWarning}};
+    EXPECT_FALSE(scan_run_outcome(warning, composed).marker_present)
+        << "an after_script WARNING was read as a terminal verdict";
+}
+
 TEST(RunOutcomeGrammar5, LongestPrefixWinsRegardlessOfDeclarationOrder)
 {
     const ComposedSemantics composed{composed_numeric()};
