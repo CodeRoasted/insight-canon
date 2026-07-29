@@ -170,10 +170,11 @@ insight-canon/
 │   └── test_package/       Conan consumer smoke test (zero-init, import insight.canon only)
 ├── semantic/               The vocabulary packages (statically composed, Apache-2.0)
 │   ├── github/             insight_semantic_github — GitHub Actions / Azure dialect (rows + strategy)
+│   ├── gitlab/             insight_semantic_gitlab — GitLab CI dialect (rows + strategy)
 │   ├── jenkins/            insight_semantic_jenkins — Jenkins dialect (rows + strategy)
 │   └── test_frameworks/    insight_semantic_test_frameworks — test-file location families
 ├── bench/                  insight_canon_bench — the composed perf harness (SP-5 gate)
-├── proof/                  Public determinism proof gate (composes core + both packages)
+├── proof/                  Public determinism proof gate (composes core + every package)
 ├── scripts/                det_public_proof.sh · sp1_semantic_unawareness_lint.sh · download_logs.sh
 ├── packages.yml            The package manifest (paths, versions, public/release flags)
 └── .github/workflows/      ci.yml · lint.yml · golden.yaml · release.yaml
