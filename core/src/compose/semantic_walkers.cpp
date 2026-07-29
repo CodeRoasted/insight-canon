@@ -189,17 +189,28 @@ namespace tokenization
     namespace
     {
         // The NumericFieldThenRemainder grammar (grammar-5, ADR 0069), over the content past a
-        // matched prefix: a non-empty run of ASCII digits, a single ':', then the payload — minus a
-        // single trailing '\r' and minus a trailing `[…]` option group, in that order (GitLab emits
-        // `<name>[<options>]\r`, so the CR is outermost). nullopt on any shape failure, including an
-        // empty payload: a declined row is the whole point, since the malformed producer marker
-        // (`section_start:%s:name`) must not be mis-parsed into a section named after an
-        // unexpanded shell expression.
+        // matched prefix: a non-empty run of ASCII digits, a single ':', then the payload — which
+        // ENDS AT THE FIRST '\r', and from which a trailing `[…]` option group is then dropped.
+        // nullopt on any shape failure, including an empty payload: a declined row is the whole
+        // point, since the malformed producer marker (`section_start:%s:name`) must not be
+        // mis-parsed into a section named after an unexpanded shell expression.
         //
-        // The option group is taken as the LAST '[' of a ']'-terminated remainder, not the first
-        // '[' anywhere: a name containing a bracket must not silently lose its tail. The observed
-        // GitLab name charset is `[A-Za-z0-9_.-]+` and carries no bracket at all, so this is a
-        // guard, not a live case.
+        // THE CR IS A TERMINATOR, NOT A TRAILING BYTE TO TRIM, and the distinction is the whole
+        // measurement. GitLab closes a marker with `\r\x1b[0K` (CR + erase-line) and MAY then
+        // continue the SAME line with the section's human-readable header: `…:build_tools_section
+        // \r\x1b[0KTools build`. Canon's D-TID-11 ingest strip removes the escape and leaves the CR,
+        // so a rule that merely trimmed a trailing CR would yield the payload
+        // `build_tools_section\rTools build`. Measured on the 482 stamped traces of
+        // marker_corpus_v1: trimming gives 56 distinct names, 36 of them carrying an embedded CR and
+        // arbitrary human prose; terminating at the CR gives 46, every one inside the producer's
+        // declared `[A-Za-z0-9_.-]+` charset. Recognition count is 3193 either way — the difference
+        // is invisible in a recall number and lands entirely in the NAME, which `compare_skeletons`
+        // keys on raw (adr/0045). Those 36 sections would only ever align against a run whose header
+        // prose is byte-identical.
+        //
+        // The option group is taken as the LAST '[' of a ']'-terminated payload, not the first '['
+        // anywhere: a name containing a bracket must not silently lose its tail. The observed name
+        // charset carries no bracket at all, so this is a guard, not a live case.
         [[nodiscard]] constexpr std::optional<std::string_view>
         skip_numeric_field(std::string_view remainder) noexcept
         {
@@ -210,8 +221,9 @@ namespace tokenization
             if (digits == 0 || digits >= remainder.size() || remainder[digits] != ':')
                 return std::nullopt;
             remainder.remove_prefix(digits + 1U);
-            if (!remainder.empty() && remainder.back() == '\r')
-                remainder.remove_suffix(1U);
+            if (const std::size_t terminator{remainder.find('\r')};
+                terminator != std::string_view::npos)
+                remainder = std::string_view{remainder.data(), terminator};
             if (!remainder.empty() && remainder.back() == ']')
                 if (const std::size_t group{remainder.rfind('[')};
                     group != std::string_view::npos)

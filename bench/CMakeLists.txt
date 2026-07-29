@@ -24,6 +24,9 @@ endif()
 if(NOT TARGET insight::semantic_github)
     find_package(insight_semantic_github REQUIRED CONFIG)
 endif()
+if(NOT TARGET insight::semantic_gitlab)
+    find_package(insight_semantic_gitlab REQUIRED CONFIG)
+endif()
 if(NOT TARGET insight::semantic_jenkins)
     find_package(insight_semantic_jenkins REQUIRED CONFIG)
 endif()
@@ -36,7 +39,8 @@ add_executable(insight_canon_bench
     ${CMAKE_CURRENT_SOURCE_DIR}/src/bench_main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/bench_tokenization.cpp)
 target_link_libraries(insight_canon_bench PRIVATE
-    insight::canon insight::semantic_github insight::semantic_jenkins insight::semantic_test_frameworks
+    insight::canon insight::semantic_github insight::semantic_gitlab insight::semantic_jenkins
+    insight::semantic_test_frameworks
     benchmark::benchmark)
 target_compile_features(insight_canon_bench PRIVATE cxx_std_23)
 set_target_properties(insight_canon_bench PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)

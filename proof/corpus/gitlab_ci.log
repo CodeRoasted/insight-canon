@@ -1,0 +1,16 @@
+2026-05-01T10:00:01.101000Z 00O Running with gitlab-runner 18.9.1 (a1b2c3d4)
+2026-05-01T10:00:01.201000Z 00O+  on runner-alpha proof-shard
+2026-05-01T10:00:02.102000Z 00O section_start:1746093602:prepare_executor
+2026-05-01T10:00:02.302000Z 00O Preparing the docker executor
+2026-05-01T10:00:03.103000Z 00O section_start:1746093603:get_sources
+2026-05-01T10:00:03.303000Z 00O Fetching changes with git depth set to 20
+2026-05-01T10:00:04.104000Z 00O section_start:1746093604:step_script
+2026-05-01T10:00:04.304000Z 00O $ cmake --build build --config Release -j 8
+2026-05-01T10:00:05.105000Z 00O [ 45%] Building CXX object src/engine/core.cpp.o
+2026-05-01T10:00:06.106000Z 00O section_start:1746093606:log_disk_usage[collapsed=true]Disk usage detail
+2026-05-01T10:00:06.306000Z 00E df: /proc/mounts: permission denied
+2026-05-01T10:00:07.107000Z 00O ++ echo -e '\e[0Ksection_start:1746093607:phantom\r\e[0K'
+2026-05-01T10:00:08.108000Z 00O section_start:%s:duration_blind
+2026-05-01T10:00:09.109000Z 00O section_start:1746093609:after_script
+2026-05-01T10:00:10.110000Z 00O Cleaning up project directory and file based variables
+2026-05-01T10:00:11.111000Z 00O ERROR: Job failed: exit code 1

@@ -43,6 +43,7 @@ import insight.canon;
 // composed pipeline (GHA + Jenkins dialects + test-file locations) is what the 5-leg byte-identity
 // compare proves (G-SP-1; the grammar-2 composed identity = G-OUT-6, extending G-SP-4).
 import insight.semantic.github;
+import insight.semantic.gitlab;
 import insight.semantic.jenkins;
 import insight.semantic.test_frameworks;
 
@@ -119,17 +120,21 @@ int main(int argc, char** argv)
     // whose encoding varies by toolchain/locale. Plain '--'.
     // v2: the grammar-2 cut (ADR 0025) — jenkins joins the composed set and every file section
     // gains a `### run_outcome` line (the console-tail scan surface the compare must cover).
+    // v4: grammar-5 (ADR 0069) — gitlab joins the composed set with its own declared ARM and its
+    // own corpus file, so the numeric-field extractor and the prefix-verdict outcome walker are
+    // both on the cross-OS compare surface. The composed `semantic_identity` moves with the grammar
+    // token, which is expected and is exactly what the emitted digest line records.
     // v3: T4 (ADR 0065) — the dialect and the transport peel are DECLARED, so every file is scored
     // once per declared ARM (below) instead of once. The compare covers only what the fixture
     // EMITS, and after T4 an undeclared stream sees no concretely-gated row at all: without the
     // declared arms this proof would still be green while covering none of the dialect walkers.
-    std::cout << "# canon public determinism proof -- v3\n";
+    std::cout << "# canon public determinism proof -- v4\n";
 
     // The composition is loop-invariant (the SAME package set tokenizes every file), so build it
     // ONCE here and thread it into each file's per-file arena/Tokenizer below.
-    const std::array<insight::semantic::SemanticPackageManifest, 3> manifests{
-        insight::semantic::github::kManifest, insight::semantic::jenkins::kManifest,
-        insight::semantic::test_frameworks::kManifest};
+    const std::array<insight::semantic::SemanticPackageManifest, 4> manifests{
+        insight::semantic::github::kManifest, insight::semantic::gitlab::kManifest,
+        insight::semantic::jenkins::kManifest, insight::semantic::test_frameworks::kManifest};
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose(manifests)};
 
     // G-SP-4 (ADR 0024 §10.4): the composed `semantic_identity` content hash must be bit-identical
@@ -165,11 +170,15 @@ int main(int argc, char** argv)
         std::span<const std::string_view> stack;
     };
     static constexpr std::array<std::string_view, 1> kRfc3339Stack{{"api-rfc3339-line-prefix"}};
-    const std::array<Arm, 3> arms{
+    const std::array<Arm, 4> arms{
         Arm{.label = "-", .dialect = {}, .stack = {}},
         Arm{.label = "github+api-rfc3339-line-prefix",
             .dialect = insight::semantic::github::kDialect,
             .stack = kRfc3339Stack},
+        // GitLab declares NO transport stack: its 32-byte runner prefix is peeled by the dialect
+        // strategy, not declared, because a faithful declaration is a two-element ordered stack
+        // (timestamp then stream tag) and that is T2's work (adr/0046), not a package landing's.
+        Arm{.label = "gitlab", .dialect = insight::semantic::gitlab::kDialect, .stack = {}},
         Arm{.label = "jenkins", .dialect = insight::semantic::jenkins::kDialect, .stack = {}},
     };
 

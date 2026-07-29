@@ -55,7 +55,7 @@ SCAN_ROOTS=(core/src core/api)
 #   - test-framework file-naming vocabulary (jest/vitest/playwright `.test.`/`.spec.`; the exact
 #     pytest `"test_"` prefix literal; go/ruby `_test.go`/`_spec.rb`; cypress `.cy.`)
 #   - dialect/framework identifiers in code (`github_actions`, bare `github`/`gha`, jest/mocha/
-#     pytest/vitest/playwright/jenkins, the retired `intent-gha` registry tag)
+#     pytest/vitest/playwright/jenkins/gitlab, the retired `intent-gha` registry tag)
 DENY=(
   '##\['                                              # GHA workflow-command bracket
   '::(group|endgroup|error|warning|notice|debug|set-output|save-state|add-mask|echo|add-matcher)::'
@@ -72,7 +72,8 @@ DENY=(
   'github_actions'                                    # the migrated GHA strategy TU identifier
   'intent-gha'                                        # the retired dialect registry tag
   '\b(github|gha)\b'                                  # bare dialect identifiers ("GitHubActions" has no \b after "github")
-  '\b(jest|mocha|pytest|vitest|playwright|jenkins)\b' # framework/dialect identifiers in code
+  '\b(jest|mocha|pytest|vitest|playwright|jenkins|gitlab)\b' # framework/dialect identifiers in code
+  'section_start:|section_end:'                       # GitLab section-marker prefixes
 )
 
 # Build one alternation.

@@ -299,9 +299,20 @@ TEST(RunOutcomeGrammar5, NumericFieldShapeFailuresDeclineTheRow)
 TEST(RunOutcomeGrammar5, TheCarriageReturnTerminatorAndOptionGroupAreDropped)
 {
     const ComposedSemantics composed{composed_numeric()};
-    // The CR is the producer's line terminator (`\r` + an erase-line escape canon's D-TID-11 ingest
-    // strip already removed). Left in, it would ride into every payload and into the alignment key.
+    // The CR is the producer's marker TERMINATOR (`\r` + an erase-line escape canon's D-TID-11
+    // ingest strip already removed). Left in, it would ride into every payload and into the
+    // alignment key.
     EXPECT_EQ(recognize("mark:1784657178:prepare_executor\r", composed).name, "prepare_executor");
+    // TERMINATOR, not a trailing byte to trim: the producer may continue the SAME line with a
+    // human-readable header after the CR. Trimming instead of terminating names the section
+    // `build_tools_section\rTools build` — an alignment key carrying arbitrary prose.
+    EXPECT_EQ(recognize("mark:1784657178:build_tools_section\rTools build", composed).name,
+              "build_tools_section");
+    EXPECT_EQ(recognize("mark:1784657178:log_disk_usage[collapsed=true]\rDisk usage detail",
+                        composed)
+                  .name,
+              "log_disk_usage")
+        << "the option group is dropped AFTER the CR terminates the payload, not before";
     // The option group is producer presentation: without the drop, toggling it RENAMES the section.
     EXPECT_EQ(recognize("mark:1784657178:build[collapsed=true]\r", composed).name, "build");
     EXPECT_EQ(recognize("mark:1784657178:build[hide_duration=true,collapsed=true]", composed).name,
