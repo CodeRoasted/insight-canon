@@ -154,6 +154,13 @@ namespace
         {
             append_str(out, row.prefix);
             append_str(out, row.dialect_gate);
+            // grammar-5 (ADR 0069): the shape discriminator and the row's own verdict. Both are
+            // serialized for EVERY row, including the RemainderToken rows for which `outcome` is
+            // inert — the preimage is a fixed field layout per generation, not a per-row-shape
+            // union, so a row changing shape moves the digest by the field that changed rather than
+            // by the encoding shifting underneath it.
+            append_u8(out, static_cast<std::uint8_t>(row.shape));
+            append_u8(out, static_cast<std::uint8_t>(row.outcome));
         }
         // grammar-3 (ADR 0044 §7): the GENERATION projection enters the identity,
         // field-for-field as the recognition markers do. This closes the SID-2/G4 gap — before

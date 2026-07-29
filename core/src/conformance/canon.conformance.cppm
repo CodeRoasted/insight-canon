@@ -24,8 +24,18 @@
 // allocation-freedom is a canon-ALGORITHM property, proven once over the walkers, not re-proven per
 // data-only package.
 //
-// The probe corpus is DERIVED FROM THE MANIFEST (each row's own key becomes a probe line), so the
-// kit is self-adapting — it works for any package's vocabulary with zero per-package configuration.
+// The probe corpus is DERIVED FROM THE MANIFEST, so the kit is self-adapting — it works for any
+// package's vocabulary with zero per-package configuration. An intent-marker probe is its own row's
+// PAIRED EMIT ROW, materialized (`marker_probe_for`); a structural-role probe, which has no writer
+// dual, is still the key plus a payload token.
+//
+// RED-CAPABILITY, OBSERVED 2026-07-29 rather than asserted. Mutation: build the marker probe as
+// `prefix + " probe"` — what this kit did before grammar-5 — and run the Jenkins package suite.
+// Reported: `[dialect_gate.marker_own] marker key "[Pipeline] { (" did NOT fire on its OWN medium …
+// for the probe "[Pipeline] { ( probe"`, 4/5 checks passed. That is the defect the current shape
+// repairs: the naive probe is valid only for a RemainderAfterPrefix row, so Jenkins's STAGE row
+// could not fire ANYWHERE, and `dialect_gate.marker_leak` was reporting green about a row it could
+// never have caught. Reverted; the suite returns to 21/21.
 module;
 
 export module insight.canon.conformance;
@@ -136,12 +146,39 @@ namespace
     constexpr std::string_view kUndeclaredDialect{};
     constexpr std::string_view kForeignDialect{"conformance-foreign-dialect"};
 
-    // A probe line for a prefix row: the key verbatim + a trailing payload token so payload-extract
-    // has content to return. The key is line-anchored, so `key + " probe"` matches iff the row
-    // fires.
+    // The payload every probe carries. One benign single-token ASCII word: not a Jenkins
+    // kStepExcludes structural token, no parens/brackets/whitespace/CR that a payload extractor
+    // would trim — so a probe that fails to fire is a real gate failure, never an artifact of the
+    // probe. Deterministic (a fixed literal, no RNG).
+    constexpr std::string_view kProbePayload{"probe"};
+
+    // A probe line for a row that has no writer dual — the structural-role rows. The key is
+    // line-anchored and a role row carries no payload grammar, so `key + " probe"` matches iff the
+    // row fires.
     [[nodiscard]] std::string probe_for(std::string_view prefix)
     {
-        return std::string{prefix} + " probe";
+        return std::string{prefix} + ' ' + std::string{kProbePayload};
+    }
+
+    // A probe line for an INTENT MARKER row: the row's own writer dual, materialized. `prefix +
+    // " probe"` is only a valid probe for a RemainderAfterPrefix row, and building one that way was
+    // a live defect — for the Jenkins STAGE row it yields `[Pipeline] { ( probe`, which fails
+    // RemainderToClosingParen's required line-final ')', so the row cannot fire and the
+    // `dialect_gate.marker_leak` leg then asserted "it did not fire on a foreign stream" about a
+    // probe that fires NOWHERE. A gate that cannot fail. It would have been vacuous for every
+    // GitLab row too (NumericFieldThenRemainder needs a numeric field the naive probe has no way to
+    // produce), which is what surfaced it.
+    //
+    // The repair is the canonical inverse, which `round_trip_report` already uses: render the paired
+    // writer row. That makes the probe self-adapting over every present and future extractor by
+    // construction, because the two projections are each other's duals. An UNPAIRED row has no
+    // probe — `check_grammar_wellformed` fails that separately (grammar.unpaired_marker), so the
+    // empty string here reaches only a manifest already red, and it fires no row.
+    [[nodiscard]] std::string marker_probe_for(const IntentMarkerRow& row,
+                                               std::span<const IntentEmitRow> emits)
+    {
+        const IntentEmitRow* writer{paired_writer_row(row, emits)};
+        return writer == nullptr ? std::string{} : render_row(*writer, kProbePayload);
     }
 
     // ── Check 1: determinism — identical identity + identical recognizer output across independent
@@ -164,7 +201,7 @@ namespace
         // Recognizer output must be bit-identical run-to-run for every derived probe.
         for (const IntentMarkerRow& row : manifest.markers)
         {
-            const std::string probe{probe_for(row.prefix)};
+            const std::string probe{marker_probe_for(row, manifest.emits)};
             const ComposedSemantics first_view{first.for_stream(manifest.name, row.channel_gate)};
             const ComposedSemantics second_view{second.for_stream(manifest.name, row.channel_gate)};
             const auto lhs{insight::tokenization::recognize(probe, first_view)};
@@ -249,23 +286,46 @@ namespace
                                       std::string{kForeignDialect} + "\" — II-6 gate leak."};
             }
         }
-        // Intent markers (always concretely gated by construction — II-6). Inert under a foreign
-        // declaration. NB the OWN-view leg is NOT asserted here: a channel-gated marker is
-        // legitimately absent from the kAnyChannel view, and the round-trip report (G2) already
-        // proves every marker reachable under its own Medium.
+        // Intent markers (always concretely gated by construction — II-6): present under their own
+        // MEDIUM, inert under a foreign declaration.
+        //
+        // The OWN leg is scored at the row's own Medium (`dialect × channel`), not against the
+        // kAnyChannel view — a channel-gated marker is legitimately absent from that one, which is
+        // why the leg used to be skipped altogether. Skipping it is what let the leak leg go
+        // vacuous: a probe that fires NOWHERE also fails to leak, so `marker_leak` reported green
+        // about a row it could never have caught. It is asserted here rather than left to
+        // `round_trip_report` because that is a SEPARATE entry point a package may never call, and
+        // a leg whose non-vacuity depends on another test being run is not guarded.
         for (const IntentMarkerRow& row : manifest.markers)
         {
             if (row.dialect_gate == kAnyDialect)
                 continue;
-            const std::string probe{probe_for(row.prefix)};
-            if (insight::tokenization::recognize(probe, foreign).kind !=
+            const std::string probe{marker_probe_for(row, manifest.emits)};
+            const ComposedSemantics medium{
+                composed.for_stream(manifest.name, row.channel_gate)};
+            if (insight::tokenization::recognize(probe, medium).kind !=
                 insight::tokenization::IntentMarkerKind::None)
-                return {.name = "dialect_gate.marker_leak",
-                        .passed = false,
-                        .detail = "marker key \"" + std::string{row.prefix} + "\" (gated to \"" +
-                                  std::string{row.dialect_gate} +
-                                  "\") FIRED on a stream declaring \"" +
-                                  std::string{kForeignDialect} + "\" — II-6 gate leak."};
+            {
+                if (insight::tokenization::recognize(probe, foreign).kind !=
+                    insight::tokenization::IntentMarkerKind::None)
+                    return {.name = "dialect_gate.marker_leak",
+                            .passed = false,
+                            .detail = "marker key \"" + std::string{row.prefix} + "\" (gated to \"" +
+                                      std::string{row.dialect_gate} +
+                                      "\") FIRED on a stream declaring \"" +
+                                      std::string{kForeignDialect} + "\" — II-6 gate leak."};
+                continue;
+            }
+            return {.name = "dialect_gate.marker_own",
+                    .passed = false,
+                    .detail = "marker key \"" + std::string{row.prefix} + "\" did NOT fire on its "
+                              "OWN medium (dialect \"" +
+                              std::string{manifest.name} + "\", channel \"" +
+                              std::string{row.channel_gate} + "\") for the probe \"" + probe +
+                              "\", which its own paired emit row rendered. The row is unreachable "
+                              "under every declaration, so the leak leg below can never catch "
+                              "anything — either the emit row is not the extractor's inverse, or "
+                              "the row cannot match its own generated bytes."};
         }
         // Outcome tokens (grammar-2, always concretely gated — a dialect's verdict string never
         // resolves under another dialect, ADR 0025 §3.1).
@@ -305,8 +365,8 @@ namespace
                                   "depth), never fall open."};
         for (const IntentMarkerRow& row : manifest.markers)
             if (row.dialect_gate != kAnyDialect &&
-                insight::tokenization::recognize(probe_for(row.prefix), composed).kind !=
-                    insight::tokenization::IntentMarkerKind::None)
+                insight::tokenization::recognize(marker_probe_for(row, manifest.emits), composed)
+                        .kind != insight::tokenization::IntentMarkerKind::None)
                 return {.name = "dialect_gate.undeclared_leak",
                         .passed = false,
                         .detail = "marker key \"" + std::string{row.prefix} + "\" (gated to \"" +
@@ -564,12 +624,6 @@ Report round_trip_report(const SemanticPackageManifest& manifest, const Composed
 {
     const std::span<const IntentMarkerRow> markers{manifest.markers};
     const std::span<const IntentEmitRow> emits{manifest.emits};
-
-    // A benign single-token ASCII payload valid for every POC row: not a Jenkins kStepExcludes
-    // structural token, no parens/whitespace that a payload extractor would trim — so a closure
-    // miss is a real expressivity failure, never an artifact of the probe. Deterministic (a fixed
-    // literal, no RNG).
-    constexpr std::string_view kProbePayload{"probe"};
 
     Report report;
     for (const IntentMarkerRow& reader : markers)

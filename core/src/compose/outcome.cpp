@@ -70,17 +70,41 @@ RunOutcomeScan scan_run_outcome(std::span<const std::string> lines,
         const auto parsed{parser.parse_line(line)};
         if (parsed.has_value())
         {
+            // Longest VALID prefix wins within the line — "valid" because a row whose own shape
+            // requirement fails must fall through so a shorter row can still claim the line, the
+            // same rule `recognize` applies to its extractors. A line that produces no winner leaves
+            // the scan untouched, so a mid-log `Finished: SUCCESS (took 3s)` never displaces an
+            // earlier real verdict.
+            const insight::semantic::OutcomeMarkerRow* best{nullptr};
+            std::string_view best_token;
             for (const insight::semantic::OutcomeMarkerRow& row : composed.outcome_markers())
-                if (parsed->content.starts_with(row.prefix))
+            {
+                if (!parsed->content.starts_with(row.prefix) ||
+                    (best != nullptr && row.prefix.size() <= best->prefix.size()))
+                    continue;
+                std::string_view token{parsed->content};
+                token.remove_prefix(row.prefix.size());
+                if (row.shape == insight::semantic::OutcomeMarkerShape::RemainderToken &&
+                    !is_verdict_word(token))
+                    continue;
+                best = &row;
+                best_token = token;
+            }
+            if (best != nullptr)
+            {
+                // LAST matching line wins (a run has one terminal verdict; deterministic).
+                scan.marker_present = true;
+                if (best->shape == insight::semantic::OutcomeMarkerShape::PrefixIsVerdict)
                 {
-                    const std::string_view token{parsed->content.substr(row.prefix.size())};
-                    if (is_verdict_word(token))
-                    {
-                        // LAST match wins (a run has one terminal verdict; deterministic).
-                        scan.marker_present = true;
-                        scan.token.assign(token); // copied before the per-line arena reset
-                    }
+                    scan.verdict = best->outcome;
+                    scan.token.clear();
                 }
+                else
+                {
+                    scan.verdict.reset();
+                    scan.token.assign(best_token); // copied before the per-line arena reset
+                }
+            }
         }
         arena.reset();
     }
@@ -98,7 +122,11 @@ RunOutcomeResolution resolve_run_outcome(std::string_view side_input_token,
     std::optional<RunOutcome> console_mapped;
     if (scan.marker_present)
     {
-        console_mapped = map_outcome_token(scan.token, composed);
+        // grammar-5 (ADR 0069): a PrefixIsVerdict row carries its verdict on the ROW, so there is
+        // nothing to map and nothing that can fail to map. The token path — and with it the
+        // fail-closed note — stays exactly as it was for the RemainderToken shape, which is the only
+        // shape whose verdict comes off the LINE and can therefore be outside the vocabulary.
+        console_mapped = scan.verdict ? scan.verdict : map_outcome_token(scan.token, composed);
         if (console_mapped)
             resolution.console = *console_mapped;
         else

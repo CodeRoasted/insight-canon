@@ -589,6 +589,11 @@ enum class LogFormat : uint8_t
     // `[<RFC3339>] `-prefixed lines, and the `Finished: <RESULT>` run epilogue; other console
     // output falls through (typically RawText) — a Jenkins console has no uniform line prefix.
     Jenkins,
+    // GitLab CI job-trace dialect (ADR 0024 §1.3 registration; the strategy code lives in
+    // insight_semantic_gitlab). Line-selective: a fixed-width `<RFC3339> NNC[ +]` runner transport
+    // prefix (stamped traces), `section_start:` section markers, and the terminal
+    // `Job succeeded` / `ERROR: Job failed…` verdict line; other trace output falls through.
+    GitLab,
     // Catch-all for unstructured text (CI / pytest / build logs). Selected only
     // when no structured strategy matches a non-empty line, so the tokenizer
     // never silently drops a line. Keep immediately before Unknown.
@@ -642,6 +647,8 @@ enum class LogFormat : uint8_t
         return "GitHubActions"sv;
     case LogFormat::Jenkins:
         return "Jenkins"sv;
+    case LogFormat::GitLab:
+        return "GitLab"sv;
     case LogFormat::RawText:
         return "RawText"sv;
     default:

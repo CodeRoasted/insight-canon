@@ -188,6 +188,39 @@ namespace tokenization
 
     namespace
     {
+        // The NumericFieldThenRemainder grammar (grammar-5, ADR 0069), over the content past a
+        // matched prefix: a non-empty run of ASCII digits, a single ':', then the payload — minus a
+        // single trailing '\r' and minus a trailing `[…]` option group, in that order (GitLab emits
+        // `<name>[<options>]\r`, so the CR is outermost). nullopt on any shape failure, including an
+        // empty payload: a declined row is the whole point, since the malformed producer marker
+        // (`section_start:%s:name`) must not be mis-parsed into a section named after an
+        // unexpanded shell expression.
+        //
+        // The option group is taken as the LAST '[' of a ']'-terminated remainder, not the first
+        // '[' anywhere: a name containing a bracket must not silently lose its tail. The observed
+        // GitLab name charset is `[A-Za-z0-9_.-]+` and carries no bracket at all, so this is a
+        // guard, not a live case.
+        [[nodiscard]] constexpr std::optional<std::string_view>
+        skip_numeric_field(std::string_view remainder) noexcept
+        {
+            std::size_t digits{0};
+            while (digits < remainder.size() && remainder[digits] >= '0' &&
+                   remainder[digits] <= '9')
+                ++digits;
+            if (digits == 0 || digits >= remainder.size() || remainder[digits] != ':')
+                return std::nullopt;
+            remainder.remove_prefix(digits + 1U);
+            if (!remainder.empty() && remainder.back() == '\r')
+                remainder.remove_suffix(1U);
+            if (!remainder.empty() && remainder.back() == ']')
+                if (const std::size_t group{remainder.rfind('[')};
+                    group != std::string_view::npos)
+                    remainder = std::string_view{remainder.data(), group};
+            if (remainder.empty())
+                return std::nullopt;
+            return remainder;
+        }
+
         // Extract a row's payload from the content past its matched prefix (the closed extractor
         // algorithms, grammar-2). nullopt = the extractor's own shape requirement failed ⇒ the ROW
         // does not match at all (RemainderToClosingParen without a line-final ')' — an un-named
@@ -217,6 +250,8 @@ namespace tokenization
                     return std::nullopt;
                 remainder.remove_suffix(1U); // drop the required line-final ')'
                 return remainder;
+            case insight::semantic::PayloadExtract::NumericFieldThenRemainder:
+                return skip_numeric_field(remainder);
             }
             return std::nullopt;
         }

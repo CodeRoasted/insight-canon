@@ -29,10 +29,14 @@ using insight::scan_run_outcome;
 using insight::semantic::compose;
 using insight::semantic::ComposedSemantics;
 using insight::semantic::find_conflict;
+using insight::semantic::IntentEmitRow;
 using insight::semantic::IntentMarkerRow;
 using insight::semantic::OutcomeMarkerRow;
+using insight::semantic::OutcomeMarkerShape;
 using insight::semantic::OutcomeTokenRow;
+using insight::semantic::PayloadEmit;
 using insight::semantic::PayloadExtract;
+using insight::semantic::render_row;
 using insight::semantic::SemanticPackageManifest;
 using insight::tokenization::ChildOrder;
 using insight::tokenization::IntentMarkerKind;
@@ -99,6 +103,58 @@ constexpr SemanticPackageManifest kOtherGatePkg{
 [[nodiscard]] ComposedSemantics composed_outcome()
 {
     return compose(std::array{kOutcomePkg}).for_stream(kSyntheticDialect, {});
+}
+
+// ── grammar-5 (ADR 0069) — a second synthetic dialect exercising the two shapes GitLab forced:
+// a marker payload behind a variable-length numeric field, and terminal lines whose PREFIX carries
+// the verdict with a free-form remainder. Both projections are declared so the round trip is
+// scored here too, at the level that owns the algorithms. Still no real ecosystem literal: canon
+// core stays semantic-unaware. ──
+constexpr std::string_view kNumericDialect{"synthetic_numeric"};
+
+constexpr std::array<IntentMarkerRow, 1> kNumericRows{{
+    {.prefix = "mark:",
+     .kind = IntentMarkerKind::Step,
+     .child_order = ChildOrder::Ordered,
+     .dialect_gate = kNumericDialect,
+     .extract = PayloadExtract::NumericFieldThenRemainder},
+}};
+constexpr std::array<IntentEmitRow, 1> kNumericEmits{{
+    {.prefix = "mark:",
+     .kind = IntentMarkerKind::Step,
+     .child_order = ChildOrder::Ordered,
+     .dialect_gate = kNumericDialect,
+     .emit = PayloadEmit::PlaceholderNumericFieldThenPayload},
+}};
+
+// Three prefix-verdict rows, two of which NEST — the longest-prefix tie-break is the property, and
+// the nesting pair is declared SHORTEST-FIRST on purpose: under the pre-grammar-5 walker the last
+// matching row overwrote, so declaration order decided the verdict. Reversing this array must not
+// change a single expectation below.
+constexpr std::array<OutcomeMarkerRow, 3> kVerdictMarkers{{
+    {.prefix = "Run finished",
+     .dialect_gate = kNumericDialect,
+     .shape = OutcomeMarkerShape::PrefixIsVerdict,
+     .outcome = RunOutcome::Success},
+    {.prefix = "FATAL: Run broke",
+     .dialect_gate = kNumericDialect,
+     .shape = OutcomeMarkerShape::PrefixIsVerdict,
+     .outcome = RunOutcome::Failure},
+    {.prefix = "FATAL: Run broke: stopped",
+     .dialect_gate = kNumericDialect,
+     .shape = OutcomeMarkerShape::PrefixIsVerdict,
+     .outcome = RunOutcome::Aborted},
+}};
+
+constexpr SemanticPackageManifest kNumericPkg{.name = "synthetic_numeric",
+                                              .version = "1.0.0",
+                                              .markers = kNumericRows,
+                                              .emits = kNumericEmits,
+                                              .outcome_markers = kVerdictMarkers};
+
+[[nodiscard]] ComposedSemantics composed_numeric()
+{
+    return compose(std::array{kNumericPkg}).for_stream(kNumericDialect, {});
 }
 } // namespace
 
@@ -205,6 +261,114 @@ TEST(RunOutcomeScanTest, DegenerateCompositionScansNothing)
     const ComposedSemantics core{compose({})};
     const std::vector<std::string> lines{"Ended: GOOD"};
     EXPECT_FALSE(scan_run_outcome(lines, core).marker_present);
+}
+
+// ── grammar-5: NumericFieldThenRemainder — skip a variable-length numeric field ──
+TEST(RunOutcomeGrammar5, NumericFieldIsSkippedAndThePayloadIsTheRemainder)
+{
+    const ComposedSemantics composed{composed_numeric()};
+    const auto step{recognize("mark:1784657178:prepare_executor", composed)};
+    EXPECT_EQ(step.kind, IntentMarkerKind::Step);
+    EXPECT_EQ(step.name, "prepare_executor")
+        << "the numeric field must be SKIPPED, not folded into the payload — a per-run epoch inside "
+           "the name is the identity storm this extractor exists to prevent";
+    // Field WIDTH is unconstrained: a width window would mirror the instrument that measured the
+    // corpus, and it is anchoring — not the stamp — that excludes the echoed phantoms.
+    EXPECT_EQ(recognize("mark:7:short_field", composed).name, "short_field");
+    EXPECT_EQ(recognize("mark:123456789012345678:wide_field", composed).name, "wide_field");
+}
+
+TEST(RunOutcomeGrammar5, NumericFieldShapeFailuresDeclineTheRow)
+{
+    const ComposedSemantics composed{composed_numeric()};
+    // The wireshark class: an unexpanded `%s` / `$(date +%s)` where the stamp belongs. DECLINED —
+    // structure present, stamp absent — never mis-parsed into a section named after a shell
+    // expression.
+    EXPECT_EQ(recognize("mark:%s:prepare_executor", composed).kind, IntentMarkerKind::None);
+    EXPECT_EQ(recognize("mark:$(date +%s):prepare_executor", composed).kind,
+              IntentMarkerKind::None);
+    // No separator after the digits.
+    EXPECT_EQ(recognize("mark:1784657178", composed).kind, IntentMarkerKind::None);
+    // No digits at all.
+    EXPECT_EQ(recognize("mark::prepare_executor", composed).kind, IntentMarkerKind::None);
+    // An empty payload is not a quantum.
+    EXPECT_EQ(recognize("mark:1784657178:", composed).kind, IntentMarkerKind::None);
+    EXPECT_EQ(recognize("mark:1784657178:\r", composed).kind, IntentMarkerKind::None);
+}
+
+TEST(RunOutcomeGrammar5, TheCarriageReturnTerminatorAndOptionGroupAreDropped)
+{
+    const ComposedSemantics composed{composed_numeric()};
+    // The CR is the producer's line terminator (`\r` + an erase-line escape canon's D-TID-11 ingest
+    // strip already removed). Left in, it would ride into every payload and into the alignment key.
+    EXPECT_EQ(recognize("mark:1784657178:prepare_executor\r", composed).name, "prepare_executor");
+    // The option group is producer presentation: without the drop, toggling it RENAMES the section.
+    EXPECT_EQ(recognize("mark:1784657178:build[collapsed=true]\r", composed).name, "build");
+    EXPECT_EQ(recognize("mark:1784657178:build[hide_duration=true,collapsed=true]", composed).name,
+              "build");
+    // A ']' that closes nothing is content, not a group.
+    EXPECT_EQ(recognize("mark:1784657178:weird]", composed).name, "weird]");
+    // A group that would consume the WHOLE payload leaves nothing to name → declined.
+    EXPECT_EQ(recognize("mark:1784657178:[collapsed=true]", composed).kind, IntentMarkerKind::None);
+}
+
+TEST(RunOutcomeGrammar5, TheEmitDualRoundTripsThroughTheExtractor)
+{
+    const ComposedSemantics composed{composed_numeric()};
+    const std::string line{render_row(kNumericEmits[0], "prepare_executor")};
+    EXPECT_EQ(line, "mark:0:prepare_executor")
+        << "the numeric field is a single PLACEHOLDER digit — a generated marker carries no "
+           "wall-clock, and a plausible-looking epoch would hide that";
+    const auto back{recognize(line, composed)};
+    EXPECT_EQ(back.kind, kNumericEmits[0].kind);
+    EXPECT_EQ(back.child_order, kNumericEmits[0].child_order);
+    EXPECT_EQ(back.name, "prepare_executor") << "G2: recognize(render_row(row, p)) must recover p";
+}
+
+// ── grammar-5: PrefixIsVerdict outcome markers + longest-prefix-wins ──
+TEST(RunOutcomeGrammar5, PrefixIsVerdictReadsTheVerdictOffTheRowNotTheRemainder)
+{
+    const ComposedSemantics composed{composed_numeric()};
+    // The free-form remainder is exactly what RemainderToken cannot express, and it is the shape a
+    // real terminal failure line has.
+    const std::vector<std::string> failed{"building", "FATAL: Run broke: code 1"};
+    const RunOutcomeScan scan{scan_run_outcome(failed, composed)};
+    ASSERT_TRUE(scan.marker_present);
+    ASSERT_TRUE(scan.verdict.has_value()) << "a PrefixIsVerdict row carries its own verdict";
+    EXPECT_EQ(*scan.verdict, RunOutcome::Failure);
+    EXPECT_TRUE(scan.token.empty()) << "this shape has no remainder token by construction";
+    EXPECT_EQ(resolve_run_outcome({}, scan, composed).outcome, RunOutcome::Failure);
+
+    // A bare prefix with NO remainder is still a match (the success form).
+    const std::vector<std::string> ok{"Run finished"};
+    EXPECT_EQ(resolve_run_outcome({}, scan_run_outcome(ok, composed), composed).outcome,
+              RunOutcome::Success);
+}
+
+TEST(RunOutcomeGrammar5, LongestPrefixWinsRegardlessOfDeclarationOrder)
+{
+    const ComposedSemantics composed{composed_numeric()};
+    // `FATAL: Run broke: stopped` is a strict EXTENSION of `FATAL: Run broke`, and it is declared
+    // AFTER it — so under the pre-grammar-5 "last row that matched overwrites" walk the answer was a
+    // function of where the rows sit in an array. It must now be a function of the bytes.
+    const std::vector<std::string> stopped{"FATAL: Run broke: stopped"};
+    const RunOutcomeScan scan{scan_run_outcome(stopped, composed)};
+    ASSERT_TRUE(scan.verdict.has_value());
+    EXPECT_EQ(*scan.verdict, RunOutcome::Aborted)
+        << "the LONGER prefix must win: a cancellation announced with the failure prefix is a WRONG "
+           "verdict, not a missing one";
+    // And the shorter row still claims everything the longer one does not.
+    const std::vector<std::string> plain{"FATAL: Run broke: code 137"};
+    EXPECT_EQ(*scan_run_outcome(plain, composed).verdict, RunOutcome::Failure);
+}
+
+TEST(RunOutcomeGrammar5, LastVerdictLineStillWinsAcrossLines)
+{
+    const ComposedSemantics composed{composed_numeric()};
+    const std::vector<std::string> lines{"FATAL: Run broke: code 1", "retrying", "Run finished"};
+    const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
+    ASSERT_TRUE(scan.verdict.has_value());
+    EXPECT_EQ(*scan.verdict, RunOutcome::Success) << "a run has ONE terminal verdict — the LAST one";
 }
 
 // ── resolve_run_outcome: the D-OUT-RUN-1 strict ladder ──

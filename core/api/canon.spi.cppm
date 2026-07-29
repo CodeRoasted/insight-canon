@@ -146,7 +146,15 @@ export namespace insight::semantic
 // the `semantic_identity` preimage (compose.cpp), reaches no wire field and no MetaLog block, and
 // the digest it feeds is moving anyway. It is not reserved by a plan — the shape shipped, so it
 // takes the token (adr/0047 clause 1).
-inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-4"};
+//
+// grammar-5 (ADR 0069, the GitLab CI dialect): three shape changes, all forced by bytes GitLab
+// emits and none expressible in grammar-4 — the `NumericFieldThenRemainder` extractor and its
+// `NumericFieldThenPayload` emit dual (a marker payload preceded by a variable-length numeric
+// field), and `OutcomeMarkerRow`'s shape discriminator + own verdict (a terminal line whose PREFIX
+// carries the verdict and whose remainder is free-form). Two new closed-enum members, one new enum,
+// and two new serialized row fields — every one of them a serialization shape change, so the token
+// moves for the reason the paragraph above states.
+inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-5"};
 
 // ── The DIALECT coordinate (ADR 0064 / ADR 0065) ─────────────────────────────────────────────────
 // A DIALECT is a VOCABULARY over a HOST FORMAT (0064 clause 1): the format owns the LAYOUT rule
@@ -273,6 +281,32 @@ enum class PayloadExtract : std::uint8_t
     // is scaffold, not a quantum). Nested parens stay inside the payload (`{ (Branch: test (lts))`
     // → `Branch: test (lts)`): only the single final ')' is the delimiter.
     RemainderToClosingParen,
+    // grammar-5 (ADR 0069): the content after the matched prefix is a non-empty run of ASCII digits,
+    // then a single ':', then the payload — the GitLab section marker
+    // `section_start:<unix-ts>:<name>[<options>]`. A variable-length field to SKIP is what no other
+    // extractor can express: `RemainderAfterPrefix` would put the epoch inside the payload, and
+    // `IntentMarker::name` is the raw payload that `compare_skeletons` keys on (adr/0045), so every
+    // run would carry a different name and nothing would ever align. Lengthening the prefix cannot
+    // absorb a variable-length field.
+    //
+    // The payload is the remainder minus two producer-owned suffixes, both bundled into the
+    // extractor exactly as RemainderToClosingParen bundles its required ')':
+    //   * a single trailing '\r' — GitLab terminates every marker with `\r\x1b[0K` (CR + erase-line,
+    //     the runner's collapse idiom). Canon's D-TID-11 ingest strip kills the escape and leaves
+    //     the CR, so without this the payload would be `prepare_executor\r`. MEASURED on
+    //     marker_corpus_v1: the CR follows the name on every marker that carries a terminator.
+    //     It is trimmed HERE rather than in the dialect strategy because the strategy is not the
+    //     only recognition path — eidos's `strip_leading_timestamp` pre-pass calls `recognize()`
+    //     with no strategy in the loop (adr/0063 clause 4), and the extractor is the one site both
+    //     paths share, so agreement is by construction rather than by coordination.
+    //   * a trailing `[…]` option group (`[collapsed=true]`, `[hide_duration=true,collapsed=true]`)
+    //     — without the drop, a producer toggling `collapsed` RENAMES a section.
+    // A shape failure (no digits, no ':', an empty payload) means the ROW DOES NOT MATCH, so a
+    // malformed producer marker — the unexpanded `%s` / `$(date +%s)` class, 95 occurrences in
+    // marker_corpus_v1 — is declined rather than mis-parsed. Digit-length is deliberately
+    // unconstrained: a width window would mirror the study instrument that measured it, and it is
+    // anchoring, not the stamp, that excludes the echoed phantoms.
+    NumericFieldThenRemainder,
 };
 
 // How a WRITER row materializes an intent's payload into log bytes (studies/008,
@@ -288,6 +322,16 @@ enum class PayloadEmit : std::uint8_t
     PayloadAfterPrefix, ///< dual of RemainderAfterPrefix — the prefix, then the payload verbatim
     PayloadThenClosingParen, ///< dual of RemainderToClosingParen — prefix, payload, then the final
                              ///< ')'
+    // grammar-5 (ADR 0069): dual of NumericFieldThenRemainder — prefix, a single PLACEHOLDER digit
+    // `0`, ':', then the payload. The placeholder is deliberate and its consequence is declared: a
+    // generated GitLab marker carries no wall-clock, so a synthetic stream has no section duration.
+    // Emitting a VARYING stamp is a step_duration capability, not a writer detail.
+    //
+    // The two reader-side suffix drops have no generation dual — the writer never emits a producer
+    // option group and never emits the CR terminator — the same asymmetry `payload_excludes` already
+    // carries. So the round trip closes on every payload the writer can produce, which is what G2
+    // asserts.
+    PlaceholderNumericFieldThenPayload,
 };
 
 // Which core location-matching ALGORITHM a LocationRow selects + parameterizes (§2.2 — a CLOSED
@@ -424,14 +468,37 @@ struct OutcomeTokenRow
     std::string_view dialect_gate{kAnyDialect}; // ADR 0065 clause 1 — the owning package's name
 };
 
-// The console-tail terminal-verdict line (Jenkins: `Finished: `). Core matches it line-anchored on
-// the routed format, extracts the remainder token (which must be a single ASCII word), and maps it
-// through the composed OutcomeTokenRow set; the LAST match in line order wins (a run has one
-// terminal verdict; deterministic integer index).
+// How a matched OutcomeMarkerRow yields its verdict (grammar-5, ADR 0069 — a CLOSED shape enum, the
+// PayloadExtract discipline applied to the outcome walker). Two dialects, two genuinely different
+// terminal-line grammars, and no prefix choice unifies them.
+enum class OutcomeMarkerShape : std::uint8_t
+{
+    // The verdict is the line's REMAINDER after the prefix and must be a single ASCII word, mapped
+    // through the composed OutcomeTokenRow set (Jenkins `Finished: SUCCESS`).
+    RemainderToken = 0,
+    // The PREFIX itself announces the verdict; the remainder is free-form and is not read. GitLab's
+    // failure line is `ERROR: Job failed: exit code 1` / `… : exit status 137` /
+    // `… (system failure): <reason>` — 144 of 619 traces in marker_corpus_v1, and unrecognizable
+    // under RemainderToken for any prefix: `ERROR: Job failed: ` leaves `exit code 1`,
+    // `ERROR: Job failed` leaves `: exit code 1`, `ERROR: Job ` leaves `failed: exit code 1`.
+    PrefixIsVerdict,
+};
+
+// The console-tail terminal-verdict line (Jenkins: `Finished: `; GitLab: `Job succeeded` /
+// `ERROR: Job failed`). Core matches it line-anchored on the resolved view; the LONGEST matching
+// prefix wins within a line and the LAST match in line order wins across lines (a run has one
+// terminal verdict; deterministic integer index, no dependence on declaration order).
 struct OutcomeMarkerRow
 {
     std::string_view prefix;
     std::string_view dialect_gate{kAnyDialect}; // ADR 0065 clause 1 — the owning package's name
+    OutcomeMarkerShape shape{OutcomeMarkerShape::RemainderToken};
+    // The verdict this row's PREFIX announces. READ ONLY under PrefixIsVerdict — a RemainderToken
+    // row's verdict comes from its remainder, through the token rows, and this field is inert for
+    // it. That conditionality is what the type cannot express, which is why it is written here:
+    // RunOutcome has no "absent" member (Unknown is a real verdict a row may legitimately carry —
+    // the Jenkins NOT_BUILT precedent), so a sentinel would be a lie rather than a guard.
+    insight::RunOutcome outcome{insight::RunOutcome::Unknown};
 };
 
 // A value-class rule (the grammar SEAT for package value classes, §5). No package ships domain
@@ -516,6 +583,12 @@ struct SemanticPackageManifest
 // behind it.
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
+// The numeric field a PlaceholderNumericFieldThenPayload row materializes, separator included. One
+// digit, and the value is not a stamp: the reader skips the field whatever it holds, so the writer
+// owes only a SHAPE-VALID field, and the shortest valid one makes the absence of a wall-clock
+// legible in the rendered bytes rather than hidden behind a plausible-looking epoch.
+inline constexpr std::string_view kPlaceholderNumericField{"0:"};
+
 // render_row — the writer-row expansion. PURE: a function of (row, payload) ONLY — no RNG, no
 // envelope, no engine state, no wall-clock — so it lives on the canon (recognition) side and
 // LogCraft merely calls it to materialize. The exact inverse of the PayloadExtract algorithm: for
@@ -541,6 +614,12 @@ struct SemanticPackageManifest
         out.append(row.prefix);
         out.append(payload);
         out.push_back(')');
+        break;
+    case PayloadEmit::PlaceholderNumericFieldThenPayload:
+        out.reserve(row.prefix.size() + kPlaceholderNumericField.size() + payload.size());
+        out.append(row.prefix);
+        out.append(kPlaceholderNumericField);
+        out.append(payload);
         break;
     }
     return out;
