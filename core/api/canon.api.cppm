@@ -1525,3 +1525,113 @@ template <typename Visit>
 }
 
 } // namespace insight::utils
+
+// ──────── from src/scan/canon.detail.scan.cppm (ANSI ingest normalization, D-TID-11) ────────
+// PUBLIC, and homed here rather than in the sealed detail.scan shard for one reason: stage 1 is an
+// obligation the `recognize()`/`classify()` DECLARATION places on its callers (see the precondition
+// on those two in insight.canon), and a caller cannot discharge an obligation whose only
+// implementation is build-private. It sits beside `insight::utils::detail::ansi_escape_len` — the
+// second ANSI grammar in this unit — because the two are the pair that will have to be reconciled:
+// `ansi_escape_len` treats an escape run as a token DELIMITER and handles no OSC, while the strip
+// below deletes the run outright and does handle OSC. Physical adjacency is the cheapest thing
+// keeping that divergence visible.
+export namespace insight::tokenization
+{
+
+inline constexpr unsigned char kEsc{0x1bU}; // ESC, the escape introducer
+inline constexpr unsigned char kBel{0x07U}; // BEL, an OSC terminator
+
+namespace detail
+{
+    // The terminal escape-grammar byte ranges (ECMA-48): a CSI body is params then intermediates
+    // then one final byte; OSC runs to a BEL or ST terminator.
+    inline constexpr unsigned char kCsiParamLo{0x30U}; // CSI parameter bytes 0–9:;<=>?
+    inline constexpr unsigned char kCsiParamHi{0x3fU};
+    inline constexpr unsigned char kCsiInterLo{0x20U}; // CSI intermediate bytes (space..'/')
+    inline constexpr unsigned char kCsiInterHi{0x2fU};
+    inline constexpr unsigned char kCsiFinalLo{0x40U}; // CSI final byte ('@'..'~', incl. SGR 'm')
+    inline constexpr unsigned char kCsiFinalHi{0x7eU};
+
+    // Advance past a CSI body (params* intermediates* final?). `pos` is the index just
+    // after the `ESC [` introducer; returns the index of the first post-sequence byte.
+    [[nodiscard]] inline std::size_t scan_csi_body(std::string_view line, std::size_t pos) noexcept
+    {
+        const std::size_t len{line.size()};
+        const auto byte_at{[&](std::size_t idx) { return static_cast<unsigned char>(line[idx]); }};
+        while (pos < len && byte_at(pos) >= kCsiParamLo && byte_at(pos) <= kCsiParamHi)
+            ++pos;
+        while (pos < len && byte_at(pos) >= kCsiInterLo && byte_at(pos) <= kCsiInterHi)
+            ++pos;
+        if (pos < len && byte_at(pos) >= kCsiFinalLo && byte_at(pos) <= kCsiFinalHi)
+            ++pos;
+        return pos;
+    }
+
+    // Advance past an OSC body to its BEL or ST (ESC \) terminator (consumed). `pos` is
+    // the index just after the `ESC ]` introducer.
+    [[nodiscard]] inline std::size_t scan_osc_body(std::string_view line, std::size_t pos) noexcept
+    {
+        const std::size_t len{line.size()};
+        const auto byte_at{[&](std::size_t idx) { return static_cast<unsigned char>(line[idx]); }};
+        while (pos < len)
+        {
+            if (byte_at(pos) == kBel)
+                return pos + 1U;
+            if (byte_at(pos) == kEsc && pos + 1U < len && line[pos + 1U] == '\\')
+                return pos + 2U;
+            ++pos;
+        }
+        return pos;
+    }
+
+} // namespace detail
+
+// Strip CSI / SGR / OSC and bare-ESC terminal escape sequences from a line as an
+// UNCONDITIONAL content normalization at canon ingest — BEFORE tokenization. Colour
+// is presentation, never content (D-TID-10); the escapes interleave within/between
+// tokens (`\x1b[31mERROR\x1b[0m`) so a per-token mask cannot reach them — they must
+// die here. A pure byte state machine: no float, order-independent → cross-stdlib
+// bit-identical (the same grammar the TTY `sanitize()` drops, re-homed at ingest).
+// Appends the cleaned bytes to `out` (cleared first); result ≤ input, so a reused
+// buffer makes this allocation-free in steady state.
+//
+// ⚠ THIS IS **STAGE 1**, AND IT IS A CONSUMER'S OBLIGATION, NEVER A PACKAGE'S. A semantic package's
+// strategy MUST NOT call it: normalization inside a strategy is refused by ADR 0024 §2.2, and a
+// package that normalized would double-strip content canon already stripped, then disagree with
+// canon on any line where the two grammars differ. The caller that OWNS the ingest — LogParser, or
+// a consumer deriving content for `recognize()`/`classify()` — runs it once, before the transport
+// peel (stage 2). The order is load-bearing: an escape sitting BEFORE a transport prefix is
+// invisible to the peel unless the strip ran first.
+//
+// ⚠ AND IT MUST NEVER OVERWRITE THE BUFFER A Tokenizer LATER READS. The strip is destructive of
+// exactly the bytes some provenance hooks need: GHA's command-echo SGR wrapper survives ONLY on the
+// raw line (D-PROV-1, log_parser.cpp), so normalizing a caller's line storage in place would
+// silently kill the echoed-source demotion. Stage 1 produces a DERIVED view for recognition; the
+// raw line stays raw.
+inline void strip_escape_sequences(std::string_view line, std::string& out)
+{
+    out.clear();
+    out.reserve(line.size());
+    const std::size_t len{line.size()};
+    std::size_t pos{0};
+    while (pos < len)
+    {
+        if (static_cast<unsigned char>(line[pos]) != kEsc)
+        {
+            out.push_back(line[pos]);
+            ++pos;
+            continue;
+        }
+        if (pos + 1U >= len)
+            break; // a lone trailing ESC — drop it
+        const char introducer{line[pos + 1U]};
+        if (introducer == '[')
+            pos = detail::scan_csi_body(line, pos + 2U);
+        else if (introducer == ']')
+            pos = detail::scan_osc_body(line, pos + 2U);
+        else
+            pos += 2U; // a simple two-byte ESC sequence (charset select, reset, …)
+    }
+}
+
+} // namespace insight::tokenization

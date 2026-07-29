@@ -9,7 +9,7 @@ import insight.canon.api;      // LogFormat, ArenaAllocator
 import insight.canon.spi;      // SemanticPackageManifest (composed strategy factories)
 import insight.canon.compose;  // ComposedSemantics — composed strategies + echoed-source hooks
 import insight.canon.detail.strategy; // IFormatStrategy, ParsedLine
-import insight.canon.detail.scan;     // strip_escape_sequences (ANSI ingest normalization)
+import insight.canon.detail.scan;     // fast_gates char-class predicates (FormatDetector's probes)
 
 // ──────── from src/insight/tokenization/format_detector.hpp ────────
 export namespace insight::tokenization

@@ -725,88 +725,18 @@ inline void sv_skip_ws(std::string_view& str) noexcept
     return tag;
 }
 
-// ── ANSI / terminal escape stripping (stateless_template_id.md D-TID-11) ─────────
-// The terminal escape-grammar byte ranges (ECMA-48): a CSI body is params then
-// intermediates then one final byte; OSC runs to a BEL or ST terminator.
-inline constexpr unsigned char kEsc{0x1bU};        // ESC, the escape introducer
-inline constexpr unsigned char kBel{0x07U};        // BEL, an OSC terminator
-inline constexpr unsigned char kCsiParamLo{0x30U}; // CSI parameter bytes 0–9:;<=>?
-inline constexpr unsigned char kCsiParamHi{0x3fU};
-inline constexpr unsigned char kCsiInterLo{0x20U}; // CSI intermediate bytes (space..'/')
-inline constexpr unsigned char kCsiInterHi{0x2fU};
-inline constexpr unsigned char kCsiFinalLo{0x40U}; // CSI final byte ('@'..'~', incl. SGR 'm')
-inline constexpr unsigned char kCsiFinalHi{0x7eU};
-
-// Advance past a CSI body (params* intermediates* final?). `pos` is the index just
-// after the `ESC [` introducer; returns the index of the first post-sequence byte.
-[[nodiscard]] inline std::size_t scan_csi_body(std::string_view line, std::size_t pos) noexcept
-{
-    const std::size_t len{line.size()};
-    const auto byte_at{[&](std::size_t idx) { return static_cast<unsigned char>(line[idx]); }};
-    while (pos < len && byte_at(pos) >= kCsiParamLo && byte_at(pos) <= kCsiParamHi)
-        ++pos;
-    while (pos < len && byte_at(pos) >= kCsiInterLo && byte_at(pos) <= kCsiInterHi)
-        ++pos;
-    if (pos < len && byte_at(pos) >= kCsiFinalLo && byte_at(pos) <= kCsiFinalHi)
-        ++pos;
-    return pos;
-}
-
-// Advance past an OSC body to its BEL or ST (ESC \) terminator (consumed). `pos` is
-// the index just after the `ESC ]` introducer.
-[[nodiscard]] inline std::size_t scan_osc_body(std::string_view line, std::size_t pos) noexcept
-{
-    const std::size_t len{line.size()};
-    const auto byte_at{[&](std::size_t idx) { return static_cast<unsigned char>(line[idx]); }};
-    while (pos < len)
-    {
-        if (byte_at(pos) == kBel)
-            return pos + 1U;
-        if (byte_at(pos) == kEsc && pos + 1U < len && line[pos + 1U] == '\\')
-            return pos + 2U;
-        ++pos;
-    }
-    return pos;
-}
-
-// Strip CSI / SGR / OSC and bare-ESC terminal escape sequences from a line as an
-// UNCONDITIONAL content normalization at canon ingest — BEFORE tokenization. Colour
-// is presentation, never content (D-TID-10); the escapes interleave within/between
-// tokens (`\x1b[31mERROR\x1b[0m`) so a per-token mask cannot reach them — they must
-// die here. A pure byte state machine: no float, order-independent → cross-stdlib
-// bit-identical (the same grammar the TTY `sanitize()` drops, re-homed at ingest).
-// Appends the cleaned bytes to `out` (cleared first); result ≤ input, so a reused
-// buffer makes this allocation-free in steady state.
-inline void strip_escape_sequences(std::string_view line, std::string& out)
-{
-    out.clear();
-    out.reserve(line.size());
-    const std::size_t len{line.size()};
-    std::size_t pos{0};
-    while (pos < len)
-    {
-        if (static_cast<unsigned char>(line[pos]) != kEsc)
-        {
-            out.push_back(line[pos]);
-            ++pos;
-            continue;
-        }
-        if (pos + 1U >= len)
-            break; // a lone trailing ESC — drop it
-        const char introducer{line[pos + 1U]};
-        if (introducer == '[')
-            pos = scan_csi_body(line, pos + 2U);
-        else if (introducer == ']')
-            pos = scan_osc_body(line, pos + 2U);
-        else
-            pos += 2U; // a simple two-byte ESC sequence (charset select, reset, …)
-    }
-}
+// ── ANSI / terminal escape stripping (D-TID-11) relocated to insight.canon.api ───────────────────
+// `strip_escape_sequences` + kEsc/kBel + the two body scanners now live in the PUBLIC api unit.
+// They were never detail-scan knowledge: the cluster depends on nothing in this shard (no strategy,
+// no gate, no SSE2 primitive) and sat here only because its one caller, LogParser, lives in
+// detail.parse. Stage 1 is an obligation on every `recognize()`/`classify()` CONSUMER, not just on
+// canon's own parser, so it must be reachable — a sealed shard cannot carry a precondition that
+// external callers are required to satisfy.
 
 // ── Echoed-source detection (D-PROV-1) relocated to insight_semantic_github (ADR 0024 §1.2) ──
 // The GHA command-echo SGR catalog (`\x1b[36;1m … \x1b[0m`), parse_sgr_params, and
 // is_echoed_source_line are dialect knowledge — they now live in the github package's code tier and
-// reach LogParser as a composed ProvenanceHook. strip_escape_sequences (above) stays core: it is a
+// reach LogParser as a composed ProvenanceHook. strip_escape_sequences stays core: it is a
 // universal ANSI ingest normalization, not dialect-specific.
 
 } // namespace insight::tokenization

@@ -37,15 +37,48 @@ export namespace insight::tokenization
 // dialect argument here would restore the content dependence T4 removed: the argument used to be
 // `LogParser::routed_format()`, the per-line detector winner under a sticky-strategy fast path.
 
+// ⚠⚠ THE PRECONDITION ON `content` — NORMATIVE, AND THE PART THAT MUST NOT BE SKIPPED.
+//
+// `content` MUST be **stage 1 ∘ stage 2**: ANSI-normalized bytes (`strip_escape_sequences`,
+// insight.canon.api) from which the stream's transport prefix has THEN been peeled. That is what
+// the word *content* means everywhere in canon — D-TID-11 states the strip as unconditional and
+// BEFORE strategy detection, and a dialect package's anti-phantom guard is written against it (a
+// genuine marker sits at offset 0 of the peeled, ANSI-stripped content).
+//
+// THE ORDER IS LOAD-BEARING, not stylistic: an escape sitting BEFORE the transport prefix is
+// invisible to the peel unless the strip ran first, and real producers put escapes at segment
+// heads.
+//
+// **A CALLER THAT PEELS WITHOUT NORMALIZING GETS A SILENTLY NARROWER ANSWER, NOT AN ERROR.** These
+// functions are anchored longest-prefix walks: a leading CSI run displaces the row's prefix off
+// offset 0 and the row simply does not fire. There is no diagnostic, no counter and no degraded
+// mode — the caller sees `None` and a smaller, plausible-looking result. That is not a theoretical
+// hazard: it cost 1 077 of 3 193 GitLab section markers (33.7 % of the modern leg's sections)
+// across two consumers that both looked correct.
+//
+// **The declared transport peel cannot discharge stage 1 for you.** `PeeledLine::content` borrows
+// from the caller's buffer — the peel only ever SHORTENS, never rewrites (insight.canon.transport)
+// — and an ANSI strip rewrites. Using `stream.transport.peel(line).content` is stage 2 ONLY.
+//
+// **Derive it at ONE seam per consumer, and never in place.** Stage 1 must produce a DERIVED view;
+// it must never overwrite the line buffer a `Tokenizer` or a provenance hook later reads (GHA's
+// echoed-source SGR wrapper survives only on the raw line — see `strip_escape_sequences`). A
+// convention spread across call sites is what failed here; one derivation function per consumer is
+// what replaces it.
+//
+// **NOT the semantic packages' job.** Normalization inside a strategy is refused (ADR 0024 §2.2):
+// the obligation belongs to whoever owns the ingest, one level above the row tables.
+
 // Classify a LINE's structural role from the resolved view's role rows (longest-match). None when
-// no row matches.
+// no row matches. `content` carries the precondition above.
 [[nodiscard]] StructuralRole
 classify(std::string_view content,
          const insight::semantic::ComposedSemantics& composed) noexcept;
 
 // Recognize an intent marker from the resolved view's marker rows (longest-match). The payload is
 // the content after the matched prefix; the alignment class + instance discriminant are derived by
-// canon's canonicalize_intent / discriminant_of. None when no row matches.
+// canon's canonicalize_intent / discriminant_of. None when no row matches. `content` carries the
+// precondition above.
 [[nodiscard]] IntentMarker recognize(std::string_view content,
                                      const insight::semantic::ComposedSemantics& composed) noexcept;
 

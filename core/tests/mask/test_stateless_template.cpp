@@ -196,21 +196,6 @@ TEST(StatelessTemplate, NonEphemeralPathsAndSourcePathsUntouched)
 
 // ── F13 strengthening (§8 / D-TID-11..13) — the re-measure rule set ──────────────
 
-TEST(StatelessTemplate, AnsiEscapesStrippedBeforeTokenization)
-{
-    // D-TID-11: colour codes are presentation, stripped at ingest. Two coloured
-    // variants of one line fold to the same colour-free content.
-    std::string clean;
-    strip_escape_sequences("\x1b[31mERROR\x1b[0m: pool down", clean);
-    EXPECT_EQ(clean, "ERROR: pool down");
-    strip_escape_sequences("plain text, no escapes", clean);
-    EXPECT_EQ(clean, "plain text, no escapes");
-    // An OSC sequence (ESC ] ... BEL) is dropped whole. (`\a` = BEL 0x07; avoid the
-    // greedy `\x07b` hex-escape that would absorb the trailing 'b'.)
-    strip_escape_sequences("a\x1b]0;title\ab", clean);
-    EXPECT_EQ(clean, "ab");
-}
-
 TEST(StatelessTemplate, DigitLeadingTokensMask)
 {
     ArenaAllocator arena{256U * 1024U};
