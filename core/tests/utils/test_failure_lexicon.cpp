@@ -46,9 +46,21 @@ TEST(FailureLexicon, StandaloneWordIsACue)
 // [bracket], or a ✗-led line); a BARE type in prose / a source-echo (`raise ValueError`,
 // no register) does NOT — the actual thrown line `ValueError: …` carries the colon and still
 // fires, so the lost recall is on non-verdict echoes only (precision-first, ADR 0013).
+//
+// D-OUT-4c re-baselined the colon half 2026-07-29: the colon anchors only in the line's KIND
+// SLOT. error_type_anchors IS is_verdict_anchored, so this consumer moved with the kernel — by
+// construction, not as a side effect. The pytest gutter row below is the measured cost, and it is
+// the SAME ruling that excludes the jest/rust code-frame gutter (`> 10 |   err: &str`): a gutter
+// marker is not prefix material, and carving one out would be the per-shape allowlist the rule
+// exists to avoid.
 TEST(FailureLexicon, CamelCaseTypeIsACueOnlyInVerdictRegister)
 {
-    EXPECT_TRUE(contains_failure_cue("E   sqlalchemy.exc.OperationalError: bad")) << "dotted type:";
+    EXPECT_FALSE(contains_failure_cue("E   sqlalchemy.exc.OperationalError: bad"))
+        << "D-OUT-4c: the pytest report gutter 'E' is neither colon-terminated nor "
+           "bracket-enclosed, so the type is not in the kind slot — the declared recall edge";
+    EXPECT_TRUE(contains_failure_cue("sqlalchemy.exc.OperationalError: bad"))
+        << "the same dotted type at index 0 IS the kind slot — the discriminator is POSITION, not "
+           "the token (without this row the row above would pass a blanket suppressor)";
     EXPECT_TRUE(contains_failure_cue("IOError: disk full")) << "uppercase-before suffix, colon";
     EXPECT_FALSE(contains_failure_cue("raise ValueError"))
         << "a BARE type with no verdict register (source echo) no longer fires — the actual "
@@ -98,8 +110,12 @@ TEST(FailureLexicon, NegatedErrorTypeIsNotACue)
         << "the exact dogfood false match — '…NotError' is a negation, not an error type";
     EXPECT_FALSE(contains_failure_cue("status NoError after retry")) << "'NoError' negates";
     EXPECT_FALSE(contains_failure_cue("assert HandlesNonError path")) << "'NonError' negates";
-    EXPECT_TRUE(contains_failure_cue("raises ValueError: bad value"))
-        << "control: a real type ('Value' before 'Error') in verdict register (colon) is a cue";
+    EXPECT_TRUE(contains_failure_cue("ValueError: bad value"))
+        << "control: a real type ('Value' before 'Error') in verdict register (a kind-slot colon) "
+           "is a cue — the negation guard is not a blanket suppressor";
+    EXPECT_FALSE(contains_failure_cue("raises ValueError: bad value"))
+        << "D-OUT-4c: 'raises' is prose, so the type is not in the kind slot — consistent with "
+           "`raise ValueError` (no register) already demoting; the thrown line still fires above";
 }
 
 // ── A declared PASS verdict demotes a bare error-TYPE NAME (Guard 2) ───────────

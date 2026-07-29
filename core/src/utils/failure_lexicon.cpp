@@ -314,6 +314,71 @@ namespace
         return token;
     }
 
+    // ── D-OUT-4c — the KIND SLOT: anchor #2 is a POSITION claim, not an adjacency ─────
+    // PREFIX MATERIAL: a token that may PRECEDE the line's kind slot without displacing it. Two
+    // declared, closed classes — the same shape D-OUT-4's role partition uses, and the reason this
+    // is a rule rather than per-shape tuning:
+    //   1. colon-terminated — the byte past its span is `:` (`ld:`, `src/main.rs:`, `357:`, `14:`)
+    //   2. bracket-enclosed — its span is bounded by `[…]`, `(…)` or `<…>` (`[main]`, `(none)`,
+    //      `<WORKSPACE>`); the closing bracket may itself carry a `:`, which class 1 then covers
+    //      for whatever token follows.
+    // Both read the RAW span — the untrimmed extent take_trimmed_token walked — because the byte
+    // that carries the structure is the one just past it, and the trim can hide it ("foo-:" trims
+    // to "foo", whose next byte is `-`, not `:`).
+    [[nodiscard]] bool is_prefix_material(std::string_view line, std::size_t raw_begin,
+                                          std::size_t raw_end) noexcept
+    {
+        const char before{raw_begin > 0U ? line[raw_begin - 1U] : '\0'};
+        const char after{raw_end < line.size() ? line[raw_end] : '\0'};
+        if (after == ':')
+            return true;
+        return (before == '[' && after == ']') || (before == '(' && after == ')') ||
+               (before == '<' && after == '>');
+    }
+
+    // D-OUT-4c — true iff `token` occupies the line's KIND SLOT: every token preceding it on the
+    // line is prefix material.
+    //
+    // WHY A WALK IS NEEDED AT ALL. `after == ':'` is an adjacency test standing in for a position
+    // claim, and it cannot separate
+    //     error: connection refused   (a verdict)
+    //     error: string               (a struct field declaration)
+    //     err:   &str                 (a named parameter in a code frame)
+    // — all three are byte-identical in the ±1 neighbourhood of the token, so no WIDENING of that
+    // neighbourhood discriminates: the information is positional, not local. D-NOTE-1 already
+    // validates its own marker BACKWARDS for exactly this reason ("structural rather than
+    // lexical"); this is that same treatment for anchor #2. It also subsumes the compiler-frame
+    // shape for free — `<path>:<line>:<col>:` is not a special case, it IS a run of
+    // colon-terminated tokens.
+    //
+    // WHOLE-LINE, never head-bounded, and that is load-bearing: a register is a claim about a
+    // line's structure and a bounded head is a cost control, so gating the claim on a byte budget
+    // makes it change silently with presentation — the one property of a log line no producer
+    // guarantees (adr/0074). Cost is bounded instead by the walk being SELF-TERMINATING: it stops
+    // at the first non-prefix token, which on prose is token index 1, and it is reached only after
+    // a `:` was already found.
+    //
+    // PRECONDITION: `token` is a sub-view of `line`, as for every register kernel here. A token
+    // never reached is treated as absent and DEMOTES — the conservative direction.
+    [[nodiscard]] bool token_in_kind_slot(std::string_view line, std::string_view token) noexcept
+    {
+        std::size_t pos{0};
+        for (;;)
+        {
+            pos = skip_to_token_start(line, pos);
+            if (pos >= line.size())
+                return false; // walked off the line without reaching `token`
+            const std::size_t raw_begin{pos};
+            const std::string_view current{take_trimmed_token(line, pos)};
+            if (current.data() == token.data() && current.size() == token.size())
+                return true; // reached it with nothing but prefix material behind it
+            // An empty trimmed token is pure punctuation ("##", "--") and is invisible to
+            // for_each_token, so it is invisible here too — the two must agree on what a token is.
+            if (!current.empty() && !is_prefix_material(line, raw_begin, pos))
+                return false;
+        }
+    }
+
     // ── D-OUT-4a — a leading FAIL glyph CONFIRMS a failure word (the ✗-anchor) ────────
     // Mirror of leading_outcome_is_pass: does the line's FIRST outcome-bearing token mark a
     // FAIL? Walk the head; the first token that is a ballot-X glyph ⇒ true; a PASS glyph ⇒
@@ -424,11 +489,15 @@ namespace detail
         const std::size_t end{start + token.size()};
         const char before{start > 0U ? line[start - 1U] : '\0'};
         const char after{end < line.size() ? line[end] : '\0'};
-        // anchor #2 — a verdict colon ("error:"), or enclosed in brackets/parens
-        // ("[error]", "##[error]", "(FAILED)"): the separators CI/test runners frame an
-        // outcome with. A leading "##" is its own (empty-trimmed) token, so the byte
-        // immediately before "error" is the '[' — bracket-bound.
-        if (after == ':')
+        // anchor #2 — a verdict colon ("error:") IN THE LINE'S KIND SLOT (D-OUT-4c), or the token
+        // enclosed in brackets/parens ("[error]", "##[error]", "(FAILED)"): the separators CI/test
+        // runners frame an outcome with. A leading "##" is its own (empty-trimmed) token, so the
+        // byte immediately before "error" is the '[' — bracket-bound.
+        // Only the colon half carries the kind-slot precondition, and the asymmetry is the design:
+        // a trailing colon is a ONE-SIDED adjacency that every `key: value` in every config dump,
+        // source frame and quoted string satisfies, while a bracket pair is already a two-sided
+        // enclosure that prose does not produce by accident.
+        if (after == ':' && token_in_kind_slot(line, token))
             return true;
         if ((before == '[' && after == ']') || (before == '(' && after == ')'))
             return true;

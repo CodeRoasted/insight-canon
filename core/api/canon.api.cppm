@@ -1161,7 +1161,7 @@ export namespace insight::utils
 // verb failed/refused/…, OR a unique failure noun segfault/traceback/unhandled) self-
 // anchors and fires bare in prose ("build failed", "unhandled exception"); a collision-
 // prone token (error/fail/crash/timeout/fatal/panic/…) fires ONLY when verdict-anchored
-// (detail::is_verdict_anchored — CAPS, a `:`/bracket delimiter, a leading ✗ fail glyph,
+// (detail::is_verdict_anchored — CAPS, a kind-slot `:` or a bracket pair, a leading ✗ fail glyph,
 // the CamelCase `…Error` type form, or the `segmentation fault` phrase). A bare collision-
 // prone noun in a non-verdict line (`Storing crash reports into <path>`, `watcher fail
 // event`, `error_handler`) does NOT classify — the structural lesson, not a per-word denylist.
@@ -1205,8 +1205,9 @@ namespace detail
     // decoration CI/test tooling uses to mark an outcome, so a benign-collision-prone
     // failure token classifies its line ONLY in verdict register (never in a path / config
     // line / test description). Anchors: (1) CAPS register — token's raw bytes ALL-UPPERCASE,
-    // ≥2 letters (ERROR/FAILED/FATAL); (2) DELIMITER-bound — immediately followed by `:`
-    // (`error:`, `fatal:`), or enclosed by `[..]`/`(..)` (`[error]`, `##[error]`, `(FAILED)`);
+    // ≥2 letters (ERROR/FAILED/FATAL); (2) DELIMITER-bound — followed by `:` AND standing in the
+    // line's KIND SLOT (D-OUT-4c, below), or enclosed by `[..]`/`(..)` (`[error]`, `##[error]`,
+    // `(FAILED)`);
     // (3) a LEADING fail glyph `✗`/`✕`/`✖`/`✘` (D-OUT-4a) marking the line a failed verdict —
     // a line-level register that CONFIRMS the token, never creates a cue (a glyph-only line
     // has no failure word). (Type-named CamelCase `…Error` and the `segmentation fault`
@@ -1216,6 +1217,18 @@ namespace detail
     // pre-casefold byte facts the trimmed token alone does not surface. Pure byte-compare +
     // ASCII case test, order-independent ⇒ cross-stdlib + MSVC bit-identical by construction
     // (F5). The SAME kernel both severity feeders consult; internal/detail, NOT a public surface.
+    //
+    // D-OUT-4c — THE KIND SLOT, anchor #2's precondition. A trailing `:` anchors `token` only when
+    // `token` occupies the line's KIND SLOT: every token preceding it is itself colon-terminated
+    // (`ld:`, `src/main.rs:`, `357:`) or bracket-enclosed (`[main]`, `(none)`, `<WORKSPACE>`). A
+    // bare adjacency cannot separate a log prefix `error:` from an object key, a named parameter
+    // or a quoted source string — the three are byte-identical in the token's ±1 neighbourhood, so
+    // the discriminating information is POSITIONAL and no widening of the neighbourhood recovers
+    // it. The rule is monotone-DEMOTING (it only ever removes an anchor, never adds one), which is
+    // what makes it admissible under adr/0013 clause 2 with no corroborating recall argument, and
+    // `<path>:<line>:<col>:` needs no special case — it IS a run of colon-terminated tokens, so
+    // D-NOTE-1's hand-parsed shape is an instance of this rule rather than a sibling of it.
+    // The walk is WHOLE-LINE and never head-bounded: adr/0074 — bound the scan, never the claim.
     [[nodiscard]] bool is_verdict_anchored(std::string_view line, std::string_view token) noexcept;
 
     // The count-register kernel (D-CNT-1) — true iff `token` is a COUNT register summary: its

@@ -769,6 +769,24 @@ namespace
     {
         return level == LogLevel::Warn || level == LogLevel::Error || level == LogLevel::Fatal;
     }
+
+    // Is there any token left on the line after `token` ends? Stage 1's "…or it is the terminal /
+    // sole significant token" branch is a claim about the LINE, so it is derived over the whole
+    // line. Deriving it inside the head-bounded scan instead made a level word at content offset
+    // 35 whose successor starts at 41 read as TERMINAL — and therefore authoritative — so the
+    // verdict moved with the byte count of the prefix rather than with its structure. That is the
+    // presentation-dependence D-OUT-4c names, in the one branch the kind-slot rule does not cover
+    // (adr/0074: bound the scan, never the claim). Cold — reached only once a level word matched —
+    // and self-terminating: for_each_token stops at the first token it finds.
+    // PRECONDITION: `token` is a sub-view of `line`.
+    // Only throw path is for_each_token's substr (begin <= size); the noexcept body cannot throw.
+    // NOLINTNEXTLINE(bugprone-exception-escape)
+    [[nodiscard]] bool token_follows(std::string_view line, std::string_view token) noexcept
+    {
+        const std::size_t end{static_cast<std::size_t>(token.data() - line.data()) + token.size()};
+        return for_each_token(line.substr(end), 0U,
+                              [](std::string_view) noexcept { return true; });
+    }
 } // namespace
 
 // Only throw path is for_each_token's substr(begin, ...) with begin <= line.size()
@@ -790,7 +808,16 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
     //     "INFO" can't override it.
     //  2) Otherwise, scan the head for an error/warning CUE as a standalone token
     //     (pytest "…OperationalError", tracebacks, bare "connection refused").
-    constexpr std::size_t kLeadingScanHead{40}; // covers an ISO-8601 timestamp + the level start
+    // A COST BOUND on the leading-level search, and nothing else: how far into the line an explicit
+    // level token may START. It states nothing about what precedes the level word and decides no
+    // verdict — the register decision (D-OUT-4c's kind slot) and the terminality decision below are
+    // both derived over the WHOLE line. It read as a position rule once ("covers an ISO-8601
+    // timestamp + the level start"), and that framing was the defect: a byte budget is only ever a
+    // proxy for position, and a proxy over presentation bytes moves when the presentation moves —
+    // for_each_token's limit is a RAW-BYTE offset, so an ANSI run before the level word spends the
+    // budget and pushes the word out of the head entirely. Bound the scan, never the claim
+    // (adr/0074). Bounded ⇒ alloc-free hot-path discipline (adr/0013 clause 3).
+    constexpr std::size_t kLeadingScanHead{40};
     // Head scanned for a failure/warning cue. 128 (not 64), aligned with the pass/fail-glyph
     // kOutcomeHead: a VERDICT ANCHOR can sit at the END of a long line — a deeply-namespaced CI
     // test verdict (`Tests\E2E\…\DocumentsDBCustomServerTest::testTimeout (FAILED)`) puts the
@@ -807,30 +834,26 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
     // so a descriptive line ("error handling enabled", "failure modes documented") whose
     // FIRST token is a level WORD would otherwise be classified alerting and authoritative,
     // bypassing the Stage-2 cue guard. So a leading level word is authoritative only when
-    // it is verdict-anchored (caps / `:` / bracket — e.g. "ERROR", "error:", "##[error]")
-    // OR it is the terminal/sole significant token in the head (a bare one-word status). An
-    // unanchored, non-terminal level word falls THROUGH to Stage 2's anchored cue scan.
+    // it is verdict-anchored (caps / a kind-slot `:` / bracket — e.g. "ERROR", "error:",
+    // "##[error]") OR it is the terminal/sole significant token ON THE LINE (a bare one-word
+    // status). An unanchored, non-terminal level word falls THROUGH to Stage 2's anchored cue scan.
     LogLevel leading{LogLevel::Unknown};
     std::string_view level_token{};
-    bool token_follows_level{false};
-    // The return (did-stop-early) is unused: we read the captured leading/level_token/
-    // token_follows_level, set as side effects, instead.
+    // The return (did-stop-early) is unused: we read the captured leading/level_token, set as side
+    // effects, instead.
     (void)for_each_token(line, kLeadingScanHead,
                          [&](std::string_view token) noexcept
                          {
-                             if (leading != LogLevel::Unknown)
-                             {
-                                 token_follows_level = true; // the level word is not terminal
-                                 return true;                // stop — we have all we need
-                             }
                              const LogLevel level{parse_log_level(token)};
                              if (level == LogLevel::Unknown)
                                  return false;
-                             leading =
-                                 level; // first level token wins; keep scanning for a follower
+                             leading = level; // first level token wins
                              level_token = token;
-                             return false;
+                             return true; // stop — Stage 1 has everything it reads
                          });
+    // Terminality is a property of the LINE, not of the head — see token_follows.
+    const bool token_follows_level{leading != LogLevel::Unknown &&
+                                   token_follows(line, level_token)};
     // D-CNT-1: a leading level WORD in COUNT register ("There was 1 failure:") is a SUMMARY,
     // not a per-item verdict — even though it is verdict-anchored (the trailing colon), a counted
     // noun is checked first and is NOT authoritative. Fall THROUGH to Stage 2, which still catches
