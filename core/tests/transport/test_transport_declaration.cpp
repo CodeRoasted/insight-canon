@@ -418,12 +418,158 @@ TEST(TransportRenderer, BracketPrefixRendersOneFixedFormAndRoundTrips)
     std::string untouched;
     EXPECT_FALSE(insight::transport::render_transport_prefix(*gha_row, stamp, untouched));
     EXPECT_TRUE(untouched.empty());
+}
 
-    // Out of the four-digit-year window: refused, never a silently wrong prefix.
-    const auto far_future{stamp + std::chrono::hours{24LL * 366 * 8000}};
-    std::string refused;
-    EXPECT_FALSE(insight::transport::render_transport_prefix(*bracket_row, far_future, refused));
-    EXPECT_TRUE(refused.empty());
+// ── The renderer's DOMAIN (T5 §2.3) — which stamps the writer ACCEPTS, as opposed to what it
+// spells for the ones it does. Split from the form/round-trip law above because a failure must be
+// able to name the window, and because the domain is the one property of this function whose very
+// EXPRESSIBILITY varies by build.
+//
+// `insight::Timestamp` is `system_clock::time_point`, whose tick period is STDLIB-DEFINED:
+// libstdc++ ships a nanosecond tick — the entire clock spans 1677..2262 — while libc++ (µs) and
+// MSVC (100 ns) span the calendar. So "a stamp outside the four-digit-year window" is not a value
+// one can simply write down: on a nanosecond tick no such `Timestamp` EXISTS, and an offset large
+// enough to reach one is signed overflow, i.e. UB. That is precisely how this arm was wrong before:
+// `stamp + 8000 years` wrapped to 1859 on the ship toolchain, the renderer correctly rendered it,
+// and the assertion — not the renderer — was the defect.
+//
+// The shape that survives the variation asserts the law over the domain that ACTUALLY EXISTS in
+// this build, by probing every boundary that domain has: the window's own edges where the clock can
+// carry them (the only place an off-by-one in the guard can hide), and — on every build, without
+// exception — the extreme stamps the build can carry. Where a window edge lies outside the clock's
+// reach the arm does not fall silent: it asserts the fact that makes the edge unreachable, namely
+// that the extreme on that side is itself inside the window, so no out-of-window stamp can be
+// constructed at all. That substitute is a claim about THIS build and it fails when the build's
+// clock widens — which is what separates it from a skipped assertion.
+constexpr int kFirstRenderableYear{0};
+constexpr int kLastRenderableYear{9999};
+
+// 27 bytes: `[YYYY-MM-DDTHH:MM:SS.mmmZ]` + one separator space. A literal, for the same reason the
+// catalogue name above is one.
+constexpr std::size_t kRenderedPrefixBytes{27U};
+
+// The widest stamps this build can both CARRY and NAME, at DAY grain.
+//
+// CARRY is the clock's reach: flooring the time_point limits DOWN to days divides and so cannot
+// overflow, whereas building a `Timestamp` UP from an arbitrary day multiplies and can — the trap
+// that produced the 1859 wrap. Everything below therefore compares days, never ticks.
+//
+// NAME is the ORACLE's reach, and it is a separate bound that must not be assumed away:
+// `std::chrono::year` is a ±32767 type, so on a microsecond tick (libc++ spans ~292471 years) the
+// clock outruns the calendar and `year_month_day` reports a WRAPPED year — measured: the true
+// ceiling year 292277 reads back as 32103. An expectation computed from a wrapped year would be a
+// coin flip dressed as an oracle, so the probe stops where the oracle stops. Both clamps sit far
+// outside the four-digit window on every wide-tick stdlib, so nothing that matters is given up.
+constexpr std::chrono::sys_days kClockFloor{
+    std::chrono::ceil<std::chrono::days>(insight::Timestamp::min())};
+constexpr std::chrono::sys_days kClockCeiling{
+    std::chrono::floor<std::chrono::days>(insight::Timestamp::max())};
+constexpr std::chrono::sys_days kCalendarFloor{std::chrono::year::min() / std::chrono::January / 1};
+constexpr std::chrono::sys_days kCalendarCeiling{std::chrono::year::max() / std::chrono::December /
+                                                 31};
+constexpr std::chrono::sys_days kFirstProbeDay{kClockFloor > kCalendarFloor ? kClockFloor
+                                                                            : kCalendarFloor};
+constexpr std::chrono::sys_days kLastProbeDay{kClockCeiling < kCalendarCeiling ? kClockCeiling
+                                                                              : kCalendarCeiling};
+
+// The oracle for "which year is this day in" is the standard calendar, deliberately NOT the
+// renderer's own `civil_from_days`: an expectation computed by the code under test is the
+// SUT==ORACLE tautology ([[synthetic-gate-vacuity-vs-judgment]]).
+[[nodiscard]] int civil_year_of(std::chrono::sys_days day) noexcept
+{
+    return int{std::chrono::year_month_day{day}.year()};
+}
+
+[[nodiscard]] bool is_in_window(int year) noexcept
+{
+    return year >= kFirstRenderableYear && year <= kLastRenderableYear;
+}
+
+TEST(TransportRenderer, AcceptsExactlyTheStampsInsideTheFourDigitYearWindow)
+{
+    const auto* bracket_row{find_transform("bracket-rfc3339-line-prefix")};
+    ASSERT_NE(bracket_row, nullptr);
+
+    const auto probe{[bracket_row](std::chrono::sys_days day, bool expect_rendered,
+                                   std::string_view why) {
+        std::string out;
+        const bool rendered{
+            insight::transport::render_transport_prefix(*bracket_row, insight::Timestamp{day}, out)};
+        EXPECT_EQ(rendered, expect_rendered)
+            << why << " — day " << day.time_since_epoch().count() << " since epoch (civil year "
+            << civil_year_of(day) << "): render_transport_prefix returned " << rendered
+            << ", expected " << expect_rendered << "; buffer holds \"" << out << '"';
+        if (expect_rendered)
+            EXPECT_EQ(out.size(), kRenderedPrefixBytes)
+                << why << " — an accepted stamp must produce the ONE fixed form; got " << out.size()
+                << " bytes: \"" << out << '"';
+        else
+            EXPECT_TRUE(out.empty())
+                << why << " — a refusal must leave the caller's buffer untouched, never a partial "
+                          "or wrong prefix; got \""
+                << out << '"';
+    }};
+
+    // ── Leg 1: the extremes this build can carry and name. Present whatever the tick period, so
+    // this leg runs on every stdlib; its expectation is DERIVED from the calendar, so on a wide
+    // clock it exercises the guard's refusal on BOTH sides and on a narrow one it pins the
+    // containment that is the whole reason leg 2 cannot reach the window's edges there.
+    for (const auto day : {kFirstProbeDay, kLastProbeDay})
+        probe(day, is_in_window(civil_year_of(day)),
+              "the widest stamp this build can carry must obey the same law as any other");
+
+    // ── Leg 2: the window's own edges — where an off-by-one in the guard hides.
+    struct WindowEdge
+    {
+        std::chrono::year_month_day day;
+        bool renderable;
+        std::string_view why;
+    };
+    const std::array<WindowEdge, 4> edges{{
+        {.day = std::chrono::year{kFirstRenderableYear} / std::chrono::January / 1,
+         .renderable = true,
+         .why = "year 0000 — the FIRST year the four-digit form can spell"},
+        {.day = std::chrono::year{kLastRenderableYear} / std::chrono::December / 31,
+         .renderable = true,
+         .why = "year 9999 — the LAST"},
+        {.day = std::chrono::year{kFirstRenderableYear - 1} / std::chrono::December / 31,
+         .renderable = false,
+         .why = "one day below the window — a negative year has no four-digit spelling"},
+        {.day = std::chrono::year{kLastRenderableYear + 1} / std::chrono::January / 1,
+         .renderable = false,
+         .why = "one day above the window — a five-digit year cannot fit the fixed form"},
+    }};
+
+    for (const auto& edge : edges)
+    {
+        const std::chrono::sys_days day{edge.day};
+        if (day > kLastProbeDay)
+        {
+            // Not a skipped assertion. On a nanosecond tick this edge does not EXIST in
+            // `insight::Timestamp` — there is no value to pass — so what stands in its place is the
+            // fact that makes it unreachable: the highest stamp this build can carry is itself
+            // inside the window, hence no stamp above the window can be constructed at all. That is
+            // a claim about THIS build, and it fails the day the clock widens.
+            EXPECT_LE(civil_year_of(kLastProbeDay), kLastRenderableYear)
+                << edge.why << " — no such Timestamp exists in this build, which is only sound "
+                               "while the highest carryable stamp (civil year "
+                << civil_year_of(kLastProbeDay)
+                << ") stays inside the window; it no longer does, so this edge is now reachable "
+                   "and must be probed rather than explained away";
+            continue;
+        }
+        if (day < kFirstProbeDay)
+        {
+            EXPECT_GE(civil_year_of(kFirstProbeDay), kFirstRenderableYear)
+                << edge.why << " — no such Timestamp exists in this build, which is only sound "
+                               "while the lowest carryable stamp (civil year "
+                << civil_year_of(kFirstProbeDay)
+                << ") stays inside the window; it no longer does, so this edge is now reachable "
+                   "and must be probed rather than explained away";
+            continue;
+        }
+        probe(day, edge.renderable, edge.why);
+    }
 }
 
 } // namespace
