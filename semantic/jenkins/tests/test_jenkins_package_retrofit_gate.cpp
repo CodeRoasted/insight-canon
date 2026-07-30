@@ -122,6 +122,12 @@ namespace
 // null-termination guarantee.
 constexpr const char* kCorpusVar{"CORPUS_JENKINS_MARKERS_DIR"};
 constexpr std::string_view kTraceSidecar{"RETRO-v2.trace-sidecar.tsv"};
+// The frozen column order (positional reader). Namespace-scope because the pre-cut oracle emitter
+// below reads the same sidecar through the same header check.
+constexpr std::string_view kTraceHeader{
+    "path\tsha256\tbytes\tjob_class\tdepth_type\telided\tresult\twfapi_status"
+    "\twfapi_stage_count\twfapi_step_count\tconsole_stage_count\tconsole_step_count"
+    "\tconsole_finished\tstamp_class"};
 constexpr std::string_view kWfapiStages{"RETRO-v2.wfapi-stages.tsv"};
 constexpr std::string_view kConsoleStages{"RETRO-v2.console-stages.tsv"};
 constexpr std::string_view kBytesRoot{"data/v2"};
@@ -148,6 +154,13 @@ constexpr std::size_t kResultSuccess{72};
 constexpr std::size_t kResultFailure{28};
 constexpr std::size_t kResultAborted{9};
 constexpr std::size_t kResultUnstable{4};
+// CORROBORATED — the stamp-class partition (studies/010 §6.2, adr/0046 Part 2), now a GENERATED
+// sidecar column (T5 §6: one classifier, one owner — `t0_transport.triage` imported by the
+// generator; declarations in the T5 gates come from these frozen labels, never from inspection).
+// A second partition on a second axis: NEVER cross-quoted with the depth cells.
+constexpr std::size_t kWholeStream{12};
+constexpr std::size_t kPayloadStamped{19};
+constexpr std::size_t kBare{82};
 // CHARACTERIZATION — the result-vs-wfapi cross-surface cell, counted under result-rules-run-grain
 // (§2's authority map). The design doc's §2 says ONE such disagreement; the committed oracle
 // carries TWO (remoting_3_10_x_backup__1 and Nem_controller_PR_826__53) — pinned at the measured
@@ -309,6 +322,7 @@ struct TraceRow
     std::uint64_t console_stage_count{0};
     std::uint64_t console_step_count{0};
     std::string console_finished;           // "" = the instrument found no epilogue
+    std::string stamp_class;                // studies/010 §6.2: whole-stream | payload-stamped | bare
 };
 
 [[nodiscard]] std::vector<std::string_view> split_tabs(std::string_view line)
@@ -433,6 +447,7 @@ struct CorpusScore
     std::size_t unstable_wfapi_stages{0};
     std::size_t elided{0};
     std::map<std::string, std::size_t> result_cells;
+    std::map<std::string, std::size_t> stamp_cells; // studies/010 §6.2 — the second partition
     std::size_t cross_surface{0}; // result ABORTED ∧ wfapi FAILED — counted, result rules
     std::size_t console_stage_rows{0};
     std::size_t console_finished_absent{0};
@@ -566,10 +581,6 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
     {
         CorpusScore corpus;
 
-        constexpr std::string_view kTraceHeader{
-            "path\tsha256\tbytes\tjob_class\tdepth_type\telided\tresult\twfapi_status"
-            "\twfapi_stage_count\twfapi_step_count\tconsole_stage_count\tconsole_step_count"
-            "\tconsole_finished"};
         constexpr std::string_view kWfapiHeader{"path\tstage_index\tname\tstatus"};
         constexpr std::string_view kConsoleHeader{"path\tstage_index\tname"};
 
@@ -577,7 +588,7 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
         for (const auto& fields :
              read_tsv(root_ / kTraceSidecar, kTraceHeader, corpus.integrity_errors))
         {
-            bool row_ok{fields.size() == 13U};
+            bool row_ok{fields.size() == 14U};
             if (!row_ok)
             {
                 corpus.integrity_errors.push_back("unparseable trace-sidecar row");
@@ -589,7 +600,8 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
                          .depth_type = fields[4],
                          .result = fields[6],
                          .wfapi_status = fields[7],
-                         .console_finished = fields[12]};
+                         .console_finished = fields[12],
+                         .stamp_class = fields[13]};
             row.bytes = parse_count(fields[2], row_ok);
             row.elided = fields[5] == "1";
             row_ok = row_ok && (fields[5] == "0" || fields[5] == "1");
@@ -646,6 +658,7 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
             ++corpus.rows;
             ++corpus.depth_cells[row.depth_type];
             ++corpus.result_cells[row.result];
+            ++corpus.stamp_cells[row.stamp_class];
             if (row.job_class == "WorkflowJob")
                 ++corpus.workflow_jobs;
             if (row.elided)
@@ -941,6 +954,21 @@ TEST_F(JenkinsRecognizerRetrofitGate, ThePopulationIsTheCommittedSidecarVerified
            "map); the design prose said 1, the committed oracle carries 2 — the oracle is the "
            "record, pinned at the measured value."
         << report(corpus);
+
+    // The stamp-class partition (studies/010 §6.2, a GENERATED sidecar column — one classifier,
+    // one owner). A second axis beside the depth partition, never cross-quoted; closes to 113.
+    const auto stamp{[&](const char* name) {
+        const auto found{corpus.stamp_cells.find(name)};
+        return found == corpus.stamp_cells.end() ? std::size_t{0} : found->second;
+    }};
+    EXPECT_EQ(stamp("whole-stream"), kWholeStream) << report(corpus);
+    EXPECT_EQ(stamp("payload-stamped"), kPayloadStamped) << report(corpus);
+    EXPECT_EQ(stamp("bare"), kBare) << report(corpus);
+    EXPECT_EQ(corpus.stamp_cells.size(), 3U)
+        << "an unrecognized stamp-class label appeared — the partition no longer closes."
+        << report(corpus);
+    EXPECT_EQ(stamp("whole-stream") + stamp("payload-stamped") + stamp("bare"), corpus.rows)
+        << report(corpus);
 }
 
 TEST_F(JenkinsRecognizerRetrofitGate, LTTranscriptionTheShippedChainEqualsTheFrozenInstrument)
@@ -1058,6 +1086,155 @@ TEST_F(JenkinsRecognizerRetrofitGate, LOTheRunOutcomeRecoversThePlatformVerdict)
         << report(corpus);
 
     GTEST_LOG_(INFO) << "Jenkins retrofit gate green" << report(corpus);
+}
+
+// ═══ THE PRE-CUT BARE-NULL ORACLE EMITTER (T5 beat 5.2, FIRST ACT — adr/0062) ═══
+//
+// G-T5-BARE will assert that the purification moves NOTHING on the 82 bare logs: byte-identical
+// templates and quanta pre/post. The "pre" side of that compare is the SHIPPED chain — the
+// detection strategy this very cut deletes — so per adr/0062 the pre-cut scores are FROZEN into a
+// committed oracle BEFORE any identity movement, by this emitter, and the gate then compares
+// against the committed file and never against a re-derivation (a silent oracle shift is exactly
+// what the P2b discipline forbids).
+//
+// THE SURFACE SERIALIZATION the digest covers (whole-surface, line grain — reproducible by the
+// post-cut gate with no strategy in the chain):
+//   section T: one record per `\n`-split segment of the raw bytes (EVERY segment, empty included):
+//              the Tokenizer's produced template (escaped: \t, \r, \\) or the literal `<declined>`
+//              — the tokenizer runs UNDECLARED (compose over the package, no for_stream), i.e. the
+//              shipped detection world pre-cut and the RawText floor post-cut.
+//   section Q: `stages:<name\x1f...>` + `steps:<n>` + `finished:<token>` from the retrofit ingest
+//              assembly under the DECLARED dialect view (for_stream(jenkins, {})).
+//   digest  := sha256(section T + '\n' + section Q).
+// Emitted once, by hand: JENKINS_BARE_ORACLE_EMIT_DIR=<dir> [JENKINS_BARE_ORACLE_PROVENANCE=<hash>]
+// then the output is committed beside this TU and THIS TEST IS DELETED at the identity cut,
+// replaced by the G-T5-BARE gate that reads the committed file.
+[[nodiscard]] std::string escape_oracle_field(std::string_view text)
+{
+    std::string out;
+    out.reserve(text.size());
+    for (const char chr : text)
+    {
+        if (chr == '\t')
+            out += "\\t";
+        else if (chr == '\r')
+            out += "\\r";
+        else if (chr == '\\')
+            out += "\\\\";
+        else
+            out += chr;
+    }
+    return out;
+}
+
+// Its OWN suite name, deliberately: the corpus-gates job runs `JenkinsRecognizerRetrofitGate.*`
+// and REDS on any skipped test (clause 9's skip==red arm); this hand-run emitter must be outside
+// that filter, and the census keys on the FILE, which is already dispositioned RUN.
+class JenkinsBareNullPrecutOracleEmitter : public JenkinsRecognizerRetrofitGate
+{
+};
+
+TEST_F(JenkinsBareNullPrecutOracleEmitter, EmitOnceByHand)
+{
+    const char* const out_dir{std::getenv("JENKINS_BARE_ORACLE_EMIT_DIR")};
+    if (out_dir == nullptr || *out_dir == '\0')
+        GTEST_SKIP() << "JENKINS_BARE_ORACLE_EMIT_DIR unset — the pre-cut oracle emitter runs "
+                        "once, by hand, before the 5.2 identity cut; its committed output is the "
+                        "G-T5-BARE oracle and this TEST dies at the cut.";
+
+    std::vector<std::string> errors;
+    const auto rows{read_tsv(root_ / kTraceSidecar, kTraceHeader, errors)};
+    ASSERT_TRUE(errors.empty()) << errors.front();
+
+    const ComposedSemantics declared_view{jenkins_only()};
+    const std::array manifests{insight::semantic::jenkins::kManifest};
+    const ComposedSemantics undeclared_view{insight::semantic::compose(manifests)};
+    const std::unique_ptr<insight::tokenization::IFormatStrategy> strategy{
+        insight::semantic::jenkins::make_strategy()};
+    constexpr std::size_t kArenaBlockBytes{4U * 1024U * 1024U};
+
+    std::string body;
+    std::size_t bare_rows{0};
+    for (const auto& fields : rows)
+    {
+        ASSERT_EQ(fields.size(), 14U);
+        if (fields[13] != "bare")
+            continue;
+        ++bare_rows;
+        const std::string& path{fields[0]};
+        bool read_ok{true};
+        const std::string bytes{read_file(root_ / kBytesRoot / path, read_ok)};
+        ASSERT_TRUE(read_ok) << path;
+
+        // Section T — the template surface, every `\n` segment, tokenizer UNDECLARED.
+        std::string section_t;
+        std::size_t produced_lines{0};
+        std::set<std::string> distinct_templates;
+        {
+            ArenaAllocator arena{kArenaBlockBytes};
+            insight::tokenization::Tokenizer tokenizer{arena, insight::tokenization::MaskConfig{},
+                                                       undeclared_view};
+            for (std::size_t begin{0}; begin < bytes.size();)
+            {
+                std::size_t end{bytes.find('\n', begin)};
+                if (end == std::string::npos)
+                    end = bytes.size();
+                const std::string_view raw_line{bytes.data() + begin, end - begin};
+                begin = end + 1U;
+                const auto event{tokenizer.process_line(raw_line)};
+                if (event.has_value())
+                {
+                    ++produced_lines;
+                    distinct_templates.insert(std::string{event->template_str});
+                    section_t += escape_oracle_field(event->template_str);
+                }
+                else
+                {
+                    section_t += "<declined>";
+                }
+                section_t += '\n';
+            }
+        }
+
+        // Section Q — the quanta surface through the retrofit ingest assembly (declared dialect).
+        ArenaAllocator arena{kArenaBlockBytes};
+        const TraceEngineResult engine{score_trace(bytes, declared_view, *strategy, arena)};
+        std::string section_q{"stages:"};
+        for (std::size_t index{0}; index < engine.stage_names.size(); ++index)
+        {
+            if (index != 0)
+                section_q += '\x1f';
+            section_q += escape_oracle_field(engine.stage_names[index]);
+        }
+        section_q += "\nsteps:" + std::to_string(engine.steps);
+        section_q += "\nfinished:" + engine.finished_token;
+
+        const std::string digest{sha256_hex(section_t + '\n' + section_q)};
+        body += path + '\t' + std::to_string(engine.stage_names.size()) + '\t' +
+                std::to_string(engine.steps) + '\t' + engine.finished_token + '\t' +
+                std::to_string(produced_lines) + '\t' +
+                std::to_string(distinct_templates.size()) + '\t' + digest + '\n';
+    }
+    ASSERT_EQ(bare_rows, kBare) << "the bare class must carry exactly " << kBare << " traces";
+
+    const char* const provenance{std::getenv("JENKINS_BARE_ORACLE_PROVENANCE")};
+    std::string out{"# BARE-v2.precut-oracle.tsv — the G-T5-BARE frozen oracle (adr/0062).\n"
+                    "# Emitted from the SHIPPED pre-cut chain (JenkinsStrategy live) by\n"
+                    "# JenkinsBareNullPrecutOracleEmitter.EmitOnceByHand over the 82 bare\n"
+                    "# traces of jenkins-markers/v2 (stamp_class column, studies/010 triage).\n"};
+    if (provenance != nullptr && *provenance != '\0')
+        out += std::string{"# provenance: "} + provenance + "\n";
+    out += "path\tstages\tsteps\tfinished\tproduced_lines\tdistinct_templates\tsurface_sha256\n";
+    out += body;
+
+    const std::filesystem::path out_path{std::filesystem::path{out_dir} /
+                                         "BARE-v2.precut-oracle.tsv"};
+    std::ofstream sink{out_path, std::ios::binary};
+    ASSERT_TRUE(sink.is_open()) << out_path;
+    sink << out;
+    sink.close();
+    GTEST_LOG_(INFO) << "pre-cut bare-null oracle written: " << out_path << " (" << bare_rows
+                     << " rows)";
 }
 
 } // namespace
