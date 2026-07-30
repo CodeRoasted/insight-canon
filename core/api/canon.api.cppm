@@ -56,8 +56,12 @@ using EventID = uint64_t;
 // the serialized `dominant_level` of a gcc/clang cascade's note lines moves Error → Unknown.
 // `template_str` and `template_id` do NOT move under -7 — the masker is untouched — but
 // `dominant_level` is serialized and gates NewErrorPattern and diff polarity, so it is an
-// output-affecting canonicalization change and takes the bump.
-inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-7"};
+// output-affecting canonicalization change and takes the bump. -8 = D-MSK-5 bracket_timestamp
+// (jenkins_retrofit_gates.md §6, adr/0053 erratum 2 — "the bracket is the entire difference"): a
+// WHOLE-token bracketed RFC3339 full datetime (`[2026-06-23T15:11:09.020Z]`) masks to `[<*>]`
+// instead of falling through to literal KEEP; `template_str`/`template_id` move ONLY for lines
+// carrying that token class, every other document is byte-identical except this version string.
+inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-8"};
 
 // ── Template identity (insight_perf_template_id.md D-TIR-1) ──
 // The structural identity of a canonicalised template: the first 16 bytes of
@@ -1297,6 +1301,72 @@ inline constexpr int kDefaultReferenceYear{2024};
 // Accepted forms: "2024-01-15T10:30:00Z", "2024-01-15T10:30:00.123Z",
 //                 "2024-01-15T10:30:00+05:30", "2024-01-15 10:30:00"
 [[nodiscard]] std::optional<Timestamp> parse_iso8601(std::string_view timestamp_str) noexcept;
+
+// The RFC3339 full-datetime byte GRAMMAR — one owner, two consumers (adr/0053 erratum 2's "three
+// spellings of one shape", collapsed): the Jenkins strategy's `timestamper_prefix_end` delegates
+// its character grammar here, and the masker's `bracket_timestamp` composite rule (D-MSK-5) tests
+// a bracket interior with the same function. Homed PUBLIC (not in the mask detail) because the
+// Jenkins package imports only insight.canon.api/spi — canon's detail shards are sealed, so a
+// detail-homed grammar could not be delegated to (jenkins_retrofit_gates.md §6.3, homing note).
+// Returns the number of bytes consumed by a COMPLETE datetime starting at `pos`, or 0 when the
+// bytes at `pos` do not carry one. Accepted shape, byte-exact — `YYYY-MM-DDTHH:MM:SS`, optional
+// `.f…` fraction, optional `Z` / `±HH:MM` / `±HHMM` zone. A malformed OPTIONAL part is a hard 0,
+// never "stop before it": `2026-01-02T03:04:05+9` matches nothing, so a consumer's "nothing else
+// follows" check cannot silently accept a truncated zone. Deliberately NOT a calendar validator
+// (month 13 matches): the consumers claim a token CLASS, and the strict character shape is
+// already the anti-phantom guard (a Proxifier `[10.20.30.40]`, an ApacheError `[Mon Oct 03 …]`,
+// a bare `[12:34:56]` all fail). Pure constexpr byte scan: no locale, no wall clock, ASCII-only
+// (F5).
+[[nodiscard]] constexpr std::size_t rfc3339_datetime_length(std::string_view text,
+                                                            std::size_t pos) noexcept
+{
+    constexpr std::size_t kDateLen{10U};
+    constexpr std::size_t kTimeLen{8U};
+    constexpr unsigned kDecimalBase{10U};
+    const auto digit_at{[&text](std::size_t at) noexcept {
+        return at < text.size() && static_cast<unsigned>(text[at]) - '0' < kDecimalBase;
+    }};
+    const std::size_t start{pos};
+    if (pos + kDateLen + 1U + kTimeLen > text.size())
+        return 0;
+    if (!(digit_at(pos) && digit_at(pos + 1U) && digit_at(pos + 2U) && digit_at(pos + 3U) &&
+          text[pos + 4U] == '-' && digit_at(pos + 5U) && digit_at(pos + 6U) &&
+          text[pos + 7U] == '-' && digit_at(pos + 8U) && digit_at(pos + 9U)))
+        return 0;
+    pos += kDateLen;
+    if (text[pos] != 'T')
+        return 0;
+    ++pos;
+    if (!(digit_at(pos) && digit_at(pos + 1U) && text[pos + 2U] == ':' && digit_at(pos + 3U) &&
+          digit_at(pos + 4U) && text[pos + 5U] == ':' && digit_at(pos + 6U) &&
+          digit_at(pos + 7U)))
+        return 0;
+    pos += kTimeLen;
+    if (pos < text.size() && text[pos] == '.') // optional fraction
+    {
+        ++pos;
+        const std::size_t frac_start{pos};
+        while (digit_at(pos))
+            ++pos;
+        if (pos == frac_start)
+            return 0; // a bare '.' is not a fraction
+    }
+    if (pos < text.size() && text[pos] == 'Z') // optional zone: Z
+        ++pos;
+    else if (pos < text.size() && (text[pos] == '+' || text[pos] == '-')) // or ±HH:MM / ±HHMM
+    {
+        ++pos;
+        if (!digit_at(pos) || !digit_at(pos + 1U))
+            return 0;
+        pos += 2U;
+        if (pos < text.size() && text[pos] == ':')
+            ++pos;
+        if (!digit_at(pos) || !digit_at(pos + 1U))
+            return 0;
+        pos += 2U;
+    }
+    return pos - start;
+}
 
 // Parse BSD syslog timestamp (no year — yearless RFC3164, e.g. "Jan 15 08:03:22").
 // The year is the injected `reference_year` (deterministic; no wall-clock read).

@@ -74,6 +74,35 @@ TEST(JenkinsStrategy, StripsAndParsesTheTimestamperPrefix)
     EXPECT_EQ(secs, 1750861872) << "expected 2025-06-25T14:31:12Z as epoch seconds";
 }
 
+// The §6.5 NAMED HOLDER of the post-stamp whitespace boundary (jenkins_retrofit_gates.md §6.5:
+// "the strategy's own unit arms hold the boundary bytes"). adr/0046's bundled-behavior #3 is a
+// GREEDY `[ \t]+` strip after the stamp — it consumes the payload's own leading indentation (a
+// Java stack frame's tab), and it stops at the first non-whitespace byte, never inside the
+// content. The §6.5 P2b corpus leg asserts conformance to this exact spelling on real bytes;
+// these arms pin the boundary synthetically so a strip regression is red HERE first, without a
+// corpus. Whether eating content indentation is WISE is deliberately not asserted anywhere — that
+// semantic question is the flaws.md parked entry (Eqya·9), measurement-gated.
+TEST(JenkinsStrategy, PostStampWhitespaceStripIsGreedyOverSpaceAndTabAndStopsAtContent)
+{
+    const auto strategy{insight::semantic::jenkins::make_strategy()};
+    ArenaAllocator arena{64U * 1024U};
+    // Greedy over the mixed run: space + tabs are ALL consumed, content starts at `at`.
+    const auto indented{strategy->parse(
+        "[2025-06-25T14:31:12.339Z] \t\tat org.example.Foo.bar(Foo.java:12)", arena)};
+    ASSERT_TRUE(indented.has_value()) << indented.error();
+    EXPECT_EQ(indented->content, "at org.example.Foo.bar(Foo.java:12)")
+        << "bundled #3: the strip is greedy over [ \\t]+ — the payload's leading tabs are "
+           "consumed with the separator";
+    // Stops at the first non-whitespace byte: INTERIOR whitespace is content and survives.
+    const auto interior{strategy->parse("[2025-06-25T14:31:12.339Z] x\ty z", arena)};
+    ASSERT_TRUE(interior.has_value()) << interior.error();
+    EXPECT_EQ(interior->content, "x\ty z")
+        << "the strip must stop at the first non-whitespace byte — interior tabs are content";
+    // A whitespace-only payload is the blank-line decline (bundled #4), tabs included.
+    EXPECT_FALSE(strategy->parse("[2025-06-25T14:31:12.339Z] \t \t", arena).has_value())
+        << "a stamp followed by only [ \\t]+ is a blank line — declined";
+}
+
 TEST(JenkinsStrategy, BareShapesCarryNoTimestamp)
 {
     const auto strategy{insight::semantic::jenkins::make_strategy()};

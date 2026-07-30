@@ -36,6 +36,17 @@
 //   * Anything strictly between is a THIRD outcome and is reported as such — it is never rounded
 //     into a branch.
 //
+// STATUS OF THAT CLASSIFIER AFTER THE D-MSK-5 REPAIR (jenkins_retrofit_gates.md §6.5, amended
+// 2fe2e85): it is the FROZEN RECORD of the pre-fix measurement it correctly scored (EXPLODES at
+// 95.9% of ceiling), and it is NOT the repair's fitness predicate — its ceiling leg is can't-PASS
+// on these bytes from the pre-fix record alone (arm A alone at 3 138/6 055 = 51.8% ≥ the 0.5 bar,
+// and B ≥ A is a theorem of the bracket-keeping normal form plus the strip), and its STABLE leg's
+// exact equality is foreclosed by any template whose raw population is both stamped and
+// unstamped. It keeps REPORTING its counts below — the post-fix counts enter the record there, as
+// scored evidence — while the §6.5 PREFIX-IMAGE triangle (PrefixImageExitGate, this file) carries
+// the exit assertions: an identity, not a threshold, ratified before each application (Eqya,
+// 2026-07-30).
+//
 // THE VACUITY GUARD. A gate that cannot return the bad answer is not a gate
 // ([[synthetic-gate-vacuity-vs-judgment]]). `CounterCanReportAnExplosion` feeds the SAME counting
 // path a block of lines carrying a token the masker keeps verbatim and asserts the count tracks the
@@ -216,25 +227,26 @@ TEST(JenkinsPayloadStampMeasurement, CounterCanReportAnExplosion)
            "lines";
 }
 
-// What the real masker does to the real token, run through the real chain — MEASURED, and the
-// answer is the one adr/0046 clause 3 routes into the shipped comment.
+// What the real masker does to the real token, run through the real chain — MEASURED, both ways.
 //
-// It is NOT the one clause (c)'s re-derivation predicted. That re-derivation had
-// `normalize_diagnostic_composite` (kCompositeRules rule #1, first-claim-wins) claiming the token
-// because `15:11` satisfies its `':'`-then-digit TRIGGER. It stops one gate short: D-MSK-1 also
-// requires an ANCHOR — at least one LETTER-LEADING sub-segment (mask.cpp, the rule's own contract:
-// "Returns true … only when ≥1 segment was masked AND an anchor exists"). Splitting
-// `[2026-06-23T15:11:09.020Z]` on `:`/`/` yields `[2026-06-23T15`, `11`, `09.020Z]` — not one of
-// them letter-leading — so rule #1 DECLINES. `normalize_bracket_index` declines too (digits then
-// `-`, not `]`), and the whole-token digit mask (dispatch rule 5) never sees it because the leading
-// byte is `[`, not a digit. The token therefore reaches dispatch rule 6: LITERAL KEEP, verbatim,
-// stamp and all.
+// HISTORY, because this test is the record of an intended failure. As written at `c848c52` it was
+// the CHARACTERIZATION of the adr/0053-erratum-2 defect: the whole-token bracketed RFC3339 stamp
+// fell through every rule to LITERAL KEEP (rule #1's `:digit` trigger fired but its letter-leading
+// ANCHOR gate did not; `bracket_index` declined at the `-`; the digit-leading whole-token mask
+// never saw the `[`-leading byte), so three same-shape stamped lines were THREE templates, each
+// equal to its raw line, and the header declared: "the day the masker claims `[<RFC3339>]` to a
+// stable normal form, this test goes RED and must be rewritten to the new normal form. That is the
+// intended failure, not a regression." That day came with D-MSK-5 `bracket_timestamp`
+// (kCanonicalizationVersion -8, jenkins_retrofit_gates.md §6): the RED fired exactly as designed
+// (observed 2026-07-30, all three per-line verbatim EXPECTs), and this is the rewrite it demanded.
 //
-// This is a CHARACTERIZATION test: it asserts what the masker does today, not what it should do.
-// It is deliberately the tripwire for the T5 masker work — the day the masker claims `[<RFC3339>]`
-// to a stable normal form, this test goes RED and must be rewritten to the new normal form. That is
-// the intended failure, not a regression.
-TEST(JenkinsPayloadStampMeasurement, TheMaskerKeepsTheTimestamperTokenVerbatim)
+// What it asserts NOW: the stamp class collapses to the `[<*>]` normal form — the unit-mechanism
+// arm behind the §6.5 prefix-image exit predicate (the corpus arms are PrefixImageExitGate below;
+// the frozen clause-2 classifier keeps reporting in TemplateCountUnderTheStrip, unchanged). The
+// bracket remains the ENTIRE difference, now in the fixed direction: the bracketed and unbracketed
+// forms of the same token BOTH collapse, through different rules (bracket_timestamp → `[<*>]`,
+// digit-leading mask → `<*>`).
+TEST(JenkinsPayloadStampMeasurement, TheMaskerClaimsTheTimestamperTokenToTheBracketNormalForm)
 {
     const insight::semantic::ComposedSemantics none{
         insight::semantic::compose(std::span<const insight::semantic::SemanticPackageManifest>{})};
@@ -248,20 +260,19 @@ TEST(JenkinsPayloadStampMeasurement, TheMaskerKeepsTheTimestamperTokenVerbatim)
     {
         ASSERT_TRUE(outcomes[index].produced) << "line " << index << " produced no event";
         std::cout << "  unstripped[" << index << "] = \"" << outcomes[index].template_str << "\"\n";
-        EXPECT_EQ(outcomes[index].template_str, stamped[index])
-            << "the bracketed RFC3339 token survives the masker VERBATIM — no rule claims it";
+        EXPECT_EQ(outcomes[index].template_str, "[<*>] + git fetch --tags")
+            << "the bracketed RFC3339 token must mask to the bracket normal form `[<*>]` — the "
+               "D-MSK-5 claim, adr/0046 clause 2's second branch discharged";
     }
-    EXPECT_NE(outcomes[0].template_str, outcomes[1].template_str)
-        << "two lines differing ONLY in the stamp's milliseconds template APART: this is the "
-           "collapse loss the strip prevents, and it is why adr/0046's branch 2 fires";
-    EXPECT_NE(outcomes[0].template_str, outcomes[2].template_str)
-        << "a different day forks the template too";
+    EXPECT_EQ(outcomes[0].template_str, outcomes[1].template_str)
+        << "two lines differing ONLY in the stamp's milliseconds must now share ONE template — "
+           "the collapse loss adr/0053 measured is the thing this rule repairs";
+    EXPECT_EQ(outcomes[0].template_str, outcomes[2].template_str)
+        << "a different day must not fork the template";
 
-    // The mechanism, pinned AT THE MASK LAYER: the same token WITHOUT its brackets is
-    // digit-leading, so dispatch rule 5 masks it and the two lines collapse to one template. The
-    // token sits mid-line in both probes so neither line's strategy routing can change — the ONLY
-    // difference reaching the masker is the pair of brackets. That is the whole of it, and it gives
-    // a T5 masker fix a short, named target.
+    // The mechanism, pinned AT THE MASK LAYER, both sides of the bracket. The token sits mid-line
+    // in all four probes so no line's strategy routing can differ — the only difference reaching
+    // the masker is the pair of brackets, and BOTH forms now collapse.
     const std::array<std::string, 2> unbracketed{"fetched at 2026-06-23T15:11:09.020Z ok",
                                                  "fetched at 2026-06-24T09:02:44.001Z ok"};
     std::vector<std::string> bare{unbracketed.begin(), unbracketed.end()};
@@ -271,8 +282,7 @@ TEST(JenkinsPayloadStampMeasurement, TheMaskerKeepsTheTimestamperTokenVerbatim)
     ASSERT_TRUE(bare_outcomes[1].produced);
     std::cout << "  unbracketed[0] = \"" << bare_outcomes[0].template_str << "\"\n";
     EXPECT_EQ(bare_outcomes[0].template_str, bare_outcomes[1].template_str)
-        << "the same timestamp WITHOUT brackets is digit-leading → masked → collapses; the "
-           "bracket is the whole difference";
+        << "the unbracketed token is digit-leading → masked → collapses (unchanged by D-MSK-5)";
     const std::array<std::string, 2> bracketed{"fetched at [2026-06-23T15:11:09.020Z] ok",
                                                "fetched at [2026-06-24T09:02:44.001Z] ok"};
     std::vector<std::string> kept{bracketed.begin(), bracketed.end()};
@@ -280,8 +290,11 @@ TEST(JenkinsPayloadStampMeasurement, TheMaskerKeepsTheTimestamperTokenVerbatim)
     ASSERT_TRUE(kept_outcomes[0].produced);
     ASSERT_TRUE(kept_outcomes[1].produced);
     std::cout << "  bracketed[0]   = \"" << kept_outcomes[0].template_str << "\"\n";
-    EXPECT_NE(kept_outcomes[0].template_str, kept_outcomes[1].template_str)
-        << "re-bracket the SAME token, same position, same routing — and collapse is lost again";
+    EXPECT_EQ(kept_outcomes[0].template_str, kept_outcomes[1].template_str)
+        << "re-bracketing the SAME token, same position, same routing, must no longer lose "
+           "collapse — the bracket stopped being a difference";
+    EXPECT_EQ(kept_outcomes[0].template_str, "fetched at [<*>] ok")
+        << "and the bracket class marker survives in the template";
 }
 
 // The measurement. Corpus-gated: skips cleanly without the private corpus.
@@ -454,15 +467,420 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
                                                      static_cast<double>(all_a.templates.size())) ||
                         static_cast<double>(stamped_b.templates.size()) >=
                             kExplosionCeilingShare * static_cast<double>(stamped_raw.size())};
-    std::cout << "VERDICT: "
-              << (explodes ? "EXPLODES (adr/0046 branch 2 — precision-first regression, T5 BLOCKED)"
-                           : (stable ? "COUNT STABLE (adr/0046 branch 1 — honesty-only + "
-                                       "re-baseline, T5 proceeds)"
-                                     : "NEITHER pre-registered branch — report the numbers as a "
-                                       "third outcome"))
-              << "\n\n";
+    std::cout << "FROZEN clause-2 CLASSIFIER reads: "
+              << (explodes ? "EXPLODES" : (stable ? "COUNT STABLE" : "NEITHER branch"))
+              << "  — the frozen record's reading, NOT the exit verdict: post-D-MSK-5 the exit "
+                 "predicate is §6.5's prefix-image triangle (PrefixImageExitGate), and this "
+                 "classifier's ceiling leg is can't-PASS on these bytes by construction "
+                 "(jenkins_retrofit_gates.md §6.5)\n\n";
 
     // This test REPORTS; it never asserts the branch. The branch is the finding.
     SUCCEED();
+}
+
+// ═══ The §6.5 exit gate — the PREFIX-IMAGE TRIANGLE (jenkins_retrofit_gates.md §6.5, 2fe2e85) ═══
+//
+// Derived a priori from the normal form's structure AND the shipped chain's ENUMERATED behaviors
+// (adr/0046's bundled list: #2 the stamp strip, #3 the greedy `[ \t]+` leading-whitespace strip,
+// #4 the blank-line decline). Per stamped raw line `[STAMP]<sep>rest-tail`, with
+// `rest := everything after the ']'` and `rest′ := strip_ws(rest)` computed by THIS HARNESS'S OWN
+// frozen `[ \t]+` spelling — never by calling the strategy (an oracle that called the strategy
+// would move WITH a strip regression):
+//
+//   (P2a)  template_B(ℓ) == "[<*>]" ⧺ M(rest)     — the masker composes over the claimed prefix
+//   (P2b)  template_A(ℓ) == M(rest′)              — bundled #2 + #3, asserted against the frozen
+//                                                   spelling, not trusted
+//
+// with the A-DECLINED CELL at the same strip boundary (rest′ empty: arm A blank-declines per
+// bundled #4, arm B renders "[<*>]" ⧺ M(rest) — enumerated by P2a, never assumed one template),
+// and the GLUED-STAMP cell boundary-defined (acceptor at 0, EMPTY `[ \t]+` separator run).
+//
+// HOW M IS REACHED, stated because the mask module is sealed (PRIVATE file set — this package
+// test cannot import insight.canon.detail.mask): M(x) is obtained through the REAL chain behind a
+// neutral RawText CARRIER token — template("maskerprobe " ⧺ x) minus the carrier — resting on the
+// same prev-neutrality the §6.5 derivation verifies at source (the single prev-consulting rule
+// tests is_status_keyword, and "maskerprobe" is not one), and guarded per line: the carrier
+// template must begin with the carrier token verbatim, or the line is counted as a CARRIER
+// failure (INSTRUMENT arm, never silently absorbed). The carrier also fences M from strategy
+// contamination: a bare `rest` re-run as its own line could be claimed by a builtin strategy that
+// strips its own prefix, which would corrupt the oracle exactly on the lines that matter.
+//
+// Verdict partition (closed): all legs hold → REPAIRED; P1(a) > 0 → NOT REPAIRED; P0 or the
+// carrier fails → INSTRUMENT; P2a/P2b/P3 fail with P1(a)=0 (incl. glued cell > 0) →
+// NEW PHENOMENON, escalated, never rounded into a branch.
+//
+// Declared limitation (§6.5): the triangle is OVER-MASKING-BLIND by construction — a leaking rule
+// appears on both sides of each identity and cancels. Named holders: the §6 decline-list unit
+// arms (canon core) and the D11 collateral leg. And P2 asserts CONFORMANCE to the 0046
+// enumeration, not the enumeration's wisdom — the merit of bundled #3 (a stack frame's leading
+// tab is content by any reasonable reading) is held by the strategy's own unit arms and the
+// flaws.md parked entry (Eqya·9), measurement-gated, never a second change in this pass.
+TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
+{
+    const auto manifest_path{env_value("JENKINS_T5_MANIFEST")};
+    if (!manifest_path.has_value())
+        GTEST_SKIP() << "JENKINS_T5_MANIFEST unset — the payload-stamped slice is §2a-private and "
+                        "out-of-tree";
+    const std::vector<std::string> logs{read_manifest(*manifest_path)};
+    ASSERT_FALSE(logs.empty()) << "manifest " << *manifest_path << " listed no logs";
+
+    const std::array manifests{insight::semantic::jenkins::kManifest};
+    const insight::semantic::ComposedSemantics with_jenkins{insight::semantic::compose(manifests)};
+    const insight::semantic::ComposedSemantics without_jenkins{
+        insight::semantic::compose(std::span<const insight::semantic::SemanticPackageManifest>{})};
+    const auto strategy{insight::semantic::jenkins::make_strategy()};
+    ArenaAllocator probe_arena{kArenaBlockBytes};
+
+    constexpr std::string_view kCarrier{"maskerprobe"};
+    constexpr std::string_view kBareNormalForm{"[<*>]"};
+    constexpr std::string_view kImagePrefix{"[<*>] "};
+
+    // ── population counters (raw bytes + the shared grammar; never from either arm) ──
+    std::size_t stamped_lines{0};
+    std::size_t unstamped_lines{0};
+    std::size_t a_declined_cell_lines{0}; // rest′ == "" at the frozen [ \t]+ boundary
+    std::size_t glued_stamp_lines{0};     // acceptor at 0, EMPTY separator run, tail non-empty
+    std::size_t stamped_lens_disagree{0}; // strategy lens vs raw-bytes acceptor — premise check
+    std::size_t carrier_failures{0};      // carrier template did not begin with the carrier token
+    std::vector<std::string> glued_samples;
+    std::vector<std::string> carrier_samples;
+
+    // ── P0 ──
+    std::size_t unstamped_lines_moved{0};
+    std::vector<std::string> moved_samples;
+
+    // ── P2 per-line violation counters ──
+    std::size_t p2a_violations{0}; // template_B != "[<*>]" ⧺ M(rest)
+    std::size_t p2b_violations{0}; // template_A != M(rest′), or produced/declined mismatch
+    std::vector<std::string> p2a_samples;
+    std::vector<std::string> p2b_samples;
+
+    // ── P3 term accumulators (raw + masker derived) ──
+    std::set<std::string> arm_a_all;
+    std::set<std::string> arm_b_all;
+    std::map<std::string, std::set<std::string>> rest_images_by_stripped; // M(rest′) → {M(rest)}
+    std::set<std::string> cell_b_templates;   // expected B templates over the A-declined cell
+    std::set<std::string> m_stamped_stripped; // M(rest′) over stamped non-declined lines
+    std::set<std::string> arm_a_unstamped;    // A-templates of unstamped lines (P0 ⇒ == B's)
+
+    for (const std::string& log_path : logs)
+    {
+        const std::vector<std::string> lines{read_raw_lines(log_path)};
+        ASSERT_FALSE(lines.empty()) << "empty or unreadable log: " << log_path;
+        const auto arm_a{run_arm(lines, with_jenkins)};
+        const auto arm_b{run_arm(lines, without_jenkins)};
+        ASSERT_EQ(arm_a.size(), arm_b.size());
+
+        // Batch the carrier lines for this log: one M(rest) and one M(rest′) per stamped line.
+        struct StampFacts
+        {
+            std::size_t line_index;
+            std::size_t m_rest_index{SIZE_MAX};       // into carrier_outcomes
+            std::size_t m_stripped_index{SIZE_MAX};   // into carrier_outcomes
+            bool a_declined_cell{false};
+        };
+        std::vector<StampFacts> stamps;
+        std::vector<std::string> carrier_lines;
+
+        for (std::size_t index{0}; index < lines.size(); ++index)
+        {
+            const std::string& line{lines[index]};
+
+            bool is_stamped{false};
+            if (const auto parsed{strategy->parse(line, probe_arena)}; parsed.has_value())
+                is_stamped = parsed->timestamp.has_value();
+            else
+                is_stamped = line.starts_with("[2") && strategy->confidence(line) > 0.0;
+
+            std::size_t prefix_end{0};
+            if (!line.empty() && line.front() == '[')
+            {
+                const std::size_t len{insight::utils::rfc3339_datetime_length(line, 1U)};
+                if (len != 0 && 1U + len < line.size() && line[1U + len] == ']')
+                    prefix_end = 1U + len + 1U; // one past the ']'
+            }
+            if (is_stamped != (prefix_end != 0))
+                ++stamped_lens_disagree;
+
+            if (!is_stamped)
+            {
+                if (!line.empty())
+                    ++unstamped_lines;
+                if (arm_a[index].produced)
+                {
+                    arm_a_all.insert(arm_a[index].template_str);
+                    arm_a_unstamped.insert(arm_a[index].template_str);
+                }
+                if (arm_b[index].produced)
+                    arm_b_all.insert(arm_b[index].template_str);
+                const bool moved{arm_a[index].produced != arm_b[index].produced ||
+                                 arm_a[index].template_str != arm_b[index].template_str};
+                if (moved)
+                {
+                    ++unstamped_lines_moved;
+                    if (moved_samples.size() < kSampleTemplatesPrinted)
+                        moved_samples.push_back(log_path + ":" + std::to_string(index));
+                }
+                continue;
+            }
+
+            ++stamped_lines;
+            if (arm_a[index].produced)
+                arm_a_all.insert(arm_a[index].template_str);
+            if (arm_b[index].produced)
+                arm_b_all.insert(arm_b[index].template_str);
+
+            // rest / sep / rest′ at the frozen [ \t]+ boundary — the harness's OWN spelling.
+            const std::string_view rest{prefix_end != 0
+                                            ? std::string_view{lines[index]}.substr(prefix_end)
+                                            : std::string_view{}};
+            std::size_t sep_len{0};
+            while (sep_len < rest.size() && (rest[sep_len] == ' ' || rest[sep_len] == '\t'))
+                ++sep_len;
+            const std::string_view rest_prime{rest.substr(sep_len)};
+            if (!rest.empty() && sep_len == 0)
+            {
+                ++glued_stamp_lines;
+                if (glued_samples.size() < kSampleTemplatesPrinted)
+                    glued_samples.push_back(log_path + ":" + std::to_string(index));
+            }
+
+            StampFacts facts{.line_index = index};
+            facts.a_declined_cell = rest_prime.empty();
+            facts.m_rest_index = carrier_lines.size();
+            carrier_lines.push_back(std::string{kCarrier} + " " + std::string{rest});
+            if (!facts.a_declined_cell)
+            {
+                facts.m_stripped_index = carrier_lines.size();
+                carrier_lines.push_back(std::string{kCarrier} + " " + std::string{rest_prime});
+            }
+            stamps.push_back(facts);
+        }
+
+        const auto carrier_outcomes{run_arm(carrier_lines, without_jenkins)};
+        ASSERT_EQ(carrier_outcomes.size(), carrier_lines.size());
+
+        // Extract M(x) from a carrier outcome; nullopt = carrier failure (INSTRUMENT arm).
+        const auto extract_m{[&](std::size_t carrier_index) -> std::optional<std::string> {
+            const LineOutcome& outcome{carrier_outcomes[carrier_index]};
+            if (!outcome.produced || !outcome.template_str.starts_with(kCarrier))
+                return std::nullopt;
+            const std::string_view tail{
+                std::string_view{outcome.template_str}.substr(kCarrier.size())};
+            if (tail.empty())
+                return std::string{}; // M(x) is empty (x was empty/space-only)
+            if (!tail.starts_with(' '))
+                return std::nullopt; // carrier token fused — carrier failure
+            return std::string{tail.substr(1U)};
+        }};
+
+        for (const StampFacts& facts : stamps)
+        {
+            const auto m_rest{extract_m(facts.m_rest_index)};
+            if (!m_rest.has_value())
+            {
+                ++carrier_failures;
+                if (carrier_samples.size() < kSampleTemplatesPrinted)
+                    carrier_samples.push_back(log_path + ":" + std::to_string(facts.line_index));
+                continue;
+            }
+            const std::string expected_b{m_rest->empty()
+                                             ? std::string{kBareNormalForm}
+                                             : std::string{kImagePrefix} + *m_rest};
+
+            // (P2a) — per line, the masker composes over the claimed prefix.
+            const LineOutcome& b_outcome{arm_b[facts.line_index]};
+            if (!b_outcome.produced || b_outcome.template_str != expected_b)
+            {
+                ++p2a_violations;
+                if (p2a_samples.size() < kSampleTemplatesPrinted)
+                    p2a_samples.push_back(
+                        log_path + ":" + std::to_string(facts.line_index) + " B=\"" +
+                        (b_outcome.produced ? b_outcome.template_str : "<declined>") +
+                        "\" expected=\"" + expected_b + "\"");
+            }
+
+            if (facts.a_declined_cell)
+            {
+                ++a_declined_cell_lines;
+                cell_b_templates.insert(expected_b);
+                // (P2b, declined form) — bundled #4: arm A must have declined the line.
+                if (arm_a[facts.line_index].produced)
+                {
+                    ++p2b_violations;
+                    if (p2b_samples.size() < kSampleTemplatesPrinted)
+                        p2b_samples.push_back(log_path + ":" +
+                                              std::to_string(facts.line_index) +
+                                              " A produced on an A-declined-cell line: \"" +
+                                              arm_a[facts.line_index].template_str + "\"");
+                }
+                continue;
+            }
+
+            const auto m_stripped{extract_m(facts.m_stripped_index)};
+            if (!m_stripped.has_value() || m_stripped->empty())
+            {
+                ++carrier_failures; // rest′ is non-empty here, so M(rest′) must be non-empty
+                if (carrier_samples.size() < kSampleTemplatesPrinted)
+                    carrier_samples.push_back(log_path + ":" + std::to_string(facts.line_index));
+                continue;
+            }
+            m_stamped_stripped.insert(*m_stripped);
+            rest_images_by_stripped[*m_stripped].insert(*m_rest);
+
+            // (P2b) — the strategy's bundled #2 + #3, asserted against the frozen spelling.
+            const LineOutcome& a_outcome{arm_a[facts.line_index]};
+            if (!a_outcome.produced || a_outcome.template_str != *m_stripped)
+            {
+                ++p2b_violations;
+                if (p2b_samples.size() < kSampleTemplatesPrinted)
+                    p2b_samples.push_back(
+                        log_path + ":" + std::to_string(facts.line_index) + " A=\"" +
+                        (a_outcome.produced ? a_outcome.template_str : "<declined>") +
+                        "\" M(rest')=\"" + *m_stripped + "\"");
+            }
+        }
+    }
+
+    // ── P1: extinction under the spike's INDEPENDENT loose stamp class, token grain ──
+    constexpr std::string_view kLooseInteriorClass{"0123456789T:.Z+-"};
+    std::size_t cell_a_full_datetime_survivors{0};
+    std::size_t cell_b_declined_variants{0};
+    std::vector<std::string> p1a_samples;
+    std::vector<std::string> p1b_samples;
+    for (const std::string& template_str : arm_b_all)
+    {
+        std::size_t cursor{0};
+        while (cursor < template_str.size())
+        {
+            while (cursor < template_str.size() && template_str[cursor] == ' ')
+                ++cursor;
+            const std::size_t start{cursor};
+            while (cursor < template_str.size() && template_str[cursor] != ' ')
+                ++cursor;
+            const std::string_view token{template_str.data() + start, cursor - start};
+            if (token.size() < 3U || token.front() != '[' || token.back() != ']')
+                continue;
+            const std::string_view interior{token.substr(1U, token.size() - 2U)};
+            if (interior.find_first_not_of(kLooseInteriorClass) != std::string_view::npos)
+                continue; // not the loose family (`[<*>]` exits here: '<' is not in class)
+            if (insight::utils::rfc3339_datetime_length(token, 1U) == interior.size())
+            {
+                ++cell_a_full_datetime_survivors;
+                if (p1a_samples.size() < kSampleTemplatesPrinted)
+                    p1a_samples.push_back(std::string{token});
+            }
+            else
+            {
+                ++cell_b_declined_variants;
+                if (p1b_samples.size() < kSampleTemplatesPrinted)
+                    p1b_samples.push_back(std::string{token});
+            }
+        }
+    }
+
+    // ── P3: distinct_B == distinct_A + |dual(A)| + |refine(A)| + |cell_B| ──
+    std::set<std::string> dual_a; // raw+masker stamped side ∩ A's unstamped population
+    for (const std::string& template_str : m_stamped_stripped)
+        if (arm_a_unstamped.contains(template_str))
+            dual_a.insert(template_str);
+    std::size_t refine_a{0}; // per stripped image, distinct rest-images beyond the first
+    std::vector<std::string> refine_samples;
+    for (const auto& [stripped, images] : rest_images_by_stripped)
+    {
+        refine_a += images.size() - 1U;
+        if (images.size() > 1U && refine_samples.size() < kSampleTemplatesPrinted)
+            refine_samples.push_back("\"" + stripped + "\" ← " + std::to_string(images.size()) +
+                                     " rest-images");
+    }
+    const std::size_t predicted_b{arm_a_all.size() + dual_a.size() + refine_a +
+                                  cell_b_templates.size()};
+
+    // ── the report — every number with its denominator, before any assertion fires ──
+    std::cout << "\n=== §6.5 PREFIX-IMAGE TRIANGLE exit gate ===\n"
+              << "logs                                   : " << logs.size() << "\n"
+              << "stamped / unstamped lines              : " << stamped_lines << " / "
+              << unstamped_lines << "\n"
+              << "A-declined (ts-only) cell lines        : " << a_declined_cell_lines << "\n"
+              << "glued-stamp cell (expect 0)            : " << glued_stamp_lines << "\n"
+              << "stamped-lens disagreements (expect 0)  : " << stamped_lens_disagree << "\n"
+              << "carrier failures (expect 0)            : " << carrier_failures << "\n"
+              << "P0 unstamped moved (expect 0)          : " << unstamped_lines_moved << "\n"
+              << "P1(a) full-datetime survivors (MUST 0) : " << cell_a_full_datetime_survivors
+              << "\n"
+              << "P1(b) rule-declined variants (declared): " << cell_b_declined_variants << "\n"
+              << "P2a per-line violations (of " << stamped_lines
+              << ")          : " << p2a_violations << "\n"
+              << "P2b per-line violations (of " << stamped_lines
+              << ")          : " << p2b_violations << "\n"
+              << "P3 |dual(A)| / |refine(A)| / |cell_B|  : " << dual_a.size() << " / " << refine_a
+              << " / " << cell_b_templates.size() << "\n"
+              << "P3 distinct_A + terms = predicted_B    : " << arm_a_all.size() << " + "
+              << dual_a.size() << " + " << refine_a << " + " << cell_b_templates.size() << " = "
+              << predicted_b << "\n"
+              << "P3 distinct_B                          : " << arm_b_all.size() << "\n";
+    for (const std::string& sample : p1b_samples)
+        std::cout << "  P1(b) sample: " << sample << "\n";
+    for (const std::string& sample : dual_a)
+        std::cout << "  dual(A): \"" << sample << "\"\n";
+    for (const std::string& sample : refine_samples)
+        std::cout << "  refine(A): " << sample << "\n";
+    for (const std::string& sample : cell_b_templates)
+        std::cout << "  cell_B: \"" << sample << "\"\n";
+
+    const bool instrument_ok{unstamped_lines_moved == 0 && carrier_failures == 0 &&
+                             stamped_lens_disagree == 0};
+    const bool p1a_zero{cell_a_full_datetime_survivors == 0};
+    const bool p2_holds{p2a_violations == 0 && p2b_violations == 0 && glued_stamp_lines == 0};
+    const bool p3_holds{arm_b_all.size() == predicted_b};
+    const char* verdict{!instrument_ok
+                            ? "INSTRUMENT — the arm construction or the carrier broke; no verdict "
+                              "about the masker may be read"
+                        : !p1a_zero ? "NOT REPAIRED — the literal-KEEP class survives"
+                        : (!p2_holds || !p3_holds)
+                            ? "NEW PHENOMENON — the masker is not prefix-compositional on these "
+                              "bytes, or the strategy drifted from the 0046 enumeration; "
+                              "escalate, never round into a branch"
+                            : "REPAIRED — adr/0046 clause 2's own words are met: the masker "
+                              "claims the token to a stable normal form; the T5 content move "
+                              "unblocks"};
+    std::cout << "VERDICT: " << verdict << "\n\n";
+
+    EXPECT_EQ(unstamped_lines_moved, 0U)
+        << "P0 (INSTRUMENT arm): an unstamped line moved between arms.";
+    for (const std::string& sample : moved_samples)
+        ADD_FAILURE() << "  P0 moved: " << sample;
+    EXPECT_EQ(carrier_failures, 0U)
+        << "INSTRUMENT arm: the neutral carrier was claimed or altered — the M oracle is invalid "
+           "on those lines; nothing below may be read.";
+    for (const std::string& sample : carrier_samples)
+        ADD_FAILURE() << "  carrier failure at " << sample;
+    EXPECT_EQ(stamped_lens_disagree, 0U)
+        << "INSTRUMENT arm: the strategy lens and the raw-bytes acceptor disagree on stampedness.";
+
+    EXPECT_EQ(cell_a_full_datetime_survivors, 0U)
+        << "P1(a) (NOT-REPAIRED arm): a bracketed FULL-DATETIME token survived into an arm-B "
+           "template.";
+    for (const std::string& sample : p1a_samples)
+        ADD_FAILURE() << "  P1(a) survivor: " << sample;
+
+    EXPECT_EQ(p2a_violations, 0U)
+        << "P2a (NEW-PHENOMENON arm): template_B != \"[<*>]\" ⧺ M(rest) — the masker does not "
+           "compose over the claimed prefix.";
+    for (const std::string& sample : p2a_samples)
+        ADD_FAILURE() << "  P2a: " << sample;
+    EXPECT_EQ(p2b_violations, 0U)
+        << "P2b (NEW-PHENOMENON arm): template_A != M(strip_ws(rest)) — the strategy drifted "
+           "from the 0046 enumeration's frozen [ \\t]+ spelling.";
+    for (const std::string& sample : p2b_samples)
+        ADD_FAILURE() << "  P2b: " << sample;
+    EXPECT_EQ(glued_stamp_lines, 0U)
+        << "P2 glued-stamp cell (NEW-PHENOMENON arm): acceptor at 0 with an EMPTY separator run.";
+    for (const std::string& sample : glued_samples)
+        ADD_FAILURE() << "  glued stamp at " << sample;
+
+    EXPECT_EQ(arm_b_all.size(), predicted_b)
+        << "P3 (NEW-PHENOMENON arm): distinct_B != distinct_A + |dual(A)| + |refine(A)| + "
+           "|cell_B| — a partition error P0/P2 did not catch.";
 }
 // NOLINTEND

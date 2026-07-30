@@ -539,6 +539,39 @@ namespace
         return true;
     }
 
+    // BRACKET_TIMESTAMP composite (D-MSK-5; jenkins_retrofit_gates.md §6, adr/0053 erratum 2 —
+    // "the bracket is the entire difference"). The WHOLE-token bracketed RFC3339 stamp
+    // `[2026-06-23T15:11:09.020Z]` used to fall through EVERY rule to literal KEEP: the
+    // diagnostic composite declines it (its `:digit` trigger fires but no sub-segment is
+    // letter-leading, so the anchor gate fails), bracket_index declines at the first `-`, and the
+    // digit-leading whole-token mask never sees a `[`-leading byte. On a Jenkins timestamper
+    // stream reaching the masker WITHOUT the dialect declared (the RawText floor, fail-closed)
+    // every stamped line was therefore its own template — measured at 95.9% of the no-collapse
+    // ceiling on the payload-stamped slice (adr/0046 clause 2), a live adr/0013 precision-first
+    // regression. The TRIGGER is deliberately NARROW (precision-first: claim the stamp class and
+    // nothing adjacent to it): the token is exactly `[` + a COMPLETE RFC3339 full datetime + `]`.
+    // Date-only, time-only, bare-integer (`[42]` stays bracket_index's), word (`[INFO]`,
+    // `[Pipeline]`), version (`[v1.2.3]`) interiors and any trailing punctuation are all
+    // declined. The byte grammar is insight::utils::rfc3339_datetime_length — ONE owner, shared
+    // with the Jenkins strategy's timestamper_prefix_end, so the shape is never spelled twice.
+    // Normal form `[<*>]`: the KEEP-class bracket convention its neighbor set — the bracket (the
+    // class) survives, the instance masks. The output-class collision with bracket_index's `[<*>]`
+    // is NAMED AND ACCEPTED: both are masked-instance-inside-brackets, and inventing a second
+    // placeholder vocabulary for one rule is worse than sharing the normal form.
+    [[nodiscard]] inline bool normalize_bracket_timestamp(std::string_view tok, std::string& out)
+    {
+        if (tok.size() < 3U || tok.front() != '[' || tok.back() != ']')
+            return false;
+        const std::size_t interior{insight::utils::rfc3339_datetime_length(tok, 1U)};
+        if (interior == 0 || 1U + interior + 1U != tok.size())
+            return false; // the interior is not EXACTLY one complete full datetime — declined
+        out.clear();
+        out.push_back('[');
+        out.append(kWildcard);
+        out.push_back(']');
+        return true;
+    }
+
     // BRACKET_INDEX composite: `<word>[<short-alpha>?<digits>]<rest>`. Recursion depth,
     // worker/shard indices ("make[2]:", "thread[15]", pytest-xdist "[gw0]") otherwise
     // template per index. Normalize the bracketed digit run, KEEPING any short alpha
@@ -796,11 +829,15 @@ namespace
         std::string_view name; // stable rule id (diagnostics / the canon bible)
         bool (*normalize)(std::string_view tok, std::string& out); // fills out; true iff claimed
     };
-    constexpr std::array<CompositeRule, 8U> kCompositeRules{{
+    // The two bracket rules are ADJACENT, most-specific first, and non-overlapping today
+    // (bracket_timestamp requires a `-` where bracket_index requires `]`) — the ordering is
+    // stated so future drift between them has a rule to violate loudly.
+    constexpr std::array<CompositeRule, 9U> kCompositeRules{{
         {.name = "diagnostic_composite",
          .normalize = normalize_diagnostic_composite},                           // D-MSK-1  (-4)
         {.name = "ephemeral_root", .normalize = normalize_ephemeral_root},       // D-MSK-2  (-4)
         {.name = "versioned_ref", .normalize = normalize_versioned_ref},         // D-TID-12 #2
+        {.name = "bracket_timestamp", .normalize = normalize_bracket_timestamp}, // D-MSK-5  (-8)
         {.name = "bracket_index", .normalize = normalize_bracket_index},         // D-TID-13(b)
         {.name = "hash_counter", .normalize = normalize_hash_counter},           // D-TID-13(a)
         {.name = "marker_number", .normalize = normalize_marker_number},         // D-TID-22 (-3)

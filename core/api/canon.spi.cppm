@@ -140,7 +140,7 @@ export namespace insight::semantic
 // content" — and adr/0047 clause 2.3 sharpened exactly it for the sibling transport token.
 //
 // ⚠ ADR 0065 clause 6 says T4 "spends no version token". That reading is right about the two tokens
-// it measured — `canonicalization_version` (the MASKING token, still `stateless-masks-7`) and the
+// it measured — `canonicalization_version` (the MASKING token; canon.api.cppm owns the value) and the
 // MetaLog wire version, neither of which T4 touches — and it did not enumerate THIS one. The bump
 // costs Eqya's sequencing nothing: `kSemanticGrammarVersion` appears at exactly one site, inside
 // the `semantic_identity` preimage (compose.cpp), reaches no wire field and no MetaLog block, and

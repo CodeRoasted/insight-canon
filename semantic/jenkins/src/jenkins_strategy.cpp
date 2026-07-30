@@ -40,78 +40,27 @@ namespace
                chr == '_';
     }
 
-    // "YYYY-MM-DD" at offset `pos` (re-homed private byte primitive, the github-package precedent).
-    [[nodiscard]] constexpr bool match_iso_date_at(std::string_view str, std::size_t pos) noexcept
-    {
-        if (pos + 10U > str.size())
-            return false;
-        return is_digit(str[pos]) && is_digit(str[pos + 1]) && is_digit(str[pos + 2]) &&
-               is_digit(str[pos + 3]) && str[pos + 4] == '-' && is_digit(str[pos + 5]) &&
-               is_digit(str[pos + 6]) && str[pos + 7] == '-' && is_digit(str[pos + 8]) &&
-               is_digit(str[pos + 9]);
-    }
-
-    // "HH:MM:SS" at offset `pos`.
-    [[nodiscard]] constexpr bool match_time_at(std::string_view str, std::size_t pos) noexcept
-    {
-        if (pos + 8U > str.size())
-            return false;
-        return is_digit(str[pos]) && is_digit(str[pos + 1]) && str[pos + 2] == ':' &&
-               is_digit(str[pos + 3]) && is_digit(str[pos + 4]) && str[pos + 5] == ':' &&
-               is_digit(str[pos + 6]) && is_digit(str[pos + 7]);
-    }
-
     // The timestamper-plugin prefix: `[` + a STRICT RFC3339 timestamp (`YYYY-MM-DDTHH:MM:SS`,
-    // optional
-    // `.fff…` fraction, optional `Z` / `±HH:MM` / `±HHMM` zone) + `]`. Returns the offset ONE PAST
-    // the closing `]`, or 0 when the line does not carry the prefix. Strictness is the anti-phantom
-    // guard: a Proxifier `[10.20.30.40]`, an ApacheError `[Mon Oct 03 …]`, or a bare `[12:34:56]`
-    // never match.
-    // a single coherent constexpr character scan recognizing the Jenkins timestamper prefix
-    // shape; the branch count is the grammar it accepts, not separable logic.
-    // NOLINTNEXTLINE(readability-function-cognitive-complexity)
+    // optional `.fff…` fraction, optional `Z` / `±HH:MM` / `±HHMM` zone) + `]`. Returns the offset
+    // ONE PAST the closing `]`, or 0 when the line does not carry the prefix. Strictness is the
+    // anti-phantom guard: a Proxifier `[10.20.30.40]`, an ApacheError `[Mon Oct 03 …]`, or a bare
+    // `[12:34:56]` never match. The CHARACTER GRAMMAR is delegated to canon's
+    // `insight::utils::rfc3339_datetime_length` — one owner, shared with the masker's D-MSK-5
+    // `bracket_timestamp` rule (jenkins_retrofit_gates.md §6: the spike, this strategy and that
+    // rule were three spellings of one shape; now there is one, with two consumers). This function
+    // keeps only the LINE-POSITION logic: prefix-anchored, bracketed, nothing between the datetime
+    // and the closing `]`.
     [[nodiscard]] constexpr std::size_t timestamper_prefix_end(std::string_view line) noexcept
     {
-        constexpr std::size_t kDateLen{10U};
-        constexpr std::size_t kTimeLen{8U};
-        if (line.size() < 2U + kDateLen + 1U + kTimeLen || line.front() != '[')
+        if (line.empty() || line.front() != '[')
             return 0;
-        std::size_t pos{1};
-        if (!match_iso_date_at(line, pos))
+        const std::size_t datetime_len{insight::utils::rfc3339_datetime_length(line, 1U)};
+        if (datetime_len == 0)
             return 0;
-        pos += kDateLen;
-        if (line[pos] != 'T')
+        const std::size_t close{1U + datetime_len};
+        if (close >= line.size() || line[close] != ']')
             return 0;
-        ++pos;
-        if (!match_time_at(line, pos))
-            return 0;
-        pos += kTimeLen;
-        if (pos < line.size() && line[pos] == '.') // optional fraction
-        {
-            ++pos;
-            const std::size_t frac_start{pos};
-            while (pos < line.size() && is_digit(line[pos]))
-                ++pos;
-            if (pos == frac_start)
-                return 0; // a bare '.' is not a fraction
-        }
-        if (pos < line.size() && line[pos] == 'Z') // optional zone: Z
-            ++pos;
-        else if (pos < line.size() && (line[pos] == '+' || line[pos] == '-')) // or ±HH:MM / ±HHMM
-        {
-            ++pos;
-            if (pos + 2U > line.size() || !is_digit(line[pos]) || !is_digit(line[pos + 1]))
-                return 0;
-            pos += 2U;
-            if (pos < line.size() && line[pos] == ':')
-                ++pos;
-            if (pos + 2U > line.size() || !is_digit(line[pos]) || !is_digit(line[pos + 1]))
-                return 0;
-            pos += 2U;
-        }
-        if (pos >= line.size() || line[pos] != ']')
-            return 0;
-        return pos + 1U;
+        return close + 1U;
     }
 
     constexpr std::string_view kPipelinePrefix{"[Pipeline] "};
@@ -146,22 +95,24 @@ namespace
 
     // Does the strategy claim this line? The three dialect-marked shapes, after an optional
     // timestamper strip (a timestamper-prefixed line is claimed REGARDLESS of its content — the
-    // strip itself is the dialect knowledge, and it is what restores template collapse).
+    // strip is the dialect knowledge: it routes the line, extracts the event timestamp, and
+    // yields the stamp-free content the marker rows walk).
     //
-    // The collapse claim is MEASURED, not asserted — adr/0046 Part 2 clause 2, on the ratified
-    // `jenkins-markers/v2` corpus; the harness is
-    // `tests/t5_payload_stamp_template_measurement_test.cpp`, re-runnable. Without the strip the
-    // masker keeps the whole `[<RFC3339>]` token VERBATIM (it is not merely normalized to some
-    // other stable form): the diagnostic-composite rule declines it for want of a letter-leading
-    // sub-segment, `normalize_bracket_index` declines it at the `-`, and the leading `[` hides it
-    // from the digit-leading whole-token mask, so it falls through to literal KEEP. Distinct
-    // templates, with the strip → without it:
-    //   whole-stream    (ci.jenkins.io, 12 logs, 127 502 stamped lines):   7 256 → 118 376
-    //   payload-stamped (2 other instances, 19 logs, 6 416 stamped lines): 3 425 →   6 094
-    // Restricted to the stamped lines themselves, the un-stripped arm reaches 97.1 % / 95.9 % of
-    // the no-collapse ceiling (the distinct RAW stamped-line count) — a near-total loss of
-    // collapse. The claim therefore holds on BOTH stamped classes; it is not confined to
-    // ci.jenkins.io.
+    // Template collapse NO LONGER depends on this strip — measured, both worlds, on the ratified
+    // `jenkins-markers/v2` payload-stamped slice (the harness is
+    // `tests/t5_payload_stamp_template_measurement_test.cpp`, re-runnable). Since D-MSK-5
+    // `bracket_timestamp` (kCanonicalizationVersion -8) the masker claims the whole-token
+    // `[<RFC3339>]` stamp to the stable normal form `[<*>]` on the RawText floor, and the §6.5
+    // prefix-image triangle returned REPAIRED (2026-07-30): per stamped line,
+    // template(unstripped) == "[<*>]" ⧺ M(rest), zero exceptions on 6 416 stamped lines; distinct
+    // templates ±strip 3 337 vs 3 339, the +2 fully attributed (one dual-occurrence twin + the
+    // bare-[<*>] cell from 134 timestamp-only lines).
+    //
+    // The HISTORICAL record, kept because it is why D-MSK-5 exists (adr/0053 erratum 2 — "the
+    // bracket is the entire difference"): pre-fix the token fell through every mask rule to
+    // literal KEEP, and the un-stripped arm measured 3 425 → 6 094 distinct templates on this
+    // slice (95.9 % of the no-collapse ceiling; 7 256 → 118 376 on the whole-stream class) — the
+    // adr/0013 precision-first regression the rule repaired.
     [[nodiscard]] constexpr bool claims(std::string_view line) noexcept
     {
         if (timestamper_prefix_end(line) != 0)

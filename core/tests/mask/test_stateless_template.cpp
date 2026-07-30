@@ -109,6 +109,59 @@ TEST(StatelessTemplate, CompositesNormalized)
               masked("error at parser.cpp:1:1: bad token", arena));
 }
 
+// ── D-MSK-5 (jenkins_retrofit_gates.md §6, adr/0053 erratum 2) — bracket_timestamp ──
+// The whole-token bracketed RFC3339 stamp fell through every rule to literal KEEP ("the bracket
+// is the entire difference"): unbracketed the same token is digit-leading and masks, so on an
+// undeclared Jenkins timestamper stream every stamped line was its own template (95.9% of the
+// no-collapse ceiling, adr/0046 clause 2). These arms are the fix's UNIT gate: the stamp class
+// collapses to `[<*>]`, and the §6.2 decline list stays byte-identical — the rule claims the
+// bracketed full-datetime class and NOTHING adjacent to it (precision-first, adr/0013). These
+// arms are also one of the two NAMED holders of the §6.5 P2 over-masking blind spot: the A/B
+// prefix-image comparison cancels a leak that hits both arms, so the decline list HERE (plus the
+// D11 collateral leg) is what carries that hazard.
+TEST(StatelessTemplate, BracketTimestampCollapsesTheStampClass)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // Three same-shape lines differing only in the stamp → ONE template (the adr/0053 measured
+    // shape, inverted: pre-fix these were three templates, each equal to its raw line).
+    const std::string first{masked("[2026-06-23T15:11:09.020Z] + git fetch --tags", arena)};
+    const std::string second{masked("[2026-06-23T15:11:10.884Z] + git fetch --tags", arena)};
+    const std::string third{masked("[2026-06-24T09:02:44.001Z] + git fetch --tags", arena)};
+    EXPECT_EQ(first, second) << "same-shape stamped lines must now collapse";
+    EXPECT_EQ(first, third) << "a different day must not fork the template";
+    EXPECT_EQ(first, "[<*>] + git fetch --tags")
+        << "normal form is the bracket convention: the bracket survives, the instance masks";
+    // Mid-line, and zone variants: the whole-token trigger is position-independent within the
+    // line, and the shared grammar accepts Z / ±HH:MM / ±HHMM / zoneless exactly like the
+    // Jenkins timestamper acceptor.
+    EXPECT_EQ(masked("fetched at [2026-06-23T15:11:09.020Z] ok", arena),
+              masked("fetched at [2026-06-24T09:02:44.001Z] ok", arena))
+        << "re-bracketing the token mid-line must no longer defeat collapse";
+    EXPECT_EQ(masked("[2026-06-23T15:11:09+02:00] x", arena), "[<*>] x");
+    EXPECT_EQ(masked("[2026-06-23T15:11:09-0700] x", arena), "[<*>] x");
+    EXPECT_EQ(masked("[2026-06-23T15:11:09] x", arena), "[<*>] x");
+}
+
+TEST(StatelessTemplate, BracketTimestampDeclinesEverythingAdjacentToTheClass)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // The §6.2 decline list, byte-identical through the masker: date-only, time-only, word,
+    // version, and trailing-punctuation forms are NOT the claimed class and stay literal KEEPs.
+    EXPECT_EQ(masked("[2026-06-23] x", arena), "[2026-06-23] x") << "date-only interior declined";
+    EXPECT_EQ(masked("[15:11:09] x", arena), "[15:11:09] x") << "time-only interior declined";
+    EXPECT_EQ(masked("[INFO] x", arena), "[INFO] x") << "word interior declined";
+    EXPECT_EQ(masked("[Pipeline] x", arena), "[Pipeline] x") << "word interior declined";
+    EXPECT_EQ(masked("[EnvInject] x", arena), "[EnvInject] x") << "word interior declined";
+    EXPECT_EQ(masked("[v1.2.3] x", arena), "[v1.2.3] x") << "version interior declined";
+    EXPECT_EQ(masked("[2026-06-23T15:11:09.020Z], x", arena), "[2026-06-23T15:11:09.020Z], x")
+        << "trailing punctuation breaks the whole-token trigger — declined, declared";
+    EXPECT_EQ(masked("[2026-06-23T15:11] x", arena), "[2026-06-23T15:11] x")
+        << "a truncated time is not a full datetime — declined";
+    // The bare-integer interior stays bracket_index's: `[42]` still normalizes to `[<*>]` via its
+    // OWN rule (the output-class collision is named and accepted; the CLAIM stays partitioned).
+    EXPECT_EQ(masked("[42] x", arena), "[<*>] x") << "bracket_index's claim, unchanged";
+}
+
 // ── D-MSK-1 (§4.1) — generalized composite-numeric masking (Chromium/Electron prefix) ──
 // The glog/Chromium diagnostic prefix `[PID:MMDD/HHMMSS.micros:ERROR:file.cc:line]` is ONE
 // whitespace-delimited token. The old source-location normalizer masked only the trailing
