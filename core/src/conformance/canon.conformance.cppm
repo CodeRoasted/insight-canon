@@ -112,6 +112,17 @@ struct Report
 [[nodiscard]] Report round_trip_report(const SemanticPackageManifest& manifest,
                                        const ComposedSemantics& composed);
 
+// The kit's own marker probe, EXPORTED for regression tripwires (jenkins_retrofit_gates.md §4,
+// leg L-C). The repaired construction is `render_row(paired_writer_row(row), "probe")` — the
+// writer dual materialized, self-adapting over every extractor. The OLD form (`prefix + " probe"`)
+// yielded, for the Jenkins STAGE row, `[Pipeline] { ( probe` — a probe that fires NOWHERE, which
+// made the `dialect_gate.marker_leak` leg vacuous. A consumer asserting "this probe FIRES on its
+// own dialect stream" observes THIS function, so a regression to the old form is a loud red in
+// the consumer, never a silent vacuity inside the kit. Returns "" for an UNPAIRED row (already
+// red under grammar.unpaired_marker).
+[[nodiscard]] std::string marker_probe_for(const IntentMarkerRow& row,
+                                           std::span<const IntentEmitRow> emits);
+
 } // namespace insight::semantic::conformance
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -120,6 +131,36 @@ struct Report
 // ════════════════════════════════════════════════════════════════════════════════════════════════════
 namespace insight::semantic::conformance
 {
+
+// The payload every probe carries. One benign single-token ASCII word: not a Jenkins
+// kStepExcludes structural token, no parens/brackets/whitespace/CR that a payload extractor
+// would trim — so a probe that fails to fire is a real gate failure, never an artifact of the
+// probe. Deterministic (a fixed literal, no RNG). Module linkage (not in the unnamed namespace)
+// because the exported marker_probe_for below renders with it.
+constexpr std::string_view kProbePayload{"probe"};
+
+// A probe line for an INTENT MARKER row: the row's own writer dual, materialized. `prefix +
+// " probe"` is only a valid probe for a RemainderAfterPrefix row, and building one that way was
+// a live defect — for the Jenkins STAGE row it yields `[Pipeline] { ( probe`, which fails
+// RemainderToClosingParen's required line-final ')', so the row cannot fire and the
+// `dialect_gate.marker_leak` leg then asserted "it did not fire on a foreign stream" about a
+// probe that fires NOWHERE. A gate that cannot fail. It would have been vacuous for every
+// GitLab row too (NumericFieldThenRemainder needs a numeric field the naive probe has no way to
+// produce), which is what surfaced it.
+//
+// The repair is the canonical inverse, which `round_trip_report` already uses: render the paired
+// writer row. That makes the probe self-adapting over every present and future extractor by
+// construction, because the two projections are each other's duals. An UNPAIRED row has no
+// probe — `check_grammar_wellformed` fails that separately (grammar.unpaired_marker), so the
+// empty string here reaches only a manifest already red, and it fires no row.
+// EXPORTED (declared in the interface block above) so the Jenkins retrofit's L-C leg can assert
+// the kit's own probe fires — vacuity-by-regression guarded outside the kit.
+std::string marker_probe_for(const IntentMarkerRow& row, std::span<const IntentEmitRow> emits)
+{
+    const IntentEmitRow* writer{paired_writer_row(row, emits)};
+    return writer == nullptr ? std::string{} : render_row(*writer, kProbePayload);
+}
+
 namespace
 {
 
@@ -146,39 +187,12 @@ namespace
     constexpr std::string_view kUndeclaredDialect{};
     constexpr std::string_view kForeignDialect{"conformance-foreign-dialect"};
 
-    // The payload every probe carries. One benign single-token ASCII word: not a Jenkins
-    // kStepExcludes structural token, no parens/brackets/whitespace/CR that a payload extractor
-    // would trim — so a probe that fails to fire is a real gate failure, never an artifact of the
-    // probe. Deterministic (a fixed literal, no RNG).
-    constexpr std::string_view kProbePayload{"probe"};
-
     // A probe line for a row that has no writer dual — the structural-role rows. The key is
     // line-anchored and a role row carries no payload grammar, so `key + " probe"` matches iff the
     // row fires.
     [[nodiscard]] std::string probe_for(std::string_view prefix)
     {
         return std::string{prefix} + ' ' + std::string{kProbePayload};
-    }
-
-    // A probe line for an INTENT MARKER row: the row's own writer dual, materialized. `prefix +
-    // " probe"` is only a valid probe for a RemainderAfterPrefix row, and building one that way was
-    // a live defect — for the Jenkins STAGE row it yields `[Pipeline] { ( probe`, which fails
-    // RemainderToClosingParen's required line-final ')', so the row cannot fire and the
-    // `dialect_gate.marker_leak` leg then asserted "it did not fire on a foreign stream" about a
-    // probe that fires NOWHERE. A gate that cannot fail. It would have been vacuous for every
-    // GitLab row too (NumericFieldThenRemainder needs a numeric field the naive probe has no way to
-    // produce), which is what surfaced it.
-    //
-    // The repair is the canonical inverse, which `round_trip_report` already uses: render the paired
-    // writer row. That makes the probe self-adapting over every present and future extractor by
-    // construction, because the two projections are each other's duals. An UNPAIRED row has no
-    // probe — `check_grammar_wellformed` fails that separately (grammar.unpaired_marker), so the
-    // empty string here reaches only a manifest already red, and it fires no row.
-    [[nodiscard]] std::string marker_probe_for(const IntentMarkerRow& row,
-                                               std::span<const IntentEmitRow> emits)
-    {
-        const IntentEmitRow* writer{paired_writer_row(row, emits)};
-        return writer == nullptr ? std::string{} : render_row(*writer, kProbePayload);
     }
 
     // ── Check 1: determinism — identical identity + identical recognizer output across independent
