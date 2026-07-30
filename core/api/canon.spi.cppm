@@ -627,6 +627,36 @@ inline constexpr std::string_view kPlaceholderNumericField{"0:"};
     return out;
 }
 
+// render_outcome — the writer dual of the run-outcome console-tail scan (T5 §3.1: the Jenkins
+// epilogue `Finished: <RESULT>`). PURE, same contract as render_row: a function of (row, token)
+// only — no RNG, no clock — homed canon-side so the epilogue's byte shape has ONE owner (the same
+// rows scan_run_outcome matches; a LogCraft-side spelling of the prefix would be the third-spelling
+// defect the retrofit killed). NO new row kind: the outcome rows are already symmetric literals.
+//
+// `token` is read only under RemainderToken — the exact conditionality OutcomeMarkerRow::outcome
+// already documents, mirrored: a RemainderToken row's verdict rides its remainder (prefix + the
+// native token), while a PrefixIsVerdict row's PREFIX announces the verdict and its remainder is
+// free-form and unread, so the minimal shape-valid rendering is the prefix alone. The conformance
+// law (canon.conformance, outcome.round_trip): scan_run_outcome over the rendered line recovers
+// the row/token's own verdict.
+[[nodiscard]] inline std::string render_outcome(const OutcomeMarkerRow& row, std::string_view token)
+{
+    std::string out;
+    switch (row.shape)
+    {
+    case OutcomeMarkerShape::RemainderToken:
+        out.reserve(row.prefix.size() + token.size());
+        out.append(row.prefix);
+        out.append(token);
+        break;
+    case OutcomeMarkerShape::PrefixIsVerdict:
+        out.reserve(row.prefix.size());
+        out.append(row.prefix);
+        break;
+    }
+    return out;
+}
+
 // paired_writer_row — the reader→writer pairing. Given a recognition row, returns the generation
 // row that materializes into a line THAT row recognizes: same prefix, kind, and MEDIUM. The Medium
 // is `dialect × IntentChannel` (ADR 0029 D1 / ADR 0065 clause 1), so the pairing matches on BOTH

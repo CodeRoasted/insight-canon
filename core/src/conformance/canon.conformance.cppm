@@ -610,6 +610,68 @@ namespace
         return {.name = "code_tier", .passed = true, .detail = {}};
     }
 
+    // ── Check 6: the outcome round-trip law (T5 §3.1) — scan_run_outcome(render_outcome(…))
+    // recovers the row's own verdict ──
+    //
+    // The writer dual of the console-tail scan, held to the same one-owner closure as the intent
+    // rows' G2 round-trip: for every outcome-marker row, the line `render_outcome` materializes is
+    // recognized back by the shipped scan under the package's OWN declaration, and the verdict it
+    // resolves is the one the rendered row/token carries. Self-adapting over both grammar-5 shapes:
+    // a RemainderToken row round-trips once per declared outcome token (the remainder maps through
+    // the SAME token set both ways), a PrefixIsVerdict row round-trips its prefix alone (its
+    // remainder is free-form and unread). Trivially green for a package that ships tokens but no
+    // marker (GHA — it has no run-verdict console line to render); the law is about the marker's
+    // two projections, not about token existence.
+    CheckResult check_outcome_round_trip(const SemanticPackageManifest& manifest,
+                                         const ComposedSemantics& composed)
+    {
+        const ComposedSemantics own{composed.for_stream(manifest.name, kAnyChannel)};
+        for (const OutcomeMarkerRow& row : manifest.outcome_markers)
+        {
+            const auto scan_one{[&own](const std::string& line)
+                                {
+                                    const std::array<std::string, 1> lines{line};
+                                    return insight::scan_run_outcome(lines, own);
+                                }};
+            if (row.shape == OutcomeMarkerShape::PrefixIsVerdict)
+            {
+                const std::string line{render_outcome(row, {})};
+                const insight::RunOutcomeScan scan{scan_one(line)};
+                if (!scan.marker_present || !scan.verdict.has_value() ||
+                    *scan.verdict != row.outcome)
+                    return {.name = "outcome.round_trip",
+                            .passed = false,
+                            .detail = "PrefixIsVerdict row \"" + std::string{row.prefix} +
+                                      "\": scan_run_outcome(render_outcome(row)) did not recover "
+                                      "the row's own verdict (marker_present=" +
+                                      (scan.marker_present ? "true" : "false") +
+                                      ") — the two projections of the run-verdict line disagree."};
+                continue;
+            }
+            for (const OutcomeTokenRow& token : manifest.outcome_tokens)
+            {
+                const std::string line{render_outcome(row, token.token)};
+                const insight::RunOutcomeScan scan{scan_one(line)};
+                const std::optional<insight::RunOutcome> mapped{
+                    scan.marker_present && !scan.token.empty()
+                        ? insight::map_outcome_token(scan.token, own)
+                        : std::nullopt};
+                if (!mapped.has_value() || *mapped != token.outcome)
+                    return {.name = "outcome.round_trip",
+                            .passed = false,
+                            .detail = "RemainderToken row \"" + std::string{row.prefix} +
+                                      "\" + token \"" + std::string{token.token} +
+                                      "\": scan_run_outcome(render_outcome(row, token)) over \"" +
+                                      line +
+                                      "\" did not map back to the token's own verdict "
+                                      "(marker_present=" +
+                                      (scan.marker_present ? "true" : "false") + ", scanned token \"" +
+                                      scan.token + "\")."};
+            }
+        }
+        return {.name = "outcome_round_trip", .passed = true, .detail = {}};
+    }
+
 } // namespace
 
 Report run(const SemanticPackageManifest& manifest)
@@ -623,6 +685,7 @@ Report run(const SemanticPackageManifest& manifest)
     report.checks.push_back(check_ascii_safety(manifest));
     report.checks.push_back(check_grammar_wellformed(manifest));
     report.checks.push_back(check_code_tier(manifest));
+    report.checks.push_back(check_outcome_round_trip(manifest, composed));
     return report;
 }
 
