@@ -342,7 +342,11 @@ TEST_F(JenkinsBareNullGate, ThePurifiedChainMovesNothingOnTheBareClass)
     const std::filesystem::path oracle_path{
         std::filesystem::path{__FILE__}.parent_path() / kOracleFile};
     const std::string oracle_text{read_file(oracle_path)};
-    ASSERT_TRUE(read_ok) << oracle_path << " — the committed pre-cut oracle is part of this "
+    // `.string()` is load-bearing, not noise: libstdc++ spells `operator<<(ostream&, const path&)`
+    // in terms of `std::quoted`, whose declaration this TU never sees — it takes std through
+    // `import std;` while gtest arrives as a header, so the header template instantiates against a
+    // std that is not in its scope. Streaming the string sidesteps the module/header seam entirely.
+    ASSERT_TRUE(read_ok) << oracle_path.string() << " — the committed pre-cut oracle is part of this "
                          << "repo; a missing file is a checkout defect, never a skip.";
     std::map<std::string, OracleRow> oracle_rows;
     {
