@@ -12,10 +12,11 @@
 //     role exists to stop: real bytes cannot prove a property that is about the empty stack.
 //   • `tests/compose/test_transport_identity.cpp` — that declaring transport does not move
 //     `semantic_identity`. Also unit, but its seam is compose's, not transport's.
-//   • The CORPUS arm (byte-identical shipped behavior over the D11 slice) + G1-PEEL — a package
-//     integration gate in `insight-canon/semantic/github/tests/`, because the ORACLE
-//     (`GitHubActionsStrategy::parse`) lives there and the dependency arrow runs core → github,
-//     never back. Not yet landed: see FALSIFIABILITY below.
+//   • The CORPUS arm (byte-identical behavior over the D11 slice) + G1-PEEL — the sibling
+//     `test_transport_peel_equivalence_gate.cpp` in THIS directory. It once homed in
+//     `semantic/github/tests/` because it needed the shipped `GitHubActionsStrategy::parse` in
+//     scope; post-T4 the oracle is frozen INLINE in the gate and the SUT is core's
+//     `TransportStack::peel`, so it is core's (corpus_backed_gates.md § 5).
 //
 // FALSIFIABILITY — what this file DOES discharge, and what it explicitly does NOT.
 // §9 makes falsifiability a requirement, not a note: G1 must be OBSERVED red under a one-byte

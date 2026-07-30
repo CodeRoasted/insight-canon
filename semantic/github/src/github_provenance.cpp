@@ -17,9 +17,10 @@ import insight.canon.spi;
 // `TransportStack::peel` before canon sees the line — so nothing here detects anything.
 //
 // The deleted decision function is not lost: it is FROZEN VERBATIM into
-// `tests/test_transport_peel_equivalence_gate.cpp` (ADR 0062), where it still scores the declared
-// peel over 4 082 logs / 22 490 937 lines. That gate is the provenance record; `git log` of this
-// file is not.
+// `core/tests/transport/test_transport_peel_equivalence_gate.cpp` (ADR 0062; re-homed to core per
+// corpus_backed_gates.md § 5 — the SUT is core's peel and the oracle is inline), where it still
+// scores the declared peel over 4 082 logs / 22 490 937 lines. That gate is the provenance record;
+// `git log` of this file is not.
 //
 // CONSEQUENCE, stated because it is a real cost and not a tidiness: `kManifest.strategy` is now
 // nullptr, so `ComposedPackage::has_strategy` is FALSE for github while `has_echoed_source` stays

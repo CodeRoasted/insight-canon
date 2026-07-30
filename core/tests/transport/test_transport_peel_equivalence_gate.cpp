@@ -26,13 +26,16 @@
 //     location. Copying bytes cannot manufacture provenance. What relocation preserves is the
 //     ability to RE-RUN the same comparison — nothing more, and no document may read it as more.
 //
-// HOMING (Kleio's, and it is now resting on a RETIRED premise — 0062 clause 6). This is the third
-// of G1's three grains; the other two are unit tests in canon core (`core/tests/transport/`,
-// `core/tests/compose/`). It was homed in this package for one structural reason: it needed BOTH
-// implementations in scope at once, and the dependency arrow runs core → semantic/github and never
-// back. With the oracle inlined that reason has expired — this file now depends only on
-// `insight.canon` plus an env-var corpus path. Re-homing is a TEST-HOMING decision and belongs to
-// Kleio, not to the commit that made it possible.
+// HOMING (Kleio's — corpus_backed_gates.md § 5). `core/tests/transport/`, 1:1 with
+// `core/src/transport/` under the per-domain mirror, beside the sibling G1 grain
+// `test_transport_declaration.cpp` (the third grain is `core/tests/compose/test_transport_identity.cpp`).
+// The SUT is `insight::transport::TransportStack::peel` — core's; the oracle is inline; the corpus
+// arrives by env var. The original home (`semantic/github/tests/`) rested on a premise T4 retired:
+// the gate once needed BOTH implementations in scope at once, and the dependency arrow runs
+// core → semantic/github and never back. With the oracle frozen inline this file imports only
+// `insight.canon`, and leaving it in the package compiled the whole `insight.semantic.github`
+// module into a binary that never referenced it while making a core-owned characterization pin
+// look like a dialect-package obligation (the misreading adr/0062 clause 4 guards against).
 //   • NOT insight-eidos, which already has the `CORPUS_D11_*` plumbing. Reusing that wiring would
 //     home a canon-internal refactor-equivalence claim inside a downstream consumer — homing by
 //     convenience past the package that owns the property.
