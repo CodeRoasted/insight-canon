@@ -39,7 +39,13 @@ class InsightCanonConan(ConanFile):
         "with_numa": False,
     }
 
-    exports_sources = "CMakeLists.txt", "src/*", "api/*"
+    # `tools/` is here because CMakeLists.txt builds f13_cardinality_measure UNCONDITIONALLY
+    # (the malf one-compile-surface rule: a tool excluded from the package build rots unseen).
+    # An unconditional target whose sources miss this allowlist configures fine as an editable
+    # and dies at `conan create` generate-time — the conan-create-only class malf cut-verify exists
+    # to catch. tests/ is deliberately absent: its target is guarded by INSIGHT_CANON_BUILD_TESTS,
+    # which the recipe leaves OFF.
+    exports_sources = "CMakeLists.txt", "src/*", "api/*", "tools/*"
 
     def config_options(self):
         if self.settings.os == "Windows":
