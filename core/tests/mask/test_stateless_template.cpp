@@ -1,11 +1,10 @@
 // NOLINTBEGIN
-// Unit tests + measurement for the stateless template masker
-// (stateless_template_id.md D-TID-1/2). The property tests are committed regression
-// guards — chiefly the phantom-pair kill (the whole point, §9.5). CardinalityOnCorpus
-// is the masker-cardinality measurement (env-gated, skipped unless CORPUS_DIR points at
-// a log corpus); the one-time over-split ratio vs the (now-ripped) Drain was 4.12x→1.79x,
-// recorded at the re-measure gate (§8, commit 3829a88) — the standing guard is now the
-// K_dim cardinality monitor, not a vs-Drain ratio.
+// Unit tests for the stateless template masker (stateless_template_id.md D-TID-1/2).
+// The property tests are committed regression guards — chiefly the phantom-pair kill
+// (the whole point, §9.5). The F13 masker-cardinality RE-MEASURE lived here as an
+// env-gated CardinalityOnCorpus test; it is a measurement over an operator-mounted
+// population, not a regression property, so it moved out of the unit tree to the CLI
+// instrument `core/tools/f13_cardinality_measure.cpp` (corpus_backed_gates.md § 3.3).
 
 #include <gtest/gtest.h>
 
@@ -424,94 +423,6 @@ TEST(StatelessTemplate, HexClassifierFoldsAsciiCase)
         << "a same-length UPPERCASE non-hex word must stay literal — the case fold must not "
         << "widen the hex alphabet\n  token: " << kUpperNonHex << "\n  expected: " << kUpperNonHex
         << " (kept)\n  actual: " << non_hex;
-}
-
-// ── Masker cardinality on a real corpus (the standing F13 re-measure instrument) ──
-// Reports the masker's distinct-template count + singleton fraction on a corpus — the
-// reading used to size F13 (the one-time over-split ratio vs the now-ripped Drain was
-// 4.12x→1.79x at the §8 gate; that comparison cannot re-run post-rip, and the standing
-// guard is the K_dim cardinality monitor). Re-run this after any F13 rule change.
-// Skipped unless CORPUS_DIR is a directory of *.log files (the CI revert corpus).
-TEST(StatelessTemplate, CardinalityOnCorpus)
-{
-    const char* const corpus_dir{std::getenv("CORPUS_DIR")};
-    if (corpus_dir == nullptr)
-        GTEST_SKIP() << "set CORPUS_DIR to a directory of *.log files to measure cardinality";
-
-    namespace fs = std::filesystem;
-    std::vector<fs::path> files;
-    for (const auto& entry : fs::directory_iterator{corpus_dir})
-        if (entry.is_regular_file() && entry.path().extension() == ".log")
-            files.push_back(entry.path());
-    std::ranges::sort(files); // deterministic order
-    ASSERT_FALSE(files.empty()) << "no *.log files under " << corpus_dir;
-
-    constexpr std::size_t kMaxLines{300000};
-    ArenaAllocator arena{8U * 1024U * 1024U};
-    // Generic corpus masking is semantic-unaware — a degenerate (zero-package) composition.
-    // `composed` precedes `parser` so it outlives the const-ref LogParser holds.
-    const insight::semantic::ComposedSemantics composed{
-        insight::test_support::degenerate_composition()};
-    LogParser parser{arena, composed};
-    std::unordered_map<std::string, std::uint64_t> stateless_templates;
-    std::size_t lines{0};
-
-    for (const auto& file : files)
-    {
-        if (lines >= kMaxLines)
-            break;
-        std::ifstream in{file};
-        std::string raw;
-        while (lines < kMaxLines && std::getline(in, raw))
-        {
-            if (raw.empty())
-                continue;
-            arena.reset();
-            // parse_line ANSI-strips at ingest (D-TID-11) and the masker runs on the
-            // parsed content — exactly the production path.
-            const auto parsed{parser.parse_line(raw)};
-            if (!parsed)
-                continue;
-            ++stateless_templates[std::string{
-                stateless_template(parsed->content, arena, cfg()).template_str}];
-            ++lines;
-        }
-    }
-
-    const std::size_t stateless_distinct{stateless_templates.size()};
-    const std::size_t singletons{static_cast<std::size_t>(
-        std::ranges::count_if(stateless_templates, [](const auto& kv) { return kv.second == 1; }))};
-
-    std::cout << "\n=== Stateless template_id cardinality (F13 re-measure) ===\n"
-              << "files            : " << files.size() << "\n"
-              << "lines            : " << lines << "\n"
-              << "Stateless distinct: " << stateless_distinct << "\n"
-              << "singletons       : " << singletons << " ("
-              << (stateless_distinct > 0 ? (100.0 * static_cast<double>(singletons) /
-                                            static_cast<double>(stateless_distinct))
-                                         : 0.0)
-              << "% of distinct)\n";
-
-    // The 30 loudest stateless templates with a long alnum-with-digit token (F13
-    // candidates — tokens that varied but no rule masked).
-    std::vector<std::pair<std::string, std::uint64_t>> by_count{stateless_templates.begin(),
-                                                                stateless_templates.end()};
-    std::ranges::sort(by_count,
-                      [](const auto& lhs, const auto& rhs) { return lhs.second > rhs.second; });
-    std::cout << "--- top 15 by count ---\n";
-    for (std::size_t i{0}; i < std::min<std::size_t>(15, by_count.size()); ++i)
-        std::cout << by_count[i].second << "  " << by_count[i].first.substr(0, 120) << "\n";
-    std::cout << "--- 40 singleton samples (the F13 over-split tail) ---\n";
-    std::size_t shown{0};
-    for (auto it{by_count.rbegin()}; it != by_count.rend() && shown < 40; ++it)
-        if (it->second == 1)
-        {
-            std::cout << it->first.substr(0, 140) << "\n";
-            ++shown;
-        }
-    std::cout << std::flush;
-
-    EXPECT_GT(lines, 0u);
 }
 
 // ── D-MSK-4 gates: ephemeral-root masking (canon_ephemeral_root_masking.md §7) ──

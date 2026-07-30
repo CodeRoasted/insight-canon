@@ -196,6 +196,18 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/insight_canon-config.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/insight_canon)
 
 ###########################################################
+#  Measurement instruments (tools/) — built on the package's own compile surface
+###########################################################
+# The F13 masker-cardinality re-measure (corpus_backed_gates.md § 3.3): a CLI over the PUBLIC
+# facade, deliberately NOT a test — its population is operator-mounted, so it reports and declares
+# rather than asserts. Built unconditionally so it can never rot unseen (the malf one-compile-surface
+# rule), linked exactly as an external consumer would link.
+add_executable(f13_cardinality_measure tools/f13_cardinality_measure.cpp)
+target_link_libraries(f13_cardinality_measure PRIVATE insight::canon)
+target_compile_features(f13_cardinality_measure PRIVATE cxx_std_23)
+set_target_properties(f13_cardinality_measure PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
+
+###########################################################
 #  Tests (unit + regression)
 ###########################################################
 if(INSIGHT_CANON_BUILD_TESTS)
