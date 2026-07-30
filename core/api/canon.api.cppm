@@ -1669,52 +1669,189 @@ namespace detail
 
 } // namespace detail
 
-// Strip CSI / SGR / OSC and bare-ESC terminal escape sequences from a line as an
-// UNCONDITIONAL content normalization at canon ingest — BEFORE tokenization. Colour
-// is presentation, never content (D-TID-10); the escapes interleave within/between
-// tokens (`\x1b[31mERROR\x1b[0m`) so a per-token mask cannot reach them — they must
-// die here. A pure byte state machine: no float, order-independent → cross-stdlib
-// bit-identical (the same grammar the TTY `sanitize()` drops, re-homed at ingest).
-// Appends the cleaned bytes to `out` (cleared first); result ≤ input, so a reused
-// buffer makes this allocation-free in steady state.
+} // namespace insight::tokenization
+
+// The §12.5.1(c) passkey's GLOBAL-MODULE forward declaration. The key is DEFINED in the sealed
+// `insight.canon.detail.parse` — a shard this public unit cannot import (detail imports api, so
+// the arrow only runs the other way) — and a linkage-specification attaches a declaration to the
+// GLOBAL module, which is what makes the sealed definition and this name ONE entity across the
+// module boundary (the std module's own mechanism). It is EXPORTED so the shard, importing this
+// unit, redeclares THE VISIBLE entity rather than a twin gcc-15 never merges — measured: a
+// non-exported spelling built on clang-21 and failed friendship access on gcc-15. Exporting leaks
+// only an INCOMPLETE name: the definition is sealed and the constructor private, so no consumer
+// can construct or complete it — unforgeability is unchanged.
+export extern "C++"
+{
+    namespace insight::tokenization
+    {
+        class LogParserPasskey;
+    } // namespace insight::tokenization
+}
+
+export namespace insight::tokenization
+{
+
+class NormalizedContent;
+class NormalizedLine;
+// Declared before the class so the in-class friend below names THIS exported entity — a
+// friend-first declaration would pin `normalize` non-exported ([module.interface]).
+[[nodiscard]] NormalizedLine normalize(std::string_view raw_line, std::string& scratch);
+
+// ── STAGE 1 AS A TYPE (insight_ingest_normalization_contract.md §12.2/§12.5) ────────────────────
 //
-// ⚠ THIS IS **STAGE 1**, AND IT IS A CONSUMER'S OBLIGATION, NEVER A PACKAGE'S. A semantic package's
-// strategy MUST NOT call it: normalization inside a strategy is refused by ADR 0024 §2.2, and a
-// package that normalized would double-strip content canon already stripped, then disagree with
-// canon on any line where the two grammars differ. The caller that OWNS the ingest — LogParser, or
-// a consumer deriving content for `recognize()`/`classify()` — runs it once, before the transport
-// peel (stage 2). The order is load-bearing: an escape sitting BEFORE a transport prefix is
-// invisible to the peel unless the strip ran first.
+// `NormalizedLine` means: STAGE 1 RAN ON THESE BYTES — canon's universal ANSI ingest normalization
+// (D-TID-11), the exact grammar `normalize()` below owns. Produced ONLY by `normalize()`; there is
+// deliberately NO constructor from `std::string_view`, because that absence is the whole
+// mechanism: a caller cannot reach the content walkers (`classify`/`recognize`/
+// `recognize_location`, which take `NormalizedContent`) without having gone through stage 1, and
+// cannot fake the passage — the only other producer NARROWS an object it must already hold. The
+// obligation this replaces was a comment three repos of call sites were expected to remember; two
+// of three consumers broke it silently at a measured cost of 1 077 of 3 193 GitLab markers
+// (adr/0073). The same argument that made the transport boundary a type (canon.transport §4:
+// "by construction, not by review") makes this one one.
+class NormalizedLine
+{
+  public:
+    // The normalized bytes, read-only. An OUTBOUND accessor weakens nothing: reading normalized
+    // bytes destroys no stage-1 evidence; minting from arbitrary bytes would. (Do not "harden"
+    // this away — the seam's byte-readers have no other expressible edit, §12.5.2.)
+    [[nodiscard]] constexpr std::string_view bytes() const noexcept
+    {
+        return bytes_;
+    }
+
+    // The suffix-narrowing door — the caller's own INFERRED stage 2 (a transport strip canon was
+    // never told about). Named for what it states: the offset comes from a strip that is NOT a
+    // declared catalogue row, which is adr/0063 clause 4's declared limitation placed at its one
+    // call site, greppable, instead of in a comment three repos away. (The DECLARED stage 2 is
+    // `TransportStack::peel(NormalizedLine)`, which composes this door with a catalogue row's
+    // width.) Narrowing is the safe escape hatch by construction: both real stage-2
+    // implementations only ever SHORTEN, and a suffix cannot destroy the stage-1 evidence — which
+    // is precisely what a `string_view` constructor would destroy. An `offset` past the end
+    // yields the empty content (a whole-line transport line peels to nothing).
+    [[nodiscard]] constexpr NormalizedContent undeclared_suffix(std::size_t offset) const noexcept;
+
+  private:
+    friend NormalizedLine normalize(std::string_view raw_line, std::string& scratch);
+    constexpr explicit NormalizedLine(std::string_view bytes) noexcept : bytes_{bytes} {}
+    std::string_view bytes_;
+};
+
+// `NormalizedContent` means: stage 1 ran, AND a suffix has since been taken (a stage 2 — declared
+// or inferred — or the explicit `undeclared_suffix(0)` statement that there is none). This is the
+// only currency `classify()`/`recognize()`/`recognize_location()` accept.
+//
+// Producers — the door census the deleted P2 lint's value collapsed into (doors are finite where
+// call sites are not):
+//   * `NormalizedLine::undeclared_suffix(offset)` — public, the caller's inferred stage 2;
+//   * `TransportStack::peel(const NormalizedLine&)` — public, the declared stage 2
+//     (insight.canon.transport; composes the door above with a catalogue row);
+//   * `LogParserPasskey` — the ONE privileged mint (§12.5.1 exit (c)), sealed in
+//     `insight.canon.detail.parse` with a private constructor and LogParser its single friend.
+//     It exists because canon's own tokenizer consumes walkers on strategy-REBUILT arena bytes
+//     (six of 22 strategies assemble `content` rather than narrowing the line), which no suffix
+//     door can express — and the attestor is the object that PERFORMED stage 1 unconditionally at
+//     its one named site (D-TID-11), so the boundary guarantee stays exactly the measured defect's
+//     scope: unforgeable from OUTSIDE `insight.canon`.
+//
+// WHAT THE TYPE DOES NOT PROVE (§12.3, load-bearing): it does not prove the RIGHT stage 2 ran and
+// deliberately does not carry which one did — a NormalizedContent that knew its transport stack
+// would be a declaration reaching the tokenizer, the exact channel canon.transport §4 closes.
+class NormalizedContent
+{
+  public:
+    // Read-only bytes — outbound only; see the accessor note on NormalizedLine::bytes().
+    [[nodiscard]] constexpr std::string_view bytes() const noexcept
+    {
+        return bytes_;
+    }
+
+  private:
+    friend class NormalizedLine; // the suffix door (and, through it, the declared peel)
+    // QUALIFIED on purpose: a qualified friend is a pure REFERENCE to the prior (global-module,
+    // extern "C++") declaration above — it cannot declare a fresh module-attached entity, which
+    // is how the sealed definition in insight.canon.detail.parse stays THIS friend on both
+    // gcc-15 and clang-21 (an unqualified spelling bound differently across the two).
+    friend class insight::tokenization::LogParserPasskey; // the §12.5.1(c) mint
+
+    constexpr explicit NormalizedContent(std::string_view bytes) noexcept : bytes_{bytes} {}
+    std::string_view bytes_;
+};
+
+// The §12.2 shape guard, at the type's own declaration so any second member fails the build
+// BEFORE any caller is recompiled. This is what restores by-construction on the identity path:
+// interposing a struct re-opened a channel a future edit could widen without touching a single
+// signature, and these two lines close it — one borrowed view, trivially copyable, nothing else.
+static_assert(sizeof(NormalizedContent) == sizeof(std::string_view));
+static_assert(std::is_trivially_copyable_v<NormalizedContent>);
+static_assert(sizeof(NormalizedLine) == sizeof(std::string_view));
+static_assert(std::is_trivially_copyable_v<NormalizedLine>);
+
+constexpr NormalizedContent NormalizedLine::undeclared_suffix(std::size_t offset) const noexcept
+{
+    const std::size_t clamped{offset > bytes_.size() ? bytes_.size() : offset};
+    return NormalizedContent{std::string_view{bytes_.data() + clamped, bytes_.size() - clamped}};
+}
+
+// ── STAGE 1 — the factory (the former `strip_escape_sequences(string_view, string&)`; the
+// out-parameter form is REMOVED, not deprecated: §12.1 — what canon owes is a stage-1 factory
+// with a RETURN TYPE, and two spellings of one behaviour is this document's defect class) ───────
+//
+// Strip CSI / SGR / OSC and bare-ESC terminal escape sequences from a line as an UNCONDITIONAL
+// content normalization at canon ingest — BEFORE tokenization. Colour is presentation, never
+// content (D-TID-10); the escapes interleave within/between tokens (`\x1b[31mERROR\x1b[0m`) so a
+// per-token mask cannot reach them — they must die here. A pure byte state machine: no float,
+// order-independent → cross-stdlib bit-identical.
+//
+// FAST PATH, now inside the factory (the gate LogParser used to carry at its call site): a line
+// with no ESC byte is a FIXED POINT of the strip, so the result BORROWS the caller's `raw_line`
+// with no copy and `scratch` is not touched (`find` is the SIMD any-ESC scan). Only an
+// ESC-bearing line rewrites into `scratch` (cleared first; result ≤ input, so a reused scratch is
+// allocation-free in steady state).
+//
+// LIFETIME: the returned NormalizedLine (and every NormalizedContent narrowed from it, and every
+// coordinate a walker slices out of THAT — an IntentMarker's name views the handed content,
+// adr/0045) borrows `raw_line` or `scratch`; both must outlive every such view.
+//
+// ⚠ STAGE 1 IS A CONSUMER'S OBLIGATION, NEVER A PACKAGE'S. A semantic package's strategy MUST NOT
+// call this: normalization inside a strategy is refused by ADR 0024 §2.2, and a package that
+// normalized would double-strip content canon already stripped, then disagree with canon on any
+// line where the two grammars differ. The caller that OWNS the ingest runs it once, before the
+// transport peel (stage 2). The order is load-bearing: an escape sitting BEFORE a transport
+// prefix is invisible to the peel unless the strip ran first.
 //
 // ⚠ AND IT MUST NEVER OVERWRITE THE BUFFER A Tokenizer LATER READS. The strip is destructive of
-// exactly the bytes some provenance hooks need: GHA's command-echo SGR wrapper survives ONLY on the
-// raw line (D-PROV-1, log_parser.cpp), so normalizing a caller's line storage in place would
+// exactly the bytes some provenance hooks need: GHA's command-echo SGR wrapper survives ONLY on
+// the raw line (D-PROV-1, log_parser.cpp), so normalizing a caller's line storage in place would
 // silently kill the echoed-source demotion. Stage 1 produces a DERIVED view for recognition; the
 // raw line stays raw.
-inline void strip_escape_sequences(std::string_view line, std::string& out)
+[[nodiscard]] inline NormalizedLine normalize(std::string_view raw_line, std::string& scratch)
 {
-    out.clear();
-    out.reserve(line.size());
-    const std::size_t len{line.size()};
+    if (raw_line.find(static_cast<char>(kEsc)) == std::string_view::npos)
+        return NormalizedLine{raw_line}; // fixed point: zero-copy, scratch untouched
+    scratch.clear();
+    scratch.reserve(raw_line.size());
+    const std::size_t len{raw_line.size()};
     std::size_t pos{0};
     while (pos < len)
     {
-        if (static_cast<unsigned char>(line[pos]) != kEsc)
+        if (static_cast<unsigned char>(raw_line[pos]) != kEsc)
         {
-            out.push_back(line[pos]);
+            scratch.push_back(raw_line[pos]);
             ++pos;
             continue;
         }
         if (pos + 1U >= len)
             break; // a lone trailing ESC — drop it
-        const char introducer{line[pos + 1U]};
+        const char introducer{raw_line[pos + 1U]};
         if (introducer == '[')
-            pos = detail::scan_csi_body(line, pos + 2U);
+            pos = detail::scan_csi_body(raw_line, pos + 2U);
         else if (introducer == ']')
-            pos = detail::scan_osc_body(line, pos + 2U);
+            pos = detail::scan_osc_body(raw_line, pos + 2U);
         else
             pos += 2U; // a simple two-byte ESC sequence (charset select, reset, …)
     }
+    return NormalizedLine{scratch};
 }
 
 } // namespace insight::tokenization

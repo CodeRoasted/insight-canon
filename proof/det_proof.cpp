@@ -219,7 +219,7 @@ int main(int argc, char** argv)
             observation_times.reserve(lines.size());
             for (const auto& raw : lines)
             {
-                const insight::transport::PeeledLine peeled{stream.transport.peel(raw)};
+                const insight::transport::RawPeeledLine peeled{stream.transport.peel_raw(raw)};
                 peeled_lines.emplace_back(peeled.content);
                 observation_times.push_back(peeled.observation_time);
             }

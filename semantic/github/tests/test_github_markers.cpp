@@ -21,6 +21,14 @@ using insight::tokenization::IntentMarker;
 using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::recognize;
 
+// The walkers take NormalizedContent (adr/0073's precondition as a type); every probe here is an
+// escape-free literal, so normalize() is the zero-copy fixed point over a shared scratch.
+[[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
+{
+    static std::string scratch;
+    return insight::tokenization::normalize(probe, scratch).undeclared_suffix(0);
+}
+
 namespace
 {
 // The composition under test: the github package alone, RESOLVED for a stream that declared this
@@ -70,12 +78,11 @@ namespace
 TEST(GithubMarkers, RecognizesJobAndStepBanners)
 {
     const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};
-    const auto job{
-        recognize("Complete job name: build (ubuntu-latest)", gh)};
+    const auto job{recognize(norm_probe("Complete job name: build (ubuntu-latest)"), gh)};
     EXPECT_EQ(job.kind, IntentMarkerKind::Job) << "expected Job, got " << show(job);
     EXPECT_EQ(job.name, "build (ubuntu-latest)") << "raw job payload wrong: " << show(job);
 
-    const auto step{recognize("Run actions/checkout@v4", gh)};
+    const auto step{recognize(norm_probe("Run actions/checkout@v4"), gh)};
     EXPECT_EQ(step.kind, IntentMarkerKind::Step) << "expected Step, got " << show(step);
     EXPECT_EQ(step.name, "actions/checkout@v4") << "raw step payload wrong: " << show(step);
 }
@@ -102,13 +109,13 @@ TEST(GithubMarkers, StepIdentityIsInvariantAcrossTheRealChannelAndOurAblation)
     const ComposedSemantics annotated{github_only(insight::semantic::github::kChannelAnnotated)};
     const ComposedSemantics stripped{github_only(insight::semantic::github::kChannelStripped)};
 
-    const auto wrapped{recognize("##[group]Run yarn lint", annotated)};
+    const auto wrapped{recognize(norm_probe("##[group]Run yarn lint"), annotated)};
     EXPECT_EQ(wrapped.kind, IntentMarkerKind::Step)
         << "the annotated channel's genuine banner was not recognized: " << show(wrapped);
     EXPECT_EQ(wrapped.name, "yarn lint")
         << "the wrapped payload must strip to the bare step name: " << show(wrapped);
 
-    const auto bare{recognize("Run yarn lint", stripped)};
+    const auto bare{recognize(norm_probe("Run yarn lint"), stripped)};
     EXPECT_EQ(bare.kind, IntentMarkerKind::Step)
         << "the stripped channel's genuine banner was not recognized: " << show(bare);
     EXPECT_EQ(bare.name, wrapped.name) << "THE CHANNEL BECAME AN AXIS: the real channel and our "
@@ -120,22 +127,20 @@ TEST(GithubMarkers, StepIdentityIsInvariantAcrossTheRealChannelAndOurAblation)
                                           "would see every step vanished+new";
 
     // Each channel's OTHER form is not a banner there — the whole point of the coordinate.
-    const auto prose{
-        recognize("Run `npm audit` for details.", annotated)};
+    const auto prose{recognize(norm_probe("Run `npm audit` for details."), annotated)};
     EXPECT_EQ(prose.kind, IntentMarkerKind::None)
         << "PHANTOM: bare `Run ` prose opened a Step in the ANNOTATED channel, where the genuine "
            "banner is "
            "`##[group]Run ` and this line is ordinary npm output: "
         << show(prose);
-    const auto wrapped_in_stripped{
-        recognize("##[group]Run yarn lint", stripped)};
+    const auto wrapped_in_stripped{recognize(norm_probe("##[group]Run yarn lint"), stripped)};
     EXPECT_EQ(wrapped_in_stripped.kind, IntentMarkerKind::None)
         << "the annotated banner fired under the STRIPPED channel, where `##[` cannot occur: "
         << show(wrapped_in_stripped);
 
     // `::group::Run ` is not a shipped row → it must NOT open a Step (guards against a speculative
     // row).
-    const auto colon{recognize("::group::Run yarn lint", annotated)};
+    const auto colon{recognize(norm_probe("::group::Run yarn lint"), annotated)};
     EXPECT_EQ(colon.kind, IntentMarkerKind::None)
         << "::group:: form unexpectedly recognized: " << show(colon);
 }
@@ -149,18 +154,15 @@ TEST(GithubMarkers, UndeclaredChannelFiresNoStepRowEitherWay)
 {
     const ComposedSemantics undeclared{github_only(insight::semantic::kAnyChannel)};
 
-    EXPECT_EQ(
-        recognize("Complete job name: build (ubuntu-latest)", undeclared)
-            .kind,
-        IntentMarkerKind::Job)
+    EXPECT_EQ(recognize(norm_probe("Complete job name: build (ubuntu-latest)"), undeclared).kind,
+              IntentMarkerKind::Job)
         << "the Job banner is kAnyChannel (identical in both channels) and must still fire "
            "undeclared";
-    EXPECT_EQ(recognize("Run yarn lint", undeclared).kind,
-              IntentMarkerKind::None)
+    EXPECT_EQ(recognize(norm_probe("Run yarn lint"), undeclared).kind, IntentMarkerKind::None)
         << "a channel-gated Step row fired with NO channel declared — the composition defaulted to "
            "a "
            "concrete channel, which is exactly the fail-open defect ADR 0029 D5 closes";
-    EXPECT_EQ(recognize("##[group]Run yarn lint", undeclared).kind,
+    EXPECT_EQ(recognize(norm_probe("##[group]Run yarn lint"), undeclared).kind,
               IntentMarkerKind::None)
         << "same, for the annotated materialization";
 }
@@ -179,14 +181,14 @@ TEST(GithubMarkers, DialectGatedToTheDeclaringStream)
     const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};
     constexpr std::string_view run_line{"Run daemon started"};
 
-    const auto undeclared{
-        recognize(run_line, undeclared_dialect(insight::semantic::github::kChannelStripped))};
+    const auto undeclared{recognize(
+        norm_probe(run_line), undeclared_dialect(insight::semantic::github::kChannelStripped))};
     EXPECT_EQ(undeclared.kind, IntentMarkerKind::None)
         << "a dialect-gated Step row fired on a stream that declared NO dialect — fail-closed on "
            "depth is not optional: "
         << show(undeclared);
 
-    EXPECT_EQ(recognize(run_line, gh).kind, IntentMarkerKind::Step)
+    EXPECT_EQ(recognize(norm_probe(run_line), gh).kind, IntentMarkerKind::Step)
         << "the SAME line must open a Step once the stream declares \""
         << insight::semantic::github::kDialect
         << "\" — the dialect declaration is the sole difference";
@@ -196,11 +198,11 @@ TEST(GithubMarkers, DialectGatedToTheDeclaringStream)
 TEST(GithubMarkers, NoFalseStepOnRunningOrEmpty)
 {
     const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};
-    const auto running{recognize("Running database migrations", gh)};
+    const auto running{recognize(norm_probe("Running database migrations"), gh)};
     EXPECT_EQ(running.kind, IntentMarkerKind::None)
         << "\"Running …\" false-matched a Step: " << show(running);
 
-    const auto empty{recognize("", gh)};
+    const auto empty{recognize(norm_probe(""), gh)};
     EXPECT_EQ(empty.kind, IntentMarkerKind::None)
         << "empty content opened a quantum: " << show(empty);
 }
@@ -212,12 +214,11 @@ TEST(GithubMarkers, NoFalseStepOnRunningOrEmpty)
 TEST(GithubMarkers, JobUnorderedStepOrdered)
 {
     const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};
-    const auto job{
-        recognize("Complete job name: Test (ubuntu-latest)", gh)};
+    const auto job{recognize(norm_probe("Complete job name: Test (ubuntu-latest)"), gh)};
     EXPECT_EQ(job.child_order, ChildOrder::Unordered) << "jobs are parallel → set-matched";
     EXPECT_EQ(job.discriminant, "(ubuntu-latest)") << "the marker carries its raw discriminant";
 
-    const auto step{recognize("Run yarn build", gh)};
+    const auto step{recognize(norm_probe("Run yarn build"), gh)};
     EXPECT_EQ(step.child_order, ChildOrder::Ordered) << "steps are sequential → LCS-matched";
 }
 
@@ -229,12 +230,12 @@ TEST(GithubMarkers, RawPayloadFeedsAlignmentClass)
 {
     const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};
     const auto job{
-        recognize("Complete job name: test (win-msvc, windows-latest, nightly)", gh)};
+        recognize(norm_probe("Complete job name: test (win-msvc, windows-latest, nightly)"), gh)};
     ASSERT_EQ(job.kind, IntentMarkerKind::Job) << show(job);
     EXPECT_EQ(canonicalize_intent(job.name), "test (M)")
         << "raw \"" << job.name << "\" did not collapse to the matrix class";
 
-    const auto step{recognize("Run actions/checkout@v4", gh)};
+    const auto step{recognize(norm_probe("Run actions/checkout@v4"), gh)};
     ASSERT_EQ(step.kind, IntentMarkerKind::Step) << show(step);
     EXPECT_EQ(canonicalize_intent(step.name), "actions/checkout@vX")
         << "raw \"" << step.name << "\" did not collapse to the versioned-action class";

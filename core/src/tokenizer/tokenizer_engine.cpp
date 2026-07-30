@@ -85,8 +85,13 @@ struct Tokenizer::Impl
         event.host = parsed_line.host;
         event.template_str = match.template_str;
         event.params = match.params;
+        // The walkers take NormalizedContent; strategy content is attested by the PARSER — the
+        // object that performed stage 1 on this very line (§12.5.1(c) — the privileged mint, held
+        // one line below the parse it attests). Six strategies REBUILD content into arena bytes,
+        // so no public narrowing door could express these two calls.
         event.structural_role = insight::tokenization::classify(
-            parsed_line.content, composed); // announced structural role (the resolved view's rows)
+            parser.attest(parsed_line.content),
+            composed); // announced structural role (the resolved view's rows)
         // Identity-derived WHERE (intent_identity_model.md §5.3, II-8): populate an EMPTY component
         // WHERE axis with the recognized test-file. Semantic-unaware (SP-1): no dialect literal — a
         // format whose lines carry a native component already skips via component.empty(); a format
@@ -95,7 +100,8 @@ struct Tokenizer::Impl
         // and default-OFF, so every G-SP-1 default path is byte-identical (the flag is the aligned
         // pipeline's, feeding the where_set_shift coverage verdict — §5.4).
         if (config.recognize_test_where && event.component.empty())
-            event.component = insight::recognize_location(parsed_line.content, composed);
+            event.component =
+                insight::recognize_location(parser.attest(parsed_line.content), composed);
         event.trace = parsed_line.trace; // OTEL trace context (D-OTEL-1): consumed by O2/O3,
                                          // never serialized; default-empty for non-OTEL inputs
         event.ordinals = parsed_line.ordinals; // W1 ordinal observations (D-W1-3): consumed by

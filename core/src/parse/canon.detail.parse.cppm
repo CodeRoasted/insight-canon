@@ -52,6 +52,54 @@ class FormatDetector
 
 export namespace insight::tokenization
 {
+// Declared before the passkey below so its friend declaration binds to THIS (module-attached)
+// entity — a friend naming an undeclared class inside a linkage-specification would mint a
+// global-module phantom instead.
+class LogParser;
+} // namespace insight::tokenization
+
+// ── The §12.5.1(c) privileged mint (insight_ingest_normalization_contract.md) ───────────────────
+// THE one non-public producer of `NormalizedContent`, and the friend list below is the audit
+// surface: growing it is a visible, reviewable edit, and the door-census gate pins it at ONE.
+//
+// WHY IT EXISTS: canon's own tokenizer hands strategy-produced `ParsedLine::content` to the
+// walkers, and six of the 22 strategies REBUILD content into arena bytes — not a suffix of the
+// line — so no public narrowing door can express them. The attestation is issued by `LogParser`
+// (the object that PERFORMS stage 1, unconditionally, at its one named site — D-TID-11), not
+// asserted by the consumer.
+//
+// WHY `extern "C++"`: a linkage-specification attaches the class to the GLOBAL module, which is
+// what lets the public api unit (which cannot import this sealed shard) name it in a friend
+// declaration and have both refer to ONE entity. The key stays sealed all the same: this shard is
+// never installed and never re-exported, so no consumer outside canon can complete — or
+// construct — the type.
+//
+// ⚠ THE CONFORMANCE KIT MUST NEVER REACH FOR THIS. Its nine synthesized probes are escape-free by
+// construction, so `normalize()` is a fixed point on them and the public factory is the honest
+// door — minting there would grow this friend list to two and delete the mechanism (§12.5.2).
+extern "C++"
+{
+    namespace insight::tokenization
+    {
+        class LogParserPasskey
+        {
+          public:
+            // The mint. Callable only by whoever can construct the key — LogParser, and nobody
+            // else.
+            [[nodiscard]] NormalizedContent mint(std::string_view stage1_bytes) const noexcept
+            {
+                return NormalizedContent{stage1_bytes};
+            }
+
+          private:
+            constexpr LogParserPasskey() noexcept = default;
+            friend class LogParser; // THE friend list — size one, asserted by the door-census gate
+        };
+    } // namespace insight::tokenization
+}
+
+export namespace insight::tokenization
+{
 
 // LogParser wraps arena + FormatDetector + active strategy.
 // Thread-safety: NOT thread-safe; use one instance per thread / strand.
@@ -80,6 +128,20 @@ class LogParser
 
     [[nodiscard]] std::vector<std::expected<ParsedLine, std::string>>
     parse_batch(std::span<const std::string_view> lines);
+
+    // The §12.5.1(c) attestation — issued by the PERFORMER of stage 1. Every byte a strategy's
+    // `ParsedLine::content` carries derives from a line this parser normalized unconditionally at
+    // its one named site (parse_line's D-TID-11 step) — including the six strategies that REBUILD
+    // content into arena bytes, which assemble from post-strip input. That invariant is local to
+    // this class, reviewable in one place, which is what entitles it to hold the one passkey.
+    // ⚠ For strategy-produced content ONLY. Anything else goes through `normalize()`.
+    // Deliberately NON-static: the attestation is issued by a HELD parser instance — the caller
+    // must possess the performer, not merely name its class.
+    // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+    [[nodiscard]] NormalizedContent attest(std::string_view stage1_content) const noexcept
+    {
+        return LogParserPasskey{}.mint(stage1_content);
+    }
 
     [[nodiscard]] std::size_t lines_parsed() const noexcept;
     [[nodiscard]] std::size_t lines_failed() const noexcept;

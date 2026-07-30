@@ -28,7 +28,11 @@ namespace
 void expect_loc(const ComposedSemantics& composed, std::string_view content,
                 std::string_view expected)
 {
-    const std::string_view got{recognize_location(content, composed)};
+    // The walker takes NormalizedContent (adr/0073's precondition as a type); every probe here is
+    // an escape-free literal, so normalize() is the zero-copy fixed point over a shared scratch.
+    static std::string scratch;
+    const std::string_view got{recognize_location(
+        insight::tokenization::normalize(content, scratch).undeclared_suffix(0), composed)};
     EXPECT_EQ(got, expected) << "recognize_location(\"" << content << "\") = \"" << got
                              << "\"  expected \"" << expected << '"';
 }

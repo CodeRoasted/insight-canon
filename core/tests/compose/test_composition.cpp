@@ -34,6 +34,14 @@ using insight::tokenization::classify;
 using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::MaskConfig;
 using insight::tokenization::recognize;
+
+// The walkers take NormalizedContent (adr/0073's precondition as a type); every probe here is an
+// escape-free literal, so normalize() is the zero-copy fixed point over a shared scratch.
+[[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
+{
+    static std::string scratch;
+    return insight::tokenization::normalize(probe, scratch).undeclared_suffix(0);
+}
 using insight::tokenization::Tokenizer;
 
 namespace
@@ -133,9 +141,9 @@ TEST(Composition, DegenerateCoreOnlyRuns)
 
     // No dialect row fires — a would-be GHA marker classifies to None, no marker, no test-file
     // WHERE.
-    EXPECT_EQ(classify("##[error]boom", core), StructuralRole::None);
-    EXPECT_EQ(recognize("Run something", core).kind, IntentMarkerKind::None);
-    EXPECT_EQ(recognize_location("src/auth/login.test.ts", core), "");
+    EXPECT_EQ(classify(norm_probe("##[error]boom"), core), StructuralRole::None);
+    EXPECT_EQ(recognize(norm_probe("Run something"), core).kind, IntentMarkerKind::None);
+    EXPECT_EQ(recognize_location(norm_probe("src/auth/login.test.ts"), core), "");
 
     // But the universal formats still tokenize (core is runnable semantic-unaware).
     ArenaAllocator arena{64U * 1024U};

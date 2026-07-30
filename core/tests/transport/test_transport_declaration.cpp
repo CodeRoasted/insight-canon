@@ -47,7 +47,7 @@ using insight::transport::IngestDeclaration;
 using insight::transport::kGhaApiPrefixWidth;
 using insight::transport::kTransportCatalogRows;
 using insight::transport::kTransportCatalogVersion;
-using insight::transport::PeeledLine;
+using insight::transport::RawPeeledLine;
 using insight::transport::resolve_transport_stack;
 using insight::transport::TransportExtract;
 using insight::transport::TransportStack;
@@ -180,7 +180,7 @@ TEST(TransportDeclaration, DegenerateStackPeelIsByteIdentity)
     for (std::size_t idx{0}; idx < kLines.size(); ++idx)
     {
         const LineCase& line{kLines[idx]};
-        const PeeledLine peeled{stack.peel(line.bytes)};
+        const RawPeeledLine peeled{stack.peel_raw(line.bytes)};
 
         EXPECT_EQ(peeled.content, line.bytes)
             << "case [" << idx << "] '" << line.label << "': the degenerate peel changed bytes.\n"
@@ -227,7 +227,7 @@ TEST(TransportDeclaration, DeclaredStackActuallyPeels)
     for (std::size_t idx{0}; idx < kLines.size(); ++idx)
     {
         const LineCase& line{kLines[idx]};
-        const PeeledLine peeled{stack.peel(line.bytes)};
+        const RawPeeledLine peeled{stack.peel_raw(line.bytes)};
 
         if (line.carries_stamp)
         {
@@ -281,14 +281,14 @@ TEST(TransportDeclaration, DeclaredStackExtractsObservationTimeOnlyWhenTheStampP
     const IngestDeclaration declaration{.stack = kDeclaredGha, .dialect = {}, .channel = {}};
     const TransportStack stack{resolve_transport_stack(declaration)};
 
-    const PeeledLine stamped{stack.peel("2026-04-15T22:20:38.2879579Z ok")};
+    const RawPeeledLine stamped{stack.peel_raw("2026-04-15T22:20:38.2879579Z ok")};
     EXPECT_EQ(stamped.content, "ok") << "declared peel must strip the stamp AND the separator "
                                         "space (strip_leading_space is load-bearing, ADR 0044 §8)";
     EXPECT_TRUE(stamped.observation_time.has_value())
         << "the shipped row declares TransportExtract::EventObservationTime, so a parseable stamp "
            "must yield one";
 
-    const PeeledLine unstamped{stack.peel("no stamp here")};
+    const RawPeeledLine unstamped{stack.peel_raw("no stamp here")};
     EXPECT_EQ(unstamped.content, "no stamp here");
     EXPECT_FALSE(unstamped.observation_time.has_value())
         << "a line the rule did not shorten must carry no observation time";
@@ -296,7 +296,7 @@ TEST(TransportDeclaration, DeclaredStackExtractsObservationTimeOnlyWhenTheStampP
     // A line that is ENTIRELY transport peels to empty, and empty means DROP — not an empty
     // template. This is how the shipped GHA strategy's "a timestamp-only line is a blank line"
     // behavior survives the move to a declared peel (ADR 0044 §8's bundled behavior 3).
-    const PeeledLine bare{stack.peel("2026-04-15T22:20:38.2879579Z ")};
+    const RawPeeledLine bare{stack.peel_raw("2026-04-15T22:20:38.2879579Z ")};
     EXPECT_TRUE(bare.is_blank()) << "a stamp-only line must peel to blank, got \""
                                  << escape(bare.content) << "\"";
 }

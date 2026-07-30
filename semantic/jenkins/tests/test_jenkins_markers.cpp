@@ -18,6 +18,15 @@ using insight::tokenization::ChildOrder;
 using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::recognize;
 
+// The walkers take NormalizedContent (adr/0073's precondition as a type); every probe here is an
+// escape-free literal (the xtrace probe's `\\e` is TWO prose bytes, not an escape — the P3
+// precision leg), so normalize() is the zero-copy fixed point over a shared scratch.
+[[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
+{
+    static std::string scratch;
+    return insight::tokenization::normalize(probe, scratch).undeclared_suffix(0);
+}
+
 namespace
 {
 // The RESOLVED view of a stream that declared this dialect (ADR 0065 clause 2) — after T4 the
@@ -40,7 +49,7 @@ namespace
 TEST(JenkinsMarkers, NamedBlockOpenIsAStage)
 {
     const ComposedSemantics composed{jenkins_only()};
-    const auto stage{recognize("[Pipeline] { (Build)", composed)};
+    const auto stage{recognize(norm_probe("[Pipeline] { (Build)"), composed)};
     EXPECT_EQ(stage.kind, IntentMarkerKind::Job)
         << "STAGE is the container level (GHA Job ≡ stage)";
     EXPECT_EQ(stage.name, "Build");
@@ -53,8 +62,7 @@ TEST(JenkinsMarkers, ParallelBranchIsAStageWithItsDiscriminant)
     const ComposedSemantics composed{jenkins_only()};
     // A matrix/parallel leg: the axis tuple stays VERBATIM in the discriminant (II-9) while
     // canonicalize_intent (downstream) collapses the class — the studies/004 vanish-storm guard.
-    const auto branch{
-        recognize("[Pipeline] { (Branch: maven (lts))", composed)};
+    const auto branch{recognize(norm_probe("[Pipeline] { (Branch: maven (lts))"), composed)};
     EXPECT_EQ(branch.kind, IntentMarkerKind::Job);
     EXPECT_EQ(branch.name, "Branch: maven (lts)") << "nested parens stay inside the payload";
     EXPECT_EQ(branch.discriminant, "(lts)") << "the raw declared coordinate is kept verbatim";
@@ -67,7 +75,7 @@ TEST(JenkinsMarkers, DeclarativeSyntheticStageRecognized)
     // the recognizer (studies/006: the over-granularity vs the flat wfapi oracle,
     // richer-not-wrong).
     const auto synthetic{
-        recognize("[Pipeline] { (Declarative: Checkout SCM)", composed)};
+        recognize(norm_probe("[Pipeline] { (Declarative: Checkout SCM)"), composed)};
     EXPECT_EQ(synthetic.kind, IntentMarkerKind::Job);
     EXPECT_EQ(synthetic.name, "Declarative: Checkout SCM");
 }
@@ -80,7 +88,7 @@ TEST(JenkinsMarkers, VerbAnnotationIsAStep)
     {
         // The line outlives the returned marker (its name is a view into the content).
         const std::string line{std::string{"[Pipeline] "} + std::string{verb}};
-        const auto step{recognize(line, composed)};
+        const auto step{recognize(norm_probe(line), composed)};
         EXPECT_EQ(step.kind, IntentMarkerKind::Step) << "verb: " << verb;
         EXPECT_EQ(step.name, verb);
         EXPECT_EQ(step.child_order, ChildOrder::Ordered)
@@ -96,7 +104,7 @@ TEST(JenkinsMarkers, StructuralTokensAreScaffoldNotQuanta)
           "[Pipeline] parallel", "[Pipeline] End of Pipeline", "[Pipeline] // stage",
           "[Pipeline] // node", "[Pipeline] { (Build"})
     {
-        EXPECT_EQ(recognize(scaffold, composed).kind, IntentMarkerKind::None)
+        EXPECT_EQ(recognize(norm_probe(scaffold), composed).kind, IntentMarkerKind::None)
             << "scaffold line must open no quantum: " << scaffold;
     }
 }
@@ -109,15 +117,16 @@ TEST(JenkinsMarkers, StructuralTokensAreScaffoldNotQuanta)
 TEST(JenkinsMarkers, DialectGatedToTheDeclaringStream)
 {
     const ComposedSemantics undeclared{undeclared_stream()};
-    EXPECT_EQ(recognize("[Pipeline] { (Build)", undeclared).kind, IntentMarkerKind::None)
+    EXPECT_EQ(recognize(norm_probe("[Pipeline] { (Build)"), undeclared).kind,
+              IntentMarkerKind::None)
         << "a dialect-gated marker fired on a stream that declared NO dialect — fail-closed on "
            "depth is not optional";
-    EXPECT_EQ(recognize("[Pipeline] sh", undeclared).kind, IntentMarkerKind::None);
+    EXPECT_EQ(recognize(norm_probe("[Pipeline] sh"), undeclared).kind, IntentMarkerKind::None);
 
     // The control: the SAME lines DO fire once the stream declares this dialect, so the leg above
     // is a real gate rather than a line nothing would have claimed anyway.
     const ComposedSemantics declared{jenkins_only()};
-    EXPECT_EQ(recognize("[Pipeline] { (Build)", declared).kind, IntentMarkerKind::Job);
-    EXPECT_EQ(recognize("[Pipeline] sh", declared).kind, IntentMarkerKind::Step);
+    EXPECT_EQ(recognize(norm_probe("[Pipeline] { (Build)"), declared).kind, IntentMarkerKind::Job);
+    EXPECT_EQ(recognize(norm_probe("[Pipeline] sh"), declared).kind, IntentMarkerKind::Step);
 }
 // NOLINTEND

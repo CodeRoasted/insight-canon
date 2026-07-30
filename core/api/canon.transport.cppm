@@ -207,12 +207,15 @@ struct IngestDeclaration
 // §4 — the `transport_context` boundary. The tokenizer NEVER learns the stack existed.
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
-// What one line's peel yielded. `content` is the ONLY thing that may reach the tokenizer.
+// What one line's DECLARED peel yielded on the RECOGNITION path. `content` carries the ingest
+// precondition as a TYPE (insight_ingest_normalization_contract.md §12.2): this peel takes a
+// `NormalizedLine`, so holding a PeeledLine is proof that stage 1 ran and the declared stage 2
+// followed — the currency the content walkers accept.
 struct PeeledLine
 {
-    // The line with every declared transform unwound. Borrows from the caller's line buffer — the
-    // peel only ever SHORTENS, never rewrites, so no allocation and no arena are involved.
-    std::string_view content;
+    // The line with every declared transform unwound. Borrows from the NormalizedLine's storage —
+    // the peel only ever SHORTENS, never rewrites, so no allocation and no arena are involved.
+    insight::tokenization::NormalizedContent content;
     // The observation time a `LinePrefixTimestamp` extracted, if the stack declared one and the
     // line actually carried a parseable stamp. ⚠ Read `TransportExtract::EventObservationTime`
     // before using it: enrichment only, never an ordering key, never a replay input.
@@ -223,6 +226,24 @@ struct PeeledLine
     // "timestamp-only line is a blank line: decline it" behavior survives the move to a declared
     // peel; ADR 0044 §8 lists that decline as one of the bundled behaviors content-neutrality
     // depends on, so it is expressed here rather than lost.
+    [[nodiscard]] constexpr bool is_blank() const noexcept
+    {
+        return content.bytes().empty();
+    }
+};
+
+// What one line's peel yielded on the TOKENIZER-FEEDING path (`peel_raw`). `content` is a plain
+// view of the caller's RAW bytes with the declared transforms unwound — deliberately NOT a
+// `NormalizedContent`, because no stage 1 has run and this struct must not pretend one has. It
+// cannot reach a content walker (the type forbids it); what it CAN do is feed
+// `Tokenizer::process_line`, which performs stage 1 itself and reads the raw bytes beside it
+// (D-PROV-1: the GHA command-echo SGR wrapper survives ONLY there — pre-normalizing this path is
+// the §5.4 trap and would silently kill the echoed-source demotion).
+struct RawPeeledLine
+{
+    std::string_view content;
+    std::optional<insight::Timestamp> observation_time;
+
     [[nodiscard]] constexpr bool is_blank() const noexcept
     {
         return content.empty();
@@ -266,7 +287,20 @@ class TransportStack
     // on a payload-stamped stream would also strip applicative log4j prefixes (0031's argument,
     // attested at 16 250 measured lines). Declaration moves RESPONSIBILITY to the party that owns
     // the knowledge; it does not make a wrong declaration harmless.
-    [[nodiscard]] PeeledLine peel(std::string_view line) const noexcept;
+    //
+    // TWO DOORS, TWO PATHS, TWO RETURN TYPES — and the split is the §5.4 refusal made structural
+    // (insight_ingest_normalization_contract.md):
+    //   * `peel(const NormalizedLine&)` — the RECOGNITION path's DECLARED stage 2. Stage 1 first
+    //     (the type carries the proof), then the catalogue rows; the result is the walkers'
+    //     currency. The order is load-bearing: an escape sitting BEFORE the transport prefix is
+    //     invisible to this peel unless the strip ran first.
+    //   * `peel_raw(std::string_view)` — the TOKENIZER-FEEDING path. `process_line` performs
+    //     stage 1 itself and MUST see the raw (ANSI-bearing) bytes beside it (D-PROV-1's
+    //     echoed-source register survives nowhere else), so this path must NOT pre-normalize.
+    //     Its result carries no stage-1 claim and cannot reach a walker — the types close what
+    //     the old single string_view door left to convention.
+    [[nodiscard]] PeeledLine peel(const insight::tokenization::NormalizedLine& line) const noexcept;
+    [[nodiscard]] RawPeeledLine peel_raw(std::string_view line) const noexcept;
 
     [[nodiscard]] bool empty() const noexcept
     {

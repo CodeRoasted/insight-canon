@@ -9,7 +9,9 @@ How a raw line becomes structured fields. Three steps, in order: **normalize** (
 ## 1. Ingest normalization — escape stripping (before everything)
 
 The **first** thing canon does to a line, *before* format detection and *before* tokenization, is strip
-terminal escape sequences (`LogParser::parse_line` → `strip_escape_sequences`):
+terminal escape sequences (`LogParser::parse_line` → `normalize`, the stage-1 factory returning a
+`NormalizedLine` — the type that carries the proof stage 1 ran, and the only road to the
+`NormalizedContent` the recognition walkers accept):
 
 - **What is stripped:** CSI / SGR colour sequences (`ESC [ … m`), OSC sequences (`ESC ] … BEL`/`ST`), and bare
   two-byte `ESC` sequences. A pure byte state machine.

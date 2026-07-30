@@ -17,6 +17,14 @@ using insight::to_string;
 using insight::semantic::ComposedSemantics;
 using insight::tokenization::ArenaAllocator;
 using insight::tokenization::classify;
+
+// The walkers take NormalizedContent (adr/0073's precondition as a type); every probe here is an
+// escape-free literal, so normalize() is the zero-copy fixed point over a shared scratch.
+[[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
+{
+    static std::string scratch;
+    return insight::tokenization::normalize(probe, scratch).undeclared_suffix(0);
+}
 using insight::tokenization::MaskConfig;
 using insight::tokenization::Tokenizer;
 
@@ -43,16 +51,13 @@ namespace
 TEST(GithubRoles, RecognizesAnnouncedMarkers)
 {
     const ComposedSemantics gh{github_only()};
-    EXPECT_EQ(classify("##[group]Run cmake --build .", gh),
-              StructuralRole::GroupBegin);
-    EXPECT_EQ(classify("::group::Build", gh), StructuralRole::GroupBegin);
-    EXPECT_EQ(classify("##[endgroup]", gh), StructuralRole::GroupEnd);
-    EXPECT_EQ(classify("::endgroup::", gh), StructuralRole::GroupEnd);
-    EXPECT_EQ(
-        classify("##[error]Process completed with exit code 2.", gh),
-        StructuralRole::Terminator);
-    EXPECT_EQ(classify("::error::file=x.cpp::boom", gh),
+    EXPECT_EQ(classify(norm_probe("##[group]Run cmake --build ."), gh), StructuralRole::GroupBegin);
+    EXPECT_EQ(classify(norm_probe("::group::Build"), gh), StructuralRole::GroupBegin);
+    EXPECT_EQ(classify(norm_probe("##[endgroup]"), gh), StructuralRole::GroupEnd);
+    EXPECT_EQ(classify(norm_probe("::endgroup::"), gh), StructuralRole::GroupEnd);
+    EXPECT_EQ(classify(norm_probe("##[error]Process completed with exit code 2."), gh),
               StructuralRole::Terminator);
+    EXPECT_EQ(classify(norm_probe("::error::file=x.cpp::boom"), gh), StructuralRole::Terminator);
 }
 
 // ── kAnyDialect: the role rows fire whatever the caller declared (the pre-split ungated behavior)
@@ -67,9 +72,9 @@ TEST(GithubRoles, FireWhateverTheStreamDeclared)
          {std::pair{std::cref(declared), std::string_view{"the declared github stream"}},
           std::pair{std::cref(undeclared), std::string_view{"an UNDECLARED stream"}}})
     {
-        EXPECT_EQ(classify("##[group]x", view.get()), StructuralRole::GroupBegin)
+        EXPECT_EQ(classify(norm_probe("##[group]x"), view.get()), StructuralRole::GroupBegin)
             << "kAnyDialect role failed to fire under " << label;
-        EXPECT_EQ(classify("##[error]boom", view.get()), StructuralRole::Terminator)
+        EXPECT_EQ(classify(norm_probe("##[error]boom"), view.get()), StructuralRole::Terminator)
             << "kAnyDialect role failed to fire under " << label;
     }
 }
@@ -80,15 +85,13 @@ TEST(GithubRoles, FireWhateverTheStreamDeclared)
 TEST(GithubRoles, NoFalseRoleOnPlainContent)
 {
     const ComposedSemantics gh{github_only()};
-    EXPECT_EQ(classify("compiling tokenizer.cpp", gh),
-              StructuralRole::None);
-    EXPECT_EQ(classify("error: undefined reference to foo", gh),
-              StructuralRole::None);
+    EXPECT_EQ(classify(norm_probe("compiling tokenizer.cpp"), gh), StructuralRole::None);
+    EXPECT_EQ(classify(norm_probe("error: undefined reference to foo"), gh), StructuralRole::None);
 }
 
 // ── End-to-end, over the DECLARED path (ADR 0044 §4/§6, T4): the caller resolves a stream, peels
-// the transport, and hands only `PeeledLine::content` to the Tokenizer, which then tags the role on
-// CanonicalEvent.
+// the transport, and hands only `RawPeeledLine::content` to the Tokenizer, which then tags the role
+// on CanonicalEvent.
 //
 // ⚠ THE PEEL IS THE CALLER'S, and these tests are the smallest place that says so. Before T4 the
 // same lines worked because `GitHubActionsStrategy` DETECTED the stamp and stripped it inside
@@ -117,7 +120,7 @@ TEST(GithubRoles, DeclaredPeelThenTokenizerTagsTerminatorOnGhaError)
     ArenaAllocator arena{64U * 1024U};
     Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
 
-    const insight::transport::PeeledLine peeled{stream.transport.peel(
+    const insight::transport::RawPeeledLine peeled{stream.transport.peel_raw(
         "2026-05-27T15:42:03.4000004Z ##[error]Process completed with exit code 2.")};
     ASSERT_FALSE(peeled.is_blank());
     EXPECT_EQ(peeled.content, "##[error]Process completed with exit code 2.")
@@ -140,7 +143,7 @@ TEST(GithubRoles, DeclaredPeelThenTokenizerTagsGroupBoundary)
     ArenaAllocator arena{64U * 1024U};
     Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
     const auto event{tokenizer.process_line(
-        stream.transport.peel("2026-05-27T15:42:03.4000004Z ##[group]Run cmake --build .")
+        stream.transport.peel_raw("2026-05-27T15:42:03.4000004Z ##[group]Run cmake --build .")
             .content)};
     ASSERT_TRUE(event.has_value()) << event.error();
     EXPECT_EQ(event->structural_role, StructuralRole::GroupBegin);
@@ -154,7 +157,7 @@ TEST(GithubRoles, DeclaredPeelThenTokenizerPlainGhaLineHasNoRole)
     ArenaAllocator arena{64U * 1024U};
     Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
     const auto event{tokenizer.process_line(
-        stream.transport.peel("2026-05-27T15:42:03.4000004Z compiling tokenizer.cpp object")
+        stream.transport.peel_raw("2026-05-27T15:42:03.4000004Z compiling tokenizer.cpp object")
             .content)};
     ASSERT_TRUE(event.has_value()) << event.error();
     EXPECT_EQ(event->structural_role, StructuralRole::None);
@@ -173,7 +176,7 @@ TEST(GithubRoles, TokenizerSeesTheStampWithoutADeclaration)
     Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
     const auto event{tokenizer.process_line(
         stream.transport
-            .peel("2026-05-27T15:42:03.4000004Z ##[error]Process completed with exit code 2.")
+            .peel_raw("2026-05-27T15:42:03.4000004Z ##[error]Process completed with exit code 2.")
             .content)};
     ASSERT_TRUE(event.has_value()) << event.error();
     EXPECT_EQ(event->structural_role, StructuralRole::None)

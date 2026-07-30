@@ -42,6 +42,14 @@ using insight::tokenization::ChildOrder;
 using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::recognize;
 
+// The walkers take NormalizedContent (adr/0073's precondition as a type); every probe here is an
+// escape-free literal, so normalize() is the zero-copy fixed point over a shared scratch.
+[[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
+{
+    static std::string scratch;
+    return insight::tokenization::normalize(probe, scratch).undeclared_suffix(0);
+}
+
 namespace
 {
 // ── A synthetic outcome-bearing dialect, gated on its OWN package name (ADR 0065 clause 1 — the
@@ -197,17 +205,16 @@ TEST(RunOutcomeGrammar2, ParenExtractorIsStrict)
 {
     const ComposedSemantics composed{composed_outcome()};
     // The named-container form: payload is the paren content, verbatim.
-    const auto stage{recognize("[Mark] { (Build)", composed)};
+    const auto stage{recognize(norm_probe("[Mark] { (Build)"), composed)};
     EXPECT_EQ(stage.kind, IntentMarkerKind::Job);
     EXPECT_EQ(stage.name, "Build");
     // Nested parens stay inside the payload; only the single final ')' delimits.
-    const auto nested{recognize("[Mark] { (Branch: test (lts))", composed)};
+    const auto nested{recognize(norm_probe("[Mark] { (Branch: test (lts))"), composed)};
     EXPECT_EQ(nested.kind, IntentMarkerKind::Job);
     EXPECT_EQ(nested.name, "Branch: test (lts)");
     // No line-final ')' → the paren row does NOT match; the line falls through to the shorter
     // remainder row, whose payload "{ (Build" is excluded by "{" → no marker at all.
-    EXPECT_EQ(recognize("[Mark] { (Build", composed).kind,
-              IntentMarkerKind::None)
+    EXPECT_EQ(recognize(norm_probe("[Mark] { (Build"), composed).kind, IntentMarkerKind::None)
         << "an unterminated paren form must not claim a quantum";
 }
 
@@ -215,20 +222,18 @@ TEST(RunOutcomeGrammar2, PayloadExcludesAreWordBounded)
 {
     const ComposedSemantics composed{composed_outcome()};
     // An un-named wrapper open/close is scaffold, not a step.
-    EXPECT_EQ(recognize("[Mark] {", composed).kind, IntentMarkerKind::None);
-    EXPECT_EQ(recognize("[Mark] }", composed).kind, IntentMarkerKind::None);
+    EXPECT_EQ(recognize(norm_probe("[Mark] {"), composed).kind, IntentMarkerKind::None);
+    EXPECT_EQ(recognize(norm_probe("[Mark] }"), composed).kind, IntentMarkerKind::None);
     // A multi-word exclusion entry matches the whole payload.
-    EXPECT_EQ(recognize("[Mark] End of Run", composed).kind,
-              IntentMarkerKind::None);
+    EXPECT_EQ(recognize(norm_probe("[Mark] End of Run"), composed).kind, IntentMarkerKind::None);
     // First-token semantics: an excluded token followed by trailing content still excludes…
-    EXPECT_EQ(recognize("[Mark] { retries", composed).kind,
-              IntentMarkerKind::None);
+    EXPECT_EQ(recognize(norm_probe("[Mark] { retries"), composed).kind, IntentMarkerKind::None);
     // …but the boundary is a WORD boundary: a verb merely PREFIXED by an entry is a real step.
-    const auto step{recognize("[Mark] {}able", composed)};
+    const auto step{recognize(norm_probe("[Mark] {}able"), composed)};
     EXPECT_EQ(step.kind, IntentMarkerKind::Step)
         << "exclusion must not over-reach past the boundary";
     // The ordinary verb form is a step with the verbatim remainder payload.
-    const auto verb{recognize("[Mark] compile", composed)};
+    const auto verb{recognize(norm_probe("[Mark] compile"), composed)};
     EXPECT_EQ(verb.kind, IntentMarkerKind::Step);
     EXPECT_EQ(verb.name, "compile");
 }
@@ -267,15 +272,16 @@ TEST(RunOutcomeScanTest, DegenerateCompositionScansNothing)
 TEST(RunOutcomeGrammar5, NumericFieldIsSkippedAndThePayloadIsTheRemainder)
 {
     const ComposedSemantics composed{composed_numeric()};
-    const auto step{recognize("mark:1784657178:prepare_executor", composed)};
+    const auto step{recognize(norm_probe("mark:1784657178:prepare_executor"), composed)};
     EXPECT_EQ(step.kind, IntentMarkerKind::Step);
     EXPECT_EQ(step.name, "prepare_executor")
         << "the numeric field must be SKIPPED, not folded into the payload — a per-run epoch inside "
            "the name is the identity storm this extractor exists to prevent";
     // Field WIDTH is unconstrained: a width window would mirror the instrument that measured the
     // corpus, and it is anchoring — not the stamp — that excludes the echoed phantoms.
-    EXPECT_EQ(recognize("mark:7:short_field", composed).name, "short_field");
-    EXPECT_EQ(recognize("mark:123456789012345678:wide_field", composed).name, "wide_field");
+    EXPECT_EQ(recognize(norm_probe("mark:7:short_field"), composed).name, "short_field");
+    EXPECT_EQ(recognize(norm_probe("mark:123456789012345678:wide_field"), composed).name,
+              "wide_field");
 }
 
 TEST(RunOutcomeGrammar5, NumericFieldShapeFailuresDeclineTheRow)
@@ -284,16 +290,18 @@ TEST(RunOutcomeGrammar5, NumericFieldShapeFailuresDeclineTheRow)
     // The wireshark class: an unexpanded `%s` / `$(date +%s)` where the stamp belongs. DECLINED —
     // structure present, stamp absent — never mis-parsed into a section named after a shell
     // expression.
-    EXPECT_EQ(recognize("mark:%s:prepare_executor", composed).kind, IntentMarkerKind::None);
-    EXPECT_EQ(recognize("mark:$(date +%s):prepare_executor", composed).kind,
+    EXPECT_EQ(recognize(norm_probe("mark:%s:prepare_executor"), composed).kind,
+              IntentMarkerKind::None);
+    EXPECT_EQ(recognize(norm_probe("mark:$(date +%s):prepare_executor"), composed).kind,
               IntentMarkerKind::None);
     // No separator after the digits.
-    EXPECT_EQ(recognize("mark:1784657178", composed).kind, IntentMarkerKind::None);
+    EXPECT_EQ(recognize(norm_probe("mark:1784657178"), composed).kind, IntentMarkerKind::None);
     // No digits at all.
-    EXPECT_EQ(recognize("mark::prepare_executor", composed).kind, IntentMarkerKind::None);
+    EXPECT_EQ(recognize(norm_probe("mark::prepare_executor"), composed).kind,
+              IntentMarkerKind::None);
     // An empty payload is not a quantum.
-    EXPECT_EQ(recognize("mark:1784657178:", composed).kind, IntentMarkerKind::None);
-    EXPECT_EQ(recognize("mark:1784657178:\r", composed).kind, IntentMarkerKind::None);
+    EXPECT_EQ(recognize(norm_probe("mark:1784657178:"), composed).kind, IntentMarkerKind::None);
+    EXPECT_EQ(recognize(norm_probe("mark:1784657178:\r"), composed).kind, IntentMarkerKind::None);
 }
 
 TEST(RunOutcomeGrammar5, TheCarriageReturnTerminatorAndOptionGroupAreDropped)
@@ -302,25 +310,32 @@ TEST(RunOutcomeGrammar5, TheCarriageReturnTerminatorAndOptionGroupAreDropped)
     // The CR is the producer's marker TERMINATOR (`\r` + an erase-line escape canon's D-TID-11
     // ingest strip already removed). Left in, it would ride into every payload and into the
     // alignment key.
-    EXPECT_EQ(recognize("mark:1784657178:prepare_executor\r", composed).name, "prepare_executor");
+    EXPECT_EQ(recognize(norm_probe("mark:1784657178:prepare_executor\r"), composed).name,
+              "prepare_executor");
     // TERMINATOR, not a trailing byte to trim: the producer may continue the SAME line with a
     // human-readable header after the CR. Trimming instead of terminating names the section
     // `build_tools_section\rTools build` — an alignment key carrying arbitrary prose.
-    EXPECT_EQ(recognize("mark:1784657178:build_tools_section\rTools build", composed).name,
-              "build_tools_section");
-    EXPECT_EQ(recognize("mark:1784657178:log_disk_usage[collapsed=true]\rDisk usage detail",
-                        composed)
-                  .name,
-              "log_disk_usage")
+    EXPECT_EQ(
+        recognize(norm_probe("mark:1784657178:build_tools_section\rTools build"), composed).name,
+        "build_tools_section");
+    EXPECT_EQ(
+        recognize(norm_probe("mark:1784657178:log_disk_usage[collapsed=true]\rDisk usage detail"),
+                  composed)
+            .name,
+        "log_disk_usage")
         << "the option group is dropped AFTER the CR terminates the payload, not before";
     // The option group is producer presentation: without the drop, toggling it RENAMES the section.
-    EXPECT_EQ(recognize("mark:1784657178:build[collapsed=true]\r", composed).name, "build");
-    EXPECT_EQ(recognize("mark:1784657178:build[hide_duration=true,collapsed=true]", composed).name,
+    EXPECT_EQ(recognize(norm_probe("mark:1784657178:build[collapsed=true]\r"), composed).name,
               "build");
+    EXPECT_EQ(
+        recognize(norm_probe("mark:1784657178:build[hide_duration=true,collapsed=true]"), composed)
+            .name,
+        "build");
     // A ']' that closes nothing is content, not a group.
-    EXPECT_EQ(recognize("mark:1784657178:weird]", composed).name, "weird]");
+    EXPECT_EQ(recognize(norm_probe("mark:1784657178:weird]"), composed).name, "weird]");
     // A group that would consume the WHOLE payload leaves nothing to name → declined.
-    EXPECT_EQ(recognize("mark:1784657178:[collapsed=true]", composed).kind, IntentMarkerKind::None);
+    EXPECT_EQ(recognize(norm_probe("mark:1784657178:[collapsed=true]"), composed).kind,
+              IntentMarkerKind::None);
 }
 
 TEST(RunOutcomeGrammar5, TheEmitDualRoundTripsThroughTheExtractor)
@@ -330,7 +345,7 @@ TEST(RunOutcomeGrammar5, TheEmitDualRoundTripsThroughTheExtractor)
     EXPECT_EQ(line, "mark:0:prepare_executor")
         << "the numeric field is a single PLACEHOLDER digit — a generated marker carries no "
            "wall-clock, and a plausible-looking epoch would hide that";
-    const auto back{recognize(line, composed)};
+    const auto back{recognize(norm_probe(line), composed)};
     EXPECT_EQ(back.kind, kNumericEmits[0].kind);
     EXPECT_EQ(back.child_order, kNumericEmits[0].child_order);
     EXPECT_EQ(back.name, "prepare_executor") << "G2: recognize(render_row(row, p)) must recover p";
@@ -433,7 +448,7 @@ TEST(RunOutcomeGrammar5, TheCarriageReturnAnchorDoesNotFoldTheByteItAnchorsAfter
     // line the recognizer sharing these bytes would see a different string.
     constexpr std::string_view kSectionThenWarning{
         "mark:1784657178:after_script\rWARNING: after_script failed, but job will continue"};
-    EXPECT_EQ(recognize(kSectionThenWarning, composed).name, "after_script")
+    EXPECT_EQ(recognize(norm_probe(kSectionThenWarning), composed).name, "after_script")
         << "the \\r-anchored scan altered bytes the marker extractor depends on";
 
     // And that same line carries no verdict: `WARNING: …` is not one of the declared prefixes.

@@ -32,8 +32,8 @@ LogParser::LogParser(ArenaAllocator& arena, const insight::semantic::ComposedSem
 {
 }
 
-// D-PROV-1 echoed-source register: the GHA command-echo SGR wrapper is destroyed by
-// strip_escape_sequences before any strategy sees the line, so the composed provenance hooks
+// D-PROV-1 echoed-source register: the GHA command-echo SGR wrapper is destroyed by the
+// stage-1 normalize() before any strategy sees the line, so the composed provenance hooks
 // classify the RAW (ANSI-bearing) line — the only place it survives. Strategy-INDEPENDENT (a
 // wrapped line is echoed source whatever it routed to), reproducing the pre-split
 // is_echoed_source_line exactly. In 1.7.5 the single hook is the GitHub-Actions one from
@@ -142,29 +142,18 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
     // presentation, never content; the escapes interleave within/between tokens so a per-token
     // mask cannot reach them). Pure byte state machine → cross-stdlib bit-identical.
     //
-    // Fast path: the strip is a no-op for any line carrying no ESC byte — strip_escape_sequences
-    // copies such a line through verbatim, so its output is byte-identical to the input (a fixed
-    // point). The vast majority of real log lines have no ANSI, so gate the strip (and the
-    // escape_scratch_ copy) behind a memchr-backed ESC pre-scan (string_view::find is the SIMD
-    // any-ESC scan); a clean line then flows straight to the single arena copy below — no strip,
-    // no scratch copy. Identity-preserving by construction, so the canonical digest is unchanged.
-    std::string_view line;
-    if (raw_line.find(static_cast<char>(kEsc)) != std::string_view::npos)
+    // This is THE one named site where the parser performs stage 1 unconditionally — the
+    // invariant that entitles `attest()` to exist. The ESC-gated fast path (no ESC byte → the
+    // normalized line borrows `raw_line`, no scratch copy) now lives INSIDE `normalize()`, so the
+    // gate this call site used to spell is the factory's own.
+    const NormalizedLine normalized{normalize(raw_line, escape_scratch_)};
+    if (normalized.bytes().empty()) // the (non-empty) line was all escape bytes
     {
-        strip_escape_sequences(raw_line, escape_scratch_);
-        if (escape_scratch_.empty()) // the line was all escape bytes
-        {
-            ++failed_count_;
-            INSIGHT_LOG_TRACE(logging::parser_logger(),
-                              "parse: line was all escape bytes, skipped");
-            return std::unexpected(std::string("LogParser: empty line"));
-        }
-        line = escape_scratch_;
+        ++failed_count_;
+        INSIGHT_LOG_TRACE(logging::parser_logger(), "parse: line was all escape bytes, skipped");
+        return std::unexpected(std::string("LogParser: empty line"));
     }
-    else
-    {
-        line = raw_line; // no ANSI → zero-copy; the stripped content equals the input
-    }
+    const std::string_view line{normalized.bytes()};
 
     IFormatStrategy* strategy = active_strategy_;
 
@@ -195,7 +184,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
             strategy->format(); // the routed winner for this event (per-line observability)
         apply_level_lift(*result, composed_);
         // D-PROV-1 (echoed-source register): the GHA command-echo SGR wrapper was destroyed
-        // by strip_escape_sequences above, so detect it on the RAW (ANSI-bearing) line — the
+        // by the stage-1 normalize() above, so detect it on the RAW (ANSI-bearing) line — the
         // only place it survives. An echoed-source line is run-step SCRIPT text, not an
         // observed runtime event: demote its level to Unknown so a failure WORD in echoed
         // shell source ("echo \"Download failed …\"") confers NO alerting level. Single root —

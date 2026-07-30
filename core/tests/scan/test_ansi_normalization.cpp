@@ -1,8 +1,10 @@
 // NOLINTBEGIN : Unit tests may intentionally violate some style rules for clarity or simplicity.
 // tests/scan/test_ansi_normalization.cpp
 //
-// Unit coverage for STAGE 1 — `strip_escape_sequences`, canon's universal ANSI ingest normalization
-// (stateless_template_id.md D-TID-11).
+// Unit coverage for STAGE 1 — `normalize()`, canon's universal ANSI ingest normalization
+// (stateless_template_id.md D-TID-11), now the FACTORY that mints `NormalizedLine`
+// (insight_ingest_normalization_contract.md §12: the out-parameter strip form is REMOVED; the
+// return type carries the proof that stage 1 ran).
 //
 // WHY THIS FILE EXISTS AT ALL. Stage 1's only coverage used to be three assertions inside
 // `tests/mask/test_stateless_template.cpp`, filed under `mask/` because the template-identity path
@@ -29,26 +31,29 @@ using namespace insight::tokenization;
 // fold to the same colour-free bytes, so they cannot mint two templates.
 TEST(AnsiNormalization, EscapesInterleavedWithTokensAreRemoved)
 {
-    std::string clean;
-    strip_escape_sequences("\x1b[31mERROR\x1b[0m: pool down", clean);
-    EXPECT_EQ(clean, "ERROR: pool down");
+    std::string scratch;
+    EXPECT_EQ(normalize("\x1b[31mERROR\x1b[0m: pool down", scratch).bytes(), "ERROR: pool down");
     // An escape INSIDE a word is the reason a per-token mask cannot reach these and they must die
     // at ingest: `for_each_token` treats an escape run as a DELIMITER, so un-normalized this is two
     // tokens and the level word is never seen.
-    strip_escape_sequences("\x1b[31mER\x1b[0mROR: pool down", clean);
-    EXPECT_EQ(clean, "ERROR: pool down");
+    EXPECT_EQ(normalize("\x1b[31mER\x1b[0mROR: pool down", scratch).bytes(), "ERROR: pool down");
 }
 
-// The fast path LogParser rides (`log_parser.cpp` gates the strip behind an ESC pre-scan) is only
-// sound because a line with no escape byte is a FIXED POINT of the strip. If it were not, the gated
-// and ungated paths would produce different bytes for the same line.
-TEST(AnsiNormalization, AnEscapeFreeLineIsAFixedPoint)
+// The fast path now lives INSIDE the factory: a line with no escape byte is a FIXED POINT of the
+// strip, so `normalize()` borrows the caller's line with NO copy and the scratch is untouched.
+// Both halves are asserted — the bytes AND the zero-copy borrow (data pointer identity), because
+// the borrow is what makes the per-line cost of the typed seam a memchr rather than a memcpy.
+TEST(AnsiNormalization, AnEscapeFreeLineIsAZeroCopyFixedPoint)
 {
-    std::string clean;
-    strip_escape_sequences("plain text, no escapes", clean);
-    EXPECT_EQ(clean, "plain text, no escapes");
-    strip_escape_sequences("", clean);
-    EXPECT_EQ(clean, "");
+    std::string scratch{"sentinel"};
+    constexpr std::string_view plain{"plain text, no escapes"};
+    const auto normalized{normalize(plain, scratch)};
+    EXPECT_EQ(normalized.bytes(), plain);
+    EXPECT_EQ(static_cast<const void*>(normalized.bytes().data()),
+              static_cast<const void*>(plain.data()))
+        << "an escape-free line must be BORROWED, not copied";
+    EXPECT_EQ(scratch, "sentinel") << "the fast path must not touch the scratch";
+    EXPECT_EQ(normalize("", scratch).bytes(), "");
 }
 
 // A leading CSI run displaces an anchored prefix off offset 0, and `recognize()`/`classify()` are
@@ -60,14 +65,14 @@ TEST(AnsiNormalization, AnEscapeFreeLineIsAFixedPoint)
 // mirror of one producer with an expiry date nobody would notice.
 TEST(AnsiNormalization, ALeadingCsiRunIsRemovedSoAnAnchoredPrefixReachesOffsetZero)
 {
-    std::string clean;
-    strip_escape_sequences("\x1b[0Ksection_start:1746093602:prepare_executor", clean);
-    EXPECT_EQ(clean, "section_start:1746093602:prepare_executor");
-    strip_escape_sequences("\x1b[0;msection_start:1746093602:prepare_executor", clean);
-    EXPECT_EQ(clean, "section_start:1746093602:prepare_executor");
+    std::string scratch;
+    EXPECT_EQ(normalize("\x1b[0Ksection_start:1746093602:prepare_executor", scratch).bytes(),
+              "section_start:1746093602:prepare_executor");
+    EXPECT_EQ(normalize("\x1b[0;msection_start:1746093602:prepare_executor", scratch).bytes(),
+              "section_start:1746093602:prepare_executor");
     // Several escapes in one run — the same rule, no special case for "exactly one".
-    strip_escape_sequences("\x1b[0K\x1b[36;1msection_start:1:x", clean);
-    EXPECT_EQ(clean, "section_start:1:x");
+    EXPECT_EQ(normalize("\x1b[0K\x1b[36;1msection_start:1:x", scratch).bytes(),
+              "section_start:1:x");
 }
 
 // THE PRECISION LEG, and it can genuinely fail. A shell xtrace echoes the SOURCE of a command, so
@@ -78,9 +83,10 @@ TEST(AnsiNormalization, ALeadingCsiRunIsRemovedSoAnAnchoredPrefixReachesOffsetZe
 // semantic/gitlab/tests/test_gitlab_markers.cpp.)
 TEST(AnsiNormalization, LiteralEscapeNotationSurvivesAsProse)
 {
-    std::string clean;
-    strip_escape_sequences(R"(++ echo -e '\e[0Ksection_start:1746093602:prepare_executor')", clean);
-    EXPECT_EQ(clean, R"(++ echo -e '\e[0Ksection_start:1746093602:prepare_executor')");
+    std::string scratch;
+    EXPECT_EQ(normalize(R"(++ echo -e '\e[0Ksection_start:1746093602:prepare_executor')", scratch)
+                  .bytes(),
+              R"(++ echo -e '\e[0Ksection_start:1746093602:prepare_executor')");
 }
 
 // OSC is the arm the SIBLING grammar in this codebase does not have: `detail::ansi_escape_len`
@@ -89,15 +95,13 @@ TEST(AnsiNormalization, LiteralEscapeNotationSurvivesAsProse)
 // live — which is exactly why the arm that DOES handle it needs a test that keeps it honest.
 TEST(AnsiNormalization, OscSequencesAreDroppedWholeAtEitherTerminator)
 {
-    std::string clean;
+    std::string scratch;
     // BEL-terminated. (`\a` = BEL 0x07; a `\x07b` hex-escape would greedily absorb the trailing
     // 'b'.)
-    strip_escape_sequences("a\x1b]0;title\ab", clean);
-    EXPECT_EQ(clean, "ab");
+    EXPECT_EQ(normalize("a\x1b]0;title\ab", scratch).bytes(), "ab");
     // ST-terminated (ESC \) — the other ECMA-48 terminator, and the one a BEL-only scanner would
     // run past, swallowing the rest of the line as an OSC body.
-    strip_escape_sequences("a\x1b]0;title\x1b\\b", clean);
-    EXPECT_EQ(clean, "ab");
+    EXPECT_EQ(normalize("a\x1b]0;title\x1b\\b", scratch).bytes(), "ab");
 }
 
 // A two-byte ESC sequence that is neither CSI nor OSC (charset select, reset, …) is consumed whole.
@@ -105,16 +109,17 @@ TEST(AnsiNormalization, OscSequencesAreDroppedWholeAtEitherTerminator)
 // ('B' from `ESC ( B` becoming a token), consuming three eats a byte of real content.
 TEST(AnsiNormalization, ATwoByteEscapeSequenceIsConsumedWhole)
 {
-    std::string clean;
-    strip_escape_sequences("a\x1b(Bb", clean);
-    EXPECT_EQ(clean, "aBb"); // ESC ( is the two-byte sequence; 'B' is the charset designator, kept
-    strip_escape_sequences("a\x1b"
-                           "7b",
-                           clean);
-    EXPECT_EQ(clean, "ab"); // ESC 7 (save cursor) — nothing follows the designator
+    std::string scratch;
+    // ESC ( is the two-byte sequence; 'B' is the charset designator, kept.
+    EXPECT_EQ(normalize("a\x1b(Bb", scratch).bytes(), "aBb");
+    // ESC 7 (save cursor) — nothing follows the designator.
+    EXPECT_EQ(normalize("a\x1b"
+                        "7b",
+                        scratch)
+                  .bytes(),
+              "ab");
     // A lone trailing ESC has no sequence to complete and is dropped rather than emitted.
-    strip_escape_sequences("tail\x1b", clean);
-    EXPECT_EQ(clean, "tail");
+    EXPECT_EQ(normalize("tail\x1b", scratch).bytes(), "tail");
 }
 
 // `LogParser::parse_line` branches on an EMPTY strip result — a line that was nothing but escape
@@ -123,25 +128,25 @@ TEST(AnsiNormalization, ATwoByteEscapeSequenceIsConsumedWhole)
 // cosmetic.
 TEST(AnsiNormalization, ALineOfNothingButEscapeBytesStripsToEmpty)
 {
-    std::string clean;
-    strip_escape_sequences("\x1b[0K\x1b[39m\x1b[0m", clean);
-    EXPECT_TRUE(clean.empty()) << "expected empty, got: " << clean;
+    std::string scratch;
+    const auto normalized{normalize("\x1b[0K\x1b[39m\x1b[0m", scratch)};
+    EXPECT_TRUE(normalized.bytes().empty())
+        << "expected empty, got: " << std::string{normalized.bytes()};
 }
 
-// The strip is idempotent, and the caller's buffer is REUSED across lines (LogParser holds one
+// The strip is idempotent, and the caller's scratch is REUSED across lines (LogParser holds one
 // `escape_scratch_` for the whole stream; eidos's seam holds one per line loop). A strip that
 // appended instead of clearing would leak the previous line into this one — silently, and only on
-// the second and later lines of a stream.
-TEST(AnsiNormalization, TheOutputBufferIsClearedSoReuseCannotLeakThePreviousLine)
+// the second and later ESC-bearing lines of a stream.
+TEST(AnsiNormalization, TheScratchIsClearedSoReuseCannotLeakThePreviousLine)
 {
-    std::string clean;
-    strip_escape_sequences("\x1b[31mfirst line\x1b[0m", clean);
-    EXPECT_EQ(clean, "first line");
-    strip_escape_sequences("second", clean);
-    EXPECT_EQ(clean, "second");
-    // Idempotence: stripping already-stripped bytes changes nothing.
+    std::string scratch;
+    EXPECT_EQ(normalize("\x1b[31mfirst line\x1b[0m", scratch).bytes(), "first line");
+    EXPECT_EQ(normalize("\x1b[32msecond\x1b[0m", scratch).bytes(), "second");
+    // Idempotence: normalizing already-normalized bytes changes nothing (and, being escape-free,
+    // takes the zero-copy fast path).
     std::string again;
-    strip_escape_sequences(clean, again);
-    EXPECT_EQ(again, clean);
+    const auto once{normalize("\x1b[31mfirst line\x1b[0m", scratch)};
+    EXPECT_EQ(normalize(once.bytes(), again).bytes(), once.bytes());
 }
 // NOLINTEND

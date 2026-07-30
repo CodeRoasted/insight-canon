@@ -195,6 +195,19 @@ namespace
         return std::string{prefix} + ' ' + std::string{kProbePayload};
     }
 
+    // The kit's ONE door to the walkers' NormalizedContent. The probes this kit synthesizes
+    // (render_row / probe_for / marker_probe_for) are ESCAPE-FREE BY CONSTRUCTION, so stage 1 is
+    // a FIXED POINT on them: `normalize()` copies nothing (the returned content views the probe
+    // itself, so `scratch` is untouched and a caller-scoped scratch may be shared across probes),
+    // no count can move, and the kit exercises the same public ingest a production consumer does.
+    // ⚠ NEVER the LogParser mint here — that would grow its friend list to two and delete the
+    // mechanism (insight_ingest_normalization_contract.md §12.5.2, named in advance).
+    [[nodiscard]] insight::tokenization::NormalizedContent normalized_probe(std::string_view probe,
+                                                                            std::string& scratch)
+    {
+        return insight::tokenization::normalize(probe, scratch).undeclared_suffix(0);
+    }
+
     // ── Check 1: determinism — identical identity + identical recognizer output across independent
     // runs ──
     CheckResult check_determinism(const SemanticPackageManifest& manifest)
@@ -216,10 +229,13 @@ namespace
         for (const IntentMarkerRow& row : manifest.markers)
         {
             const std::string probe{marker_probe_for(row, manifest.emits)};
+            std::string scratch;
             const ComposedSemantics first_view{first.for_stream(manifest.name, row.channel_gate)};
             const ComposedSemantics second_view{second.for_stream(manifest.name, row.channel_gate)};
-            const auto lhs{insight::tokenization::recognize(probe, first_view)};
-            const auto rhs{insight::tokenization::recognize(probe, second_view)};
+            const auto lhs{
+                insight::tokenization::recognize(normalized_probe(probe, scratch), first_view)};
+            const auto rhs{
+                insight::tokenization::recognize(normalized_probe(probe, scratch), second_view)};
             if (lhs.kind != rhs.kind || lhs.name != rhs.name ||
                 lhs.discriminant != rhs.discriminant)
                 return {.name = "determinism.recognize",
@@ -262,6 +278,7 @@ namespace
         const ComposedSemantics foreign{dialect_leak_view(manifest)};
 
         // Structural roles.
+        std::string scratch;
         for (const StructuralRoleRow& row : manifest.roles)
         {
             const std::string probe{probe_for(row.prefix)};
@@ -271,7 +288,8 @@ namespace
                 for (const auto& [view, label] :
                      {std::pair{std::cref(composed), std::string_view{"the UNDECLARED view"}},
                       std::pair{std::cref(foreign), kForeignDialect}})
-                    if (insight::tokenization::classify(probe, view.get()) != row.role)
+                    if (insight::tokenization::classify(normalized_probe(probe, scratch),
+                                                        view.get()) != row.role)
                         return {.name = "dialect_gate.role_any",
                                 .passed = false,
                                 .detail = "kAnyDialect role key \"" + std::string{row.prefix} +
@@ -282,7 +300,8 @@ namespace
             else
             {
                 // Must be present under its OWN dialect and inert under a foreign one.
-                if (insight::tokenization::classify(probe, own) != row.role)
+                if (insight::tokenization::classify(normalized_probe(probe, scratch), own) !=
+                    row.role)
                     return {.name = "dialect_gate.role_own",
                             .passed = false,
                             .detail = "role key \"" + std::string{row.prefix} + "\" (gated to \"" +
@@ -290,7 +309,7 @@ namespace
                                       "\") did NOT fire on a stream declaring \"" +
                                       std::string{manifest.name} +
                                       "\" — the row is unreachable under any declaration."};
-                if (insight::tokenization::classify(probe, foreign) !=
+                if (insight::tokenization::classify(normalized_probe(probe, scratch), foreign) !=
                     insight::StructuralRole::None)
                     return {.name = "dialect_gate.role_leak",
                             .passed = false,
@@ -317,11 +336,11 @@ namespace
             const std::string probe{marker_probe_for(row, manifest.emits)};
             const ComposedSemantics medium{
                 composed.for_stream(manifest.name, row.channel_gate)};
-            if (insight::tokenization::recognize(probe, medium).kind !=
+            if (insight::tokenization::recognize(normalized_probe(probe, scratch), medium).kind !=
                 insight::tokenization::IntentMarkerKind::None)
             {
-                if (insight::tokenization::recognize(probe, foreign).kind !=
-                    insight::tokenization::IntentMarkerKind::None)
+                if (insight::tokenization::recognize(normalized_probe(probe, scratch), foreign)
+                        .kind != insight::tokenization::IntentMarkerKind::None)
                     return {.name = "dialect_gate.marker_leak",
                             .passed = false,
                             .detail = "marker key \"" + std::string{row.prefix} + "\" (gated to \"" +
@@ -379,7 +398,8 @@ namespace
                                   "depth), never fall open."};
         for (const IntentMarkerRow& row : manifest.markers)
             if (row.dialect_gate != kAnyDialect &&
-                insight::tokenization::recognize(marker_probe_for(row, manifest.emits), composed)
+                insight::tokenization::recognize(
+                    normalized_probe(marker_probe_for(row, manifest.emits), scratch), composed)
                         .kind != insight::tokenization::IntentMarkerKind::None)
                 return {.name = "dialect_gate.undeclared_leak",
                         .passed = false,
@@ -666,10 +686,11 @@ Report round_trip_report(const SemanticPackageManifest& manifest, const Composed
         // every row against ONE composition would be asking whether the stripped banner is a banner
         // in the annotated channel — which is the phantom, not the closure.
         const std::string line{render_row(*writer, kProbePayload)};
+        std::string scratch;
         const ComposedSemantics medium_view{
             composed.for_stream(writer->dialect_gate, writer->channel_gate)};
         const insight::tokenization::IntentMarker got{
-            insight::tokenization::recognize(line, medium_view)};
+            insight::tokenization::recognize(normalized_probe(line, scratch), medium_view)};
 
         if (got.kind == reader.kind && got.child_order == reader.child_order &&
             got.name == kProbePayload)

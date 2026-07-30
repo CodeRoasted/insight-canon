@@ -47,9 +47,12 @@ namespace
                line[16] == ':' && is_digit(line[17]) && is_digit(line[18]);
     }
 
-    // Apply ONE row. Returns the shortened view; sets `observation_time` when the row declares that
-    // extract AND the stamp actually parses.
-    void apply_row(const TransportTransformRow& row, PeeledLine& peeled) noexcept
+    // Apply ONE row over a plain view. Returns the shortened view; sets `observation_time` when
+    // the row declares that extract AND the stamp actually parses. The ONE algorithm both public
+    // doors share — `peel` and `peel_raw` differ only in what their parameter PROVES and their
+    // return type STATES, never in bytes (a byte divergence between the two would be the
+    // two-implementations defect this whole contract is about).
+    void apply_row(const TransportTransformRow& row, RawPeeledLine& peeled) noexcept
     {
         switch (row.kind)
         {
@@ -91,14 +94,27 @@ namespace
 
 } // namespace
 
-PeeledLine TransportStack::peel(std::string_view line) const noexcept
+RawPeeledLine TransportStack::peel_raw(std::string_view line) const noexcept
 {
-    PeeledLine peeled{.content = line, .observation_time = std::nullopt};
+    RawPeeledLine peeled{.content = line, .observation_time = std::nullopt};
     // Outside-in, in declaration order: the outermost delivery layer was applied last on the way
     // out, so it comes off first on the way in.
     for (const TransportTransformRow* row : rows_)
         apply_row(*row, peeled);
     return peeled;
+}
+
+PeeledLine TransportStack::peel(const insight::tokenization::NormalizedLine& line) const noexcept
+{
+    // One algorithm, run over the NORMALIZED bytes; the result is re-expressed as a suffix of the
+    // NormalizedLine, which is what entitles this door to hand back a NormalizedContent — the peel
+    // only ever SHORTENS from the head, so the narrowing preserves the stage-1 evidence by
+    // construction. From this seat the suffix width comes from DECLARED catalogue rows; the door's
+    // name records the OTHER producer's limitation (an inferred strip), not this caller's.
+    const RawPeeledLine raw{peel_raw(line.bytes())};
+    const std::size_t offset{static_cast<std::size_t>(raw.content.data() - line.bytes().data())};
+    return PeeledLine{.content = line.undeclared_suffix(offset),
+                      .observation_time = raw.observation_time};
 }
 
 TransportStack resolve_transport_stack(const IngestDeclaration& declaration)

@@ -62,13 +62,13 @@
 //   7 red-capability OBSERVED and recorded below
 //   8 the SUT is the shipped symbols — `make_strategy()`, `recognize()`, `scan_run_outcome`,
 //     `resolve_run_outcome`, `map_outcome_token`, with stage 1 = the public
-//     `strip_escape_sequences` (§ 4.9(b): the marker leg discharges the declared precondition and
+//     `normalize` (§ 4.9(b): the marker leg discharges the type-borne precondition and
 //     scores the package's rows on content normalized as canon normalizes it — stated in those
 //     words; the outcome leg is the shipped `scan_run_outcome` outright)
 //   9 registered as RUN in `scripts/run_corpus_gates.sh` in the same pass that writes this file
 //
 // ═══ THE INGEST ASSEMBLY THE MARKER LEG SCORES (§ 4.9(b), path A) ═══
-// Per `\n`-split line: stage 1 `strip_escape_sequences` (skip a line that was all escape bytes,
+// Per `\n`-split line: stage 1 `normalize` (skip a line that was all escape bytes,
 // the LogParser discipline) → the SHIPPED strategy's `parse` (peels the 32-byte transport prefix
 // where present; claims the bare marker/verdict shapes; declines everything else, which then
 // scores verbatim — the RawText fall-through) → the SHIPPED `recognize()` over the composed rows.
@@ -113,7 +113,7 @@
 #include <gtest/gtest.h>
 
 import std;
-import insight.canon;           // recognize / scan_run_outcome / strip_escape_sequences / compose
+import insight.canon;           // recognize / scan_run_outcome / normalize / compose
 import insight.semantic.gitlab; // kManifest + make_strategy (via export import spi: IFormatStrategy)
 
 using insight::map_outcome_token;
@@ -125,7 +125,6 @@ using insight::semantic::ComposedSemantics;
 using insight::tokenization::ArenaAllocator;
 using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::recognize;
-using insight::tokenization::strip_escape_sequences;
 
 namespace
 {
@@ -430,6 +429,7 @@ struct CorpusScore
     TraceResult result;
     std::vector<std::string> outcome_lines;
     std::string stage1_scratch;
+    std::string refixpoint_scratch; // never written: strategy content is escape-free (fixed point)
 
     for (std::size_t begin{0}; begin < bytes.size();)
     {
@@ -446,27 +446,31 @@ struct CorpusScore
         // content would double-normalize (the § 6 P2 violation, inside the gate built to catch it).
         outcome_lines.emplace_back(raw_line);
 
-        // ── marker leg: stage 1 → shipped strategy → shipped recognize() ──
-        std::string_view content_line{raw_line};
-        if (raw_line.find('\x1b') != std::string_view::npos)
+        // ── marker leg: stage 1 (the typed factory) → shipped strategy → shipped recognize() ──
+        const auto normalized{insight::tokenization::normalize(raw_line, stage1_scratch)};
+        if (normalized.bytes().empty())
+            continue; // the line was all escape bytes — the LogParser discipline
+        // A declined line scores verbatim (suffix 0 — the RawText fall-through carries no further
+        // peel); a parsed line re-expresses the strategy's content as the SUFFIX it is (the GitLab
+        // strategy only ever peels the 32-byte prefix / anchored form, never a rebuild) — the same
+        // offset arithmetic the production seam uses.
+        auto content{normalized.undeclared_suffix(0)};
+        if (const auto parsed{strategy.parse(normalized.bytes(), arena)}; parsed.has_value())
         {
-            strip_escape_sequences(raw_line, stage1_scratch);
-            if (stage1_scratch.empty())
-                continue; // the line was all escape bytes — the LogParser discipline
-            content_line = stage1_scratch;
-        }
-        std::string_view content{content_line};
-        if (const auto parsed{strategy.parse(content_line, arena)}; parsed.has_value())
-        {
-            content = parsed->content;
+            // The strategy ARENA-STORES its content (gitlab_strategy.cpp: store_string after the
+            // peel) — verbatim bytes of an input that was already normalized, so stage 1 is a
+            // FIXED POINT on them and the factory is the honest re-attestation available to a
+            // test (production's tokenizer holds the parser and uses its mint for exactly this
+            // stored-bytes shape; a test neither holds one nor may grow the friend list).
+            content = insight::tokenization::normalize(parsed->content, refixpoint_scratch)
+                          .undeclared_suffix(0);
             if (parsed->timestamp.has_value())
                 result.stamped = true; // the 32-byte transport prefix, derived IN-BAND
         }
-        // A declined line scores verbatim — the RawText fall-through carries no further peel.
         const auto marker{recognize(content, composed)};
         if (marker.kind != IntentMarkerKind::None)
             ++result.markers;
-        else if (content.starts_with("section_start:"))
+        else if (content.bytes().starts_with("section_start:"))
             ++result.section_declined; // § 4.6.4's counted cell (malformed `%s`, empty-name, …)
         arena.reset();
     }

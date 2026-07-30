@@ -34,7 +34,7 @@
 //
 // ═══ THE INGEST ASSEMBLY THE MARKER LEGS SCORE (clause 8, the T5-harness chain) ═══
 // Per `\n`-split line (binary read, `\r` NEVER trimmed — clause 6): stage 1
-// `strip_escape_sequences` where an ESC byte is present (skip an all-escape line — the LogParser
+// `normalize` (skip an all-escape line — the LogParser
 // discipline; measured on this corpus: 7 582 ESC-bearing lines, ZERO of them marker/`Finished:`-
 // bearing, so the seam is declared and inert on these bytes) → the SHIPPED strategy's `parse`
 // (timestamper strip where present; declined lines score verbatim — the RawText fall-through) →
@@ -60,7 +60,7 @@
 //   6 binary reads, `\n`-split only, `\r` is content
 //   7 red-capability OBSERVED and recorded below
 //   8 the SUT is the shipped symbols — `make_strategy()`, `recognize()`, `scan_run_outcome`,
-//     `resolve_run_outcome`, `map_outcome_token`, `strip_escape_sequences`
+//     `resolve_run_outcome`, `map_outcome_token`, `normalize`
 //   9 registered as RUN in `scripts/run_corpus_gates.sh` in the same commit as this file
 //
 // ═══ PIN PROVENANCE — two strengths, labelled (the G1-PEEL / GitLab discipline) ═══
@@ -101,7 +101,7 @@
 #include <gtest/gtest.h>
 
 import std;
-import insight.canon; // recognize / scan_run_outcome / resolve_run_outcome / strip_escape_sequences
+import insight.canon;             // recognize / scan_run_outcome / resolve_run_outcome / normalize
 import insight.canon.conformance; // marker_probe_for — the L-C tripwire observes the kit's probe
 import insight.semantic.jenkins;  // kManifest + kDialect + make_strategy
 
@@ -114,7 +114,6 @@ using insight::semantic::ComposedSemantics;
 using insight::tokenization::ArenaAllocator;
 using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::recognize;
-using insight::tokenization::strip_escape_sequences;
 
 namespace
 {
@@ -373,6 +372,7 @@ struct TraceEngineResult
     TraceEngineResult result;
     std::vector<std::string> outcome_lines;
     std::string stage1_scratch;
+    std::string refixpoint_scratch; // never written: strategy content is escape-free (fixed point)
 
     for (std::size_t begin{0}; begin < bytes.size();)
     {
@@ -388,19 +388,19 @@ struct TraceEngineResult
         // stage 1 (it drives the real LogParser) and its own `\r` anchoring.
         outcome_lines.emplace_back(raw_line);
 
-        // ── marker legs: stage 1 (declared seam) → shipped strategy → shipped recognize() ──
-        std::string_view content_line{raw_line};
-        if (raw_line.find('\x1b') != std::string_view::npos)
-        {
-            strip_escape_sequences(raw_line, stage1_scratch);
-            if (stage1_scratch.empty())
-                continue; // the line was all escape bytes — the LogParser discipline
-            content_line = stage1_scratch;
-        }
-        std::string_view content{content_line};
-        if (const auto parsed{strategy.parse(content_line, arena)}; parsed.has_value())
-            content = parsed->content;
-        // A declined line scores verbatim — the RawText fall-through carries no further peel.
+        // ── marker legs: stage 1 (the typed factory) → shipped strategy → shipped recognize() ──
+        const auto normalized{insight::tokenization::normalize(raw_line, stage1_scratch)};
+        if (normalized.bytes().empty())
+            continue; // the line was all escape bytes — the LogParser discipline
+        // A declined line scores verbatim (suffix 0 — the RawText fall-through carries no
+        // further peel). A parsed line's content is STRATEGY-STORED bytes (arena), not a
+        // guaranteed subview — verbatim bytes of an already-normalized input, so stage 1 is a
+        // FIXED POINT on them and the factory is the honest re-attestation available to a test
+        // (production's tokenizer holds the parser and uses its mint for this shape).
+        auto content{normalized.undeclared_suffix(0)};
+        if (const auto parsed{strategy.parse(normalized.bytes(), arena)}; parsed.has_value())
+            content = insight::tokenization::normalize(parsed->content, refixpoint_scratch)
+                          .undeclared_suffix(0);
         const auto marker{recognize(content, composed)};
         if (marker.kind == IntentMarkerKind::Job)
             result.stage_names.emplace_back(marker.name);
@@ -1082,7 +1082,9 @@ TEST(JenkinsRetrofitConformanceTripwire, TheKitsOwnStageProbeFires)
             insight::semantic::conformance::marker_probe_for(row, manifest.emits)};
         ASSERT_FALSE(probe.empty()) << "row '" << row.prefix << "' has no paired writer — "
                                     << "grammar.unpaired_marker should already be red";
-        const auto marker{recognize(probe, composed)};
+        std::string probe_scratch;
+        const auto marker{recognize(
+            insight::tokenization::normalize(probe, probe_scratch).undeclared_suffix(0), composed)};
         EXPECT_EQ(marker.kind, row.kind)
             << "the kit's probe \"" << probe << "\" does not fire its own row ('" << row.prefix
             << "') — the marker_leak leg is vacuous again (the defect the render_row repair "

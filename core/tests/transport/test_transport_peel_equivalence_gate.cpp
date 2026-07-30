@@ -104,7 +104,7 @@ import std;
 import insight.canon; // insight::transport::* — the SUT. The ORACLE is frozen below.
 
 using insight::transport::IngestDeclaration;
-using insight::transport::PeeledLine;
+using insight::transport::RawPeeledLine;
 using insight::transport::TransportStack;
 
 namespace
@@ -479,7 +479,7 @@ class TransportPeelEquivalenceGate : public ::testing::Test
                 ++score.lines;
 
                 const std::optional<std::string_view> parsed{oracle_claim(line)};
-                const PeeledLine peeled{stack.peel(line)};
+                const RawPeeledLine peeled{stack.peel_raw(line)};
 
                 if (parsed.has_value())
                 {

@@ -144,9 +144,10 @@ namespace
     }
 } // namespace
 
-std::string_view recognize_location(std::string_view content,
+std::string_view recognize_location(insight::tokenization::NormalizedContent normalized,
                                     const insight::semantic::ComposedSemantics& composed) noexcept
 {
+    const std::string_view content{normalized.bytes()};
     const std::span<const insight::semantic::LocationRow> rows{composed.locations()};
     std::size_t cursor{0};
     const std::size_t len{content.size()};
@@ -169,9 +170,10 @@ std::string_view recognize_location(std::string_view content,
 namespace tokenization
 {
 
-    StructuralRole classify(std::string_view content,
+    StructuralRole classify(NormalizedContent normalized,
                             const insight::semantic::ComposedSemantics& composed) noexcept
     {
+        const std::string_view content{normalized.bytes()};
         // Longest-match: the row with the longest matching prefix wins (deterministic,
         // declaration-order- free). No nesting among today's rows → equivalent to the pre-split
         // fixed-order chain.
@@ -285,9 +287,10 @@ namespace tokenization
         }
     } // namespace
 
-    IntentMarker recognize(std::string_view content,
+    IntentMarker recognize(NormalizedContent normalized,
                            const insight::semantic::ComposedSemantics& composed) noexcept
     {
+        const std::string_view content{normalized.bytes()};
         const insight::semantic::IntentMarkerRow* best{nullptr};
         std::string_view best_payload;
         for (const insight::semantic::IntentMarkerRow& row : composed.markers())

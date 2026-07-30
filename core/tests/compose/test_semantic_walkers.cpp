@@ -35,6 +35,16 @@ using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::lift_level;
 using insight::tokenization::recognize;
 
+// The walkers take NormalizedContent (the adr/0073 precondition as a type). Every probe in this
+// suite is an escape-free literal, so normalize() is the zero-copy FIXED POINT: the content views
+// the literal itself and the shared scratch is never written — which is what keeps the SP-5
+// no-allocation guard meaningful over the full probe path below.
+[[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
+{
+    static std::string scratch;
+    return insight::tokenization::normalize(probe, scratch).undeclared_suffix(0);
+}
+
 // ════════════════════════════════════════════════════════════════════════════════════════════════════
 // SP-5 heap-allocation guard — a global operator-new replacement counting allocations while ARMED.
 // The replacement is a plain passthrough (forwards to malloc) unless a RAII AllocGuard is live, so
@@ -240,14 +250,14 @@ TEST(SemanticWalkers, DialectGateSemantics)
     for (const auto& [view, label] : {std::pair{std::cref(own), "the OWN dialect"},
                                       std::pair{std::cref(foreign), "a FOREIGN dialect"},
                                       std::pair{std::cref(none), "an UNDECLARED stream"}})
-        EXPECT_EQ(classify("<OPEN>x", view.get()), StructuralRole::GroupBegin)
+        EXPECT_EQ(classify(norm_probe("<OPEN>x"), view.get()), StructuralRole::GroupBegin)
             << "kAnyDialect role must fire under " << label;
 
     // Concretely-gated role fires ONLY on a stream declaring its package.
-    EXPECT_EQ(classify("GATED>x", own), StructuralRole::Terminator);
-    EXPECT_EQ(classify("GATED>x", foreign), StructuralRole::None)
+    EXPECT_EQ(classify(norm_probe("GATED>x"), own), StructuralRole::Terminator);
+    EXPECT_EQ(classify(norm_probe("GATED>x"), foreign), StructuralRole::None)
         << "a concrete gate must not leak into another dialect's view";
-    EXPECT_EQ(classify("GATED>x", none), StructuralRole::None)
+    EXPECT_EQ(classify(norm_probe("GATED>x"), none), StructuralRole::None)
         << "an UNDECLARED stream must fire no concretely-gated row (fail-closed on depth)";
 }
 
@@ -257,22 +267,23 @@ TEST(SemanticWalkers, LongestPrefixWins)
     const ComposedSemantics sc{synth()};
     // "<G>" (GroupBegin) is a proper prefix of "<G-LONGER>" (GroupEnd); a line matching both
     // resolves to the longer rule's role regardless of the rows' declared order.
-    EXPECT_EQ(classify("<G-LONGER> details", sc), StructuralRole::GroupEnd);
-    EXPECT_EQ(classify("<G> details", sc), StructuralRole::GroupBegin);
+    EXPECT_EQ(classify(norm_probe("<G-LONGER> details"), sc), StructuralRole::GroupEnd);
+    EXPECT_EQ(classify(norm_probe("<G> details"), sc), StructuralRole::GroupBegin);
 }
 
 // ── recognize(): RemainderAfterPrefix payload = the content after the matched prefix, verbatim ──
 TEST(SemanticWalkers, PayloadExtractionRemainderAfterPrefix)
 {
     const ComposedSemantics sc{synth()};
-    const auto mark{recognize("STEP build the widget", sc)};
+    const auto mark{recognize(norm_probe("STEP build the widget"), sc)};
     EXPECT_EQ(mark.kind, IntentMarkerKind::Step);
     EXPECT_EQ(mark.name, "build the widget")
         << "payload must be the verbatim remainder after \"STEP \"";
     EXPECT_EQ(mark.child_order, ChildOrder::Ordered);
     // Gated: inert on a stream declaring another dialect, and on an undeclared one.
-    EXPECT_EQ(recognize("STEP build the widget", other()).kind, IntentMarkerKind::None);
-    EXPECT_EQ(recognize("STEP build the widget", undeclared()).kind, IntentMarkerKind::None);
+    EXPECT_EQ(recognize(norm_probe("STEP build the widget"), other()).kind, IntentMarkerKind::None);
+    EXPECT_EQ(recognize(norm_probe("STEP build the widget"), undeclared()).kind,
+              IntentMarkerKind::None);
 }
 
 // ── The three LocationMatchKind families + token-boundary mechanics (whitespace skip,
@@ -282,16 +293,16 @@ TEST(SemanticWalkers, LocationFamiliesAndTokenBoundaries)
 {
     const ComposedSemantics sc{synth()};
     // 1. TestSpecExtension: `<base>.chk.aa`
-    EXPECT_EQ(recognize_location("PASS dir/thing.chk.aa", sc), "dir/thing.chk.aa");
+    EXPECT_EQ(recognize_location(norm_probe("PASS dir/thing.chk.aa"), sc), "dir/thing.chk.aa");
     // 2. PrefixAndExtension: basename `pre_*` + ext `.zz`
-    EXPECT_EQ(recognize_location("ok src/pre_widget.zz done", sc), "src/pre_widget.zz");
+    EXPECT_EQ(recognize_location(norm_probe("ok src/pre_widget.zz done"), sc), "src/pre_widget.zz");
     // 3. SuffixSet: full-file suffix `_end.qq`
-    EXPECT_EQ(recognize_location("a/b/module_end.qq", sc), "a/b/module_end.qq");
+    EXPECT_EQ(recognize_location(norm_probe("a/b/module_end.qq"), sc), "a/b/module_end.qq");
     // Token boundaries: trailing :line:col excluded, leading glyph + tab skipped, no-match → empty.
-    EXPECT_EQ(recognize_location("dir/thing.chk.aa:42:5", sc), "dir/thing.chk.aa");
-    EXPECT_EQ(recognize_location("\xE2\x9C\x93 \t dir/thing.chk.aa (7 ms)", sc),
+    EXPECT_EQ(recognize_location(norm_probe("dir/thing.chk.aa:42:5"), sc), "dir/thing.chk.aa");
+    EXPECT_EQ(recognize_location(norm_probe("\xE2\x9C\x93 \t dir/thing.chk.aa (7 ms)"), sc),
               "dir/thing.chk.aa");
-    EXPECT_EQ(recognize_location("nothing here.txt", sc), "");
+    EXPECT_EQ(recognize_location(norm_probe("nothing here.txt"), sc), "");
 }
 
 // ── lift_level(): FIRST match in declared order wins — NOT longest match ──
@@ -363,14 +374,14 @@ TEST(SemanticWalkers, RecognizersDoNotHeapAllocate)
     {
         const AllocGuard guard;
         // Drive every walker over a representative probe set.
-        (void)classify("<OPEN>x", sc);
-        (void)classify("GATED>x", sc);
-        (void)recognize("STEP build the widget", sc);
+        (void)classify(norm_probe("<OPEN>x"), sc);
+        (void)classify(norm_probe("GATED>x"), sc);
+        (void)recognize(norm_probe("STEP build the widget"), sc);
         (void)lift_level("<LVL>-LONG boom", sc);
         (void)lift_level("plain body text", sc);
-        (void)recognize_location("PASS dir/thing.chk.aa:42", sc);
-        (void)recognize_location("ok src/pre_widget.zz", sc);
-        (void)recognize_location("a/b/module_end.qq", sc);
+        (void)recognize_location(norm_probe("PASS dir/thing.chk.aa:42"), sc);
+        (void)recognize_location(norm_probe("ok src/pre_widget.zz"), sc);
+        (void)recognize_location(norm_probe("a/b/module_end.qq"), sc);
         observed = guard.count();
     }
     EXPECT_EQ(observed, 0U)

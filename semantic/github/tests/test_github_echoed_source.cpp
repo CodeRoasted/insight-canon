@@ -103,7 +103,7 @@ TEST(GithubEchoedSource, TokenizerDemotesEchoedFailureLevelToUnknown)
 
     const auto echoed{tokenizer.process_line(
         stream.transport
-            .peel(gha("\x1b[36;1m    echo \"Download failed after 3 attempts\" >&2\x1b[0m"))
+            .peel_raw(gha("\x1b[36;1m    echo \"Download failed after 3 attempts\" >&2\x1b[0m"))
             .content)};
     ASSERT_TRUE(echoed.has_value()) << "process_line failed: " << echoed.error();
     EXPECT_TRUE(echoed->echoed_source) << "the command-echo wrapper must set echoed_source";
@@ -127,7 +127,7 @@ TEST(GithubEchoedSource, EchoedSourceDemotionOutranksTheDeclaredLevelLift)
     Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
 
     const auto echoed{tokenizer.process_line(
-        stream.transport.peel(gha("\x1b[36;1m##[error]deploy step failed\x1b[0m")).content)};
+        stream.transport.peel_raw(gha("\x1b[36;1m##[error]deploy step failed\x1b[0m")).content)};
     ASSERT_TRUE(echoed.has_value()) << "process_line failed: " << echoed.error();
     EXPECT_TRUE(echoed->echoed_source) << "the command-echo wrapper must set echoed_source";
     EXPECT_EQ(echoed->level, LogLevel::Unknown)
@@ -137,8 +137,8 @@ TEST(GithubEchoedSource, EchoedSourceDemotionOutranksTheDeclaredLevelLift)
 
     // The disconfirming control: the SAME content UNWRAPPED does lift to Error, so the case above
     // is a real contest between the lift and the demotion rather than a line the lift ignores.
-    const auto plain{
-        tokenizer.process_line(stream.transport.peel(gha("##[error]deploy step failed")).content)};
+    const auto plain{tokenizer.process_line(
+        stream.transport.peel_raw(gha("##[error]deploy step failed")).content)};
     ASSERT_TRUE(plain.has_value()) << "process_line failed: " << plain.error();
     EXPECT_FALSE(plain->echoed_source);
     EXPECT_EQ(plain->level, LogLevel::Error)
@@ -156,7 +156,7 @@ TEST(GithubEchoedSource, TokenizerKeepsRealColouredErrorAsError)
     Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
 
     const auto real{tokenizer.process_line(
-        stream.transport.peel(gha("\x1b[31mERROR\x1b[0m: db connection refused")).content)};
+        stream.transport.peel_raw(gha("\x1b[31mERROR\x1b[0m: db connection refused")).content)};
     ASSERT_TRUE(real.has_value()) << "process_line failed: " << real.error();
     EXPECT_FALSE(real->echoed_source) << "a red (`31`) coloured line is not echoed-source";
     EXPECT_EQ(real->level, LogLevel::Error)

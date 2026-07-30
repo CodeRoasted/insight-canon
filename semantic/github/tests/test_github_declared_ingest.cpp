@@ -7,10 +7,10 @@
 // WHAT REPLACED IT, and why the tests could not simply be ported. The GHA per-line RFC 3339 stamp
 // is a property of GitHub's *delivery*, not of the GHA *dialect* (ADR 0044 §3): the host format of
 // a GHA job log is RawText and always was, and the dialect is the workflow-command VOCABULARY over
-// it (ADR 0064 clause 1). So there is nothing left to DETECT — the caller DECLARES the transform and
-// the dialect, canon verifies both, `TransportStack::peel` unwinds the stamp, and only
-// `PeeledLine::content` crosses into the Tokenizer. A "does the strategy claim this line" test has
-// no subject any more; a "does the declared path read this line" test does.
+// it (ADR 0064 clause 1). So there is nothing left to DETECT — the caller DECLARES the transform
+// and the dialect, canon verifies both, `TransportStack::peel` unwinds the stamp, and only
+// `RawPeeledLine::content` crosses into the Tokenizer. A "does the strategy claim this line" test
+// has no subject any more; a "does the declared path read this line" test does.
 //
 // The equivalence between the two — that the declared peel produces the same bytes the deleted
 // detector did — is NOT re-asserted here. It is G1-PEEL's, scored against the frozen oracle over
@@ -31,7 +31,7 @@ using insight::tokenization::ArenaAllocator;
 using insight::tokenization::MaskConfig;
 using insight::tokenization::Tokenizer;
 using insight::transport::IngestDeclaration;
-using insight::transport::PeeledLine;
+using insight::transport::RawPeeledLine;
 
 namespace
 {
@@ -66,7 +66,7 @@ constexpr std::string_view kGHAPageFault{
     "2026-05-27T15:26:41.7842152Z page fault handler registered"};
 // A stamp with no body is a blank line — it peels to EMPTY, and empty means DROP (never an empty ""
 // template). This is the shipped detector's "timestamp-only line is a blank line: decline it"
-// behavior, expressed on the declared side as `PeeledLine::is_blank()`.
+// behavior, expressed on the declared side as `RawPeeledLine::is_blank()`.
 constexpr std::string_view kGHABlankWithSpace{"2026-05-27T15:26:41.7842152Z "};
 constexpr std::string_view kGHABlankNoSpace{"2026-05-27T15:26:41.7842152Z"};
 } // namespace
@@ -76,7 +76,7 @@ TEST(GithubDeclaredIngest, DeclaredPeelStripsStampAndIndentation)
 {
     const ComposedSemantics composed{github_composition()};
     const ResolvedStream stream{gha_stream(composed)};
-    const PeeledLine peeled{stream.transport.peel(kGHALine)};
+    const RawPeeledLine peeled{stream.transport.peel_raw(kGHALine)};
     EXPECT_EQ(peeled.content, "CODEROAST_IPC_REPO: CodeRoasted/coderoast-ipc")
         << "the whole message must survive, leading GHA indentation stripped";
     EXPECT_TRUE(peeled.observation_time.has_value())
@@ -89,8 +89,8 @@ TEST(GithubDeclaredIngest, StampOnlyLinePeelsToBlank)
 {
     const ComposedSemantics composed{github_composition()};
     const ResolvedStream stream{gha_stream(composed)};
-    EXPECT_TRUE(stream.transport.peel(kGHABlankWithSpace).is_blank());
-    EXPECT_TRUE(stream.transport.peel(kGHABlankNoSpace).is_blank());
+    EXPECT_TRUE(stream.transport.peel_raw(kGHABlankWithSpace).is_blank());
+    EXPECT_TRUE(stream.transport.peel_raw(kGHABlankNoSpace).is_blank());
 }
 
 // ── Level lift: the workflow-command vocabulary (kLevelLifts) → LogLevel, over the PRODUCTION path
@@ -138,7 +138,7 @@ TEST(GithubDeclaredIngest, LiftsDeclaredLevelsFromWorkflowCommands)
         // accident.
         const std::string line{std::string{"2026-05-27T15:26:41.7842152Z "} +
                                std::string{probe.marker} + "the quick brown fox"};
-        const PeeledLine peeled{stream.transport.peel(line)};
+        const RawPeeledLine peeled{stream.transport.peel_raw(line)};
         ASSERT_FALSE(peeled.is_blank()) << "marker=" << probe.marker;
         const auto event{tokenizer.process_line(peeled.content)};
         ASSERT_TRUE(event.has_value()) << "marker=" << probe.marker << " line=\"" << line
@@ -170,7 +170,7 @@ TEST(GithubDeclaredIngest, AnUndeclaredStreamGetsNoDeclaredLift)
     ArenaAllocator arena{64U * 1024U};
     Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
     const auto event{tokenizer.process_line(
-        stream.transport.peel("2026-05-27T15:26:41.7842152Z ##[notice]the quick brown fox")
+        stream.transport.peel_raw("2026-05-27T15:26:41.7842152Z ##[notice]the quick brown fox")
             .content)};
     ASSERT_TRUE(event.has_value()) << event.error();
     EXPECT_EQ(event->level, LogLevel::Unknown)
@@ -193,7 +193,7 @@ TEST(GithubDeclaredIngest, DeclaredLiftOutranksBodyInference)
 
     const auto lifted{tokenizer.process_line(
         stream.transport
-            .peel("2026-05-27T15:26:41.7842152Z ##[notice]ERROR the deploy step was skipped")
+            .peel_raw("2026-05-27T15:26:41.7842152Z ##[notice]ERROR the deploy step was skipped")
             .content)};
     ASSERT_TRUE(lifted.has_value()) << lifted.error();
     EXPECT_EQ(lifted->level, LogLevel::Info)
@@ -204,7 +204,7 @@ TEST(GithubDeclaredIngest, DeclaredLiftOutranksBodyInference)
     // The control: the SAME body without the marker does infer Error — so the case above is a
     // genuine contest between the two sources, not a body the inference ignores anyway.
     const auto unlifted{tokenizer.process_line(
-        stream.transport.peel("2026-05-27T15:26:41.7842152Z ERROR the deploy step was skipped")
+        stream.transport.peel_raw("2026-05-27T15:26:41.7842152Z ERROR the deploy step was skipped")
             .content)};
     ASSERT_TRUE(unlifted.has_value()) << unlifted.error();
     EXPECT_EQ(unlifted->level, LogLevel::Error)
@@ -220,18 +220,18 @@ TEST(GithubDeclaredIngest, InfersErrorFromBodyCueWhenUnmarked)
     ArenaAllocator arena{64U * 1024U};
     Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
 
-    const auto crash{tokenizer.process_line(stream.transport.peel(kGHASegfault).content)};
+    const auto crash{tokenizer.process_line(stream.transport.peel_raw(kGHASegfault).content)};
     ASSERT_TRUE(crash.has_value()) << crash.error();
     EXPECT_EQ(crash->level, LogLevel::Error)
         << "bare 'Segmentation fault (core dumped)' escalates via the lexicon";
     EXPECT_EQ(crash->template_str, "Segmentation fault (core dumped)");
 
-    const auto seg_pipe{tokenizer.process_line(stream.transport.peel(kGHASegPipe).content)};
+    const auto seg_pipe{tokenizer.process_line(stream.transport.peel_raw(kGHASegPipe).content)};
     ASSERT_TRUE(seg_pipe.has_value()) << seg_pipe.error();
     EXPECT_EQ(seg_pipe->level, LogLevel::Unknown)
         << "'image segmentation pipeline complete' — 'segmentation' not adjacent to 'fault'";
 
-    const auto page_fault{tokenizer.process_line(stream.transport.peel(kGHAPageFault).content)};
+    const auto page_fault{tokenizer.process_line(stream.transport.peel_raw(kGHAPageFault).content)};
     ASSERT_TRUE(page_fault.has_value()) << page_fault.error();
     EXPECT_EQ(page_fault->level, LogLevel::Unknown)
         << "'page fault handler registered' — bare 'fault' is not the cue phrase";

@@ -75,8 +75,9 @@ constexpr std::string_view kRawWithoutCarriageReturn{
 
 TEST(IngestNormalizationLevelFlip, TheAfterScriptWarningReadsWarnOnceNormalized)
 {
-    std::string normalized;
-    insight::tokenization::strip_escape_sequences(kRawAfterScriptWarning, normalized);
+    std::string scratch;
+    const std::string_view normalized{
+        insight::tokenization::normalize(kRawAfterScriptWarning, scratch).bytes()};
 
     // The RAW line reads as failing — recorded, because it is the state the flip moved AWAY from and
     // a test that only pinned the destination could not tell a fix from a classifier that had
@@ -102,8 +103,9 @@ TEST(IngestNormalizationLevelFlip, TheAfterScriptWarningReadsWarnOnceNormalized)
 // the classifier falls through to `failed`, and the false positive comes back.
 TEST(IngestNormalizationLevelFlip, FoldingTheBareCarriageReturnReManufacturesTheFalsePositive)
 {
-    std::string normalized;
-    insight::tokenization::strip_escape_sequences(kRawWithoutCarriageReturn, normalized);
+    std::string scratch;
+    const std::string_view normalized{
+        insight::tokenization::normalize(kRawWithoutCarriageReturn, scratch).bytes()};
     EXPECT_TRUE(is_failing(infer_leading_log_level(normalized)))
         << "without the \\r this line reads " << to_string(infer_leading_log_level(normalized))
         << " — if this ever stops being a failing read, the \\r is no longer what separates the "
@@ -115,13 +117,13 @@ TEST(IngestNormalizationLevelFlip, FoldingTheBareCarriageReturnReManufacturesThe
 // gain into a real recall loss, silently, and is exactly what the to-passing flip was feared to be.
 TEST(IngestNormalizationLevelFlip, NormalizationDoesNotDisarmGenuineFailureLines)
 {
-    std::string normalized;
+    std::string scratch;
     for (const std::string_view raw :
          {std::string_view{"\x1b[0;31mERROR: Job failed: exit code 1\x1b[0;m"},
           std::string_view{"\x1b[0K\x1b[31;1merror: cannot find crate 'serde'\x1b[0;m"},
           std::string_view{"FATAL: unrecoverable"}})
     {
-        insight::tokenization::strip_escape_sequences(raw, normalized);
+        const std::string_view normalized{insight::tokenization::normalize(raw, scratch).bytes()};
         EXPECT_TRUE(is_failing(infer_leading_log_level(normalized)))
             << "a genuine failure line must stay failing after normalization; '" << normalized
             << "' read " << to_string(infer_leading_log_level(normalized));
