@@ -32,15 +32,19 @@
 //   * The corpora-side `projection(manifest) == sidecar` equality is the generator's own
 //     `--check` mode (corpora-repo governance) — this binary cannot see the JSON and does not try.
 //
-// ═══ THE INGEST ASSEMBLY THE MARKER LEGS SCORE (clause 8, the T5-harness chain) ═══
-// Per `\n`-split line (binary read, `\r` NEVER trimmed — clause 6): stage 1
-// `normalize` (skip an all-escape line — the LogParser
-// discipline; measured on this corpus: 7 582 ESC-bearing lines, ZERO of them marker/`Finished:`-
-// bearing, so the seam is declared and inert on these bytes) → the SHIPPED strategy's `parse`
-// (timestamper strip where present; declined lines score verbatim — the RawText fall-through) →
-// the SHIPPED `recognize()` over the composed rows. The outcome leg is the SHIPPED
-// `scan_run_outcome` + `resolve_run_outcome` over the raw `\n`-split lines — public, driving the
-// real LogParser (clause 8 satisfied outright).
+// ═══ THE INGEST ASSEMBLY THE MARKER LEGS SCORE (clause 8 — the PURIFIED chain, G-T5-RETRO) ═══
+// Since T5 5.2 the legs re-score through the DECLARED chain, expectations frozen byte-for-byte at
+// the pre-cut figures (the migration-gate shape, adr/0062). Per `\n`-split line (binary read,
+// `\r` NEVER trimmed — clause 6): the DECLARED transport peel — the stack comes from the
+// sidecar's frozen `stamp_class` column, never from inspection (whole-stream ⇒
+// `bracket-rfc3339-line-prefix`, payload-stamped/bare ⇒ degenerate; parse order transport →
+// logformat → intent, adr/0031; a stamp-only line peels blank and DROPS, bundled #4
+// catalogue-side) → stage 1 `normalize` (skip an all-escape line — the LogParser discipline;
+// measured on this corpus: 7 582 ESC-bearing lines, ZERO of them marker/`Finished:`-bearing, so
+// the seam is declared and inert on these bytes) → the SHIPPED `recognize()` over the composed
+// rows (there is no strategy any more — the rows plus canon's walkers ARE the parser). The
+// outcome leg is the SHIPPED `scan_run_outcome` + `resolve_run_outcome` over the PEELED lines —
+// public, driving the real LogParser (clause 8 satisfied outright).
 //
 // ═══ THE §4.4 NAMED DELTAS, so a red is attributed rather than hand-waved ═══
 // Two spike-vs-walker semantic deltas are pre-named: (1) exclusion token boundary — spike
@@ -59,8 +63,8 @@
 //     per class; elided (12) segregated in every structural cell, never filtered
 //   6 binary reads, `\n`-split only, `\r` is content
 //   7 red-capability OBSERVED and recorded below
-//   8 the SUT is the shipped symbols — `make_strategy()`, `recognize()`, `scan_run_outcome`,
-//     `resolve_run_outcome`, `map_outcome_token`, `normalize`
+//   8 the SUT is the shipped symbols — `TransportStack::peel_raw`, `recognize()`,
+//     `scan_run_outcome`, `resolve_run_outcome`, `map_outcome_token`, `normalize`
 //   9 registered as RUN in `scripts/run_corpus_gates.sh` in the same commit as this file
 //
 // ═══ PIN PROVENANCE — two strengths, labelled (the G1-PEEL / GitLab discipline) ═══
@@ -103,7 +107,7 @@
 import std;
 import insight.canon;             // recognize / scan_run_outcome / resolve_run_outcome / normalize
 import insight.canon.conformance; // marker_probe_for — the L-C tripwire observes the kit's probe
-import insight.semantic.jenkins;  // kManifest + kDialect + make_strategy
+import insight.semantic.jenkins;  // kManifest + kDialect (the code tier is empty since T5 5.2)
 
 using insight::map_outcome_token;
 using insight::resolve_run_outcome;
@@ -378,15 +382,26 @@ struct TraceEngineResult
                                                             {});
 }
 
+// The DECLARED stacks, per stamp class (T5 §6: declarations come from the frozen sidecar labels,
+// never from inspection). whole-stream ⇒ the bracket row; payload-stamped and bare ⇒ the
+// degenerate stack (the payload-stamped class is NOT declarable — adr/0044 §1 — so its stamps
+// stay content, the attributed re-baseline).
+[[nodiscard]] const insight::transport::TransportStack& stack_for(std::string_view stamp_class)
+{
+    static const insight::transport::TransportStack degenerate{};
+    static const std::array<std::string_view, 1> bracket_names{"bracket-rfc3339-line-prefix"};
+    static const insight::transport::TransportStack bracket{insight::transport::
+        resolve_transport_stack(insight::transport::IngestDeclaration{.stack = bracket_names})};
+    return stamp_class == "whole-stream" ? bracket : degenerate;
+}
+
 [[nodiscard]] TraceEngineResult score_trace(const std::string& bytes,
                                             const ComposedSemantics& composed,
-                                            insight::tokenization::IFormatStrategy& strategy,
-                                            ArenaAllocator& arena)
+                                            const insight::transport::TransportStack& stack)
 {
     TraceEngineResult result;
     std::vector<std::string> outcome_lines;
     std::string stage1_scratch;
-    std::string refixpoint_scratch; // never written: strategy content is escape-free (fixed point)
 
     for (std::size_t begin{0}; begin < bytes.size();)
     {
@@ -398,29 +413,27 @@ struct TraceEngineResult
         if (raw_line.empty())
             continue;
 
-        // The outcome scan receives the raw `\n`-split line: `scan_run_outcome` owns its own
-        // stage 1 (it drives the real LogParser) and its own `\r` anchoring.
-        outcome_lines.emplace_back(raw_line);
+        // ── the purified chain: DECLARED transport peel → stage 1 → shipped recognize() ──
+        // (parse order transport → logformat → intent, adr/0031). A stamp-only line peels to
+        // blank and blank means DROP (PeeledLine::is_blank — the strategy's bundled #4, now
+        // catalogue-side); a line the row's grammar declines peels to itself (totality is
+        // application, not effect — adr/0044 §2).
+        const insight::transport::RawPeeledLine peeled{stack.peel_raw(raw_line)};
+        if (peeled.content.empty())
+            continue;
 
-        // ── marker legs: stage 1 (the typed factory) → shipped strategy → shipped recognize() ──
-        const auto normalized{insight::tokenization::normalize(raw_line, stage1_scratch)};
+        // The outcome scan receives the PEELED line: `scan_run_outcome` owns its own stage 1
+        // (it drives the real LogParser) and its own `\r` anchoring.
+        outcome_lines.emplace_back(peeled.content);
+
+        const auto normalized{insight::tokenization::normalize(peeled.content, stage1_scratch)};
         if (normalized.bytes().empty())
             continue; // the line was all escape bytes — the LogParser discipline
-        // A declined line scores verbatim (suffix 0 — the RawText fall-through carries no
-        // further peel). A parsed line's content is STRATEGY-STORED bytes (arena), not a
-        // guaranteed subview — verbatim bytes of an already-normalized input, so stage 1 is a
-        // FIXED POINT on them and the factory is the honest re-attestation available to a test
-        // (production's tokenizer holds the parser and uses its mint for this shape).
-        auto content{normalized.undeclared_suffix(0)};
-        if (const auto parsed{strategy.parse(normalized.bytes(), arena)}; parsed.has_value())
-            content = insight::tokenization::normalize(parsed->content, refixpoint_scratch)
-                          .undeclared_suffix(0);
-        const auto marker{recognize(content, composed)};
+        const auto marker{recognize(normalized.undeclared_suffix(0), composed)};
         if (marker.kind == IntentMarkerKind::Job)
             result.stage_names.emplace_back(marker.name);
         else if (marker.kind == IntentMarkerKind::Step)
             ++result.steps;
-        arena.reset();
     }
 
     const RunOutcomeScan scan{scan_run_outcome(outcome_lines, composed)};
@@ -648,10 +661,6 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
         }
 
         const ComposedSemantics composed{jenkins_only()};
-        const std::unique_ptr<insight::tokenization::IFormatStrategy> strategy{
-            insight::semantic::jenkins::make_strategy()};
-        constexpr std::size_t kArenaBlockBytes{64U * 1024U};
-        ArenaAllocator arena{kArenaBlockBytes};
 
         for (const TraceRow& row : traces)
         {
@@ -697,7 +706,8 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
                     "trace '" + row.path + "' sha256 differs from the attested digest — wrong "
                     "bytes under a right count is the fabricated-pass shape");
 
-            const TraceEngineResult engine{score_trace(bytes, composed, *strategy, arena)};
+            const TraceEngineResult engine{
+                score_trace(bytes, composed, stack_for(row.stamp_class))};
 
             // ── L-T: the shipped chain equals the frozen instrument, per trace ──
             const std::vector<std::string> empty_names;
@@ -1088,154 +1098,12 @@ TEST_F(JenkinsRecognizerRetrofitGate, LOTheRunOutcomeRecoversThePlatformVerdict)
     GTEST_LOG_(INFO) << "Jenkins retrofit gate green" << report(corpus);
 }
 
-// ═══ THE PRE-CUT BARE-NULL ORACLE EMITTER (T5 beat 5.2, FIRST ACT — adr/0062) ═══
-//
-// G-T5-BARE will assert that the purification moves NOTHING on the 82 bare logs: byte-identical
-// templates and quanta pre/post. The "pre" side of that compare is the SHIPPED chain — the
-// detection strategy this very cut deletes — so per adr/0062 the pre-cut scores are FROZEN into a
-// committed oracle BEFORE any identity movement, by this emitter, and the gate then compares
-// against the committed file and never against a re-derivation (a silent oracle shift is exactly
-// what the P2b discipline forbids).
-//
-// THE SURFACE SERIALIZATION the digest covers (whole-surface, line grain — reproducible by the
-// post-cut gate with no strategy in the chain):
-//   section T: one record per `\n`-split segment of the raw bytes (EVERY segment, empty included):
-//              the Tokenizer's produced template (escaped: \t, \r, \\) or the literal `<declined>`
-//              — the tokenizer runs UNDECLARED (compose over the package, no for_stream), i.e. the
-//              shipped detection world pre-cut and the RawText floor post-cut.
-//   section Q: `stages:<name\x1f...>` + `steps:<n>` + `finished:<token>` from the retrofit ingest
-//              assembly under the DECLARED dialect view (for_stream(jenkins, {})).
-//   digest  := sha256(section T + '\n' + section Q).
-// Emitted once, by hand: JENKINS_BARE_ORACLE_EMIT_DIR=<dir> [JENKINS_BARE_ORACLE_PROVENANCE=<hash>]
-// then the output is committed beside this TU and THIS TEST IS DELETED at the identity cut,
-// replaced by the G-T5-BARE gate that reads the committed file.
-[[nodiscard]] std::string escape_oracle_field(std::string_view text)
-{
-    std::string out;
-    out.reserve(text.size());
-    for (const char chr : text)
-    {
-        if (chr == '\t')
-            out += "\\t";
-        else if (chr == '\r')
-            out += "\\r";
-        else if (chr == '\\')
-            out += "\\\\";
-        else
-            out += chr;
-    }
-    return out;
-}
-
-// Its OWN suite name, deliberately: the corpus-gates job runs `JenkinsRecognizerRetrofitGate.*`
-// and REDS on any skipped test (clause 9's skip==red arm); this hand-run emitter must be outside
-// that filter, and the census keys on the FILE, which is already dispositioned RUN.
-class JenkinsBareNullPrecutOracleEmitter : public JenkinsRecognizerRetrofitGate
-{
-};
-
-TEST_F(JenkinsBareNullPrecutOracleEmitter, EmitOnceByHand)
-{
-    const char* const out_dir{std::getenv("JENKINS_BARE_ORACLE_EMIT_DIR")};
-    if (out_dir == nullptr || *out_dir == '\0')
-        GTEST_SKIP() << "JENKINS_BARE_ORACLE_EMIT_DIR unset — the pre-cut oracle emitter runs "
-                        "once, by hand, before the 5.2 identity cut; its committed output is the "
-                        "G-T5-BARE oracle and this TEST dies at the cut.";
-
-    std::vector<std::string> errors;
-    const auto rows{read_tsv(root_ / kTraceSidecar, kTraceHeader, errors)};
-    ASSERT_TRUE(errors.empty()) << errors.front();
-
-    const ComposedSemantics declared_view{jenkins_only()};
-    const std::array manifests{insight::semantic::jenkins::kManifest};
-    const ComposedSemantics undeclared_view{insight::semantic::compose(manifests)};
-    const std::unique_ptr<insight::tokenization::IFormatStrategy> strategy{
-        insight::semantic::jenkins::make_strategy()};
-    constexpr std::size_t kArenaBlockBytes{4U * 1024U * 1024U};
-
-    std::string body;
-    std::size_t bare_rows{0};
-    for (const auto& fields : rows)
-    {
-        ASSERT_EQ(fields.size(), 14U);
-        if (fields[13] != "bare")
-            continue;
-        ++bare_rows;
-        const std::string& path{fields[0]};
-        bool read_ok{true};
-        const std::string bytes{read_file(root_ / kBytesRoot / path, read_ok)};
-        ASSERT_TRUE(read_ok) << path;
-
-        // Section T — the template surface, every `\n` segment, tokenizer UNDECLARED.
-        std::string section_t;
-        std::size_t produced_lines{0};
-        std::set<std::string> distinct_templates;
-        {
-            ArenaAllocator arena{kArenaBlockBytes};
-            insight::tokenization::Tokenizer tokenizer{arena, insight::tokenization::MaskConfig{},
-                                                       undeclared_view};
-            for (std::size_t begin{0}; begin < bytes.size();)
-            {
-                std::size_t end{bytes.find('\n', begin)};
-                if (end == std::string::npos)
-                    end = bytes.size();
-                const std::string_view raw_line{bytes.data() + begin, end - begin};
-                begin = end + 1U;
-                const auto event{tokenizer.process_line(raw_line)};
-                if (event.has_value())
-                {
-                    ++produced_lines;
-                    distinct_templates.insert(std::string{event->template_str});
-                    section_t += escape_oracle_field(event->template_str);
-                }
-                else
-                {
-                    section_t += "<declined>";
-                }
-                section_t += '\n';
-            }
-        }
-
-        // Section Q — the quanta surface through the retrofit ingest assembly (declared dialect).
-        ArenaAllocator arena{kArenaBlockBytes};
-        const TraceEngineResult engine{score_trace(bytes, declared_view, *strategy, arena)};
-        std::string section_q{"stages:"};
-        for (std::size_t index{0}; index < engine.stage_names.size(); ++index)
-        {
-            if (index != 0)
-                section_q += '\x1f';
-            section_q += escape_oracle_field(engine.stage_names[index]);
-        }
-        section_q += "\nsteps:" + std::to_string(engine.steps);
-        section_q += "\nfinished:" + engine.finished_token;
-
-        const std::string digest{sha256_hex(section_t + '\n' + section_q)};
-        body += path + '\t' + std::to_string(engine.stage_names.size()) + '\t' +
-                std::to_string(engine.steps) + '\t' + engine.finished_token + '\t' +
-                std::to_string(produced_lines) + '\t' +
-                std::to_string(distinct_templates.size()) + '\t' + digest + '\n';
-    }
-    ASSERT_EQ(bare_rows, kBare) << "the bare class must carry exactly " << kBare << " traces";
-
-    const char* const provenance{std::getenv("JENKINS_BARE_ORACLE_PROVENANCE")};
-    std::string out{"# BARE-v2.precut-oracle.tsv — the G-T5-BARE frozen oracle (adr/0062).\n"
-                    "# Emitted from the SHIPPED pre-cut chain (JenkinsStrategy live) by\n"
-                    "# JenkinsBareNullPrecutOracleEmitter.EmitOnceByHand over the 82 bare\n"
-                    "# traces of jenkins-markers/v2 (stamp_class column, studies/010 triage).\n"};
-    if (provenance != nullptr && *provenance != '\0')
-        out += std::string{"# provenance: "} + provenance + "\n";
-    out += "path\tstages\tsteps\tfinished\tproduced_lines\tdistinct_templates\tsurface_sha256\n";
-    out += body;
-
-    const std::filesystem::path out_path{std::filesystem::path{out_dir} /
-                                         "BARE-v2.precut-oracle.tsv"};
-    std::ofstream sink{out_path, std::ios::binary};
-    ASSERT_TRUE(sink.is_open()) << out_path;
-    sink << out;
-    sink.close();
-    GTEST_LOG_(INFO) << "pre-cut bare-null oracle written: " << out_path << " (" << bare_rows
-                     << " rows)";
-}
+// The pre-cut bare-null oracle EMITTER lived here between the FIRST ACT and the identity cut
+// (T5 5.2, adr/0062): it froze the shipped chain's per-trace scores over the 82 bare traces
+// into the committed BARE-v2.precut-oracle.tsv (emitted at e6f5494, provenance in the file's
+// own header) and was DELETED with the cut, exactly as announced — regenerating the oracle now
+// requires re-adding code, which is the loud act the freeze demands. The comparing gate is
+// test_jenkins_bare_null_gate.cpp (G-T5-BARE).
 
 } // namespace
 

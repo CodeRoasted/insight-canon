@@ -55,24 +55,45 @@ TEST(JenkinsOutcome, TheFiveNativeResultStringsMap)
         << "a dialect's verdict token resolved on an UNDECLARED stream — the gate is fail-open";
 }
 
-TEST(JenkinsOutcome, ConsoleTailRecoveredFromARealisticConsole)
+TEST(JenkinsOutcome, ConsoleTailRecoveredFromADeclaredWholeStreamConsole)
 {
     const ComposedSemantics composed{jenkins_only()};
     // A ci.jenkins.io-shaped console: timestamper-prefixed skeleton + plain output + the epilogue.
-    const std::vector<std::string> lines{
+    // POST-T5-5.2 this is the WHOLE-STREAM class and its stamp is DECLARED transport
+    // (`bracket-rfc3339-line-prefix`): the caller peels through the declared stack and the scan
+    // receives the PEELED lines — the production shape (there is no strategy inside the parser to
+    // strip detections any more; blank peels DROP).
+    const std::vector<std::string> raw_lines{
         "[2025-06-25T14:31:12.339Z] [Pipeline] { (Build)",
         "[2025-06-25T14:31:12.501Z] + mvn -B verify",
-        "some plain output the strategy does not claim",
+        "some plain output nobody claims",
         "[2025-06-25T14:40:01.007Z] [Pipeline] End of Pipeline",
         "[2025-06-25T14:40:01.100Z] Finished: UNSTABLE",
     };
-    const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
-    ASSERT_TRUE(scan.marker_present) << "the timestamper-prefixed epilogue must be recognized";
+    const std::array<std::string_view, 1> declared_names{"bracket-rfc3339-line-prefix"};
+    const insight::transport::TransportStack stack{insight::transport::resolve_transport_stack(
+        insight::transport::IngestDeclaration{.stack = declared_names})};
+    std::vector<std::string> peeled_lines;
+    for (const std::string& line : raw_lines)
+    {
+        const insight::transport::RawPeeledLine peeled{stack.peel_raw(line)};
+        if (!peeled.content.empty())
+            peeled_lines.emplace_back(peeled.content);
+    }
+    const RunOutcomeScan scan{scan_run_outcome(peeled_lines, composed)};
+    ASSERT_TRUE(scan.marker_present) << "the declared-peel epilogue must be recognized";
     EXPECT_EQ(scan.token, "UNSTABLE");
 
     const auto res{resolve_run_outcome("", scan, composed)};
     EXPECT_EQ(res.outcome, RunOutcome::Unstable)
         << "the degenerate only-a-console-log path preserves the four-class verdict";
+
+    // The FAIL-CLOSED arm (T5 §4 item 4 — the ruling's intent, not its price): the SAME console
+    // scanned UNDECLARED (raw, stamps in content) recovers NO verdict marker — an undeclared
+    // stamped stream yields nothing, it never falls open to detection.
+    const RunOutcomeScan raw_scan{scan_run_outcome(raw_lines, composed)};
+    EXPECT_FALSE(raw_scan.marker_present)
+        << "a stamped epilogue was recognized WITHOUT the declared peel — detection returned";
 }
 
 TEST(JenkinsOutcome, BareFreestyleEpilogueStillResolves)

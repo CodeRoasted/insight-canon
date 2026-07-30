@@ -52,6 +52,17 @@ namespace
     // doors share — `peel` and `peel_raw` differ only in what their parameter PROVES and their
     // return type STATES, never in bytes (a byte divergence between the two would be the
     // two-implementations defect this whole contract is about).
+    // Shared by both prefix kinds: the post-stamp separator/indentation strip (greedy `[ \t]+`,
+    // leading only). For the bracketed kind this reproduces the deleted JenkinsStrategy's bundled
+    // behavior #3 BYTE-EXACTLY (adr/0046 verdict (a); the merit question stays parked in flaws.md).
+    void strip_separator(const TransportTransformRow& row, RawPeeledLine& peeled) noexcept
+    {
+        if (!row.strip_leading_space)
+            return;
+        while (!peeled.content.empty() && is_space(peeled.content.front()))
+            peeled.content.remove_prefix(1U);
+    }
+
     void apply_row(const TransportTransformRow& row, RawPeeledLine& peeled) noexcept
     {
         switch (row.kind)
@@ -70,12 +81,74 @@ namespace
                     insight::utils::parse_iso8601(peeled.content.substr(0U, width));
             }
             peeled.content.remove_prefix(width);
-            if (row.strip_leading_space)
-                while (!peeled.content.empty() && is_space(peeled.content.front()))
-                    peeled.content.remove_prefix(1U);
+            strip_separator(row, peeled);
+            break;
+        }
+        case TransportTransformKind::LinePrefixBracketedTimestamp:
+        {
+            // The deleted JenkinsStrategy's `timestamper_prefix_end` position logic, verbatim in
+            // effect (G-T5-PEEL scores the equivalence against the frozen oracle spelling): `[` at
+            // byte 0, the SHARED full-datetime grammar starting at byte 1 (one owner —
+            // rfc3339_datetime_length; the strictness carve-outs fail it by construction), `]`
+            // immediately after, nothing in between. Variable width; `prefix_width` unread.
+            if (peeled.content.empty() || peeled.content.front() != '[')
+                return; // the rule's effect on these bytes is nothing (§2)
+            const std::size_t datetime_len{
+                insight::utils::rfc3339_datetime_length(peeled.content, 1U)};
+            if (datetime_len == 0U)
+                return;
+            const std::size_t close{1U + datetime_len};
+            if (close >= peeled.content.size() || peeled.content[close] != ']')
+                return;
+
+            if (row.extract == TransportExtract::EventObservationTime)
+            {
+                // The bracket interior — same enrichment-only contract as above.
+                peeled.observation_time =
+                    insight::utils::parse_iso8601(peeled.content.substr(1U, datetime_len));
+            }
+            peeled.content.remove_prefix(close + 1U);
+            strip_separator(row, peeled);
             break;
         }
         }
+    }
+
+    // Proleptic-Gregorian calendar decomposition of a day count since 1970-01-01 (Howard
+    // Hinnant's `civil_from_days`, the standard integer-only algorithm — the era/cycle constants
+    // below are the algorithm's own and carry its citation rather than local names: 146097 days
+    // per 400-year era, 719468 days from 0000-03-01 to 1970-01-01, 153-day 5-month cycles).
+    // Pure integer — no <ctime>, no locale, no wall-clock (determinism MUST M8).
+    struct CivilDate
+    {
+        std::int64_t year;
+        unsigned month;
+        unsigned day;
+    };
+
+    [[nodiscard]] constexpr CivilDate civil_from_days(std::int64_t days_since_epoch) noexcept
+    {
+        const std::int64_t shifted{days_since_epoch + 719468};
+        const std::int64_t era{(shifted >= 0 ? shifted : shifted - 146096) / 146097};
+        const auto day_of_era{static_cast<unsigned>(shifted - (era * 146097))};
+        const unsigned year_of_era{
+            ((day_of_era - (day_of_era / 1460)) + (day_of_era / 36524) - (day_of_era / 146096)) /
+            365};
+        const std::int64_t year{static_cast<std::int64_t>(year_of_era) + (era * 400)};
+        const unsigned day_of_year{
+            day_of_era - ((365 * year_of_era) + (year_of_era / 4) - (year_of_era / 100))};
+        const unsigned shifted_month{((5 * day_of_year) + 2) / 153};
+        const unsigned day{(day_of_year - (((153 * shifted_month) + 2) / 5)) + 1};
+        const unsigned month{shifted_month < 10 ? shifted_month + 3 : shifted_month - 9};
+        return {.year = year + (month <= 2 ? 1 : 0), .month = month, .day = day};
+    }
+
+    // Two zero-padded decimal digits into `out` at `pos` (pos advances). Caller guarantees range.
+    constexpr void put_two_digits(std::span<char> out, std::size_t& pos, unsigned value) noexcept
+    {
+        out[pos] = static_cast<char>('0' + (value / 10U));
+        out[pos + 1U] = static_cast<char>('0' + (value % 10U));
+        pos += 2U;
     }
 
     [[noreturn]] void fail_unknown_transform(std::string_view name)
@@ -115,6 +188,75 @@ PeeledLine TransportStack::peel(const insight::tokenization::NormalizedLine& lin
     const std::size_t offset{static_cast<std::size_t>(raw.content.data() - line.bytes().data())};
     return PeeledLine{.content = line.undeclared_suffix(offset),
                       .observation_time = raw.observation_time};
+}
+
+bool render_transport_prefix(const TransportTransformRow& row, insight::Timestamp stamp,
+                             std::string& out)
+{
+    switch (row.kind)
+    {
+    case TransportTransformKind::LinePrefixTimestamp:
+        // NO writer dual, deliberately (T5 §3.3): the GHA API stamp is the platform's, baked into
+        // the GHA IntentFormat's own writer — see the interface contract.
+        return false;
+    case TransportTransformKind::LinePrefixBracketedTimestamp:
+        break;
+    }
+
+    // The ONE fixed lexical form: `[YYYY-MM-DDTHH:MM:SS.mmmZ]` + one separator space — 27 bytes,
+    // filled into a stack scratch and appended in one call (allocation-free on this function's
+    // own account; the caller's buffer amortizes to steady-state capacity).
+    static constexpr std::int64_t kMillisPerSecond{1000};
+    static constexpr std::int64_t kMillisPerDay{86'400'000};
+    static constexpr std::int64_t kSecondsPerMinute{60};
+    static constexpr std::int64_t kMinutesPerHour{60};
+    static constexpr std::size_t kPrefixBytes{27U};
+    static constexpr std::int64_t kMaxRenderableYear{9999};
+
+    const std::int64_t total_millis{
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::floor<std::chrono::milliseconds>(stamp.time_since_epoch()))
+            .count()};
+    std::int64_t days{total_millis / kMillisPerDay};
+    std::int64_t millis_in_day{total_millis % kMillisPerDay};
+    if (millis_in_day < 0)
+    {
+        millis_in_day += kMillisPerDay;
+        --days;
+    }
+    const CivilDate date{civil_from_days(days)};
+    if (date.year < 0 || date.year > kMaxRenderableYear)
+        return false; // outside the four-digit window the fixed form can spell — never a wrong prefix
+
+    const std::int64_t millis{millis_in_day % kMillisPerSecond};
+    const std::int64_t seconds_in_day{millis_in_day / kMillisPerSecond};
+    const std::int64_t second{seconds_in_day % kSecondsPerMinute};
+    const std::int64_t minute{(seconds_in_day / kSecondsPerMinute) % kMinutesPerHour};
+    const std::int64_t hour{seconds_in_day / (kSecondsPerMinute * kMinutesPerHour)};
+
+    std::array<char, kPrefixBytes> scratch{};
+    std::size_t pos{0};
+    scratch[pos++] = '[';
+    put_two_digits(scratch, pos, static_cast<unsigned>(date.year / 100));
+    put_two_digits(scratch, pos, static_cast<unsigned>(date.year % 100));
+    scratch[pos++] = '-';
+    put_two_digits(scratch, pos, date.month);
+    scratch[pos++] = '-';
+    put_two_digits(scratch, pos, date.day);
+    scratch[pos++] = 'T';
+    put_two_digits(scratch, pos, static_cast<unsigned>(hour));
+    scratch[pos++] = ':';
+    put_two_digits(scratch, pos, static_cast<unsigned>(minute));
+    scratch[pos++] = ':';
+    put_two_digits(scratch, pos, static_cast<unsigned>(second));
+    scratch[pos++] = '.';
+    scratch[pos++] = static_cast<char>('0' + (millis / 100));
+    put_two_digits(scratch, pos, static_cast<unsigned>(millis % 100));
+    scratch[pos++] = 'Z';
+    scratch[pos++] = ']';
+    scratch[pos++] = ' ';
+    out.append(scratch.data(), scratch.size());
+    return true;
 }
 
 TransportStack resolve_transport_stack(const IngestDeclaration& declaration)

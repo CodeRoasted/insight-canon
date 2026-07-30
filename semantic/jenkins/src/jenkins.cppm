@@ -1,6 +1,6 @@
 // insight.semantic.jenkins — the Jenkins Pipeline dialect semantic package (ADR 0024/0025,
 // studies/006). VOCABULARY as DATA in the closed canon rule grammar (intent markers + run-outcome
-// rows) + the CODE tier (the dialect format strategy). Fully self-contained: imports only
+// rows); the code tier is EMPTY since T5 5.2 (see below). Fully self-contained: imports only
 // insight.canon.api (types) + insight.canon.spi (the provider contract) — never a sealed detail
 // shard. The composition (insight::semantic::compose) statically links this package's kManifest
 // into a binary.
@@ -26,10 +26,26 @@ export import insight.canon.spi;
 namespace insight::semantic::jenkins
 {
 
-// ── The code-tier seam (defined in jenkins_strategy.cpp, this module's impl unit) ──
-// The dialect format strategy factory (matches spi::StrategyFactory). Jenkins has no echoed-source
-// wrapper (that is the GHA SGR command-echo), so no provenance hook.
-export std::unique_ptr<insight::tokenization::IFormatStrategy> make_strategy();
+// ── The code tier: NONE (T5 5.2 — the GHA T4 precedent, one dialect over) ──
+// There is NO strategy factory any more: `JenkinsStrategy` detected and peeled the Timestamper
+// bracket stamp, claimed `[Pipeline] ` lines and the `Finished: ` epilogue at 0.92, and every one
+// of those legs is now DECLARED rather than detected — the bracket stamp is catalogue transport
+// (`bracket-rfc3339-line-prefix`, canon.transport; peel-equivalence certified by G-T5-PEEL against
+// the strip frozen per adr/0062), and the marker/outcome rows are dialect-gated data walked by
+// core under `--dialect jenkins` (adr/0065 clause 5: rows plus canon's walkers ARE the parser).
+// The strategy's parse of a bare claimed line was RawText's parse (level via the same
+// infer_leading_log_level, empty component, content unmoved) — certified as exactly that by
+// G-T5-BARE's byte-identity over the 82 bare traces. Jenkins has no echoed-source wrapper either
+// (that is the GHA SGR command-echo), so the whole code tier is empty.
+//
+// THE 19-LOG PAYLOAD-STAMPED RE-BASELINE, recorded here because this is the strategy's successor
+// surface (adr/0046 Part 2 clause 1; T5 §4 item 5): that class is NOT declarable (the stamp is a
+// payload-determined subset, adr/0044 §1), so post-purification its stamps stay CONTENT and those
+// lines template with the stamp under D-MSK-5's `[<*>]` normal form. Template IDs move; the count
+// is stable — measured ±strip 3 337 vs 3 339, the +2 fully attributed (one dual-occurrence twin +
+// the bare-`[<*>]` cell from 134 timestamp-only lines; the §6.5 prefix-image triangle returned
+// REPAIRED 2026-07-30, per stamped line template(unstripped) == "[<*>]" ⧺ M(rest), zero exceptions
+// on 6 416 stamped lines). A re-baseline, not a regression.
 
 // The dialect NAME every gated row below carries, and the name a caller declares
 // (`IngestDeclaration::dialect` / `--dialect`). ADR 0065 clause 1: the gate is a composed package
@@ -123,14 +139,17 @@ inline constexpr std::array<OutcomeMarkerRow, 1> kOutcomeMarkers{{
 }};
 
 // ── The manifest (§2.5) — the package's single composed contribution ──
-// name "jenkins", version "1.0.0" (SP-7 immutable-release discipline). The depth claim this
-// vocabulary carries is scoped to DECLARATIVE Pipeline (studies/006: 100% stage + step recall on
-// the claim carrier; scripted/matrix-pipe corroborate); freestyle + classic MatrixProject are the
-// II-4 floor for STRUCTURE but still get a correct four-class VERDICT (outcome recognition works on
-// every Jenkins job type — the `result` is always present, `Finished:` is emitted).
+// name "jenkins", version "1.1.0" (SP-7 immutable-release discipline; bumped from 1.0.0 for T5
+// 5.2: the package's CODE TIER lost its format strategy — `.strategy` is serialized as a presence
+// byte, so the manifest's content genuinely moved; the GHA 1.3.0→1.4.0 precedent at T4). The
+// depth claim this vocabulary carries is scoped to DECLARATIVE Pipeline (studies/006: 100% stage
+// + step recall on the claim carrier; scripted/matrix-pipe corroborate); freestyle + classic
+// MatrixProject are the II-4 floor for STRUCTURE but still get a correct four-class VERDICT
+// (outcome recognition works on every Jenkins job type — the `result` is always present,
+// `Finished:` is emitted).
 export inline constexpr SemanticPackageManifest kManifest{
     .name = "jenkins",
-    .version = "1.0.0",
+    .version = "1.1.0",
     .roles = {},
     .markers = kMarkers,
     .emits = kEmitMarkers, // ADR 0044 §7 — the generation projection is identity-bearing
@@ -139,7 +158,6 @@ export inline constexpr SemanticPackageManifest kManifest{
     .value_classes = {},
     .outcome_tokens = kOutcomeTokens,
     .outcome_markers = kOutcomeMarkers,
-    .strategy = &make_strategy,
     .echoed_source = nullptr,
 };
 

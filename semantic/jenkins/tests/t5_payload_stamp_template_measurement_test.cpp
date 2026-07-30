@@ -10,9 +10,10 @@
 // cosmetic re-baseline and a precision-first regression (adr/0013).
 //
 // THE ARMS, and why arm B is constructed the way it is.
-//   A (+strip, the shipped world) — Tokenizer composed WITH insight.semantic.jenkins. A stamped
-//       line is claimed by JenkinsStrategy, the prefix is stripped, the template comes off the
-//       stripped content.
+//   A (+strip, the shipped world) — POST-CUT (T5 5.2): the DECLARED catalogue peel
+//       (`bracket-rfc3339-line-prefix`) strips the stamp, then the tokenizer templates the
+//       peeled content. (Pre-cut this arm was JenkinsStrategy claiming and stripping; the
+//       strategy died at the identity cut and G-T5-PEEL certifies the peel equals its strip.)
 //   B (−strip, the adr/0044 §1 world) — Tokenizer composed with NO semantic package. A stamped
 //       line is claimed by nobody and falls to the RawText floor with the stamp in content.
 // B is the right vehicle for the §1 world ONLY IF removing the whole package changes nothing for
@@ -70,7 +71,7 @@
 
 import std;
 import insight.canon; // Tokenizer / ArenaAllocator / MaskConfig / compose / template_id_of
-import insight.semantic.jenkins; // kManifest + make_strategy
+import insight.semantic.jenkins; // kManifest (the code tier is empty since T5 5.2)
 
 namespace
 {
@@ -154,6 +155,103 @@ struct LineOutcome
             outcome.produced = true;
             outcome.template_str = std::string{event->template_str};
             outcome.format = event->format;
+        }
+        outcomes.push_back(std::move(outcome));
+    }
+    return outcomes;
+}
+
+// ── POST-CUT (T5 5.2): the +strip arm and the stampedness lens, re-owned ──
+// JenkinsStrategy died at the identity cut; the strip is now the DECLARED catalogue row
+// (`bracket-rfc3339-line-prefix`, peel-equivalence certified by G-T5-PEEL against the strip
+// frozen per adr/0062). This harness's +strip arm therefore peels through the declared stack and
+// tokenizes the peeled content — the arm delta against `run_arm` on the SAME composed view is the
+// peel ALONE, which is a strictly cleaner construction than the pre-cut package-±-composition
+// arms (the old premise check "an unstamped line must not move" is now structural rather than
+// assumed). Stampedness comes from the raw-bytes acceptor (one owner: the shared
+// rfc3339_datetime_length grammar + the row's position logic), the same predicate the catalogue
+// peel applies.
+[[nodiscard]] std::size_t bracket_prefix_end(std::string_view line)
+{
+    if (line.empty() || line.front() != '[')
+        return 0U;
+    const std::size_t datetime_len{insight::utils::rfc3339_datetime_length(line, 1U)};
+    if (datetime_len == 0U)
+        return 0U;
+    const std::size_t close{1U + datetime_len};
+    if (close >= line.size() || line[close] != ']')
+        return 0U;
+    return close + 1U; // one past the ']'
+}
+
+[[nodiscard]] const insight::transport::TransportStack& bracket_stack()
+{
+    static const std::array<std::string_view, 1> names{"bracket-rfc3339-line-prefix"};
+    static const insight::transport::TransportStack stack{insight::transport::
+        resolve_transport_stack(insight::transport::IngestDeclaration{.stack = names})};
+    return stack;
+}
+
+[[nodiscard]] std::vector<LineOutcome>
+run_declared_peel_arm(const std::vector<std::string>& lines,
+                      const insight::semantic::ComposedSemantics& composed)
+{
+    ArenaAllocator arena{kArenaBlockBytes};
+    Tokenizer tokenizer{arena, MaskConfig{}, composed};
+    constexpr std::string_view kPeelCarrier{"maskerprobe"};
+    std::vector<LineOutcome> outcomes;
+    outcomes.reserve(lines.size());
+    for (const std::string& line : lines)
+    {
+        LineOutcome outcome;
+        const std::size_t prefix_end{bracket_prefix_end(line)};
+        if (prefix_end == 0U)
+        {
+            // Unstamped: the peel is the identity, and the pre-cut arm A templated the line
+            // through the ORDINARY chain (any structured claim included) — identical to arm B,
+            // which is P0's premise.
+            if (const auto event{tokenizer.process_line(line)}; event.has_value())
+            {
+                outcome.produced = true;
+                outcome.template_str = std::string{event->template_str};
+                outcome.format = event->format;
+            }
+        }
+        else
+        {
+            // Stamped: peel via the declared stack, then template CARRIER-FENCED — the pre-cut
+            // +strip world's SINGLE-CLAIM semantics reconstructed: JenkinsStrategy claimed the
+            // WHOLE stamped line, so its stripped content templated at the RawText grade and was
+            // never re-claimed by a second strategy. Feeding the peeled payload back through
+            // detection instead would let a logfmt-shaped payload be claimed by KeyValue — a
+            // world neither the pre-cut chain nor any production path produces (the
+            // payload-stamped class is NOT declarable, adr/0044 §1). MEASURED when this rework
+            // first ran without the fence (2026-07-30): 45/6 416 stamped lines diverged exactly
+            // that way — the corruption the M-oracle's carrier comment below pre-named.
+            const insight::transport::RawPeeledLine peeled{bracket_stack().peel_raw(line)};
+            if (!peeled.content.empty())
+            {
+                const std::string carried{std::string{kPeelCarrier} + " " +
+                                          std::string{peeled.content}};
+                if (const auto event{tokenizer.process_line(carried)}; event.has_value())
+                {
+                    const std::string_view templ{event->template_str};
+                    if (templ.starts_with(kPeelCarrier) &&
+                        templ.size() > kPeelCarrier.size() &&
+                        templ[kPeelCarrier.size()] == ' ')
+                    {
+                        outcome.produced = true;
+                        outcome.template_str =
+                            std::string{templ.substr(kPeelCarrier.size() + 1U)};
+                        outcome.format = event->format;
+                    }
+                    // A fused carrier is an instrument failure; left as DECLINED here, and the
+                    // exit gate's own carrier-failure counter (same fence, same bytes) reports it
+                    // loudly on the M side.
+                }
+            }
+            // blank-after-peel: DROP (bundled #4, catalogue-side) — declined, like the
+            // strategy's blank branch.
         }
         outcomes.push_back(std::move(outcome));
     }
@@ -307,13 +405,12 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
     const std::vector<std::string> logs{read_manifest(*manifest_path)};
     ASSERT_FALSE(logs.empty()) << "manifest " << *manifest_path << " listed no logs";
 
-    const std::array manifests{insight::semantic::jenkins::kManifest};
-    const insight::semantic::ComposedSemantics with_jenkins{insight::semantic::compose(manifests)};
+    // POST-CUT: one composed view for both arms — the arm delta is the DECLARED peel alone (see
+    // run_declared_peel_arm). The package's rows are dialect-gated recognition data and do not
+    // touch templates, so composing it here would change nothing; the empty composition keeps the
+    // construction visibly strategy-free.
     const insight::semantic::ComposedSemantics without_jenkins{
         insight::semantic::compose(std::span<const insight::semantic::SemanticPackageManifest>{})};
-
-    const auto strategy{insight::semantic::jenkins::make_strategy()};
-    ArenaAllocator probe_arena{kArenaBlockBytes};
 
     DistinctCounter all_a;
     DistinctCounter all_b;
@@ -340,7 +437,7 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
         const std::vector<std::string> lines{read_raw_lines(log_path)};
         ASSERT_FALSE(lines.empty()) << "empty or unreadable log: " << log_path;
 
-        const auto arm_a{run_arm(lines, with_jenkins)};
+        const auto arm_a{run_declared_peel_arm(lines, without_jenkins)};
         const auto arm_b{run_arm(lines, without_jenkins)};
         ASSERT_EQ(arm_a.size(), arm_b.size());
 
@@ -362,13 +459,10 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
             const std::string& line{lines[index]};
             ++total_lines;
 
-            // The stamped partition comes from the SHIPPED acceptor, never a re-implementation:
-            // JenkinsStrategy sets a timestamp exactly on a timestamper-prefixed line.
-            bool is_stamped{false};
-            if (const auto parsed{strategy->parse(line, probe_arena)}; parsed.has_value())
-                is_stamped = parsed->timestamp.has_value();
-            else
-                is_stamped = line.starts_with("[2") && strategy->confidence(line) > 0.0;
+            // The stamped partition comes from the SHIPPED acceptor — post-cut that is the
+            // catalogue row's own grammar (bracket_prefix_end: the shared rfc3339_datetime_length
+            // + the row's position logic), the exact predicate the declared peel applies.
+            const bool is_stamped{bracket_prefix_end(line) != 0U};
             if (is_stamped)
             {
                 ++log_stamped;
@@ -524,12 +618,10 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
     const std::vector<std::string> logs{read_manifest(*manifest_path)};
     ASSERT_FALSE(logs.empty()) << "manifest " << *manifest_path << " listed no logs";
 
-    const std::array manifests{insight::semantic::jenkins::kManifest};
-    const insight::semantic::ComposedSemantics with_jenkins{insight::semantic::compose(manifests)};
+    // POST-CUT: same construction as TemplateCountUnderTheStrip — one composed view, the arm
+    // delta is the DECLARED peel alone, stampedness from the row's own acceptor.
     const insight::semantic::ComposedSemantics without_jenkins{
         insight::semantic::compose(std::span<const insight::semantic::SemanticPackageManifest>{})};
-    const auto strategy{insight::semantic::jenkins::make_strategy()};
-    ArenaAllocator probe_arena{kArenaBlockBytes};
 
     constexpr std::string_view kCarrier{"maskerprobe"};
     constexpr std::string_view kBareNormalForm{"[<*>]"};
@@ -540,7 +632,6 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
     std::size_t unstamped_lines{0};
     std::size_t a_declined_cell_lines{0}; // rest′ == "" at the frozen [ \t]+ boundary
     std::size_t glued_stamp_lines{0};     // acceptor at 0, EMPTY separator run, tail non-empty
-    std::size_t stamped_lens_disagree{0}; // strategy lens vs raw-bytes acceptor — premise check
     std::size_t carrier_failures{0};      // carrier template did not begin with the carrier token
     std::vector<std::string> glued_samples;
     std::vector<std::string> carrier_samples;
@@ -567,7 +658,7 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
     {
         const std::vector<std::string> lines{read_raw_lines(log_path)};
         ASSERT_FALSE(lines.empty()) << "empty or unreadable log: " << log_path;
-        const auto arm_a{run_arm(lines, with_jenkins)};
+        const auto arm_a{run_declared_peel_arm(lines, without_jenkins)};
         const auto arm_b{run_arm(lines, without_jenkins)};
         ASSERT_EQ(arm_a.size(), arm_b.size());
 
@@ -586,21 +677,10 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
         {
             const std::string& line{lines[index]};
 
-            bool is_stamped{false};
-            if (const auto parsed{strategy->parse(line, probe_arena)}; parsed.has_value())
-                is_stamped = parsed->timestamp.has_value();
-            else
-                is_stamped = line.starts_with("[2") && strategy->confidence(line) > 0.0;
-
-            std::size_t prefix_end{0};
-            if (!line.empty() && line.front() == '[')
-            {
-                const std::size_t len{insight::utils::rfc3339_datetime_length(line, 1U)};
-                if (len != 0 && 1U + len < line.size() && line[1U + len] == ']')
-                    prefix_end = 1U + len + 1U; // one past the ']'
-            }
-            if (is_stamped != (prefix_end != 0))
-                ++stamped_lens_disagree;
+            // ONE lens post-cut: the row's own acceptor (the pre-cut strategy-vs-acceptor
+            // premise cell died with the strategy — there is no second instrument to disagree).
+            const std::size_t prefix_end{bracket_prefix_end(line)};
+            const bool is_stamped{prefix_end != 0U};
 
             if (!is_stamped)
             {
@@ -728,7 +808,8 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
             m_stamped_stripped.insert(*m_stripped);
             rest_images_by_stripped[*m_stripped].insert(*m_rest);
 
-            // (P2b) — the strategy's bundled #2 + #3, asserted against the frozen spelling.
+            // (P2b) — bundled #2 + #3 (now the declared peel's), asserted against the frozen
+            // spelling.
             const LineOutcome& a_outcome{arm_a[facts.line_index]};
             if (!a_outcome.produced || a_outcome.template_str != *m_stripped)
             {
@@ -803,7 +884,6 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
               << unstamped_lines << "\n"
               << "A-declined (ts-only) cell lines        : " << a_declined_cell_lines << "\n"
               << "glued-stamp cell (expect 0)            : " << glued_stamp_lines << "\n"
-              << "stamped-lens disagreements (expect 0)  : " << stamped_lens_disagree << "\n"
               << "carrier failures (expect 0)            : " << carrier_failures << "\n"
               << "P0 unstamped moved (expect 0)          : " << unstamped_lines_moved << "\n"
               << "P1(a) full-datetime survivors (MUST 0) : " << cell_a_full_datetime_survivors
@@ -828,8 +908,7 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
     for (const std::string& sample : cell_b_templates)
         std::cout << "  cell_B: \"" << sample << "\"\n";
 
-    const bool instrument_ok{unstamped_lines_moved == 0 && carrier_failures == 0 &&
-                             stamped_lens_disagree == 0};
+    const bool instrument_ok{unstamped_lines_moved == 0 && carrier_failures == 0};
     const bool p1a_zero{cell_a_full_datetime_survivors == 0};
     const bool p2_holds{p2a_violations == 0 && p2b_violations == 0 && glued_stamp_lines == 0};
     const bool p3_holds{arm_b_all.size() == predicted_b};
@@ -855,8 +934,6 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
            "on those lines; nothing below may be read.";
     for (const std::string& sample : carrier_samples)
         ADD_FAILURE() << "  carrier failure at " << sample;
-    EXPECT_EQ(stamped_lens_disagree, 0U)
-        << "INSTRUMENT arm: the strategy lens and the raw-bytes acceptor disagree on stampedness.";
 
     EXPECT_EQ(cell_a_full_datetime_survivors, 0U)
         << "P1(a) (NOT-REPAIRED arm): a bracketed FULL-DATETIME token survived into an arm-B "
@@ -870,7 +947,7 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
     for (const std::string& sample : p2a_samples)
         ADD_FAILURE() << "  P2a: " << sample;
     EXPECT_EQ(p2b_violations, 0U)
-        << "P2b (NEW-PHENOMENON arm): template_A != M(strip_ws(rest)) — the strategy drifted "
+        << "P2b (NEW-PHENOMENON arm): template_A != M(strip_ws(rest)) — the DECLARED peel drifted "
            "from the 0046 enumeration's frozen [ \\t]+ spelling.";
     for (const std::string& sample : p2b_samples)
         ADD_FAILURE() << "  P2b: " << sample;

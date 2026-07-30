@@ -46,8 +46,10 @@ export namespace insight::transport
 //
 // LIKE EVERY MONOTONIC TOKEN HERE, THIS IS ASSIGNED AT SHIP AND NEVER RESERVED (adr/0047 clause 1,
 // NORMATIVE): the value means "the Nth shape", and which change causes the Nth shape is not
-// knowable in advance. `-1` moves next when a SECOND transform lands with its row.
-inline constexpr std::string_view kTransportCatalogVersion{"transport-catalog-1"};
+// knowable in advance. `-2` was taken when the SECOND transform landed with its row (T5 5.2:
+// `bracket-rfc3339-line-prefix`, jenkins_writer_envelope_t5.md §2 — the co-fire the comment above
+// predicted); `-3` moves next, at whatever ship makes the third shape.
+inline constexpr std::string_view kTransportCatalogVersion{"transport-catalog-2"};
 
 // ⚠ NORMATIVE — CATALOGUE ENUM VALUES ARE IDENTITY-BEARING: NEW MEMBERS APPEND (adr/0047
 // clause 2.2). A value is never renumbered and never inserted mid-enum. Both enums below serialize
@@ -65,11 +67,12 @@ inline constexpr std::string_view kTransportCatalogVersion{"transport-catalog-1"
 
 // Which transform ALGORITHM a row selects and parameterizes.
 //
-// ONE member today, and the narrowing is RATIFIED (adr/0047 clause 2.1). ADR 0044 §3 listed a wider
-// anticipated vocabulary — FramingLine, AnsiEchoWrap, StreamTag, Truncation, Chunking, Encoding —
-// and **§3's enum bodies are to be read as a SKETCH, never as a normative closed set**; §3's
-// normative content is the row shape, the rows-as-data rule and the ternary extract routing, all of
-// which shipped intact.
+// TWO members today, each grown in WITH ITS ALGORITHM, ITS ROW AND ITS GATE (adr/0047 clause 2.1),
+// as `PayloadExtract` and `LocationMatchKind` grew. ADR 0044 §3 listed a wider anticipated
+// vocabulary — FramingLine, AnsiEchoWrap, StreamTag, Truncation, Chunking, Encoding — and **§3's
+// enum bodies are to be read as a SKETCH, never as a normative closed set**; §3's normative
+// content is the row shape, the rows-as-data rule and the ternary extract routing, all of which
+// shipped intact.
 //
 // The decisive argument is not anti-dormant, it is arithmetic: an enum member with no row
 // serializes zero bytes, so declaring the full set up front either moves no digest (and buys
@@ -79,15 +82,24 @@ inline constexpr std::string_view kTransportCatalogVersion{"transport-catalog-1"
 // resolves a declaration by NAME against the rows, so an unused sibling kind would not improve the
 // hard error.
 //
-// Each further member grows in WITH ITS ALGORITHM, ITS ROW AND ITS GATE, as `PayloadExtract` and
-// `LocationMatchKind` grew — and it APPENDS (see the identity-bearing note above).
+// Each further member APPENDS (see the identity-bearing note above).
 enum class TransportTransformKind : std::uint8_t
 {
     // A fixed-width timestamp stamped at the head of EVERY line by the delivery layer. The GHA API
-    // per-line RFC 3339 prefix is the shipped member; Jenkins Timestamper in its whole-stream
-    // scoping is the same shape (ADR 0044 §1's table), and is NOT shipped here — it has no
-    // validatable arm (§10, and Eqya's vehicle ruling re-homed it).
+    // per-line RFC 3339 prefix is the shipped member.
     LinePrefixTimestamp = 0,
+    // A BRACKETED strict-RFC3339 stamp at the head of every line of a declared stream, VARIABLE
+    // width: `[` + the shared full-datetime grammar (`insight::utils::rfc3339_datetime_length` —
+    // the one owner, jenkins_retrofit_gates.md §6 item 3) + `]`, then the declared separator/
+    // indentation strip. The Jenkins Timestamper plugin's whole-stream scoping is the attested
+    // population (12/113 in jenkins-markers/v2, adr/0046 Part 2), and the row landed exactly where
+    // the earlier refusal said it could not YET land: WITH its algorithm, its row and its gate
+    // (G-T5-PEEL — a real population and a real frozen oracle, the shipped strategy strip frozen
+    // per adr/0062 since this cut deletes it). Admissibility argument:
+    // jenkins_writer_envelope_t5.md §2.2. Peel-equivalence is the ONLY obligation this row
+    // carries — the invariance cell stays empty (adr/0058: no world vehicle exists), so declaring
+    // it certifies OUR refactor and nothing about the world.
+    LinePrefixBracketedTimestamp,
 };
 
 // What the peeled bytes YIELD, if anything. 0031's ternary extract routing, now typed: identity
@@ -115,8 +127,9 @@ enum class TransportExtract : std::uint8_t
 // algorithm's parameters, and what it extracts. POD, constexpr-constructible, canonically
 // serializable — the same discipline as the semantic grammar rows.
 //
-// Not every parameter is read by every kind (the `LocationRow` precedent): `prefix_width` and
-// `strip_leading_space` are `LinePrefixTimestamp`'s.
+// Not every parameter is read by every kind (the `LocationRow` precedent): `prefix_width` is
+// `LinePrefixTimestamp`'s alone — `LinePrefixBracketedTimestamp` is VARIABLE width and its
+// acceptor computes the width from the shared grammar, so its row leaves the field 0 and unread.
 struct TransportTransformRow
 {
     std::string_view name; ///< the declaration's reference key; unique within the catalogue
@@ -148,11 +161,27 @@ struct TransportTransformRow
 // below still records where the 28-byte width was measured.
 inline constexpr std::uint32_t kGhaApiPrefixWidth{28U}; // "YYYY-MM-DDTHH:MM:SS.fffffffZ"
 
-inline constexpr std::array<TransportTransformRow, 1> kTransportCatalogRows{{
+inline constexpr std::array<TransportTransformRow, 2> kTransportCatalogRows{{
     {.name = "api-rfc3339-line-prefix",
      .kind = TransportTransformKind::LinePrefixTimestamp,
      .extract = TransportExtract::EventObservationTime,
      .prefix_width = kGhaApiPrefixWidth,
+     .strip_leading_space = true},
+    // The bracketed variable-width form (T5 §2.1). Delivery-shaped name, same argument as the row
+    // above; Jenkins-Timestamper provenance lives HERE in prose, never in the identifier. The
+    // greedy `[ \t]+` strip reproduces the shipped strategy's bundled behavior #3 byte-exactly
+    // because adr/0046 verdict (a) requires items 2–4 reproduced — NOT because the strip's merit
+    // is settled: that question stays PARKED, measurement-gated (flaws.md Eqya·9), and this row
+    // does not move shipped canonicalization as a second change in its pass. `prefix_width` unread
+    // (variable width — the acceptor computes it from the shared grammar). The shipped strictness
+    // carve-outs — Proxifier `[10.20.30.40]`, ApacheError `[Mon Oct …]`, bare `[12:34:56]`,
+    // `[Pipeline]`, `[v1.2.3]` — fail the shared grammar by construction (one owner, both
+    // consumers). The blank decline (bundled #4) is already expressed catalogue-side as
+    // `PeeledLine::is_blank` ⇒ DROP.
+    {.name = "bracket-rfc3339-line-prefix",
+     .kind = TransportTransformKind::LinePrefixBracketedTimestamp,
+     .extract = TransportExtract::EventObservationTime,
+     .prefix_width = 0U,
      .strip_leading_space = true},
 }};
 
@@ -165,6 +194,45 @@ inline constexpr std::array<TransportTransformRow, 1> kTransportCatalogRows{{
             return &row;
     return nullptr;
 }
+
+// ── The WRITER dual of the catalogue (T5 §2.3) — one owner, no third spelling ──────────────────
+//
+// render_transport_prefix appends the row's line prefix (stamp + the single separator space) to
+// `out` and returns true, or returns false for a row whose kind has NO writer dual. The killed
+// third spelling is the point (jenkins_retrofit_gates.md §6 item 3: spike / strategy / masker →
+// one grammar, one owner): a LogCraft-side bracket renderer would be that spelling returning
+// through the writer door. Canon owns every transform ALGORITHM; LogCraft supplies the stamp
+// value and the plumbing, exactly as it supplies payloads to render_row.
+//
+// * `LinePrefixBracketedTimestamp` renders ONE fixed lexical form — the corpus-attested
+//   millisecond-`Z` spelling `[YYYY-MM-DDTHH:MM:SS.mmmZ]` + one space. Integer/manual formatting
+//   only (no iostream, no locale, no strftime — determinism MUST M8), and ALLOCATION-FREE beyond
+//   the caller's buffer: the trailer of a declared wrap is stamped inside the writer's `noexcept`
+//   end-of-stream path (§3.1's high-water-mark rule), so this function may not allocate on its
+//   own account — a stack scratch is filled and appended in one call. NORMATIVE, not an accident.
+// * `LinePrefixTimestamp` has NO writer dual, deliberately (returns false): the GHA API stamp is
+//   the PLATFORM's, baked into the GHA IntentFormat's own writer (T5 §3.3 — a writer-side ± knob
+//   there would generate only our own ablation and move shipped SID-3 bytes for nothing). A
+//   declared output wrap naming that row is rejected at declaration time, loudly, via this exact
+//   predicate.
+//
+// Conformance laws (asserted in tests, stated here as the contract):
+//   * `parse_iso8601(<the rendered interior>) == floor<seconds>(stamp)` — the shipped parser
+//     reads whole seconds (fraction skipped by design), so the round-trip law holds at the
+//     parser's grain; the rendered millisecond digits are covered by the byte-exact peel law:
+//   * `peel_raw(render ∥ ℓ).content == strip_ws(ℓ)` and the extracted observation time equals
+//     `floor<seconds>(stamp)` — the peel is the renderer's inverse at the declared strip's
+//     boundary (T5 §2.3's round-trip law, stated at the honest `strip_ws` boundary).
+//
+// Returns false also for a stamp outside the four-digit-year window the fixed form can spell
+// (0000-01-01 … 9999-12-31) — a caller-contract violation surfaced as "not renderable", never a
+// silently wrong prefix. Deliberately NOT noexcept: `out.append` may grow the caller's buffer,
+// and an allocating function must not wear the keyword (the escape-NOLINT that would preserve it
+// defeats the very tripwire it decorates) — "allocation-free" is the function's own account: a
+// caller that reserves once appends forever without a further allocation. Defined in
+// transport.cpp.
+[[nodiscard]] bool render_transport_prefix(const TransportTransformRow& row,
+                                           insight::Timestamp stamp, std::string& out);
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 // §6 — the per-run, per-stream DECLARATION. Generalizes `IntentChannel` rather than sitting beside

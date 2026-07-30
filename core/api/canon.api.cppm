@@ -588,11 +588,12 @@ enum class LogFormat : uint8_t
     // commands). A first-class CI input — without it these lines are mis-claimed
     // by Syslog (RFC3339 prefix) and shredded into empty templates.
     GitHubActions,
-    // Jenkins Pipeline console dialect (ADR 0024 §1.3 registration; the strategy code lives in
-    // insight_semantic_jenkins). Line-selective: `[Pipeline] ` annotations, timestamper-plugin
-    // `[<RFC3339>] `-prefixed lines, and the `Finished: <RESULT>` run epilogue; other console
-    // output falls through (typically RawText) — a Jenkins console has no uniform line prefix.
-    Jenkins,
+    // `Jenkins` EXITED here at T5 5.2 (the GHA T4 purification, one dialect over): the dialect's
+    // detection strategy died — the Timestamper bracket stamp is DECLARED catalogue transport
+    // (`bracket-rfc3339-line-prefix`), and the `[Pipeline] `/`Finished: ` legs are dialect-gated
+    // rows walked by core under `--dialect jenkins`. Freeze-agnostic re-verified at the exit: no
+    // wire field and no wire token carries this enum's numeric values, so the member shift below
+    // is invisible outside a single build graph.
     // GitLab CI job-trace dialect (ADR 0024 §1.3 registration; the strategy code lives in
     // insight_semantic_gitlab). Line-selective: a fixed-width `<RFC3339> NNC[ +]` runner transport
     // prefix (stamped traces), `section_start:` section markers, and the terminal
@@ -649,8 +650,6 @@ enum class LogFormat : uint8_t
         return "NginxError"sv;
     case LogFormat::GitHubActions:
         return "GitHubActions"sv;
-    case LogFormat::Jenkins:
-        return "Jenkins"sv;
     case LogFormat::GitLab:
         return "GitLab"sv;
     case LogFormat::RawText:

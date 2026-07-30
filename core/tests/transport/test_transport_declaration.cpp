@@ -307,11 +307,13 @@ TEST(TransportDeclaration, DeclaredStackExtractsObservationTimeOnlyWhenTheStampP
 
 TEST(TransportCatalog, ShippedRowsAreExactlyWhatTheCatalogDeclares)
 {
-    // ONE row today, deliberately (ADR 0044 §3 sketches seven; this workspace does not ship enum
-    // members with no algorithm, no row and no gate). Pinned so that adding a member without its
-    // algorithm and its gate fails here — the anti-dormant rule with teeth
+    // TWO rows today, each landed WITH its algorithm, its row and its gate (ADR 0044 §3 sketches
+    // seven; this workspace does not ship enum members with no algorithm, no row and no gate).
+    // The second landed at T5 5.2 (`bracket-rfc3339-line-prefix` + G-T5-PEEL) — the co-fire the
+    // version comment predicted. Pinned so that adding a member without its algorithm and its
+    // gate fails here — the anti-dormant rule with teeth
     // ([[rip-dormant-no-premature-specialization]]).
-    ASSERT_EQ(kTransportCatalogRows.size(), 1U)
+    ASSERT_EQ(kTransportCatalogRows.size(), 2U)
         << "a new catalogue row is a catalogue-VERSION bump landing WITH its algorithm and its "
            "gate. If you are here because you added one, bump kTransportCatalogVersion and add "
            "its arm — the version is part of every composed semantic_identity.";
@@ -324,10 +326,20 @@ TEST(TransportCatalog, ShippedRowsAreExactlyWhatTheCatalogDeclares)
     EXPECT_EQ(row.prefix_width, 28U) << "\"YYYY-MM-DDTHH:MM:SS.fffffffZ\" is 28 bytes";
     EXPECT_TRUE(row.strip_leading_space);
 
+    const auto& bracket_row{kTransportCatalogRows[1]};
+    EXPECT_EQ(bracket_row.name, "bracket-rfc3339-line-prefix");
+    EXPECT_EQ(bracket_row.kind, TransportTransformKind::LinePrefixBracketedTimestamp);
+    EXPECT_EQ(bracket_row.extract, TransportExtract::EventObservationTime);
+    EXPECT_EQ(bracket_row.prefix_width, 0U)
+        << "the bracketed form is VARIABLE width — the field is unread (the LocationRow "
+           "unread-parameter precedent) and 0 says so";
+    EXPECT_TRUE(bracket_row.strip_leading_space)
+        << "bundled #3 (the greedy [ \\t]+ strip) reproduced byte-exactly — adr/0046 verdict (a)";
+
     // The catalogue version is a component of every composed semantic_identity. Pinned as a
     // LITERAL: a silent bump would move every digest in the workspace, and a test that read the
-    // constant back from the constant could never say so.
-    EXPECT_EQ(kTransportCatalogVersion, "transport-catalog-1");
+    // constant back from the constant could never say so. `-2` = the second shape (T5 5.2).
+    EXPECT_EQ(kTransportCatalogVersion, "transport-catalog-2");
 }
 
 TEST(TransportCatalog, NamesAreUniqueAndLookupRoundTrips)
@@ -365,7 +377,53 @@ TEST(TransportDeclarationDeathTest, UnknownTransformFailsClosedNamingTheCatalog)
     // The message must NAME the vocabulary — a fail-closed error the operator cannot act on is
     // only half the posture.
     EXPECT_DEATH({ (void)resolve_transport_stack(declaration); }, "api-rfc3339-line-prefix");
-    EXPECT_DEATH({ (void)resolve_transport_stack(declaration); }, "transport-catalog-1");
+    EXPECT_DEATH({ (void)resolve_transport_stack(declaration); }, "bracket-rfc3339-line-prefix");
+    EXPECT_DEATH({ (void)resolve_transport_stack(declaration); }, "transport-catalog-2");
+}
+
+// ── The WRITER dual's laws (T5 §2.3 — render_transport_prefix, the emit side of the catalogue) ──
+TEST(TransportRenderer, BracketPrefixRendersOneFixedFormAndRoundTrips)
+{
+    const auto* bracket_row{find_transform("bracket-rfc3339-line-prefix")};
+    ASSERT_NE(bracket_row, nullptr);
+
+    // One fixed lexical form: the corpus-attested millisecond-Z spelling + ONE separator space.
+    const auto stamp{*insight::utils::parse_iso8601("2026-06-23T15:11:09Z")};
+    std::string rendered;
+    ASSERT_TRUE(insight::transport::render_transport_prefix(*bracket_row, stamp, rendered));
+    EXPECT_EQ(rendered, "[2026-06-23T15:11:09.000Z] ");
+
+    // Determinism: two renders, byte-identical; append semantics (the caller's buffer grows).
+    std::string second;
+    ASSERT_TRUE(insight::transport::render_transport_prefix(*bracket_row, stamp, second));
+    EXPECT_EQ(rendered, second);
+
+    // The round-trip laws at the honest boundary (§2.3): peel_raw(render ∥ ℓ) recovers
+    // strip_ws(ℓ), and the extracted observation time equals the parser's whole-second reading
+    // of the rendered interior (parse_iso8601 skips the fraction BY DESIGN — the law holds at
+    // the parser's grain; the millisecond digits are covered by the byte-exact form pin above).
+    const std::array<std::string_view, 1> declared_names{"bracket-rfc3339-line-prefix"};
+    const TransportStack stack{resolve_transport_stack(
+        IngestDeclaration{.stack = declared_names})};
+    const std::string line{rendered + "hello world"};
+    const auto peeled{stack.peel_raw(line)};
+    EXPECT_EQ(peeled.content, "hello world");
+    ASSERT_TRUE(peeled.observation_time.has_value());
+    EXPECT_EQ(*peeled.observation_time, stamp);
+
+    // `LinePrefixTimestamp` has NO writer dual, deliberately (T5 §3.3): the GHA API stamp is the
+    // platform's, baked into the GHA IntentFormat's own writer — false, and the buffer untouched.
+    const auto* gha_row{find_transform(kGhaTransform)};
+    ASSERT_NE(gha_row, nullptr);
+    std::string untouched;
+    EXPECT_FALSE(insight::transport::render_transport_prefix(*gha_row, stamp, untouched));
+    EXPECT_TRUE(untouched.empty());
+
+    // Out of the four-digit-year window: refused, never a silently wrong prefix.
+    const auto far_future{stamp + std::chrono::hours{24LL * 366 * 8000}};
+    std::string refused;
+    EXPECT_FALSE(insight::transport::render_transport_prefix(*bracket_row, far_future, refused));
+    EXPECT_TRUE(refused.empty());
 }
 
 } // namespace
