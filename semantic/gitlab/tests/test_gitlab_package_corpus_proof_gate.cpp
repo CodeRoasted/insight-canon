@@ -1,7 +1,7 @@
 // NOLINTBEGIN — integration gate: literals and printed diagnostics are intended.
 // test_gitlab_package_corpus_proof_gate.cpp — the GitLab PACKAGE PROOF over marker_corpus_v1
 // (technical_docs/history/architecture-v1/corpus_backed_gates.md § 4; homed here by Kleio,
-// § 4.1/§ 4.2; the live gates-shelf register is technical_docs/design_notes/DN-018-corpus-gates-shelf-register.md).
+// § 4.1/§ 4.2; the live gates-shelf register is DN-18).
 //
 // ═══ WHAT IS BEING CLAIMED, IN THE WORDS § 4.4 REQUIRES ═══
 //
