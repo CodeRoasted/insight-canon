@@ -2,7 +2,7 @@
 // Canon public determinism proof — fixture.
 //
 // The externally-checkable half of the "same input → same output, bit-for-bit"
-// claim (insight_determinism_model.md § "Public proof-gate (canon, Apache)").
+// claim (bibles/determinism_model.md §3).
 // Drives ONLY canon's public Apache API — the tokenizer/stateless-masker template set,
 // `failure_lexicon` token-scan, and `det_math` — over a canon-local PUBLIC corpus,
 // and emits a CANONICAL, INTEGER-DOMAIN text digest. No metalog, no eidos, no

@@ -121,7 +121,7 @@ endif()
 ###########################################################
 #  Float determinism — det_math (header-only inline in the api module) requires cross-machine
 #  bit-identity. Disable FMA contraction so `a*b+c` is never fused. PUBLIC so consumers compiling
-#  det_math inherit it. (insight_determinism_model.md "Float Hardening".)
+#  det_math inherit it. (bibles/determinism_model.md "Float Hardening".)
 ###########################################################
 target_compile_options(insight_canon PUBLIC
     $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-ffp-contract=off>

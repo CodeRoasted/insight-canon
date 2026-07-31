@@ -294,7 +294,7 @@ std::optional<Timestamp> parse_iso8601(std::string_view timestamp_str) noexcept
 
 // BSD syslog: "Jan  1 12:00:00" or "Jan 15 08:03:22"
 // Yearless (RFC3164); the year is the injected `reference_year`. Deterministic by
-// construction — NO wall-clock read (insight_determinism_model.md § Event-time):
+// construction — NO wall-clock read (bibles/determinism_model.md §7):
 // a `std::time(nullptr)`-derived year made the parsed timestamp non-reproducible
 // across the year rollover and (cached in a thread_local) invisible to the
 // differential oracle. Default = kDefaultReferenceYear; a live consumer injects

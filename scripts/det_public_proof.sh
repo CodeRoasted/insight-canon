@@ -2,7 +2,7 @@
 ###############################################################################
 # Canon public determinism proof gate — the EXTERNALLY-CHECKABLE half of the
 # "same input → same output, bit-for-bit" claim
-# (insight_determinism_model.md § "Public proof-gate (canon, Apache)").
+# (bibles/determinism_model.md §3).
 #
 # Canon-only by construction: it builds ONLY canon's public Apache module across
 # the (gcc-15/libstdc++ × clang-21/libc++)  x  -O{0,3}  x  -ffp-contract{off,fast}
@@ -14,7 +14,7 @@
 # (proof/golden.sha256). No metalog, no eidos, no private surface — an outsider can
 # clone the public repo and run this to verify the determinism claim.
 #
-# ── Approach B (Daidalos ruling 2026-06-06; insight_determinism_model.md) ──────
+# ── Approach B (Daidalos ruling 2026-06-06; bibles/determinism_model.md) ──────
 # The methodology is unchanged: build N ways → canonical digest → assert identical
 # + golden. Only the "N ways" MECHANIC changed. The 1.5.1 unwrap turned canon's
 # public surface into a C++20 MODULE (the textual api/*.hpp the old single-shot
