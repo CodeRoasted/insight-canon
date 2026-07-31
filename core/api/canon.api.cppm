@@ -1696,7 +1696,7 @@ class NormalizedLine;
 // friend-first declaration would pin `normalize` non-exported ([module.interface]).
 [[nodiscard]] NormalizedLine normalize(std::string_view raw_line, std::string& scratch);
 
-// ── STAGE 1 AS A TYPE (insight_ingest_normalization_contract.md §12.2/§12.5) ────────────────────
+// ── STAGE 1 AS A TYPE (ADR-21.D3) ──────────────────────────────────────────────────────────────
 //
 // `NormalizedLine` means: STAGE 1 RAN ON THESE BYTES — canon's universal ANSI ingest normalization
 // (D-TID-11), the exact grammar `normalize()` below owns. Produced ONLY by `normalize()`; there is

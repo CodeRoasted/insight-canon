@@ -1,6 +1,6 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_normalized_content_doors.cpp — the DOOR CENSUS of the typed ingest precondition
-// (insight_ingest_normalization_contract.md §12.5.5 items 2 and 4, plus Eqya's ruling-1 addition).
+// (ADR-21.D3's door census and ADR-21.D4's pinned-absence traits, plus Eqya's ruling-1 addition).
 //
 // Homed beside the walker tests because the walkers are what the doors guard (flagged for Kleio's
 // confirmation — test homing is hers). Four legs:
@@ -150,7 +150,7 @@ TEST(NormalizedContentDoors, NormalizedContentHasExactlyTheTwoAuditedFriends)
         "friend class NormalizedLine", "friend class insight::tokenization::LogParserPasskey"};
     EXPECT_EQ(found, expected)
         << "NormalizedContent's friend list moved — that list is the DOOR CENSUS "
-           "(insight_ingest_normalization_contract.md §12.5.5 item 2): every entry is a producer "
+           "(ADR-21.D3): every entry is a producer "
            "of the walkers' currency, and growth is a ruling, not an edit. Found:\n"
         << ::testing::PrintToString(found);
 }

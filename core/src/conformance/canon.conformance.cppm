@@ -201,7 +201,7 @@ namespace
     // itself, so `scratch` is untouched and a caller-scoped scratch may be shared across probes),
     // no count can move, and the kit exercises the same public ingest a production consumer does.
     // ⚠ NEVER the LogParser mint here — that would grow its friend list to two and delete the
-    // mechanism (insight_ingest_normalization_contract.md §12.5.2, named in advance).
+    // mechanism (ADR-21.D4 — the friend list IS the audit surface; named in advance).
     [[nodiscard]] insight::tokenization::NormalizedContent normalized_probe(std::string_view probe,
                                                                             std::string& scratch)
     {

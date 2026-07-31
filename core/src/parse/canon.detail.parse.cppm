@@ -58,7 +58,7 @@ export namespace insight::tokenization
 class LogParser;
 } // namespace insight::tokenization
 
-// ── The §12.5.1(c) privileged mint (insight_ingest_normalization_contract.md) ───────────────────
+// ── The privileged mint — the canon-interior half of the boundary scope (ADR-21.D4) ─────────────
 // THE one non-public producer of `NormalizedContent`, and the friend list below is the audit
 // surface: growing it is a visible, reviewable edit, and the door-census gate pins it at ONE.
 //

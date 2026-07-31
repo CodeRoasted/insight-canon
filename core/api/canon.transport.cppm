@@ -276,7 +276,7 @@ struct IngestDeclaration
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
 // What one line's DECLARED peel yielded on the RECOGNITION path. `content` carries the ingest
-// precondition as a TYPE (insight_ingest_normalization_contract.md §12.2): this peel takes a
+// precondition as a TYPE (ADR-21.D3): this peel takes a
 // `NormalizedLine`, so holding a PeeledLine is proof that stage 1 ran and the declared stage 2
 // followed — the currency the content walkers accept.
 struct PeeledLine
@@ -356,8 +356,8 @@ class TransportStack
     // attested at 16 250 measured lines). Declaration moves RESPONSIBILITY to the party that owns
     // the knowledge; it does not make a wrong declaration harmless.
     //
-    // TWO DOORS, TWO PATHS, TWO RETURN TYPES — and the split is the §5.4 refusal made structural
-    // (insight_ingest_normalization_contract.md):
+    // TWO DOORS, TWO PATHS, TWO RETURN TYPES — the never-in-place refusal made structural
+    // (ADR-21.D2, scoped by ADR-21.D4):
     //   * `peel(const NormalizedLine&)` — the RECOGNITION path's DECLARED stage 2. Stage 1 first
     //     (the type carries the proof), then the catalogue rows; the result is the walkers'
     //     currency. The order is load-bearing: an escape sitting BEFORE the transport prefix is

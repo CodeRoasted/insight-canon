@@ -37,8 +37,8 @@ export namespace insight::tokenization
 // dialect argument here would restore the content dependence T4 removed: the argument used to be
 // `LogParser::routed_format()`, the per-line detector winner under a sticky-strategy fast path.
 
-// ⚠⚠ THE PRECONDITION ON `content` IS THE TYPE (adr/0073, made structural per
-// insight_ingest_normalization_contract.md §12). `NormalizedContent` is producible only by
+// ⚠⚠ THE PRECONDITION ON `content` IS THE TYPE (ADR-21.D3 — carried by the type, so an
+// unnormalized caller outside canon fails to compile). `NormalizedContent` is producible only by
 // stage 1 (`normalize`, insight.canon.api) followed by a suffix-taking stage 2 — the declared
 // `TransportStack::peel(NormalizedLine)` or the caller's own `undeclared_suffix` — so a caller
 // that has not normalized DOES NOT COMPILE at canon's public boundary. What used to stand here
