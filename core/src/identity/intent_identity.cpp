@@ -1,7 +1,7 @@
 module insight.canon.api;
 import insight.canon.internal;
 
-// intent_identity.cpp — the canon-owned INTENT identity (intent_identity_model.md §5/§5.1).
+// intent_identity.cpp — the canon-owned INTENT identity (bibles/intent_identity.md §2-§4).
 //
 // `canonicalize_intent` is the templating discipline of the stateless value masker
 // (canon.detail.mask, D-TID-1/2) REAPPLIED to identifiers — the closure-as-identity-constructor

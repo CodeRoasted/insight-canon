@@ -92,7 +92,7 @@ struct Tokenizer::Impl
         event.structural_role = insight::tokenization::classify(
             parser.attest(parsed_line.content),
             composed); // announced structural role (the resolved view's rows)
-        // Identity-derived WHERE (intent_identity_model.md §5.3, II-8): populate an EMPTY component
+        // Identity-derived WHERE (bibles/intent_identity.md §8, II-8): populate an EMPTY component
         // WHERE axis with the recognized test-file. Semantic-unaware (SP-1): no dialect literal — a
         // format whose lines carry a native component already skips via component.empty(); a format
         // without one (GHA today, any future dialect tomorrow) gets the identity-derived WHERE, and

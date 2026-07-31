@@ -1,6 +1,6 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_where_wiring.cpp — MaskConfig.recognize_test_where, the flag-gated identity-derived WHERE on
-// the tokenizer (intent_identity_model.md §5.3, II-8). REPLACES the 1.7.4
+// the tokenizer (bibles/intent_identity.md §8, II-8). REPLACES the 1.7.4
 // tests/identity/test_where_wiring.cpp, re-homed to core as a SYNTHETIC-composition mechanism test
 // after the SP-1 fix removed the dialect gate (was `event.format == LogFormat::GitHubActions`; now
 // purely `component.empty()` — tokenizer_engine.cpp:89, bugs.md 2026-07-08). The property is now

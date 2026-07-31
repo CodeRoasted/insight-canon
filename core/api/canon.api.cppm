@@ -109,7 +109,7 @@ struct NgramId
 // the sequence's id bytes; transient (never serialized), order-sensitive.
 [[nodiscard]] NgramId ngram_id_of(const std::vector<TemplateId>& sequence) noexcept;
 
-// ── Intent identity (intent_identity_model.md §5/§5.1, II-1/II-6/II-7) ──
+// ── Intent identity (bibles/intent_identity.md §2-§4, II-1/II-6/II-7) ──
 // kIntentRegistryVersion RETIRED (ADR 0024 §4.1): it was a dead constant (zero downstream readers),
 // and its job — the II-7 comparability identity of the recognizer/marker rule set — is now
 // discharged by the composed `semantic_identity` (insight::semantic::ComposedSemantics), a CONTENT
@@ -147,7 +147,7 @@ struct NgramId
 // one call keeps `intent_id` co-located with its comparability version.
 [[nodiscard]] TemplateId intent_id_of(std::string_view name);
 
-// Location recognition (intent_identity_model.md §5.3/§5.4, II-8) moved to the facade
+// Location recognition (bibles/intent_identity.md §8, II-8) moved to the facade
 // (insight::recognize_location over a ComposedSemantics) — it walks the composed location rows the
 // test_frameworks package ships, so it cannot live in api (which the compose module imports). The
 // three LocationMatchKind families (jest/vitest/playwright `.test.`/`.spec.`; pytest `test_*.py`;
@@ -986,7 +986,7 @@ struct MaskConfig
     // is formed, so they never fossilise into the template identity.
     bool mask_ip_addresses{true};  // IPv4 address tokens (e.g. "192.168.1.1:")
     bool mask_hex_addresses{true}; // hex address tokens  (e.g. "0xdeadbeef")
-    // Identity-derived WHERE (intent_identity_model.md §5.3, II-8): when set, a GitHub-Actions
+    // Identity-derived WHERE (bibles/intent_identity.md §8, II-8): when set, a GitHub-Actions
     // line whose NATIVE component is empty (GHA carries none) gets its recognize_location()
     // test-file as `component` — populating the cube WHERE axis ABOVE the empty native tier
     // (never faking it — GHA WHERE is identity-derived by construction). OFF by default so every
@@ -1008,7 +1008,7 @@ struct MaskConfig
 export namespace insight::tokenization
 {
 
-// ── Intent-marker recognition (intent_identity_model.md §5.2, the registry's segmentation
+// ── Intent-marker recognition (bibles/intent_identity.md §6, the registry's segmentation
 // rule class; GitHub-Actions dialect tier) ──────────────────────────────────────────────
 // On the STRIPPED content stream Sift consumes (studies/004: `strip_workflow_commands`), the
 // RESET-class markers that open a behavioural quantum — the segmentation anchors the aligned

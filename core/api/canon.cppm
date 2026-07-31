@@ -176,7 +176,7 @@ struct RunOutcomeResolution
 resolve_run_outcome(std::string_view side_input_token, const RunOutcomeScan& scan,
                     const insight::semantic::ComposedSemantics& composed);
 
-// Location recognition (intent_identity_model.md §5.3/§5.4, II-8) — the test-file WHERE coordinate,
+// Location recognition (bibles/intent_identity.md §8, II-8) — the test-file WHERE coordinate,
 // homed in the facade because it walks the composed location rows (ComposedSemantics is in
 // insight.canon.compose). Canon owns the three LocationMatchKind algorithms; the composed rows are
 // the dialect-independent file-naming vocabulary. Returns a view into the content's bytes, or
