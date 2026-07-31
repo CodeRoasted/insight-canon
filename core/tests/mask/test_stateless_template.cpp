@@ -1,5 +1,5 @@
 // NOLINTBEGIN
-// Unit tests for the stateless template masker (stateless_template_id.md D-TID-1/2).
+// Unit tests for the stateless template masker (stateless_template_id.md D-TID-1/D-TID-2).
 // The property tests are committed regression guards — chiefly the phantom-pair kill
 // (the whole point, §9.5). The F13 masker-cardinality RE-MEASURE lived here as an
 // env-gated CardinalityOnCorpus test; it is a measurement over an operator-mounted
@@ -58,7 +58,7 @@ TEST(StatelessTemplate, LogicallyIdenticalLinesShareTemplate)
 // templates (a false NewTemplate + VanishedTemplate on an outcome flip). The stateless
 // masker decides masking per token from the line's OWN content, so the shared line
 // yields ONE template no matter what surrounds it — the phantom cannot form. (It also
-// shows the accepted tradeoff, D-TID-8: `eu-west` stays literal — a letter-leading word,
+// shows the accepted tradeoff: `eu-west` stays literal — a letter-leading word,
 // not a syntactic high-card class; the over-split that F13 + the cardinality monitor size.)
 TEST(StatelessTemplate, KillsThePhantomPair)
 {
@@ -80,7 +80,7 @@ TEST(StatelessTemplate, KillsThePhantomPair)
         << "stream A: " << in_stream_a << "\nstream B: " << in_stream_b;
     EXPECT_EQ(in_stream_a, alone) << "priming must have zero effect: " << in_stream_a << " vs "
                                   << alone;
-    // The accepted tradeoff (D-TID-8): the region word is KEPT literal, not wildcarded.
+    // The accepted tradeoff (SRC-D-TID-14): the region word is KEPT literal, not wildcarded.
     EXPECT_NE(in_stream_a.find("eu-west"), std::string::npos)
         << "a letter-leading word stays literal (F13 boundary): " << in_stream_a;
 }

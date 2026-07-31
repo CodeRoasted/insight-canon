@@ -446,7 +446,7 @@ TEST_F(TokenizerTest, JSONWithKVContentMaskedStatelessly)
     // KEPT literal (the SRC-D-TID-14 boundary: a varying value-WORD is not a syntactic
     // high-card class; masking it needs the deferred SemanticClassRegistry). So two
     // lines differing only in a KV value-word are DISTINCT templates — the accepted
-    // stateless over-split (D-TID-8), NOT Drain's old cross-line wildcard.
+    // stateless over-split, NOT Drain's old cross-line wildcard.
     auto ra{tokenizer.process_line(R"({"msg":"action=login user=alice status=ok"})")};
     auto rb{tokenizer.process_line(R"({"msg":"action=login user=bob status=ok"})")};
     ASSERT_TRUE(ra.has_value() && rb.has_value());

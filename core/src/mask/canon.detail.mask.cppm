@@ -14,7 +14,7 @@ import insight.canon.api;      // MaskConfig, ArenaAllocator
 export namespace insight::tokenization
 {
 
-// ── Stateless per-line template masker (stateless_template_id.md D-TID-1/2) ──────
+// ── Stateless per-line template masker (stateless_template_id.md D-TID-1/D-TID-2) ──────
 // A deterministic, run-independent function of the line's OWN masked/kept tokens —
 // NO cluster state, NO cross-line learning. The same logical line yields the same
 // template_str (hence the same SHA-256 template_id, computed downstream) in any run,
@@ -22,7 +22,7 @@ export namespace insight::tokenization
 // template differently) cannot form. The per-token KEEP / MASK / composite-normalize
 // classification (status-value KEEP, UUID/long-hash + IPv4/hex + digit-leading MASK,
 // source-location / versioned-ref / bracket-index / #-counter / embedded-identity /
-// key=<numeric-value> normalization — §8 D-TID-12/13) is DECIDED per token, never discovered from
+// key=<numeric-value> normalization — §8 D-TID-12/D-TID-13) is DECIDED per token, never discovered from
 // cross-line data (D-TID-2: discover→decide). This is the sole identity source (the clustering tree
 // it replaced is RIPPED — SRC-D-TID-3).
 //

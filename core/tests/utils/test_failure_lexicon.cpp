@@ -190,7 +190,7 @@ TEST(FailureLexicon, PassWordOrTrailingGlyphDoesNotDemote)
 // §6.7 re-run hard-floor false positives: P3 rank 1 `Storing crash reports into
 // '<path>'` (an informational startup line, the NOUN "crash") and P3 rank 2
 // `- deleting watched path emits watcher fail event` (a mocha test DESCRIPTION,
-// "fail" modifying "event"). This is one level past D-OUT-1/-1b: D-OUT-1 demotes a
+// "fail" modifying "event"). This is one level past D-OUT-1/SRC-D-OUT-1b: D-OUT-1 demotes a
 // pass-MARKED verdict (a ✓ leads); here there is NO marker to demote against — the
 // line is simply not a verdict. The discriminator is the same decoration CI/test
 // tooling uses to MARK an outcome — caps / `:` / `[ ]` / `( )` / CamelCase type /

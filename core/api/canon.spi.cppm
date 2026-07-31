@@ -58,7 +58,7 @@ struct ParsedLine
     // arena-stable storage; empty for every non-ordinal line. Consumed metalog-side (W1 binning),
     // never tokenized into the template.
     std::span<const OrdinalObservation> ordinals;
-    // O4b Span Links (SRC-D-OTEL-9/21): the span_ids this span declares a cross-trace edge to (OTLP
+    // O4b Span Links (SRC-D-OTEL-9/SRC-D-OTEL-21): the span_ids this span declares a cross-trace edge to (OTLP
     // `links[]`), populated by the span strategy. A span over arena-stable storage; empty for every
     // line without links. Consumed metalog-side (distilled into the service topology), never
     // tokenized.

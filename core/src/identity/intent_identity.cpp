@@ -4,7 +4,7 @@ import insight.canon.internal;
 // intent_identity.cpp — the canon-owned INTENT identity (bibles/intent_identity.md §2-§4).
 //
 // `canonicalize_intent` is the templating discipline of the stateless value masker
-// (canon.detail.mask, D-TID-1/2) REAPPLIED to identifiers — the closure-as-identity-constructor
+// (canon.detail.mask, D-TID-1/D-TID-2) REAPPLIED to identifiers — the closure-as-identity-constructor
 // make-or-break (§5.1 detail 1). It is a DISTINCT rule set from the value masker, by design:
 //   - the value masker keeps structure to DISTINGUISH   ( `yarn (1/10)` → `yarn (1/<*>` )
 //   - identity canonicalization COLLAPSES to ALIGN      ( `yarn (1/10)` → `yarn (M)`     )

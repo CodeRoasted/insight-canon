@@ -261,7 +261,7 @@ inline constexpr std::array<OtelFieldDescriptor, 4> kOtelFieldCatalog{{
     {.field_class = OtelFieldClass::SeverityNumber, .key = "severityNumber"},
 }};
 
-// ── Declared ordinal-field catalog (W1 ordinal channel, §4A.4 SRC-D-W1-2/3/8) ──
+// ── Declared ordinal-field catalog (W1 ordinal channel, §4A.4 SRC-D-W1-2/D-W1-3/D-W1-8) ──
 // The "now" tier (SRC-D-TID-6): a declared, registry-free catalog of structured numeric fields
 // whose VALUE is ordinal (metric structure — magnitude + distance), recognized by EXACT top-level
 // field name in the JsonStrategy field-route (mirror kOtelFieldCatalog). A declared-key hit is
