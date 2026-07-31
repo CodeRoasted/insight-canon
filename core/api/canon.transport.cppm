@@ -90,7 +90,7 @@ enum class TransportTransformKind : std::uint8_t
     LinePrefixTimestamp = 0,
     // A BRACKETED strict-RFC3339 stamp at the head of every line of a declared stream, VARIABLE
     // width: `[` + the shared full-datetime grammar (`insight::utils::rfc3339_datetime_length` —
-    // the one owner, jenkins_retrofit_gates.md §6 item 3) + `]`, then the declared separator/
+    // the one owner, bibles/jenkins_dialect.md §4 item 3) + `]`, then the declared separator/
     // indentation strip. The Jenkins Timestamper plugin's whole-stream scoping is the attested
     // population (12/113 in jenkins-markers/v2, adr/0046 Part 2), and the row landed exactly where
     // the earlier refusal said it could not YET land: WITH its algorithm, its row and its gate
@@ -199,7 +199,7 @@ inline constexpr std::array<TransportTransformRow, 2> kTransportCatalogRows{{
 //
 // render_transport_prefix appends the row's line prefix (stamp + the single separator space) to
 // `out` and returns true, or returns false for a row whose kind has NO writer dual. The killed
-// third spelling is the point (jenkins_retrofit_gates.md §6 item 3: spike / strategy / masker →
+// third spelling is the point (bibles/jenkins_dialect.md §4 item 3: spike / strategy / masker →
 // one grammar, one owner): a LogCraft-side bracket renderer would be that spelling returning
 // through the writer door. Canon owns every transform ALGORITHM; LogCraft supplies the stamp
 // value and the plumbing, exactly as it supplies payloads to render_row.

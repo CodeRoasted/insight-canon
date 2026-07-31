@@ -112,7 +112,7 @@ struct Report
 [[nodiscard]] Report round_trip_report(const SemanticPackageManifest& manifest,
                                        const ComposedSemantics& composed);
 
-// The kit's own marker probe, EXPORTED for regression tripwires (jenkins_retrofit_gates.md §4,
+// The kit's own marker probe, EXPORTED for regression tripwires (bibles/jenkins_dialect.md §3,
 // leg L-C). The repaired construction is `render_row(paired_writer_row(row), "probe")` — the
 // writer dual materialized, self-adapting over every extractor. The OLD form (`prefix + " probe"`)
 // yielded, for the Jenkins STAGE row, `[Pipeline] { ( probe` — a probe that fires NOWHERE, which

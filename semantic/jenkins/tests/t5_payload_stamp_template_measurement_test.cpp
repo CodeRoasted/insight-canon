@@ -37,7 +37,7 @@
 //   * Anything strictly between is a THIRD outcome and is reported as such — it is never rounded
 //     into a branch.
 //
-// STATUS OF THAT CLASSIFIER AFTER THE D-MSK-5 REPAIR (jenkins_retrofit_gates.md §6.5, amended
+// STATUS OF THAT CLASSIFIER AFTER THE D-MSK-5 REPAIR (bibles/jenkins_dialect.md §4, amended
 // 2fe2e85): it is the FROZEN RECORD of the pre-fix measurement it correctly scored (EXPLODES at
 // 95.9% of ceiling), and it is NOT the repair's fitness predicate — its ceiling leg is can't-PASS
 // on these bytes from the pre-fix record alone (arm A alone at 3 138/6 055 = 51.8% ≥ the 0.5 bar,
@@ -335,7 +335,7 @@ TEST(JenkinsPayloadStampMeasurement, CounterCanReportAnExplosion)
 // equal to its raw line, and the header declared: "the day the masker claims `[<RFC3339>]` to a
 // stable normal form, this test goes RED and must be rewritten to the new normal form. That is the
 // intended failure, not a regression." That day came with D-MSK-5 `bracket_timestamp`
-// (kCanonicalizationVersion -8, jenkins_retrofit_gates.md §6): the RED fired exactly as designed
+// (kCanonicalizationVersion -8, bibles/jenkins_dialect.md §4): the RED fired exactly as designed
 // (observed 2026-07-30, all three per-line verbatim EXPECTs), and this is the rewrite it demanded.
 //
 // What it asserts NOW: the stamp class collapses to the `[<*>]` normal form — the unit-mechanism
@@ -566,13 +566,13 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
               << "  — the frozen record's reading, NOT the exit verdict: post-D-MSK-5 the exit "
                  "predicate is §6.5's prefix-image triangle (PrefixImageExitGate), and this "
                  "classifier's ceiling leg is can't-PASS on these bytes by construction "
-                 "(jenkins_retrofit_gates.md §6.5)\n\n";
+                 "(bibles/jenkins_dialect.md §4)\n\n";
 
     // This test REPORTS; it never asserts the branch. The branch is the finding.
     SUCCEED();
 }
 
-// ═══ The §6.5 exit gate — the PREFIX-IMAGE TRIANGLE (jenkins_retrofit_gates.md §6.5, 2fe2e85) ═══
+// ═══ The PREFIX-IMAGE exit gate — the TRIANGLE (bibles/jenkins_dialect.md §4, 2fe2e85) ═══
 //
 // Derived a priori from the normal form's structure AND the shipped chain's ENUMERATED behaviors
 // (adr/0046's bundled list: #2 the stamp strip, #3 the greedy `[ \t]+` leading-whitespace strip,

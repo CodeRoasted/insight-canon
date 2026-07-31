@@ -15,7 +15,7 @@
 // never a silent oracle shift).
 //
 // ═══ WHAT SHARING `rfc3339_datetime_length` MEANS (the can't-PASS ledger, §6) ═══
-// The CHARACTER grammar is deliberately the one shared owner (jenkins_retrofit_gates.md §6
+// The CHARACTER grammar is deliberately the one shared owner (bibles/jenkins_dialect.md §4
 // item 3) — oracle and SUT both call it, so this gate cannot catch a defect INSIDE that grammar.
 // What it scores is exactly the residual independent surface: the position logic, the strip, the
 // blank decline, and the extract — the surfaces that were re-spelled in the catalogue peel.

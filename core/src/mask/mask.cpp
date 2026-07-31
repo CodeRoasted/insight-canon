@@ -539,7 +539,7 @@ namespace
         return true;
     }
 
-    // BRACKET_TIMESTAMP composite (D-MSK-5; jenkins_retrofit_gates.md §6, adr/0053 erratum 2 —
+    // BRACKET_TIMESTAMP composite (D-MSK-5; bibles/jenkins_dialect.md §4, adr/0053 erratum 2 —
     // "the bracket is the entire difference"). The WHOLE-token bracketed RFC3339 stamp
     // `[2026-06-23T15:11:09.020Z]` used to fall through EVERY rule to literal KEEP: the
     // diagnostic composite declines it (its `:digit` trigger fires but no sub-segment is

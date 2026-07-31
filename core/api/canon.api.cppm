@@ -57,7 +57,7 @@ using EventID = uint64_t;
 // `template_str` and `template_id` do NOT move under -7 — the masker is untouched — but
 // `dominant_level` is serialized and gates NewErrorPattern and diff polarity, so it is an
 // output-affecting canonicalization change and takes the bump. -8 = D-MSK-5 bracket_timestamp
-// (jenkins_retrofit_gates.md §6, adr/0053 erratum 2 — "the bracket is the entire difference"): a
+// (bibles/jenkins_dialect.md §4, adr/0053 erratum 2 — "the bracket is the entire difference"): a
 // WHOLE-token bracketed RFC3339 full datetime (`[2026-06-23T15:11:09.020Z]`) masks to `[<*>]`
 // instead of falling through to literal KEEP; `template_str`/`template_id` move ONLY for lines
 // carrying that token class, every other document is byte-identical except this version string.
@@ -1306,7 +1306,7 @@ inline constexpr int kDefaultReferenceYear{2024};
 // its character grammar here, and the masker's `bracket_timestamp` composite rule (D-MSK-5) tests
 // a bracket interior with the same function. Homed PUBLIC (not in the mask detail) because the
 // Jenkins package imports only insight.canon.api/spi — canon's detail shards are sealed, so a
-// detail-homed grammar could not be delegated to (jenkins_retrofit_gates.md §6.3, homing note).
+// detail-homed grammar could not be delegated to (bibles/jenkins_dialect.md §4, homing note).
 // Returns the number of bytes consumed by a COMPLETE datetime starting at `pos`, or 0 when the
 // bytes at `pos` do not carry one. Accepted shape, byte-exact — `YYYY-MM-DDTHH:MM:SS`, optional
 // `.f…` fraction, optional `Z` / `±HH:MM` / `±HHMM` zone. A malformed OPTIONAL part is a hard 0,
