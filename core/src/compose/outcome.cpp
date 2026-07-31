@@ -1,5 +1,5 @@
 module;
-#include "utils/log_macros.hpp" // textual macro layer (§11.9) — the kept trace-level divergence log
+#include "utils/log_macros.hpp" // textual macro layer (ADR-3.D4) — the kept trace-level divergence log
 
 module insight.canon;
 import insight.canon.internal;

@@ -1,4 +1,4 @@
-// insight.canon.api — the public DATA + API surface of canon (1.5.1 unwrap, §11.9). The former
+// insight.canon.api — the public DATA + API surface of canon (ADR-3.D4). The former
 // api/insight/**/*.hpp content (types, det_math, canonical_event, mask_config,
 // structural_role_registry, arena_allocator, tokenizer_engine, failure_lexicon, time_utils, logger
 // accessors) lives here. std comes from insight.canon.internal; spdlog (3rd-party, the logger
@@ -1468,7 +1468,7 @@ namespace detail
 
     // The function INSIGHT_LOG_* expand to. Homed in the module (not the textual macro header) so
     // no first-party declaration leaks through the GMF — log_macros.hpp stays pure preprocessor + a
-    // single third-party include (the logcraft canonical pattern, §11.4).
+    // single third-party include (the logcraft canonical pattern, ADR-3.D4).
     template <typename... Args>
     inline void
     log_message(const std::shared_ptr<spdlog::logger>& logger,

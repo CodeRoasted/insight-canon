@@ -1,5 +1,5 @@
-// insight.canon.internal — the lone `import std` manifest for the canon module graph (1.5.1 unwrap,
-// §11.9). Every other canon module unit imports THIS (plain) to reach std; it is the single hinge
+// insight.canon.internal — the lone `import std` manifest for the canon module graph (
+// ADR-3.D4). Every other canon module unit imports THIS (plain) to reach std; it is the single hinge
 // where a future modular dependency graduates in. It also re-exports the GLOBAL C fixed-width types
 // that the canon source uses UNQUALIFIED (`uint64_t`, `uint8_t`, …) — `import std` provides
 // `std::uint64_t` but NOT the global `::uint64_t`, so we surface them here (the logcraft internal

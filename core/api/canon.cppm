@@ -1,4 +1,4 @@
-// insight.canon — public facade (1.5.2 domain decomposition, §11.9.11). Consumers
+// insight.canon — public facade (ADR-3.D4). Consumers
 // `import insight.canon;` unchanged. Re-exports the public api surface; the
 // insight.canon.detail.{scan,strategy,mask,parse} shards are NOT re-exported (sealed, build-only).
 // Tokenizer lives HERE (not in api): its impl needs LogParser/the masker from the detail shards,

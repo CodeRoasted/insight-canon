@@ -8,7 +8,7 @@
 //     catalogue's contract, and fail-closed resolution. Every one of these is a property of ONE
 //     component (`insight.canon.transport`) over bytes this file authors. It needs no seam and no
 //     corpus, so it is a UNIT test and belongs in `core/tests/transport/`, 1:1 with `src/transport/`
-//     (§11.9.11's per-domain mirror). Homing it as a corpus gate would have been the mis-homing this
+//     (ADR-3.D4's per-domain mirror). Homing it as a corpus gate would have been the mis-homing this
 //     role exists to stop: real bytes cannot prove a property that is about the empty stack.
 //   • `tests/compose/test_transport_identity.cpp` — that declaring transport does not move
 //     `semantic_identity`. Also unit, but its seam is compose's, not transport's.

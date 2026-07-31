@@ -1,5 +1,5 @@
-// insight.canon.detail.parse — SEALED detection/parsing domain (1.5.2 domain decomposition,
-// §11.9.11). FormatDetector (strategy registry + majority vote) and LogParser (arena + detector +
+// insight.canon.detail.parse — SEALED detection/parsing domain (
+// ADR-3.D4). FormatDetector (strategy registry + majority vote) and LogParser (arena + detector +
 // sticky active-strategy state). Top of the strategy chain: imports detail.strategy for the
 // IFormatStrategy/ParsedLine contract it routes. Never re-exported by the facade and never
 // installed (PRIVATE file set).

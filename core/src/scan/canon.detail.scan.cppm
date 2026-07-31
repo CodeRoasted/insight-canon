@@ -1,4 +1,4 @@
-// insight.canon.detail.scan — SEALED scanning foundation (1.5.2 domain decomposition, §11.9.11).
+// insight.canon.detail.scan — SEALED scanning foundation (ADR-3.D4).
 // The fast_gates layer: branch-light constexpr char/prefix predicates + the SSE2 sv_* parsing
 // primitives the strategy confidence()/parse() hot paths ride. Interface-only (everything inline /
 // constexpr — no impl units). Bottom of the canon detail DAG: imports internal only; SSE2

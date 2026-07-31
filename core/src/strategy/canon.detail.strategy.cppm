@@ -1,5 +1,5 @@
-// insight.canon.detail.strategy — SEALED format-strategy domain (1.5.2 domain decomposition,
-// §11.9.11). ParsedLine, the IFormatStrategy contract, and the 20 concrete format strategies.
+// insight.canon.detail.strategy — SEALED format-strategy domain (
+// ADR-3.D4). ParsedLine, the IFormatStrategy contract, and the 20 concrete format strategies.
 // Imports api (Timestamp/LogLevel/LogFormat/ArenaAllocator) — never the facade. The strategy impl
 // units additionally import detail.scan (fast_gates predicates) and keep simdjson textual in their
 // GMFs (simdjson_scratch.hpp). Never re-exported by the facade and never installed (PRIVATE file

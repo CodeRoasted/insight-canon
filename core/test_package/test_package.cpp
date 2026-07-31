@@ -3,7 +3,7 @@
 #include <gtest/gtest.h>
 #include <string_view>
 
-// Black-box consumer: the 1.5.1 unwrap (§11.9) replaced the textual public headers with a
+// Black-box consumer: the 1.5.1 unwrap (ADR-3.D4) replaced the textual public headers with a
 // module — the facade re-exports core types, tokenization
 // (ArenaAllocator/Tokenizer/CanonicalEvent), time_utils (parse_iso8601) and det_math, so one import
 // gives the whole consumer surface.

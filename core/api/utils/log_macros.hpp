@@ -1,10 +1,10 @@
-// log_macros.hpp — the INSIGHT_LOG_* macro layer (1.5.1 unwrap, §11.9).
+// log_macros.hpp — the INSIGHT_LOG_* macro layer (ADR-3.D4).
 //
 // Macros cannot cross a module boundary (`import` brings declarations, not `#define`s), and the
 // compile-time level elision these macros provide is load-bearing (true zero-cost in Release). So
 // the macros stay a TEXTUAL header, #included in the GMF of every logging TU. This header is
 // SEALED to pure preprocessor + a SINGLE third-party include — NO first-party declarations leak
-// (§11.4: GMF = third-party-textual). The function the macros expand to (detail::log_message) lives
+// (ADR-3.D4: GMF = third-party-textual). The function the macros expand to (detail::log_message) lives
 // in the insight.canon.api module; every logging TU (canon's own + downstream consumers like eidos)
 // also does `import insight.canon;`. (The compile-time DEBUG gate for `if constexpr` elision is a
 // build-only local in canon's tokenizer/parser impl units — never the api surface, so no level

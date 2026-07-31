@@ -1,5 +1,5 @@
 module;
-#include "utils/log_macros.hpp" // textual macro layer (§11.9)
+#include "utils/log_macros.hpp" // textual macro layer (ADR-3.D4)
 
 module insight.canon;
 import insight.canon.internal;

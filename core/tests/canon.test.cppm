@@ -1,4 +1,4 @@
-// insight.canon.test — shared white-box test infrastructure (§11.9.11, the logcraft.test pattern).
+// insight.canon.test — shared white-box test infrastructure (ADR-3.D4, the logcraft.test pattern).
 // All test TUs import this instead of spelling out the full import block.
 // Re-exports the complete canon module surface (public facade + the sealed detail shards), so a
 // test TU needs no further imports beyond gtest (textual, third-party).

@@ -1,5 +1,5 @@
 module;
-#include "strategy/simdjson_scratch.hpp" // textual: TU-local simdjson entities (§11.8 family)
+#include "strategy/simdjson_scratch.hpp" // textual: TU-local simdjson entities (ADR-3.D4 family)
 #include <simdjson.h>
 
 module insight.canon.detail.strategy;

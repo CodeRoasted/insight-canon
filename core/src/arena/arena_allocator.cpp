@@ -4,7 +4,7 @@ module;
 #ifdef INSIGHT_HAS_NUMA
 #include <numa.h>
 #endif
-#include "utils/log_macros.hpp" // textual macro layer (§11.9)
+#include "utils/log_macros.hpp" // textual macro layer (ADR-3.D4)
 
 module insight.canon.api;
 import insight.canon.internal;

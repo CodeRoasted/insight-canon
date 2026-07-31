@@ -1,5 +1,5 @@
 // insight.canon.detail.mask — SEALED stateless template-masking domain (1.5.2 domain
-// decomposition, §11.9.11). The per-line masker: content → (arena-stable masked template +
+// decomposition, ADR-3.D4). The per-line masker: content → (arena-stable masked template +
 // params), a PURE function of the line's own tokens. A leaf over the contract: imports api only
 // (MaskConfig, ArenaAllocator) — independent of scan/strategy/parse. Never re-exported by the
 // facade and never installed (PRIVATE file set).
