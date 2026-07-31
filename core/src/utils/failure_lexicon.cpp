@@ -246,13 +246,10 @@ namespace
         {0xE2U, 0x9CU, 0x85U}, // ✅ U+2705 WHITE HEAVY CHECK MARK
         {0xE2U, 0x88U, 0x9AU}, // √ U+221A SQUARE ROOT — mocha's Windows pass mark
     }};
-    // Per-test FAIL glyphs (SRC-D-OUT-4a) — the ballot-X family + the ❌ cross-mark emoji, all
-    // 3-byte UTF-8. Like the pass glyphs, they are unambiguous per-test result markers. ❌
-    // U+274C (CROSS MARK) is the emoji jest/vitest/mocha emit on a failing test; it never
-    // doubles as a separator, so it is recall-safe to add (the 1.6.5 dogfood found ❌-led
-    // fail lines anchoring nothing where ✗-led ones did). × U+00D7 (MULTIPLICATION SIGN, a
-    // 2-byte sequence) stays EXCLUDED on purpose: it doubles as a dimension separator
-    // ("1920×1080"), the precision risk that deferred D-OUT-3.
+    // Per-test FAIL glyphs — the SRC-D-OUT-4a set (contract: canon.api.cppm). The ballot-X
+    // family + the ❌ cross-mark emoji, all 3-byte UTF-8; × U+00D7 is the 2-byte one the rule
+    // excludes. ❌ U+274C earned its place on evidence: the 1.6.5 dogfood found ❌-led fail
+    // lines anchoring nothing where ✗-led ones did.
     constexpr std::array<Glyph, 5U> kFailGlyphs{{
         {0xE2U, 0x9CU, 0x95U}, // ✕ U+2715 MULTIPLICATION X
         {0xE2U, 0x9CU, 0x96U}, // ✖ U+2716 HEAVY MULTIPLICATION X
@@ -457,15 +454,12 @@ namespace detail
             for (const FailureWord& entry : kFailureLexicon)
                 if (iequals(token, entry.word)) // a failure word leads → not a pass
                     return false;
-            // SRC-D-OUT-2: a leading pass WORD (passed/ok/success/succeeded) demotes a failure
-            // word, but ONLY as the FIRST significant token — so the TAP/node-runner case "ok 1 -
-            // should return error" demotes (ok leads), while "25 passed, 5 failed" does NOT (a
-            // number is the first significant token, not "passed" — a summary count the count
-            // register independently handles). Conservative vs the glyph rule: a glyph is an
-            // unambiguous verdict that never appears in prose; a pass WORD does ("passed through"),
-            // so it must LEAD, never fire mid-line. Disconfirming "not ok 1 …" is a TAP FAILURE —
-            // "not" is the first significant token → no demote → the line stays a failure
-            // (correct).
+            // SRC-D-OUT-2 — see canon.api.cppm for the contract. WHY THE GUARD IS THE LOOP'S
+            // `first_significant` FLAG and not a position compare: the pass WORD must LEAD, and
+            // "leading" is defined over SIGNIFICANT tokens, so a pure-punctuation prefix is
+            // skipped (above) without consuming the slot. This is also what makes "not ok 1 …"
+            // come out right with no special case — `not` takes the slot, so no demote fires and
+            // the TAP failure survives.
             if (first_significant)
             {
                 for (const std::string_view verdict : kSuccessVerdicts)
@@ -687,9 +681,9 @@ bool contains_failure_cue(std::string_view text, std::size_t scan_limit) noexcep
                 if (iequals(prev, phrase[0]) && iequals(token, phrase[1]))
                     return true; // phrase completes — a strong cue
             const LexiconHit hit{lexicon_hit(text, token, prev, prev_prev)};
-            // SRC-D-OUT-4b: the CamelCase error-TYPE anchors only in verdict
-            // register; a ▶-led node:test suite-NAME line referencing a
-            // …Error type does not (register/position, not the token).
+            // SRC-D-OUT-4b — see canon.api.cppm for the contract. Cold: reached only
+            // when the lexicon missed, so the extra full-line scan
+            // error_type_anchors costs is paid on non-matching lines only.
             if (!hit.matched && is_camel_error_type(token) && error_type_anchors(text, token))
                 saw_error_type = true;
             prev_prev = prev; // shift the two-token window for the next adjacency

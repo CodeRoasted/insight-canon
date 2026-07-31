@@ -136,11 +136,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
         return std::unexpected(std::string("LogParser: empty line"));
     }
 
-    // SRC-D-TID-11: strip ANSI/CSI/SGR/OSC escape sequences as a content normalization at canon
-    // ingest — BEFORE strategy detection AND tokenization, so the format prefix-match, the level
-    // token-scan, and the `component` extraction all see colour-free content (colour is
-    // presentation, never content; the escapes interleave within/between tokens so a per-token
-    // mask cannot reach them). Pure byte state machine → cross-stdlib bit-identical.
+    // SRC-D-TID-11 — see canon.api.cppm for the contract.
     //
     // This is THE one named site where the parser performs stage 1 unconditionally — the
     // invariant that entitles `attest()` to exist. The ESC-gated fast path (no ESC byte → the

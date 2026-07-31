@@ -248,6 +248,12 @@ struct OtelFieldDescriptor
 
 // The OTLP/JSON top-level keys per the OpenTelemetry Log Data Model. Keys are exact (OTLP is
 // a declared schema); a structured catalog, not scattered inline predicates.
+//
+// SRC-D-OTEL-18b: the span `kind` field is DEFERRED, deliberately and not by oversight. It is a
+// categorical value, so carrying it would need a categorical-field→value_counts channel canon does
+// not have; routing it through any existing channel would either fabricate an ordinal or smuggle a
+// vocabulary into the semantic-unaware core. It is not load-bearing for the structural exhibits,
+// so the honest state is ABSENT — never a placeholder. Adding the channel is what unblocks it.
 inline constexpr std::array<OtelFieldDescriptor, 4> kOtelFieldCatalog{{
     {.field_class = OtelFieldClass::TraceId, .key = "traceId"},
     {.field_class = OtelFieldClass::SpanId, .key = "spanId"},
@@ -980,6 +986,16 @@ export namespace insight::tokenization
 // The Drain clustering knobs (max_depth / similarity_threshold / max_clusters) were
 // removed with the clustering itself (stateless_template_id.md SRC-D-TID-3) — a stateless
 // masker has no tree, no similarity match, and no cluster cap to bound.
+//
+// SRC-D-TID-14 — THE ANTI-MONSTER BOUNDARY, the rule every mask rule is admitted against.
+// A mask rule may classify a SYNTACTIC token class only (digit-leading numerics, hex runs,
+// UUIDs, paths, marker+numeric composites): decidable from the token's own bytes, one token,
+// no lexicon. Varying WORDS stay LITERAL — a categorical value is a KEEP-lexicon concern, and
+// the lexicon is a seed that grows on calibration EVIDENCE, never on anticipation. The
+// boundary is what stops the masker becoming a vocabulary: every widening that needs a list
+// of words is out of scope here by construction, and belongs to the deferred value-class
+// registry (ADR-17). It is also why byte-only single-token rules are the only admissible
+// shape — that is what makes them cross-stdlib identical.
 struct MaskConfig
 {
     // Structurally variable tokens are replaced with "<*>" before the masked template
@@ -1195,11 +1211,16 @@ namespace detail
     // (parse_log_level), which lives in a SEPARATE TU that could not see a TU-local symbol.
     // True iff the line's leading outcome is a PASS: a pass GLYPH (✓/✔/✅/√) anywhere in the
     // head (an unambiguous per-test verdict, so a failure WORD embedded in the test NAME
-    // "✔ … failure …" is not an alert), OR (SRC-D-OUT-2) a pass WORD (passed/ok/success/succeeded)
-    // as the FIRST SIGNIFICANT token ("ok 1 - should return error" → pass; the TAP/node-runner
-    // case). A leading failure WORD ⇒ false (failure leads), so a genuine "ERROR:"/"FATAL:" line
-    // is preserved; a summary "25 passed, 5 failed" ⇒ false (a number is the first significant
-    // token, not "passed"), and a prose "passed" mid-line never demotes (word must LEAD).
+    // "✔ … failure …" is not an alert).
+    //
+    // SRC-D-OUT-2: a leading pass WORD (passed/ok/success/succeeded) ALSO demotes a failure word,
+    // but ONLY as the FIRST SIGNIFICANT token ("ok 1 - should return error" → pass; the
+    // TAP/node-runner case). A leading failure WORD ⇒ false (failure leads), so a genuine
+    // "ERROR:"/"FATAL:" line is preserved; a summary "25 passed, 5 failed" ⇒ false (a number is
+    // the first significant token, not "passed"), and a prose "passed" mid-line never demotes.
+    // The asymmetry with the glyph is deliberate and is the whole rule: a glyph is an unambiguous
+    // verdict that never occurs in prose, so it fires anywhere in the head; a pass WORD occurs in
+    // prose ("passed through the proxy"), so it must LEAD or it does not fire at all.
     // Internal/detail — NOT a public product surface (the public failure-lexicon API stays
     // contains_failure_cue / contains_warning_cue); defined with the lexicon in
     // failure_lexicon.cpp.
@@ -1212,10 +1233,17 @@ namespace detail
     // ≥2 letters (ERROR/FAILED/FATAL); (2) DELIMITER-bound — followed by `:` AND standing in the
     // line's KIND SLOT (SRC-D-OUT-4c, below), or enclosed by `[..]`/`(..)` (`[error]`, `##[error]`,
     // `(FAILED)`);
-    // (3) a LEADING fail glyph `✗`/`✕`/`✖`/`✘` (SRC-D-OUT-4a) marking the line a failed verdict —
-    // a line-level register that CONFIRMS the token, never creates a cue (a glyph-only line
-    // has no failure word). (Type-named CamelCase `…Error` and the `segmentation fault`
-    // phrase are the other two register forms, handled at their own existing sites.)
+    // (3) SRC-D-OUT-4a: a LEADING fail glyph `✗`/`✕`/`✖`/`✘`/`❌` marks the line a failed verdict —
+    // a line-level register that CONFIRMS the token, never CREATES a cue (a glyph-only line has no
+    // failure word, and stays silent). `×` U+00D7 is excluded on purpose: it doubles as a dimension
+    // separator ("1920×1080"), the precision risk that deferred D-OUT-3.
+    //
+    // SRC-D-OUT-4b: a CamelCase error-TYPE name (`…Error`/`…Exception`) is the fourth register
+    // form, and it anchors ONLY in verdict register — a thrown `ValueError: bad input` fires, a
+    // `▶`-led node:test suite NAME that merely REFERENCES the type does not. The discriminator is
+    // register/position, never the token: the same identifier names a type in one line and throws
+    // one in the next. (`segmentation fault` is the fifth form, an adjacent-pair phrase.) Both are
+    // handled at their own sites in failure_lexicon.cpp, which cite back here.
     // PRECONDITION: `token` MUST be a sub-view of `line` (a for_each_token token) — the
     // kernel recovers the surrounding bytes by pointer arithmetic, as caps/adjacency are
     // pre-casefold byte facts the trimmed token alone does not surface. Pure byte-compare +
@@ -1610,7 +1638,16 @@ template <typename Visit>
 
 } // namespace insight::utils
 
-// ──────── from src/scan/canon.detail.scan.cppm (ANSI ingest normalization, SRC-D-TID-11) ────────
+// ──────── from src/scan/canon.detail.scan.cppm (ANSI ingest normalization) ────────
+// SRC-D-TID-11 — STRIP ANSI/CSI/SGR/OSC ESCAPE SEQUENCES AS A CONTENT NORMALIZATION AT CANON
+// INGEST, BEFORE strategy detection AND tokenization, so the format prefix-match, the level
+// token-scan and the `component` extraction all see colour-free content. Colour is presentation,
+// never content. The ordering is not a preference: the escapes interleave WITHIN and BETWEEN
+// tokens, so no per-token mask downstream can reach them — a strip that runs after tokenization
+// has already lost. The implementation is a pure byte state machine, hence cross-stdlib
+// bit-identical (F5). The one carve-out is the RECOGNITION path's raw read, which needs the
+// wrapper intact for SRC-D-PROV-1 (canon.transport.cppm states that seam).
+//
 // PUBLIC, and homed here rather than in the sealed detail.scan shard for one reason: stage 1 is an
 // obligation the `recognize()`/`classify()` DECLARATION places on its callers (see the precondition
 // on those two in insight.canon), and a caller cannot discharge an obligation whose only

@@ -124,8 +124,8 @@ namespace
     // integer literal when it immediately follows a status keyword AND is small
     // (≤ kMaxStatusDigits). Size-gating bounds cardinality (exit codes ≤ 255,
     // HTTP status ≤ 599 — both ≤ 3 digits); the keyword gate keeps bare counts
-    // ("port 8080", "took 200 ms") masked. The lexicon is a seed and will grow
-    // during calibration (SRC-D-TID-14: categorical numbers stay a KEEP-lexicon concern).
+    // ("port 8080", "took 200 ms") masked. The lexicon is a seed and grows on calibration
+    // evidence only — SRC-D-TID-14, contract in canon.api.cppm.
     constexpr std::size_t kMaxStatusDigits{3};
 
     [[nodiscard]] inline bool equals_ascii_lower(std::string_view tok,
@@ -607,8 +607,8 @@ namespace
     // ── F13 composite-masking (stateless_template_id.md §8 / D-TID-12,13) ────────
     // Per-line masking is the SOLE generalizer once Drain's learning is retired, so
     // these classify the high-card SYNTACTIC token classes the fixed masks missed.
-    // Boundary (SRC-D-TID-14): syntactic classes only — varying WORDS stay literal (the
-    // deferred registry's job). All byte-only, single-token → cross-stdlib identical.
+    // Admitted under SRC-D-TID-14 (contract: canon.api.cppm) — all byte-only and
+    // single-token, which is what makes them cross-stdlib identical.
 
     // D-TID-12 #5: digit-leading (after an optional sign) ⇒ a number / measurement /
     // version / timestamp, intrinsically high-card. Subsumes the all-digit mask AND
