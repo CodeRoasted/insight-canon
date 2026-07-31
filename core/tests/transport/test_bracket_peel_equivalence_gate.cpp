@@ -1,9 +1,9 @@
 // NOLINTBEGIN — corpus gate: literals and printed diagnostics are intended.
 // test_bracket_peel_equivalence_gate.cpp — G-T5-PEEL: the bracket row's peel-equivalence gate
-// (jenkins_writer_envelope_t5.md §6; the G1-PEEL shape one row over; adr/0044 Part 1's owed
+// (jenkins_writer_envelope_t5.md §6; the G1-PEEL shape one row over; ADR-23 Part 1's owed
 // obligation for Timestamper, discharged).
 //
-// ═══ THE ORACLE IS A FROZEN COPY (adr/0062 clauses 1–2) ═══
+// ═══ THE ORACLE IS A FROZEN COPY (ADR-8) ═══
 // Taken VERBATIM from `semantic/jenkins/src/jenkins_strategy.cpp` at insight-canon commit
 // `f5e4838` — the last commit before T5 5.2 deleted that detection from production. Its
 // provenance lives HERE, in the gate, and not only in the `git log` of a deleted file. It is
@@ -19,7 +19,7 @@
 // item 3) — oracle and SUT both call it, so this gate cannot catch a defect INSIDE that grammar.
 // What it scores is exactly the residual independent surface: the position logic, the strip, the
 // blank decline, and the extract — the surfaces that were re-spelled in the catalogue peel.
-// CLAIM WORD: REFACTOR-EQUIVALENCE, never external validity (adr/0044 §9 verbatim: no sentence
+// CLAIM WORD: REFACTOR-EQUIVALENCE, never external validity (ADR-23 verbatim: no sentence
 // may cite this green as evidence the transport model is right about the world).
 //
 // ═══ POPULATION (clauses 1/3/4/5) ═══
@@ -77,7 +77,7 @@ constexpr std::size_t kUnclaimedIdentity{12};
 // extract-equal), per line.
 constexpr std::size_t kMismatches{0};
 
-// ═══ THE FROZEN ORACLE (adr/0062) — do not tidy, do not modernize ═══
+// ═══ THE FROZEN ORACLE (ADR-8) — do not tidy, do not modernize ═══
 [[nodiscard]] constexpr bool oracle_is_space(char chr) noexcept
 {
     return chr == ' ' || chr == '\t';

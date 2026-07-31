@@ -34,11 +34,11 @@
 //
 // ═══ THE INGEST ASSEMBLY THE MARKER LEGS SCORE (clause 8 — the PURIFIED chain, G-T5-RETRO) ═══
 // Since T5 5.2 the legs re-score through the DECLARED chain, expectations frozen byte-for-byte at
-// the pre-cut figures (the migration-gate shape, adr/0062). Per `\n`-split line (binary read,
+// the pre-cut figures (the migration-gate shape, ADR-8). Per `\n`-split line (binary read,
 // `\r` NEVER trimmed — clause 6): the DECLARED transport peel — the stack comes from the
 // sidecar's frozen `stamp_class` column, never from inspection (whole-stream ⇒
 // `bracket-rfc3339-line-prefix`, payload-stamped/bare ⇒ degenerate; parse order transport →
-// logformat → intent, adr/0031; a stamp-only line peels blank and DROPS, bundled #4
+// logformat → intent, ADR-23; a stamp-only line peels blank and DROPS, bundled #4
 // catalogue-side) → stage 1 `normalize` (skip an all-escape line — the LogParser discipline;
 // measured on this corpus: 7 582 ESC-bearing lines, ZERO of them marker/`Finished:`-bearing, so
 // the seam is declared and inert on these bytes) → the SHIPPED `recognize()` over the composed
@@ -158,7 +158,7 @@ constexpr std::size_t kResultSuccess{72};
 constexpr std::size_t kResultFailure{28};
 constexpr std::size_t kResultAborted{9};
 constexpr std::size_t kResultUnstable{4};
-// CORROBORATED — the stamp-class partition (studies/010 §6.2, adr/0046 Part 2), now a GENERATED
+// CORROBORATED — the stamp-class partition (studies/010 §6.2, ADR-23 Part 2), now a GENERATED
 // sidecar column (T5 §6: one classifier, one owner — `t0_transport.triage` imported by the
 // generator; declarations in the T5 gates come from these frozen labels, never from inspection).
 // A second partition on a second axis: NEVER cross-quoted with the depth cells.
@@ -205,7 +205,7 @@ constexpr StructuralCell kS2MatrixPipeElided{833, 887, 1223};
 // CORROBORATED — L-O (spike TABLE 4, reproduced by the engine's own scan): per API class, the
 // count the console scan recovers IN AGREEMENT; absent-console pinned 0 (v2 true-tail capture);
 // exactly ONE console-vs-API divergence — the Accumulo-#498 class's own trace, API SUCCESS with
-// console `Finished: ABORTED`, our rows faithfully reporting the console (adr/0025 D-OUT-RUN-1's
+// console `Finished: ABORTED`, our rows faithfully reporting the console (ADR-17 D-OUT-RUN-1's
 // declared subordination as a counted cell, never a row defect).
 constexpr std::size_t kAgreeSuccess{71};
 constexpr std::size_t kAgreeFailure{28};
@@ -384,7 +384,7 @@ struct TraceEngineResult
 
 // The DECLARED stacks, per stamp class (T5 §6: declarations come from the frozen sidecar labels,
 // never from inspection). whole-stream ⇒ the bracket row; payload-stamped and bare ⇒ the
-// degenerate stack (the payload-stamped class is NOT declarable — adr/0044 §1 — so its stamps
+// degenerate stack (the payload-stamped class is NOT declarable — ADR-23 — so its stamps
 // stay content, the attributed re-baseline).
 [[nodiscard]] const insight::transport::TransportStack& stack_for(std::string_view stamp_class)
 {
@@ -414,10 +414,10 @@ struct TraceEngineResult
             continue;
 
         // ── the purified chain: DECLARED transport peel → stage 1 → shipped recognize() ──
-        // (parse order transport → logformat → intent, adr/0031). A stamp-only line peels to
+        // (parse order transport → logformat → intent, ADR-23). A stamp-only line peels to
         // blank and blank means DROP (PeeledLine::is_blank — the strategy's bundled #4, now
         // catalogue-side); a line the row's grammar declines peels to itself (totality is
-        // application, not effect — adr/0044 §2).
+        // application, not effect — ADR-23).
         const insight::transport::RawPeeledLine peeled{stack.peel_raw(raw_line)};
         if (peeled.content.empty())
             continue;
@@ -801,7 +801,7 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
                 corpus.divergent_rows.push_back(
                     "console-vs-API divergence: " + row.path + " — API '" + row.result +
                     "', console " + outcome_name(engine.outcome) +
-                    " (the console's declared subordination to the API result, adr/0025 "
+                    " (the console's declared subordination to the API result, ADR-17 "
                     "D-OUT-RUN-1 — a counted cell, never a row defect)");
             }
             if (row.result == "UNSTABLE")
@@ -1066,7 +1066,7 @@ TEST_F(JenkinsRecognizerRetrofitGate, LOTheRunOutcomeRecoversThePlatformVerdict)
     // ═══ Unstable is FIRST-CLASS, pinned 4/4 BY NAME — never recovered as Failure/Success ═══
     EXPECT_EQ(corpus.unstable_recovered, kAgreeUnstable)
         << "an UNSTABLE run did not recover as RunOutcome::Unstable — the four-class run-grain "
-           "vocabulary folded (adr/0025)."
+           "vocabulary folded (ADR-17)."
         << report(corpus);
 
     // The agreement cells, per API class — denominator 113, cells sum per class (clause 5).
@@ -1099,7 +1099,7 @@ TEST_F(JenkinsRecognizerRetrofitGate, LOTheRunOutcomeRecoversThePlatformVerdict)
 }
 
 // The pre-cut bare-null oracle EMITTER lived here between the FIRST ACT and the identity cut
-// (T5 5.2, adr/0062): it froze the shipped chain's per-trace scores over the 82 bare traces
+// (T5 5.2, ADR-8): it froze the shipped chain's per-trace scores over the 82 bare traces
 // into the committed BARE-v2.precut-oracle.tsv (emitted at e6f5494, provenance in the file's
 // own header) and was DELETED with the cut, exactly as announced — regenerating the oracle now
 // requires re-adding code, which is the loud act the freeze demands. The comparing gate is

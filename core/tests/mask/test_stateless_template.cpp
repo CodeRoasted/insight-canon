@@ -109,20 +109,20 @@ TEST(StatelessTemplate, CompositesNormalized)
               masked("error at parser.cpp:1:1: bad token", arena));
 }
 
-// ── D-MSK-5 (bibles/jenkins_dialect.md §4, adr/0053 erratum 2) — bracket_timestamp ──
+// ── D-MSK-5 (bibles/jenkins_dialect.md §4, ADR-23 erratum 2) — bracket_timestamp ──
 // The whole-token bracketed RFC3339 stamp fell through every rule to literal KEEP ("the bracket
 // is the entire difference"): unbracketed the same token is digit-leading and masks, so on an
 // undeclared Jenkins timestamper stream every stamped line was its own template (95.9% of the
-// no-collapse ceiling, adr/0046 clause 2). These arms are the fix's UNIT gate: the stamp class
+// no-collapse ceiling, ADR-23). These arms are the fix's UNIT gate: the stamp class
 // collapses to `[<*>]`, and the §6.2 decline list stays byte-identical — the rule claims the
-// bracketed full-datetime class and NOTHING adjacent to it (precision-first, adr/0013). These
+// bracketed full-datetime class and NOTHING adjacent to it (precision-first, ADR-9). These
 // arms are also one of the two NAMED holders of the §6.5 P2 over-masking blind spot: the A/B
 // prefix-image comparison cancels a leak that hits both arms, so the decline list HERE (plus the
 // D11 collateral leg) is what carries that hazard.
 TEST(StatelessTemplate, BracketTimestampCollapsesTheStampClass)
 {
     ArenaAllocator arena{256U * 1024U};
-    // Three same-shape lines differing only in the stamp → ONE template (the adr/0053 measured
+    // Three same-shape lines differing only in the stamp → ONE template (the ADR-23 measured
     // shape, inverted: pre-fix these were three templates, each equal to its raw line).
     const std::string first{masked("[2026-06-23T15:11:09.020Z] + git fetch --tags", arena)};
     const std::string second{masked("[2026-06-23T15:11:10.884Z] + git fetch --tags", arena)};

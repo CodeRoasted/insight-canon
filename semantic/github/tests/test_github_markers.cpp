@@ -21,7 +21,7 @@ using insight::tokenization::IntentMarker;
 using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::recognize;
 
-// The walkers take NormalizedContent (adr/0073's precondition as a type); every probe here is an
+// The walkers take NormalizedContent (ADR-21's precondition as a type); every probe here is an
 // escape-free literal, so normalize() is the zero-copy fixed point over a shared scratch.
 [[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
 {

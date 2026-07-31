@@ -177,7 +177,7 @@ int main(int argc, char** argv)
             .stack = kRfc3339Stack},
         // GitLab declares NO transport stack: its 32-byte runner prefix is peeled by the dialect
         // strategy, not declared, because a faithful declaration is a two-element ordered stack
-        // (timestamp then stream tag) and that is T2's work (adr/0046), not a package landing's.
+        // (timestamp then stream tag) and that is T2's work (ADR-23), not a package landing's.
         Arm{.label = "gitlab", .dialect = insight::semantic::gitlab::kDialect, .stack = {}},
         Arm{.label = "jenkins", .dialect = insight::semantic::jenkins::kDialect, .stack = {}},
     };

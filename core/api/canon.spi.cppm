@@ -123,21 +123,21 @@ export namespace insight::semantic
 // reorder, a widened enum) would move nothing on its own, and this string is the only thing that
 // would. Keep bumping it on any serialization change, including one that also moves content.
 //
-// THIS TOKEN IS ASSIGNED AT SHIP, NEVER RESERVED — adr/0047 clause 1, NORMATIVE, and it binds every
+// THIS TOKEN IS ASSIGNED AT SHIP, NEVER RESERVED — ADR-2, NORMATIVE, and it binds every
 // token of this class (semantic-grammar-N, transport-catalog-N, canonicalization_version, wire
 // versions). The value means "the Nth shape of this grammar", and WHICH feature causes the Nth
 // shape is not knowable in advance: ship order is not plan order, so a growth can be gated,
-// descoped or never built while an unrelated change lands tomorrow. adr/0026 had named "grammar-2 →
+// descoped or never built while an unrelated change lands tomorrow. ADR-17 had named "grammar-2 →
 // grammar-3" for the gcc/make growth; that package does not exist, so the number was reserved by a
 // plan and was never assignable. `emits` moved the shape and shipped, so it takes the token.
-// adr/0047 carries the errata to 0026 (its substantive claim is untouched — it names the GROWTH,
+// ADR-2 carries the errata to 0026 (its substantive claim is untouched — it names the GROWTH,
 // not a number).
 //
 // grammar-4 (ADR-22, T4): the per-row `format_gate : insight::LogFormat` becomes
 // `dialect_gate : std::string_view` on all six gated row kinds, so six preimage sites move from a
 // single `append_u8` to a length-prefixed `append_str`. That is a SERIALIZATION SHAPE change on the
 // nose — the case the paragraph above says to keep bumping for, "including one that also moves
-// content" — and adr/0047 clause 2.3 sharpened exactly it for the sibling transport token.
+// content" — and ADR-2.3 sharpened exactly it for the sibling transport token.
 //
 // ⚠ ADR-22 says T4 "spends no version token". That reading is right about the two tokens
 // it measured — `canonicalization_version` (the MASKING token; canon.api.cppm owns the value) and the
@@ -145,7 +145,7 @@ export namespace insight::semantic
 // costs Eqya's sequencing nothing: `kSemanticGrammarVersion` appears at exactly one site, inside
 // the `semantic_identity` preimage (compose.cpp), reaches no wire field and no MetaLog block, and
 // the digest it feeds is moving anyway. It is not reserved by a plan — the shape shipped, so it
-// takes the token (adr/0047 clause 1).
+// takes the token (ADR-2).
 //
 // grammar-5 (ADR-17, the GitLab CI dialect): three shape changes, all forced by bytes GitLab
 // emits and none expressible in grammar-4 — the `NumericFieldThenRemainder` extractor and its
@@ -286,7 +286,7 @@ enum class PayloadExtract : std::uint8_t
     // digits, then a single ':', then the payload — the GitLab section marker
     // `section_start:<unix-ts>:<name>[<options>]`. A variable-length field to SKIP is what no other
     // extractor can express: `RemainderAfterPrefix` would put the epoch inside the payload, and
-    // `IntentMarker::name` is the raw payload that `compare_skeletons` keys on (adr/0045), so every
+    // `IntentMarker::name` is the raw payload that `compare_skeletons` keys on (ADR-18), so every
     // run would carry a different name and nothing would ever align. Lengthening the prefix cannot
     // absorb a variable-length field.
     //
@@ -299,7 +299,7 @@ enum class PayloadExtract : std::uint8_t
     //     CR would name a section `build_tools_section\rTools build`. It is handled HERE rather
     //     than in the dialect strategy because the strategy is not the only recognition path —
     //     eidos's `strip_leading_timestamp` pre-pass calls `recognize()` with no strategy in the
-    //     loop (adr/0063 clause 4) — and the extractor is the one site both paths share, so
+    //     loop (ADR-22) — and the extractor is the one site both paths share, so
     //     agreement is by construction rather than by coordination.
     //   * a trailing `[…]` option group (`[collapsed=true]`, `[hide_duration=true,collapsed=true]`)
     //     — without the drop, a producer toggling `collapsed` RENAMES a section.

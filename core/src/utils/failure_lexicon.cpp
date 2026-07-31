@@ -351,7 +351,7 @@ namespace
     // WHOLE-LINE, never head-bounded, and that is load-bearing: a register is a claim about a
     // line's structure and a bounded head is a cost control, so gating the claim on a byte budget
     // makes it change silently with presentation — the one property of a log line no producer
-    // guarantees (adr/0074). Cost is bounded instead by the walk being SELF-TERMINATING: it stops
+    // guarantees (ADR-20). Cost is bounded instead by the walk being SELF-TERMINATING: it stops
     // at the first non-prefix token, which on prose is token index 1, and it is reached only after
     // a `:` was already found.
     //

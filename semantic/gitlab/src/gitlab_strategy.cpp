@@ -17,12 +17,12 @@ import insight.canon.spi;
 //      knowledge lives in one place (the row) — the Jenkins-strategy discipline.
 //
 // THE 32-BYTE PREFIX IS PEELED HERE, NOT DECLARED. It is textbook admissible transport under
-// adr/0044 §1 — a TOTAL-scope, whole-stream, fixed-width transform, the same class as GHA's 28-byte
+// ADR-23 — a TOTAL-scope, whole-stream, fixed-width transform, the same class as GHA's 28-byte
 // api-rfc3339-line-prefix — and the catalogue already ships the right KIND
 // (TransportTransformKind::LinePrefixTimestamp with an EventObservationTime extract). What it does
 // NOT ship is a faithful declaration of a timestamp FOLLOWED BY a stream tag, which needs a
 // two-element ordered stack and therefore a new kind, a transport-catalog token, and the
-// acquisition-side plumbing that decides who declares it. adr/0046 has already sequenced that work
+// acquisition-side plumbing that decides who declares it. ADR-23 has already sequenced that work
 // as T2, whose ± arms are the two legs this dialect's corpus contains. Peeling in the strategy is
 // exactly where Jenkins's timestamper peel lives; this package makes T2's vehicle concrete and does
 // not schedule it.

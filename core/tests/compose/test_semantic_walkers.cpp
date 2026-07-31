@@ -35,7 +35,7 @@ using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::lift_level;
 using insight::tokenization::recognize;
 
-// The walkers take NormalizedContent (the adr/0073 precondition as a type). Every probe in this
+// The walkers take NormalizedContent (the ADR-21 precondition as a type). Every probe in this
 // suite is an escape-free literal, so normalize() is the zero-copy FIXED POINT: the content views
 // the literal itself and the shared scratch is never written — which is what keeps the SP-5
 // no-allocation guard meaningful over the full probe path below.

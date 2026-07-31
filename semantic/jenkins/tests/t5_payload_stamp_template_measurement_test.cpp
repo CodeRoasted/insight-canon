@@ -1,20 +1,20 @@
 // NOLINTBEGIN — measurement harness: long literals, wide reports and raw loops are the point.
 // t5_payload_stamp_template_measurement_test.cpp — the pre-registered measurement owed by
-// adr/0046 Part 2 clause 2 (and the evidence that settles clause 3).
+// ADR-23 Part 2 clause 2 (and the evidence that settles clause 3).
 //
-// THE QUESTION. adr/0044 §1 rules the Jenkins `payload-stamped` class NOT declarable as transport
+// THE QUESTION. ADR-23 rules the Jenkins `payload-stamped` class NOT declarable as transport
 // (the stamp is a payload-determined subset, not a stream property), so on that class the
 // timestamper stamps stay in CONTENT and those lines lose their Jenkins claim → they re-route to
 // RawText and template WITH the stamp. The templates change; that is settled. What is NOT settled
 // is whether the template COUNT changes with them, and that difference is the difference between a
-// cosmetic re-baseline and a precision-first regression (adr/0013).
+// cosmetic re-baseline and a precision-first regression (ADR-9).
 //
 // THE ARMS, and why arm B is constructed the way it is.
 //   A (+strip, the shipped world) — POST-CUT (T5 5.2): the DECLARED catalogue peel
 //       (`bracket-rfc3339-line-prefix`) strips the stamp, then the tokenizer templates the
 //       peeled content. (Pre-cut this arm was JenkinsStrategy claiming and stripping; the
 //       strategy died at the identity cut and G-T5-PEEL certifies the peel equals its strip.)
-//   B (−strip, the adr/0044 §1 world) — Tokenizer composed with NO semantic package. A stamped
+//   B (−strip, the ADR-23 world) — Tokenizer composed with NO semantic package. A stamped
 //       line is claimed by nobody and falls to the RawText floor with the stamp in content.
 // B is the right vehicle for the §1 world ONLY IF removing the whole package changes nothing for
 // the lines that are not supposed to move. That is not assumed: `TemplateCountUnderTheStrip`
@@ -27,12 +27,12 @@
 // order is the audit trail, studies/010 §2 discipline). Let `distinct_A` / `distinct_B` be the
 // distinct template counts over the whole payload-stamped slice, and `ceiling` the distinct RAW
 // stamped-line count (what "no collapse at all" would score):
-//   * STABLE   ⇒ distinct_B == distinct_A. adr/0046 branch 1 (honesty-only + re-baseline; the move
+//   * STABLE   ⇒ distinct_B == distinct_A. ADR-23 branch 1 (honesty-only + re-baseline; the move
 //                rides T5 as specified) — the id SETS still move, which is why the id counts are
 //                reported alongside.
 //   * EXPLODES ⇒ distinct_B >= 2 × distinct_A, or the stamped-subset arm-B distinct count reaches
 //                >= 0.5 × ceiling (the token defeating collapse toward per-line uniqueness).
-//                adr/0046 branch 2 (precision-first regression under adr/0013; T5 blocked until the
+//                ADR-23 branch 2 (precision-first regression under ADR-9; T5 blocked until the
 //                masker claims the token to a stable normal form).
 //   * Anything strictly between is a THIRD outcome and is reported as such — it is never rounded
 //     into a branch.
@@ -164,7 +164,7 @@ struct LineOutcome
 // ── POST-CUT (T5 5.2): the +strip arm and the stampedness lens, re-owned ──
 // JenkinsStrategy died at the identity cut; the strip is now the DECLARED catalogue row
 // (`bracket-rfc3339-line-prefix`, peel-equivalence certified by G-T5-PEEL against the strip
-// frozen per adr/0062). This harness's +strip arm therefore peels through the declared stack and
+// frozen per ADR-8). This harness's +strip arm therefore peels through the declared stack and
 // tokenizes the peeled content — the arm delta against `run_arm` on the SAME composed view is the
 // peel ALONE, which is a strictly cleaner construction than the pre-cut package-±-composition
 // arms (the old premise check "an unstamped line must not move" is now structural rather than
@@ -225,7 +225,7 @@ run_declared_peel_arm(const std::vector<std::string>& lines,
             // never re-claimed by a second strategy. Feeding the peeled payload back through
             // detection instead would let a logfmt-shaped payload be claimed by KeyValue — a
             // world neither the pre-cut chain nor any production path produces (the
-            // payload-stamped class is NOT declarable, adr/0044 §1). MEASURED when this rework
+            // payload-stamped class is NOT declarable, ADR-23). MEASURED when this rework
             // first ran without the fence (2026-07-30): 45/6 416 stamped lines diverged exactly
             // that way — the corruption the M-oracle's carrier comment below pre-named.
             const insight::transport::RawPeeledLine peeled{bracket_stack().peel_raw(line)};
@@ -258,7 +258,7 @@ run_declared_peel_arm(const std::vector<std::string>& lines,
     return outcomes;
 }
 
-// Distinct-set accumulator: the two counts adr/0046 clause 2 asks for, kept side by side so their
+// Distinct-set accumulator: the two counts ADR-23 asks for, kept side by side so their
 // AGREEMENT is itself observable (template_id is SHA-256 of the template string — a divergence
 // would be a collision and is reported, not assumed away).
 struct DistinctCounter
@@ -328,7 +328,7 @@ TEST(JenkinsPayloadStampMeasurement, CounterCanReportAnExplosion)
 // What the real masker does to the real token, run through the real chain — MEASURED, both ways.
 //
 // HISTORY, because this test is the record of an intended failure. As written at `c848c52` it was
-// the CHARACTERIZATION of the adr/0053-erratum-2 defect: the whole-token bracketed RFC3339 stamp
+// the CHARACTERIZATION of the ADR-23-erratum-2 defect: the whole-token bracketed RFC3339 stamp
 // fell through every rule to LITERAL KEEP (rule #1's `:digit` trigger fired but its letter-leading
 // ANCHOR gate did not; `bracket_index` declined at the `-`; the digit-leading whole-token mask
 // never saw the `[`-leading byte), so three same-shape stamped lines were THREE templates, each
@@ -360,11 +360,11 @@ TEST(JenkinsPayloadStampMeasurement, TheMaskerClaimsTheTimestamperTokenToTheBrac
         std::cout << "  unstripped[" << index << "] = \"" << outcomes[index].template_str << "\"\n";
         EXPECT_EQ(outcomes[index].template_str, "[<*>] + git fetch --tags")
             << "the bracketed RFC3339 token must mask to the bracket normal form `[<*>]` — the "
-               "D-MSK-5 claim, adr/0046 clause 2's second branch discharged";
+               "D-MSK-5 claim, ADR-23's second branch discharged";
     }
     EXPECT_EQ(outcomes[0].template_str, outcomes[1].template_str)
         << "two lines differing ONLY in the stamp's milliseconds must now share ONE template — "
-           "the collapse loss adr/0053 measured is the thing this rule repairs";
+           "the collapse loss ADR-23 measured is the thing this rule repairs";
     EXPECT_EQ(outcomes[0].template_str, outcomes[2].template_str)
         << "a different day must not fork the template";
 
@@ -428,7 +428,7 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
 
     const auto out_dir{env_value("JENKINS_T5_OUT")};
 
-    std::cout << "\n=== adr/0046 Part 2 clause 2 — per-log ===\n"
+    std::cout << "\n=== ADR-23 Part 2 clause 2 — per-log ===\n"
               << std::format("{:>7} {:>7} {:>7} {:>7} {:>7} {:>7}  {}\n", "lines", "stamped",
                              "tmplA", "tmplB", "idA", "idB", "log");
 
@@ -525,7 +525,7 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
     const std::size_t shared_stamped_ids{static_cast<std::size_t>(std::ranges::count_if(
         stamped_a.ids, [&](const TemplateId& id) { return stamped_b.ids.contains(id); }))};
 
-    std::cout << "\n=== adr/0046 Part 2 clause 2 — THE FOUR NUMBERS (slice-wide) ===\n"
+    std::cout << "\n=== ADR-23 Part 2 clause 2 — THE FOUR NUMBERS (slice-wide) ===\n"
               << "logs                         : " << logs.size() << "\n"
               << "lines (raw, '\\n'-split)      : " << total_lines << "\n"
               << "stamped lines                : " << stamped_lines << "\n"
@@ -549,7 +549,7 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
     EXPECT_EQ(unstamped_moved, 0U)
         << "an UNSTAMPED line templated differently with and without the Jenkins package: arm B is "
            "then measuring package removal, not the timestamper strip, and the four numbers below "
-           "do not answer adr/0046 clause 2";
+           "do not answer ADR-23";
 
     // The counts must agree with their id counts — a divergence is a SHA-256 collision, reported.
     EXPECT_EQ(all_a.templates.size(), all_a.ids.size());
@@ -575,7 +575,7 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
 // ═══ The PREFIX-IMAGE exit gate — the TRIANGLE (bibles/jenkins_dialect.md §4, 2fe2e85) ═══
 //
 // Derived a priori from the normal form's structure AND the shipped chain's ENUMERATED behaviors
-// (adr/0046's bundled list: #2 the stamp strip, #3 the greedy `[ \t]+` leading-whitespace strip,
+// (ADR-23's bundled list: #2 the stamp strip, #3 the greedy `[ \t]+` leading-whitespace strip,
 // #4 the blank-line decline). Per stamped raw line `[STAMP]<sep>rest-tail`, with
 // `rest := everything after the ']'` and `rest′ := strip_ws(rest)` computed by THIS HARNESS'S OWN
 // frozen `[ \t]+` spelling — never by calling the strategy (an oracle that called the strategy
@@ -920,7 +920,7 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
                             ? "NEW PHENOMENON — the masker is not prefix-compositional on these "
                               "bytes, or the strategy drifted from the 0046 enumeration; "
                               "escalate, never round into a branch"
-                            : "REPAIRED — adr/0046 clause 2's own words are met: the masker "
+                            : "REPAIRED — ADR-23's own words are met: the masker "
                               "claims the token to a stable normal form; the T5 content move "
                               "unblocks"};
     std::cout << "VERDICT: " << verdict << "\n\n";

@@ -190,7 +190,7 @@ constexpr std::size_t kAbortedConsoleCeiling{17};
 constexpr std::size_t kRecoveredTraces{602};
 constexpr std::size_t kAgreements{599};
 // All 3 disagreements are one class: GitLab's console and GitLab's API disagreeing with each
-// other, our rows faithfully reporting the console (adr/0025 D-OUT-RUN-1's declared subordination
+// other, our rows faithfully reporting the console (ADR-17 D-OUT-RUN-1's declared subordination
 // as a counted cell). 2 × `canceled`-but-`Job succeeded`, 1 × `canceled`-but-exit-code-128.
 constexpr std::size_t kDisagreements{3};
 constexpr std::size_t kDisagreementsConsoleSuccess{2};
@@ -809,7 +809,7 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
                         std::to_string(row.job_id) + ", banner leg '" + row.leg + "'): API '" +
                         row.job_status + "', console " + outcome_name(result.outcome) +
                         " — the console's declared subordination to the API result "
-                        "(adr/0025 D-OUT-RUN-1), a counted cell, never a row defect");
+                        "(ADR-17 D-OUT-RUN-1), a counted cell, never a row defect");
                 }
             }
         }

@@ -776,7 +776,7 @@ namespace
     // 35 whose successor starts at 41 read as TERMINAL — and therefore authoritative — so the
     // verdict moved with the byte count of the prefix rather than with its structure. That is the
     // presentation-dependence SRC-D-OUT-4c names, in the one branch the kind-slot rule does not
-    // cover (adr/0074: bound the scan, never the claim). Cold — reached only once a level word
+    // cover (ADR-20: bound the scan, never the claim). Cold — reached only once a level word
     // matched — and self-terminating: for_each_token stops at the first token it finds.
     // PRECONDITION: `token` is a sub-view of `line`.
     // Only throw path is for_each_token's substr (begin <= size); the noexcept body cannot throw.
@@ -816,7 +816,7 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
     // proxy for position, and a proxy over presentation bytes moves when the presentation moves —
     // for_each_token's limit is a RAW-BYTE offset, so an ANSI run before the level word spends the
     // budget and pushes the word out of the head entirely. Bound the scan, never the claim
-    // (adr/0074). Bounded ⇒ alloc-free hot-path discipline (adr/0013 clause 3).
+    // (ADR-20). Bounded ⇒ alloc-free hot-path discipline (ADR-9).
     constexpr std::size_t kLeadingScanHead{40};
     // Head scanned for a failure/warning cue. 128 (not 64), aligned with the pass/fail-glyph
     // kOutcomeHead: a VERDICT ANCHOR can sit at the END of a long line — a deeply-namespaced CI

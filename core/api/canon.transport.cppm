@@ -30,13 +30,13 @@ export namespace insight::transport
 // version is. A stream analyzed under two different transport vocabularies is not comparable, and
 // the digest must say so.
 //
-// THE BUMP RULE (adr/0047 clause 2.3, which SHARPENED the over-broad rule this comment first
+// THE BUMP RULE (ADR-2.3, which SHARPENED the over-broad rule this comment first
 // carried):
 //
 //     Bump on a change to what the catalogue SERIALIZES — plus any change to its serialization
 //     SHAPE, even when the bytes happen to coincide.
 //
-// The second half is the token's whole reason to exist (adr/0047 clause 1): a shape change whose
+// The second half is the token's whole reason to exist (ADR-2): a shape change whose
 // bytes happen not to move is exactly the collision a content hash cannot catch. The first half is
 // why "a new kind" is NOT on the list: `kind` is serialized only as a value ON a row, so an enum
 // member with no row serializes ZERO bytes and changes no behavior — bumping on it would move every
@@ -44,14 +44,14 @@ export namespace insight::transport
 // "a new kind" and "a new row" always co-fire, and two criteria that always agree are one
 // criterion.
 //
-// LIKE EVERY MONOTONIC TOKEN HERE, THIS IS ASSIGNED AT SHIP AND NEVER RESERVED (adr/0047 clause 1,
+// LIKE EVERY MONOTONIC TOKEN HERE, THIS IS ASSIGNED AT SHIP AND NEVER RESERVED (ADR-2,
 // NORMATIVE): the value means "the Nth shape", and which change causes the Nth shape is not
 // knowable in advance. `-2` was taken when the SECOND transform landed with its row (T5 5.2:
 // `bracket-rfc3339-line-prefix`, jenkins_writer_envelope_t5.md §2 — the co-fire the comment above
 // predicted); `-3` moves next, at whatever ship makes the third shape.
 inline constexpr std::string_view kTransportCatalogVersion{"transport-catalog-2"};
 
-// ⚠ NORMATIVE — CATALOGUE ENUM VALUES ARE IDENTITY-BEARING: NEW MEMBERS APPEND (adr/0047
+// ⚠ NORMATIVE — CATALOGUE ENUM VALUES ARE IDENTITY-BEARING: NEW MEMBERS APPEND (ADR-2
 // clause 2.2). A value is never renumbered and never inserted mid-enum. Both enums below serialize
 // as their `uint8_t` VALUE on every row (`compose.cpp`), so inserting a member in the middle shifts
 // the serialized byte of EVERY EXISTING ROW — the digest moves for rows nobody touched, and it
@@ -67,7 +67,7 @@ inline constexpr std::string_view kTransportCatalogVersion{"transport-catalog-2"
 
 // Which transform ALGORITHM a row selects and parameterizes.
 //
-// TWO members today, each grown in WITH ITS ALGORITHM, ITS ROW AND ITS GATE (adr/0047 clause 2.1),
+// TWO members today, each grown in WITH ITS ALGORITHM, ITS ROW AND ITS GATE (ADR-2.1),
 // as `PayloadExtract` and `LocationMatchKind` grew. ADR-23 listed a wider anticipated
 // vocabulary — FramingLine, AnsiEchoWrap, StreamTag, Truncation, Chunking, Encoding — and **§3's
 // enum bodies are to be read as a SKETCH, never as a normative closed set**; §3's normative
@@ -92,12 +92,12 @@ enum class TransportTransformKind : std::uint8_t
     // width: `[` + the shared full-datetime grammar (`insight::utils::rfc3339_datetime_length` —
     // the one owner, bibles/jenkins_dialect.md §4 item 3) + `]`, then the declared separator/
     // indentation strip. The Jenkins Timestamper plugin's whole-stream scoping is the attested
-    // population (12/113 in jenkins-markers/v2, adr/0046 Part 2), and the row landed exactly where
+    // population (12/113 in jenkins-markers/v2, ADR-23 Part 2), and the row landed exactly where
     // the earlier refusal said it could not YET land: WITH its algorithm, its row and its gate
     // (G-T5-PEEL — a real population and a real frozen oracle, the shipped strategy strip frozen
-    // per adr/0062 since this cut deletes it). Admissibility argument:
+    // per ADR-8 since this cut deletes it). Admissibility argument:
     // jenkins_writer_envelope_t5.md §2.2. Peel-equivalence is the ONLY obligation this row
-    // carries — the invariance cell stays empty (adr/0058: no world vehicle exists), so declaring
+    // carries — the invariance cell stays empty (ADR-23: no world vehicle exists), so declaring
     // it certifies OUR refactor and nothing about the world.
     LinePrefixBracketedTimestamp,
 };
@@ -108,7 +108,7 @@ enum class TransportTransformKind : std::uint8_t
 // dropped.
 //
 // `StreamLabel` from ADR-23's sketch is not shipped: no transform produces one today (same
-// rule as the kinds above, ratified by adr/0047 clause 2.1). It APPENDS if it ever lands.
+// rule as the kinds above, ratified by ADR-2.1). It APPENDS if it ever lands.
 enum class TransportExtract : std::uint8_t
 {
     None = 0, ///< the peel yields nothing but the shortened line
@@ -149,7 +149,7 @@ struct TransportTransformRow
 // ADR-23, and it is the one transform that has BOTH a corpus (22 030 real logs) and an
 // INDEPENDENT oracle to score against — which is what makes it shippable where Timestamper is not.
 // That oracle was `GitHubActionsStrategy`'s peel; T4 deleted the detection, and the oracle is now
-// FROZEN inside G1-PEEL itself (adr/0062), where it still scores this row over 22 490 937 lines.
+// FROZEN inside G1-PEEL itself (ADR-8), where it still scores this row over 22 490 937 lines.
 //
 // THE NAME IS DELIVERY-SHAPED, NOT ECOSYSTEM-SHAPED, and that is load-bearing twice over. ADR-23
 // §3 is the reason the row lives here at all: the catalogue is orthogonal to the dialect packages
@@ -170,7 +170,7 @@ inline constexpr std::array<TransportTransformRow, 2> kTransportCatalogRows{{
     // The bracketed variable-width form (T5 §2.1). Delivery-shaped name, same argument as the row
     // above; Jenkins-Timestamper provenance lives HERE in prose, never in the identifier. The
     // greedy `[ \t]+` strip reproduces the shipped strategy's bundled behavior #3 byte-exactly
-    // because adr/0046 verdict (a) requires items 2–4 reproduced — NOT because the strip's merit
+    // because ADR-23 verdict (a) requires items 2–4 reproduced — NOT because the strip's merit
     // is settled: that question stays PARKED, measurement-gated (flaws.md Eqya·9), and this row
     // does not move shipped canonicalization as a second change in its pass. `prefix_width` unread
     // (variable width — the acceptor computes it from the shared grammar). The shipped strictness

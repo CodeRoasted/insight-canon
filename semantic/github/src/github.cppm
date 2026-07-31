@@ -101,7 +101,7 @@ export inline constexpr std::string_view kChannelAnnotated{"annotated"};
 //   The BYTES are ours. Anything measured on a stripped corpus was measured against
 //   ci_revert_corpus.transform.degrade(), so it evidences how canon reads OUR ablation — never how
 //   a dialect behaves in the field. It may not stand as corpus evidence for a product claim, and
-//   an A/B across the pair is not materialization invariance (adr/0030 D1 rules on this).
+//   an A/B across the pair is not materialization invariance (ADR-22 rules on this).
 //
 //   The NAME is real, and it is a recognition state that ABSENCE CANNOT DECIDE. Markers present
 //   positively proves the annotated channel — only that channel carries them — but no observation
@@ -110,7 +110,7 @@ export inline constexpr std::string_view kChannelAnnotated{"annotated"};
 //   evidence claims no channel at all. Guessing it is unsound in the DANGEROUS direction — it
 //   re-arms the bare `Run ` row against annotated prose and reinstates the phantom Step the fix
 //   below exists to kill. The deduction that gets this right, and the fail-closed branch, belong
-//   to sift's channel probe; canon never infers (adr/0030 D2).
+//   to sift's channel probe; canon never infers (ADR-22).
 export inline constexpr std::string_view kChannelStripped{"stripped"};
 export inline constexpr std::array<std::string_view, 2> kChannels{
     {kChannelAnnotated, kChannelStripped}};

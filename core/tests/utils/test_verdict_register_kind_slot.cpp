@@ -168,7 +168,7 @@ TEST(VerdictRegisterKindSlot, VerdictIsInvariantUnderPrefixLengthAcrossTheScanHe
 // ── §7.5 — monotone-demoting, and the ONE surface where it does not carry ──────
 // SRC-D-OUT-4c only ever REMOVES an anchor, so on the CUE surface (contains_failure_cue) no line
 // that did not fire can start firing: the anchors confirm an already-matched failure word and there
-// is no branch in which losing one creates a cue. That is the adr/0013 clause-2 direction the
+// is no branch in which losing one creates a cue. That is the ADR-9 clause-2 direction the
 // ruling rests on, and these rows pin it.
 TEST(VerdictRegisterKindSlot, TheCueSurfaceOnlyEverLosesAnchors)
 {

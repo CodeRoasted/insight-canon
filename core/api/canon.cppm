@@ -44,7 +44,7 @@ export namespace insight::tokenization
 // that has not normalized DOES NOT COMPILE at canon's public boundary. What used to stand here
 // was the same obligation as prose; it was satisfied by one of three consumers and cost 1 077 of
 // 3 193 GitLab markers, silently, across two call sites that both looked correct. The type does
-// NOT prove the RIGHT stage 2 ran (§12.3) — adr/0063 clause 4's strip divergence stands, and the
+// NOT prove the RIGHT stage 2 ran (§12.3) — ADR-22's strip divergence stands, and the
 // eidos/canon reconciliation still rides T5.
 
 // Classify a LINE's structural role from the resolved view's role rows (longest-match). None when
@@ -55,7 +55,7 @@ classify(NormalizedContent content, const insight::semantic::ComposedSemantics& 
 // Recognize an intent marker from the resolved view's marker rows (longest-match). The payload is
 // the content after the matched prefix; the alignment class + instance discriminant are derived by
 // canon's canonicalize_intent / discriminant_of. None when no row matches. The returned marker's
-// `name`/`discriminant` VIEW the handed content's bytes (adr/0045) — the caller's storage must
+// `name`/`discriminant` VIEW the handed content's bytes (ADR-18) — the caller's storage must
 // outlive them.
 [[nodiscard]] IntentMarker recognize(NormalizedContent content,
                                      const insight::semantic::ComposedSemantics& composed) noexcept;

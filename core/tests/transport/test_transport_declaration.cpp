@@ -334,7 +334,7 @@ TEST(TransportCatalog, ShippedRowsAreExactlyWhatTheCatalogDeclares)
         << "the bracketed form is VARIABLE width — the field is unread (the LocationRow "
            "unread-parameter precedent) and 0 says so";
     EXPECT_TRUE(bracket_row.strip_leading_space)
-        << "bundled #3 (the greedy [ \\t]+ strip) reproduced byte-exactly — adr/0046 verdict (a)";
+        << "bundled #3 (the greedy [ \\t]+ strip) reproduced byte-exactly — ADR-23 verdict (a)";
 
     // The catalogue version is a component of every composed semantic_identity. Pinned as a
     // LITERAL: a silent bump would move every digest in the workspace, and a test that read the

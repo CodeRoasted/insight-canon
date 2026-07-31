@@ -31,16 +31,16 @@ namespace insight::semantic::jenkins
 // bracket stamp, claimed `[Pipeline] ` lines and the `Finished: ` epilogue at 0.92, and every one
 // of those legs is now DECLARED rather than detected — the bracket stamp is catalogue transport
 // (`bracket-rfc3339-line-prefix`, canon.transport; peel-equivalence certified by G-T5-PEEL against
-// the strip frozen per adr/0062), and the marker/outcome rows are dialect-gated data walked by
-// core under `--dialect jenkins` (adr/0065 clause 5: rows plus canon's walkers ARE the parser).
+// the strip frozen per ADR-8), and the marker/outcome rows are dialect-gated data walked by
+// core under `--dialect jenkins` (ADR-22: rows plus canon's walkers ARE the parser).
 // The strategy's parse of a bare claimed line was RawText's parse (level via the same
 // infer_leading_log_level, empty component, content unmoved) — certified as exactly that by
 // G-T5-BARE's byte-identity over the 82 bare traces. Jenkins has no echoed-source wrapper either
 // (that is the GHA SGR command-echo), so the whole code tier is empty.
 //
 // THE 19-LOG PAYLOAD-STAMPED RE-BASELINE, recorded here because this is the strategy's successor
-// surface (adr/0046 Part 2 clause 1; T5 §4 item 5): that class is NOT declarable (the stamp is a
-// payload-determined subset, adr/0044 §1), so post-purification its stamps stay CONTENT and those
+// surface (ADR-23 Part 2 clause 1; T5 §4 item 5): that class is NOT declarable (the stamp is a
+// payload-determined subset, ADR-23), so post-purification its stamps stay CONTENT and those
 // lines template with the stamp under D-MSK-5's `[<*>]` normal form. Template IDs move; the count
 // is stable — measured ±strip 3 337 vs 3 339, the +2 fully attributed (one dual-occurrence twin +
 // the bare-`[<*>]` cell from 134 timestamp-only lines; the §6.5 prefix-image triangle returned

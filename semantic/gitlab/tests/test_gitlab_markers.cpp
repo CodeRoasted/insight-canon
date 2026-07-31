@@ -24,7 +24,7 @@ using insight::tokenization::ChildOrder;
 using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::recognize;
 
-// The walkers take NormalizedContent (adr/0073's precondition as a type); every probe here is an
+// The walkers take NormalizedContent (ADR-21's precondition as a type); every probe here is an
 // escape-free literal (the xtrace probe's `\\e` is TWO prose bytes, not an escape — the P3
 // precision leg), so normalize() is the zero-copy fixed point over a shared scratch.
 [[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
@@ -68,7 +68,7 @@ TEST(GitLabMarkers, TheEpochIsSkippedNotFoldedIntoTheName)
 {
     const ComposedSemantics composed{gitlab_only()};
     // The whole reason the extractor exists: `IntentMarker::name` is the raw payload
-    // `compare_skeletons` keys on (adr/0045). Two runs of the same phase carry different epochs and
+    // `compare_skeletons` keys on (ADR-18). Two runs of the same phase carry different epochs and
     // must still carry the SAME name.
     EXPECT_EQ(recognize(norm_probe("section_start:1784657178:get_sources"), composed).name,
               "get_sources");

@@ -207,7 +207,7 @@ namespace tokenization
         // and arbitrary human prose; terminating at the CR gives 46, every one inside the
         // producer's declared `[A-Za-z0-9_.-]+` charset. Recognition count is 3193 either way — the
         // difference is invisible in a recall number and lands entirely in the NAME, which
-        // `compare_skeletons` keys on raw (adr/0045). Those 36 sections would only ever align
+        // `compare_skeletons` keys on raw (ADR-18). Those 36 sections would only ever align
         // against a run whose header prose is byte-identical.
         //
         // The option group is taken as the LAST '[' of a ']'-terminated payload, not the first '['

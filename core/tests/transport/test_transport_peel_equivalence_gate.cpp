@@ -35,7 +35,7 @@
 // core → semantic/github and never back. With the oracle frozen inline this file imports only
 // `insight.canon`, and leaving it in the package compiled the whole `insight.semantic.github`
 // module into a binary that never referenced it while making a core-owned characterization pin
-// look like a dialect-package obligation (the misreading adr/0062 clause 4 guards against).
+// look like a dialect-package obligation (the misreading ADR-8 guards against).
 //   • NOT insight-eidos, which already has the `CORPUS_D11_*` plumbing. Reusing that wiring would
 //     home a canon-internal refactor-equivalence claim inside a downstream consumer — homing by
 //     convenience past the package that owns the property.

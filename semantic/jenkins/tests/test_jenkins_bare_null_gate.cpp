@@ -4,7 +4,7 @@
 // ANYTHING on the 82 bare traces — a template byte, a quantum, the epilogue token — this gate is
 // red and the identity cut does not stand as landed (the masker coupling discipline, repeated).
 //
-// ═══ THE ORACLE IS THE COMMITTED PRE-CUT FILE (adr/0062) ═══
+// ═══ THE ORACLE IS THE COMMITTED PRE-CUT FILE (ADR-8) ═══
 // `BARE-v2.precut-oracle.tsv`, beside this TU — emitted from the SHIPPED chain (JenkinsStrategy
 // live) at insight-canon e6f5494 by the since-deleted JenkinsBareNullPrecutOracleEmitter, 2-run
 // byte-identical at emit time, provenance in the file's own header. The "pre" side of this
@@ -41,7 +41,7 @@
 //         DialectIntent still compiles): G-T5-BARE stayed GREEN (section Q runs under the jenkins
 //         declaration, where the row fires either way; section T never consumes marker rows), and
 //         so did G-T5-RETRO and the conformance kit (its marker legs SKIP kAnyDialect rows by
-//         design). The catcher was the package's own adr/0065 gating unit test —
+//         design). The catcher was the package's own ADR-22 gating unit test —
 //         `JenkinsMarkers.DialectGatedToTheDeclaringStream` RED (an undeclared stream recovered
 //         Step structure) — plus `JenkinsOutcome` collaterally. SCOPE NOTE, recorded so nobody
 //         later "simplifies" that unit test believing the corpus gates cover gating width: they

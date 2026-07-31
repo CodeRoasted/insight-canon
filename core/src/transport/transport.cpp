@@ -54,7 +54,7 @@ namespace
     // two-implementations defect this whole contract is about).
     // Shared by both prefix kinds: the post-stamp separator/indentation strip (greedy `[ \t]+`,
     // leading only). For the bracketed kind this reproduces the deleted JenkinsStrategy's bundled
-    // behavior #3 BYTE-EXACTLY (adr/0046 verdict (a); the merit question stays parked in flaws.md).
+    // behavior #3 BYTE-EXACTLY (ADR-23 verdict (a); the merit question stays parked in flaws.md).
     void strip_separator(const TransportTransformRow& row, RawPeeledLine& peeled) noexcept
     {
         if (!row.strip_leading_space)

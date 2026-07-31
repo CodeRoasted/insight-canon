@@ -57,7 +57,7 @@ using EventID = uint64_t;
 // `template_str` and `template_id` do NOT move under -7 — the masker is untouched — but
 // `dominant_level` is serialized and gates NewErrorPattern and diff polarity, so it is an
 // output-affecting canonicalization change and takes the bump. -8 = D-MSK-5 bracket_timestamp
-// (bibles/jenkins_dialect.md §4, adr/0053 erratum 2 — "the bracket is the entire difference"): a
+// (bibles/jenkins_dialect.md §4, ADR-23 erratum 2 — "the bracket is the entire difference"): a
 // WHOLE-token bracketed RFC3339 full datetime (`[2026-06-23T15:11:09.020Z]`) masks to `[<*>]`
 // instead of falling through to literal KEEP; `template_str`/`template_id` move ONLY for lines
 // carrying that token class, every other document is byte-identical except this version string.
@@ -1258,10 +1258,10 @@ namespace detail
     // or a quoted source string — the three are byte-identical in the token's ±1 neighbourhood, so
     // the discriminating information is POSITIONAL and no widening of the neighbourhood recovers
     // it. The rule is monotone-DEMOTING (it only ever removes an anchor, never adds one), which is
-    // what makes it admissible under adr/0013 clause 2 with no corroborating recall argument, and
+    // what makes it admissible under ADR-9 with no corroborating recall argument, and
     // `<path>:<line>:<col>:` needs no special case — it IS a run of colon-terminated tokens, so
     // SRC-D-NOTE-1's hand-parsed shape is an instance of this rule rather than a sibling of it.
-    // The walk is WHOLE-LINE and never head-bounded: adr/0074 — bound the scan, never the claim.
+    // The walk is WHOLE-LINE and never head-bounded: ADR-20 — bound the scan, never the claim.
     [[nodiscard]] bool is_verdict_anchored(std::string_view line, std::string_view token) noexcept;
 
     // The count-register kernel (SRC-D-CNT-1) — true iff `token` is a COUNT register summary: its
@@ -1331,7 +1331,7 @@ inline constexpr int kDefaultReferenceYear{2024};
 //                 "2024-01-15T10:30:00+05:30", "2024-01-15 10:30:00"
 [[nodiscard]] std::optional<Timestamp> parse_iso8601(std::string_view timestamp_str) noexcept;
 
-// The RFC3339 full-datetime byte GRAMMAR — one owner, two consumers (adr/0053 erratum 2's "three
+// The RFC3339 full-datetime byte GRAMMAR — one owner, two consumers (ADR-23 erratum 2's "three
 // spellings of one shape", collapsed): the Jenkins strategy's `timestamper_prefix_end` delegates
 // its character grammar here, and the masker's `bracket_timestamp` composite rule (D-MSK-5) tests
 // a bracket interior with the same function. Homed PUBLIC (not in the mask detail) because the
@@ -1745,7 +1745,7 @@ class NormalizedLine;
 // cannot fake the passage — the only other producer NARROWS an object it must already hold. The
 // obligation this replaces was a comment three repos of call sites were expected to remember; two
 // of three consumers broke it silently at a measured cost of 1 077 of 3 193 GitLab markers
-// (adr/0073). The same argument that made the transport boundary a type (canon.transport §4:
+// (ADR-21). The same argument that made the transport boundary a type (canon.transport §4:
 // "by construction, not by review") makes this one one.
 class NormalizedLine
 {
@@ -1760,7 +1760,7 @@ class NormalizedLine
 
     // The suffix-narrowing door — the caller's own INFERRED stage 2 (a transport strip canon was
     // never told about). Named for what it states: the offset comes from a strip that is NOT a
-    // declared catalogue row, which is adr/0063 clause 4's declared limitation placed at its one
+    // declared catalogue row, which is ADR-22's declared limitation placed at its one
     // call site, greppable, instead of in a comment three repos away. (The DECLARED stage 2 is
     // `TransportStack::peel(NormalizedLine)`, which composes this door with a catalogue row's
     // width.) Narrowing is the safe escape hatch by construction: both real stage-2
@@ -1849,7 +1849,7 @@ constexpr NormalizedContent NormalizedLine::undeclared_suffix(std::size_t offset
 //
 // LIFETIME: the returned NormalizedLine (and every NormalizedContent narrowed from it, and every
 // coordinate a walker slices out of THAT — an IntentMarker's name views the handed content,
-// adr/0045) borrows `raw_line` or `scratch`; both must outlive every such view.
+// ADR-18) borrows `raw_line` or `scratch`; both must outlive every such view.
 //
 // ⚠ STAGE 1 IS A CONSUMER'S OBLIGATION, NEVER A PACKAGE'S. A semantic package's strategy MUST NOT
 // call this: normalization inside a strategy is refused by ADR-17, and a package that
