@@ -54,7 +54,7 @@ set(CANON_PUBLIC_MODULE_UNITS
     # Tokenizer. Imports spi (plain — the provider surface stays off the consumer default path).
     ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.compose.cppm
     ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.cppm
-    # insight.canon.conformance — the package-agnostic CONFORMANCE KIT (ADR 0024 §2.3, SP-2): the
+    # insight.canon.conformance — the package-agnostic CONFORMANCE KIT (ADR 0024 §2.3, SRC-SP-2): the
     # canon-shipped harness every semantic package must pass. Installed + public (an external package
     # author runs the identical gate), NOT re-exported by the facade — a package's test target imports it
     # explicitly. Imports the facade + spi; pure (no gtest, no global operator new in the library).
@@ -251,6 +251,6 @@ if(INSIGHT_CANON_BUILD_TESTS)
 endif()
 
 # Benchmarks moved to the sibling `bench/` leaf package (insight_canon_bench, ADR 0024 / SP-5):
-# the composed perf gate links the semantic packages, which the core build must never do (SP-1/R1
+# the composed perf gate links the semantic packages, which the core build must never do (SRC-SP-1/R1
 # dependency arrow). The bench consumes canon externally (the det_proof shape), so the white-box
 # insight.canon.bench aggregate is retired with it.

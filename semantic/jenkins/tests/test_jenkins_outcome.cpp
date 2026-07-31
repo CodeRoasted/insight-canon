@@ -48,7 +48,7 @@ TEST(JenkinsOutcome, TheFiveNativeResultStringsMap)
     const auto not_built{map_outcome_token("NOT_BUILT", composed)};
     ASSERT_TRUE(not_built.has_value()) << "NOT_BUILT is a MAPPING (to Unknown), not a miss";
     EXPECT_EQ(*not_built, RunOutcome::Unknown);
-    // Unmapped stays unmapped (fail-closed upstream), and the map is DIALECT-gated (II-6): on a
+    // Unmapped stays unmapped (fail-closed upstream), and the map is DIALECT-gated (SRC-II-6): on a
     // stream that declared no dialect the row is not in the view at all.
     EXPECT_FALSE(map_outcome_token("GREEN", composed).has_value());
     EXPECT_FALSE(map_outcome_token("SUCCESS", undeclared_stream()).has_value())

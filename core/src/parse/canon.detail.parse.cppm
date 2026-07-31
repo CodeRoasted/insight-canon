@@ -20,7 +20,8 @@ class FormatDetector
   public:
     // Registers the built-in REPRESENTATION-format strategies, then the composed DIALECT strategies
     // (ADR 0024 §3): the strategy factories `composed` carries are instantiated via
-    // register_strategy. No dialect strategy is hardcoded here — core is semantic-unaware (SP-1).
+    // register_strategy. No dialect strategy is hardcoded here — core is semantic-unaware
+    // (SRC-SP-1).
     explicit FormatDetector(const insight::semantic::ComposedSemantics& composed);
 
     void register_strategy(std::unique_ptr<IFormatStrategy> strategy);
@@ -65,7 +66,7 @@ class LogParser;
 // WHY IT EXISTS: canon's own tokenizer hands strategy-produced `ParsedLine::content` to the
 // walkers, and six of the 22 strategies REBUILD content into arena bytes — not a suffix of the
 // line — so no public narrowing door can express them. The attestation is issued by `LogParser`
-// (the object that PERFORMS stage 1, unconditionally, at its one named site — D-TID-11), not
+// (the object that PERFORMS stage 1, unconditionally, at its one named site — SRC-D-TID-11), not
 // asserted by the consumer.
 //
 // WHY `extern "C++"`: a linkage-specification attaches the class to the GLOBAL module, which is
@@ -131,10 +132,10 @@ class LogParser
 
     // The §12.5.1(c) attestation — issued by the PERFORMER of stage 1. Every byte a strategy's
     // `ParsedLine::content` carries derives from a line this parser normalized unconditionally at
-    // its one named site (parse_line's D-TID-11 step) — including the six strategies that REBUILD
-    // content into arena bytes, which assemble from post-strip input. That invariant is local to
-    // this class, reviewable in one place, which is what entitles it to hold the one passkey.
-    // ⚠ For strategy-produced content ONLY. Anything else goes through `normalize()`.
+    // its one named site (parse_line's SRC-D-TID-11 step) — including the six strategies that
+    // REBUILD content into arena bytes, which assemble from post-strip input. That invariant is
+    // local to this class, reviewable in one place, which is what entitles it to hold the one
+    // passkey. ⚠ For strategy-produced content ONLY. Anything else goes through `normalize()`.
     // Deliberately NON-static: the attestation is issued by a HELD parser instance — the caller
     // must possess the performer, not merely name its class.
     // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
@@ -174,7 +175,7 @@ class LogParser
     LogFormat last_format_{LogFormat::Unknown}; // the format the last routed line was parsed with
     std::size_t parsed_count_{0};
     std::size_t failed_count_{0};
-    // Reusable buffer for the D-TID-11 ANSI/escape strip applied to every raw line
+    // Reusable buffer for the SRC-D-TID-11 ANSI/escape strip applied to every raw line
     // at ingest (before detection & tokenization). Result is ≤ input, so the retained
     // capacity makes the strip allocation-free in steady state.
     std::string escape_scratch_;

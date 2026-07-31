@@ -246,7 +246,7 @@ TEST(StatelessTemplate, NonEphemeralPathsAndSourcePathsUntouched)
            "masks";
 }
 
-// ── F13 strengthening (§8 / D-TID-11..13) — the re-measure rule set ──────────────
+// ── F13 strengthening (§8 / SRC-D-TID-11..13) — the re-measure rule set ──────────────
 
 TEST(StatelessTemplate, DigitLeadingTokensMask)
 {
@@ -265,7 +265,7 @@ TEST(StatelessTemplate, DigitLeadingTokensMask)
 TEST(StatelessTemplate, LetterLeadingKeptUuidAndHashMasked)
 {
     ArenaAllocator arena{256U * 1024U};
-    // Letter-leading words are KEPT (the F13 boundary — D-TID-14): a word is not a number.
+    // Letter-leading words are KEPT (the F13 boundary — SRC-D-TID-14): a word is not a number.
     EXPECT_NE(masked("decode utf8 stream", arena), masked("decode ascii stream", arena));
     EXPECT_EQ(masked("decode utf8 stream", arena), masked("decode utf8 stream", arena));
     EXPECT_NE(masked("hash sha256 ok", arena),
@@ -297,7 +297,7 @@ TEST(StatelessTemplate, KvNumericValueMaskedWordKept)
     EXPECT_EQ(masked("payment timeout txn=50000", arena),
               masked("payment timeout txn=70000", arena));
     EXPECT_EQ(masked("GC pause=512ms heap=87%", arena), masked("GC pause=9ms heap=3%", arena));
-    // A value-WORD stays literal (the D-TID-14 boundary; the registry's job): user=alice
+    // A value-WORD stays literal (the SRC-D-TID-14 boundary; the registry's job): user=alice
     // ≠ user=bob.
     EXPECT_NE(masked("login user=alice", arena), masked("login user=bob", arena));
     // Status-value KEEP (KV form): a green→red flip must NOT collapse.
@@ -307,7 +307,7 @@ TEST(StatelessTemplate, KvNumericValueMaskedWordKept)
     EXPECT_EQ(masked("listening port=8080", arena), masked("listening port=9090", arena));
 }
 
-// D-TID-22: a declared currency MARKER glued to a digit-led numeric core masks to <marker><*>
+// SRC-D-TID-22: a declared currency MARKER glued to a digit-led numeric core masks to <marker><*>
 // (keep-marker, the #42→#<*> shape) — the decidable-numeric refinement of D-TID-18. Closes the
 // over-split twin: `order completed total=$N` collapses to one stable template so its vanish forms.
 TEST(StatelessTemplate, CurrencyMarkerNumberMasked)
@@ -322,7 +322,8 @@ TEST(StatelessTemplate, CurrencyMarkerNumberMasked)
     // The marker is KEPT (legible + a distinct class): $463 ≠ a bare 463, and $ ≠ # counters.
     EXPECT_NE(masked("$463", arena), masked("463", arena));
     EXPECT_NE(masked("$463", arena), masked("#463", arena));
-    // Boundary (D-TID-22 does NOT cross): `$`+letter has no digit core → kept literal, distinct.
+    // Boundary (SRC-D-TID-22 does NOT cross): `$`+letter has no digit core → kept literal,
+    // distinct.
     EXPECT_NE(masked("export $HOME", arena), masked("export $PATH", arena));
     EXPECT_NE(masked("cfg path=$HOME", arena), masked("cfg path=$ROOT", arena));
     // Letter-prefixed ids stay D-TID-18 registry-class (untouched, still distinct).
@@ -348,7 +349,7 @@ TEST(StatelessTemplate, CurrencyMarkerNumberMasked)
 // These assert CURRENT SHIPPED BEHAVIOUR; they do not argue the floor is correct.
 // studies/011 rules the value is not tunable by a threshold study — a red here means
 // someone moved a load-bearing masking constant, which is an identity-affecting change
-// requiring a kCanonicalizationVersion bump (D-TID-16), not a test to retune.
+// requiring a kCanonicalizationVersion bump (SRC-D-TID-16), not a test to retune.
 
 namespace
 {

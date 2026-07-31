@@ -80,7 +80,7 @@ grouping. Only BGL and RFC5424 populate `host` today.
 > (`insight::tokenization::lift_level` over `ComposedSemantics::level_lifts()`), and `LogParser` applies it
 > to every parsed line right after the strategy returns, gated on the routed format. So the lift **overrides**
 > whatever the strategy put in `level`, and the table column above describes only what the strategy itself
-> reads. Exactly one rule outranks the lift in turn: the echoed-source demotion (D-PROV-1), which drives an
+> reads. Exactly one rule outranks the lift in turn: the echoed-source demotion (SRC-D-PROV-1), which drives an
 > echoed script line to `Unknown` whatever any earlier stage decided.
 
 > **Known gap (JSON nested fields):** the JSON strategy reads `component`/`level` only at the **top level**.

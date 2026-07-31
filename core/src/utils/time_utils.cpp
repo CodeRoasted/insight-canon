@@ -763,8 +763,8 @@ LogLevel parse_log_level(std::string_view level_str) noexcept
 namespace
 {
     // An alerting tier (Warn/Error/Fatal) is the only severity a pass-glyph-led line can FALSELY
-    // earn (D-OUT-1b): Info/Debug/Trace never alert, so the outcome guard below is paid only on a
-    // would-be-positive result — the D-OUT-1 hot-path discipline.
+    // earn (SRC-D-OUT-1b): Info/Debug/Trace never alert, so the outcome guard below is paid only on
+    // a would-be-positive result — the D-OUT-1 hot-path discipline.
     [[nodiscard]] constexpr bool is_alerting_level(LogLevel level) noexcept
     {
         return level == LogLevel::Warn || level == LogLevel::Error || level == LogLevel::Fatal;
@@ -775,9 +775,9 @@ namespace
     // line. Deriving it inside the head-bounded scan instead made a level word at content offset
     // 35 whose successor starts at 41 read as TERMINAL — and therefore authoritative — so the
     // verdict moved with the byte count of the prefix rather than with its structure. That is the
-    // presentation-dependence D-OUT-4c names, in the one branch the kind-slot rule does not cover
-    // (adr/0074: bound the scan, never the claim). Cold — reached only once a level word matched —
-    // and self-terminating: for_each_token stops at the first token it finds.
+    // presentation-dependence SRC-D-OUT-4c names, in the one branch the kind-slot rule does not
+    // cover (adr/0074: bound the scan, never the claim). Cold — reached only once a level word
+    // matched — and self-terminating: for_each_token stops at the first token it finds.
     // PRECONDITION: `token` is a sub-view of `line`.
     // Only throw path is for_each_token's substr (begin <= size); the noexcept body cannot throw.
     // NOLINTNEXTLINE(bugprone-exception-escape)
@@ -810,8 +810,8 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
     //     (pytest "…OperationalError", tracebacks, bare "connection refused").
     // A COST BOUND on the leading-level search, and nothing else: how far into the line an explicit
     // level token may START. It states nothing about what precedes the level word and decides no
-    // verdict — the register decision (D-OUT-4c's kind slot) and the terminality decision below are
-    // both derived over the WHOLE line. It read as a position rule once ("covers an ISO-8601
+    // verdict — the register decision (SRC-D-OUT-4c's kind slot) and the terminality decision below
+    // are both derived over the WHOLE line. It read as a position rule once ("covers an ISO-8601
     // timestamp + the level start"), and that framing was the defect: a byte budget is only ever a
     // proxy for position, and a proxy over presentation bytes moves when the presentation moves —
     // for_each_token's limit is a RAW-BYTE offset, so an ANSI run before the level word spends the
@@ -829,7 +829,7 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
     constexpr std::size_t kKeywordHead{128};
 
     // Stage 1 — first exact level token whose start lies within the head, but
-    // authoritative only IN VERDICT REGISTER (D-OUT-4). parse_log_level is outcome-blind:
+    // authoritative only IN VERDICT REGISTER (SRC-D-OUT-4). parse_log_level is outcome-blind:
     // it maps the bare words failure/fatal/critical → Fatal, error → Error, warn → Warn,
     // so a descriptive line ("error handling enabled", "failure modes documented") whose
     // FIRST token is a level WORD would otherwise be classified alerting and authoritative,
@@ -854,7 +854,7 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
     // Terminality is a property of the LINE, not of the head — see token_follows.
     const bool token_follows_level{leading != LogLevel::Unknown &&
                                    token_follows(line, level_token)};
-    // D-CNT-1: a leading level WORD in COUNT register ("There was 1 failure:") is a SUMMARY,
+    // SRC-D-CNT-1: a leading level WORD in COUNT register ("There was 1 failure:") is a SUMMARY,
     // not a per-item verdict — even though it is verdict-anchored (the trailing colon), a counted
     // noun is checked first and is NOT authoritative. Fall THROUGH to Stage 2, which still catches
     // a genuine non-count verdict elsewhere on the line ("Build failed with 1 error" → "failed"
@@ -864,7 +864,7 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
         (detail::is_verdict_anchored(line, level_token) || !token_follows_level) &&
         !(is_alerting_level(leading) && detail::is_count_register(line, level_token)))
     {
-        // Authoritative leading level. D-OUT-1b: a leading pass GLYPH ("✔ … ERROR …") is an
+        // Authoritative leading level. SRC-D-OUT-1b: a leading pass GLYPH ("✔ … ERROR …") is an
         // unambiguous pass verdict whose name embeds a level word ⇒ demote an alerting level
         // to Unknown. A genuine "ERROR:"/"FATAL:" leads with the WORD, so
         // leading_outcome_is_pass returns false and the level is preserved (no recall loss).
@@ -880,13 +880,14 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
     // spuriously promoted new templates to HIGH "New error" downstream in the diff.
     if (contains_failure_cue(line, kKeywordHead))
         return LogLevel::Error; // contains_failure_cue self-guards (D-OUT-1) — no double call
-    // D-CNT-1: a count-register failure word ("1 failure", "5 failed") is a SUMMARY — it did not
-    // fire as a verdict cue above, but it still surfaces, capped at Warn (below per-item verdicts;
-    // demote, never suppress — the "25 passed, 5 failed" dual). A leading pass GLYPH still demotes.
+    // SRC-D-CNT-1: a count-register failure word ("1 failure", "5 failed") is a SUMMARY — it did
+    // not fire as a verdict cue above, but it still surfaces, capped at Warn (below per-item
+    // verdicts; demote, never suppress — the "25 passed, 5 failed" dual). A leading pass GLYPH
+    // still demotes.
     if (detail::contains_failure_summary_cue(line, kKeywordHead))
         return detail::leading_outcome_is_pass(line) ? LogLevel::Unknown : LogLevel::Warn;
     if (contains_warning_cue(line, kKeywordHead))
-        // D-OUT-1b: contains_warning_cue has no outcome guard, so apply it here (Warn alerts).
+        // SRC-D-OUT-1b: contains_warning_cue has no outcome guard, so apply it here (Warn alerts).
         return detail::leading_outcome_is_pass(line) ? LogLevel::Unknown : LogLevel::Warn;
     return LogLevel::Unknown;
 }

@@ -41,13 +41,13 @@ TEST(FailureLexicon, StandaloneWordIsACue)
 }
 
 // ── CamelCase exception types are a cue ONLY in verdict register (D-MSK-4 ruling) ──
-// D-OUT-4b re-baselined 2026-07-21: error_type_anchors == is_verdict_anchored. A …Error/
+// SRC-D-OUT-4b re-baselined 2026-07-21: error_type_anchors == is_verdict_anchored. A …Error/
 // …Exception type fires when it carries verdict register (a `:` verdict colon, caps, a
 // [bracket], or a ✗-led line); a BARE type in prose / a source-echo (`raise ValueError`,
 // no register) does NOT — the actual thrown line `ValueError: …` carries the colon and still
 // fires, so the lost recall is on non-verdict echoes only (precision-first, ADR 0013).
 //
-// D-OUT-4c re-baselined the colon half 2026-07-29: the colon anchors only in the line's KIND
+// SRC-D-OUT-4c re-baselined the colon half 2026-07-29: the colon anchors only in the line's KIND
 // SLOT. error_type_anchors IS is_verdict_anchored, so this consumer moved with the kernel — by
 // construction, not as a side effect. The pytest gutter row below is the measured cost, and it is
 // the SAME ruling that excludes the jest/rust code-frame gutter (`> 10 |   err: &str`): a gutter
@@ -56,7 +56,7 @@ TEST(FailureLexicon, StandaloneWordIsACue)
 TEST(FailureLexicon, CamelCaseTypeIsACueOnlyInVerdictRegister)
 {
     EXPECT_FALSE(contains_failure_cue("E   sqlalchemy.exc.OperationalError: bad"))
-        << "D-OUT-4c: the pytest report gutter 'E' is neither colon-terminated nor "
+        << "SRC-D-OUT-4c: the pytest report gutter 'E' is neither colon-terminated nor "
            "bracket-enclosed, so the type is not in the kind slot — the declared recall edge";
     EXPECT_TRUE(contains_failure_cue("sqlalchemy.exc.OperationalError: bad"))
         << "the same dotted type at index 0 IS the kind slot — the discriminator is POSITION, not "
@@ -71,7 +71,7 @@ TEST(FailureLexicon, CamelCaseTypeIsACueOnlyInVerdictRegister)
         << "'Error' as a PREFIX (ErrorBudget) is not a cue — only the type suffix is";
 }
 
-// ── D-OUT-4b: a CamelCase error-TYPE in DESCRIPTIVE register is a reference ─────
+// ── SRC-D-OUT-4b: a CamelCase error-TYPE in DESCRIPTIVE register is a reference ─────
 // The discriminator is REGISTER/POSITION, not the token. A …Error/…Exception name
 // inside a node:test ▶-suite NAME line NAMES a type, it does not throw one — the
 // 1.6.5 dogfood FP "▶ … when frameworkError calls …" (fastify) classified Error on a
@@ -114,7 +114,7 @@ TEST(FailureLexicon, NegatedErrorTypeIsNotACue)
         << "control: a real type ('Value' before 'Error') in verdict register (a kind-slot colon) "
            "is a cue — the negation guard is not a blanket suppressor";
     EXPECT_FALSE(contains_failure_cue("raises ValueError: bad value"))
-        << "D-OUT-4c: 'raises' is prose, so the type is not in the kind slot — consistent with "
+        << "SRC-D-OUT-4c: 'raises' is prose, so the type is not in the kind slot — consistent with "
            "`raise ValueError` (no register) already demoting; the thrown line still fires above";
 }
 
@@ -170,12 +170,12 @@ TEST(FailureLexicon, LeadingPassGlyphDemotesFailureWord)
 // discriminator is "first outcome token is a pass glyph", nothing weaker.
 TEST(FailureLexicon, PassWordOrTrailingGlyphDoesNotDemote)
 {
-    // D-CNT-1: "5 failed" is a COUNT-register summary (a bare integer immediately precedes the
+    // SRC-D-CNT-1: "5 failed" is a COUNT-register summary (a bare integer immediately precedes the
     // failure word), so contains_failure_cue — a per-item VERDICT predicate — does NOT fire. The
     // summary still surfaces at Warn via the level path; it just never outranks the per-item
     // verdicts it summarizes (the symmetric dual of the "25 passed" pass-count).
     EXPECT_FALSE(contains_failure_cue("======== 25 passed, 5 failed ========"))
-        << "pytest summary: '5 failed' is a count summary, not a per-item verdict (D-CNT-1)";
+        << "pytest summary: '5 failed' is a count summary, not a per-item verdict (SRC-D-CNT-1)";
     EXPECT_TRUE(contains_failure_cue("build failed after a retry"))
         << "'failed' preceded by a WORD (not a bare-integer count) is a genuine verdict — fires";
     EXPECT_TRUE(contains_failure_cue("ERROR build broke ✓ cache restored"))
@@ -184,7 +184,7 @@ TEST(FailureLexicon, PassWordOrTrailingGlyphDoesNotDemote)
         << "✗ is a FAIL glyph (not a pass glyph), skipped — the failure word 'failed' stands";
 }
 
-// ── D-OUT-4 — verdict-register awareness (§4A.6): a failure WORD is a cue ───────
+// ── SRC-D-OUT-4 — verdict-register awareness (§4A.6): a failure WORD is a cue ───────
 // ONLY in verdict register. A bare base-form failure NOUN in prose ("crash", "fail",
 // "error", "timeout" with no decoration) is NOT a verdict and must not fire — the
 // §6.7 re-run hard-floor false positives: P3 rank 1 `Storing crash reports into
@@ -209,7 +209,7 @@ TEST(FailureLexicon, InformationalFailureWordIsNotAVerdictCue)
         << "the noun 'timeout' as configuration prose, no register";
 }
 
-// ── D-OUT-4 recall guard: a verdict-ANCHORED failure token still fires ──────────
+// ── SRC-D-OUT-4 recall guard: a verdict-ANCHORED failure token still fires ──────────
 // The partition is by grammatical ROLE, not a blanket family suppression — proved by
 // the minimal pairs against the demotes above: the NOUN "crash"/"fail"/"error"
 // demotes, but the SAME stem in verdict register survives. Five anchors CONFIRM an
@@ -242,7 +242,7 @@ TEST(FailureLexicon, VerdictAnchoredFailureSurvives)
     EXPECT_TRUE(contains_failure_cue("deploy aborted by operator")) << "'aborted'";
 }
 
-// ── D-OUT-4 role partition (Daidalos Q1 ruling): the criterion is BENIGN-COLLISION-
+// ── SRC-D-OUT-4 role partition (Daidalos Q1 ruling): the criterion is BENIGN-COLLISION-
 // PRONENESS, not grammatical role. A SelfAnchoring noun essentially never appears
 // benignly (segfault / traceback / unhandled) → it fires BARE, no register; gating it
 // only suppressed recall ("unhandled exception" / "unhandled promise rejection" are
@@ -272,7 +272,7 @@ TEST(FailureLexicon, RegisterAnchoredNounDemotesInProseFiresAnchored)
         << "caps 'FATAL' fires";
     EXPECT_TRUE(contains_failure_cue("panic: runtime stack overflow")) << "'panic:' colon fires";
 }
-// ── D-OUT-4a — a leading FAIL glyph (✗/✕/✖/✘) ANCHORS a RegisterAnchored word but ──
+// ── SRC-D-OUT-4a — a leading FAIL glyph (✗/✕/✖/✘) ANCHORS a RegisterAnchored word but ──
 // never CREATES a cue. So a failing test "✗ should not crash …" surfaces (✗ anchors
 // "crash"), while a glyph-only line with no failure word stays silent — provably safe
 // against the deferred D-OUT-3 ×-risk: × U+00D7 (the "1920×1080" dimension separator)
@@ -299,7 +299,7 @@ TEST(FailureLexicon, LeadingFailGlyphAnchorsButNeverCreates)
 // ── Tokenization boundary the §6.7 P3 finding identified (documenting pin) ─────
 // `_` is NOT a token delimiter and the ends are alnum, so "ERR_FAILED" is ONE atom —
 // it matches no kFailureLexicon word and is no CamelCase `…Error` type, so it fires no
-// cue (and infer_leading_log_level → Unknown). This is BY DESIGN, not a gap D-OUT-4
+// cue (and infer_leading_log_level → Unknown). This is BY DESIGN, not a gap SRC-D-OUT-4
 // addresses: the real vscode P3 GT crash (`ERR_FAILED (-2) loading 'about:blank'`, 20×)
 // is surfaced by RECURRENCE/NOVELTY, not the failure level — orthogonal to verdict-
 // register classification. The caps anchor only CONFIRMS an already-matched failure
@@ -312,7 +312,7 @@ TEST(FailureLexicon, UnderscoreCompoundIsOneAtomNotADecomposedCue)
            "word; the 20x crash is caught by recurrence, not the failure level";
 }
 
-// ── D-CNT-1 — the count register (§3.2): a counted-noun failure word is a SUMMARY ──
+// ── SRC-D-CNT-1 — the count register (§3.2): a counted-noun failure word is a SUMMARY ──
 // The symmetric dual of the "25 passed, 5 failed" pass-count: a failure word whose
 // IMMEDIATELY-preceding token is a bare integer ("1 failure", "5 failed") asserts an
 // aggregate, not a per-item verdict — so it does NOT fire as a cue, even when it carries
@@ -338,9 +338,9 @@ TEST(FailureLexicon, CountRegisterFailureWordIsSummaryNotVerdict)
            "line";
 }
 
-// ── D-OUT-2 — a leading pass WORD demotes, but ONLY as the first significant token ──
+// ── SRC-D-OUT-2 — a leading pass WORD demotes, but ONLY as the first significant token ──
 // D-OUT-1 is glyph-gated (a leading pass GLYPH demotes; a pass WORD does not) to protect
-// the "25 passed, 5 failed" summary. D-OUT-2 closes the TAP/node-runner recall gap: a
+// the "25 passed, 5 failed" summary. SRC-D-OUT-2 closes the TAP/node-runner recall gap: a
 // kSuccessVerdicts WORD (passed/ok/success/succeeded) leading the line (first significant
 // token, mirroring the glyph rule) demotes a failure word — `ok 1 - … failed` is a PASSING
 // TAP assertion whose description carries failure vocab. The count register (above) is the
@@ -359,7 +359,8 @@ TEST(FailureLexicon, LeadingPassWordDemotesAsFirstSignificantToken)
     EXPECT_TRUE(contains_failure_cue("worker crashed but all 4 checks passed"))
         << "'crashed' is the first significant token; a TRAILING 'passed' must not demote it";
     EXPECT_FALSE(contains_failure_cue("======== 25 passed, 5 failed ========"))
-        << "a NUMBER is the first significant token (not 'passed') — D-OUT-2 does not fire; the "
+        << "a NUMBER is the first significant token (not 'passed') — SRC-D-OUT-2 does not fire; "
+           "the "
            "count register independently demotes '5 failed' (so still no cue)";
 }
 
@@ -400,7 +401,7 @@ TEST(FailureLexicon, AnsiColourWrappedCueIsExtracted)
         << "ANSI-wrapped PASSED is not a failure";
 }
 
-// ── The NOTE register (D-NOTE-1) — a compiler note asserts no verdict ──────────
+// ── The NOTE register (SRC-D-NOTE-1) — a compiler note asserts no verdict ──────────
 // A gcc/clang failure is ONE `error:` line plus N `note:` lines, and the notes carry the
 // outcome vocabulary: `note: template argument deduction/substitution failed:`. `failed`
 // is SelfAnchoring — it fires bare, by design — so every such note was classified as a
@@ -426,9 +427,9 @@ TEST(FailureLexicon, CompilerNoteDiagnosticCarriesNoFailureVerdict)
     EXPECT_FALSE(contains_failure_cue(
         "/opt/gcc-15.3/include/c++/15.3.0/bits/fs_path.h:542:14: note: there are 102 candidates"))
         << "a note carrying no failure word stays silent (the trivial control)";
-    // The CamelCase error-TYPE path, isolated: the type is colon-anchored (D-OUT-4b would fire it)
-    // and the line carries no lexicon word, so this row is red without the register and green with
-    // it — it is not a restatement of the row above.
+    // The CamelCase error-TYPE path, isolated: the type is colon-anchored (SRC-D-OUT-4b would fire
+    // it) and the line carries no lexicon word, so this row is red without the register and green
+    // with it — it is not a restatement of the row above.
     EXPECT_FALSE(contains_failure_cue("/src/parser.cpp:88:12: note: candidate function not viable: "
                                       "ValueError: no known conversion from 'int'"))
         << "a verdict-anchored CamelCase error TYPE inside a note message is the note's word too";
@@ -444,7 +445,7 @@ TEST(FailureLexicon, CompilerNoteDiagnosticCarriesNoFailureVerdict)
         << "a lexical 'note:' with no <line>:<col> is not the diagnostic-kind position";
 }
 
-// ── The note register is REGISTER-scoped, never LINE-scoped (D-NOTE-1) ─────────
+// ── The note register is REGISTER-scoped, never LINE-scoped (SRC-D-NOTE-1) ─────────
 // It removes the NOTE's authority over its own message; a verdict anchored EARLIER on the
 // same line is a different claim by a different author and survives untouched. This is
 // what makes it a fourth register beside verdict / count / echoed-source rather than a
@@ -462,7 +463,7 @@ TEST(FailureLexicon, NoteRegisterDoesNotReachAVerdictAnchoredEarlierOnTheLine)
 // ── scan_limit bounds where a token may START (it may extend past the limit) ────
 TEST(FailureLexicon, ScanLimitBoundsTheHead)
 {
-    // The late cue is CAPS 'ERROR' (verdict-anchored under D-OUT-4) so it genuinely
+    // The late cue is CAPS 'ERROR' (verdict-anchored under SRC-D-OUT-4) so it genuinely
     // fires — the head bound is then the SOLE reason the limit=20 scan stays silent
     // (a bare lowercase 'error' would now demote on its own, masking the bound).
     const std::string_view line{"INFO request ok ............................ then ERROR happened"};

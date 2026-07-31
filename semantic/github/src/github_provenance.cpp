@@ -70,7 +70,7 @@ namespace
 
 } // namespace
 
-// True iff `line` is an echoed-source line (D-PROV-1): the ENTIRE visible content is a SINGLE
+// True iff `line` is an echoed-source line (SRC-D-PROV-1): the ENTIRE visible content is a SINGLE
 // SGR-wrapped span — a command-echo SGR (`36;1`/`1;36`), a content run, and a closing reset
 // (`0`/empty/`39`) — with no un-wrapped visible bytes outside the span. Operates on the RAW line
 // (ANSI intact). Byte-exact state machine (F5).

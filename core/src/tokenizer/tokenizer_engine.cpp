@@ -14,7 +14,7 @@ import insight.canon.detail.parse;    // LogParser
 //   raw_line
 //     →  LogParser::parse_line()  →  ParsedLine { level, timestamp, component,
 //                                                  content }   (all arena-stable;
-//                                                  ANSI-stripped at ingest, D-TID-11)
+//                                                  ANSI-stripped at ingest, SRC-D-TID-11)
 //     →  stateless_template(content, arena, config)
 //                                →  StatelessTemplate { template_str, params[] }
 //                                   (a pure function of the line's own masked tokens —
@@ -92,26 +92,27 @@ struct Tokenizer::Impl
         event.structural_role = insight::tokenization::classify(
             parser.attest(parsed_line.content),
             composed); // announced structural role (the resolved view's rows)
-        // Identity-derived WHERE (bibles/intent_identity.md §8, II-8): populate an EMPTY component
-        // WHERE axis with the recognized test-file. Semantic-unaware (SP-1): no dialect literal — a
-        // format whose lines carry a native component already skips via component.empty(); a format
-        // without one (GHA today, any future dialect tomorrow) gets the identity-derived WHERE, and
-        // recognize_location returns empty on non-test content so nothing is faked. Config-gated
-        // and default-OFF, so every G-SP-1 default path is byte-identical (the flag is the aligned
-        // pipeline's, feeding the where_set_shift coverage verdict — §5.4).
+        // Identity-derived WHERE (bibles/intent_identity.md §8, SRC-II-8): populate an EMPTY
+        // component WHERE axis with the recognized test-file. Semantic-unaware (SRC-SP-1): no
+        // dialect literal — a format whose lines carry a native component already skips via
+        // component.empty(); a format without one (GHA today, any future dialect tomorrow) gets the
+        // identity-derived WHERE, and recognize_location returns empty on non-test content so
+        // nothing is faked. Config-gated and default-OFF, so every G-SP-1 default path is
+        // byte-identical (the flag is the aligned pipeline's, feeding the where_set_shift coverage
+        // verdict — §5.4).
         if (config.recognize_test_where && event.component.empty())
             event.component =
                 insight::recognize_location(parser.attest(parsed_line.content), composed);
-        event.trace = parsed_line.trace; // OTEL trace context (D-OTEL-1): consumed by O2/O3,
+        event.trace = parsed_line.trace; // OTEL trace context (SRC-D-OTEL-1): consumed by O2/O3,
                                          // never serialized; default-empty for non-OTEL inputs
         event.ordinals = parsed_line.ordinals; // W1 ordinal observations (D-W1-3): consumed by
                                                // metalog binning; empty span for non-ordinal lines
         event.linked_span_ids =
-            parsed_line.linked_span_ids;                 // O4b Span Links (D-OTEL-9): consumed by
-                                                         // metalog into the service topology; empty
-                                                         // for lines without links
-        event.echoed_source = parsed_line.echoed_source; // D-PROV-1: echoed script source, not a
-                                                         // runtime event; consumed (salience tier
+            parsed_line.linked_span_ids; // O4b Span Links (SRC-D-OTEL-9): consumed by
+                                         // metalog into the service topology; empty
+                                         // for lines without links
+        event.echoed_source = parsed_line.echoed_source; // SRC-D-PROV-1: echoed script source, not
+                                                         // a runtime event; consumed (salience tier
                                                          // gate), never serialized; false for the
                                                          // vast majority of lines
 

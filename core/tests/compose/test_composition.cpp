@@ -130,7 +130,7 @@ TEST(CompositionDeathTest, DuplicateKeyFailsClosedAtRuntime)
         << "compose() must fatal (fail-closed) on a cross-package duplicate, not silently merge";
 }
 
-// ── The degenerate core-only composition is a defined, RUNNABLE state (II-4 at the composition
+// ── The degenerate core-only composition is a defined, RUNNABLE state (SRC-II-4 at the composition
 // layer) ──
 TEST(Composition, DegenerateCoreOnlyRuns)
 {

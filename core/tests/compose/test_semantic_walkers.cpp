@@ -133,7 +133,7 @@ constexpr std::array<StructuralRoleRow, 4> kSynthRoles{{
     {.prefix = "GATED>", .role = StructuralRole::Terminator, .dialect_gate = kSynth},
 }};
 
-// One intent marker, concretely gated (II-6), RemainderAfterPrefix payload.
+// One intent marker, concretely gated (SRC-II-6), RemainderAfterPrefix payload.
 constexpr std::array<IntentMarkerRow, 1> kSynthMarkers{{
     {.prefix = "STEP ",
      .kind = IntentMarkerKind::Step,

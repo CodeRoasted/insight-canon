@@ -32,7 +32,7 @@ LogParser::LogParser(ArenaAllocator& arena, const insight::semantic::ComposedSem
 {
 }
 
-// D-PROV-1 echoed-source register: the GHA command-echo SGR wrapper is destroyed by the
+// SRC-D-PROV-1 echoed-source register: the GHA command-echo SGR wrapper is destroyed by the
 // stage-1 normalize() before any strategy sees the line, so the composed provenance hooks
 // classify the RAW (ANSI-bearing) line — the only place it survives. Strategy-INDEPENDENT (a
 // wrapped line is echoed source whatever it routed to), reproducing the pre-split
@@ -57,8 +57,8 @@ is_echoed_source(std::string_view raw_line,
 //     a dialect with a line prefix, the content past it). There is no earlier point where that
 //     exists.
 //   * BEFORE the echoed-source demotion — an echoed-source line is script text, not an observed
-//     event, so D-PROV-1 drives its level to Unknown unconditionally. That demotion outranked the
-//     lift when the lift lived inside parse(), and it must keep outranking it.
+//     event, so SRC-D-PROV-1 drives its level to Unknown unconditionally. That demotion outranked
+//     the lift when the lift lived inside parse(), and it must keep outranking it.
 // An UNDECLARED stream's view carries no concretely-gated level-lift row at all (ADR 0065 clause
 // 2), so the walk is over an empty span and costs nothing — the dialect gate is not tested here,
 // because it was tested once at `resolve_stream` and the row is either in this view or it is not.
@@ -136,7 +136,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
         return std::unexpected(std::string("LogParser: empty line"));
     }
 
-    // D-TID-11: strip ANSI/CSI/SGR/OSC escape sequences as a content normalization at canon
+    // SRC-D-TID-11: strip ANSI/CSI/SGR/OSC escape sequences as a content normalization at canon
     // ingest — BEFORE strategy detection AND tokenization, so the format prefix-match, the level
     // token-scan, and the `component` extraction all see colour-free content (colour is
     // presentation, never content; the escapes interleave within/between tokens so a per-token
@@ -183,7 +183,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
         last_format_ =
             strategy->format(); // the routed winner for this event (per-line observability)
         apply_level_lift(*result, composed_);
-        // D-PROV-1 (echoed-source register): the GHA command-echo SGR wrapper was destroyed
+        // SRC-D-PROV-1 (echoed-source register): the GHA command-echo SGR wrapper was destroyed
         // by the stage-1 normalize() above, so detect it on the RAW (ANSI-bearing) line — the
         // only place it survives. An echoed-source line is run-step SCRIPT text, not an
         // observed runtime event: demote its level to Unknown so a failure WORD in echoed
@@ -265,7 +265,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_stable(std::string_view 
         last_format_ =
             strategy->format(); // the routed winner for this event (per-line observability)
         apply_level_lift(*result, composed_);
-        // D-PROV-1: echoed-source demotion (see parse_line). Detect on the supplied line; a
+        // SRC-D-PROV-1: echoed-source demotion (see parse_line). Detect on the supplied line; a
         // pre-ANSI-stripped stable line carries no wrapper, so this is a no-op there.
         if (is_echoed_source(stable_line, composed_))
         {

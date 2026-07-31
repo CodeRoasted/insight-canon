@@ -31,7 +31,7 @@ using Duration = std::chrono::system_clock::duration;
 // ── Identifiers ──
 using EventID = uint64_t;
 
-// ── Canonicalization-contract version (stateless_template_id.md D-TID-16) ──
+// ── Canonicalization-contract version (stateless_template_id.md SRC-D-TID-16) ──
 // The single canon-owned identifier of the canonicalization CONTRACT — the masking
 // rules that turn a raw line into its `template_str` (the stateless per-line masker +
 // the F13 class set). Every MetaLog producer DEFAULTS to this (MetaLogConfig), so a
@@ -42,16 +42,16 @@ using EventID = uint64_t;
 // canonicalization change. Generations: -1 = stateless masker + F13; -2 = OTEL-awareness
 // (severity-from-severity_number + trace-context routing + the trace-scoped graph —
 // insight_otel_epic.md D-OTEL-2, unconditional); -3 = currency-marker numerics
-// (stateless_template_id.md D-TID-22 — `$463`/`total=$463` mask to `$<*>`/`total=$<*>`); -4 = the
-// 1.6.4 masking batch (detection_provenance_and_legibility.md): D-MSK-1 generalized
+// (stateless_template_id.md SRC-D-TID-22 — `$463`/`total=$463` mask to `$<*>`/`total=$<*>`); -4 =
+// the 1.6.4 masking batch (detection_provenance_and_legibility.md): D-MSK-1 generalized
 // diagnostic-composite masking (per-`:`/`/`-segment digit-leading rule — collapses the
 // Chromium/glog prefix `[PID:DATE/TIME:LEVEL:file.cc:line]`, subsumes source-location), D-MSK-2
-// ephemeral-root path catalog (`/tmp/…` → `/tmp/<*>`), and D-MSK-3 JSON nested-`fields`
+// ephemeral-root path catalog (`/tmp/…` → `/tmp/<*>`), and SRC-D-MSK-3 JSON nested-`fields`
 // component/level descent (a cube-axis change folded into the same bump). The -4 content changes
 // ONLY for inputs carrying a diagnostic-composite / ephemeral-root token or a nested-`fields` JSON
 // record; every other document is byte-identical except this version string. -5 = D-OTEL-15
 // (`4e46af0`); -6 = the D-MSK-4 batch — canon ephemeral-root masking + the lexicon-context
-// precision fix (`9c5db20`); -7 = D-NOTE-1, the NOTE register: a failure word inside a compiler
+// precision fix (`9c5db20`); -7 = SRC-D-NOTE-1, the NOTE register: a failure word inside a compiler
 // note's message (`<path>:<line>:<col>: note: … failed:`) no longer confers a failure verdict, so
 // the serialized `dominant_level` of a gcc/clang cascade's note lines moves Error → Unknown.
 // `template_str` and `template_id` do NOT move under -7 — the masker is untouched — but
@@ -68,7 +68,7 @@ inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-8"};
 // SHA-256(masked template_str), carried as a fixed-size POD through the whole
 // metalog/eidos domain. The 34-byte "h:"+hex string is materialised only at the
 // serialize seam (render()). Owned by canon because identity IS "the hash under
-// kCanonicalizationVersion" (D-TID-9/D-TID-16) — identity and its comparability
+// kCanonicalizationVersion" (D-TID-9/SRC-D-TID-16) — identity and its comparability
 // version belong in one place.
 struct TemplateId
 {
@@ -109,7 +109,7 @@ struct NgramId
 // the sequence's id bytes; transient (never serialized), order-sensitive.
 [[nodiscard]] NgramId ngram_id_of(const std::vector<TemplateId>& sequence) noexcept;
 
-// ── Intent identity (bibles/intent_identity.md §2-§4, II-1/II-6/II-7) ──
+// ── Intent identity (bibles/intent_identity.md §2-§4, II-1/SRC-II-6/II-7) ──
 // kIntentRegistryVersion RETIRED (ADR 0024 §4.1): it was a dead constant (zero downstream readers),
 // and its job — the II-7 comparability identity of the recognizer/marker rule set — is now
 // discharged by the composed `semantic_identity` (insight::semantic::ComposedSemantics), a CONTENT
@@ -123,31 +123,31 @@ struct NgramId
 // version-bearing / matrix / shard tokens that vary across homologous runs, keep the
 // structural name — so matrix legs and retries of ONE job collapse to one class
 // (instances are separated downstream by ordinal, per §5.3 multiplicity, NEVER eaten
-// here — II-2). This is the canon.detail.mask templating discipline REAPPLIED to
+// here — SRC-II-2). This is the canon.detail.mask templating discipline REAPPLIED to
 // identifiers (§5.1 detail 1); it is a distinct rule set from the value masker (which
 // keeps `(1/<*>` to distinguish, where identity must collapse `(1/10)`→`(M)` to align).
 // Deterministic, ASCII-safe, no float, no regex, no cross-line state. Cold path (few
 // markers per log) — returns an owned string.
 [[nodiscard]] std::string canonicalize_intent(std::string_view name);
 
-// The raw INSTANCE DISCRIMINANT (ADR 0023, II-9 — the third role on the identity spine): the matrix
-// tuple rendered into a job/step display name (`Test (ubuntu-latest, Node 24.x)` → `(ubuntu-latest,
-// Node 24.x)`), returned VERBATIM (a view into `name`). This is the STABLE declared parallelism
-// coordinate that separates co-occurring siblings within one identity class — kept raw (NOT masked,
-// NOT an appearance ordinal) because matrix axes are stable by declaration, so raw keys pair
-// exactly across runs. Empty when the name carries no tuple (the aligner then falls to a retry
-// ordinal — the declared-runs-on source is stripped from Sift's input stream, so it is inert here).
-// The complement of canonicalize_intent: the class MASKS the tuple to `(M)`, the discriminant KEEPS
-// it verbatim.
+// The raw INSTANCE DISCRIMINANT (ADR 0023, SRC-II-9 — the third role on the identity spine): the
+// matrix tuple rendered into a job/step display name (`Test (ubuntu-latest, Node 24.x)` →
+// `(ubuntu-latest, Node 24.x)`), returned VERBATIM (a view into `name`). This is the STABLE
+// declared parallelism coordinate that separates co-occurring siblings within one identity class —
+// kept raw (NOT masked, NOT an appearance ordinal) because matrix axes are stable by declaration,
+// so raw keys pair exactly across runs. Empty when the name carries no tuple (the aligner then
+// falls to a retry ordinal — the declared-runs-on source is stripped from Sift's input stream, so
+// it is inert here). The complement of canonicalize_intent: the class MASKS the tuple to `(M)`, the
+// discriminant KEEPS it verbatim.
 [[nodiscard]] std::string_view discriminant_of(std::string_view name) noexcept;
 
 // The intent identity: the 16-byte SHA-256 of the canonicalized name — a STRUCTURAL
-// grouping key derived from the marker, never a retained value (II-1, the O1/D-OTEL-1
+// grouping key derived from the marker, never a retained value (II-1, the O1/SRC-D-OTEL-1
 // discipline verbatim). Byte-identical to template_id_of(canonicalize_intent(name));
 // one call keeps `intent_id` co-located with its comparability version.
 [[nodiscard]] TemplateId intent_id_of(std::string_view name);
 
-// Location recognition (bibles/intent_identity.md §8, II-8) moved to the facade
+// Location recognition (bibles/intent_identity.md §8, SRC-II-8) moved to the facade
 // (insight::recognize_location over a ComposedSemantics) — it walks the composed location rows the
 // test_frameworks package ships, so it cannot live in api (which the compose module imports). The
 // three LocationMatchKind families (jest/vitest/playwright `.test.`/`.spec.`; pytest `test_*.py`;
@@ -160,7 +160,7 @@ inline std::ostream& operator<<(std::ostream& out, const TemplateId& template_id
     return out << render(template_id);
 }
 
-// ── OTEL trace context (insight_otel_epic.md §12, D-OTEL-1) ──
+// ── OTEL trace context (insight_otel_epic.md §12, SRC-D-OTEL-1) ──
 // The OTEL hex ids (traceId/spanId/parentSpanId) are hashed to fixed-width scalar PODs at
 // the strategy seam — the D-TIR-4 hash-to-POD discipline — carried IN-MEMORY on the
 // CanonicalEvent, CONSUMED by the structural layer (trace_id groups the n-gram graph in O2;
@@ -180,7 +180,7 @@ struct SpanId
     bool operator==(const SpanId&) const = default;
 };
 
-// The per-record OTEL trace context extracted by the strategy layer (D-OTEL-1). All fields
+// The per-record OTEL trace context extracted by the strategy layer (SRC-D-OTEL-1). All fields
 // are consumed downstream and never serialized. `present` is true iff the record carried a
 // trace_id (the O2 grouping key); span_id/parent_span_id are carried for O3 (the causal
 // vertex/edge) and unread by O2.
@@ -188,10 +188,10 @@ struct OtelTraceContext
 {
     bool present{false};    // the record carried a trace_id (the O2 grouping key)
     bool has_parent{false}; // a parent_span_id was present (O3 edge; usually absent on logs)
-    bool is_span{false};    // O3 (D-OTEL-11): a SPAN record (declared causality → observed edge),
-                            // not a log record with trace context (positional causality → O2 ring).
-                            // Set by the flat-span parser; false on the OTEL-log path. Metalog
-                            // routes spans to the observed-DAG, never the adjacency ring.
+    bool is_span{false}; // O3 (SRC-D-OTEL-11): a SPAN record (declared causality → observed edge),
+                         // not a log record with trace context (positional causality → O2 ring).
+                         // Set by the flat-span parser; false on the OTEL-log path. Metalog
+                         // routes spans to the observed-DAG, never the adjacency ring.
     TraceId trace_id{};     // the transaction grouping key (O2)
     SpanId span_id{};       // the causal vertex identity (carried for O3)
     SpanId parent_span_id{}; // the observed causal edge span→parent (carried for O3)
@@ -227,10 +227,10 @@ struct OtelTraceContext
 // key) catalog — the christened ValueClassRegistry (ADR 0024 §5) is the composed view over THIS
 // catalog + kOrdinalFieldCatalog + the KEEP lexicons + the package ValueClassRow seat
 // (ComposedSemantics::value_classes). These UNIVERSAL value concepts stay core (the ratified rule);
-// this is the D-TID-6 "now" tier (a declared contract with hardcoded strategies, like the
+// this is the SRC-D-TID-6 "now" tier (a declared contract with hardcoded strategies, like the
 // JsonStrategy key lists) — NOT a package extension. OTEL fields are
 // schema-declared (never data-learned), so they need no registry. Each class routes to its
-// declared layer (D-OTEL-1): the three trace keys → consumed structural metadata (dropped
+// declared layer (SRC-D-OTEL-1): the three trace keys → consumed structural metadata (dropped
 // from the template, never tokenized); severity_number → the LogLevel band.
 enum class OtelFieldClass : std::uint8_t
 {
@@ -255,35 +255,35 @@ inline constexpr std::array<OtelFieldDescriptor, 4> kOtelFieldCatalog{{
     {.field_class = OtelFieldClass::SeverityNumber, .key = "severityNumber"},
 }};
 
-// ── Declared ordinal-field catalog (W1 ordinal channel, §4A.4 D-W1-2/3/8) ──
-// The "now" tier (D-TID-6): a declared, registry-free catalog of structured numeric fields whose
-// VALUE is ordinal (metric structure — magnitude + distance), recognized by EXACT top-level field
-// name in the JsonStrategy field-route (mirror kOtelFieldCatalog). A declared-key hit is captured
-// as a consumed-not-tokenized ordinal observation (CanonicalEvent.ordinals) — NEVER a param —
-// which metalog bins per schedule into the W1 carrier (TopKEntry.ordinal_histograms). A UNIVERSAL
-// value class → stays core (this catalog); arbitrary/client ordinals await a package ValueClassRow
-// (the ValueClassRegistry seat, ADR 0024 §5 — no package ships one in 1.7.5; we do not build
-// dormant vocabulary — the D-TID-14 anti-monster boundary). EXACT keys only — uniform across the
-// fast/slow JSON paths, no value-syntax guessing (the D-W1-5 mis-route hazard); suffix/pattern
-// matching is a future extension when a scenario needs it. Unit-explicit names only, so each
-// value's unit is unambiguous (D-W1-3).
+// ── Declared ordinal-field catalog (W1 ordinal channel, §4A.4 SRC-D-W1-2/3/8) ──
+// The "now" tier (SRC-D-TID-6): a declared, registry-free catalog of structured numeric fields
+// whose VALUE is ordinal (metric structure — magnitude + distance), recognized by EXACT top-level
+// field name in the JsonStrategy field-route (mirror kOtelFieldCatalog). A declared-key hit is
+// captured as a consumed-not-tokenized ordinal observation (CanonicalEvent.ordinals) — NEVER a
+// param — which metalog bins per schedule into the W1 carrier (TopKEntry.ordinal_histograms). A
+// UNIVERSAL value class → stays core (this catalog); arbitrary/client ordinals await a package
+// ValueClassRow (the ValueClassRegistry seat, ADR 0024 §5 — no package ships one in 1.7.5; we do
+// not build dormant vocabulary — the SRC-D-TID-14 anti-monster boundary). EXACT keys only — uniform
+// across the fast/slow JSON paths, no value-syntax guessing (the D-W1-5 mis-route hazard);
+// suffix/pattern matching is a future extension when a scenario needs it. Unit-explicit names only,
+// so each value's unit is unambiguous (D-W1-3).
 
 // Which ordinal SCHEDULE (canonical unit + log ladder) a field bins onto. The schedule is a
-// versioned catalog (D-W1-4): its stable string id is the eidos diff's comparability key.
+// versioned catalog (SRC-D-W1-4): its stable string id is the eidos diff's comparability key.
 enum class OrdinalSchedule : std::uint8_t
 {
     DurationLog2Ns, // log2-octave ladder over nanoseconds (durations / latencies)
     SizeLog2Bytes,  // log2-octave ladder over bytes (payload / response sizes)
 };
 
-// Per-schedule wire identity + bin count B (the frozen, versioned ladder — D-W1-2). The ladder
+// Per-schedule wire identity + bin count B (the frozen, versioned ladder — SRC-D-W1-2). The ladder
 // MAP itself (bin = clamp(bit_width(value)−1, 0, B−1)) lives metalog-side — it owns binning; canon
 // only needs the stable string id (carried to the wire) and the B, and never bins.
 struct OrdinalScheduleSpec
 {
     OrdinalSchedule schedule;
     std::string_view schedule_id; // stable + versioned; mismatch ⇒ no W1 (the eidos diff gate)
-    std::uint32_t bin_count;      // B — fixed, small, bounds the carrier (D-W1-2)
+    std::uint32_t bin_count;      // B — fixed, small, bounds the carrier (SRC-D-W1-2)
 };
 inline constexpr std::array<OrdinalScheduleSpec, 2> kOrdinalScheduleCatalog{{
     {.schedule = OrdinalSchedule::DurationLog2Ns,
@@ -324,7 +324,7 @@ inline constexpr std::int64_t kNanosPerMicro{1'000};
 inline constexpr std::int64_t kNanosPerMilli{1'000'000};
 inline constexpr std::int64_t kNanosPerSecond{1'000'000'000};
 inline constexpr std::array<OrdinalFieldDescriptor, 15> kOrdinalFieldCatalog{{
-    // OTEL span wall-duration (insight_otel_epic.md §13, D-OTEL-12): endTimeUnixNano −
+    // OTEL span wall-duration (insight_otel_epic.md §13, SRC-D-OTEL-12): endTimeUnixNano −
     // startTimeUnixNano, already integer ns. Computed by the flat-span parser and emitted as
     // this declared ordinal on the shipped DurationLog2Ns ladder (activates W1 + latency_shift
     // on traces). The key also self-matches a literal span_duration_ns field if a log carries one.
@@ -531,7 +531,7 @@ enum class RunOutcome : std::uint8_t
     return baseline_rank >= 0 && changed_rank >= 0 && changed_rank > baseline_rank;
 }
 
-// ── OTEL severity_number → LogLevel band (insight_otel_epic.md D-OTEL-1) ──
+// ── OTEL severity_number → LogLevel band (insight_otel_epic.md SRC-D-OTEL-1) ──
 // The OpenTelemetry severity_number (1–24) folds into canon's existing 6-level LogLevel
 // by integer division: band = (n-1)/4 → Trace(1–4)/Debug(5–8)/Info(9–12)/Warn(13–16)/
 // Error(17–20)/Fatal(21–24). Integer-only (no float — D-OTEL-3); n<1 clamps to Trace,
@@ -723,7 +723,7 @@ template <> struct hash<insight::NgramId>
     }
 };
 
-// std::hash<TraceId> (D-OTEL-1): keys O2's per-trace ring map. `value` is already an fnv1a
+// std::hash<TraceId> (SRC-D-OTEL-1): keys O2's per-trace ring map. `value` is already an fnv1a
 // hash of the OTEL hex, so it IS a good size_t — no mixing. Importing the module suffices.
 template <> struct hash<insight::TraceId>
 {
@@ -732,7 +732,7 @@ template <> struct hash<insight::TraceId>
         return static_cast<std::size_t>(trace_id.value);
     }
 };
-// std::hash<SpanId> (D-OTEL-11): keys O3's per-window span_id → template map for close-time
+// std::hash<SpanId> (SRC-D-OTEL-11): keys O3's per-window span_id → template map for close-time
 // observed-edge resolution. `value` is already an fnv1a hash of the OTEL hex → a good size_t.
 template <> struct hash<insight::SpanId>
 {
@@ -943,7 +943,7 @@ struct CanonicalEvent
     // and to the semantic class of tokens inside it. Consumers: phase alignment +
     // structural surprise (Phase 2/4); None for the vast majority of lines.
     StructuralRole structural_role{StructuralRole::None};
-    // OTEL trace context (insight_otel_epic.md D-OTEL-1), extracted by the strategy layer for
+    // OTEL trace context (insight_otel_epic.md SRC-D-OTEL-1), extracted by the strategy layer for
     // OTEL inputs. CONSUMED in-memory (trace_id groups the n-gram graph in O2;
     // span_id/parent_span_id feed the deferred O3 DAG) and NEVER serialized — the MetaLog wire
     // shape is unchanged (OR1). `present == false` for every non-OTEL input → zero added cost.
@@ -954,17 +954,17 @@ struct CanonicalEvent
     // params. A span over arena-allocated storage (like `params`); EMPTY for every non-ordinal line
     // → zero added cost on the hot path (input-conditional, the OTEL D-OTEL-2a precedent).
     std::span<const OrdinalObservation> ordinals;
-    // O4b Span Links (insight_otel_epic.md §5.3 / D-OTEL-9, D-OTEL-21): the span_ids this span
-    // DECLARES a cross-trace edge to (OTEL `links[]`). Consumed metalog-side — each resolves (by
-    // span_id, across traces) into the SAME distilled service topology as intra-trace parentage:
-    // component(this) → component(linked). A span over arena-allocated storage; EMPTY for every
-    // span without links (and every non-span line) → zero added cost. NEVER retained/serialized
-    // (the trace-context discipline).
+    // O4b Span Links (insight_otel_epic.md §5.3 / SRC-D-OTEL-9, SRC-D-OTEL-21): the span_ids this
+    // span DECLARES a cross-trace edge to (OTEL `links[]`). Consumed metalog-side — each resolves
+    // (by span_id, across traces) into the SAME distilled service topology as intra-trace
+    // parentage: component(this) → component(linked). A span over arena-allocated storage; EMPTY
+    // for every span without links (and every non-span line) → zero added cost. NEVER
+    // retained/serialized (the trace-context discipline).
     std::span<const SpanId> linked_span_ids;
-    // Observation-provenance attribute (D-PROV-1): the line is echoed program/script SOURCE (the
-    // CI harness printing a run-step body), not an observed runtime event — recognized at the ANSI
-    // strip layer by the GHA command-echo SGR wrapper (Fact 1). CONSUMED in-memory — it already
-    // demoted `level` to Unknown in the parser, and metalog skips the level-blind salience
+    // Observation-provenance attribute (SRC-D-PROV-1): the line is echoed program/script SOURCE
+    // (the CI harness printing a run-step body), not an observed runtime event — recognized at the
+    // ANSI strip layer by the GHA command-echo SGR wrapper (Fact 1). CONSUMED in-memory — it
+    // already demoted `level` to Unknown in the parser, and metalog skips the level-blind salience
     // failure-cue tier for an all-echoed template (§3.1) — and NEVER serialized: the MetaLog wire
     // shape is unchanged (like `trace`/`ordinals`). `false` for every non-echoed line.
     bool echoed_source{false};
@@ -978,7 +978,7 @@ export namespace insight::tokenization
 
 // Token-masking configuration for the stateless per-line masker (stateless_template).
 // The Drain clustering knobs (max_depth / similarity_threshold / max_clusters) were
-// removed with the clustering itself (stateless_template_id.md D-TID-3) — a stateless
+// removed with the clustering itself (stateless_template_id.md SRC-D-TID-3) — a stateless
 // masker has no tree, no similarity match, and no cluster cap to bound.
 struct MaskConfig
 {
@@ -986,7 +986,7 @@ struct MaskConfig
     // is formed, so they never fossilise into the template identity.
     bool mask_ip_addresses{true};  // IPv4 address tokens (e.g. "192.168.1.1:")
     bool mask_hex_addresses{true}; // hex address tokens  (e.g. "0xdeadbeef")
-    // Identity-derived WHERE (bibles/intent_identity.md §8, II-8): when set, a GitHub-Actions
+    // Identity-derived WHERE (bibles/intent_identity.md §8, SRC-II-8): when set, a GitHub-Actions
     // line whose NATIVE component is empty (GHA carries none) gets its recognize_location()
     // test-file as `component` — populating the cube WHERE axis ABOVE the empty native tier
     // (never faking it — GHA WHERE is identity-derived by construction). OFF by default so every
@@ -1001,10 +1001,11 @@ struct MaskConfig
 // ──────── structural-role + intent-marker recognition TYPES ────────
 // The StructuralRoleRegistry / IntentMarkerRegistry CLASSES (the hardcoded GHA `starts_with`
 // chains) moved to the facade's COMPOSED walkers — insight::tokenization::classify / recognize over
-// a ComposedSemantics (ADR 0024 §3). Canon core is semantic-unaware (SP-1): it owns the recognition
-// ALGORITHM, the semantic packages own the rule ROWS. The result TYPES stay here — StructuralRole
-// (above) and IntentMarkerKind / ChildOrder / IntentMarker (below): the grammar's vocabulary + the
-// recognizer's return shapes, referenced by the spi rows and by every downstream consumer.
+// a ComposedSemantics (ADR 0024 §3). Canon core is semantic-unaware (SRC-SP-1): it owns the
+// recognition ALGORITHM, the semantic packages own the rule ROWS. The result TYPES stay here —
+// StructuralRole (above) and IntentMarkerKind / ChildOrder / IntentMarker (below): the grammar's
+// vocabulary + the recognizer's return shapes, referenced by the spi rows and by every downstream
+// consumer.
 export namespace insight::tokenization
 {
 
@@ -1017,13 +1018,13 @@ export namespace insight::tokenization
 // bottoms at job▸step). The payload is the RAW name; canonicalize_intent turns it into the
 // alignment CLASS (so `test (win-msvc, …)` → `test (M)` pairs across runs).
 //
-// FORMAT-GATED (II-6 — a dialect never fires cross-format): the GHA-dialect rules fire only
+// FORMAT-GATED (SRC-II-6 — a dialect never fires cross-format): the GHA-dialect rules fire only
 // for LogFormat::GitHubActions; every other format returns None. This is why the recognizer
 // takes the format (unlike StructuralRoleRegistry's universal `##[group]` markers): `Run ` is
 // GHA-runner-specific and WOULD misfire on a "Run daemon started" content line elsewhere. The
 // residual within-GHA phantom rate (content lines beginning `Run `) is the measured 0.8%
 // (studies/004 Table 2) — a phantom step-quantum simply fails to align (VANISHED+INSERTED,
-// low-sev), never a silent mispair (II-2). Deterministic, ASCII-safe, no cross-line state.
+// low-sev), never a silent mispair (SRC-II-2). Deterministic, ASCII-safe, no cross-line state.
 enum class IntentMarkerKind : std::uint8_t
 {
     None = 0, ///< the line opens no quantum (the common case)
@@ -1046,8 +1047,8 @@ struct IntentMarker
 {
     IntentMarkerKind kind{IntentMarkerKind::None};
     std::string_view name; ///< raw payload (empty when kind == None); canonicalize_intent → class
-    // The raw instance discriminant (ADR 0023 / II-9): the matrix tuple in the display name, kept
-    // VERBATIM (never masked) — the stable declared coordinate that separates co-occurring
+    // The raw instance discriminant (ADR 0023 / SRC-II-9): the matrix tuple in the display name,
+    // kept VERBATIM (never masked) — the stable declared coordinate that separates co-occurring
     // siblings. Empty when the name carries no tuple. `= discriminant_of(name)`.
     std::string_view discriminant;
     ChildOrder child_order{
@@ -1159,7 +1160,7 @@ export namespace insight::utils
 // `no errors found`. That raw-substring over-match was the bug — it promoted
 // benign new templates to HIGH "New error" in the diff and inflated severity.
 //
-// A failure-vocab token classifies its line only IN VERDICT REGISTER (D-OUT-4): the
+// A failure-vocab token classifies its line only IN VERDICT REGISTER (SRC-D-OUT-4): the
 // lexicon partitions by benign-collision-proneness — a zero-collision token (an outcome
 // verb failed/refused/…, OR a unique failure noun segfault/traceback/unhandled) self-
 // anchors and fires bare in prose ("build failed", "unhandled exception"); a collision-
@@ -1188,13 +1189,13 @@ export namespace insight::utils
 
 namespace detail
 {
-    // The shared outcome predicate (D-OUT-1b) — promoted from failure_lexicon.cpp's
+    // The shared outcome predicate (SRC-D-OUT-1b) — promoted from failure_lexicon.cpp's
     // anonymous namespace so EVERY severity-classification site can consult it: the cue
     // lexicon (contains_failure_cue) AND infer_leading_log_level's explicit-level Stage 1
     // (parse_log_level), which lives in a SEPARATE TU that could not see a TU-local symbol.
     // True iff the line's leading outcome is a PASS: a pass GLYPH (✓/✔/✅/√) anywhere in the
     // head (an unambiguous per-test verdict, so a failure WORD embedded in the test NAME
-    // "✔ … failure …" is not an alert), OR (D-OUT-2) a pass WORD (passed/ok/success/succeeded)
+    // "✔ … failure …" is not an alert), OR (SRC-D-OUT-2) a pass WORD (passed/ok/success/succeeded)
     // as the FIRST SIGNIFICANT token ("ok 1 - should return error" → pass; the TAP/node-runner
     // case). A leading failure WORD ⇒ false (failure leads), so a genuine "ERROR:"/"FATAL:" line
     // is preserved; a summary "25 passed, 5 failed" ⇒ false (a number is the first significant
@@ -1204,14 +1205,14 @@ namespace detail
     // failure_lexicon.cpp.
     [[nodiscard]] bool leading_outcome_is_pass(std::string_view line) noexcept;
 
-    // The verdict-register kernel (D-OUT-4) — true iff `token` carries the structural
+    // The verdict-register kernel (SRC-D-OUT-4) — true iff `token` carries the structural
     // decoration CI/test tooling uses to mark an outcome, so a benign-collision-prone
     // failure token classifies its line ONLY in verdict register (never in a path / config
     // line / test description). Anchors: (1) CAPS register — token's raw bytes ALL-UPPERCASE,
     // ≥2 letters (ERROR/FAILED/FATAL); (2) DELIMITER-bound — followed by `:` AND standing in the
-    // line's KIND SLOT (D-OUT-4c, below), or enclosed by `[..]`/`(..)` (`[error]`, `##[error]`,
+    // line's KIND SLOT (SRC-D-OUT-4c, below), or enclosed by `[..]`/`(..)` (`[error]`, `##[error]`,
     // `(FAILED)`);
-    // (3) a LEADING fail glyph `✗`/`✕`/`✖`/`✘` (D-OUT-4a) marking the line a failed verdict —
+    // (3) a LEADING fail glyph `✗`/`✕`/`✖`/`✘` (SRC-D-OUT-4a) marking the line a failed verdict —
     // a line-level register that CONFIRMS the token, never creates a cue (a glyph-only line
     // has no failure word). (Type-named CamelCase `…Error` and the `segmentation fault`
     // phrase are the other two register forms, handled at their own existing sites.)
@@ -1221,8 +1222,9 @@ namespace detail
     // ASCII case test, order-independent ⇒ cross-stdlib + MSVC bit-identical by construction
     // (F5). The SAME kernel both severity feeders consult; internal/detail, NOT a public surface.
     //
-    // D-OUT-4c — THE KIND SLOT, anchor #2's precondition. A trailing `:` anchors `token` only when
-    // `token` occupies the line's KIND SLOT: every token preceding it is itself colon-terminated
+    // SRC-D-OUT-4c — THE KIND SLOT, anchor #2's precondition. A trailing `:` anchors `token` only
+    // when `token` occupies the line's KIND SLOT: every token preceding it is itself
+    // colon-terminated
     // (`ld:`, `src/main.rs:`, `357:`) or bracket-enclosed (`[main]`, `(none)`, `<WORKSPACE>`). A
     // bare adjacency cannot separate a log prefix `error:` from an object key, a named parameter
     // or a quoted source string — the three are byte-identical in the token's ±1 neighbourhood, so
@@ -1230,11 +1232,11 @@ namespace detail
     // it. The rule is monotone-DEMOTING (it only ever removes an anchor, never adds one), which is
     // what makes it admissible under adr/0013 clause 2 with no corroborating recall argument, and
     // `<path>:<line>:<col>:` needs no special case — it IS a run of colon-terminated tokens, so
-    // D-NOTE-1's hand-parsed shape is an instance of this rule rather than a sibling of it.
+    // SRC-D-NOTE-1's hand-parsed shape is an instance of this rule rather than a sibling of it.
     // The walk is WHOLE-LINE and never head-bounded: adr/0074 — bound the scan, never the claim.
     [[nodiscard]] bool is_verdict_anchored(std::string_view line, std::string_view token) noexcept;
 
-    // The count-register kernel (D-CNT-1) — true iff `token` is a COUNT register summary: its
+    // The count-register kernel (SRC-D-CNT-1) — true iff `token` is a COUNT register summary: its
     // IMMEDIATELY-PRECEDING token (under the shared canon tokenization) is a BARE INTEGER count
     // ("1 failure", "5 failed", "HTTP 500 error") that is NOT part of a numeric/temporal chain (the
     // token before the count is not itself digit-leading — so a leading ISO timestamp
@@ -1249,19 +1251,19 @@ namespace detail
     // cross-stdlib + MSVC bit-identical (F5).
     [[nodiscard]] bool is_count_register(std::string_view line, std::string_view token) noexcept;
 
-    // D-CNT-1 dual — true iff the head carries a failure-lexicon word in COUNT register (a summary
-    // like "1 failure" / "5 failed"). contains_failure_cue treats such words as NON-firing (a count
-    // is not a per-item verdict); this reports their presence so infer_leading_log_level caps the
-    // line at Warn (surfaced, below per-item verdicts). `scan_limit` bounds the head as for
-    // contains_failure_cue. Internal/detail — NOT a public product surface. Cold path (consulted
-    // only when contains_failure_cue is false). Pure byte/case test ⇒ cross-stdlib bit-identical
-    // (F5).
+    // SRC-D-CNT-1 dual — true iff the head carries a failure-lexicon word in COUNT register (a
+    // summary like "1 failure" / "5 failed"). contains_failure_cue treats such words as NON-firing
+    // (a count is not a per-item verdict); this reports their presence so infer_leading_log_level
+    // caps the line at Warn (surfaced, below per-item verdicts). `scan_limit` bounds the head as
+    // for contains_failure_cue. Internal/detail — NOT a public product surface. Cold path
+    // (consulted only when contains_failure_cue is false). Pure byte/case test ⇒ cross-stdlib
+    // bit-identical (F5).
     [[nodiscard]] bool contains_failure_summary_cue(std::string_view text,
                                                     std::size_t scan_limit = 0) noexcept;
 
-    // ── The NOTE register (D-NOTE-1) — the FOURTH register, beside verdict (D-OUT-4), count
-    // (D-CNT-1) and echoed-source (D-PROV-1). It has NO declaration here on purpose: unlike the
-    // three above it has no cross-TU consumer, so its kernel stays private to
+    // ── The NOTE register (SRC-D-NOTE-1) — the FOURTH register, beside verdict (SRC-D-OUT-4),
+    // count (SRC-D-CNT-1) and echoed-source (SRC-D-PROV-1). It has NO declaration here on purpose:
+    // unlike the three above it has no cross-TU consumer, so its kernel stays private to
     // failure_lexicon.cpp, where BOTH of its consumers live (contains_failure_cue and its
     // count-summary dual). Named here so a reader enumerating the registers from this header does
     // not conclude there are three.
@@ -1278,7 +1280,7 @@ namespace detail
     // strictly worse. It is REGISTER-scoped, not LINE-scoped — a verdict anchored EARLIER on the
     // same line (an `##[error]` wrapper) is a different author's claim and survives. And it
     // DEMOTES, NEVER SUPPRESSES: the cue does not fire, the line lands at Unknown and still
-    // surfaces (the D-OUT-1 / D-PROV-1 precedent). The lexicon is untouched — the defect is
+    // surfaces (the D-OUT-1 / SRC-D-PROV-1 precedent). The lexicon is untouched — the defect is
     // CONTEXT, not vocabulary.
 } // namespace detail
 
@@ -1608,7 +1610,7 @@ template <typename Visit>
 
 } // namespace insight::utils
 
-// ──────── from src/scan/canon.detail.scan.cppm (ANSI ingest normalization, D-TID-11) ────────
+// ──────── from src/scan/canon.detail.scan.cppm (ANSI ingest normalization, SRC-D-TID-11) ────────
 // PUBLIC, and homed here rather than in the sealed detail.scan shard for one reason: stage 1 is an
 // obligation the `recognize()`/`classify()` DECLARATION places on its callers (see the precondition
 // on those two in insight.canon), and a caller cannot discharge an obligation whose only
@@ -1699,8 +1701,8 @@ class NormalizedLine;
 // ── STAGE 1 AS A TYPE (ADR-21.D3) ──────────────────────────────────────────────────────────────
 //
 // `NormalizedLine` means: STAGE 1 RAN ON THESE BYTES — canon's universal ANSI ingest normalization
-// (D-TID-11), the exact grammar `normalize()` below owns. Produced ONLY by `normalize()`; there is
-// deliberately NO constructor from `std::string_view`, because that absence is the whole
+// (SRC-D-TID-11), the exact grammar `normalize()` below owns. Produced ONLY by `normalize()`; there
+// is deliberately NO constructor from `std::string_view`, because that absence is the whole
 // mechanism: a caller cannot reach the content walkers (`classify`/`recognize`/
 // `recognize_location`, which take `NormalizedContent`) without having gone through stage 1, and
 // cannot fake the passage — the only other producer NARROWS an object it must already hold. The
@@ -1750,8 +1752,8 @@ class NormalizedLine
 //     It exists because canon's own tokenizer consumes walkers on strategy-REBUILT arena bytes
 //     (six of 22 strategies assemble `content` rather than narrowing the line), which no suffix
 //     door can express — and the attestor is the object that PERFORMED stage 1 unconditionally at
-//     its one named site (D-TID-11), so the boundary guarantee stays exactly the measured defect's
-//     scope: unforgeable from OUTSIDE `insight.canon`.
+//     its one named site (SRC-D-TID-11), so the boundary guarantee stays exactly the measured
+//     defect's scope: unforgeable from OUTSIDE `insight.canon`.
 //
 // WHAT THE TYPE DOES NOT PROVE (§12.3, load-bearing): it does not prove the RIGHT stage 2 ran and
 // deliberately does not carry which one did — a NormalizedContent that knew its transport stack
@@ -1821,9 +1823,9 @@ constexpr NormalizedContent NormalizedLine::undeclared_suffix(std::size_t offset
 //
 // ⚠ AND IT MUST NEVER OVERWRITE THE BUFFER A Tokenizer LATER READS. The strip is destructive of
 // exactly the bytes some provenance hooks need: GHA's command-echo SGR wrapper survives ONLY on
-// the raw line (D-PROV-1, log_parser.cpp), so normalizing a caller's line storage in place would
-// silently kill the echoed-source demotion. Stage 1 produces a DERIVED view for recognition; the
-// raw line stays raw.
+// the raw line (SRC-D-PROV-1, log_parser.cpp), so normalizing a caller's line storage in place
+// would silently kill the echoed-source demotion. Stage 1 produces a DERIVED view for recognition;
+// the raw line stays raw.
 [[nodiscard]] inline NormalizedLine normalize(std::string_view raw_line, std::string& scratch)
 {
     if (raw_line.find(static_cast<char>(kEsc)) == std::string_view::npos)

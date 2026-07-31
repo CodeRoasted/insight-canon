@@ -1,8 +1,8 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_instance_discriminant.cpp — discriminant_of, canon's SEMANTIC-UNAWARE complement of
-// canonicalize_intent (ADR 0023, the third role on the identity spine, II-9). The class MASKS drift
-// tokens to group siblings; the discriminant KEEPS the raw declared coordinate verbatim to SEPARATE
-// co-occurring / cross-run-drifted siblings — same R1–R4 scan, first masked span kept raw.
+// canonicalize_intent (ADR 0023, the third role on the identity spine, SRC-II-9). The class MASKS
+// drift tokens to group siblings; the discriminant KEEPS the raw declared coordinate verbatim to
+// SEPARATE co-occurring / cross-run-drifted siblings — same R1–R4 scan, first masked span kept raw.
 // Runner-agnostic by construction (it reads the declared tuple, never a hardcoded runner lexicon).
 // A diff here re-draws alignment (II-7) — it rides the composed semantic_identity (ADR 0024 §4);
 // fix the code, never the assertion.

@@ -3,7 +3,7 @@
 // (bibles/intent_identity.md §9; canon d2d460d). These pin the closure-as-identity
 // constructor: matrix legs / shards / version-parameterized jobs of ONE intent
 // canonicalize to ONE CLASS and pair across homologous runs (G1, studies/004),
-// WITHOUT over-collapsing distinct WHERE (II-2: alignment must never eat the signal).
+// WITHOUT over-collapsing distinct WHERE (SRC-II-2: alignment must never eat the signal).
 // canonicalize_intent is canon's SEMANTIC-UNAWARE algorithm, frozen under kCanonicalizationVersion;
 // the composed-ruleset comparability key (II-7) is now semantic_identity (ADR 0024 §4,
 // tests/compose/ test_composition.cpp). A diff here is a cross-run comparability break, not a
@@ -49,7 +49,7 @@ void expect_same_intent(std::string_view lhs, std::string_view rhs)
         << "\" = " << render(intent_id_of(rhs));
 }
 
-// Two distinct WHERE must stay DISTINCT (different ids) — the II-2 over-collapse guard.
+// Two distinct WHERE must stay DISTINCT (different ids) — the SRC-II-2 over-collapse guard.
 void expect_distinct_intent(std::string_view lhs, std::string_view rhs)
 {
     EXPECT_NE(intent_id_of(lhs), intent_id_of(rhs))
@@ -78,7 +78,7 @@ TEST(IntentCanonicalize, MatrixLegsCollapseToOneClass)
     expect_canon({"yarn test-build (1/10)", "yarn test-build (M)"});
 }
 
-// ── II-2 guard: a single BARE digit is a distinct WHERE ordinal, KEPT verbatim ──
+// ── SRC-II-2 guard: a single BARE digit is a distinct WHERE ordinal, KEPT verbatim ──
 // Collapsing it would over-merge — `Shard 1` and `Shard 2` are two instances, ordinal-
 // separated downstream, never fused into one class here.
 TEST(IntentCanonicalize, SingleBareDigitKeptNoOverCollapse)

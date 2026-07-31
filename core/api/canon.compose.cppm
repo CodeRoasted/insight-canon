@@ -438,11 +438,11 @@ constexpr ConflictInfo find_conflict(std::span<const SemanticPackageManifest> pa
 // WHY IT IS DECLARED HERE and not in the facade beside `classify`/`recognize`: its production
 // consumer is `LogParser` (`insight.canon.detail.parse`), a SEALED shard that sits BELOW the
 // facade. The level is decided at the parse stage — that is where the pre-existing echoed-source
-// demotion (D-PROV-1) overrides it, and the lift must be applied BEFORE that demotion to reproduce
-// the pre-relocation order exactly. A walker declared in `insight.canon` is unreachable from there
-// without inverting the facade↔detail dependency arrow, so it is declared in the module that owns
-// the composed tables. The facade `export import`s this module, so `import insight.canon;` still
-// yields it alongside the other walkers.
+// demotion (SRC-D-PROV-1) overrides it, and the lift must be applied BEFORE that demotion to
+// reproduce the pre-relocation order exactly. A walker declared in `insight.canon` is unreachable
+// from there without inverting the facade↔detail dependency arrow, so it is declared in the module
+// that owns the composed tables. The facade `export import`s this module, so `import
+// insight.canon;` still yields it alongside the other walkers.
 export namespace insight::tokenization
 {
 

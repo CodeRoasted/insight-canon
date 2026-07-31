@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###############################################################################
-# SP-1 semantic-unawareness lint (ADR 0024 §9.1; insight_canon_semantic_packages.md §9)
+# SRC-SP-1 semantic-unawareness lint (ADR 0024 §9.1; insight_canon_semantic_packages.md §9)
 #
 #   "Core is semantic-unaware. No ecosystem literal (marker, dialect prefix,
 #    framework suffix) exists in canon core sources. Enforced by a lint (the
@@ -33,7 +33,7 @@
 # "GitHubActions" carries no word boundary after "github" (that never generalized to bare names).
 #
 # A hit in comment-stripped code = an ecosystem literal fused into the mechanism =
-# an SP-1 regression = FAIL. Verbose on failure (file:line of every hit).
+# an SRC-SP-1 regression = FAIL. Verbose on failure (file:line of every hit).
 # NON-VACUITY: scanning zero files is a FAIL (a moved/renamed scan root must never
 # turn this gate silently green).
 ###############################################################################
@@ -142,19 +142,19 @@ done < <(
   done
 )
 
-echo "SP-1 semantic-unawareness lint — scanned: ${scanned} files under ${SCAN_ROOTS[*]} (core mechanism + contract surface)"
+echo "SRC-SP-1 semantic-unawareness lint — scanned: ${scanned} files under ${SCAN_ROOTS[*]} (core mechanism + contract surface)"
 echo "deny-list (behavioral ecosystem literals; LogFormat enum names deliberately excluded):"
 printf '    %s\n' "${DENY[@]}"
 echo
 
 if [ "$scanned" -eq 0 ]; then
-  echo "::error::SP-1 lint scanned ZERO files — the scan roots (${SCAN_ROOTS[*]}) are missing or empty."
+  echo "::error::SRC-SP-1 lint scanned ZERO files — the scan roots (${SCAN_ROOTS[*]}) are missing or empty."
   echo "A relocated core must update SCAN_ROOTS; a vacuous scan is a silent green, so this FAILS."
   exit 2
 fi
 
 if [ "$violations" -ne 0 ]; then
-  echo "::error::SP-1 VIOLATION — ${violations} ecosystem literal(s) fused into canon CORE (must live in a semantic package):"
+  echo "::error::SRC-SP-1 VIOLATION — ${violations} ecosystem literal(s) fused into canon CORE (must live in a semantic package):"
   printf '%s' "$report"
   echo
   echo "Core is semantic-unaware (ADR 0024 §9.1). Move the marker/prefix/suffix into semantic/github"

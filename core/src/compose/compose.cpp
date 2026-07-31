@@ -163,7 +163,7 @@ namespace
             append_u8(out, static_cast<std::uint8_t>(row.outcome));
         }
         // grammar-3 (ADR 0044 §7): the GENERATION projection enters the identity,
-        // field-for-field as the recognition markers do. This closes the SID-2/G4 gap — before
+        // field-for-field as the recognition markers do. This closes the SRC-SID-2/G4 gap — before
         // it, changing how a
         // dialect MATERIALIZES an intent left the digest untouched, so two writers could claim one
         // RulesetIdentity. Appended after the grammar-2 sections, the same discipline grammar-2

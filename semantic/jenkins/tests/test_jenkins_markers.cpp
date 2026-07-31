@@ -5,7 +5,7 @@
 //           kind=Job (the container level), UNORDERED (branches co-occur like matrix legs);
 //   STEP  = `[Pipeline] <verb>`, kind=Step, ORDERED — excluding the closed structural-token set
 //           (`{`, `}`, `stage`, `node`, `parallel`, `// …`, `End of Pipeline`);
-//   II-6  = the rows are format-gated to Jenkins and inert elsewhere.
+//   SRC-II-6  = the rows are format-gated to Jenkins and inert elsewhere.
 // Determinism: byte-only recognition over the composed rows; no RNG/clock/float.
 #include <gtest/gtest.h>
 
@@ -60,7 +60,7 @@ TEST(JenkinsMarkers, NamedBlockOpenIsAStage)
 TEST(JenkinsMarkers, ParallelBranchIsAStageWithItsDiscriminant)
 {
     const ComposedSemantics composed{jenkins_only()};
-    // A matrix/parallel leg: the axis tuple stays VERBATIM in the discriminant (II-9) while
+    // A matrix/parallel leg: the axis tuple stays VERBATIM in the discriminant (SRC-II-9) while
     // canonicalize_intent (downstream) collapses the class — the studies/004 vanish-storm guard.
     const auto branch{recognize(norm_probe("[Pipeline] { (Branch: maven (lts))"), composed)};
     EXPECT_EQ(branch.kind, IntentMarkerKind::Job);
@@ -109,7 +109,7 @@ TEST(JenkinsMarkers, StructuralTokensAreScaffoldNotQuanta)
     }
 }
 
-// ── II-6, now against the DECLARATION rather than against per-line format detection ──
+// ── SRC-II-6, now against the DECLARATION rather than against per-line format detection ──
 // The rows are gated to this package's NAME (ADR 0065 clause 1), so a stream that declared no
 // dialect fires nothing. The old form of this test passed a `LogFormat` per call, sourced in
 // production from `LogParser::routed_format()` — the per-line detector winner under a sticky

@@ -109,10 +109,10 @@ export namespace insight
 // the facade (they consume ComposedSemantics; the scan drives the sealed LogParser).
 
 // Map a native verdict token through the RESOLVED VIEW's OutcomeTokenRow set. The dialect gate was
-// applied at stream resolution (II-6 still holds — a Jenkins token is simply not in a GHA stream's
-// view), so an undeclared stream carries no concretely-gated row and nothing resolves: fail-closed
-// on depth. nullopt = no row in this view claims the token (distinct from a row that maps it TO
-// RunOutcome::Unknown, e.g. Jenkins NOT_BUILT).
+// applied at stream resolution (SRC-II-6 still holds — a Jenkins token is simply not in a GHA
+// stream's view), so an undeclared stream carries no concretely-gated row and nothing resolves:
+// fail-closed on depth. nullopt = no row in this view claims the token (distinct from a row that
+// maps it TO RunOutcome::Unknown, e.g. Jenkins NOT_BUILT).
 [[nodiscard]] std::optional<RunOutcome>
 map_outcome_token(std::string_view token,
                   const insight::semantic::ComposedSemantics& composed) noexcept;
@@ -176,7 +176,7 @@ struct RunOutcomeResolution
 resolve_run_outcome(std::string_view side_input_token, const RunOutcomeScan& scan,
                     const insight::semantic::ComposedSemantics& composed);
 
-// Location recognition (bibles/intent_identity.md §8, II-8) — the test-file WHERE coordinate,
+// Location recognition (bibles/intent_identity.md §8, SRC-II-8) — the test-file WHERE coordinate,
 // homed in the facade because it walks the composed location rows (ComposedSemantics is in
 // insight.canon.compose). Canon owns the three LocationMatchKind algorithms; the composed rows are
 // the dialect-independent file-naming vocabulary. Returns a view into the content's bytes, or

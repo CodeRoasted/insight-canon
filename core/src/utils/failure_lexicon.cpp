@@ -43,7 +43,7 @@ namespace
                std::ranges::all_of(tok, [](char chr) noexcept { return chr >= '0' && chr <= '9'; });
     }
 
-    // D-CNT-1 (count register): is a failure word in COUNT register, given its two preceding
+    // SRC-D-CNT-1 (count register): is a failure word in COUNT register, given its two preceding
     // tokens? True iff the IMMEDIATELY-preceding token is a bare-integer count ("1 failure", "5
     // failed", "HTTP 500 error") that is NOT part of a numeric/temporal chain — i.e. the token
     // before the count is NOT itself digit-leading. The chain guard is load-bearing: a leading ISO
@@ -109,7 +109,7 @@ namespace
     }
 
     // The unified failure lexicon — token forms (base + the inflections that occur in
-    // real CI / app logs), partitioned by BENIGN-COLLISION-PRONENESS (D-OUT-4, refined by
+    // real CI / app logs), partitioned by BENIGN-COLLISION-PRONENESS (SRC-D-OUT-4, refined by
     // the Daidalos Q1 ruling — the criterion is collision-proneness, NOT grammatical role):
     //   • SelfAnchoring — a token that essentially NEVER appears benignly, so it fires bare
     //     with no surrounding register. Two kinds: inflected outcome verbs whose morphology
@@ -177,7 +177,7 @@ namespace
     [[nodiscard]] LexiconHit lexicon_hit(std::string_view text, std::string_view token,
                                          std::string_view prev, std::string_view prev_prev) noexcept;
 
-    // Caps register (D-OUT-4 anchor #1): the token's raw bytes are ALL-UPPERCASE ASCII
+    // Caps register (SRC-D-OUT-4 anchor #1): the token's raw bytes are ALL-UPPERCASE ASCII
     // letters, ≥2 of them — the decoration CI/test tooling uses to mark an outcome
     // (ERROR, FAILED, FATAL, PANIC). A pre-casefold byte fact; the matched token keeps
     // the source case (for_each_token trims surrounding non-alnum but never folds), so
@@ -246,7 +246,7 @@ namespace
         {0xE2U, 0x9CU, 0x85U}, // ✅ U+2705 WHITE HEAVY CHECK MARK
         {0xE2U, 0x88U, 0x9AU}, // √ U+221A SQUARE ROOT — mocha's Windows pass mark
     }};
-    // Per-test FAIL glyphs (D-OUT-4a) — the ballot-X family + the ❌ cross-mark emoji, all
+    // Per-test FAIL glyphs (SRC-D-OUT-4a) — the ballot-X family + the ❌ cross-mark emoji, all
     // 3-byte UTF-8. Like the pass glyphs, they are unambiguous per-test result markers. ❌
     // U+274C (CROSS MARK) is the emoji jest/vitest/mocha emit on a failing test; it never
     // doubles as a separator, so it is recall-safe to add (the 1.6.5 dogfood found ❌-led
@@ -314,10 +314,10 @@ namespace
         return token;
     }
 
-    // ── D-OUT-4c — the KIND SLOT: anchor #2 is a POSITION claim, not an adjacency ─────
+    // ── SRC-D-OUT-4c — the KIND SLOT: anchor #2 is a POSITION claim, not an adjacency ─────
     // PREFIX MATERIAL: a token that may PRECEDE the line's kind slot without displacing it. Two
-    // declared, closed classes — the same shape D-OUT-4's role partition uses, and the reason this
-    // is a rule rather than per-shape tuning:
+    // declared, closed classes — the same shape SRC-D-OUT-4's role partition uses, and the reason
+    // this is a rule rather than per-shape tuning:
     //   1. colon-terminated — the byte past its span is `:` (`ld:`, `src/main.rs:`, `357:`, `14:`)
     //   2. bracket-enclosed — its span is bounded by `[…]`, `(…)` or `<…>` (`[main]`, `(none)`,
     //      `<WORKSPACE>`); the closing bracket may itself carry a `:`, which class 1 then covers
@@ -336,8 +336,8 @@ namespace
                (before == '<' && after == '>');
     }
 
-    // D-OUT-4c — true iff `token` occupies the line's KIND SLOT: every token preceding it on the
-    // line is prefix material.
+    // SRC-D-OUT-4c — true iff `token` occupies the line's KIND SLOT: every token preceding it on
+    // the line is prefix material.
     //
     // WHY A WALK IS NEEDED AT ALL. `after == ':'` is an adjacency test standing in for a position
     // claim, and it cannot separate
@@ -345,7 +345,7 @@ namespace
     //     error: string               (a struct field declaration)
     //     err:   &str                 (a named parameter in a code frame)
     // — all three are byte-identical in the ±1 neighbourhood of the token, so no WIDENING of that
-    // neighbourhood discriminates: the information is positional, not local. D-NOTE-1 already
+    // neighbourhood discriminates: the information is positional, not local. SRC-D-NOTE-1 already
     // validates its own marker BACKWARDS for exactly this reason ("structural rather than
     // lexical"); this is that same treatment for anchor #2. It also subsumes the compiler-frame
     // shape for free — `<path>:<line>:<col>:` is not a special case, it IS a run of
@@ -379,7 +379,7 @@ namespace
         }
     }
 
-    // ── D-OUT-4a — a leading FAIL glyph CONFIRMS a failure word (the ✗-anchor) ────────
+    // ── SRC-D-OUT-4a — a leading FAIL glyph CONFIRMS a failure word (the ✗-anchor) ────────
     // Mirror of leading_outcome_is_pass: does the line's FIRST outcome-bearing token mark a
     // FAIL? Walk the head; the first token that is a ballot-X glyph ⇒ true; a PASS glyph ⇒
     // false (a pass leads — not a fail line); a failure WORD ⇒ false (it self-handles via
@@ -407,7 +407,7 @@ namespace
         return false; // no leading fail glyph within the head
     }
 
-    // D-OUT-4b (D-MSK-4 cut, 2026-07-21 ruling): a CamelCase error-TYPE token anchors a failure
+    // SRC-D-OUT-4b (D-MSK-4 cut, 2026-07-21 ruling): a CamelCase error-TYPE token anchors a failure
     // cue ONLY when it is verdict-anchored — the register/position discriminator, stated literally.
     // A thrown verdict (`TypeError:`, `[Error]`, CAPS) fires; a type NAMED but not thrown does not.
     // The prior `|| !leads_with_descriptive_glyph(line)` fallback was a one-entry denylist built
@@ -425,7 +425,7 @@ namespace
 
 } // namespace
 
-// The shared outcome predicate (D-OUT-1b) — declared on the canon-internal detail surface in
+// The shared outcome predicate (SRC-D-OUT-1b) — declared on the canon-internal detail surface in
 // canon.api.cppm so infer_leading_log_level (a SEPARATE TU) consults the SAME predicate as the
 // cue lexicon, not a TU-local copy. Defined here, with the failure lexicon, reusing the TU-local
 // glyph/scan helpers above (single-responsibility). Does the line's FIRST outcome-bearing token
@@ -433,7 +433,7 @@ namespace
 // as for_each_token): the first token that is a pass GLYPH ⇒ true (pass leads); the first token
 // that is a failure WORD ⇒ false (failure leads — stop, so a pathological "ERROR … ✓" still fires
 // and the "ERROR teardown failed though setup was ok" guard holds); any other token (scope segment
-// "@cline/core", a name, a number) is skipped. End-of-head ⇒ false. Glyph-gated AND (D-OUT-2)
+// "@cline/core", a name, a number) is skipped. End-of-head ⇒ false. Glyph-gated AND (SRC-D-OUT-2)
 // first-significant-token-word-gated: a leading pass GLYPH demotes anywhere in the head; a pass
 // WORD (passed/ok/success/succeeded) demotes ONLY as the FIRST significant token ("ok 1 - should
 // return error" → demote), so a summary count "25 passed, 5 failed" (a number leads, not "passed")
@@ -457,11 +457,11 @@ namespace detail
             for (const FailureWord& entry : kFailureLexicon)
                 if (iequals(token, entry.word)) // a failure word leads → not a pass
                     return false;
-            // D-OUT-2: a leading pass WORD (passed/ok/success/succeeded) demotes a failure word,
-            // but ONLY as the FIRST significant token — so the TAP/node-runner case
-            // "ok 1 - should return error" demotes (ok leads), while "25 passed, 5 failed" does
-            // NOT (a number is the first significant token, not "passed" — a summary count the
-            // count register independently handles). Conservative vs the glyph rule: a glyph is an
+            // SRC-D-OUT-2: a leading pass WORD (passed/ok/success/succeeded) demotes a failure
+            // word, but ONLY as the FIRST significant token — so the TAP/node-runner case "ok 1 -
+            // should return error" demotes (ok leads), while "25 passed, 5 failed" does NOT (a
+            // number is the first significant token, not "passed" — a summary count the count
+            // register independently handles). Conservative vs the glyph rule: a glyph is an
             // unambiguous verdict that never appears in prose; a pass WORD does ("passed through"),
             // so it must LEAD, never fire mid-line. Disconfirming "not ok 1 …" is a TAP FAILURE —
             // "not" is the first significant token → no demote → the line stays a failure
@@ -478,7 +478,7 @@ namespace detail
         return false; // no leading outcome token within the head
     }
 
-    // D-OUT-4 — see canon.api.cppm for the contract. anchor #1 (caps) is a pure token
+    // SRC-D-OUT-4 — see canon.api.cppm for the contract. anchor #1 (caps) is a pure token
     // test; anchors #2 (delimiter) need the surrounding bytes, recovered from `token`'s
     // position within `line` (precondition: `token` is a sub-view of `line`).
     [[nodiscard]] bool is_verdict_anchored(std::string_view line, std::string_view token) noexcept
@@ -489,25 +489,25 @@ namespace detail
         const std::size_t end{start + token.size()};
         const char before{start > 0U ? line[start - 1U] : '\0'};
         const char after{end < line.size() ? line[end] : '\0'};
-        // anchor #2 — a verdict colon ("error:") IN THE LINE'S KIND SLOT (D-OUT-4c), or the token
-        // enclosed in brackets/parens ("[error]", "##[error]", "(FAILED)"): the separators CI/test
-        // runners frame an outcome with. A leading "##" is its own (empty-trimmed) token, so the
-        // byte immediately before "error" is the '[' — bracket-bound.
-        // Only the colon half carries the kind-slot precondition, and the asymmetry is the design:
-        // a trailing colon is a ONE-SIDED adjacency that every `key: value` in every config dump,
-        // source frame and quoted string satisfies, while a bracket pair is already a two-sided
-        // enclosure that prose does not produce by accident.
+        // anchor #2 — a verdict colon ("error:") IN THE LINE'S KIND SLOT (SRC-D-OUT-4c), or the
+        // token enclosed in brackets/parens ("[error]", "##[error]", "(FAILED)"): the separators
+        // CI/test runners frame an outcome with. A leading "##" is its own (empty-trimmed) token,
+        // so the byte immediately before "error" is the '[' — bracket-bound. Only the colon half
+        // carries the kind-slot precondition, and the asymmetry is the design: a trailing colon is
+        // a ONE-SIDED adjacency that every `key: value` in every config dump, source frame and
+        // quoted string satisfies, while a bracket pair is already a two-sided enclosure that prose
+        // does not produce by accident.
         if (after == ':' && token_in_kind_slot(line, token))
             return true;
         if ((before == '[' && after == ']') || (before == '(' && after == ')'))
             return true;
-        // anchor #3 (D-OUT-4a) — a leading FAIL glyph (✗/✕/✖/✘) marks the line a failed
+        // anchor #3 (SRC-D-OUT-4a) — a leading FAIL glyph (✗/✕/✖/✘) marks the line a failed
         // verdict, confirming this failure word. Line-level, so it applies to every register-
         // anchored token on a ✗-led line; never creates a cue (no failure word ⇒ never called).
         return leading_outcome_is_fail(line);
     }
 
-    // D-CNT-1 — see canon.api.cppm for the contract. true iff `token`'s IMMEDIATELY-PRECEDING
+    // SRC-D-CNT-1 — see canon.api.cppm for the contract. true iff `token`'s IMMEDIATELY-PRECEDING
     // token (under the shared canon tokenization) is a digit-leading numeric — count register
     // ("1 failure", "5 failed"). PRECONDITION: `token` is a sub-view of `line` (a for_each_token
     // token). Forward-scans `line` tracking the previous non-empty token until it reaches `token`
@@ -536,7 +536,7 @@ namespace detail
         }
     }
 
-    // D-NOTE-1 — the note-register kernel's single implementation; see canon.api.cppm for the
+    // SRC-D-NOTE-1 — the note-register kernel's single implementation; see canon.api.cppm for the
     // contract. Returns the offset of the first byte of a NOTE diagnostic's MESSAGE — one past the
     // structural `<path>:<line>:<col>: note: ` marker — or npos when the line carries no such
     // marker. FIRST occurrence wins: it is the line's diagnostic-kind slot, and anything after it
@@ -578,9 +578,9 @@ namespace detail
         return marker + kNoteMarker.size();
     }
 
-    // D-NOTE-1 — the register, expressed over ONE token: is this token inside the note's message?
-    // A thin view on note_register_begin so the per-token predicate and the once-per-line offset
-    // can never drift into two implementations of one property. PRECONDITION: `token` is a
+    // SRC-D-NOTE-1 — the register, expressed over ONE token: is this token inside the note's
+    // message? A thin view on note_register_begin so the per-token predicate and the once-per-line
+    // offset can never drift into two implementations of one property. PRECONDITION: `token` is a
     // sub-view of `line` (a for_each_token token), as for every register kernel here.
     [[nodiscard]] bool token_in_note_message(std::string_view line, std::string_view token,
                                              std::size_t message_at) noexcept
@@ -589,7 +589,7 @@ namespace detail
                static_cast<std::size_t>(token.data() - line.data()) >= message_at;
     }
 
-    // D-CNT-1 — the DUAL of contains_failure_cue: true iff the head carries a failure-lexicon
+    // SRC-D-CNT-1 — the DUAL of contains_failure_cue: true iff the head carries a failure-lexicon
     // word in COUNT register (immediately preceded by a digit-leading numeric — "1 failure",
     // "5 failed"): an aggregate SUMMARY, not a per-item verdict. contains_failure_cue treats
     // such words as non-firing; this reports their presence so infer_leading_log_level caps a
@@ -603,7 +603,7 @@ namespace detail
     {
         std::string_view prev{};
         std::string_view prev_prev{};
-        // D-NOTE-1 applies to the dual as well: a counted failure word inside a note's message
+        // SRC-D-NOTE-1 applies to the dual as well: a counted failure word inside a note's message
         // ("note: 5 candidates failed") is still the NOTE's word, and the note asserts nothing.
         // Without this the demotion would only move the line from Error to Warn, and the ruling's
         // target level is Unknown.
@@ -635,7 +635,7 @@ namespace
         {
             if (!iequals(token, entry.word))
                 continue;
-            // D-CNT-1: a count-register failure word (immediately preceded by a bare-integer
+            // SRC-D-CNT-1: a count-register failure word (immediately preceded by a bare-integer
             // count — "1 failure", "5 failed" — that is not a timestamp chain) is a SUMMARY, not
             // a per-item verdict, so it does NOT fire as a cue (checked BEFORE the verdict
             // anchors: a counted noun is a summary even with a trailing colon — "1 failure:").
@@ -661,14 +661,14 @@ bool contains_failure_cue(std::string_view text, std::size_t scan_limit) noexcep
 {
     // One head-bounded pass. The "segmentation fault" phrase, or an OUTCOME verb (a
     // self-anchoring inflected verdict), is a strong cue (short-circuit true). A TERM
-    // noun fires only in verdict register (D-OUT-4 is_verdict_anchored) — a bare noun in
+    // noun fires only in verdict register (SRC-D-OUT-4 is_verdict_anchored) — a bare noun in
     // prose is not a verdict. A CamelCase error-TYPE name is a WEAKER signal — recorded,
     // but the scan continues.
     bool saw_error_type{false};
     std::string_view prev{};
     std::string_view prev_prev{};
-    // D-NOTE-1 (the fourth register): resolved ONCE per line, not per token — the offset where a
-    // compiler NOTE diagnostic's message begins, or npos. Every cue form below (phrase, lexicon
+    // SRC-D-NOTE-1 (the fourth register): resolved ONCE per line, not per token — the offset where
+    // a compiler NOTE diagnostic's message begins, or npos. Every cue form below (phrase, lexicon
     // word, CamelCase error TYPE) is demoted uniformly inside that message, because they are all
     // the note's own words and a note asserts no verdict. Tokens BEFORE the marker keep their
     // authority: an `##[error]` wrapper or a CI prefix on the same line is not the note's claim.
@@ -687,7 +687,7 @@ bool contains_failure_cue(std::string_view text, std::size_t scan_limit) noexcep
                 if (iequals(prev, phrase[0]) && iequals(token, phrase[1]))
                     return true; // phrase completes — a strong cue
             const LexiconHit hit{lexicon_hit(text, token, prev, prev_prev)};
-            // D-OUT-4b: the CamelCase error-TYPE anchors only in verdict
+            // SRC-D-OUT-4b: the CamelCase error-TYPE anchors only in verdict
             // register; a ▶-led node:test suite-NAME line referencing a
             // …Error type does not (register/position, not the token).
             if (!hit.matched && is_camel_error_type(token) && error_type_anchors(text, token))

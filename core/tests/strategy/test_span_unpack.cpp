@@ -69,9 +69,9 @@ TEST(SpanUnpack, NonDocumentYieldsNothing)
     EXPECT_TRUE(records.empty());
 }
 
-// O4b Span Links (D-OTEL-9 / D-OTEL-23): a crafted flat OTLP span declaring two cross-trace link
-// targets — the canon-grain unit guard for the lab's links[] emission. Canon collects each link's
-// spanId into linked_span_ids in order; the link's traceId (and any link attributes) are
+// O4b Span Links (SRC-D-OTEL-9 / SRC-D-OTEL-23): a crafted flat OTLP span declaring two cross-trace
+// link targets — the canon-grain unit guard for the lab's links[] emission. Canon collects each
+// link's spanId into linked_span_ids in order; the link's traceId (and any link attributes) are
 // consumed-not-retained (only the span_id feeds metalog's cross-trace service distillation).
 constexpr std::string_view kSpanWithLinks{
     R"({"traceId":"aabb","spanId":"0001","name":"consumer","kind":"SPAN_KIND_INTERNAL",)"

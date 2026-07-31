@@ -190,9 +190,9 @@ TEST(RunOutcomeMap, DialectGatedExactMatch)
     // Byte-exact: case matters (native tokens are verbatim dialect strings).
     EXPECT_FALSE(map_outcome_token("good", composed).has_value());
 
-    // II-6, now STRUCTURAL rather than tested per call: the row is not in another dialect's view,
-    // and not in an UNDECLARED stream's view at all. Both are re-derived from the same composition,
-    // so this is the filter being exercised, not a second copy of it.
+    // SRC-II-6, now STRUCTURAL rather than tested per call: the row is not in another dialect's
+    // view, and not in an UNDECLARED stream's view at all. Both are re-derived from the same
+    // composition, so this is the filter being exercised, not a second copy of it.
     const ComposedSemantics all{compose(std::array{kOutcomePkg, kOtherGatePkg})};
     EXPECT_FALSE(map_outcome_token("BAD", all.for_stream(kOtherDialect, {})).has_value())
         << "a dialect's verdict token must not resolve on a stream declaring another dialect";
@@ -307,7 +307,7 @@ TEST(RunOutcomeGrammar5, NumericFieldShapeFailuresDeclineTheRow)
 TEST(RunOutcomeGrammar5, TheCarriageReturnTerminatorAndOptionGroupAreDropped)
 {
     const ComposedSemantics composed{composed_numeric()};
-    // The CR is the producer's marker TERMINATOR (`\r` + an erase-line escape canon's D-TID-11
+    // The CR is the producer's marker TERMINATOR (`\r` + an erase-line escape canon's SRC-D-TID-11
     // ingest strip already removed). Left in, it would ride into every payload and into the
     // alignment key.
     EXPECT_EQ(recognize(norm_probe("mark:1784657178:prepare_executor\r"), composed).name,

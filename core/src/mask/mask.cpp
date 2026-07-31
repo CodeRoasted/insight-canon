@@ -9,12 +9,12 @@ import insight.canon.detail.scan; // canonical char-class predicates (is_digit /
 // function of a line's own whitespace-delimited tokens, each classified KEEP / MASK /
 // composite-normalize by its OWN class (no cross-line state, no clustering). The joined
 // masked sequence is the template; its SHA-256 (computed downstream, unchanged) is the
-// run-independent template_id. See stateless_template_id.md (D-TID-1/2; §8 D-TID-11..14).
+// run-independent template_id. See stateless_template_id.md (D-TID-1/2; §8 SRC-D-TID-11..14).
 //
 // History: this file was the stateful Drain online log-template miner (intern table +
 // SoA cluster store + bucket index + similarity match + absorb_into wildcard learning).
 // That learning made the template — and thus template_id — order-dependent across runs,
-// manufacturing the "phantom pair" false-diff (D-TID-3). The clustering machinery was
+// manufacturing the "phantom pair" false-diff (SRC-D-TID-3). The clustering machinery was
 // RIPPED; only the per-token mask predicates and the masker survive. Token masking
 // (IPv4, hex, digit-leading, UUID/long-hash, composites) uses constexpr hand-written
 // scanners — zero RE2.
@@ -125,7 +125,7 @@ namespace
     // (≤ kMaxStatusDigits). Size-gating bounds cardinality (exit codes ≤ 255,
     // HTTP status ≤ 599 — both ≤ 3 digits); the keyword gate keeps bare counts
     // ("port 8080", "took 200 ms") masked. The lexicon is a seed and will grow
-    // during calibration (D-TID-14: categorical numbers stay a KEEP-lexicon concern).
+    // during calibration (SRC-D-TID-14: categorical numbers stay a KEEP-lexicon concern).
     constexpr std::size_t kMaxStatusDigits{3};
 
     [[nodiscard]] inline bool equals_ascii_lower(std::string_view tok,
@@ -607,7 +607,7 @@ namespace
     // ── F13 composite-masking (stateless_template_id.md §8 / D-TID-12,13) ────────
     // Per-line masking is the SOLE generalizer once Drain's learning is retired, so
     // these classify the high-card SYNTACTIC token classes the fixed masks missed.
-    // Boundary (D-TID-14): syntactic classes only — varying WORDS stay literal (the
+    // Boundary (SRC-D-TID-14): syntactic classes only — varying WORDS stay literal (the
     // deferred registry's job). All byte-only, single-token → cross-stdlib identical.
 
     // D-TID-12 #5: digit-leading (after an optional sign) ⇒ a number / measurement /
@@ -662,8 +662,8 @@ namespace
         return true;
     }
 
-    // D-TID-22 currency-marker catalog: FROZEN, DECLARED byte sequences. ASCII `$` only for now;
-    // `€`/`£`/`¥` would be added here as their literal UTF-8 byte strings ("€" etc.) iff a
+    // SRC-D-TID-22 currency-marker catalog: FROZEN, DECLARED byte sequences. ASCII `$` only for
+    // now; `€`/`£`/`¥` would be added here as their literal UTF-8 byte strings ("€" etc.) iff a
     // corpus shows them — byte-exact, NO Unicode property lookup (cross-stdlib determinism +
     // portability, the D-TID-9 oracle). Adding a marker here auto-extends both touch points (the
     // pre-gate + normalize_marker_number) — single source of truth.
@@ -679,7 +679,8 @@ namespace
         return 0;
     }
 
-    // D-TID-22: a declared currency MARKER glued to a digit-led numeric core (`$463`, `$1.50`) →
+    // SRC-D-TID-22: a declared currency MARKER glued to a digit-led numeric core (`$463`, `$1.50`)
+    // →
     // `$<*>` — keep the marker, mask the high-card amount (the D-TID-13 `#42 → #<*>` keep-class/
     // mask-instance shape). A DECIDABLE numeric: there is no low-card *keyword* of shape
     // `<marker><digits>` worth protecting (shell positionals `$1`/`$2` are negligible-in-logs and
@@ -722,7 +723,7 @@ namespace
     // `builder-<uuid>` — keeping the surrounding path/structure, masking the identity
     // instance (the same keep-class/mask-instance pattern as source-location). A UUID is
     // a UUID whether standalone or in a path; this is the largest re-measured residual
-    // chunk and is squarely a SYNTACTIC class (D-TID-14), not a varying word.
+    // chunk and is squarely a SYNTACTIC class (SRC-D-TID-14), not a varying word.
     [[nodiscard]] inline bool normalize_embedded_identity(std::string_view tok, std::string& out)
     {
         static constexpr std::size_t kUuidLen{36};
@@ -777,7 +778,7 @@ namespace
     // D-TID-13 extension (discovered at playground integration — LogCraft's KV-heavy
     // message templates + the pre-existing KV regression guards in raw_log_fidelity):
     // `<key>=<digit-leading-value>` → `<key>=<*>` (keep the key, mask the high-card
-    // numeric value). A SYNTACTIC class (D-TID-14 IN scope), the same keep-class/
+    // numeric value). A SYNTACTIC class (SRC-D-TID-14 IN scope), the same keep-class/
     // mask-instance pattern as the composites above. Without it a `key=<id>` over-splits
     // per value — and for an ERROR line that REINTRODUCES the singleton false-diff this
     // whole epic exists to kill (40 distinct `txn=<id>` error singletons → a phantom
@@ -793,10 +794,10 @@ namespace
             return false;
         const std::string_view key{tok.substr(0, eq_pos)};
         const std::string_view raw_value{tok.substr(eq_pos + 1)};
-        // D-TID-22: strip a declared currency marker off the value before the digit-leading gate,
-        // so `total=$463 → total=$<*>` (keep key AND marker, mask the amount). marker=0 for a bare
-        // value → `total=463 → total=<*>` unchanged. A non-numeric core (`total=$HOME`) fails the
-        // gate below → kept literal.
+        // SRC-D-TID-22: strip a declared currency marker off the value before the digit-leading
+        // gate, so `total=$463 → total=$<*>` (keep key AND marker, mask the amount). marker=0 for a
+        // bare value → `total=463 → total=<*>` unchanged. A non-numeric core (`total=$HOME`) fails
+        // the gate below → kept literal.
         const std::size_t marker{marker_prefix_len(raw_value)};
         const std::string_view value{raw_value.substr(marker)};
         if (!is_digit_leading(value))
@@ -821,7 +822,7 @@ namespace
     // normalized literal and returns true iff it claims the token. This catalog DEFINES the
     // composite layer of the ruleset generation named by kCanonicalizationVersion; adding,
     // reordering, or removing a rule is an output-affecting change that REQUIRES a version bump —
-    // the single enumerable place that rule can be stated (closing the D-TID-16 "rules changed,
+    // the single enumerable place that rule can be stated (closing the SRC-D-TID-16 "rules changed,
     // version didn't" gap for the rule set itself). Each entry names its governing ruling + the
     // generation that introduced it.
     struct CompositeRule
@@ -840,7 +841,7 @@ namespace
         {.name = "bracket_timestamp", .normalize = normalize_bracket_timestamp}, // D-MSK-5  (-8)
         {.name = "bracket_index", .normalize = normalize_bracket_index},         // D-TID-13(b)
         {.name = "hash_counter", .normalize = normalize_hash_counter},           // D-TID-13(a)
-        {.name = "marker_number", .normalize = normalize_marker_number},         // D-TID-22 (-3)
+        {.name = "marker_number", .normalize = normalize_marker_number}, // SRC-D-TID-22 (-3)
         {.name = "embedded_identity", .normalize = normalize_embedded_identity}, // D-TID-12 #3
         {.name = "kv_value", .normalize = normalize_kv_value},                   // D-TID-17
     }};

@@ -17,7 +17,7 @@ class InsightCanonBenchConan(ConanFile):
         "hot path under the COMPOSED semantic set (github + test_frameworks) against the "
         "degenerate core-only composition, in one binary — the per-line-cost gate for every "
         "composition-mechanism change. A leaf package by necessity: linking the vocabulary "
-        "packages from the core build would invert the SP-1/R1 dependency arrow (core must "
+        "packages from the core build would invert the SRC-SP-1/R1 dependency arrow (core must "
         "never depend on a semantic package), so the perf gate lives where the composition "
         "point does — above them all."
     )

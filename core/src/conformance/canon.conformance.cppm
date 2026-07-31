@@ -1,6 +1,6 @@
 // insight.canon.conformance — the permanent, package-agnostic CONFORMANCE KIT (ADR 0024 §2.3,
-// SP-2). The canon-shipped harness EVERY semantic package (ours or an external author's) must pass.
-// A package's test target instantiates it in one line:
+// SRC-SP-2). The canon-shipped harness EVERY semantic package (ours or an external author's) must
+// pass. A package's test target instantiates it in one line:
 //
 //     import insight.canon.conformance;
 //     import insight.semantic.github;
@@ -11,10 +11,10 @@
 //             EXPECT_TRUE(check.passed) << "[" << check.name << "] " << check.detail;
 //     }
 //
-// It is the OPEN-SOURCE HONESTY MECHANISM (SP-2): the identical kit ships installed so an external
-// package author runs the same gate CodeRoast's own packages are held to. Verbose-on-failure
-// matters doubly here — a failing check must diagnose itself for someone who has never read canon's
-// internals.
+// It is the OPEN-SOURCE HONESTY MECHANISM (SRC-SP-2): the identical kit ships installed so an
+// external package author runs the same gate CodeRoast's own packages are held to.
+// Verbose-on-failure matters doubly here — a failing check must diagnose itself for someone who has
+// never read canon's internals.
 //
 // PURE by design: imports only the facade (compose/ComposedSemantics + the recognition walkers) +
 // spi (the row grammar + manifest). NO gtest dependency (a package's ~10-line test file adapts the
@@ -106,9 +106,9 @@ struct Report
 // waiting on: `emits` is now a manifest member, so the rows the kit round-trips are the same rows
 // `semantic_identity` hashes). It formerly took the two spans separately, from the dialect TYPE,
 // because the manifest had no emit member; that split meant the kit could have closed over one
-// array while the digest covered another — precisely the two-writers-one-identity divergence SID-2
-// forbids. Kept a SEPARATE entry point from run(): it needs the recognizer composition, and a
-// package may want the closure report on its own.
+// array while the digest covered another — precisely the two-writers-one-identity divergence
+// SRC-SID-2 forbids. Kept a SEPARATE entry point from run(): it needs the recognizer composition,
+// and a package may want the closure report on its own.
 [[nodiscard]] Report round_trip_report(const SemanticPackageManifest& manifest,
                                        const ComposedSemantics& composed);
 
@@ -166,8 +166,8 @@ namespace
 
     // A byte is ASCII when its high bit is clear (< 0x80). Locale-safety is structural: every row
     // key is ASCII and every matcher is a byte comparison, so no locale-sensitive path exists (the
-    // II-6 / ASCII-only determinism hazard — det_math musts). We ASSERT the ASCII property rather
-    // than argue it.
+    // SRC-II-6 / ASCII-only determinism hazard — det_math musts). We ASSERT the ASCII property
+    // rather than argue it.
     [[nodiscard]] bool is_ascii(std::string_view str) noexcept
     {
         return std::ranges::all_of(str, [](char chr) noexcept
@@ -316,11 +316,11 @@ namespace
                             .detail = "role key \"" + std::string{row.prefix} + "\" (gated to \"" +
                                       std::string{row.dialect_gate} +
                                       "\") FIRED on a stream declaring \"" +
-                                      std::string{kForeignDialect} + "\" — II-6 gate leak."};
+                                      std::string{kForeignDialect} + "\" — SRC-II-6 gate leak."};
             }
         }
-        // Intent markers (always concretely gated by construction — II-6): present under their own
-        // MEDIUM, inert under a foreign declaration.
+        // Intent markers (always concretely gated by construction — SRC-II-6): present under their
+        // own MEDIUM, inert under a foreign declaration.
         //
         // The OWN leg is scored at the row's own Medium (`dialect × channel`), not against the
         // kAnyChannel view — a channel-gated marker is legitimately absent from that one, which is
@@ -346,7 +346,7 @@ namespace
                             .detail = "marker key \"" + std::string{row.prefix} + "\" (gated to \"" +
                                       std::string{row.dialect_gate} +
                                       "\") FIRED on a stream declaring \"" +
-                                      std::string{kForeignDialect} + "\" — II-6 gate leak."};
+                                      std::string{kForeignDialect} + "\" — SRC-II-6 gate leak."};
                 continue;
             }
             return {.name = "dialect_gate.marker_own",
@@ -380,7 +380,7 @@ namespace
                         .detail = "outcome token \"" + std::string{row.token} + "\" (gated to \"" +
                                   std::string{row.dialect_gate} +
                                   "\") RESOLVED on a stream declaring \"" +
-                                  std::string{kForeignDialect} + "\" — II-6 gate leak."};
+                                  std::string{kForeignDialect} + "\" — SRC-II-6 gate leak."};
         }
         // The UNDECLARED stream is fail-closed on DEPTH: no concretely-gated row of any kind may
         // fire. This is the leg that would have caught "the filter was never applied", which the
@@ -488,7 +488,7 @@ namespace
                 return {.name = "grammar.empty_emit",
                         .passed = false,
                         .detail = "an intent-emit row has an empty prefix."};
-        // ADR 0044 §7 / SID-2: with `emits` on the manifest, "a reader without a writer" is a
+        // ADR 0044 §7 / SRC-SID-2: with `emits` on the manifest, "a reader without a writer" is a
         // MANIFEST property and the runtime kit can state it as one. The DialectIntent concept
         // already refuses it at compile time for a package that models the concept — this catches
         // the package that declares markers on its manifest but wires `.emits` to a different (or

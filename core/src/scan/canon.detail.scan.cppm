@@ -725,16 +725,15 @@ inline void sv_skip_ws(std::string_view& str) noexcept
     return tag;
 }
 
-// ── ANSI / terminal escape stripping (D-TID-11) relocated to insight.canon.api ───────────────────
-// The stage-1 factory `normalize()` + kEsc/kBel + the two body scanners live in the PUBLIC api
-// unit.
-// They were never detail-scan knowledge: the cluster depends on nothing in this shard (no strategy,
-// no gate, no SSE2 primitive) and sat here only because its one caller, LogParser, lives in
-// detail.parse. Stage 1 is an obligation on every `recognize()`/`classify()` CONSUMER, not just on
-// canon's own parser, so it must be reachable — a sealed shard cannot carry a precondition that
-// external callers are required to satisfy.
+// ── ANSI / terminal escape stripping (SRC-D-TID-11) relocated to insight.canon.api
+// ─────────────────── The stage-1 factory `normalize()` + kEsc/kBel + the two body scanners live in
+// the PUBLIC api unit. They were never detail-scan knowledge: the cluster depends on nothing in
+// this shard (no strategy, no gate, no SSE2 primitive) and sat here only because its one caller,
+// LogParser, lives in detail.parse. Stage 1 is an obligation on every `recognize()`/`classify()`
+// CONSUMER, not just on canon's own parser, so it must be reachable — a sealed shard cannot carry a
+// precondition that external callers are required to satisfy.
 
-// ── Echoed-source detection (D-PROV-1) relocated to insight_semantic_github (ADR 0024 §1.2) ──
+// ── Echoed-source detection (SRC-D-PROV-1) relocated to insight_semantic_github (ADR 0024 §1.2) ──
 // The GHA command-echo SGR catalog (`\x1b[36;1m … \x1b[0m`), parse_sgr_params, and
 // is_echoed_source_line are dialect knowledge — they now live in the github package's code tier and
 // reach LogParser as a composed ProvenanceHook. The stage-1 strip stays core: it is a universal

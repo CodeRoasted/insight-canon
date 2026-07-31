@@ -164,7 +164,7 @@ TEST_F(JsonStrategyTest, FallsBackToJSONDumpWhenNoMessageKey)
     EXPECT_FALSE(result.value().content.empty());
 }
 
-// ── D-MSK-3 (§4.3) — nested-`fields` component/level descent (bugs.md:27) ───────
+// ── SRC-D-MSK-3 (§4.3) — nested-`fields` component/level descent (bugs.md:27) ───────
 // App loggers (and LogCraft) nest custom fields under "fields":{…}; the top-level
 // component/level lookups miss, so the cube WHERE axis went blind on JSON. When the
 // top-level lookup misses, descend ONE level into "fields" and read {component, level}.
@@ -237,7 +237,7 @@ TEST_F(JsonStrategyTest, LevelErrorParsed)
     EXPECT_EQ(result.value().level, LogLevel::Error);
 }
 
-// ── OTEL/OTLP ingestion (insight_otel_epic.md O1, D-OTEL-1) ──────────────────
+// ── OTEL/OTLP ingestion (insight_otel_epic.md O1, SRC-D-OTEL-1) ──────────────────
 // One OTLP/JSON LogRecord as the LogCraft producer emits it: nested body.stringValue,
 // numeric severityNumber, top-level traceId(32 hex)/spanId(16 hex)/parentSpanId.
 static constexpr std::string_view kOtelLine{
@@ -331,7 +331,7 @@ TEST_F(JsonStrategyTest, OtelSpanMapsAllFields)
     EXPECT_EQ(pl.trace.span_id, span_id_from_hex("00000000000000ff"));
     EXPECT_TRUE(pl.trace.has_parent);
     EXPECT_EQ(pl.trace.parent_span_id, span_id_from_hex("0000000000000001"));
-    // end − start → the span_duration_ns ordinal on the DurationLog2Ns ladder (D-OTEL-12).
+    // end − start → the span_duration_ns ordinal on the DurationLog2Ns ladder (SRC-D-OTEL-12).
     ASSERT_EQ(pl.ordinals.size(), 1U);
     EXPECT_EQ(pl.ordinals[0].field_name, "span_duration_ns");
     EXPECT_EQ(pl.ordinals[0].schedule, OrdinalSchedule::DurationLog2Ns);

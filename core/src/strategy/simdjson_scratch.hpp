@@ -138,7 +138,7 @@ inline void read_raw_json_or_keep(simdjson::simdjson_result<simdjson::ondemand::
         out = raw;
 }
 
-// OTLP body extraction (insight_otel_epic.md D-OTEL-1): the OpenTelemetry Log Data Model
+// OTLP body extraction (insight_otel_epic.md SRC-D-OTEL-1): the OpenTelemetry Log Data Model
 // nests the message under body.stringValue (`"body":{"stringValue":"…"}`). Returns the
 // stringValue, or false when body is absent / not an object / carries no stringValue. MUST
 // be the LAST field accessed on `obj` — it descends into a child, after which the parent
@@ -162,7 +162,7 @@ inline void read_raw_json_or_keep(simdjson::simdjson_result<simdjson::ondemand::
     return true;
 }
 
-// Nested-object descent (detection_provenance_and_legibility.md D-MSK-3): app loggers (and
+// Nested-object descent (detection_provenance_and_legibility.md SRC-D-MSK-3): app loggers (and
 // LogCraft) nest custom fields under `"fields":{…}`, so a top-level component/level lookup
 // misses. Get the child object at `key` (one level) so the caller can read its scalars with
 // try_get_string. Returns false when `key` is absent / not an object. Like try_get_otel_body,

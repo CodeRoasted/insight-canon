@@ -10,11 +10,11 @@ import insight.canon.internal;
 //   - identity canonicalization COLLAPSES to ALIGN      ( `yarn (1/10)` → `yarn (M)`     )
 // so that matrix legs / shards / version-parameterized jobs of ONE intent map to ONE class. The
 // class is the alignment SCOPE; the raw `discriminant_of` (below) is the complementary third role
-// (ADR 0023 / II-9) that separates co-occurring siblings WITHIN the class — never a masked ordinal,
-// never a fingerprint-similarity merge (II-2). Gate G1 (studies/004) measured the class mask on the
-// real GH-Actions corpus: matrix jobs collapse to one class (`Test (M)`); the discriminant keeps
-// the raw tuple/version so the aligner pairs the right legs and surfaces cross-run drift (v6→v7) as
-// a REPLACED, not a masked-away 0-row or a raw-key storm (ADR 0023 §3).
+// (ADR 0023 / SRC-II-9) that separates co-occurring siblings WITHIN the class — never a masked
+// ordinal, never a fingerprint-similarity merge (SRC-II-2). Gate G1 (studies/004) measured the
+// class mask on the real GH-Actions corpus: matrix jobs collapse to one class (`Test (M)`); the
+// discriminant keeps the raw tuple/version so the aligner pairs the right legs and surfaces
+// cross-run drift (v6→v7) as a REPLACED, not a masked-away 0-row or a raw-key storm (ADR 0023 §3).
 //
 // The frozen canonicalization rule set (the intent-canonicalization ALGORITHM — canon-owned; the
 // dialect marker VOCABULARY it applies to lives in the semantic packages, hashed into

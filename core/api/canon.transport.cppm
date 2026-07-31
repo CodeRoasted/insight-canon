@@ -60,9 +60,9 @@ inline constexpr std::string_view kTransportCatalogVersion{"transport-catalog-2"
 // last.
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════
-// §3 — the closed transform vocabulary. Rows-as-data, NEVER a callable (SID-2 applied to transport,
-// for SID-2's reason: a callable is un-hashable and lets the declaration and the behavior diverge
-// silently). Enum-not-tag for the closed sets (ADR 0021).
+// §3 — the closed transform vocabulary. Rows-as-data, NEVER a callable (SRC-SID-2 applied to
+// transport, for SRC-SID-2's reason: a callable is un-hashable and lets the declaration and the
+// behavior diverge silently). Enum-not-tag for the closed sets (ADR 0021).
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
 // Which transform ALGORITHM a row selects and parameterizes.
@@ -154,7 +154,7 @@ struct TransportTransformRow
 // THE NAME IS DELIVERY-SHAPED, NOT ECOSYSTEM-SHAPED, and that is load-bearing twice over. ADR 0044
 // §3 is the reason the row lives here at all: the catalogue is orthogonal to the dialect packages
 // because this prefix is a property of the *delivery*, not of the GHA *dialect* — so naming the row
-// after an ecosystem would contradict the argument that placed it in core. ADR 0024 §9.1 (SP-1)
+// after an ecosystem would contradict the argument that placed it in core. ADR 0024 §9.1 (SRC-SP-1)
 // independently forbids an ecosystem literal in the core mechanism, and the two together leave
 // exactly one coherent name: the byte grammar it peels. Any serving API that stamps this shape
 // declares this same row. Provenance stays in prose, where a reference belongs; the identifier
@@ -212,7 +212,7 @@ inline constexpr std::array<TransportTransformRow, 2> kTransportCatalogRows{{
 //   own account — a stack scratch is filled and appended in one call. NORMATIVE, not an accident.
 // * `LinePrefixTimestamp` has NO writer dual, deliberately (returns false): the GHA API stamp is
 //   the PLATFORM's, baked into the GHA IntentFormat's own writer (T5 §3.3 — a writer-side ± knob
-//   there would generate only our own ablation and move shipped SID-3 bytes for nothing). A
+//   there would generate only our own ablation and move shipped SRC-SID-3 bytes for nothing). A
 //   declared output wrap naming that row is rejected at declaration time, loudly, via this exact
 //   predicate.
 //
@@ -305,8 +305,8 @@ struct PeeledLine
 // `NormalizedContent`, because no stage 1 has run and this struct must not pretend one has. It
 // cannot reach a content walker (the type forbids it); what it CAN do is feed
 // `Tokenizer::process_line`, which performs stage 1 itself and reads the raw bytes beside it
-// (D-PROV-1: the GHA command-echo SGR wrapper survives ONLY there — pre-normalizing this path is
-// the §5.4 trap and would silently kill the echoed-source demotion).
+// (SRC-D-PROV-1: the GHA command-echo SGR wrapper survives ONLY there — pre-normalizing this path
+// is the §5.4 trap and would silently kill the echoed-source demotion).
 struct RawPeeledLine
 {
     std::string_view content;
@@ -363,7 +363,7 @@ class TransportStack
     //     currency. The order is load-bearing: an escape sitting BEFORE the transport prefix is
     //     invisible to this peel unless the strip ran first.
     //   * `peel_raw(std::string_view)` — the TOKENIZER-FEEDING path. `process_line` performs
-    //     stage 1 itself and MUST see the raw (ANSI-bearing) bytes beside it (D-PROV-1's
+    //     stage 1 itself and MUST see the raw (ANSI-bearing) bytes beside it (SRC-D-PROV-1's
     //     echoed-source register survives nowhere else), so this path must NOT pre-normalize.
     //     Its result carries no stage-1 claim and cannot reach a walker — the types close what
     //     the old single string_view door left to convention.

@@ -116,11 +116,11 @@ export inline constexpr std::array<std::string_view, 2> kChannels{
     {kChannelAnnotated, kChannelStripped}};
 
 // ── Intent-marker rows (§1.2/§2.2) ──
-// DIALECT-GATED to this package (II-6 — `Run ` is GHA-runner-specific and would misfire elsewhere).
-// The hierarchy rides the rows: Job = Unordered (jobs parallel-by-construction), Step = Ordered
-// (steps sequential-by-YAML) — the ADR 0023 level-typed alignment declaration. The payload is the
-// content after the prefix, verbatim (core's canonicalize_intent/discriminant_of derive the class +
-// instance).
+// DIALECT-GATED to this package (SRC-II-6 — `Run ` is GHA-runner-specific and would misfire
+// elsewhere). The hierarchy rides the rows: Job = Unordered (jobs parallel-by-construction), Step =
+// Ordered (steps sequential-by-YAML) — the ADR 0023 level-typed alignment declaration. The payload
+// is the content after the prefix, verbatim (core's canonicalize_intent/discriminant_of derive the
+// class + instance).
 //
 // CHANNEL-GATED per Step (ADR 0029 D5 — this is the phantom fix, and it REPLACES the reasoning that
 // used to sit here). The two Step prefixes are the same intent in two channels, so each gates to

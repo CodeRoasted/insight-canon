@@ -55,13 +55,13 @@ namespace insight::semantic::jenkins
 export inline constexpr std::string_view kDialect{"jenkins"};
 
 // ── Intent-marker rows (studies/006 §Reproduction, grammar-2) ──
-// DIALECT-GATED to this package (II-6 — `[Pipeline] ` is Jenkins-runner-specific). The hierarchy rides
-// the rows (ADR 0023): STAGE is the container level (kind=Job — declared stages AND parallel/matrix
-// `Branch:` legs co-occur, so the level matches UNORDERED, exactly like GHA matrix jobs); STEP is
-// the leaf level (Ordered — steps are sequential within their stage). The two prefixes nest, so
-// longest-VALID-match resolves a named block open to STAGE and everything else `[Pipeline] `-
-// prefixed to STEP — minus the closed structural-token exclusion set (the spike's STRUCT set +
-// the `// …` block-close annotations; `End of Pipeline` is the run epilogue).
+// DIALECT-GATED to this package (SRC-II-6 — `[Pipeline] ` is Jenkins-runner-specific). The
+// hierarchy rides the rows (ADR 0023): STAGE is the container level (kind=Job — declared stages AND
+// parallel/matrix `Branch:` legs co-occur, so the level matches UNORDERED, exactly like GHA matrix
+// jobs); STEP is the leaf level (Ordered — steps are sequential within their stage). The two
+// prefixes nest, so longest-VALID-match resolves a named block open to STAGE and everything else
+// `[Pipeline] `- prefixed to STEP — minus the closed structural-token exclusion set (the spike's
+// STRUCT set + the `// …` block-close annotations; `End of Pipeline` is the run epilogue).
 inline constexpr std::array<std::string_view, 7> kStepExcludes{
     "{", "}", "stage", "node", "parallel", "//", "End of Pipeline"};
 
@@ -144,7 +144,7 @@ inline constexpr std::array<OutcomeMarkerRow, 1> kOutcomeMarkers{{
 // byte, so the manifest's content genuinely moved; the GHA 1.3.0→1.4.0 precedent at T4). The
 // depth claim this vocabulary carries is scoped to DECLARATIVE Pipeline (studies/006: 100% stage
 // + step recall on the claim carrier; scripted/matrix-pipe corroborate); freestyle + classic
-// MatrixProject are the II-4 floor for STRUCTURE but still get a correct four-class VERDICT
+// MatrixProject are the SRC-II-4 floor for STRUCTURE but still get a correct four-class VERDICT
 // (outcome recognition works on every Jenkins job type — the `result` is always present,
 // `Finished:` is emitted).
 export inline constexpr SemanticPackageManifest kManifest{

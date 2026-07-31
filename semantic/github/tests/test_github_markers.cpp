@@ -167,8 +167,9 @@ TEST(GithubMarkers, UndeclaredChannelFiresNoStepRowEitherWay)
         << "same, for the annotated materialization";
 }
 
-// ── II-6: DIALECT-gated to this package — the dialect never fires on a stream that did not declare
-// it (ADR 0065 clause 1). The gate is the ONLY difference (proven by the declared sanity line).
+// ── SRC-II-6: DIALECT-gated to this package — the dialect never fires on a stream that did not
+// declare it (ADR 0065 clause 1). The gate is the ONLY difference (proven by the declared sanity
+// line).
 //
 // ⚠ WHAT CHANGED AND WHY IT MATTERS. This test used to loop over `LogFormat` values, passing each
 // as `recognize`'s gate — and in production that argument was `LogParser::routed_format()`, the

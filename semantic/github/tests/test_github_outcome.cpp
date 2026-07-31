@@ -79,11 +79,11 @@ TEST(GithubOutcome, TheSevenNativeConclusionStringsMap)
     // GHA has no native UNSTABLE string — the category is core, this dialect ships no row for it,
     // and the Jenkins literal must NOT leak in (fail-closed upstream surfaces the note).
     EXPECT_FALSE(map_outcome_token("UNSTABLE", composed).has_value());
-    // Byte-exact + format-gated (II-6): the GHA strings are lowercase and GHA-only.
+    // Byte-exact + format-gated (SRC-II-6): the GHA strings are lowercase and GHA-only.
     EXPECT_FALSE(map_outcome_token("SUCCESS", composed).has_value())
         << "GHA conclusions are lowercase — the uppercase form is Jenkins data, not GHA data";
-    // II-6, now STRUCTURAL: on a stream that declared no dialect the row is not in the view at all,
-    // so the token cannot resolve however unambiguous it looks (fail-closed on DEPTH).
+    // SRC-II-6, now STRUCTURAL: on a stream that declared no dialect the row is not in the view at
+    // all, so the token cannot resolve however unambiguous it looks (fail-closed on DEPTH).
     const ComposedSemantics undeclared{undeclared_stream()};
     EXPECT_FALSE(map_outcome_token("success", undeclared).has_value())
         << "a dialect's verdict token resolved on an UNDECLARED stream — the gate is fail-open";

@@ -2,7 +2,7 @@
 // Unit tests: allow short identifiers and test-specific patterns
 // tests/utils/test_verdict_register_kind_slot.cpp
 //
-// D-OUT-4c — the verdict register is a POSITION claim, not an adjacency.
+// SRC-D-OUT-4c — the verdict register is a POSITION claim, not an adjacency.
 // (bibles/canon_pipeline.md; the property set is its §7.)
 //
 // THE RULE. A trailing `:` anchors token `T` only when `T` occupies the line's KIND SLOT: every
@@ -91,13 +91,14 @@ TEST(VerdictRegisterKindSlot, EveryDeclaredPrefixClassKeepsTheAnchor)
     // A kind slot is necessary, not sufficient, and the interaction is worth stating because the
     // design's own §4.1 table lists this exact bazel line. `<WORKSPACE>:16: error:` IS in the kind
     // slot, and it still does not classify Error — the level word's immediate predecessor is the
-    // bare integer `16`, so D-CNT-1's COUNT register reads it as an aggregate ("16 errors") and
+    // bare integer `16`, so SRC-D-CNT-1's COUNT register reads it as an aggregate ("16 errors") and
     // caps the line at Warn. That register is checked independently of this one and is unmoved by
-    // D-OUT-4c; the row above uses `:16:1:` so the `1`'s own predecessor is digit-leading, which is
-    // exactly the numeric-chain guard D-CNT-1 already carries for timestamps.
+    // SRC-D-OUT-4c; the row above uses `:16:1:` so the `1`'s own predecessor is digit-leading,
+    // which is exactly the numeric-chain guard SRC-D-CNT-1 already carries for timestamps.
     EXPECT_EQ(infer_leading_log_level("<WORKSPACE>:16: error: no comment on the exported symbol"),
               LogLevel::Warn)
-        << "D-CNT-1 (count register), not D-OUT-4c: a bare integer immediately before the level "
+        << "SRC-D-CNT-1 (count register), not SRC-D-OUT-4c: a bare integer immediately before the "
+           "level "
            "word makes it a summary, and a summary caps at Warn";
 }
 
@@ -165,10 +166,10 @@ TEST(VerdictRegisterKindSlot, VerdictIsInvariantUnderPrefixLengthAcrossTheScanHe
 }
 
 // ── §7.5 — monotone-demoting, and the ONE surface where it does not carry ──────
-// D-OUT-4c only ever REMOVES an anchor, so on the CUE surface (contains_failure_cue) no line that
-// did not fire can start firing: the anchors confirm an already-matched failure word and there is
-// no branch in which losing one creates a cue. That is the adr/0013 clause-2 direction the ruling
-// rests on, and these rows pin it.
+// SRC-D-OUT-4c only ever REMOVES an anchor, so on the CUE surface (contains_failure_cue) no line
+// that did not fire can start firing: the anchors confirm an already-matched failure word and there
+// is no branch in which losing one creates a cue. That is the adr/0013 clause-2 direction the
+// ruling rests on, and these rows pin it.
 TEST(VerdictRegisterKindSlot, TheCueSurfaceOnlyEverLosesAnchors)
 {
     EXPECT_FALSE(contains_failure_cue("Writing tsc-error-report.json"));

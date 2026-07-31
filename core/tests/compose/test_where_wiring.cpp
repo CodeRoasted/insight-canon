@@ -1,13 +1,13 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_where_wiring.cpp — MaskConfig.recognize_test_where, the flag-gated identity-derived WHERE on
-// the tokenizer (bibles/intent_identity.md §8, II-8). REPLACES the 1.7.4
+// the tokenizer (bibles/intent_identity.md §8, SRC-II-8). REPLACES the 1.7.4
 // tests/identity/test_where_wiring.cpp, re-homed to core as a SYNTHETIC-composition mechanism test
-// after the SP-1 fix removed the dialect gate (was `event.format == LogFormat::GitHubActions`; now
-// purely `component.empty()` — tokenizer_engine.cpp:89, bugs.md 2026-07-08). The property is now
-// FORMAT-AGNOSTIC, so it is a core Tokenizer property provable with a synthetic location row over a
-// RawText line — no package linked. This test is also the SP-1 regression guard: a line WITHOUT a
-// native component (RawText here, any future dialect tomorrow) gets the identity-derived WHERE,
-// proving the wiring never re-acquires a dialect literal.
+// after the SRC-SP-1 fix removed the dialect gate (was `event.format == LogFormat::GitHubActions`;
+// now purely `component.empty()` — tokenizer_engine.cpp:89, bugs.md 2026-07-08). The property is
+// now FORMAT-AGNOSTIC, so it is a core Tokenizer property provable with a synthetic location row
+// over a RawText line — no package linked. This test is also the SRC-SP-1 regression guard: a line
+// WITHOUT a native component (RawText here, any future dialect tomorrow) gets the identity-derived
+// WHERE, proving the wiring never re-acquires a dialect literal.
 //
 // DEFAULT-OFF is the load-bearing invariant — the flag off leaves component byte-identical
 // ([[additive-gated-metalog-block-keeps-wire-version]]). Determinism: byte-only, no
@@ -58,7 +58,7 @@ constexpr SemanticPackageManifest kManifest{.name = "synth_loc",
 
 // A line with a synthetic test-file token that routes to RawText (no native component) — the
 // empty-component tier the identity-derived WHERE populates. Format-agnostic by construction
-// (RawText, not GitHubActions) — the SP-1 regression guard.
+// (RawText, not GitHubActions) — the SRC-SP-1 regression guard.
 constexpr std::string_view kTestLine{"PASS src/auth/login.chk.aa"};
 constexpr std::string_view kNonTestLine{"Syncing repository acme/widget"};
 } // namespace
@@ -73,7 +73,7 @@ TEST(WhereWiring, FlagOnPopulatesTestFileWhereOnEmptyComponentLine)
     ASSERT_TRUE(result.has_value()) << result.error();
     const auto& ev{result.value()};
     EXPECT_NE(ev.format, LogFormat::GitHubActions)
-        << "SP-1 guard: the wiring must fire on a NON-GHA line (no dialect literal in core)";
+        << "SRC-SP-1 guard: the wiring must fire on a NON-GHA line (no dialect literal in core)";
     EXPECT_EQ(ev.component, "src/auth/login.chk.aa")
         << "identity-derived WHERE not populated; component=\"" << ev.component << '"';
 }

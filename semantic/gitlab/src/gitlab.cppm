@@ -44,7 +44,7 @@ export std::unique_ptr<insight::tokenization::IFormatStrategy> make_strategy();
 export inline constexpr std::string_view kDialect{"gitlab"};
 
 // ── Intent-marker rows ──
-// ONE row, ONE level, flat. DIALECT-GATED to this package (II-6 — `section_start:` is
+// ONE row, ONE level, flat. DIALECT-GATED to this package (SRC-II-6 — `section_start:` is
 // GitLab-runner-specific).
 //
 // `Step`, not `Job`, and the FOLD is why: eidos treats a `Job` marker as opening a new job node and

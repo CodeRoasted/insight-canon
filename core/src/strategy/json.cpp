@@ -108,13 +108,14 @@ namespace
     // Parse a flat OTLP/JSON span (D-OTEL-10 / D-OTEL-18) in ONE forward pass over the object — the
     // on-demand idiom that descends into status/attributes inline with no rewind. The §13.1
     // mapping: name→content (the templated operation), startTimeUnixNano→event time, end−start→the
-    // span_duration_ns ordinal (D-OTEL-12, integer ns by construction), status.code→level
+    // span_duration_ns ordinal (SRC-D-OTEL-12, integer ns by construction), status.code→level
     // (ERROR→Error else Info; declared > inferred), service.name (from attributes[])→component (the
     // WHERE tier), traceId/spanId/parentSpanId→the consumed trace context (OR1). `kind` is a
-    // deferred diagnostic field (D-OTEL-18b — it needs a categorical-field→value_counts channel
-    // canon lacks today; not load-bearing for the structural exhibits). O4b Span Links (D-OTEL-9):
-    // copy the collected linked span_ids into arena-stable storage (mirrors store_ordinals). Empty
-    // in → empty out (no allocation) so a span without links stays zero-cost.
+    // deferred diagnostic field (SRC-D-OTEL-18b — it needs a categorical-field→value_counts channel
+    // canon lacks today; not load-bearing for the structural exhibits). O4b Span Links
+    // (SRC-D-OTEL-9): copy the collected linked span_ids into arena-stable storage (mirrors
+    // store_ordinals). Empty in → empty out (no allocation) so a span without links stays
+    // zero-cost.
     [[nodiscard]] std::span<const SpanId> store_span_ids(std::span<const SpanId> ids,
                                                          ArenaAllocator& arena)
     {
@@ -140,7 +141,7 @@ namespace
         std::string_view service_name;
         bool is_error{false};
         std::vector<SpanId>
-            linked; // O4b Span Links (D-OTEL-9): the declared cross-trace edge targets
+            linked; // O4b Span Links (SRC-D-OTEL-9): the declared cross-trace edge targets
 
         for (auto field : root)
         {
@@ -218,10 +219,11 @@ namespace
             }
             else if (key == "links")
             {
-                // O4b Span Links (D-OTEL-9): each link declares a cross-trace edge to another span.
-                // Collect the linked span_ids; metalog resolves them (by span_id, across traces)
-                // into the distilled service topology (component(this) → component(linked)). The
-                // link's trace_id/attributes are consumed-not-retained like the parent context.
+                // O4b Span Links (SRC-D-OTEL-9): each link declares a cross-trace edge to another
+                // span. Collect the linked span_ids; metalog resolves them (by span_id, across
+                // traces) into the distilled service topology (component(this) →
+                // component(linked)). The link's trace_id/attributes are consumed-not-retained like
+                // the parent context.
                 simdjson::ondemand::array links_array;
                 if (field.value().get_array().get(links_array) == simdjson::SUCCESS)
                     for (auto element : links_array)
@@ -238,7 +240,8 @@ namespace
         }
 
         // Apply the mapping. Event time + duration are integer ns (D-OTEL-3, by construction).
-        parsed_line.trace.is_span = true; // O3 (D-OTEL-11): declared causality → the observed DAG
+        // O3 (SRC-D-OTEL-11): declared causality → the observed DAG
+        parsed_line.trace.is_span = true;
         parsed_line.timestamp = utils::parse_unix_nano_timestamp(start_nano);
         parsed_line.level = is_error ? LogLevel::Error : LogLevel::Info;
         if (!service_name.empty())
@@ -246,8 +249,8 @@ namespace
         parsed_line.content =
             arena.store_string(name_view.empty() ? parsed_line.raw_line : name_view);
 
-        // span_duration_ns → the declared DurationLog2Ns ordinal (D-OTEL-12). end < start (skew /
-        // absent end) → 0-duration (the smallest bin), never negative.
+        // span_duration_ns → the declared DurationLog2Ns ordinal (SRC-D-OTEL-12). end < start (skew
+        // / absent end) → 0-duration (the smallest bin), never negative.
         const std::int64_t start_value{parse_span_nano(start_nano)};
         const std::int64_t end_value{parse_span_nano(end_nano)};
         const std::int64_t duration_ns{end_value > start_value ? end_value - start_value : 0};
@@ -259,7 +262,7 @@ namespace
             parsed_line.ordinals = store_ordinals(observation, arena);
         }
 
-        // O4b Span Links (D-OTEL-9): publish the declared cross-trace edge targets (empty ⇒ no
+        // O4b Span Links (SRC-D-OTEL-9): publish the declared cross-trace edge targets (empty ⇒ no
         // allocation).
         parsed_line.linked_span_ids = store_span_ids(linked, arena);
     }
@@ -427,7 +430,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     if (try_get_string(root, kComponentKeys, scratch_view))
         parsed_line.component = arena.store_string(scratch_view);
 
-    // ── OTEL/OTLP field-map (insight_otel_epic.md D-OTEL-1, the declared catalog D-OTEL-4a) ──
+    // ── OTEL/OTLP field-map (insight_otel_epic.md SRC-D-OTEL-1, the declared catalog D-OTEL-4a) ──
     // severity_number → the LogLevel band (declared > inferred) + the trace context, all
     // consumed structural metadata; the trace keys are top-level → never tokenized → dropped
     // from the template by construction (OR1). is_otel routes the message to the nested
@@ -461,7 +464,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
             parsed_line.content = arena.store_string(line);
         }
 
-        // ── Nested-fields fallback (D-MSK-3) ──────────────────────────────────────
+        // ── Nested-fields fallback (SRC-D-MSK-3) ──────────────────────────────────────
         // App loggers (and LogCraft) nest custom fields under "fields":{…}, so the
         // top-level component/level lookups above miss → the cube WHERE axis goes blind
         // on JSON (bugs.md:27). When either missed, descend ONE level into "fields" and

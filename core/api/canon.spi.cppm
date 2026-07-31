@@ -41,15 +41,15 @@ struct ParsedLine
     std::string_view component; // F3b: the low-card functional source (subsystem/daemon/job)
     std::string_view host;      // F3b: the high-card node/host identity (hors-cube)
     std::string_view content;
-    // Echoed-source provenance (D-PROV-1): true when the RAW line was a CI command-echo of run-step
-    // SCRIPT source (the GHA `\x1b[36;1m … \x1b[0m` command-echo wrapper), NOT an observed runtime
-    // event. Set by the composed provenance hook (a package code-tier predicate) at the parser
-    // layer, BEFORE any strategy sees the ANSI-stripped content. A per-line classification
+    // Echoed-source provenance (SRC-D-PROV-1): true when the RAW line was a CI command-echo of
+    // run-step SCRIPT source (the GHA `\x1b[36;1m … \x1b[0m` command-echo wrapper), NOT an observed
+    // runtime event. Set by the composed provenance hook (a package code-tier predicate) at the
+    // parser layer, BEFORE any strategy sees the ANSI-stripped content. A per-line classification
     // attribute, NOT part of template identity: the parser uses it to demote `level` to Unknown so
     // a failure WORD in echoed shell source never confers an alerting level. `false` for every
     // non-echoed line.
     bool echoed_source{false};
-    // OTEL trace context (D-OTEL-1), populated by a strategy that recognizes OTEL log records
+    // OTEL trace context (SRC-D-OTEL-1), populated by a strategy that recognizes OTEL log records
     // (today: JsonStrategy on OTLP/JSON). Consumed downstream (O2 grouping; O3 DAG), never
     // serialized; `present == false` for every non-OTEL input.
     OtelTraceContext trace{};
@@ -58,7 +58,7 @@ struct ParsedLine
     // arena-stable storage; empty for every non-ordinal line. Consumed metalog-side (W1 binning),
     // never tokenized into the template.
     std::span<const OrdinalObservation> ordinals;
-    // O4b Span Links (D-OTEL-9/21): the span_ids this span declares a cross-trace edge to (OTLP
+    // O4b Span Links (SRC-D-OTEL-9/21): the span_ids this span declares a cross-trace edge to (OTLP
     // `links[]`), populated by the span strategy. A span over arena-stable storage; empty for every
     // line without links. Consumed metalog-side (distilled into the service topology), never
     // tokenized.
@@ -115,7 +115,7 @@ export namespace insight::semantic
 // canonical serialization. A pure SERIALIZATION-COVERAGE change — no package's rows moved, no row
 // kind is new (IntentEmitRow already existed and was already required by the DialectIntent concept)
 // — but the serialization is part of the grammar shape, so it bumps here and the composed digest
-// moves with it. That bump is DELIBERATE and documented (SID-3): before it, a generation-side
+// moves with it. That bump is DELIBERATE and documented (SRC-SID-3): before it, a generation-side
 // change did not move semantic_identity at all, so two writers could claim one RulesetIdentity.
 //
 // The bump is NOT redundant with the `emits` content entering the digest, even though both move it
@@ -179,10 +179,10 @@ inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-5"};
 
 // The "any dialect" sentinel: the rule fires regardless of the stream's declared dialect. The EMPTY
 // string_view is that sentinel, exactly as `kAnyChannel` is on the channel axis — a package may
-// never be named "" , so empty is unambiguously "any". A universal structural-role row (`##[group]`,
-// fired on any content today) reproduces the pre-split UNGATED StructuralRoleRegistry::classify
-// EXACTLY. A dialect-specific row (an intent marker, a level lift) names its OWN package (II-6 — a
-// dialect never fires cross-dialect).
+// never be named "" , so empty is unambiguously "any". A universal structural-role row
+// (`##[group]`, fired on any content today) reproduces the pre-split UNGATED
+// StructuralRoleRegistry::classify EXACTLY. A dialect-specific row (an intent marker, a level lift)
+// names its OWN package (SRC-II-6 — a dialect never fires cross-dialect).
 //
 // NOTE the deliberate asymmetry with the CALLER's declaration, which is also empty when absent, and
 // it is `kAnyChannel`'s verbatim: an empty *row* gate means "fires on any dialect"; an empty
@@ -282,8 +282,8 @@ enum class PayloadExtract : std::uint8_t
     // is scaffold, not a quantum). Nested parens stay inside the payload (`{ (Branch: test (lts))`
     // → `Branch: test (lts)`): only the single final ')' is the delimiter.
     RemainderToClosingParen,
-    // grammar-5 (ADR 0069): the content after the matched prefix is a non-empty run of ASCII digits,
-    // then a single ':', then the payload — the GitLab section marker
+    // grammar-5 (ADR 0069): the content after the matched prefix is a non-empty run of ASCII
+    // digits, then a single ':', then the payload — the GitLab section marker
     // `section_start:<unix-ts>:<name>[<options>]`. A variable-length field to SKIP is what no other
     // extractor can express: `RemainderAfterPrefix` would put the epoch inside the payload, and
     // `IntentMarker::name` is the raw payload that `compare_skeletons` keys on (adr/0045), so every
@@ -294,13 +294,13 @@ enum class PayloadExtract : std::uint8_t
     // producer-owned boundaries, bundled into the extractor exactly as RemainderToClosingParen
     // bundles its required ')':
     //   * '\r' TERMINATES the marker. GitLab closes it with `\r\x1b[0K` (CR + erase-line) and may
-    //     continue the SAME line with the section's human-readable header. Canon's D-TID-11 ingest
-    //     strip kills the escape and leaves the CR, so a rule that merely trimmed a TRAILING CR
-    //     would name a section `build_tools_section\rTools build`. It is handled HERE rather than in
-    //     the dialect strategy because the strategy is not the only recognition path — eidos's
-    //     `strip_leading_timestamp` pre-pass calls `recognize()` with no strategy in the loop
-    //     (adr/0063 clause 4) — and the extractor is the one site both paths share, so agreement is
-    //     by construction rather than by coordination.
+    //     continue the SAME line with the section's human-readable header. Canon's SRC-D-TID-11
+    //     ingest strip kills the escape and leaves the CR, so a rule that merely trimmed a TRAILING
+    //     CR would name a section `build_tools_section\rTools build`. It is handled HERE rather
+    //     than in the dialect strategy because the strategy is not the only recognition path —
+    //     eidos's `strip_leading_timestamp` pre-pass calls `recognize()` with no strategy in the
+    //     loop (adr/0063 clause 4) — and the extractor is the one site both paths share, so
+    //     agreement is by construction rather than by coordination.
     //   * a trailing `[…]` option group (`[collapsed=true]`, `[hide_duration=true,collapsed=true]`)
     //     — without the drop, a producer toggling `collapsed` RENAMES a section.
     // A shape failure (no digits, no ':', an empty payload) means the ROW DOES NOT MATCH, so a
@@ -315,9 +315,9 @@ enum class PayloadExtract : std::uint8_t
 // shared_intent_declaration §2.3/§3.2) — the CLOSED dual of PayloadExtract: each emit value is the
 // exact inverse of one extractor, so recognize(render_row(row, payload)) recovers the payload. This
 // is the generation side of "one declaration, two projections": canon RECOGNIZES via
-// PayloadExtract, LogCraft GENERATES via PayloadEmit, both rows-as-data (SID-2 — never a render()
-// callable, which is un-hashable and lets the two projections diverge). A new emit shape is a
-// grammar-version bump, part of the identity, exactly as a new extractor is.
+// PayloadExtract, LogCraft GENERATES via PayloadEmit, both rows-as-data (SRC-SID-2 — never a
+// render() callable, which is un-hashable and lets the two projections diverge). A new emit shape
+// is a grammar-version bump, part of the identity, exactly as a new extractor is.
 enum class PayloadEmit : std::uint8_t
 {
     None = 0,           ///< dual of PayloadExtract::None — the prefix alone (structural markers)
@@ -367,14 +367,14 @@ struct StructuralRoleRow
 
 // An intent-marker rule: a prefix opens a behavioural quantum (§1.2 — `Complete job name: ` → Job).
 // Carries the dialect's HIERARCHY (kind + child_order — the ADR 0023 level-typed alignment
-// declaration) and the payload extractor. FORMAT-GATED by construction (II-6).
+// declaration) and the payload extractor. FORMAT-GATED by construction (SRC-II-6).
 struct IntentMarkerRow
 {
     std::string_view prefix;
     insight::tokenization::IntentMarkerKind kind;
     insight::tokenization::ChildOrder child_order;
     // ADR 0065 clause 1 — the DIALECT gate: the owning package's name (an intent marker is always
-    // concretely gated by construction, II-6). Filtered into the stream view at resolution.
+    // concretely gated by construction, SRC-II-6). Filtered into the stream view at resolution.
     std::string_view dialect_gate{kAnyDialect};
     PayloadExtract extract;
     // grammar-2 (ADR 0025 / studies/006): a CLOSED exclusion set over the extracted payload — the
@@ -400,7 +400,7 @@ struct IntentMarkerRow
 // materializes into — the O2 medium axis; the two GHA Step media `Run ` / `##[group]Run ` are two
 // emit rows sharing kind, differing in prefix). No payload_excludes: the writer only ever emits a
 // real intent, never an excluded structural token, so the exclusion set is a reader-side concern
-// with no generation dual. Rows-as-data (SID-2): the emit shape is the closed PayloadEmit enum,
+// with no generation dual. Rows-as-data (SRC-SID-2): the emit shape is the closed PayloadEmit enum,
 // never a callable. Content-hashable exactly as IntentMarkerRow is, so a generation-side change
 // moves semantic_identity as a recognition change does (G4 — the hash wiring lands with the ADR at
 // ratification).
@@ -437,7 +437,7 @@ struct LevelLiftRow
     std::string_view dialect_gate{kAnyDialect}; // ADR 0065 clause 1 — the owning package's name
 };
 
-// A location rule: recognizes a test-file WHERE coordinate (§5.3/II-8). `kind` selects the core
+// A location rule: recognizes a test-file WHERE coordinate (§5.3/SRC-II-8). `kind` selects the core
 // matching algorithm; the params are the dialect-independent file-naming vocabulary it walks. The
 // spans point at package-static constexpr arrays (SP-7 immutable-release lifetime). Not every param
 // is used by every kind — `extensions` for TestSpecExtension/PrefixAndExtension, `suffixes` for
@@ -549,9 +549,9 @@ struct SemanticPackageManifest
     // made a package ship these rows; what was missing is that the manifest — the object compose()
     // serializes into the identity — had no member for them, so a generation-side change did NOT
     // move the comparability hash and two documents from DIFFERENT writers could claim the same
-    // RulesetIdentity. That is the silent divergence SID-2 exists to forbid. EMPTY for a package
-    // that ships no markers (test_frameworks: pure location data, no intents to recognize OR
-    // generate). Every package with markers declares the SAME span its Dialect type exposes as
+    // RulesetIdentity. That is the silent divergence SRC-SID-2 exists to forbid. EMPTY for a
+    // package that ships no markers (test_frameworks: pure location data, no intents to recognize
+    // OR generate). Every package with markers declares the SAME span its Dialect type exposes as
     // `emit_markers` — one array, two views, so the pairing the concept static_asserts is the
     // pairing the identity hashes.
     std::span<const IntentEmitRow> emits;

@@ -171,7 +171,7 @@ TEST_F(TokenizerTest, VariablePartBecomesWildcardInTemplate)
 {
     // The IPv4 token is masked to "<*>" per-line (stateless); the kept literal "User"
     // anchors the template. (The names alice/bob are letter-leading words → KEPT, not
-    // masked — the D-TID-14 boundary; only syntactic high-card classes mask.)
+    // masked — the SRC-D-TID-14 boundary; only syntactic high-card classes mask.)
     auto r{tokenizer.process_line(R"({"msg":"User bob logged in from 10.0.0.2"})")};
     ASSERT_TRUE(r.has_value());
     EXPECT_NE(r.value().template_str.find("User"), std::string::npos);
@@ -356,7 +356,7 @@ TEST_F(TokenizerTest, ReportsParsedLineCount)
 }
 
 // (ReportsClusterCount retired — the stateless masker has no cluster state; cluster_count()
-//  was removed with the Drain clustering, stateless_template_id.md D-TID-3.)
+//  was removed with the Drain clustering, stateless_template_id.md SRC-D-TID-3.)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Edge cases / robustness
@@ -443,7 +443,7 @@ TEST_F(TokenizerTest, JSONWithKVContentMaskedStatelessly)
 {
     // The JSON strategy extracts the message; the stateless masker classifies each KV
     // token by its OWN content. A `key=value` pair is a single letter-leading token →
-    // KEPT literal (the D-TID-14 boundary: a varying value-WORD is not a syntactic
+    // KEPT literal (the SRC-D-TID-14 boundary: a varying value-WORD is not a syntactic
     // high-card class; masking it needs the deferred SemanticClassRegistry). So two
     // lines differing only in a KV value-word are DISTINCT templates — the accepted
     // stateless over-split (D-TID-8), NOT Drain's old cross-line wildcard.

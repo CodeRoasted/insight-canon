@@ -10,7 +10,7 @@
 //   the ECHOED marker is rejected by POSITION — the xtrace form carries a fully-valid stamp, so a
 //             stamp-shape guard would let it through and only anchoring does not;
 //   `section_end:` is NOT a row;
-//   II-6 = the rows are dialect-gated to gitlab and inert elsewhere.
+//   SRC-II-6 = the rows are dialect-gated to gitlab and inert elsewhere.
 // Every byte form here was taken from marker_corpus_v1, not invented. Determinism: byte-only
 // recognition over the composed rows; no RNG/clock/float.
 #include <gtest/gtest.h>
@@ -79,8 +79,8 @@ TEST(GitLabMarkers, TheEpochIsSkippedNotFoldedIntoTheName)
 TEST(GitLabMarkers, TheCarriageReturnTerminatesTheNameAndTheOptionGroupIsDropped)
 {
     const ComposedSemantics composed{gitlab_only()};
-    // The bytes canon sees after the transport peel and the D-TID-11 escape strip: GitLab closes the
-    // marker with `\r\x1b[0K`, the escape dies, the CR survives.
+    // The bytes canon sees after the transport peel and the SRC-D-TID-11 escape strip: GitLab
+    // closes the marker with `\r\x1b[0K`, the escape dies, the CR survives.
     EXPECT_EQ(recognize(norm_probe("section_start:1784657178:prepare_executor\r"), composed).name,
               "prepare_executor");
     // …and the producer may continue the SAME line with the section's human-readable header. Both
@@ -150,7 +150,7 @@ TEST(GitLabMarkers, SectionEndIsNotARow)
 
 TEST(GitLabMarkers, RowsAreDialectGatedAndFailClosedWhenUndeclared)
 {
-    // II-6: the row is reachable only through a declaration of THIS dialect.
+    // SRC-II-6: the row is reachable only through a declaration of THIS dialect.
     EXPECT_EQ(recognize(norm_probe("section_start:1784657178:build"), undeclared_stream()).kind,
               IntentMarkerKind::None)
         << "an UNDECLARED stream withholds every concretely-gated row (fail-closed on depth)";

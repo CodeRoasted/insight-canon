@@ -386,7 +386,7 @@ TEST(InferLeadingLogLevel, AnsiColourWrappedLevelRecovered)
         << "ANSI-wrapped PASSED is not a level";
 }
 
-// ── D-OUT-1b — outcome-awareness at the LEVEL altitude (§4A.6) ────────────────
+// ── SRC-D-OUT-1b — outcome-awareness at the LEVEL altitude (§4A.6) ────────────────
 // infer_leading_log_level is what the diff consumes (→ dominant_level → salience →
 // eidos NewErrorPattern). It has TWO severity feeders and D-OUT-1 guarded only one:
 //   • Stage 2 (contains_failure_cue) — D-OUT-1-guarded, caps at Error.
@@ -428,7 +428,7 @@ TEST(InferLeadingLogLevel, AnsiWrappedLeadingPassGlyphDemotesStage1Level)
 // true ONLY when the first outcome-bearing token is a pass glyph: a genuine leading
 // failure WORD leads → stop → false, and a summary with no leading glyph stays a
 // failure. These must NOT regress when the guard lands — they are the rejected
-// "true-leading only" recall loss made into a standing assertion (§4A.6 D-OUT-1b).
+// "true-leading only" recall loss made into a standing assertion (§4A.6 SRC-D-OUT-1b).
 TEST(InferLeadingLogLevel, GenuineLeadingFailureSurvivesWithoutPassGlyph)
 {
     EXPECT_EQ(infer_leading_log_level("ERROR: db connection failed"), LogLevel::Error)
@@ -438,7 +438,7 @@ TEST(InferLeadingLogLevel, GenuineLeadingFailureSurvivesWithoutPassGlyph)
     EXPECT_EQ(infer_leading_log_level("[worker-3] ERROR connection refused"), LogLevel::Error)
         << "scope-prefixed ERROR (token 1, not 0) — preserved (the recall guard)";
     EXPECT_EQ(infer_leading_log_level("======== 25 passed, 5 failed ========"), LogLevel::Warn)
-        << "D-CNT-1: '5 failed' is a count summary → demoted to Warn (surfaced, below per-item "
+        << "SRC-D-CNT-1: '5 failed' is a count summary → demoted to Warn (surfaced, below per-item "
            "verdicts), not Error";
     // Symmetric disconfirm: the SAME line as the first demote case but led by a FAIL
     // glyph (✗, not in the pass-glyph set) — leading_outcome_is_pass is false, so the
@@ -448,9 +448,9 @@ TEST(InferLeadingLogLevel, GenuineLeadingFailureSurvivesWithoutPassGlyph)
         << "leading FAIL glyph ✗ must NOT demote — Stage-1 'failure' stays Fatal";
 }
 
-// ── D-OUT-4 — verdict-register awareness at the LEVEL altitude (§4A.6) ─────────
+// ── SRC-D-OUT-4 — verdict-register awareness at the LEVEL altitude (§4A.6) ─────────
 // The level (infer_leading_log_level) is what the diff consumes (→ dominant_level →
-// salience → eidos NewErrorPattern). One level past D-OUT-1b: not "does a pass glyph
+// salience → eidos NewErrorPattern). One level past SRC-D-OUT-1b: not "does a pass glyph
 // lead?" but "is the line a failure VERDICT at all?" A non-verdict line carrying a
 // failure NOUN ("crash"/"fail", no register) must infer Unknown, not Error — the §6.7
 // re-run P3 FPs (`Storing crash reports into '<path>'`, `… watcher fail event`). These
@@ -480,14 +480,14 @@ TEST(InferLeadingLogLevel, VerdictAnchoredFailureLevelSurvives)
     EXPECT_EQ(infer_leading_log_level("Segmentation fault (core dumped)"), LogLevel::Error)
         << "the crash phrase — still Error";
 }
-// ── D-OUT-4 Stage-1 completion — the LATENT TWIN (§4A.6), GATED ────────────────
+// ── SRC-D-OUT-4 Stage-1 completion — the LATENT TWIN (§4A.6), GATED ────────────────
 // SEPARABLE from the blocker (the design marks Stage 1 a deferred-able twin): KEEP
 // this block IFF Heph lands the Stage-1 completion (gate the leading bare LEVEL word
 // on the same register kernel); DELETE it if he ships only the Stage-2 cue fix — these
 // stay Error/Fatal without it, and a RED that the shipped engine cannot satisfy is
 // tech debt. A LEADING bare level word with no register ("error handling enabled",
 // "failure modes documented") is classified authoritative-Error/Fatal by Stage 1
-// (parse_log_level), unguarded — the non-pass-glyph form of the D-OUT-1b feeder. The
+// (parse_log_level), unguarded — the non-pass-glyph form of the SRC-D-OUT-1b feeder. The
 // rule: a leading level WORD is authoritative only when register-anchored (caps / `:` /
 // bracket) or it is the terminal/sole significant token.
 TEST(InferLeadingLogLevel, LeadingBareLevelWordDemotedWhenUnanchored)
@@ -503,7 +503,7 @@ TEST(InferLeadingLogLevel, LeadingBareLevelWordDemotedWhenUnanchored)
         << "caps + colon — authoritative, preserved";
 }
 
-// ── D-CNT-1 — count register at the LEVEL altitude (§3.2) ──────────────────────
+// ── SRC-D-CNT-1 — count register at the LEVEL altitude (§3.2) ──────────────────────
 // infer_leading_log_level is what the diff consumes. A count-register failure word
 // ("1 failure", "5 failed") is a SUMMARY: it must NOT confer an alerting verdict tier
 // (Error/Fatal), but it still surfaces — capped at Warn (demote, never suppress). This is
@@ -525,7 +525,7 @@ TEST(InferLeadingLogLevel, CountRegisterSummaryCapsAtWarn)
         << "'failed' preceded by 'test' (not the count '1') — a real per-item failure, stays Error";
 }
 
-// ── D-OUT-2 — leading pass WORD demotes the level (§3.3) ───────────────────────
+// ── SRC-D-OUT-2 — leading pass WORD demotes the level (§3.3) ───────────────────────
 // A passing TAP/node-runner assertion ("ok 1 - … failed …") whose description embeds
 // failure vocab must not earn an alerting level. The pass WORD demotes ONLY as the first
 // significant token (the count register is the independent backstop for "25 passed, …").

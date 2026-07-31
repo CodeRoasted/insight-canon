@@ -17,7 +17,7 @@ using insight::tokenization::ArenaAllocator;
 namespace
 {
 // Verbatim from marker_corpus_v1 (code.videolan.org/esphynox__vlc job_2728336), with the ANSI
-// escapes canon's D-TID-11 ingest strip has already removed — which is what a strategy actually
+// escapes canon's SRC-D-TID-11 ingest strip has already removed — which is what a strategy actually
 // sees.
 constexpr std::string_view kStamped{"2026-07-21T18:06:18.101984Z 00O section_start:1784657178:"
                                     "prepare_executor\r"};

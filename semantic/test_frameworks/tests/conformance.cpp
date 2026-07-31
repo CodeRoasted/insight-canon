@@ -1,7 +1,8 @@
-// conformance.cpp — instantiate the canon CONFORMANCE KIT (ADR 0024 §2.3, SP-2) on THIS package's
-// manifest. Package-agnostic canon-shipped gate; this is the entire per-package instantiation. A
-// failing check prints its own verbose diagnostic. Determinism: seedless, single-threaded, pure
-// over manifest data. NOLINTBEGIN — unit test: short identifiers and string literals are fine.
+// conformance.cpp — instantiate the canon CONFORMANCE KIT (ADR 0024 §2.3, SRC-SP-2) on THIS
+// package's manifest. Package-agnostic canon-shipped gate; this is the entire per-package
+// instantiation. A failing check prints its own verbose diagnostic. Determinism: seedless,
+// single-threaded, pure over manifest data. NOLINTBEGIN — unit test: short identifiers and string
+// literals are fine.
 #include <gtest/gtest.h>
 
 import std;
