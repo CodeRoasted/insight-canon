@@ -47,7 +47,7 @@ export namespace insight::transport
 // LIKE EVERY MONOTONIC TOKEN HERE, THIS IS ASSIGNED AT SHIP AND NEVER RESERVED (ADR-2,
 // NORMATIVE): the value means "the Nth shape", and which change causes the Nth shape is not
 // knowable in advance. `-2` was taken when the SECOND transform landed with its row (T5 5.2:
-// `bracket-rfc3339-line-prefix`, jenkins_writer_envelope_t5.md §2 — the co-fire the comment above
+// `bracket-rfc3339-line-prefix`, DN-15 — the co-fire the comment above
 // predicted); `-3` moves next, at whatever ship makes the third shape.
 inline constexpr std::string_view kTransportCatalogVersion{"transport-catalog-2"};
 
@@ -96,7 +96,7 @@ enum class TransportTransformKind : std::uint8_t
     // the earlier refusal said it could not YET land: WITH its algorithm, its row and its gate
     // (G-T5-PEEL — a real population and a real frozen oracle, the shipped strategy strip frozen
     // per ADR-8 since this cut deletes it). Admissibility argument:
-    // jenkins_writer_envelope_t5.md §2.2. Peel-equivalence is the ONLY obligation this row
+    // DN-15. Peel-equivalence is the ONLY obligation this row
     // carries — the invariance cell stays empty (ADR-23: no world vehicle exists), so declaring
     // it certifies OUR refactor and nothing about the world.
     LinePrefixBracketedTimestamp,

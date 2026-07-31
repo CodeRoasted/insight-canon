@@ -1,6 +1,6 @@
 // NOLINTBEGIN — corpus gate: literals and printed diagnostics are intended.
 // test_bracket_peel_equivalence_gate.cpp — G-T5-PEEL: the bracket row's peel-equivalence gate
-// (jenkins_writer_envelope_t5.md §6; the G1-PEEL shape one row over; ADR-23 Part 1's owed
+// (DN-15; the G1-PEEL shape one row over; ADR-23 Part 1's owed
 // obligation for Timestamper, discharged).
 //
 // ═══ THE ORACLE IS A FROZEN COPY (ADR-8) ═══

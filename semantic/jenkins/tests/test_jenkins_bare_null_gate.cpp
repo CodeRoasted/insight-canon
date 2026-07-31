@@ -1,5 +1,5 @@
 // NOLINTBEGIN — corpus gate: literals and printed diagnostics are intended.
-// test_jenkins_bare_null_gate.cpp — G-T5-BARE: the bare-class null (jenkins_writer_envelope_t5.md
+// test_jenkins_bare_null_gate.cpp — G-T5-BARE: the bare-class null (DN-15
 // §6). The purification's own tripwire, and the pass's ABORT WIRE: if the purified chain moves
 // ANYTHING on the 82 bare traces — a template byte, a quantum, the epilogue token — this gate is
 // red and the identity cut does not stand as landed (the masker coupling discipline, repeated).

@@ -369,7 +369,7 @@ class SystemdJournalStrategy final : public IFormatStrategy
 
 } // namespace insight::tokenization
 
-// ──────── OTEL span-export document unpack (insight_otel_epic.md §13, D-OTEL-18) ────────
+// ──────── OTEL span-export document unpack (ADR-29, D-OTEL-18) ──────────────────────────
 export namespace insight::tokenization
 {
 

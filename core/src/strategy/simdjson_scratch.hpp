@@ -138,7 +138,7 @@ inline void read_raw_json_or_keep(simdjson::simdjson_result<simdjson::ondemand::
         out = raw;
 }
 
-// OTLP body extraction (insight_otel_epic.md SRC-D-OTEL-1): the OpenTelemetry Log Data Model
+// OTLP body extraction (ADR-29 SRC-D-OTEL-1): the OpenTelemetry Log Data Model
 // nests the message under body.stringValue (`"body":{"stringValue":"…"}`). Returns the
 // stringValue, or false when body is absent / not an object / carries no stringValue. MUST
 // be the LAST field accessed on `obj` — it descends into a child, after which the parent

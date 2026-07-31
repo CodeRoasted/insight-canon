@@ -437,7 +437,7 @@ std::optional<Timestamp> parse_epoch_timestamp(std::string_view timestamp_str) n
 }
 
 // OTLP timeUnixNano: epoch nanoseconds, "1705312200000000000". Integer-only — no float
-// (insight_otel_epic.md D-OTEL-3). The integer duration_cast truncates to system_clock's
+// (ADR-29 D-OTEL-3). The integer duration_cast truncates to system_clock's
 // resolution deterministically per stdlib; the OTLP producer emits millisecond-granular nanos,
 // so the truncation is lossless and the derived window membership is bit-identical cross-stdlib.
 std::optional<Timestamp> parse_unix_nano_timestamp(std::string_view timestamp_str) noexcept

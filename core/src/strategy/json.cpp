@@ -430,7 +430,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     if (try_get_string(root, kComponentKeys, scratch_view))
         parsed_line.component = arena.store_string(scratch_view);
 
-    // ── OTEL/OTLP field-map (insight_otel_epic.md SRC-D-OTEL-1, the declared catalog D-OTEL-4a) ──
+    // ── OTEL/OTLP field-map (ADR-29 SRC-D-OTEL-1, the declared catalog D-OTEL-4a) ──
     // severity_number → the LogLevel band (declared > inferred) + the trace context, all
     // consumed structural metadata; the trace keys are top-level → never tokenized → dropped
     // from the template by construction (OR1). is_otel routes the message to the nested

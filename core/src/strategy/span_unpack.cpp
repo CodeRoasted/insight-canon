@@ -8,7 +8,7 @@ import insight.canon.api;
 
 // src/strategy/span_unpack.cpp
 //
-// OTEL span-export DOCUMENT unpack (insight_otel_epic.md §13, D-OTEL-18 / D-OTEL-18a): the
+// OTEL span-export DOCUMENT unpack (ADR-29, D-OTEL-18 / D-OTEL-18a): the
 // record-source layer's 1→N step. An OTLP/JSON `resourceSpans` trace export (shape 1) is walked
 // and re-emitted as N CANONICAL flat-span records (shape 2) — byte-form-identical to what the
 // LogCraft lab emits for the same spans, so the flat-span parser (json.cpp) is authored ONCE and

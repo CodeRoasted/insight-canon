@@ -41,7 +41,7 @@ using EventID = uint64_t;
 // not touch the masking rules must NOT change it). Bump the suffix on any output-affecting
 // canonicalization change. Generations: -1 = stateless masker + F13; -2 = OTEL-awareness
 // (severity-from-severity_number + trace-context routing + the trace-scoped graph —
-// insight_otel_epic.md D-OTEL-2, unconditional); -3 = currency-marker numerics
+// ADR-29 D-OTEL-2, unconditional); -3 = currency-marker numerics
 // (stateless_template_id.md SRC-D-TID-22 — `$463`/`total=$463` mask to `$<*>`/`total=$<*>`); -4 =
 // the 1.6.4 masking batch (detection_provenance_and_legibility.md): D-MSK-1 generalized
 // diagnostic-composite masking (per-`:`/`/`-segment digit-leading rule — collapses the
@@ -160,7 +160,7 @@ inline std::ostream& operator<<(std::ostream& out, const TemplateId& template_id
     return out << render(template_id);
 }
 
-// ── OTEL trace context (insight_otel_epic.md §12, SRC-D-OTEL-1) ──
+// ── OTEL trace context (ADR-29, SRC-D-OTEL-1) ──
 // The OTEL hex ids (traceId/spanId/parentSpanId) are hashed to fixed-width scalar PODs at
 // the strategy seam — the D-TIR-4 hash-to-POD discipline — carried IN-MEMORY on the
 // CanonicalEvent, CONSUMED by the structural layer (trace_id groups the n-gram graph in O2;
@@ -330,7 +330,7 @@ inline constexpr std::int64_t kNanosPerMicro{1'000};
 inline constexpr std::int64_t kNanosPerMilli{1'000'000};
 inline constexpr std::int64_t kNanosPerSecond{1'000'000'000};
 inline constexpr std::array<OrdinalFieldDescriptor, 15> kOrdinalFieldCatalog{{
-    // OTEL span wall-duration (insight_otel_epic.md §13, SRC-D-OTEL-12): endTimeUnixNano −
+    // OTEL span wall-duration (ADR-29, SRC-D-OTEL-12): endTimeUnixNano −
     // startTimeUnixNano, already integer ns. Computed by the flat-span parser and emitted as
     // this declared ordinal on the shipped DurationLog2Ns ladder (activates W1 + latency_shift
     // on traces). The key also self-matches a literal span_duration_ns field if a log carries one.
@@ -537,7 +537,7 @@ enum class RunOutcome : std::uint8_t
     return baseline_rank >= 0 && changed_rank >= 0 && changed_rank > baseline_rank;
 }
 
-// ── OTEL severity_number → LogLevel band (insight_otel_epic.md SRC-D-OTEL-1) ──
+// ── OTEL severity_number → LogLevel band (ADR-29 SRC-D-OTEL-1) ──
 // The OpenTelemetry severity_number (1–24) folds into canon's existing 6-level LogLevel
 // by integer division: band = (n-1)/4 → Trace(1–4)/Debug(5–8)/Info(9–12)/Warn(13–16)/
 // Error(17–20)/Fatal(21–24). Integer-only (no float — D-OTEL-3); n<1 clamps to Trace,
@@ -949,7 +949,7 @@ struct CanonicalEvent
     // and to the semantic class of tokens inside it. Consumers: phase alignment +
     // structural surprise (Phase 2/4); None for the vast majority of lines.
     StructuralRole structural_role{StructuralRole::None};
-    // OTEL trace context (insight_otel_epic.md SRC-D-OTEL-1), extracted by the strategy layer for
+    // OTEL trace context (ADR-29 SRC-D-OTEL-1), extracted by the strategy layer for
     // OTEL inputs. CONSUMED in-memory (trace_id groups the n-gram graph in O2;
     // span_id/parent_span_id feed the deferred O3 DAG) and NEVER serialized — the MetaLog wire
     // shape is unchanged (OR1). `present == false` for every non-OTEL input → zero added cost.
@@ -960,7 +960,7 @@ struct CanonicalEvent
     // params. A span over arena-allocated storage (like `params`); EMPTY for every non-ordinal line
     // → zero added cost on the hot path (input-conditional, the OTEL D-OTEL-2a precedent).
     std::span<const OrdinalObservation> ordinals;
-    // O4b Span Links (insight_otel_epic.md §5.3 / SRC-D-OTEL-9, SRC-D-OTEL-21): the span_ids this
+    // O4b Span Links (ADR-29 / SRC-D-OTEL-9, SRC-D-OTEL-21): the span_ids this
     // span DECLARES a cross-trace edge to (OTEL `links[]`). Consumed metalog-side — each resolves
     // (by span_id, across traces) into the SAME distilled service topology as intra-trace
     // parentage: component(this) → component(linked). A span over arena-allocated storage; EMPTY
@@ -1413,7 +1413,7 @@ parse_bsd_syslog_ts(std::string_view timestamp_str,
 parse_epoch_timestamp(std::string_view timestamp_str) noexcept;
 
 // Parse OTLP `timeUnixNano` — Unix epoch NANOSECONDS as a digit string (e.g.
-// "1705312200000000000") to Timestamp (insight_otel_epic.md O1). Integer-only (from_chars +
+// "1705312200000000000") to Timestamp (ADR-29 O1). Integer-only (from_chars +
 // integer duration_cast, no float); the OTEL event-time channel so OTEL inputs window like any
 // other format. Sub-`system_clock::duration` resolution truncates deterministically per stdlib
 // (the OTLP producer emits millisecond-granular nanos → lossless on both libc++/libstdc++).
