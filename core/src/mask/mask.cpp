@@ -161,7 +161,7 @@ namespace
     // `normalize_ephemeral_root` (call site B) — adding a root here extends both with no second
     // edit (the kCurrencyMarkers discipline). Masking-only, no semantics ⇒ canon CORE, not a
     // dialect package (ADR 0024 cl.4: kCanonicalizationVersion IS the core masking generation).
-    // See technical_docs/architecture/canon_ephemeral_root_masking.md.
+    // See technical_docs/adr/016-canon-canonicalization-internals.md.
 
     enum class RootAnchor : std::uint8_t
     {

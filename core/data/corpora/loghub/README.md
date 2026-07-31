@@ -3,7 +3,7 @@
 Real-world log datasets from the academic **LogHub** collection — the structural ground truth for
 cube measurement, the cross-stdlib determinism measurement, and the rich-format AMI re-measure
 (decision #1). Registered in [../REGISTRY.md](../REGISTRY.md); governed by
-[ADR 0016](../../../../technical_docs/adr/0016-corpus-storage-and-governance.md).
+[ADR-7](../../../../../technical_docs/adr/007-corpus-storage-and-governance.md).
 
 ## Intent / test-purpose
 

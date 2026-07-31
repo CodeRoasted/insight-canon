@@ -24,7 +24,7 @@
 // with the producer's declared severity.
 //
 // ⚠ THE BARE `\r` IS LOAD-BEARING, and this row is the cheapest live proof of clause 6 in the tree
-// (architecture/corpus_backed_gates.md — *a `\r` is content in CI logs, not a delimiter*). Stage 1
+// (technical_docs/adr/008-corpus-gates-oracles-and-measurement.md D2 — *a `\r` is content in CI logs, not a delimiter*). Stage 1
 // removes the escape run and CORRECTLY leaves the `\r`, which keeps `WARNING` a separate token and
 // is why the normalized line reads Warn. Trim that one byte — as a `\r`-stripping read path would —
 // and `after_script` fuses with `WARNING` into `after_scriptWARNING`; the warning token is gone, the

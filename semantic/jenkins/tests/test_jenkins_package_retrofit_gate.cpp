@@ -1,7 +1,7 @@
 // NOLINTBEGIN — integration gate: literals and printed diagnostics are intended.
 // test_jenkins_package_retrofit_gate.cpp — the Jenkins RECOGNIZER RETROFIT over jenkins-markers/v2
 // (architecture/jenkins_retrofit_gates.md; the GitLab package-proof precedent, §4 of
-// corpus_backed_gates.md).
+// technical_docs/history/architecture-v1/corpus_backed_gates.md).
 //
 // ═══ WHAT IS BEING CLAIMED, IN THE WORDS §2 REQUIRES — three oracles, three claim words ═══
 //

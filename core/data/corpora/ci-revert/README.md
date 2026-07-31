@@ -3,9 +3,9 @@
 The **CI-text labelled proxy** — real GitHub Actions build logs, labelled two ways from one crawl,
 the only corpus whose labels are *independent of the message* (the teeth the format-relative gate
 needs). Registered in [../REGISTRY.md](../REGISTRY.md); governed by
-[ADR 0016](../../../../technical_docs/adr/0016-corpus-storage-and-governance.md). The **validity
+[ADR-7](../../../../../technical_docs/adr/007-corpus-storage-and-governance.md). The **validity
 contract** (what it may and may not claim) is
-[ci_corpus_validity_contract.md](../../../../technical_docs/architecture/ci_corpus_validity_contract.md) — read it before using the labels.
+[008-corpus-gates-oracles-and-measurement.md](../../../../../technical_docs/adr/008-corpus-gates-oracles-and-measurement.md) — read it before using the labels.
 
 ## Intent / test-purpose — one crawl, two roles
 
@@ -49,7 +49,7 @@ contract** (what it may and may not claim) is
     Release. The asset is the only source of truth (re-crawl cannot rebuild it).
 
 - **`v2` (policy `d11-ci-revert-v2`, 2026-06-17 — tooling IMPLEMENTED; awaits the official crawl):**
-  the [bugs.md](../../../../technical_docs/bugs.md) R2-yield fixes are all built + offline-tested —
+  the [bugs.md](../../../../../technical_docs/bugs.md) R2-yield fixes are all built + offline-tested —
   widened revert recall (rebase-merge sha + PR-number + rollback/back-out/reland lexicon; `revert.method`),
   revert-first sampling (guarantee-crawl every reverted PR + matched controls; `sampling_role`),
   revert-density repo selection, uncapped high-volume repos, ~60 repos (schema v2). The **longitudinal
