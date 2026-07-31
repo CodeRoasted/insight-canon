@@ -29,7 +29,7 @@ using insight::tokenization::recognize;
 
 namespace
 {
-// The RESOLVED view of a stream that declared this dialect (ADR 0065 clause 2) — after T4 the
+// The RESOLVED view of a stream that declared this dialect (ADR-22) — after T4 the
 // concretely-gated rows are reachable only through a declaration.
 [[nodiscard]] ComposedSemantics jenkins_only()
 {
@@ -54,7 +54,7 @@ TEST(JenkinsMarkers, NamedBlockOpenIsAStage)
         << "STAGE is the container level (GHA Job ≡ stage)";
     EXPECT_EQ(stage.name, "Build");
     EXPECT_EQ(stage.child_order, ChildOrder::Unordered)
-        << "stages/branches co-occur (parallel/matrix) — the level matches UNORDERED (ADR 0023)";
+        << "stages/branches co-occur (parallel/matrix) — the level matches UNORDERED (ADR-18)";
 }
 
 TEST(JenkinsMarkers, ParallelBranchIsAStageWithItsDiscriminant)
@@ -110,7 +110,7 @@ TEST(JenkinsMarkers, StructuralTokensAreScaffoldNotQuanta)
 }
 
 // ── SRC-II-6, now against the DECLARATION rather than against per-line format detection ──
-// The rows are gated to this package's NAME (ADR 0065 clause 1), so a stream that declared no
+// The rows are gated to this package's NAME (ADR-22), so a stream that declared no
 // dialect fires nothing. The old form of this test passed a `LogFormat` per call, sourced in
 // production from `LogParser::routed_format()` — the per-line detector winner under a sticky
 // strategy — which made "does the Jenkins dialect fire" a question about the line's own bytes.

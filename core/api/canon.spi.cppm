@@ -1,4 +1,4 @@
-// insight.canon.spi — the PROVIDER contract (ADR 0024 §2.4). The public, installed, versioned
+// insight.canon.spi — the PROVIDER contract (ADR-17). The public, installed, versioned
 // surface a semantic package implements: the closed rule grammar (versioned by
 // kSemanticGrammarVersion), the format-strategy interface + its ParsedLine intermediate (the code
 // tier, §2.3), the package manifest, and the curated scan primitives a dialect strategy needs.
@@ -108,10 +108,10 @@ export namespace insight::semantic
 
 // The grammar version — a component of the composed identity (§4). Bump on any grammar SHAPE change
 // (a new row kind, a new closed-enum member, a serialization change). ASCII, versioned string id.
-// grammar-2 (ADR 0025, the first anticipated growth): the run-outcome row kinds (OutcomeTokenRow /
+// grammar-2 (ADR-17, the first anticipated growth): the run-outcome row kinds (OutcomeTokenRow /
 // OutcomeMarkerRow), the IntentMarkerRow payload-exclusion set, and the RemainderToClosingParen
 // extractor — the shapes the Jenkins dialect genuinely needs.
-// grammar-3 (ADR 0044 §7): the manifest gains `emits`, so the GENERATION projection enters the
+// grammar-3 (ADR-23): the manifest gains `emits`, so the GENERATION projection enters the
 // canonical serialization. A pure SERIALIZATION-COVERAGE change — no package's rows moved, no row
 // kind is new (IntentEmitRow already existed and was already required by the DialectIntent concept)
 // — but the serialization is part of the grammar shape, so it bumps here and the composed digest
@@ -133,13 +133,13 @@ export namespace insight::semantic
 // adr/0047 carries the errata to 0026 (its substantive claim is untouched — it names the GROWTH,
 // not a number).
 //
-// grammar-4 (ADR 0065 clause 1, T4): the per-row `format_gate : insight::LogFormat` becomes
+// grammar-4 (ADR-22, T4): the per-row `format_gate : insight::LogFormat` becomes
 // `dialect_gate : std::string_view` on all six gated row kinds, so six preimage sites move from a
 // single `append_u8` to a length-prefixed `append_str`. That is a SERIALIZATION SHAPE change on the
 // nose — the case the paragraph above says to keep bumping for, "including one that also moves
 // content" — and adr/0047 clause 2.3 sharpened exactly it for the sibling transport token.
 //
-// ⚠ ADR 0065 clause 6 says T4 "spends no version token". That reading is right about the two tokens
+// ⚠ ADR-22 says T4 "spends no version token". That reading is right about the two tokens
 // it measured — `canonicalization_version` (the MASKING token; canon.api.cppm owns the value) and the
 // MetaLog wire version, neither of which T4 touches — and it did not enumerate THIS one. The bump
 // costs Eqya's sequencing nothing: `kSemanticGrammarVersion` appears at exactly one site, inside
@@ -147,7 +147,7 @@ export namespace insight::semantic
 // the digest it feeds is moving anyway. It is not reserved by a plan — the shape shipped, so it
 // takes the token (adr/0047 clause 1).
 //
-// grammar-5 (ADR 0069, the GitLab CI dialect): three shape changes, all forced by bytes GitLab
+// grammar-5 (ADR-17, the GitLab CI dialect): three shape changes, all forced by bytes GitLab
 // emits and none expressible in grammar-4 — the `NumericFieldThenRemainder` extractor and its
 // `NumericFieldThenPayload` emit dual (a marker payload preceded by a variable-length numeric
 // field), and `OutcomeMarkerRow`'s shape discriminator + own verdict (a terminal line whose PREFIX
@@ -156,7 +156,7 @@ export namespace insight::semantic
 // moves for the reason the paragraph above states.
 inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-5"};
 
-// ── The DIALECT coordinate (ADR 0064 / ADR 0065) ─────────────────────────────────────────────────
+// ── The DIALECT coordinate (ADR-22 / ADR-22) ─────────────────────────────────────────────────────
 // A DIALECT is a VOCABULARY over a HOST FORMAT (0064 clause 1): the format owns the LAYOUT rule
 // (where one record's fields begin and end), the dialect owns the NAMES inside a layout another
 // layer already delimited. `GitHub Actions` is `RawText` + the GHA workflow-command markers;
@@ -202,24 +202,24 @@ inline constexpr std::string_view kAnyDialect{};
 //   * concrete row, undeclared     → does NOT fire (fail-closed — "" matches no concrete gate)
 // An UNKNOWN declared dialect (a typo) never reaches here: it is a HARD ERROR at stream resolution,
 // listing the composed package names. An unknown dialect is a *mistake*; an absent one is a
-// *choice* — they must not share a code path (ADR 0044 §6).
+// *choice* — they must not share a code path (ADR-23).
 [[nodiscard]] constexpr bool dialect_admits(std::string_view dialect_gate,
                                             std::string_view declared_dialect) noexcept
 {
     return dialect_gate == kAnyDialect || dialect_gate == declared_dialect;
 }
 
-// ── The INTENT CHANNEL coordinate (ADR 0030) ─────────────────────────────────────────────────────
-// `Medium = Dialect × IntentChannel` (ADR 0066 — the first factor is the DIALECT, not the format;
+// ── The INTENT CHANNEL coordinate (ADR-22) ───────────────────────────────────────────────────────
+// `Medium = Dialect × IntentChannel` (ADR-22 — the first factor is the DIALECT, not the format;
 // the medium gate below and the row-firing rule already read `dialect × channel`). The
 // IntentChannel is the channel through which that intent was MATERIALIZED. Same intent, different
 // channel ⇒ a new channel (not a new dialect). The channel vocabulary is package-declared DATA,
-// exactly like the markers — core stays semantic-unaware (ADR 0024): canon knows channel *markers*,
+// exactly like the markers — core stays semantic-unaware (ADR-17): canon knows channel *markers*,
 // it does not detect, route or map.
 //
 // It is NOT "the sink": a sink is LogCraft's output destination (console/file/http/SHM), a
 // generator-side concept. This coordinate is a provenance fact about a STREAM, and a consumer that
-// never heard of LogCraft still has to declare it (ADR 0030 D3).
+// never heard of LogCraft still has to declare it (ADR-22).
 //
 // Why the coordinate exists (measured on REAL bytes, not theorized): canon receives the SAME GHA
 // Step banner in two materializations under ONE dialect gate — the runner's `##[group]Run <cmd>`
@@ -230,19 +230,19 @@ inline constexpr std::string_view kAnyDialect{};
 // stripped row cannot simply be deleted — the ablation genuinely uses the bare prefix as its banner
 // — so gating is the only fix.
 //
-// canon MUST NOT infer the channel: it is always TOLD (ADR 0030 D2). A CALLER may derive its own
+// canon MUST NOT infer the channel: it is always TOLD (ADR-22). A CALLER may derive its own
 // declaration (Acquisition peeks a whole file — deterministic given the bytes); that inference
 // lives at the caller, never here.
 //
 // The channel is EXTRINSIC and that is the whole reason it is declared rather than detected: no
 // byte carries it. A prose line is byte-identical across channels, and both GHA channels share one
 // dialect gate — the discriminating evidence is absent from the very lines that get misrecognized.
-// So someone must SAY, and only the caller who acquired the stream knows (ADR 0029 D2/D5; never
+// So someone must SAY, and only the caller who acquired the stream knows (ADR-22; never
 // auto-detect — a prefix heuristic makes content non-deterministic under streaming).
 //
 // The "any channel" sentinel: the row fires regardless of the stream's declared channel — the
 // DEGENERATE case every single-materialization dialect (Jenkins, test_frameworks) uses, so it is
-// untouched by all of this (ADR 0029 D5, minimal blast radius). The EMPTY string_view is that
+// untouched by all of this (ADR-22, minimal blast radius). The EMPTY string_view is that
 // sentinel, mirroring kAnyDialect = the empty view: a package may never declare an empty channel
 // name (all_channels_named enforces it), so empty is unambiguously "any".
 //
@@ -276,13 +276,13 @@ enum class PayloadExtract : std::uint8_t
 {
     None = 0,             ///< no payload (structural markers carry none)
     RemainderAfterPrefix, ///< the content after the matched prefix, verbatim (intent markers)
-    // grammar-2 (ADR 0025 / studies/006): the content after the matched prefix up to a REQUIRED
+    // grammar-2 (ADR-17 / studies/006): the content after the matched prefix up to a REQUIRED
     // line-final ')' — the Jenkins named-block-open form `[Pipeline] { (<name>)`. A line that does
     // not end with ')' does not match the row at all (strict — an un-named `[Pipeline] {` wrapper
     // is scaffold, not a quantum). Nested parens stay inside the payload (`{ (Branch: test (lts))`
     // → `Branch: test (lts)`): only the single final ')' is the delimiter.
     RemainderToClosingParen,
-    // grammar-5 (ADR 0069): the content after the matched prefix is a non-empty run of ASCII
+    // grammar-5 (ADR-17): the content after the matched prefix is a non-empty run of ASCII
     // digits, then a single ':', then the payload — the GitLab section marker
     // `section_start:<unix-ts>:<name>[<options>]`. A variable-length field to SKIP is what no other
     // extractor can express: `RemainderAfterPrefix` would put the epoch inside the payload, and
@@ -324,7 +324,7 @@ enum class PayloadEmit : std::uint8_t
     PayloadAfterPrefix, ///< dual of RemainderAfterPrefix — the prefix, then the payload verbatim
     PayloadThenClosingParen, ///< dual of RemainderToClosingParen — prefix, payload, then the final
                              ///< ')'
-    // grammar-5 (ADR 0069): dual of NumericFieldThenRemainder — prefix, a single PLACEHOLDER digit
+    // grammar-5 (ADR-17): dual of NumericFieldThenRemainder — prefix, a single PLACEHOLDER digit
     // `0`, ':', then the payload. The placeholder is deliberate and its consequence is declared: a
     // generated GitLab marker carries no wall-clock, so a synthetic stream has no section duration.
     // Emitting a VARYING stamp is a step_duration capability, not a writer detail.
@@ -366,18 +366,18 @@ struct StructuralRoleRow
 };
 
 // An intent-marker rule: a prefix opens a behavioural quantum (§1.2 — `Complete job name: ` → Job).
-// Carries the dialect's HIERARCHY (kind + child_order — the ADR 0023 level-typed alignment
+// Carries the dialect's HIERARCHY (kind + child_order — the ADR-18 level-typed alignment
 // declaration) and the payload extractor. FORMAT-GATED by construction (SRC-II-6).
 struct IntentMarkerRow
 {
     std::string_view prefix;
     insight::tokenization::IntentMarkerKind kind;
     insight::tokenization::ChildOrder child_order;
-    // ADR 0065 clause 1 — the DIALECT gate: the owning package's name (an intent marker is always
+    // ADR-22 — the DIALECT gate: the owning package's name (an intent marker is always
     // concretely gated by construction, SRC-II-6). Filtered into the stream view at resolution.
     std::string_view dialect_gate{kAnyDialect};
     PayloadExtract extract;
-    // grammar-2 (ADR 0025 / studies/006): a CLOSED exclusion set over the extracted payload — the
+    // grammar-2 (ADR-17 / studies/006): a CLOSED exclusion set over the extracted payload — the
     // row does NOT fire when the payload's leading token matches an entry (entry == payload, or
     // payload starts with entry followed by a space). The Jenkins step form `[Pipeline] <verb>`
     // needs it: the verb set is open (any pipeline step), the structural tokens that share the
@@ -385,7 +385,7 @@ struct IntentMarkerRow
     // data. Empty for rows without exclusions (every pre-grammar-2 row). The span points at
     // package-static constexpr storage (SP-7 lifetime); serialized into semantic_identity.
     std::span<const std::string_view> payload_excludes;
-    // ADR 0029 D5 — the CHANNEL gate: this row fires only on a stream the caller declared as this
+    // ADR-22 — the CHANNEL gate: this row fires only on a stream the caller declared as this
     // IntentChannel. kAnyChannel (the default) = fires on any channel, so every
     // single-materialization dialect is untouched. REQUIRED exactly when one channel's marker
     // occurs as ordinary CONTENT in a sibling channel (the GHA `Run ` case) — which is why `Run `
@@ -395,7 +395,7 @@ struct IntentMarkerRow
 };
 
 // A generation-template rule (studies/008, shared_intent_declaration §3.2) — the WRITER dual of
-// IntentMarkerRow. Carries the SAME dialect hierarchy (kind + child_order, the ADR 0023
+// IntentMarkerRow. Carries the SAME dialect hierarchy (kind + child_order, the ADR-18
 // declaration) and the SAME medium gate (dialect_gate × channel_gate = the Medium the line
 // materializes into — the O2 medium axis; the two GHA Step media `Run ` / `##[group]Run ` are two
 // emit rows sharing kind, differing in prefix). No payload_excludes: the writer only ever emits a
@@ -409,18 +409,18 @@ struct IntentEmitRow
     std::string_view prefix;
     insight::tokenization::IntentMarkerKind kind;
     insight::tokenization::ChildOrder child_order;
-    // ADR 0065 clause 1 — the DIALECT gate, symmetric to IntentMarkerRow's: the Medium the line
+    // ADR-22 — the DIALECT gate, symmetric to IntentMarkerRow's: the Medium the line
     // materializes into is `dialect × channel`, so both projections name the same pair.
     std::string_view dialect_gate{kAnyDialect};
     PayloadEmit emit;
-    // ADR 0029 D5 — the CHANNEL gate, symmetric to IntentMarkerRow's. The writer's dual of the
+    // ADR-22 — the CHANNEL gate, symmetric to IntentMarkerRow's. The writer's dual of the
     // reader's question: not "which prefix do I match" but "which IntentChannel am I materializing
     // into". This is what dissolves the apparent C2 contradiction — the writer never inspects
     // prefixes (the SID-1 smell C2 exists to kill), it applies the channel adaptation the Medium
     // names. Paired with the reader's gate by paired_writer_row, so the two projections cannot
     // drift onto different channels.
     //
-    // It is also the MEDIUM SELECTOR's input (ADR 0029 D4): a writer picks the emit row whose
+    // It is also the MEDIUM SELECTOR's input (ADR-22): a writer picks the emit row whose
     // channel_gate matches the channel it was told to render, never the first row that matches by
     // array order — so `##[group]Run ` is reachable and the output does not depend on canon's row
     // ordering.
@@ -434,7 +434,7 @@ struct LevelLiftRow
 {
     std::string_view prefix;
     insight::LogLevel level;
-    std::string_view dialect_gate{kAnyDialect}; // ADR 0065 clause 1 — the owning package's name
+    std::string_view dialect_gate{kAnyDialect}; // ADR-22 — the owning package's name
 };
 
 // A location rule: recognizes a test-file WHERE coordinate (§5.3/SRC-II-8). `kind` selects the core
@@ -453,7 +453,7 @@ struct LocationRow
     std::span<const std::string_view> suffixes; // `_test.go` / `_spec.rb` / `_test.rb` (SuffixSet)
 };
 
-// ── Run-outcome rows (grammar-2, ADR 0025 / insight_run_outcome_model.md §4) ──
+// ── Run-outcome rows (grammar-2, ADR-17 / insight_run_outcome_model.md §4) ──
 // The dialect's run-verdict MAPPING — native verdict string → the core-owned RunOutcome — plus the
 // console-tail fallback marker. Matcher algorithms live in core (map_outcome_token /
 // scan_run_outcome / resolve_run_outcome, the D-OUT-RUN-1 precedence); a package ships only rows,
@@ -467,10 +467,10 @@ struct OutcomeTokenRow
 {
     std::string_view token; // the native dialect verdict string, verbatim ("UNSTABLE", "cancelled")
     insight::RunOutcome outcome;
-    std::string_view dialect_gate{kAnyDialect}; // ADR 0065 clause 1 — the owning package's name
+    std::string_view dialect_gate{kAnyDialect}; // ADR-22 — the owning package's name
 };
 
-// How a matched OutcomeMarkerRow yields its verdict (grammar-5, ADR 0069 — a CLOSED shape enum, the
+// How a matched OutcomeMarkerRow yields its verdict (grammar-5, ADR-17 — a CLOSED shape enum, the
 // PayloadExtract discipline applied to the outcome walker). Two dialects, two genuinely different
 // terminal-line grammars, and no prefix choice unifies them.
 enum class OutcomeMarkerShape : std::uint8_t
@@ -493,7 +493,7 @@ enum class OutcomeMarkerShape : std::uint8_t
 struct OutcomeMarkerRow
 {
     std::string_view prefix;
-    std::string_view dialect_gate{kAnyDialect}; // ADR 0065 clause 1 — the owning package's name
+    std::string_view dialect_gate{kAnyDialect}; // ADR-22 — the owning package's name
     OutcomeMarkerShape shape{OutcomeMarkerShape::RemainderToken};
     // The verdict this row's PREFIX announces. READ ONLY under PrefixIsVerdict — a RemainderToken
     // row's verdict comes from its remainder, through the token rows, and this field is inert for
@@ -544,7 +544,7 @@ struct SemanticPackageManifest
     std::string_view version; // "1.0.0" — immutable release discipline (SP-7)
     std::span<const StructuralRoleRow> roles;
     std::span<const IntentMarkerRow> markers;
-    // grammar-3 (ADR 0044 §7): the GENERATION projection — the writer dual of `markers`, declared
+    // grammar-3 (ADR-23): the GENERATION projection — the writer dual of `markers`, declared
     // here so it enters `semantic_identity`. `IntentEmitRow` and the DialectIntent concept already
     // made a package ship these rows; what was missing is that the manifest — the object compose()
     // serializes into the identity — had no member for them, so a generation-side change did NOT
@@ -558,11 +558,11 @@ struct SemanticPackageManifest
     std::span<const LevelLiftRow> level_lifts;
     std::span<const LocationRow> locations;
     std::span<const ValueClassRow> value_classes;
-    // grammar-2 (ADR 0025): the run-outcome vocabulary. Both may be empty (§3.2 — a package
+    // grammar-2 (ADR-17): the run-outcome vocabulary. Both may be empty (§3.2 — a package
     // declares exactly the outcome surfaces its dialect actually has).
     std::span<const OutcomeTokenRow> outcome_tokens;
     std::span<const OutcomeMarkerRow> outcome_markers;
-    // ADR 0029 D5 — the package's declared INTENT CHANNEL vocabulary: every materialization this
+    // ADR-22 — the package's declared INTENT CHANNEL vocabulary: every materialization this
     // dialect's intents can be rendered into ("annotated" / "stripped" for GHA). EMPTY for a
     // single-materialization dialect (Jenkins, test_frameworks), whose rows are all kAnyChannel —
     // the degenerate case. Only the dialect that HAS multiple materializations declares channels.
@@ -659,7 +659,7 @@ inline constexpr std::string_view kPlaceholderNumericField{"0:"};
 
 // paired_writer_row — the reader→writer pairing. Given a recognition row, returns the generation
 // row that materializes into a line THAT row recognizes: same prefix, kind, and MEDIUM. The Medium
-// is `dialect × IntentChannel` (ADR 0029 D1 / ADR 0065 clause 1), so the pairing matches on BOTH
+// is `dialect × IntentChannel` (ADR-22 / ADR-22), so the pairing matches on BOTH
 // gates — a reader
 // row gated to one channel must pair with the writer row gated to the SAME channel, or the two
 // projections would silently describe different materializations (a C2 violation the pairing exists
@@ -681,7 +681,7 @@ paired_writer_row(const IntentMarkerRow& reader, std::span<const IntentEmitRow> 
     return nullptr;
 }
 
-// ── The IntentChannel static checks (ADR 0029 D5 — fail-closed at COMPILE time) ──
+// ── The IntentChannel static checks (ADR-22 — fail-closed at COMPILE time) ──
 // A package's channel vocabulary and its rows' gates must agree, and the check is consteval so the
 // disagreement is a build error in the package's own TU — the same seat, and the same posture, as
 // the DialectIntent concept. This is the compile-time half of "an unknown channel is a hard error":
@@ -711,7 +711,7 @@ all_channel_gates_declared(std::span<const IntentMarkerRow> markers,
                                { return declared(row.channel_gate); });
 }
 
-// ── The DIALECT static check (ADR 0065 clause 1 — fail-closed at COMPILE time) ──
+// ── The DIALECT static check (ADR-22 — fail-closed at COMPILE time) ──
 // Every gated row's `dialect_gate` is either kAnyDialect or the package's OWN name. Both halves are
 // load-bearing:
 //   * a gate naming a package this manifest is not — even a real, composed one — is a package

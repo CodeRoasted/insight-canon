@@ -17,7 +17,7 @@ import insight.semantic.github;   // kManifest (markers + emits)
 
 TEST(GithubRoundTrip, RecognizeRendersBackToDeclaredIntent)
 {
-    // BOTH projections come off the ONE manifest (ADR 0044 §7): the recognizer is the shipped
+    // BOTH projections come off the ONE manifest (ADR-23): the recognizer is the shipped
     // reader composed from it, and the generation rows are the same `emits` span
     // `semantic_identity` hashes — so what closes here is what the digest claims.
     const std::array<insight::semantic::SemanticPackageManifest, 1> one{

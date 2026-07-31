@@ -6,7 +6,7 @@ import insight.canon.api;
 import insight.canon.spi; // the composed row types (StructuralRoleRow / IntentMarkerRow / LocationRow)
 import insight.canon.compose; // ComposedSemantics
 
-// semantic_walkers.cpp — the dialect-recognition ALGORITHMS over the composed vocabulary (ADR 0024
+// semantic_walkers.cpp — the dialect-recognition ALGORITHMS over the composed vocabulary (ADR-17
 // §3). Canon owns these algorithms; the composed rows (from the semantic packages) are the DATA.
 // Homed as a facade impl unit (module insight.canon) because they consume ComposedSemantics, which
 // imports api — so they cannot live in api. Ported byte-for-byte from the pre-split hardcoded
@@ -17,7 +17,7 @@ namespace insight
 {
 namespace
 {
-    // NO row-gate predicate here any more (ADR 0065 clause 2). The dialect gate is evaluated ONCE,
+    // NO row-gate predicate here any more (ADR-22). The dialect gate is evaluated ONCE,
     // at `resolve_stream`, and filtered into the view these walkers receive — so a row that is in
     // the table is a row that fires, and there is nothing left to test per line. What this removed
     // is not a compare: it is a DETERMINISM hazard. The old gate argument was
@@ -190,7 +190,7 @@ namespace tokenization
 
     namespace
     {
-        // The NumericFieldThenRemainder grammar (grammar-5, ADR 0069), over the content past a
+        // The NumericFieldThenRemainder grammar (grammar-5, ADR-17), over the content past a
         // matched prefix: a non-empty run of ASCII digits, a single ':', then the payload — which
         // ENDS AT THE FIRST '\r', and from which a trailing `[…]` option group is then dropped.
         // nullopt on any shape failure, including an empty payload: a declined row is the whole
@@ -270,7 +270,7 @@ namespace tokenization
             return std::nullopt;
         }
 
-        // grammar-2 payload exclusion (ADR 0025 / studies/006): an entry excludes when it equals
+        // grammar-2 payload exclusion (ADR-17 / studies/006): an entry excludes when it equals
         // the payload or is its leading space-delimited token — `stage` excludes `stage` and `node`
         // excludes `node {`, while `stages` stays a step (word boundary). Matches the spike's
         // first-token/whole-body semantics.
@@ -310,7 +310,7 @@ namespace tokenization
         if (best == nullptr)
             return {};
         // The payload is the extractor's capture, verbatim; the class (canonicalize_intent) is
-        // derived downstream, the discriminant here (the ADR 0023 raw coordinate).
+        // derived downstream, the discriminant here (the ADR-18 raw coordinate).
         return {.kind = best->kind,
                 .name = best_payload,
                 .discriminant = discriminant_of(best_payload),

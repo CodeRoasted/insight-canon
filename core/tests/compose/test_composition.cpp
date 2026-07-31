@@ -1,5 +1,5 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_composition.cpp — the composition CONTRACT (ADR 0024 §3/§4), canon's semantic-unaware
+// test_composition.cpp — the composition CONTRACT (ADR-17), canon's semantic-unaware
 // machinery, over SYNTHETIC manifests. Three permanent properties the §10 gates name:
 //   • G-SP-5 fail-closed — an exact-duplicate key across packages is a BUILD error (constexpr
 //     find_conflict, static_assert'd here) AND a startup FATAL (the runtime compose,
@@ -10,7 +10,7 @@
 //     components.
 //   • semantic_identity is a reproducible, order-independent, CONTENT hash — the II-7 comparability
 //   key
-//     that REPLACES the retired kIntentRegistryVersion literal (ADR 0024 §4.1). This is the
+//     that REPLACES the retired kIntentRegistryVersion literal (ADR-17). This is the
 //     unit-level G-SP-4 guard; the cross-build / cross-OS leg is Argos's CI (det_public_proof).
 // Determinism: byte-only; the hash is truncated-SHA-256 over a fixed-endian canonical
 // serialization, order-independent by construction (compose sorts packages by name). No

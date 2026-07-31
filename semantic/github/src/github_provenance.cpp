@@ -5,19 +5,19 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.spi;
 
-// github_provenance.cpp — the GitHub-Actions dialect CODE TIER (ADR 0024 §2.3). What remains is the
+// github_provenance.cpp — the GitHub-Actions dialect CODE TIER (ADR-17). What remains is the
 // echoed-source provenance hook and the command-echo SGR grammar it walks. Self-contained: only api
 // + spi + std — never a sealed detail shard.
 //
-// ⚠ THE FORMAT STRATEGY IS GONE (T4 — ADR 0044 §8, ADR 0063 clause 6 item 1). `GitHubActionsStrategy`
+// ⚠ THE FORMAT STRATEGY IS GONE (T4 — ADR-23, ADR-22). `GitHubActionsStrategy`
 // DETECTED a per-line RFC 3339 stamp and peeled it. That stamp is a property of GitHub's *delivery*,
-// not of the GHA *dialect* (ADR 0044 §3): the format of a GHA job log is `RawText` and always was,
-// and the dialect is the workflow-command VOCABULARY over it (ADR 0064 clause 1). The peel is now
+// not of the GHA *dialect* (ADR-23): the format of a GHA job log is `RawText` and always was,
+// and the dialect is the workflow-command VOCABULARY over it (ADR-22). The peel is now
 // DECLARED — `IngestDeclaration{.stack = {"api-rfc3339-line-prefix"}}`, unwound by
 // `TransportStack::peel` before canon sees the line — so nothing here detects anything.
 //
 // The deleted decision function is not lost: it is FROZEN VERBATIM into
-// `core/tests/transport/test_transport_peel_equivalence_gate.cpp` (ADR 0062; re-homed to core per
+// `core/tests/transport/test_transport_peel_equivalence_gate.cpp` (ADR-8; re-homed to core per
 // corpus_backed_gates.md § 5 — the SUT is core's peel and the oracle is inline), where it still
 // scores the declared peel over 4 082 logs / 22 490 937 lines. That gate is the provenance record;
 // `git log` of this file is not.
@@ -25,7 +25,7 @@ import insight.canon.spi;
 // CONSEQUENCE, stated because it is a real cost and not a tidiness: `kManifest.strategy` is now
 // nullptr, so `ComposedPackage::has_strategy` is FALSE for github while `has_echoed_source` stays
 // true. This package's code tier is one provenance hook — a byte predicate, not a grammar — which is
-// what makes the dialect DATA-ONLY (ADR 0065 clause 5: a generator can only generate from data).
+// what makes the dialect DATA-ONLY (ADR-22: a generator can only generate from data).
 
 namespace insight::semantic::github
 {
@@ -75,7 +75,7 @@ namespace
 // (`0`/empty/`39`) — with no un-wrapped visible bytes outside the span. Operates on the RAW line
 // (ANSI intact). Byte-exact state machine (F5).
 //
-// ⚠ THE LEADING-STAMP SKIP IS RIPPED (T4 — ADR 0044 §8 item 5). This predicate used to begin by
+// ⚠ THE LEADING-STAMP SKIP IS RIPPED (T4 — ADR-23). This predicate used to begin by
 // calling `is_github_actions_prefix` and, on a hit, skipping 28 bytes plus one separator space, so
 // it could recognize an echo on a still-stamped line. That was the fifth of the strategy's bundled
 // behaviors and it was a DETECTION: a per-line content test deciding where the visible content

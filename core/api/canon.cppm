@@ -2,19 +2,19 @@
 // `import insight.canon;` unchanged. Re-exports the public api surface; the
 // insight.canon.detail.{scan,strategy,mask,parse} shards are NOT re-exported (sealed, build-only).
 // Tokenizer lives HERE (not in api): its impl needs LogParser/the masker from the detail shards,
-// which import api — homing it above detail breaks the api↔detail cycle (the ADR-0002 facade seam).
+// which import api — homing it above detail breaks the api↔detail cycle (the ADR-3 facade seam).
 // The Tokenizer decl uses only api types (ArenaAllocator/MaskConfig/CanonicalEvent) + std;
 // tokenizer_engine.cpp (module insight.canon) imports detail.{strategy,mask,parse} in its purview.
 export module insight.canon;
 import insight.canon.internal; // std (expected/unique_ptr/vector/span/string for the Tokenizer decl)
 export import insight.canon.api; // public surface (types, det_math, arena, ...)
-// compose()/ComposedSemantics (ADR 0024 §3/§4) — Tokenizer takes it. The comment sits ABOVE the
+// compose()/ComposedSemantics (ADR-17) — Tokenizer takes it. The comment sits ABOVE the
 // directive deliberately: as a trailing comment it pushed the line past the column limit, and the
 // formatter then wrapped the MODULE NAME across lines. gcc-15 rejects that (a module-import
 // directive is one logical line); clang-21 accepts it, so the break reaches only the ship
 // toolchain. Keep this line short enough that no formatter has a reason to touch it.
 export import insight.canon.compose;
-// The transport vocabulary (ADR 0044): IngestDeclaration, the catalogue, and the stream-scoped
+// The transport vocabulary (ADR-23): IngestDeclaration, the catalogue, and the stream-scoped
 // peel. Re-exported because a CONSUMER declares the stack — it is the caller's provenance, not a
 // package's data. Same short-line discipline as the directive above (gcc-15 rejects a module name
 // wrapped across lines).
@@ -24,14 +24,14 @@ export import insight.canon.transport;
 export namespace insight::tokenization
 {
 
-// ── Composed-semantics walkers (ADR 0024 §3/§4) ──────────────────────────────────────────────────
+// ── Composed-semantics walkers (ADR-17) ──────────────────────────────────────────────────────────
 // The dialect-recognition mechanisms, homed in the facade (not api) because they consume the
 // composed tables — ComposedSemantics lives in insight.canon.compose, which imports api, so a
 // walker in api would close a cycle. Canon owns the ALGORITHM; the composed rows are the DATA.
 // Byte-for-byte equivalent to the pre-split hardcoded StructuralRoleRegistry / IntentMarkerRegistry
 // / recognize_location.
 
-// ⚠ NO DIALECT COORDINATE, ON ANY OF THEM (ADR 0065 clause 2). `composed` is the RESOLVED STREAM's
+// ⚠ NO DIALECT COORDINATE, ON ANY OF THEM (ADR-22). `composed` is the RESOLVED STREAM's
 // view — `resolve_stream` filtered the declared dialect and channel into it once, before the first
 // line — so a row that is in the table is a row that fires. Re-introducing a per-line format or
 // dialect argument here would restore the content dependence T4 removed: the argument used to be
@@ -65,7 +65,7 @@ classify(NormalizedContent content, const insight::semantic::ComposedSemantics& 
 class Tokenizer
 {
   public:
-    // No default composition in core (ADR 0024 §3): every binary declares its package set and
+    // No default composition in core (ADR-17): every binary declares its package set and
     // threads the ComposedSemantics (which the Tokenizer does NOT own — it must outlive the
     // Tokenizer).
     explicit Tokenizer(ArenaAllocator& arena, MaskConfig mask_config,
@@ -103,7 +103,7 @@ class Tokenizer
 export namespace insight
 {
 
-// ── Run-outcome recognition + resolution (ADR 0025 / insight_run_outcome_model.md §3–§4) ────────
+// ── Run-outcome recognition + resolution (ADR-17 / insight_run_outcome_model.md §3–§4) ──────────
 // Canon owns the ALGORITHMS (the format-gated token map, the console-tail scan, the D-OUT-RUN-1
 // precedence resolver); the composed OutcomeTokenRow/OutcomeMarkerRow sets are the DATA. Homed in
 // the facade (they consume ComposedSemantics; the scan drives the sealed LogParser).
@@ -121,7 +121,7 @@ map_outcome_token(std::string_view token,
 // parse-only pass (no masking): per line, the resolved view's OutcomeMarkerRow set is walked and the
 // LONGEST matching prefix wins within the line; the LAST such line wins across the log.
 //
-// Longest-prefix-wins is grammar-5 (ADR 0069) and it replaces "the last row that matched overwrites"
+// Longest-prefix-wins is grammar-5 (ADR-17) and it replaces "the last row that matched overwrites"
 // — a walk whose winner was a function of DECLARATION ORDER. GitLab needs
 // `ERROR: Job failed: canceled` (Aborted) to beat `ERROR: Job failed` (Failure), and resolving that
 // by where the rows sit in an array is a silent coupling of a verdict to a package's formatting.
@@ -133,7 +133,7 @@ map_outcome_token(std::string_view token,
 // outcome-bearing routed format, and the matched marker line's routed format — whose only job was
 // to gate `map_outcome_token` afterwards. Both were per-line detector outputs, so the resolution a
 // side-input token got depended on the stream's CONTENT; under a declared dialect the vocabulary is
-// fixed before the first line and the fields have nothing left to carry (ADR 0065 clause 2).
+// fixed before the first line and the fields have nothing left to carry (ADR-22).
 struct RunOutcomeScan
 {
     bool marker_present{false};
@@ -142,7 +142,7 @@ struct RunOutcomeScan
     // PrefixIsVerdict row — that shape has no remainder token by construction, and `verdict` below
     // carries its answer instead.
     std::string token;
-    // The winning PrefixIsVerdict row's own RunOutcome (grammar-5, ADR 0069). Engaged EXACTLY when
+    // The winning PrefixIsVerdict row's own RunOutcome (grammar-5, ADR-17). Engaged EXACTLY when
     // the console tail resolved off the row rather than off a token, so the resolver never has to
     // ask which shape won — it prefers this and falls back to mapping `token`, and the
     // "console verdict is not in the composed vocabulary" fail-closed note stays reachable for the

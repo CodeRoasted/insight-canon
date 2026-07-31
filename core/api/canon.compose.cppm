@@ -1,5 +1,5 @@
 // insight.canon.compose — static composition of semantic packages into a ComposedSemantics
-// (ADR 0024 §3/§4). The consumer binary names its composition ONCE —
+// (ADR-17). The consumer binary names its composition ONCE —
 // `compose(std::array{github::kManifest, test_frameworks::kManifest})` — and threads the result
 // into every Tokenizer. Composition is:
 //   - STATIC: fixed by which manifests the call names (no dynamic loading).
@@ -104,7 +104,7 @@ class ComposedSemantics
     {
         return locations_;
     }
-    // The christened ValueClassRegistry (ADR 0024 §5): the composed view over the package
+    // The christened ValueClassRegistry (ADR-17): the composed view over the package
     // ValueClassRow seat. In 1.7.5 no package ships a value class (we do not build dormant
     // vocabulary), so this is empty — the UNIVERSAL value concepts (kOrdinalFieldCatalog /
     // kOtelFieldCatalog / the KEEP lexicons) stay core (the ratified rule), consumed directly. The
@@ -115,7 +115,7 @@ class ComposedSemantics
     {
         return value_classes_;
     }
-    // The run-outcome vocabulary (grammar-2, ADR 0025): the composed dialect verdict maps + the
+    // The run-outcome vocabulary (grammar-2, ADR-17): the composed dialect verdict maps + the
     // console-tail markers. Consumed by map_outcome_token / scan_run_outcome / resolve_run_outcome.
     [[nodiscard]] std::span<const OutcomeTokenRow> outcome_tokens() const noexcept
     {
@@ -125,7 +125,7 @@ class ComposedSemantics
     {
         return outcome_markers_;
     }
-    // ADR 0029 D5 — the composed INTENT CHANNEL vocabulary: every channel any package declares.
+    // ADR-22 — the composed INTENT CHANNEL vocabulary: every channel any package declares.
     // This is the closed set a caller's `--channel` is validated against, and the list an unknown
     // channel's error names.
     [[nodiscard]] std::span<const std::string_view> channels() const noexcept
@@ -133,9 +133,9 @@ class ComposedSemantics
         return channels_;
     }
 
-    // ── The STREAM view: dialect × channel, filtered ONCE (ADR 0029 D1/D2/D5, ADR 0065 clause 2) ──
+    // ── The STREAM view: dialect × channel, filtered ONCE (ADR-22, ADR-22) ──
     // Build the vocabulary ONE stream declares, at stream open. Both coordinates are the caller's
-    // provenance facts, never auto-detected (canon VERIFIES, it does not infer — ADR 0030 D2): a
+    // provenance facts, never auto-detected (canon VERIFIES, it does not infer — ADR-22): a
     // content heuristic decides from a PREFIX of the stream, so a later line can contradict an
     // earlier decision ⇒ content non-determinism the moment the stream is chunked.
     //
@@ -149,7 +149,7 @@ class ComposedSemantics
     //   * `kAnyDialect` / `kAnyChannel` rows survive every filter, so a universal role row and a
     //     single-materialization dialect are untouched.
     //
-    // ⚠ THE DIALECT FILTER IS A DETERMINISM FIX, not tidiness (ADR 0065 clause 2). Before T4 the
+    // ⚠ THE DIALECT FILTER IS A DETERMINISM FIX, not tidiness (ADR-22). Before T4 the
     // gate was `LogParser::routed_format()` — the per-line detector winner, served by a STICKY
     // strategy — so WHICH DECLARED ROWS FIRED WAS A FUNCTION OF CONTENT. Under a stream-scoped
     // declaration it is fixed before the first line. Anything that reintroduces a per-line format
@@ -179,14 +179,14 @@ class ComposedSemantics
     [[nodiscard]] ComposedSemantics for_stream(std::string_view declared_dialect,
                                                std::string_view declared_channel) const;
 
-    // Would declaring an IntentChannel unlock recognition this view is withholding? (ADR 0029 D5's
+    // Would declaring an IntentChannel unlock recognition this view is withholding? (ADR-22's
     // diagnostic.) True iff some marker row of THIS VIEW'S DECLARED DIALECT is channel-gated to a
     // channel that `declared_channel` does not admit — i.e. this dialect HAS materializations and
     // the caller has not said which one it acquired, so depth is being withheld and saying so would
     // unlock it.
     //
     // The dialect is no longer a parameter: it is the coordinate this view was resolved for
-    // (ADR 0065 clause 2). Asking the question against a view resolved for a DIFFERENT dialect was
+    // (ADR-22). Asking the question against a view resolved for a DIFFERENT dialect was
     // never meaningful, and passing it separately made that mistake expressible.
     //
     // A narrow QUERY, deliberately not an `all_markers()` accessor: exposing the unfiltered table
@@ -230,7 +230,7 @@ class ComposedSemantics
     // the declared (dialect, channel); a freshly composed vocabulary is the UNSPECIFIED view on
     // BOTH axes, so only kAnyDialect / kAnyChannel rows fire until a caller declares.
     //
-    // Fail-closed has to be the DEFAULT, not an opt-in a caller can forget (ADR 0029 D5's promoted
+    // Fail-closed has to be the DEFAULT, not an opt-in a caller can forget (ADR-22's promoted
     // MUST — a safety default that must be requested is not a default). That is why the accessors
     // expose the VIEW and the unfiltered tables below are private: if the full set were the public
     // `markers()`, the default composition would fire BOTH GHA Step rows at once (the phantom
@@ -253,14 +253,14 @@ class ComposedSemantics
 
     // The dialect this view was resolved for; empty = Unspecified. Not a copy of caller state for
     // its own sake — `withholds_markers_for` needs it to ask its question about the RIGHT dialect
-    // now that the dialect has stopped being a per-call parameter (ADR 0065 clause 2).
+    // now that the dialect has stopped being a per-call parameter (ADR-22).
     std::string_view declared_dialect_;
 
     // Dialect-independent (no gate on these row kinds), so they are carried verbatim through every
     // view.
     std::vector<LocationRow> locations_;
     std::vector<ValueClassRow> value_classes_;
-    std::vector<std::string_view> channels_; // ADR 0029 — the composed declared channel vocabulary
+    std::vector<std::string_view> channels_; // ADR-22 — the composed declared channel vocabulary
     std::vector<StrategyFactory> strategies_;
     std::vector<ProvenanceHook> provenance_hooks_;
     std::vector<ComposedPackage> packages_;
@@ -268,7 +268,7 @@ class ComposedSemantics
     std::array<std::uint8_t, kSemanticIdentityBytes> identity_{};
 };
 
-// ── The per-stream resolution of an IngestDeclaration (ADR 0044 §6) ──────────────────────────────
+// ── The per-stream resolution of an IngestDeclaration (ADR-23) ───────────────────────────────────
 // What ONE stream analyzes with: the channel-filtered vocabulary and the resolved transport stack.
 // Move-only, because ComposedSemantics is.
 struct ResolvedStream
@@ -280,13 +280,13 @@ struct ResolvedStream
 // Resolve a declaration against a composition — the ONE call a caller makes at stream open, and the
 // only place the three declared coordinates are checked together.
 //
-// CANON VERIFIES, NEVER INFERS (ADR 0030's split, not reopened). Each coordinate fails closed on an
+// CANON VERIFIES, NEVER INFERS (ADR-22's split, not reopened). Each coordinate fails closed on an
 // UNKNOWN value, naming the known vocabulary, and degrades on an ABSENT one:
 //   * `dialect`   — must name a composed package; unknown ⇒ hard error listing the composed names.
-//                   VERIFIED and GATING since T4 (ADR 0065): the row-level dialect gate is applied
+//                   VERIFIED and GATING since T4 (ADR-22): the row-level dialect gate is applied
 //                   HERE, once, and filtered into the view, so no walker below ever sees a dialect
 //                   coordinate. Absent ⇒ every concretely-gated row drops — fail-closed on DEPTH.
-//   * `channel`   — same construction, same call; the fail-closed posture is ADR 0029 D5's and is
+//   * `channel`   — same construction, same call; the fail-closed posture is ADR-22's and is
 //                   unchanged here.
 //   * `stack`     — delegated to resolve_transport_stack(); unknown transform ⇒ hard error listing
 //                   the catalogue.
@@ -325,7 +325,7 @@ namespace detail
     // concrete. Answering either question with the other's predicate fails closed in one direction
     // and fails OPEN in the other.
     //
-    // There is no longer a RECOGNITION-time gate predicate at all (ADR 0065 clause 2): the dialect
+    // There is no longer a RECOGNITION-time gate predicate at all (ADR-22): the dialect
     // is evaluated ONCE, at stream resolution, and filtered into the view, so the walkers walk a
     // plain row span with no gate left to test. The `gate_matches` that used to live here — the
     // per-line `row_gate == kAnyFormat || row_gate == line_format` every walker shared — is gone
@@ -369,7 +369,7 @@ namespace detail
 
 namespace detail
 {
-    // The outcome-token variant of first_prefix_dup: keyed on .token + intersecting gate (ADR 0025
+    // The outcome-token variant of first_prefix_dup: keyed on .token + intersecting gate (ADR-17
     // §3.3 — two packages mapping the SAME token under intersecting gates is a conflict, whatever
     // the mapped outcome; a duplicate row has no deterministic resolution either way).
     [[nodiscard]] constexpr std::optional<std::string_view>
@@ -428,7 +428,7 @@ constexpr ConflictInfo find_conflict(std::span<const SemanticPackageManifest> pa
 
 } // namespace insight::semantic
 
-// ── The level-lift walker (ADR 0063 clause 2) ────────────────────────────────────────────────────
+// ── The level-lift walker (ADR-22) ───────────────────────────────────────────────────────────────
 // The last row kind whose matching algorithm lived in a semantic PACKAGE: `LevelLiftRow` was walked
 // by the GitHub-Actions strategy over its own `kLevelLifts` array, inside `parse()`. Canon owns the
 // ALGORITHM for every other row kind (classify / recognize / recognize_location / map_outcome_token
@@ -450,7 +450,7 @@ export namespace insight::tokenization
 // carries wins. Unknown when no row matches — which is the caller's signal to keep whatever level
 // the strategy inferred, never a level in its own right.
 //
-// No dialect parameter (ADR 0065 clause 2): `composed` is already the resolved stream's view, so a
+// No dialect parameter (ADR-22): `composed` is already the resolved stream's view, so a
 // row that is present is a row that fires. This is what removed the live determinism hazard — the
 // gate used to be `LogParser::routed_format()`, a per-line detector winner under a sticky strategy,
 // so which DECLARED rows fired was a function of content.

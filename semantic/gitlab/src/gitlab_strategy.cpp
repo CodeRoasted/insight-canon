@@ -5,7 +5,7 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.spi;
 
-// gitlab_strategy.cpp — the GitLab CI dialect CODE TIER (ADR 0024 §2.3): the format strategy. Like
+// gitlab_strategy.cpp — the GitLab CI dialect CODE TIER (ADR-17): the format strategy. Like
 // Jenkins and unlike GHA, a GitLab trace has no single uniform line shape across runner generations,
 // so the strategy is LINE-SELECTIVE — it claims exactly the shapes this dialect marks, and
 // everything else falls through (typically to RawText):

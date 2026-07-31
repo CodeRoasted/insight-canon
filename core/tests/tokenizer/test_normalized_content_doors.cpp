@@ -77,7 +77,7 @@ TEST(NormalizedContentDoors, DeclaredPeelYieldsTypedContentAndObservationTime)
     EXPECT_TRUE(peeled.observation_time.has_value())
         << "the declared LinePrefixTimestamp must extract the observation time";
 
-    // The blank-drop survives the typed door (ADR 0044 §8's bundled decline).
+    // The blank-drop survives the typed door (ADR-23's bundled decline).
     const NormalizedLine bare{normalize("2026-04-15T22:20:38.2879579Z ", scratch)};
     EXPECT_TRUE(stack.peel(bare).is_blank());
 

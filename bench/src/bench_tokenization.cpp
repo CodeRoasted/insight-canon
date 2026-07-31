@@ -1,5 +1,5 @@
 // NOLINTBEGIN
-// Tokenization throughput benchmark — two arms (ADR 0024 / SP-5).
+// Tokenization throughput benchmark — two arms (ADR-17 / SP-5).
 //
 // Measures end-to-end Tokenizer::process_line() cost — stateless per-line template
 // masking plus arena-backed CanonicalEvent emission — on a synthetic Zipf-ish corpus.

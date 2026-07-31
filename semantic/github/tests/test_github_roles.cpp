@@ -1,5 +1,5 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_github_roles.cpp — the GitHub-Actions STRUCTURAL-ROLE vocabulary (ADR 0024). Migrated from
+// test_github_roles.cpp — the GitHub-Actions STRUCTURAL-ROLE vocabulary (ADR-17). Migrated from
 // canon tests/utils/test_structural_role.cpp: the classification MECHANISM
 // (insight::tokenization::classify, longest-match over the composed role rows) is CANON's; the
 // VOCABULARY — `##[group]`/`::group::` → GroupBegin, `##[endgroup]`/`::endgroup::` → GroupEnd,
@@ -30,7 +30,7 @@ using insight::tokenization::Tokenizer;
 
 namespace
 {
-// The RESOLVED view of a stream declaring this dialect (ADR 0065 clause 2).
+// The RESOLVED view of a stream declaring this dialect (ADR-22).
 [[nodiscard]] ComposedSemantics github_only()
 {
     const std::array manifests{insight::semantic::github::kManifest};
@@ -89,7 +89,7 @@ TEST(GithubRoles, NoFalseRoleOnPlainContent)
     EXPECT_EQ(classify(norm_probe("error: undefined reference to foo"), gh), StructuralRole::None);
 }
 
-// ── End-to-end, over the DECLARED path (ADR 0044 §4/§6, T4): the caller resolves a stream, peels
+// ── End-to-end, over the DECLARED path (ADR-23, T4): the caller resolves a stream, peels
 // the transport, and hands only `RawPeeledLine::content` to the Tokenizer, which then tags the role
 // on CanonicalEvent.
 //

@@ -1,4 +1,4 @@
-// Custom benchmark entry point for insight_canon_bench (the composed harness, ADR 0024).
+// Custom benchmark entry point for insight_canon_bench (the composed harness, ADR-17).
 
 #include <benchmark/benchmark.h>
 #include <spdlog/spdlog.h>

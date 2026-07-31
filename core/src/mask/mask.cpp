@@ -160,7 +160,7 @@ namespace
     // diagnostic-composite segment walk (call site A, below) and the standalone
     // `normalize_ephemeral_root` (call site B) — adding a root here extends both with no second
     // edit (the kCurrencyMarkers discipline). Masking-only, no semantics ⇒ canon CORE, not a
-    // dialect package (ADR 0024 cl.4: kCanonicalizationVersion IS the core masking generation).
+    // dialect package (ADR-17 cl.4: kCanonicalizationVersion IS the core masking generation).
     // See technical_docs/adr/016-canon-canonicalization-internals.md.
 
     enum class RootAnchor : std::uint8_t
@@ -185,7 +185,7 @@ namespace
     // The declared roots, segment-wise (a root is components, never a string containing '/', so it
     // matches segment-wise). Each backing array has static storage so the spans are
     // constexpr-valid. `anchor`/`scope` are EXPLICIT, never inferred: a mis-spelled root that
-    // silently floated would over-mask, and over-masking destroys signal irrecoverably (ADR 0013) —
+    // silently floated would over-mask, and over-masking destroys signal irrecoverably (ADR-9) —
     // the dangerous axes are named on purpose.
     inline constexpr std::array<std::string_view, 1> kRootTmp{{std::string_view{"tmp"}}};
     inline constexpr std::array<std::string_view, 2> kRootVarTmp{

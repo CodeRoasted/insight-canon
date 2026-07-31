@@ -5,7 +5,7 @@ import insight.canon.internal;
 import insight.canon.api; // LogLevel / LogFormat
 import insight.canon.spi; // LevelLiftRow
 
-// level_lift.cpp — the LEVEL-LIFT algorithm over the composed vocabulary (ADR 0063 clause 2).
+// level_lift.cpp — the LEVEL-LIFT algorithm over the composed vocabulary (ADR-22).
 // Canon owns the algorithm; the composed `LevelLiftRow` set (from the semantic packages) is the
 // DATA — the same split `semantic_walkers.cpp` applies to classify / recognize /
 // recognize_location.
@@ -18,7 +18,7 @@ import insight.canon.spi; // LevelLiftRow
 // stream that declared it, which is the structural equivalent of the package walk being reachable
 // only through the GHA strategy.
 //
-// NO GATE PARAMETER (ADR 0065 clause 2). The dialect is evaluated once, at `resolve_stream`, and
+// NO GATE PARAMETER (ADR-22). The dialect is evaluated once, at `resolve_stream`, and
 // filtered into this view. The intermediate shape — a `format` argument fed from
 // `LogParser::routed_format()` — was a live determinism hazard: the routed format is the per-line
 // detector winner under a sticky-strategy fast path, so which DECLARED rows fired was a function of

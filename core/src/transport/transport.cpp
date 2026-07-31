@@ -4,7 +4,7 @@ module insight.canon.transport;
 import insight.canon.internal;
 import insight.canon.api;
 
-// transport.cpp — the transform ALGORITHMS and the fail-closed declaration resolution (ADR 0044
+// transport.cpp — the transform ALGORITHMS and the fail-closed declaration resolution (ADR-23
 // §4/§6). Canon owns every algorithm; the catalogue owns only rows. A new transform kind is a
 // catalogue-version bump with its algorithm landing here, never a package-local peel.
 
@@ -28,7 +28,7 @@ namespace
     //
     // Shape-checked rather than width-trusted, and that is the DECLARED RULE, not a detection:
     // "remove these bytes IF they are a stamp of this shape" is one total rule whose effect is
-    // nothing on a line that does not carry one (ADR 0044 §2). Trusting the width blindly would
+    // nothing on a line that does not carry one (ADR-23). Trusting the width blindly would
     // corrupt every non-conforming line instead of leaving it alone, which is a worse reading of
     // the same declaration — and it would make a single unstamped line silently shift the whole
     // template.
@@ -158,7 +158,7 @@ namespace
                   << name << "\". The catalogue (" << kTransportCatalogVersion << ") declares: ";
         for (std::size_t i{0}; i < kTransportCatalogRows.size(); ++i)
             std::cerr << (i == 0 ? "" : ", ") << '"' << kTransportCatalogRows[i].name << '"';
-        std::cerr << ".\nA transport stack is caller-declared provenance (ADR 0044 §6), never "
+        std::cerr << ".\nA transport stack is caller-declared provenance (ADR-23), never "
                      "guessed: canon VERIFIES, it does not infer. An unknown transform is a "
                      "MISTAKE and fails closed here; an ABSENT stack is a CHOICE and peels "
                      "nothing. Declare one of the names above, or none.\n";

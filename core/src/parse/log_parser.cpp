@@ -47,7 +47,7 @@ is_echoed_source(std::string_view raw_line,
                                { return hook(raw_line); });
 }
 
-// The DECLARED level lift (ADR 0063 clause 2): the resolved view's LevelLiftRow set is canon-walked
+// The DECLARED level lift (ADR-22): the resolved view's LevelLiftRow set is canon-walked
 // here and OVERRIDES whatever level the strategy inferred — reproducing the pre-relocation
 // precedence exactly, where the GHA strategy consulted its own kLevelLifts array first and fell
 // back to `infer_leading_log_level` only when no row matched.
@@ -59,8 +59,8 @@ is_echoed_source(std::string_view raw_line,
 //   * BEFORE the echoed-source demotion — an echoed-source line is script text, not an observed
 //     event, so SRC-D-PROV-1 drives its level to Unknown unconditionally. That demotion outranked
 //     the lift when the lift lived inside parse(), and it must keep outranking it.
-// An UNDECLARED stream's view carries no concretely-gated level-lift row at all (ADR 0065 clause
-// 2), so the walk is over an empty span and costs nothing — the dialect gate is not tested here,
+// An UNDECLARED stream's view carries no concretely-gated level-lift row at all (ADR-22.D6),
+// so the walk is over an empty span and costs nothing — the dialect gate is not tested here,
 // because it was tested once at `resolve_stream` and the row is either in this view or it is not.
 // That is what makes the lift independent of per-line format detection.
 //

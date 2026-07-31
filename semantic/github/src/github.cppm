@@ -1,5 +1,5 @@
 // insight.semantic.github — the GitHub Actions / Azure Pipelines dialect semantic package
-// (ADR 0024). VOCABULARY as DATA in the closed canon rule grammar (structural roles, intent
+// (ADR-17). VOCABULARY as DATA in the closed canon rule grammar (structural roles, intent
 // markers, level lifts) + the CODE tier (the dialect format strategy + the echoed-source provenance
 // hook). Fully self-contained: imports only insight.canon.api (types + utils) + insight.canon.spi
 // (the provider contract) — never a sealed detail shard. The composition
@@ -22,9 +22,9 @@ namespace insight::semantic::github
 // bool(string_view) noexcept). Declared here so kManifest can take its address.
 //
 // There is NO strategy factory any more (T4): `GitHubActionsStrategy` detected and peeled GitHub's
-// per-line delivery stamp, and that peel is now DECLARED transport (ADR 0044 §3/§8 —
+// per-line delivery stamp, and that peel is now DECLARED transport (ADR-23 —
 // `api-rfc3339-line-prefix`). This package's code tier is one byte predicate, so the dialect is
-// DATA: rows plus canon's walkers ARE the GHA parser (ADR 0065 clause 5).
+// DATA: rows plus canon's walkers ARE the GHA parser (ADR-22).
 export bool is_echoed_source(std::string_view raw_line) noexcept;
 
 // The dialect NAME every gated row below carries, and the name a caller declares
@@ -55,7 +55,7 @@ inline constexpr std::array<StructuralRoleRow, 6> kRoles{{
     {.prefix = "::error::", .role = insight::StructuralRole::Terminator, .dialect_gate = kAnyDialect},
 }};
 
-// ── The declared INTENT CHANNEL vocabulary (ADR 0030 D1/D3) ──
+// ── The declared INTENT CHANNEL vocabulary (ADR-22) ──
 // `Medium = IntentFormat × IntentChannel`. GHA is ONE IntentFormat that canon receives in TWO
 // materializations — but they are NOT two channels GitHub serves, and saying so was the error ADR
 // 0030 corrects:
@@ -74,7 +74,7 @@ inline constexpr std::array<StructuralRoleRow, 6> kRoles{{
 //               for it.
 //
 // ⚠ DO NOT re-describe this pair as "two GHA materializations" or claim MATERIALIZATION INVARIANCE
-// across it (ADR 0030 D1). The pair tests canon against OUR OWN degrade(), which is a real and
+// across it (ADR-22). The pair tests canon against OUR OWN degrade(), which is a real and
 // useful property — but calling it invariance across two real materializations of a dialect is
 // exactly the endogamy trap the corpus discipline exists to prevent. The prior comment here
 // asserted a "clean partition MEASURED on 22 030 real annotated/stripped pairs"; only the ANNOTATED
@@ -118,11 +118,11 @@ export inline constexpr std::array<std::string_view, 2> kChannels{
 // ── Intent-marker rows (§1.2/§2.2) ──
 // DIALECT-GATED to this package (SRC-II-6 — `Run ` is GHA-runner-specific and would misfire
 // elsewhere). The hierarchy rides the rows: Job = Unordered (jobs parallel-by-construction), Step =
-// Ordered (steps sequential-by-YAML) — the ADR 0023 level-typed alignment declaration. The payload
+// Ordered (steps sequential-by-YAML) — the ADR-18 level-typed alignment declaration. The payload
 // is the content after the prefix, verbatim (core's canonicalize_intent/discriminant_of derive the
 // class + instance).
 //
-// CHANNEL-GATED per Step (ADR 0029 D5 — this is the phantom fix, and it REPLACES the reasoning that
+// CHANNEL-GATED per Step (ADR-22 — this is the phantom fix, and it REPLACES the reasoning that
 // used to sit here). The two Step prefixes are the same intent in two channels, so each gates to
 // ITS channel:
 //
@@ -148,7 +148,7 @@ export inline constexpr std::array<std::string_view, 2> kChannels{
 // both (both yield `yarn lint`), but ungated recognition of the *bare* prefix in the annotated
 // channel is exactly the defect. The two gated rows preserve that same-payload property under their
 // own channels — but note what it is and is not: it is canon reading our ablation back to the same
-// intent, NOT invariance across two real GHA materializations (ADR 0030 D1).
+// intent, NOT invariance across two real GHA materializations (ADR-22).
 //
 // `Complete job name: ` stays kAnyChannel: it is the banner in BOTH channels (the strip does not
 // touch it), so it has no channel-dependent reading and needs no gate — a gate is required exactly
@@ -178,7 +178,7 @@ inline constexpr std::array<IntentMarkerRow, 3> kMarkers{{
 
 // ── Generation-template rows (studies/008, shared_intent_declaration §3.2) — the WRITER dual ──
 // One emit row per recognition row, paired by (prefix, kind, dialect_gate, channel_gate) — the
-// MEDIUM is `dialect × IntentChannel` (ADR 0030 D3 / ADR 0065 clause 1), so each projection names
+// MEDIUM is `dialect × IntentChannel` (ADR-22 / ADR-22), so each projection names
 // the same dialect and channel as its dual. Both Step media are present: `##[group]Run <cmd>` materializes into the ANNOTATED
 // channel (the real one, and the writer's default), `Run <cmd>` into our STRIPPED ablation — each
 // read back to the same identity under its own channel, so the round-trip closes per channel (G2).
@@ -217,10 +217,10 @@ export struct Dialect
 static_assert(
     insight::semantic::DialectIntent<Dialect>,
     "github: a recognition marker has no paired generation row (reader without a writer), or "
-    "a reader/writer pair straddles two IntentChannels (ADR 0029 D1 — the projections must "
+    "a reader/writer pair straddles two IntentChannels (ADR-22 — the projections must "
     "name the same Medium)");
 
-// ADR 0029 D5 — the channel vocabulary and the rows that gate to it must agree, at COMPILE time,
+// ADR-22 — the channel vocabulary and the rows that gate to it must agree, at COMPILE time,
 // here.
 static_assert(
     insight::semantic::all_channels_named(kChannels),
@@ -233,7 +233,7 @@ static_assert(insight::semantic::all_channel_gates_declared(kMarkers, kEmitMarke
 // ── Level-lift rows (§1.2) ──
 // The GHA workflow-command level lift. DIALECT-GATED to this package. Pure DATA: the package
 // declares the rows, canon walks them — `insight::tokenization::lift_level` over the composed
-// `level_lifts()` table, applied by LogParser to every parsed line (ADR 0063 clause 2). Until then
+// `level_lifts()` table, applied by LogParser to every parsed line (ADR-22). Until then
 // this package's own strategy walked the array itself, which made LevelLiftRow the last row kind
 // whose algorithm lived in a package and left these rows feeding `semantic_identity` from a
 // single package-local reader. First match in DECLARED order wins, so order is content here.
@@ -265,7 +265,7 @@ inline constexpr std::array<LevelLiftRow, 8> kLevelLifts{{
      .dialect_gate = kDialect},
 }};
 
-// ── Run-outcome token rows (grammar-2, ADR 0025 §4 — the GitHub reshape) ──
+// ── Run-outcome token rows (grammar-2, ADR-17 — the GitHub reshape) ──
 // The GHA native job/run conclusion strings (`${{ needs.<job>.result }}` / the API `conclusion`),
 // mapped into the core four-class vocabulary. This RETIRES the render-side `deriveBuildStatus`
 // binary at its root: the verdict now enters the ENGINE four-class-aware through the same channel
@@ -308,7 +308,7 @@ inline constexpr std::array<OutcomeTokenRow, 7> kOutcomeTokens{{
 // semantic_identity hash, an honest comparability boundary — a diff across this boundary is
 // comparing two different recognition rulesets, and the digest says so.
 //
-// ADR 0029's rename (Sink → IntentChannel) did NOT bump this, deliberately: it renamed C++
+// ADR-22's rename (Sink → IntentChannel) did NOT bump this, deliberately: it renamed C++
 // identifiers, and what enters the digest is the channel NAMES ("annotated"/"stripped" — ruled
 // unchanged) and the row content, neither of which moved. SP-7 keys on CONTENT, not on spelling;
 // bumping for a rename would declare a new ruleset that recognizes exactly what the old one did,
@@ -320,17 +320,17 @@ export inline constexpr SemanticPackageManifest kManifest{
     .version = "1.4.0",
     .roles = kRoles,
     .markers = kMarkers,
-    .emits = kEmitMarkers, // ADR 0044 §7 — the generation projection is identity-bearing
+    .emits = kEmitMarkers, // ADR-23 — the generation projection is identity-bearing
     .level_lifts = kLevelLifts,
     .locations = {},
     .value_classes = {},
     .outcome_tokens = kOutcomeTokens,
     .outcome_markers = {},
-    .channels = kChannels, // ADR 0029 D1 — the two GHA materializations
+    .channels = kChannels, // ADR-22 — the two GHA materializations
     .echoed_source = &is_echoed_source, // the only code tier left: a byte predicate, not a grammar
 };
 
-// ADR 0065 clause 1 — every gated row names THIS package or kAnyDialect, checked at COMPILE time,
+// ADR-22 — every gated row names THIS package or kAnyDialect, checked at COMPILE time,
 // here. A gate naming another package would reach across a boundary this package does not own, and
 // a typo would produce a row that silently never fires under any declaration; composition FLATTENS,
 // so nothing downstream could tell either apart from a legitimate row.

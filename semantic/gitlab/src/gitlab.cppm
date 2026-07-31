@@ -1,4 +1,4 @@
-// insight.semantic.gitlab — the GitLab CI job-trace dialect semantic package (ADR 0024/0025/0069,
+// insight.semantic.gitlab — the GitLab CI job-trace dialect semantic package (ADR-17,
 // studies/012). VOCABULARY as DATA in the closed canon rule grammar (intent markers + run-outcome
 // rows) + the CODE tier (the dialect format strategy). Fully self-contained: imports only
 // insight.canon.api (types) + insight.canon.spi (the provider contract) — never a sealed detail
@@ -20,7 +20,7 @@
 // transport axis, never here.
 //
 // Ships NO structural-role / level-lift / location / value-class rows and NO channel vocabulary:
-// GitLab has one materialization (the degenerate kAnyChannel case, ADR 0029 D5), and studies/012
+// GitLab has one materialization (the degenerate kAnyChannel case, ADR-22), and studies/012
 // surfaced no role or location vocabulary — we do not build dormant rows (rip-dormant discipline).
 // No `echoed_source` hook either: GitLab's marker phantom is killed by ANCHORING alone (see
 // kMarkers).
@@ -39,7 +39,7 @@ namespace insight::semantic::gitlab
 export std::unique_ptr<insight::tokenization::IFormatStrategy> make_strategy();
 
 // The dialect NAME every gated row below carries, and the name a caller declares
-// (`IngestDeclaration::dialect` / `--dialect`). ADR 0065 clause 1: the gate is a composed package
+// (`IngestDeclaration::dialect` / `--dialect`). ADR-22: the gate is a composed package
 // name, never an enum, so canon knows the field and knows no value.
 export inline constexpr std::string_view kDialect{"gitlab"};
 
@@ -115,7 +115,7 @@ static_assert(
     insight::semantic::DialectIntent<Dialect>,
     "gitlab: a recognition marker has no paired generation row (reader without a writer)");
 
-// ── Run-outcome rows (ADR 0025 §4) ──
+// ── Run-outcome rows (ADR-17) ──
 // The API `status` vocabulary — what an authoritative side-input actually carries. `skipped` /
 // `manual` map to Unknown DELIBERATELY, on the Jenkins NOT_BUILT precedent: an explicit row says
 // "we know this token and it carries no verdict", where an absent row produces a fail-closed
@@ -168,18 +168,18 @@ export inline constexpr SemanticPackageManifest kManifest{
     .version = "1.0.0",
     .roles = {},
     .markers = kMarkers,
-    .emits = kEmitMarkers, // ADR 0044 §7 — the generation projection is identity-bearing
+    .emits = kEmitMarkers, // ADR-23 — the generation projection is identity-bearing
     .level_lifts = {},
     .locations = {},
     .value_classes = {},
     .outcome_tokens = kOutcomeTokens,
     .outcome_markers = kOutcomeMarkers,
-    .channels = {}, // one materialization — the degenerate kAnyChannel case (ADR 0029 D5)
+    .channels = {}, // one materialization — the degenerate kAnyChannel case (ADR-22)
     .strategy = &make_strategy,
     .echoed_source = nullptr,
 };
 
-// ADR 0065 clause 1 — every gated row names THIS package or kAnyDialect, checked at COMPILE time,
+// ADR-22 — every gated row names THIS package or kAnyDialect, checked at COMPILE time,
 // here. A gate naming another package would reach across a boundary this package does not own, and
 // a typo would produce a row that silently never fires under any declaration.
 static_assert(insight::semantic::all_dialect_gates_owned(kManifest),

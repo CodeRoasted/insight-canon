@@ -20,7 +20,7 @@ class FormatDetectorTest : public ::testing::Test
 {
   protected:
     // Degenerate (zero-package) composition: the detector registers its 18 core
-    // REPRESENTATION-format strategies (ADR 0024 — the GitHub-Actions DIALECT strategy is no longer
+    // REPRESENTATION-format strategies (ADR-17 — the GitHub-Actions DIALECT strategy is no longer
     // a builtin; it arrives via the composition, so GHA detection is now a github-package property,
     // tested in that suite).
     FormatDetector detector{insight::test_support::degenerate_composition()};

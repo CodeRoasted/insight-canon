@@ -141,7 +141,7 @@ struct TokenShape
 // cannot be function-local.
 constexpr std::size_t kBsdMinLen{15U};  // "Mon DD HH:MM:SS" minimum
 constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
-// kGhaPrefixLen + is_github_actions_prefix relocated to insight_semantic_github (ADR 0024 §1.2 —
+// kGhaPrefixLen + is_github_actions_prefix relocated to insight_semantic_github (ADR-17 —
 // GHA line-format detection is dialect knowledge). is_rfc3339_prefix below stays (Syslog uses it).
 
 // ── Composite prefix predicates ──────────────────────────────────────────
@@ -209,7 +209,7 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
            match_time_at(str, kRfc3339TimeAt);
 }
 
-// (is_github_actions_prefix relocated to insight_semantic_github — ADR 0024 §1.2.)
+// (is_github_actions_prefix relocated to insight_semantic_github — ADR-17.)
 
 // "YYYY-MM-DD HH:MM:SS" — log4j / windows_cbs / iis_w3c shape.
 // Optionally requires a trailing fractional separator ('.' or ',').
@@ -733,7 +733,7 @@ inline void sv_skip_ws(std::string_view& str) noexcept
 // CONSUMER, not just on canon's own parser, so it must be reachable — a sealed shard cannot carry a
 // precondition that external callers are required to satisfy.
 
-// ── Echoed-source detection (SRC-D-PROV-1) relocated to insight_semantic_github (ADR 0024 §1.2) ──
+// ── Echoed-source detection (SRC-D-PROV-1) relocated to insight_semantic_github (ADR-17) ──
 // The GHA command-echo SGR catalog (`\x1b[36;1m … \x1b[0m`), parse_sgr_params, and
 // is_echoed_source_line are dialect knowledge — they now live in the github package's code tier and
 // reach LogParser as a composed ProvenanceHook. The stage-1 strip stays core: it is a universal

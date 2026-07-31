@@ -7,7 +7,7 @@ import insight.canon.api;
 import insight.canon.spi;
 import insight.canon.transport;
 
-// compose.cpp — the runtime composition (ADR 0024 §3/§4). Sorts the manifest set by name (canonical
+// compose.cpp — the runtime composition (ADR-17). Sorts the manifest set by name (canonical
 // order, argument-order-independent), concatenates rows in declared order into the
 // ComposedSemantics tables, FATALS on an exact-duplicate key (the fail-closed startup invariant),
 // records longest-match shadow notes, and computes semantic_identity as SHA-256[:16] over a
@@ -95,7 +95,7 @@ namespace
             append_u8(out, static_cast<std::uint8_t>(row.role));
             append_str(out, row.dialect_gate);
         }
-        // ADR 0029: the package's declared IntentChannel vocabulary is identity — it is the closed
+        // ADR-22: the package's declared IntentChannel vocabulary is identity — it is the closed
         // set every channel_gate below is checked against, so the digest must move if the
         // vocabulary does. NB what enters the digest is the channel NAMES ("annotated"/"stripped"),
         // never the C++ spelling of the fields that carry them: identity is the RULESET's content,
@@ -112,7 +112,7 @@ namespace
             append_str_span(out, row.payload_excludes); // grammar-2: the exclusion set is identity
             append_str(
                 out,
-                row.channel_gate); // ADR 0029: the channel gate is a recognition fact ⇒ identity
+                row.channel_gate); // ADR-22: the channel gate is a recognition fact ⇒ identity
         }
         append_u32_le(out, static_cast<std::uint32_t>(pkg.level_lifts.size()));
         for (const LevelLiftRow& row : pkg.level_lifts)
@@ -138,7 +138,7 @@ namespace
             append_str(out, row.schedule_id);
             append_i64_le(out, row.scale);
         }
-        // grammar-2 (ADR 0025): the run-outcome vocabulary enters the identity — a mapping change
+        // grammar-2 (ADR-17): the run-outcome vocabulary enters the identity — a mapping change
         // honestly stales cross-artifact comparability (SP-4). Appended after the grammar-1
         // sections (fixed field order; the version string above already segregates the
         // generations).
@@ -154,7 +154,7 @@ namespace
         {
             append_str(out, row.prefix);
             append_str(out, row.dialect_gate);
-            // grammar-5 (ADR 0069): the shape discriminator and the row's own verdict. Both are
+            // grammar-5 (ADR-17): the shape discriminator and the row's own verdict. Both are
             // serialized for EVERY row, including the RemainderToken rows for which `outcome` is
             // inert — the preimage is a fixed field layout per generation, not a per-row-shape
             // union, so a row changing shape moves the digest by the field that changed rather than
@@ -162,7 +162,7 @@ namespace
             append_u8(out, static_cast<std::uint8_t>(row.shape));
             append_u8(out, static_cast<std::uint8_t>(row.outcome));
         }
-        // grammar-3 (ADR 0044 §7): the GENERATION projection enters the identity,
+        // grammar-3 (ADR-23): the GENERATION projection enters the identity,
         // field-for-field as the recognition markers do. This closes the SRC-SID-2/G4 gap — before
         // it, changing how a
         // dialect MATERIALIZES an intent left the digest untouched, so two writers could claim one
@@ -205,13 +205,13 @@ namespace
     {
         std::cerr << "FATAL: insight::semantic::compose — exact-duplicate " << conflict.kind
                   << " match key \"" << conflict.key
-                  << "\" across the composed packages. Composition fails closed (ADR 0024 §3): a "
+                  << "\" across the composed packages. Composition fails closed (ADR-17): a "
                      "duplicate rule has no deterministic resolution. Fix the package rows or gate "
                      "them.\n";
         std::terminate();
     }
 
-    // ADR 0029 D5 — an UNKNOWN IntentChannel is a hard error, distinct from an absent one. Same
+    // ADR-22 — an UNKNOWN IntentChannel is a hard error, distinct from an absent one. Same
     // fail-closed posture as a duplicate row: a clear message naming the declared vocabulary, then
     // terminate. Degrading a typo to the fallback would hand back a silently structure-less
     // analysis for what is a misspelling.
@@ -226,15 +226,15 @@ namespace
         for (std::size_t i{0}; i < declared.size(); ++i)
             std::cerr << (i == 0 ? "" : ", ") << '"' << declared[i] << '"';
         std::cerr
-            << ".\nAn IntentChannel is caller-declared provenance (ADR 0029 D2), never guessed. An "
+            << ".\nAn IntentChannel is caller-declared provenance (ADR-22), never guessed. An "
                "unknown channel is a MISTAKE and fails closed here; an ABSENT channel is a CHOICE "
                "and "
                "degrades to the raw-text fallback. Pass one of the declared names, or none.\n";
         std::terminate();
     }
 
-    // ADR 0044 §6 — an UNKNOWN declared dialect is a hard error, symmetric with an unknown channel
-    // (ADR 0029 D5) and an unknown transform. Same reasoning, three coordinates: an unknown name is
+    // ADR-23 — an UNKNOWN declared dialect is a hard error, symmetric with an unknown channel
+    // (ADR-22) and an unknown transform. Same reasoning, three coordinates: an unknown name is
     // a MISTAKE and must not share a code path with an ABSENT one, which is a CHOICE.
     [[noreturn]] void fail_unknown_dialect(std::string_view declared_dialect,
                                            std::span<const ComposedPackage> packages)
@@ -245,7 +245,7 @@ namespace
             std::cerr << "<none>";
         for (std::size_t i{0}; i < packages.size(); ++i)
             std::cerr << (i == 0 ? "" : ", ") << '"' << packages[i].name << '"';
-        std::cerr << ".\nA dialect is caller-declared provenance (ADR 0044 §6), never guessed: "
+        std::cerr << ".\nA dialect is caller-declared provenance (ADR-23), never guessed: "
                      "canon VERIFIES, it does not infer. An unknown dialect is a MISTAKE and fails "
                      "closed here; an ABSENT dialect is a CHOICE and asserts nothing. Pass one of "
                      "the names above, or none.\n";
@@ -257,7 +257,7 @@ namespace
 ResolvedStream resolve_stream(const ComposedSemantics& composed,
                               const insight::transport::IngestDeclaration& declaration)
 {
-    // Both semantic coordinates are verified and APPLIED in one construction (ADR 0065 clause 2):
+    // Both semantic coordinates are verified and APPLIED in one construction (ADR-22):
     // `for_stream` fails closed on an unknown name in either, then filters the view. This is the
     // ONE evaluation point of the dialect gate in the whole engine — nothing below the view sees
     // the coordinate, which is what makes the per-line content dependence structurally impossible
@@ -381,7 +381,7 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
     append_str(serialized, kSemanticGrammarVersion);
     append_str(serialized, insight::kCanonicalizationVersion);
 
-    // ADR 0044 §6 — the TRANSPORT CATALOGUE is identity, and the per-run DECLARATION is not. This
+    // ADR-23 — the TRANSPORT CATALOGUE is identity, and the per-run DECLARATION is not. This
     // is 0031's hash split and it is the whole quotient: the transform GRAMMAR (which transforms
     // exist and what bytes they own) is a property of the analyzing binary and belongs in the
     // comparability key; which transforms a given STREAM declared is provenance and rides to
@@ -423,7 +423,7 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
         composed.all_outcome_markers_.insert(composed.all_outcome_markers_.end(),
                                              pkg.outcome_markers.begin(),
                                              pkg.outcome_markers.end());
-        // ADR 0029 — the composed IntentChannel vocabulary. De-duplicated: two dialects may
+        // ADR-22 — the composed IntentChannel vocabulary. De-duplicated: two dialects may
         // legitimately name the same materialization, and this set is a lookup key (validating a
         // caller's --channel), not a per-package tally. Package order is canonical, so the result
         // is deterministic.
@@ -455,7 +455,7 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
     note_shadows<OutcomeMarkerRow>(composed.all_outcome_markers_, "outcome_marker",
                                    composed.report_);
 
-    // ADR 0029 D5 + ADR 0065 clause 2 — a fresh composition IS the UNSPECIFIED view on BOTH axes:
+    // ADR-22 + ADR-22 — a fresh composition IS the UNSPECIFIED view on BOTH axes:
     // nobody has declared a dialect or a channel, so every concretely-gated row stays out and only
     // kAnyDialect / kAnyChannel rows fire. A caller gets dialect depth by DECLARING (resolve_stream
     // / for_stream), which is the point: declaring is the path to depth, and the default can never

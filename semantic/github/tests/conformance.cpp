@@ -1,4 +1,4 @@
-// conformance.cpp — instantiate the canon CONFORMANCE KIT (ADR 0024 §2.3, SRC-SP-2) on THIS
+// conformance.cpp — instantiate the canon CONFORMANCE KIT (ADR-17, SRC-SP-2) on THIS
 // package's manifest. The kit is package-agnostic and canon-shipped; this file is the ENTIRE
 // per-package instantiation — the ~15-line shape an external package author copies. A failing check
 // prints its own verbose-on-failure diagnostic (which row, actual-vs-expected). Determinism:

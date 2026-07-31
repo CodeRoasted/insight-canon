@@ -8,7 +8,7 @@ import insight.canon.spi;          // OutcomeTokenRow / OutcomeMarkerRow
 import insight.canon.compose;      // ComposedSemantics
 import insight.canon.detail.parse; // LogParser — the scan is a parse-only pass (no masking)
 
-// outcome.cpp — the run-outcome ALGORITHMS over the composed grammar-2 vocabulary (ADR 0025 /
+// outcome.cpp — the run-outcome ALGORITHMS over the composed grammar-2 vocabulary (ADR-17 /
 // insight_run_outcome_model.md §3–§4). Canon owns the token map, the console-tail
 // scan, and the D-OUT-RUN-1 precedence resolver; the semantic packages own only the rows. Homed as
 // a facade impl unit (module insight.canon, the semantic_walkers.cpp precedent) because it consumes
@@ -160,7 +160,7 @@ RunOutcomeResolution resolve_run_outcome(std::string_view side_input_token,
     std::optional<RunOutcome> console_mapped;
     if (scan.marker_present)
     {
-        // grammar-5 (ADR 0069): a PrefixIsVerdict row carries its verdict on the ROW, so there is
+        // grammar-5 (ADR-17): a PrefixIsVerdict row carries its verdict on the ROW, so there is
         // nothing to map and nothing that can fail to map. The token path — and with it the
         // fail-closed note — stays exactly as it was for the RemainderToken shape, which is the only
         // shape whose verdict comes off the LINE and can therefore be outside the vocabulary.

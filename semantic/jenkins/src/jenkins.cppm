@@ -1,4 +1,4 @@
-// insight.semantic.jenkins — the Jenkins Pipeline dialect semantic package (ADR 0024/0025,
+// insight.semantic.jenkins — the Jenkins Pipeline dialect semantic package (ADR-17,
 // studies/006). VOCABULARY as DATA in the closed canon rule grammar (intent markers + run-outcome
 // rows); the code tier is EMPTY since T5 5.2 (see below). Fully self-contained: imports only
 // insight.canon.api (types) + insight.canon.spi (the provider contract) — never a sealed detail
@@ -48,7 +48,7 @@ namespace insight::semantic::jenkins
 // on 6 416 stamped lines). A re-baseline, not a regression.
 
 // The dialect NAME every gated row below carries, and the name a caller declares
-// (`IngestDeclaration::dialect` / `--dialect`). ADR 0065 clause 1: the gate is a composed package
+// (`IngestDeclaration::dialect` / `--dialect`). ADR-22: the gate is a composed package
 // name, never an enum, so canon knows the field and knows no value. Exported so a caller can name
 // this dialect without spelling a literal; `all_dialect_gates_owned` static_asserts it against the
 // manifest's `.name`.
@@ -56,7 +56,7 @@ export inline constexpr std::string_view kDialect{"jenkins"};
 
 // ── Intent-marker rows (studies/006 §Reproduction, grammar-2) ──
 // DIALECT-GATED to this package (SRC-II-6 — `[Pipeline] ` is Jenkins-runner-specific). The
-// hierarchy rides the rows (ADR 0023): STAGE is the container level (kind=Job — declared stages AND
+// hierarchy rides the rows (ADR-18): STAGE is the container level (kind=Job — declared stages AND
 // parallel/matrix `Branch:` legs co-occur, so the level matches UNORDERED, exactly like GHA matrix
 // jobs); STEP is the leaf level (Ordered — steps are sequential within their stage). The two
 // prefixes nest, so longest-VALID-match resolves a named block open to STAGE and everything else
@@ -111,7 +111,7 @@ static_assert(
     insight::semantic::DialectIntent<Dialect>,
     "jenkins: a recognition marker has no paired generation row (reader without a writer)");
 
-// ── Run-outcome rows (ADR 0025 §4, studies/006 Table 4) ──
+// ── Run-outcome rows (ADR-17, studies/006 Table 4) ──
 // The five native Jenkins `result` strings → the core four-class vocabulary. NOT_BUILT maps to
 // Unknown (the run never produced a verdict — honest, not a guess). The console-tail marker is the
 // `Finished: <RESULT>` epilogue — the DEGENERATE fallback source only (truncation-fragile, and it
@@ -152,7 +152,7 @@ export inline constexpr SemanticPackageManifest kManifest{
     .version = "1.1.0",
     .roles = {},
     .markers = kMarkers,
-    .emits = kEmitMarkers, // ADR 0044 §7 — the generation projection is identity-bearing
+    .emits = kEmitMarkers, // ADR-23 — the generation projection is identity-bearing
     .level_lifts = {},
     .locations = {},
     .value_classes = {},
@@ -161,7 +161,7 @@ export inline constexpr SemanticPackageManifest kManifest{
     .echoed_source = nullptr,
 };
 
-// ADR 0065 clause 1 — every gated row names THIS package or kAnyDialect, checked at COMPILE time,
+// ADR-22 — every gated row names THIS package or kAnyDialect, checked at COMPILE time,
 // here. A gate naming another package would reach across a boundary this package does not own, and
 // a typo would produce a row that silently never fires under any declaration.
 static_assert(insight::semantic::all_dialect_gates_owned(kManifest),

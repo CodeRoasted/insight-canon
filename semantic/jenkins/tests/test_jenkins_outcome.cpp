@@ -1,5 +1,5 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_jenkins_outcome.cpp — the Jenkins run-outcome VOCABULARY (ADR 0025 §4, studies/006 Table 4):
+// test_jenkins_outcome.cpp — the Jenkins run-outcome VOCABULARY (ADR-17, studies/006 Table 4):
 // the five native `result` strings map into the core four-class RunOutcome, and the console-tail
 // `Finished: <RESULT>` epilogue is recognized through this package's own strategy + marker row over
 // a realistic mini console (timestamper-prefixed AND bare). The D-OUT-RUN-1 LADDER mechanics are
@@ -20,7 +20,7 @@ using insight::semantic::ComposedSemantics;
 
 namespace
 {
-// The RESOLVED view of a stream that declared this dialect (ADR 0065 clause 2) — after T4 the
+// The RESOLVED view of a stream that declared this dialect (ADR-22) — after T4 the
 // concretely-gated rows are reachable only through a declaration.
 [[nodiscard]] ComposedSemantics jenkins_only()
 {

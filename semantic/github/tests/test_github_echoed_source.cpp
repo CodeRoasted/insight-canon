@@ -1,5 +1,5 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_github_echoed_source.cpp — the GitHub-Actions echoed-source CODE TIER (ADR 0024 §2.3.2,
+// test_github_echoed_source.cpp — the GitHub-Actions echoed-source CODE TIER (ADR-17,
 // SRC-D-PROV-1). Migrated from canon tests/parse/test_echoed_source.cpp. Two altitudes:
 //   1. RECOGNITION — github::is_echoed_source(raw): the byte-exact command-echo SGR predicate,
 //   relocated
@@ -42,7 +42,7 @@ constexpr std::array<std::string_view, 1> kGhaStack{{"api-rfc3339-line-prefix"}}
 
 // The ONE call a caller makes at stream open. The peel runs BEFORE the tokenizer, so the line the
 // provenance hook sees starts at the visible content — which is exactly why the hook's own
-// leading-stamp skip could be RIPPED at T4 (ADR 0044 §8 item 5).
+// leading-stamp skip could be RIPPED at T4 (ADR-23).
 [[nodiscard]] insight::semantic::ResolvedStream gha_stream(const ComposedSemantics& composed)
 {
     return insight::semantic::resolve_stream(
@@ -62,7 +62,7 @@ TEST(GithubEchoedSource, CommandEchoWrappedLineIsRecognized)
     EXPECT_TRUE(is_echoed_source("\x1b[36;1mset -e\x1b[0m"))
         << "a wrapped script line, no timestamp";
     EXPECT_FALSE(is_echoed_source(gha("\x1b[36;1m    exit 1\x1b[0m")))
-        << "⚠ T4 (ADR 0044 §8 item 5): the hook's own leading-stamp skip is RIPPED. It used to call "
+        << "⚠ T4 (ADR-23): the hook's own leading-stamp skip is RIPPED. It used to call "
            "is_github_actions_prefix and skip 28 bytes — a per-line CONTENT test deciding where the "
            "visible content starts, i.e. a second, undeclared transport strip hidden inside a "
            "provenance predicate. A still-stamped line is now correctly NOT recognized; the caller "
@@ -115,7 +115,7 @@ TEST(GithubEchoedSource, TokenizerDemotesEchoedFailureLevelToUnknown)
 // ── The demotion outranks the DECLARED level lift, not merely the body inference ──
 // An echoed script line that echoes a workflow command (`echo "##[error]…"`) is still SCRIPT TEXT,
 // so SRC-D-PROV-1 drives it to Unknown. This pins the ORDER of two things that both write
-// `ParsedLine::level` in LogParser: the composed level-lift walk (ADR 0063 clause 2) runs FIRST and
+// `ParsedLine::level` in LogParser: the composed level-lift walk (ADR-22) runs FIRST and
 // the echoed-source demotion overwrites it. That was the order when the lift lived inside the GHA
 // strategy's parse(), and the relocation had to preserve it — swap the two and this line comes back
 // Error, alerting on a string that only ever appeared inside a shell command echo.

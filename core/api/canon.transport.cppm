@@ -1,10 +1,10 @@
-// insight.canon.transport — the TRANSPORT VOCABULARY (ADR 0044). The declared, stream-scoped peel
+// insight.canon.transport — the TRANSPORT VOCABULARY (ADR-23). The declared, stream-scoped peel
 // that runs OUTSIDE-IN of everything else: transport → logformat → intent (0031's frozen parse
 // order). Public + installed; the facade `export import`s it, so `import insight.canon;` yields the
 // declaration types alongside Tokenizer.
 //
 // WHY THIS IS NOT A SEMANTIC PACKAGE CONCERN, and why the catalogue does not live in a manifest
-// (ADR 0044 §3). 0031's ratified model is a PRODUCT — `TransportStack × LogFormat × dialect intent
+// (ADR-23). 0031's ratified model is a PRODUCT — `TransportStack × LogFormat × dialect intent
 // markers`. The GHA per-line stamp is a property of GitHub's *delivery*, not of the GHA *dialect*;
 // Jenkins Timestamper is a *plugin*, not the Jenkins dialect. Filing transform rows in
 // `SemanticPackageManifest` would re-couple exactly the two factors the model separates, and would
@@ -62,13 +62,13 @@ inline constexpr std::string_view kTransportCatalogVersion{"transport-catalog-2"
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 // §3 — the closed transform vocabulary. Rows-as-data, NEVER a callable (SRC-SID-2 applied to
 // transport, for SRC-SID-2's reason: a callable is un-hashable and lets the declaration and the
-// behavior diverge silently). Enum-not-tag for the closed sets (ADR 0021).
+// behavior diverge silently). Enum-not-tag for the closed sets (ADR-20).
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
 // Which transform ALGORITHM a row selects and parameterizes.
 //
 // TWO members today, each grown in WITH ITS ALGORITHM, ITS ROW AND ITS GATE (adr/0047 clause 2.1),
-// as `PayloadExtract` and `LocationMatchKind` grew. ADR 0044 §3 listed a wider anticipated
+// as `PayloadExtract` and `LocationMatchKind` grew. ADR-23 listed a wider anticipated
 // vocabulary — FramingLine, AnsiEchoWrap, StreamTag, Truncation, Chunking, Encoding — and **§3's
 // enum bodies are to be read as a SKETCH, never as a normative closed set**; §3's normative
 // content is the row shape, the rows-as-data rule and the ternary extract routing, all of which
@@ -107,12 +107,12 @@ enum class TransportTransformKind : std::uint8_t
 // declared catalogue, FAIL-SAFE-KEEP — an unrecognized residual falls to RawText rather than being
 // dropped.
 //
-// `StreamLabel` from ADR 0044 §3's sketch is not shipped: no transform produces one today (same
+// `StreamLabel` from ADR-23's sketch is not shipped: no transform produces one today (same
 // rule as the kinds above, ratified by adr/0047 clause 2.1). It APPENDS if it ever lands.
 enum class TransportExtract : std::uint8_t
 {
     None = 0, ///< the peel yields nothing but the shortened line
-    // ⚠ An OBSERVATION time, NEVER an ordering key (ADR 0044 §5, and this is NORMATIVE). Because
+    // ⚠ An OBSERVATION time, NEVER an ordering key (ADR-23, and this is NORMATIVE). Because
     // only TOTAL-scope transforms are transport, a whole-stream stamp necessarily covers lines
     // written by DIFFERENT clocks — measured on Jenkins: the controller-stamped annotations are
     // strictly monotone (0 inversions on every one of 12 logs) while the agent-stamped payload
@@ -138,7 +138,7 @@ struct TransportTransformRow
     // LinePrefixTimestamp: the fixed byte width of the stamp at line head.
     std::uint32_t prefix_width;
     // LinePrefixTimestamp: after removing the stamp, also drop the separator space and any
-    // delivery-layer indentation. Load-bearing, not cosmetic — ADR 0044 §8 names this as one of the
+    // delivery-layer indentation. Load-bearing, not cosmetic — ADR-23 names this as one of the
     // bundled behaviors a "conceptual" peel silently drops, which is why G1-PEEL must MEASURE
     // content-neutrality rather than assume it.
     bool strip_leading_space;
@@ -146,15 +146,15 @@ struct TransportTransformRow
 
 // A per-line RFC 3339 prefix — `YYYY-MM-DDTHH:MM:SS.fffffffZ` + a separator space.
 // TOTAL scope (every line the serving API stamps carries it), so it is admissible transport under
-// ADR 0044 §1, and it is the one transform that has BOTH a corpus (22 030 real logs) and an
+// ADR-23, and it is the one transform that has BOTH a corpus (22 030 real logs) and an
 // INDEPENDENT oracle to score against — which is what makes it shippable where Timestamper is not.
 // That oracle was `GitHubActionsStrategy`'s peel; T4 deleted the detection, and the oracle is now
 // FROZEN inside G1-PEEL itself (adr/0062), where it still scores this row over 22 490 937 lines.
 //
-// THE NAME IS DELIVERY-SHAPED, NOT ECOSYSTEM-SHAPED, and that is load-bearing twice over. ADR 0044
+// THE NAME IS DELIVERY-SHAPED, NOT ECOSYSTEM-SHAPED, and that is load-bearing twice over. ADR-23
 // §3 is the reason the row lives here at all: the catalogue is orthogonal to the dialect packages
 // because this prefix is a property of the *delivery*, not of the GHA *dialect* — so naming the row
-// after an ecosystem would contradict the argument that placed it in core. ADR 0024 §9.1 (SRC-SP-1)
+// after an ecosystem would contradict the argument that placed it in core. ADR-17 (SRC-SP-1)
 // independently forbids an ecosystem literal in the core mechanism, and the two together leave
 // exactly one coherent name: the byte grammar it peels. Any serving API that stamps this shape
 // declares this same row. Provenance stays in prose, where a reference belongs; the identifier
@@ -239,12 +239,12 @@ inline constexpr std::array<TransportTransformRow, 2> kTransportCatalogRows{{
 // it: the channel is the degenerate one-field case of this.
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
-// FAIL-CLOSED BY DEFAULT is a MUST (ADR 0030, unchanged). A default-constructed declaration —
+// FAIL-CLOSED BY DEFAULT is a MUST (ADR-22, unchanged). A default-constructed declaration —
 // empty stack, empty dialect, empty channel — is exactly today's behavior: no peel, no dialect
 // verification, the Unspecified channel view. That is the G1 case, and it is why declaring is
 // purely SUBTRACTIVE: a caller who says nothing loses nothing they had.
 //
-// canon VERIFIES, never infers (ADR 0030's split, not reopened): every named transform must be in
+// canon VERIFIES, never infers (ADR-22's split, not reopened): every named transform must be in
 // the catalogue and every named dialect must be composed, or resolution is a HARD ERROR listing the
 // known names. ACQUISITION may infer (0030's CLI peek is deterministic given the bytes); canon may
 // not. An unknown name is a MISTAKE and fails closed; an ABSENT name is a CHOICE and degrades —
@@ -259,14 +259,14 @@ struct IngestDeclaration
     // ORDERED, outside-in — the order the delivery layers were applied, so the peel unwinds them
     // in declaration order. Empty = the degenerate case.
     std::span<const std::string_view> stack;
-    // The declared dialect (a composed package name). VERIFIED and GATING since T4 (ADR 0065):
+    // The declared dialect (a composed package name). VERIFIED and GATING since T4 (ADR-22):
     // `resolve_stream` checks it against the composed packages, then filters every dialect-gated
     // row into the stream's view — so no walker below ever sees a dialect coordinate, and which
     // declared rows fire stopped being a function of the stream's content. An unknown name is a
-    // named error rather than a silently structure-less analysis, the same posture ADR 0029 D5
+    // named error rather than a silently structure-less analysis, the same posture ADR-22
     // gives an unknown channel; an ABSENT one withholds every concretely-gated row.
     std::string_view dialect;
-    // Today's IntentChannel (ADR 0029 D5 / 0030 D7), unchanged in meaning. Verified and applied by
+    // Today's IntentChannel (ADR-22), unchanged in meaning. Verified and applied by
     // `ComposedSemantics::for_channel`.
     std::string_view channel;
 };
@@ -292,7 +292,7 @@ struct PeeledLine
     // A line whose entire content was transport (a bare stamp with nothing after it) peels to
     // EMPTY, and empty means DROP — not an empty template. This is how the shipped GHA strategy's
     // "timestamp-only line is a blank line: decline it" behavior survives the move to a declared
-    // peel; ADR 0044 §8 lists that decline as one of the bundled behaviors content-neutrality
+    // peel; ADR-23 lists that decline as one of the bundled behaviors content-neutrality
     // depends on, so it is expressed here rather than lost.
     [[nodiscard]] constexpr bool is_blank() const noexcept
     {
@@ -319,7 +319,7 @@ struct RawPeeledLine
 };
 
 // The resolved stack — built ONCE per stream, from the declaration, BEFORE the first line
-// (ADR 0044 §4: peeling is stream-scoped). Cheap to hold: a handful of pointers to
+// (ADR-23: peeling is stream-scoped). Cheap to hold: a handful of pointers to
 // catalogue-static rows.
 //
 // NORMATIVE, and the reason this type exists at all: LINE IDENTITY IS A PURE FUNCTION OF PEELED
@@ -344,7 +344,7 @@ class TransportStack
     // Unwind every declared transform, outside-in. Pure, allocation-free, deterministic, and
     // `noexcept`: a byte function over a borrowed view.
     //
-    // TOTALITY IS ABOUT APPLICATION, NOT EFFECT (ADR 0044 §2 — the bright line against re-admitting
+    // TOTALITY IS ABOUT APPLICATION, NOT EFFECT (ADR-23 — the bright line against re-admitting
     // detection). Every declared transform is applied to every line, unconditionally. Its EFFECT on
     // a given line may be the identity: a `LinePrefixTimestamp` whose declared stamp shape is not
     // present in these bytes removes nothing. That is the rule's effect being nothing — it is NOT
@@ -385,7 +385,7 @@ class TransportStack
 };
 
 // Resolve a declaration's `stack` against the catalogue. Every name must be known; an unknown name
-// is a HARD ERROR naming the catalogue's vocabulary, symmetric with ADR 0029 D5's treatment of an
+// is a HARD ERROR naming the catalogue's vocabulary, symmetric with ADR-22's treatment of an
 // unknown `--channel` (canon fatals with a legible message rather than degrading a typo). An EMPTY
 // stack resolves to the degenerate `TransportStack`, which is not an error — it is the G1 case.
 [[nodiscard]] TransportStack resolve_transport_stack(const IngestDeclaration& declaration);

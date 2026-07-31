@@ -7,7 +7,7 @@
 export module insight.canon.detail.strategy;
 import insight.canon.internal; // std + global C types
 import insight.canon.api;      // Timestamp, LogLevel, LogFormat, ArenaAllocator
-// ParsedLine + IFormatStrategy — the provider CODE-TIER contract (ADR 0024 §2.3.1/§2.4) — moved to
+// ParsedLine + IFormatStrategy — the provider CODE-TIER contract (ADR-17) — moved to
 // the INSTALLED insight.canon.spi module so an external semantic package can implement a dialect
 // strategy without importing this SEALED shard. Re-exported here so the 19 core representation
 // strategies below (module members of this shard) are byte-unchanged.
@@ -105,7 +105,7 @@ class CloudWatchStrategy final : public IFormatStrategy
 } // namespace insight::tokenization
 
 // GitHubActionsStrategy — the GHA/Azure DIALECT strategy — relocated to insight_semantic_github
-// (ADR 0024 §1.3/§2.3.1: a dialect strategy is code-tier package knowledge, not a core
+// (ADR-17: a dialect strategy is code-tier package knowledge, not a core
 // representation format). It reaches the FormatDetector as a composed StrategyFactory
 // (register_strategy seam), so canon core registers no dialect. The 19 strategies below are
 // universal representation formats.

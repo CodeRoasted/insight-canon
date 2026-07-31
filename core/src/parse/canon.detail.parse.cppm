@@ -19,7 +19,7 @@ class FormatDetector
 {
   public:
     // Registers the built-in REPRESENTATION-format strategies, then the composed DIALECT strategies
-    // (ADR 0024 §3): the strategy factories `composed` carries are instantiated via
+    // (ADR-17): the strategy factories `composed` carries are instantiated via
     // register_strategy. No dialect strategy is hardcoded here — core is semantic-unaware
     // (SRC-SP-1).
     explicit FormatDetector(const insight::semantic::ComposedSemantics& composed);
@@ -108,7 +108,7 @@ class LogParser
 {
   public:
     // Holds the composed vocabulary (borrowed): the FormatDetector's dialect strategies + the
-    // echoed-source provenance hooks it consults on the raw line (ADR 0024 §3). Must outlive the
+    // echoed-source provenance hooks it consults on the raw line (ADR-17). Must outlive the
     // parser.
     LogParser(ArenaAllocator& arena, const insight::semantic::ComposedSemantics& composed);
 

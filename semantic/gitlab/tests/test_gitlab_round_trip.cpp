@@ -15,7 +15,7 @@ import insight.semantic.gitlab;   // kManifest (markers + emits)
 
 TEST(GitLabRoundTrip, RecognizeRendersBackToDeclaredIntent)
 {
-    // BOTH projections come off the ONE manifest (ADR 0044 §7) — the same `emits` span
+    // BOTH projections come off the ONE manifest (ADR-23) — the same `emits` span
     // `semantic_identity` hashes.
     const std::array<insight::semantic::SemanticPackageManifest, 1> one{
         insight::semantic::gitlab::kManifest};

@@ -230,7 +230,7 @@ FormatDetector::FormatDetector(const insight::semantic::ComposedSemantics& compo
 
     // The core REPRESENTATION-format strategies (semantic-unaware — how data is represented, not
     // what an ecosystem means). The GitHub-Actions DIALECT strategy is no longer a builtin; it
-    // arrives via the composition below (ADR 0024 §1.3/§3).
+    // arrives via the composition below (ADR-17).
     add_builtin(std::make_unique<JsonStrategy>());
     add_builtin(std::make_unique<SyslogStrategy>());
     add_builtin(std::make_unique<CLFStrategy>());
@@ -251,7 +251,7 @@ FormatDetector::FormatDetector(const insight::semantic::ComposedSemantics& compo
     add_builtin(std::make_unique<SystemdJournalStrategy>());
     fallback_ = std::make_unique<RawTextStrategy>();
 
-    // Composed DIALECT strategies (ADR 0024 §3): each factory the composition carries produces one
+    // Composed DIALECT strategies (ADR-17): each factory the composition carries produces one
     // strategy, registered through the existing injection seam (probed once-per-line via
     // custom_strategies_). In 1.7.5 this is the GitHub-Actions strategy from
     // insight_semantic_github; canon core names no dialect. The factories are in canonical

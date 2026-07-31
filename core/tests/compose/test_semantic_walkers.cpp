@@ -1,5 +1,5 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_semantic_walkers.cpp — the composed-recognition ALGORITHMS (ADR 0024 §3), canon's
+// test_semantic_walkers.cpp — the composed-recognition ALGORITHMS (ADR-17), canon's
 // semantic-unaware core code, exercised over SYNTHETIC rows so the mechanism is proven
 // VOCABULARY-FREE. This is the homing counterpart to the package suites: the github/test_frameworks
 // suites prove the real VOCABULARY; here we prove canon's ALGORITHM (gate matching, longest-match,
@@ -115,7 +115,7 @@ void operator delete[](void* ptr, std::size_t) noexcept
 // ════════════════════════════════════════════════════════════════════════════════════════════════════
 namespace
 {
-// TWO synthetic packages, because after T4 the gate is a composed package NAME (ADR 0065 clause 1)
+// TWO synthetic packages, because after T4 the gate is a composed package NAME (ADR-22)
 // and the "does not leak across dialects" leg needs a real, different, composed name to declare.
 // `synth` carries the rows under test; `synth_other` carries one level-lift row and exists so a
 // FOREIGN declaration is expressible without fatalling the unknown-dialect path.
@@ -230,7 +230,7 @@ constexpr SemanticPackageManifest kOtherManifest{
 }
 } // namespace
 
-// ── The DIALECT gate (ADR 0065 clauses 1–2): kAnyDialect fires under EVERY declaration; a concrete
+// ── The DIALECT gate (ADR-22.D6): kAnyDialect fires under EVERY declaration; a concrete
 // gate fires only on a stream declaring ITS package — and NOT on an undeclared stream, which is the
 // fail-closed half.
 //
@@ -306,7 +306,7 @@ TEST(SemanticWalkers, LocationFamiliesAndTokenBoundaries)
 }
 
 // ── lift_level(): FIRST match in declared order wins — NOT longest match ──
-// ADR 0063 clause 2 relocates the level-lift walk from the GHA package into core "with the rows,
+// ADR-22 relocates the level-lift walk from the GHA package into core "with the rows,
 // their order and the first-match rule unchanged". This is the assertion that the first-match rule
 // actually survived the move: a longest-match walker (the rule classify/recognize use, and the
 // natural thing to "fix" this to) returns Error here and fails.

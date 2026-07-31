@@ -1,7 +1,7 @@
 // NOLINTBEGIN — integration gate: literals and printed diagnostics are intended.
-// test_transport_peel_equivalence_gate.cpp — G1's CORPUS arm + G1-PEEL (ADR 0044 §9), homed here.
+// test_transport_peel_equivalence_gate.cpp — G1's CORPUS arm + G1-PEEL (ADR-23), homed here.
 //
-// ⚠ THE ORACLE IS FROZEN, AND THIS GATE HAS CHANGED KIND (ADR 0062 clauses 1/2/4). Read this before
+// ⚠ THE ORACLE IS FROZEN, AND THIS GATE HAS CHANGED KIND (ADR-8.D2 clauses 1/2/4). Read this before
 // citing anything below.
 //
 //   * THE ORACLE IS A FROZEN COPY, taken VERBATIM from `semantic/github/src/github_strategy.cpp` at
@@ -43,7 +43,7 @@
 //     value: the oracle is an implementation written years before the SUT, scored on third-party
 //     logs neither was tuned against.
 //
-// WHAT IS BEING CLAIMED, AND WHAT IS NOT (ADR 0044 §9 block-quotes this, UNCHANGED and UNWEAKENED;
+// WHAT IS BEING CLAIMED, AND WHAT IS NOT (ADR-23 block-quotes this, UNCHANGED and UNWEAKENED;
 // it will be tempting to overstate, so it is restated at the top of the instrument that produces
 // the number):
 //
@@ -118,7 +118,7 @@ constexpr std::array<std::string_view, 1> kDeclaredGha{{kGhaTransform}};
 constexpr std::string_view kUtf8Bom{"\xEF\xBB\xBF"};
 
 // ══════════════════════════════════════════════════════════════════════════════════════════════
-// THE FROZEN ORACLE (ADR 0062 clauses 1–2) — `GitHubActionsStrategy`'s peel decision, byte-for-byte
+// THE FROZEN ORACLE (ADR-8.D2 clauses 1–2) — `GitHubActionsStrategy`'s peel decision, byte-for-byte
 // as it stood in `semantic/github/src/github_strategy.cpp` at insight-canon `ac94aff`, the last
 // commit before T4 removed that detection from production.
 //
@@ -325,7 +325,7 @@ struct ManifestField
 // answer about itself. Spelled out here so the two never collapse into one implementation.
 //
 // It stays a SECOND, separately-spelled derivation now that the frozen oracle lives in the same
-// file (ADR 0062 clause 3 cites this pre-existing duplication as the precedent for freezing the
+// file (ADR-8 cites this pre-existing duplication as the precedent for freezing the
 // oracle here at all). Collapsing it into `oracle_is_github_actions_prefix` would answer cell B's
 // counterfactual with the very implementation the counterfactual is about.
 [[nodiscard]] bool is_gha_stamp(std::string_view str) noexcept

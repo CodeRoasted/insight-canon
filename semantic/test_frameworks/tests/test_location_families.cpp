@@ -1,5 +1,5 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_location_families.cpp — the test-framework FILE-LOCATION vocabulary (ADR 0024, SRC-II-8).
+// test_location_families.cpp — the test-framework FILE-LOCATION vocabulary (ADR-17, SRC-II-8).
 // Migrated from canon tests/identity/test_location_recognizer.cpp: the matching MECHANISM
 // (insight::recognize_location, the three closed LocationMatchKind algorithms over the composed
 // location rows) is CANON's; the VOCABULARY — the jest/vitest/playwright `.test.`/`.spec.`

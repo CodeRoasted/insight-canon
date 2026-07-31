@@ -10,15 +10,15 @@ import insight.canon.internal;
 //   - identity canonicalization COLLAPSES to ALIGN      ( `yarn (1/10)` → `yarn (M)`     )
 // so that matrix legs / shards / version-parameterized jobs of ONE intent map to ONE class. The
 // class is the alignment SCOPE; the raw `discriminant_of` (below) is the complementary third role
-// (ADR 0023 / SRC-II-9) that separates co-occurring siblings WITHIN the class — never a masked
+// (ADR-18 / SRC-II-9) that separates co-occurring siblings WITHIN the class — never a masked
 // ordinal, never a fingerprint-similarity merge (SRC-II-2). Gate G1 (studies/004) measured the
 // class mask on the real GH-Actions corpus: matrix jobs collapse to one class (`Test (M)`); the
 // discriminant keeps the raw tuple/version so the aligner pairs the right legs and surfaces
-// cross-run drift (v6→v7) as a REPLACED, not a masked-away 0-row or a raw-key storm (ADR 0023 §3).
+// cross-run drift (v6→v7) as a REPLACED, not a masked-away 0-row or a raw-key storm (ADR-18).
 //
 // The frozen canonicalization rule set (the intent-canonicalization ALGORITHM — canon-owned; the
 // dialect marker VOCABULARY it applies to lives in the semantic packages, hashed into
-// semantic_identity — ADR 0024). Applied left-to-right in ONE pass, at word boundaries (\w =
+// semantic_identity — ADR-17). Applied left-to-right in ONE pass, at word boundaries (\w =
 // [A-Za-z0-9_]), each rule masking the maximal token it claims:
 //   R1 dotted-version   v?\d+(\.\d+)+   → vX   (`1.2.3`, `v1.2.3`)   — before R3 so it is not
 //   fragmented R2 v-version         v\d+           → vX   (`v6`, `v7`) R3 multi-digit       \d{2,}

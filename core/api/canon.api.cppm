@@ -110,7 +110,7 @@ struct NgramId
 [[nodiscard]] NgramId ngram_id_of(const std::vector<TemplateId>& sequence) noexcept;
 
 // ── Intent identity (bibles/intent_identity.md §2-§4, II-1/SRC-II-6/II-7) ──
-// kIntentRegistryVersion RETIRED (ADR 0024 §4.1): it was a dead constant (zero downstream readers),
+// kIntentRegistryVersion RETIRED (ADR-17): it was a dead constant (zero downstream readers),
 // and its job — the II-7 comparability identity of the recognizer/marker rule set — is now
 // discharged by the composed `semantic_identity` (insight::semantic::ComposedSemantics), a CONTENT
 // hash over the actual marker/role/level rows the packages ship (content, not a hand-bumped label).
@@ -130,7 +130,7 @@ struct NgramId
 // markers per log) — returns an owned string.
 [[nodiscard]] std::string canonicalize_intent(std::string_view name);
 
-// The raw INSTANCE DISCRIMINANT (ADR 0023, SRC-II-9 — the third role on the identity spine): the
+// The raw INSTANCE DISCRIMINANT (ADR-18, SRC-II-9 — the third role on the identity spine): the
 // matrix tuple rendered into a job/step display name (`Test (ubuntu-latest, Node 24.x)` →
 // `(ubuntu-latest, Node 24.x)`), returned VERBATIM (a view into `name`). This is the STABLE
 // declared parallelism coordinate that separates co-occurring siblings within one identity class —
@@ -224,7 +224,7 @@ struct OtelTraceContext
 
 // ── Declared OTEL field-map catalog (D-OTEL-4a) ──
 // The four schema-declared OTLP fields canon recognizes, as a structured (class → recognizer
-// key) catalog — the christened ValueClassRegistry (ADR 0024 §5) is the composed view over THIS
+// key) catalog — the christened ValueClassRegistry (ADR-17) is the composed view over THIS
 // catalog + kOrdinalFieldCatalog + the KEEP lexicons + the package ValueClassRow seat
 // (ComposedSemantics::value_classes). These UNIVERSAL value concepts stay core (the ratified rule);
 // this is the SRC-D-TID-6 "now" tier (a declared contract with hardcoded strategies, like the
@@ -268,7 +268,7 @@ inline constexpr std::array<OtelFieldDescriptor, 4> kOtelFieldCatalog{{
 // captured as a consumed-not-tokenized ordinal observation (CanonicalEvent.ordinals) — NEVER a
 // param — which metalog bins per schedule into the W1 carrier (TopKEntry.ordinal_histograms). A
 // UNIVERSAL value class → stays core (this catalog); arbitrary/client ordinals await a package
-// ValueClassRow (the ValueClassRegistry seat, ADR 0024 §5 — no package ships one in 1.7.5; we do
+// ValueClassRow (the ValueClassRegistry seat, ADR-17 — no package ships one in 1.7.5; we do
 // not build dormant vocabulary — the SRC-D-TID-14 anti-monster boundary). EXACT keys only — uniform
 // across the fast/slow JSON paths, no value-syntax guessing (the D-W1-5 mis-route hazard);
 // suffix/pattern matching is a future extension when a scenario needs it. Unit-explicit names only,
@@ -476,7 +476,7 @@ enum class LogLevel : uint8_t
     }
 }
 
-// ── Run outcome (ADR 0025 / insight_run_outcome_model.md §2) ──
+// ── Run outcome (ADR-17 / insight_run_outcome_model.md §2) ──
 // The CI run's terminal verdict — a run-level sibling of LogLevel, NOT a per-event field (never on
 // CanonicalEvent) and NOT a cube dimension (OUTCOME is the run LABEL — [[cube-dimension-model]]).
 // Universal outcome CATEGORIES; the strings that name them per dialect are semantic-package data
@@ -600,7 +600,7 @@ enum class LogFormat : uint8_t
     // rows walked by core under `--dialect jenkins`. Freeze-agnostic re-verified at the exit: no
     // wire field and no wire token carries this enum's numeric values, so the member shift below
     // is invisible outside a single build graph.
-    // GitLab CI job-trace dialect (ADR 0024 §1.3 registration; the strategy code lives in
+    // GitLab CI job-trace dialect (ADR-17 registration; the strategy code lives in
     // insight_semantic_gitlab). Line-selective: a fixed-width `<RFC3339> NNC[ +]` runner transport
     // prefix (stamped traces), `section_start:` section markers, and the terminal
     // `Job succeeded` / `ERROR: Job failed…` verdict line; other trace output falls through.
@@ -718,7 +718,7 @@ template <> struct hash<insight::TemplateId>
 // std::hash<NgramId> (D-TIR-4(2)): keys metalog's n-gram-sequence maps. NgramId is
 // already a uniform 128-bit hash, so the first 8 bytes ARE a good size_t — no mixing,
 // no allocation (mirrors std::hash<TemplateId>). The maps re-sort their output, so the
-// unordered iteration order is not a determinism surface (ADR 0008).
+// unordered iteration order is not a determinism surface (ADR-16).
 template <> struct hash<insight::NgramId>
 {
     [[nodiscard]] std::size_t operator()(const insight::NgramId& ngram_id) const noexcept
@@ -1017,7 +1017,7 @@ struct MaskConfig
 // ──────── structural-role + intent-marker recognition TYPES ────────
 // The StructuralRoleRegistry / IntentMarkerRegistry CLASSES (the hardcoded GHA `starts_with`
 // chains) moved to the facade's COMPOSED walkers — insight::tokenization::classify / recognize over
-// a ComposedSemantics (ADR 0024 §3). Canon core is semantic-unaware (SRC-SP-1): it owns the
+// a ComposedSemantics (ADR-17). Canon core is semantic-unaware (SRC-SP-1): it owns the
 // recognition ALGORITHM, the semantic packages own the rule ROWS. The result TYPES stay here —
 // StructuralRole (above) and IntentMarkerKind / ChildOrder / IntentMarker (below): the grammar's
 // vocabulary + the recognizer's return shapes, referenced by the spi rows and by every downstream
@@ -1048,11 +1048,11 @@ enum class IntentMarkerKind : std::uint8_t
     Step      ///< a step quantum opens (`Run <name>`)
 };
 
-// How a level's sibling nodes are matched across two runs (ADR 0023 §2, a DECLARED property of the
+// How a level's sibling nodes are matched across two runs (ADR-18, a DECLARED property of the
 // dialect level — never a runtime heuristic). GHA: jobs are parallel-by-construction (Unordered →
 // set/multiset match, no REORDERED, completion-interleave invisible); steps are sequential-by-YAML
 // (Ordered → order-respecting nominal LCS, a transposition IS a signal). child_order is package
-// DATA (an IntentMarkerRow field) → it enters the composed semantic_identity (ADR 0024).
+// DATA (an IntentMarkerRow field) → it enters the composed semantic_identity (ADR-17).
 enum class ChildOrder : std::uint8_t
 {
     Ordered = 0, ///< sequential by construction (steps within a job)
@@ -1063,7 +1063,7 @@ struct IntentMarker
 {
     IntentMarkerKind kind{IntentMarkerKind::None};
     std::string_view name; ///< raw payload (empty when kind == None); canonicalize_intent → class
-    // The raw instance discriminant (ADR 0023 / SRC-II-9): the matrix tuple in the display name,
+    // The raw instance discriminant (ADR-18 / SRC-II-9): the matrix tuple in the display name,
     // kept VERBATIM (never masked) — the stable declared coordinate that separates co-occurring
     // siblings. Empty when the name carries no tuple. `= discriminant_of(name)`.
     std::string_view discriminant;
@@ -1852,7 +1852,7 @@ constexpr NormalizedContent NormalizedLine::undeclared_suffix(std::size_t offset
 // adr/0045) borrows `raw_line` or `scratch`; both must outlive every such view.
 //
 // ⚠ STAGE 1 IS A CONSUMER'S OBLIGATION, NEVER A PACKAGE'S. A semantic package's strategy MUST NOT
-// call this: normalization inside a strategy is refused by ADR 0024 §2.2, and a package that
+// call this: normalization inside a strategy is refused by ADR-17, and a package that
 // normalized would double-strip content canon already stripped, then disagree with canon on any
 // line where the two grammars differ. The caller that OWNS the ingest runs it once, before the
 // transport peel (stage 2). The order is load-bearing: an escape sitting BEFORE a transport

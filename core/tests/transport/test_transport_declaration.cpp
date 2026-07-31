@@ -1,7 +1,7 @@
 // NOLINTBEGIN — unit test: short identifiers, string literals and printed diagnostics are intended.
-// test_transport_declaration.cpp — G1's SHAPE arm (ADR 0044 §9), homed as a canon-core unit suite.
+// test_transport_declaration.cpp — G1's SHAPE arm (ADR-23), homed as a canon-core unit suite.
 //
-// HOMING (Kleio). ADR 0044 §9 states G1's property and leaves the test design to me; the property
+// HOMING (Kleio). ADR-23 states G1's property and leaves the test design to me; the property
 // decomposes into three grains with three different homes, and this file is the first:
 //
 //   • THIS FILE — the degenerate declaration's shape: empty stack, `peel` is byte-identity, the
@@ -161,7 +161,7 @@ TEST(TransportDeclaration, DefaultDeclarationResolvesToTheDegenerateStack)
     const TransportStack stack{resolve_transport_stack(declaration)};
 
     EXPECT_TRUE(stack.empty()) << "a default-constructed IngestDeclaration must resolve to the "
-                                  "degenerate stack (ADR 0044 §6 — declaring is SUBTRACTIVE: a "
+                                  "degenerate stack (ADR-23 — declaring is SUBTRACTIVE: a "
                                   "caller who says nothing loses nothing). Got size "
                                << stack.size();
     EXPECT_EQ(stack.size(), 0U);
@@ -245,7 +245,7 @@ TEST(TransportDeclaration, DeclaredStackActuallyPeels)
         }
         else
         {
-            // TOTALITY IS ABOUT APPLICATION, NOT EFFECT (ADR 0044 §2). The row is applied to every
+            // TOTALITY IS ABOUT APPLICATION, NOT EFFECT (ADR-23). The row is applied to every
             // line unconditionally; on these bytes its effect is nothing. That is the declared
             // rule's effect being nothing — NOT the transform asking "is this line mine?".
             EXPECT_EQ(peeled.content, line.bytes)
@@ -283,7 +283,7 @@ TEST(TransportDeclaration, DeclaredStackExtractsObservationTimeOnlyWhenTheStampP
 
     const RawPeeledLine stamped{stack.peel_raw("2026-04-15T22:20:38.2879579Z ok")};
     EXPECT_EQ(stamped.content, "ok") << "declared peel must strip the stamp AND the separator "
-                                        "space (strip_leading_space is load-bearing, ADR 0044 §8)";
+                                        "space (strip_leading_space is load-bearing, ADR-23)";
     EXPECT_TRUE(stamped.observation_time.has_value())
         << "the shipped row declares TransportExtract::EventObservationTime, so a parseable stamp "
            "must yield one";
@@ -295,7 +295,7 @@ TEST(TransportDeclaration, DeclaredStackExtractsObservationTimeOnlyWhenTheStampP
 
     // A line that is ENTIRELY transport peels to empty, and empty means DROP — not an empty
     // template. This is how the shipped GHA strategy's "a timestamp-only line is a blank line"
-    // behavior survives the move to a declared peel (ADR 0044 §8's bundled behavior 3).
+    // behavior survives the move to a declared peel (ADR-23's bundled behavior 3).
     const RawPeeledLine bare{stack.peel_raw("2026-04-15T22:20:38.2879579Z ")};
     EXPECT_TRUE(bare.is_blank()) << "a stamp-only line must peel to blank, got \""
                                  << escape(bare.content) << "\"";
@@ -307,7 +307,7 @@ TEST(TransportDeclaration, DeclaredStackExtractsObservationTimeOnlyWhenTheStampP
 
 TEST(TransportCatalog, ShippedRowsAreExactlyWhatTheCatalogDeclares)
 {
-    // TWO rows today, each landed WITH its algorithm, its row and its gate (ADR 0044 §3 sketches
+    // TWO rows today, each landed WITH its algorithm, its row and its gate (ADR-23 sketches
     // seven; this workspace does not ship enum members with no algorithm, no row and no gate).
     // The second landed at T5 5.2 (`bracket-rfc3339-line-prefix` + G-T5-PEEL) — the co-fire the
     // version comment predicted. Pinned so that adding a member without its algorithm and its
@@ -363,7 +363,7 @@ TEST(TransportCatalog, NamesAreUniqueAndLookupRoundTrips)
 
 TEST(TransportDeclarationDeathTest, UnknownTransformFailsClosedNamingTheCatalog)
 {
-    // canon VERIFIES, never infers (ADR 0044 §6 / ADR 0030's split). An UNKNOWN name is a MISTAKE
+    // canon VERIFIES, never infers (ADR-23 / ADR-22's split). An UNKNOWN name is a MISTAKE
     // and fails closed; an ABSENT name is a CHOICE and degrades. They must never share a code path,
     // so the death message is part of the contract, not decoration.
     constexpr std::array<std::string_view, 1> kTypo{{"gha-api-line-prefx"}}; // one byte dropped

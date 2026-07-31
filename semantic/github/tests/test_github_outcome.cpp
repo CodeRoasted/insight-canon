@@ -1,5 +1,5 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_github_outcome.cpp — the GHA run-outcome VOCABULARY (ADR 0025 §4, the G-OUT-1 GHA half):
+// test_github_outcome.cpp — the GHA run-outcome VOCABULARY (ADR-17, the G-OUT-1 GHA half):
 // the seven native `result`/`conclusion` strings map into the core four-class RunOutcome, the
 // no-verdict conclusions (skipped/neutral/action_required) MAP to Unknown (never a guess, never a
 // miss), and the package honestly ships NO OutcomeMarkerRow — GHA has no run-verdict console line
@@ -21,7 +21,7 @@ using insight::semantic::ComposedSemantics;
 
 namespace
 {
-// The RESOLVED view of a stream that declared this dialect (ADR 0065 clause 2) — after T4 the
+// The RESOLVED view of a stream that declared this dialect (ADR-22) — after T4 the
 // outcome vocabulary is reachable only through a declaration.
 [[nodiscard]] ComposedSemantics github_only()
 {
@@ -101,7 +101,7 @@ TEST(GithubOutcome, NoMarkerMeansTheConsolePathIsHonestlyUnknown)
            "token '"
         << scan.token << "'";
     // …and rung 2 falls to Unknown. (There is no dialect LATCH any more: the dialect is declared,
-    // so `RunOutcomeScan` carries no LogFormat at all — ADR 0065 clause 2.)
+    // so `RunOutcomeScan` carries no LogFormat at all — ADR-22.)
     const auto degenerate{resolve_run_outcome("", scan, composed)};
     EXPECT_EQ(degenerate.outcome, RunOutcome::Unknown)
         << "only-a-console-log GHA is Unknown — never a guess from per-step exit codes";
@@ -112,7 +112,7 @@ TEST(GithubOutcome, NoMarkerMeansTheConsolePathIsHonestlyUnknown)
 TEST(GithubOutcome, AuthoritativeSideInputCarriesTheGhaVerdict)
 {
     const ComposedSemantics composed{github_only()};
-    // The Action forwards `${{ needs.<job>.result }}` verbatim (ADR 0025 §3.1) — the ONLY channel
+    // The Action forwards `${{ needs.<job>.result }}` verbatim (ADR-17) — the ONLY channel
     // a GHA verdict reaches the engine (no marker). On a green-looking console, `cancelled` must
     // still resolve Aborted: the side-input needs no console corroboration.
     const auto lines{gha_console(/*failing=*/false)};

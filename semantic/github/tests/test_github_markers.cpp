@@ -1,5 +1,5 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_github_markers.cpp — the GitHub-Actions INTENT-MARKER vocabulary (ADR 0024). Migrated from
+// test_github_markers.cpp — the GitHub-Actions INTENT-MARKER vocabulary (ADR-17). Migrated from
 // canon tests/identity/test_intent_marker.cpp: the recognition MECHANISM
 // (insight::tokenization::recognize over the composed marker rows) is CANON's algorithm; the
 // VOCABULARY it walks — `Complete job name: ` → Job (Unordered), `Run ` → Step (Ordered),
@@ -32,7 +32,7 @@ using insight::tokenization::recognize;
 namespace
 {
 // The composition under test: the github package alone, RESOLVED for a stream that declared this
-// dialect and ONE IntentChannel (ADR 0029 / ADR 0065 clause 2). Both coordinates are REQUIRED here
+// dialect and ONE IntentChannel (ADR-22 / ADR-22). Both coordinates are REQUIRED here
 // on purpose — GHA is the dialect that actually has two materializations, so "which channel" is
 // part of every recognition question about it, and after T4 "which dialect" is part of every one
 // too. A test that did not say would be asking an ill-posed question. `channel` names a declared
@@ -87,13 +87,13 @@ TEST(GithubMarkers, RecognizesJobAndStepBanners)
     EXPECT_EQ(step.name, "actions/checkout@v4") << "raw step payload wrong: " << show(step);
 }
 
-// ── One Step intent, the real channel and our ablation, ONE identity (ADR 0030 D1/D6) ──
+// ── One Step intent, the real channel and our ablation, ONE identity (ADR-22) ──
 // The same step banner reads back to the same identity from GHA's real `##[group]Run <cmd>` and
 // from the bare `Run <cmd>` our degrade() ablation produces. Each fires under ITS declared channel
 // and both extract the IDENTICAL payload — which is what makes the channel a materialization detail
 // and never an axis (D6).
 //
-// ⚠ WHAT THIS IS NOT (ADR 0030 D1 — the premise correction): this is NOT "materialization
+// ⚠ WHAT THIS IS NOT (ADR-22 — the premise correction): this is NOT "materialization
 // invariance across two real GHA materializations". The stripped arm is OUR OWN lab ablation
 // (ci_revert_corpus.transform.degrade()), not bytes GitHub ever served. The property asserted here
 // is canon reading our ablation back to the same intent as the real channel — genuinely
@@ -161,14 +161,14 @@ TEST(GithubMarkers, UndeclaredChannelFiresNoStepRowEitherWay)
     EXPECT_EQ(recognize(norm_probe("Run yarn lint"), undeclared).kind, IntentMarkerKind::None)
         << "a channel-gated Step row fired with NO channel declared — the composition defaulted to "
            "a "
-           "concrete channel, which is exactly the fail-open defect ADR 0029 D5 closes";
+           "concrete channel, which is exactly the fail-open defect ADR-22 closes";
     EXPECT_EQ(recognize(norm_probe("##[group]Run yarn lint"), undeclared).kind,
               IntentMarkerKind::None)
         << "same, for the annotated materialization";
 }
 
 // ── SRC-II-6: DIALECT-gated to this package — the dialect never fires on a stream that did not
-// declare it (ADR 0065 clause 1). The gate is the ONLY difference (proven by the declared sanity
+// declare it (ADR-22). The gate is the ONLY difference (proven by the declared sanity
 // line).
 //
 // ⚠ WHAT CHANGED AND WHY IT MATTERS. This test used to loop over `LogFormat` values, passing each
@@ -208,7 +208,7 @@ TEST(GithubMarkers, NoFalseStepOnRunningOrEmpty)
         << "empty content opened a quantum: " << show(empty);
 }
 
-// ── child_order is a declared per-level ROW property (ADR 0023 §2): job=Unordered, step=Ordered ──
+// ── child_order is a declared per-level ROW property (ADR-18): job=Unordered, step=Ordered ──
 // Migrated from test_instance_discriminant::JobUnorderedStepOrdered — it asserts THIS package's
 // kMarkers child_order data (the level-typed alignment declaration), plus the marker carries its
 // raw discriminant.

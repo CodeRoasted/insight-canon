@@ -35,7 +35,7 @@ using insight::tokenization::recognize;
 
 namespace
 {
-// The RESOLVED view of a stream that declared this dialect (ADR 0065 clause 2) — after T4 the
+// The RESOLVED view of a stream that declared this dialect (ADR-22) — after T4 the
 // concretely-gated rows are reachable only through a declaration.
 [[nodiscard]] ComposedSemantics gitlab_only()
 {

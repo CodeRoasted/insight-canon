@@ -1,20 +1,20 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_github_declared_ingest.cpp — the GitHub-Actions dialect over the DECLARED ingest path
-// (ADR 0044 §4/§6, ADR 0063, ADR 0065). This file replaces `test_github_strategy.cpp`, whose whole
+// (ADR-23, ADR-22, ADR-22). This file replaces `test_github_strategy.cpp`, whose whole
 // subject — `GitHubActionsStrategy`: `format()`, `confidence()`, the detection race against Syslog,
 // the in-`parse()` timestamp strip — was DELETED by T4.
 //
 // WHAT REPLACED IT, and why the tests could not simply be ported. The GHA per-line RFC 3339 stamp
-// is a property of GitHub's *delivery*, not of the GHA *dialect* (ADR 0044 §3): the host format of
+// is a property of GitHub's *delivery*, not of the GHA *dialect* (ADR-23): the host format of
 // a GHA job log is RawText and always was, and the dialect is the workflow-command VOCABULARY over
-// it (ADR 0064 clause 1). So there is nothing left to DETECT — the caller DECLARES the transform
+// it (ADR-22). So there is nothing left to DETECT — the caller DECLARES the transform
 // and the dialect, canon verifies both, `TransportStack::peel` unwinds the stamp, and only
 // `RawPeeledLine::content` crosses into the Tokenizer. A "does the strategy claim this line" test
 // has no subject any more; a "does the declared path read this line" test does.
 //
 // The equivalence between the two — that the declared peel produces the same bytes the deleted
 // detector did — is NOT re-asserted here. It is G1-PEEL's, scored against the frozen oracle over
-// 4 082 logs / 22 490 937 lines in `test_transport_peel_equivalence_gate.cpp` (ADR 0062). This file
+// 4 082 logs / 22 490 937 lines in `test_transport_peel_equivalence_gate.cpp` (ADR-8). This file
 // asserts what the PACKAGE owns: that its declared vocabulary reaches a decision on that path.
 //
 // Determinism: byte-only peel + byte-only walks; no RNG, no clock, no float.
@@ -96,7 +96,7 @@ TEST(GithubDeclaredIngest, StampOnlyLinePeelsToBlank)
 // ── Level lift: the workflow-command vocabulary (kLevelLifts) → LogLevel, over the PRODUCTION path
 // ──
 // The rows are this package's DATA; the walk is canon's (`insight::tokenization::lift_level` over
-// the resolved view's table, applied by LogParser — ADR 0063 clause 2). So the gate drives the
+// the resolved view's table, applied by LogParser — ADR-22). So the gate drives the
 // composed pipeline end to end: that is the only place the declared rows reach a decision, and it
 // is the path a product binary takes.
 //
@@ -238,7 +238,7 @@ TEST(GithubDeclaredIngest, InfersErrorFromBodyCueWhenUnmarked)
 }
 
 // ── The package's code tier is now ONE hook, and the composed report says so ──
-// ADR 0065 clause 5 item 2: deleting the strategy removes the only hand-written PARSER in a dialect
+// ADR-22: deleting the strategy removes the only hand-written PARSER in a dialect
 // package, leaving `echoed_source` — a provenance hook, not a grammar. That is what makes this
 // dialect DATA-ONLY, which is the door the LogCraft-generated dialect parser would come through.
 TEST(GithubDeclaredIngest, ThePackageShipsNoStrategyAndOneProvenanceHook)

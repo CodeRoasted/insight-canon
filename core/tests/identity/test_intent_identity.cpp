@@ -5,7 +5,7 @@
 // canonicalize to ONE CLASS and pair across homologous runs (G1, studies/004),
 // WITHOUT over-collapsing distinct WHERE (SRC-II-2: alignment must never eat the signal).
 // canonicalize_intent is canon's SEMANTIC-UNAWARE algorithm, frozen under kCanonicalizationVersion;
-// the composed-ruleset comparability key (II-7) is now semantic_identity (ADR 0024 §4,
+// the composed-ruleset comparability key (II-7) is now semantic_identity (ADR-17,
 // tests/compose/ test_composition.cpp). A diff here is a cross-run comparability break, not a
 // retune — fix the code, never the assertion.
 
@@ -115,7 +115,7 @@ TEST(IntentCanonicalize, FrozenRuleSet)
 }
 
 // NOTE: the II-7 comparability-version assertion (formerly RegistryVersionIsFrozen, pinning
-// kIntentRegistryVersion == "intent-gha-2") RETIRED with the constant (ADR 0024 §4.1): the
+// kIntentRegistryVersion == "intent-gha-2") RETIRED with the constant (ADR-17): the
 // composed-ruleset content hash `semantic_identity` supersedes it and is pinned in
 // tests/compose/test_composition.cpp (stability + reproducibility + order-independence).
 // canonicalize_intent below stays canon's frozen semantic-unaware algorithm.

@@ -37,7 +37,7 @@
 // public surface (Tokenizer, det::FixedReducer, failure_lexicon cues, to_string,
 // CanonicalEvent / StructuralRole) is all reachable through the single facade import.
 import insight.canon;
-// ADR 0024: the Tokenizer now takes a ComposedSemantics. The proof composes the SAME package set a
+// ADR-17: the Tokenizer now takes a ComposedSemantics. The proof composes the SAME package set a
 // product binary does — insight_semantic_github + insight_semantic_jenkins +
 // insight_semantic_test_frameworks (the eidos composition TU's exact set and order) — so the
 // composed pipeline (GHA + Jenkins dialects + test-file locations) is what the 5-leg byte-identity
@@ -118,13 +118,13 @@ int main(int argc, char** argv)
     // different sequence than gcc/clang's UTF-8, diverging the digest on that ONE line while every
     // other (pure-ASCII) section matched. A byte-hashed canonical output must contain no character
     // whose encoding varies by toolchain/locale. Plain '--'.
-    // v2: the grammar-2 cut (ADR 0025) — jenkins joins the composed set and every file section
+    // v2: the grammar-2 cut (ADR-17) — jenkins joins the composed set and every file section
     // gains a `### run_outcome` line (the console-tail scan surface the compare must cover).
-    // v4: grammar-5 (ADR 0069) — gitlab joins the composed set with its own declared ARM and its
+    // v4: grammar-5 (ADR-17) — gitlab joins the composed set with its own declared ARM and its
     // own corpus file, so the numeric-field extractor and the prefix-verdict outcome walker are
     // both on the cross-OS compare surface. The composed `semantic_identity` moves with the grammar
     // token, which is expected and is exactly what the emitted digest line records.
-    // v3: T4 (ADR 0065) — the dialect and the transport peel are DECLARED, so every file is scored
+    // v3: T4 (ADR-22) — the dialect and the transport peel are DECLARED, so every file is scored
     // once per declared ARM (below) instead of once. The compare covers only what the fixture
     // EMITS, and after T4 an undeclared stream sees no concretely-gated row at all: without the
     // declared arms this proof would still be green while covering none of the dialect walkers.
@@ -137,7 +137,7 @@ int main(int argc, char** argv)
         insight::semantic::jenkins::kManifest, insight::semantic::test_frameworks::kManifest};
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose(manifests)};
 
-    // G-SP-4 (ADR 0024 §10.4): the composed `semantic_identity` content hash must be bit-identical
+    // G-SP-4 (ADR-17): the composed `semantic_identity` content hash must be bit-identical
     // across independent builds and every OS/ISA leg (no paths/timestamps/link-order in its input —
     // by construction, verified anyway). Emitting it into THIS canonical digest folds G-SP-4 into
     // the existing 5-leg byte-identity compare — a divergent identity byte diverges the digest and
@@ -151,7 +151,7 @@ int main(int argc, char** argv)
         std::cout << ' ' << pkg.name << '@' << pkg.version;
     std::cout << '\n';
 
-    // ── The declared ARMS (ADR 0044 §6 / ADR 0065). ──
+    // ── The declared ARMS (ADR-23 / ADR-22). ──
     //
     // EVERY arm is applied to EVERY file, on purpose. Choosing an arm per file would be inference —
     // "this one looks like GHA" — which is precisely the per-line content dependence T4 deleted, and
@@ -202,7 +202,7 @@ int main(int argc, char** argv)
 
         for (const Arm& arm : arms)
         {
-            // The ONE call a caller makes at stream open (ADR 0044 §6): both semantic coordinates
+            // The ONE call a caller makes at stream open (ADR-23): both semantic coordinates
             // verified and filtered into the view, and the transport stack resolved — all before
             // the first line, so nothing downstream can depend on content.
             const insight::semantic::ResolvedStream stream{insight::semantic::resolve_stream(
@@ -244,7 +244,7 @@ int main(int argc, char** argv)
             for (std::size_t idx{0}; idx < peeled_lines.size(); ++idx)
             {
                 auto event{tokenizer.process_line(peeled_lines[idx])};
-                // THE TIMESTAMP HANDOVER (ADR 0044 §8 item 4 / ADR 0063 clause 3): the extract is
+                // THE TIMESTAMP HANDOVER (ADR-23 / ADR-22): the extract is
                 // the CALLER's to inject, because §4 forbids handing the stack to the Tokenizer.
                 // ⚠ An OBSERVATION time, never an ordering key and never a replay input.
                 if (event && observation_times[idx])

@@ -47,7 +47,7 @@ struct Tokenizer::Impl
 {
     ArenaAllocator& arena; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members): tokenizer
                            // shares the caller-managed arena for stable string_views.
-    // The composed vocabulary (ADR 0024): borrowed, not owned — must outlive the Tokenizer. NOLINT
+    // The composed vocabulary (ADR-17): borrowed, not owned — must outlive the Tokenizer. NOLINT
     // for the same non-owning-ref reason as `arena`.
     const insight::semantic::ComposedSemantics&
         composed; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
