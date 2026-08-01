@@ -401,7 +401,7 @@ TEST(InferLeadingLogLevel, AnsiColourWrappedLevelRecovered)
 // THE TEST HOLE THIS CLOSES: the D-OUT-1 RED asserted contains_failure_cue (the cue
 // boolean) and went green while the LEVEL of the same line was Fatal — outcome-
 // awareness asserted at the wrong altitude. These cases assert the LEVEL the diff
-// actually consumes. [[sift-failure-lexicon-must-be-outcome-aware]]
+// actually consumes.
 TEST(InferLeadingLogLevel, LeadingPassGlyphDemotesAlertingStage1Level)
 {
     // "failure" is a parse_log_level word → Stage 1 Fatal (unguarded). ✔ leads ⇒ demote.
@@ -456,7 +456,7 @@ TEST(InferLeadingLogLevel, GenuineLeadingFailureSurvivesWithoutPassGlyph)
 // re-run P3 FPs (`Storing crash reports into '<path>'`, `… watcher fail event`). These
 // route through Stage 2 (contains_failure_cue): neither "crash" nor "fail" is a
 // parse_log_level vocabulary word, so Stage 1 is silent — the cue fix alone demotes
-// them, no Stage-1 change required. [[sift-failure-lexicon-must-be-outcome-aware]]
+// them, no Stage-1 change required.
 TEST(InferLeadingLogLevel, InformationalFailureWordLineIsNotAlerting)
 {
     EXPECT_EQ(infer_leading_log_level(
@@ -510,7 +510,6 @@ TEST(InferLeadingLogLevel, LeadingBareLevelWordDemotedWhenUnanchored)
 // the P5 root: `There was 1 failure:` was Fatal (colon anchor) and outranked the named
 // `testSitesStats (FAILED)` it summarized. `25 passed, 5 failed` → Warn is the dual,
 // already pinned by GenuineLeadingFailureSurvivesWithoutPassGlyph.
-// [[sift-failure-lexicon-must-be-outcome-aware]]
 TEST(InferLeadingLogLevel, CountRegisterSummaryCapsAtWarn)
 {
     EXPECT_EQ(infer_leading_log_level("There was 1 failure:"), LogLevel::Warn)
@@ -518,8 +517,9 @@ TEST(InferLeadingLogLevel, CountRegisterSummaryCapsAtWarn)
     EXPECT_EQ(infer_leading_log_level("Tests: 5 failed"), LogLevel::Warn)
         << "'5 failed' count summary → surfaced at Warn, below per-item verdicts";
     EXPECT_EQ(infer_leading_log_level("HTTP 500 error"), LogLevel::Warn)
-        << "accepted precision boundary (§3.2): '500 error' is count-preceded → Warn summary, not "
-           "an Error verdict (corroborated by 5xx-rate signals in-window, not shouted)";
+        << "accepted precision boundary: '500 error' is count-preceded → Warn summary, not an "
+           "Error verdict (an HTTP status is corroborated by 5xx-rate signals in-window, never "
+           "shouted per line)";
     // The minimal-pair survivor: a genuine per-item verdict (predecessor is a WORD) stays Error.
     EXPECT_EQ(infer_leading_log_level("1 test failed"), LogLevel::Error)
         << "'failed' preceded by 'test' (not the count '1') — a real per-item failure, stays Error";

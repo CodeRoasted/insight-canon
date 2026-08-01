@@ -160,9 +160,9 @@ TEST(GithubMarkers, UndeclaredChannelFiresNoStepRowEitherWay)
         << "the Job banner is kAnyChannel (identical in both channels) and must still fire "
            "undeclared";
     EXPECT_EQ(recognize(norm_probe("Run yarn lint"), undeclared).kind, IntentMarkerKind::None)
-        << "a channel-gated Step row fired with NO channel declared — the composition defaulted to "
-           "a "
-           "concrete channel, which is exactly the fail-open defect ADR-22 closes";
+        << "a channel-gated Step row fired with NO channel declared — the composition defaulted "
+           "to a concrete channel. An undeclared stream must never inherit one: guessing the "
+           "channel is the fail-open defect the gate exists to close";
     EXPECT_EQ(recognize(norm_probe("##[group]Run yarn lint"), undeclared).kind,
               IntentMarkerKind::None)
         << "same, for the annotated materialization";

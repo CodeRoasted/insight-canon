@@ -55,7 +55,8 @@ TEST(JenkinsMarkers, NamedBlockOpenIsAStage)
         << "STAGE is the container level (GHA Job ≡ stage)";
     EXPECT_EQ(stage.name, "Build");
     EXPECT_EQ(stage.child_order, ChildOrder::Unordered)
-        << "stages/branches co-occur (parallel/matrix) — the level matches UNORDERED (ADR-18)";
+        << "stages/branches co-occur (parallel/matrix), so the level's children are UNORDERED: "
+           "their sequence is not a structural fact and must never be diffed as one";
 }
 
 TEST(JenkinsMarkers, ParallelBranchIsAStageWithItsDiscriminant)

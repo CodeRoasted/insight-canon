@@ -49,11 +49,10 @@
 // the exit assertions: an identity, not a threshold, ratified before each application (Eqya,
 // 2026-07-30).
 //
-// THE VACUITY GUARD. A gate that cannot return the bad answer is not a gate
-// ([[synthetic-gate-vacuity-vs-judgment]]). `CounterCanReportAnExplosion` feeds the SAME counting
-// path a block of lines carrying a token the masker keeps verbatim and asserts the count tracks the
-// line count — so a green "count stable" on the corpus is a fact about the corpus, not a saturated
-// instrument.
+// THE VACUITY GUARD. A gate that cannot return the bad answer is not a gate.
+// `CounterCanReportAnExplosion` feeds the SAME counting path a block of lines carrying a token the
+// masker keeps verbatim and asserts the count tracks the line count — so a green "count stable" on
+// the corpus is a fact about the corpus, not a saturated instrument.
 //
 // CORPUS-GATED. The Jenkins marker corpus is private and out-of-tree, so this SKIPS cleanly
 // when the manifest env is unset/missing — green in CI and on every clone.
@@ -64,8 +63,8 @@
 //   JENKINS_T5_OUT       (optional) directory for a per-line TSV dump, for the offline cross-check
 //
 // BYTE FIDELITY. Every read is binary; lines are split on '\n' ONLY and no '\r' is trimmed
-// ([[corpus-scrub-freeze-byte-fidelity]] — a CR-folding read has already fabricated a gate score in
-// this workspace). Both arms see the identical bytes, so the comparison is fair by construction.
+// (a CR-folding read has already fabricated a gate score in this workspace). Both arms see the
+// identical bytes, so the comparison is fair by construction.
 //
 // Determinism: pure byte functions, no RNG, no clock, no float in any counted quantity.
 #include <gtest/gtest.h>
@@ -361,11 +360,11 @@ TEST(JenkinsPayloadStampMeasurement, TheMaskerClaimsTheTimestamperTokenToTheBrac
         std::cout << "  unstripped[" << index << "] = \"" << outcomes[index].template_str << "\"\n";
         EXPECT_EQ(outcomes[index].template_str, "[<*>] + git fetch --tags")
             << "the bracketed RFC3339 token must mask to the bracket normal form `[<*>]` — the "
-               "D-MSK-5 claim, ADR-23's second branch discharged";
+               "D-MSK-5 claim, the bracketed branch of the stamp rule discharged";
     }
     EXPECT_EQ(outcomes[0].template_str, outcomes[1].template_str)
         << "two lines differing ONLY in the stamp's milliseconds must now share ONE template — "
-           "the collapse loss ADR-23 measured is the thing this rule repairs";
+           "the measured collapse loss is the thing this rule repairs";
     EXPECT_EQ(outcomes[0].template_str, outcomes[2].template_str)
         << "a different day must not fork the template";
 
@@ -401,7 +400,7 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
 {
     const auto manifest_path{env_value("JENKINS_T5_MANIFEST")};
     if (!manifest_path.has_value())
-        GTEST_SKIP() << "JENKINS_T5_MANIFEST unset — the payload-stamped slice is §2a-private and "
+        GTEST_SKIP() << "JENKINS_T5_MANIFEST unset — the payload-stamped slice is private and "
                         "out-of-tree";
     const std::vector<std::string> logs{read_manifest(*manifest_path)};
     ASSERT_FALSE(logs.empty()) << "manifest " << *manifest_path << " listed no logs";
@@ -429,7 +428,7 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
 
     const auto out_dir{env_value("JENKINS_T5_OUT")};
 
-    std::cout << "\n=== ADR-23 Part 2 clause 2 — per-log ===\n"
+    std::cout << "\n=== payload-stamp template measurement — per-log ===\n"
               << std::format("{:>7} {:>7} {:>7} {:>7} {:>7} {:>7}  {}\n", "lines", "stamped",
                              "tmplA", "tmplB", "idA", "idB", "log");
 
@@ -526,7 +525,7 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
     const std::size_t shared_stamped_ids{static_cast<std::size_t>(std::ranges::count_if(
         stamped_a.ids, [&](const TemplateId& id) { return stamped_b.ids.contains(id); }))};
 
-    std::cout << "\n=== ADR-23 Part 2 clause 2 — THE FOUR NUMBERS (slice-wide) ===\n"
+    std::cout << "\n=== payload-stamp template measurement — THE FOUR NUMBERS (slice-wide) ===\n"
               << "logs                         : " << logs.size() << "\n"
               << "lines (raw, '\\n'-split)      : " << total_lines << "\n"
               << "stamped lines                : " << stamped_lines << "\n"
@@ -550,7 +549,7 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
     EXPECT_EQ(unstamped_moved, 0U)
         << "an UNSTAMPED line templated differently with and without the Jenkins package: arm B is "
            "then measuring package removal, not the timestamper strip, and the four numbers below "
-           "do not answer ADR-23";
+           "answer no question about the strip";
 
     // The counts must agree with their id counts — a divergence is a SHA-256 collision, reported.
     EXPECT_EQ(all_a.templates.size(), all_a.ids.size());
@@ -565,9 +564,8 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
     std::cout << "FROZEN clause-2 CLASSIFIER reads: "
               << (explodes ? "EXPLODES" : (stable ? "COUNT STABLE" : "NEITHER branch"))
               << "  — the frozen record's reading, NOT the exit verdict: post-D-MSK-5 the exit "
-                 "predicate is §6.5's prefix-image triangle (PrefixImageExitGate), and this "
-                 "classifier's ceiling leg is can't-PASS on these bytes by construction "
-                 "(bibles/jenkins_dialect.md §4)\n\n";
+                 "predicate is the prefix-image triangle (PrefixImageExitGate, below), and this "
+                 "classifier's ceiling leg is can't-PASS on these bytes by construction\n\n";
 
     // This test REPORTS; it never asserts the branch. The branch is the finding.
     SUCCEED();
@@ -615,7 +613,7 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
 {
     const auto manifest_path{env_value("JENKINS_T5_MANIFEST")};
     if (!manifest_path.has_value())
-        GTEST_SKIP() << "JENKINS_T5_MANIFEST unset — the payload-stamped slice is §2a-private and "
+        GTEST_SKIP() << "JENKINS_T5_MANIFEST unset — the payload-stamped slice is private and "
                         "out-of-tree";
     const std::vector<std::string> logs{read_manifest(*manifest_path)};
     ASSERT_FALSE(logs.empty()) << "manifest " << *manifest_path << " listed no logs";
@@ -880,7 +878,7 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
                                   cell_b_templates.size()};
 
     // ── the report — every number with its denominator, before any assertion fires ──
-    std::cout << "\n=== §6.5 PREFIX-IMAGE TRIANGLE exit gate ===\n"
+    std::cout << "\n=== PREFIX-IMAGE TRIANGLE exit gate ===\n"
               << "logs                                   : " << logs.size() << "\n"
               << "stamped / unstamped lines              : " << stamped_lines << " / "
               << unstamped_lines << "\n"
@@ -920,11 +918,10 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
                         : !p1a_zero ? "NOT REPAIRED — the literal-KEEP class survives"
                         : (!p2_holds || !p3_holds)
                             ? "NEW PHENOMENON — the masker is not prefix-compositional on these "
-                              "bytes, or the strategy drifted from the 0046 enumeration; "
-                              "escalate, never round into a branch"
-                            : "REPAIRED — ADR-23's own words are met: the masker "
-                              "claims the token to a stable normal form; the T5 content move "
-                              "unblocks"};
+                              "bytes, or the strategy drifted from its enumerated bundled "
+                              "behaviors; escalate, never round into a branch"
+                            : "REPAIRED — the masker claims the token to a stable normal form; "
+                              "the T5 content move unblocks"};
     std::cout << "VERDICT: " << verdict << "\n\n";
 
     EXPECT_EQ(unstamped_lines_moved, 0U)

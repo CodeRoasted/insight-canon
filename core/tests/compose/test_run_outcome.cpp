@@ -255,7 +255,8 @@ TEST(RunOutcomeScanTest, RemainderMustBeASingleVerdictWord)
     const ComposedSemantics composed{composed_outcome()};
     const std::vector<std::string> trailing{"Ended: GOOD (took 3s)"};
     EXPECT_FALSE(scan_run_outcome(trailing, composed).marker_present)
-        << "a decorated epilogue is not a terminal-verdict line (studies/006 ^Finished: (\\w+)$)";
+        << "a decorated epilogue is not a terminal-verdict line: the verdict word must be the "
+           "WHOLE remainder (^Finished: (\\w+)$), so a trailing '(took 3s)' disqualifies it";
     const std::vector<std::string> empty_tok{"Ended: "};
     EXPECT_FALSE(scan_run_outcome(empty_tok, composed).marker_present);
     const std::vector<std::string> none{"a log with no epilogue at all"};
@@ -576,7 +577,8 @@ TEST(OutcomeRegressed, StrictlyWorseOnTheAxisOnly)
     EXPECT_TRUE(outcome_regressed(RunOutcome::Unstable, RunOutcome::Failure));
     // Steady or better.
     EXPECT_FALSE(outcome_regressed(RunOutcome::Unstable, RunOutcome::Unstable))
-        << "steady-flaky is NOT a verdict regression (§6.1)";
+        << "steady-flaky is NOT a verdict regression: the axis is pass↔fail, and Unstable→Unstable "
+           "did not move along it";
     EXPECT_FALSE(outcome_regressed(RunOutcome::Failure, RunOutcome::Success));
     EXPECT_FALSE(outcome_regressed(RunOutcome::Unstable, RunOutcome::Success));
     EXPECT_FALSE(outcome_regressed(RunOutcome::Failure, RunOutcome::Failure));

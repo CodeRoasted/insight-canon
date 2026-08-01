@@ -94,8 +94,7 @@
 // class (the GHA separator being a tab rather than a space) that `data/v1/sample` does not contain a
 // single instance of: the sample arm stayed fully GREEN under it while the full arm caught 23 157
 // lines. So `sample` (0.4 s) is a SMOKE arm and `full` (23.5 s) is the claim. Wiring only the fast
-// one buys a green that is measurably weaker than it reads
-// ([[synthetic-gate-vacuity-vs-judgment]] — green-BLIND).
+// one buys a green that is measurably weaker than it reads — green-BLIND.
 //
 // Determinism: byte-only. Sorted population, fixed files, no RNG, no clock, no float, no threads.
 
@@ -406,8 +405,8 @@ class TransportPeelEquivalenceGate : public ::testing::Test
         const char* const raw{std::getenv(kSliceDirVar)};
         if (raw == nullptr || *raw == '\0')
             GTEST_SKIP() << kSliceDirVar
-                         << " unset — the §2a-private D11 slice is not present. Point it at a slice "
-                            "directory holding corpus.jsonl AND log_annotated/, i.e. "
+                         << " unset — the private D11 corpus slice is not present. Point it at a "
+                            "slice directory holding corpus.jsonl AND log_annotated/, i.e. "
                             ".../github_corpora/revert_corpus/data/v1/sample (fast, 33 MB) or "
                             ".../data/v1/full (the full claim, 2.3 GB).";
 
@@ -417,7 +416,7 @@ class TransportPeelEquivalenceGate : public ::testing::Test
         ASSERT_TRUE(std::filesystem::is_regular_file(slice_ / "corpus.jsonl"))
             << kSliceDirVar << " is set to '" << raw << "' but there is no corpus.jsonl under it. "
             << "The slice is declared present, so this is a wiring error, not an absent corpus — "
-               "unset the variable if this runner has no §2a slice.";
+               "unset the variable if this runner has no local copy of the private slice.";
         ASSERT_TRUE(std::filesystem::is_directory(slice_ / "log_annotated"))
             << kSliceDirVar << " is set to '" << raw << "' but there is no log_annotated/ under it.";
     }
@@ -443,8 +442,8 @@ class TransportPeelEquivalenceGate : public ::testing::Test
                 continue;
             std::filesystem::path path{slice_ / field.value};
             // A manifest row naming an absent file is a corpus-integrity failure, not a line to
-            // skip ([[corpus-scrub-freeze-byte-fidelity]] — verify the asset against what the
-            // manifest ATTESTS). Silently skipping would shrink the population behind a green.
+            // skip — verify the asset against what the manifest ATTESTS. Silently skipping would
+            // shrink the population behind a green.
             EXPECT_TRUE(std::filesystem::exists(path))
                 << "corpus.jsonl record " << record_no << " attests '" << field.value
                 << "' but that file is not present in the slice.";
@@ -622,8 +621,8 @@ TEST_F(TransportPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheShippedDete
     EXPECT_EQ(score.logs, pins->logs) << report();
     EXPECT_EQ(score.lines, pins->lines)
         << "the line total moved: the slice's bytes changed, or the line split did "
-           "([[corpus-scrub-freeze-byte-fidelity]] — a count that differs from the study number is "
-           "a FORMULA difference until proven a byte one)."
+           "(a count that differs from the study number is a FORMULA difference — how the reader "
+           "splits lines — until proven a byte one)."
         << report();
     EXPECT_EQ(score.claimed_equal, pins->claimed_equal) << report();
     EXPECT_EQ(score.blank_decline + score.empty_input, pins->blank_and_empty) << report();
@@ -635,8 +634,8 @@ TEST_F(TransportPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheShippedDete
     // the shipped peel including its warts, so a behavior change has to be a deliberate re-pin.
     EXPECT_EQ(score.bom_decline, pins->bom_declines)
         << "cell B moved. If the BOM defect was just fixed, this gate is CORRECTLY red: re-pin it "
-           "deliberately, and do NOT land that fix between this gate's arms (bugs.md's sequencing "
-           "MUST — a behavior change mid-capture makes the red uninterpretable)."
+           "deliberately, and do NOT land that fix between this gate's arms (the sequencing MUST: "
+           "a behavior change mid-capture makes the red uninterpretable)."
         << report();
 
     // ── The characterization pin, held to a different standard and labelled as such ──

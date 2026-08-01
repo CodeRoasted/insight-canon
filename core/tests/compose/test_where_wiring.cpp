@@ -9,8 +9,8 @@
 // WITHOUT a native component (RawText here, any future dialect tomorrow) gets the identity-derived
 // WHERE, proving the wiring never re-acquires a dialect literal.
 //
-// DEFAULT-OFF is the load-bearing invariant — the flag off leaves component byte-identical
-// ([[additive-gated-metalog-block-keeps-wire-version]]). Determinism: byte-only, no
+// DEFAULT-OFF is the load-bearing invariant — the flag off leaves component byte-identical, so the
+// gated block stays additive and the wire version does not move. Determinism: byte-only, no
 // RNG/clock/float.
 #include <gtest/gtest.h>
 

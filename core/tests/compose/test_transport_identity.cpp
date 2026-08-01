@@ -103,8 +103,8 @@ TEST(TransportIdentity, DeclaringATransportStackDoesNotMoveSemanticIdentity)
            "(canon.compose.cppm:166).";
 
     EXPECT_EQ(with.semantics.identity(), baseline)
-        << "DECLARING A TRANSPORT TRANSFORM MOVED semantic_identity — ADR-23's MUST is "
-           "violated and transport-invariance is not being built.\n"
+        << "DECLARING A TRANSPORT TRANSFORM MOVED semantic_identity — the transport-invariance "
+           "MUST is violated: declaring a stack may not change the ruleset's identity.\n"
         << "  composed          : " << composed.identity_hex() << "\n"
         << "  ± transform (with): " << with.semantics.identity_hex() << "\n"
         << "The per-run DECLARATION is PROVENANCE (it goes to MetaLog); only the transform GRAMMAR "

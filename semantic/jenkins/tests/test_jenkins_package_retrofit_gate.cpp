@@ -522,14 +522,14 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
         const char* const raw{std::getenv(kCorpusVar)};
         if (raw == nullptr || *raw == '\0')
             GTEST_SKIP() << kCorpusVar
-                         << " unset — the §2a-private Jenkins marker corpus is not present. Point "
+                         << " unset — the private Jenkins marker corpus is not present. Point "
                             "it at the tree holding the RETRO-v2.*.tsv projections and data/v2/ "
                             "(i.e. .../coderoast-corpora/jenkins_corpora/marker_corpus).";
         root_ = std::filesystem::path{raw};
         ASSERT_TRUE(std::filesystem::is_regular_file(root_ / kTraceSidecar))
             << kCorpusVar << " is set to '" << raw << "' but there is no " << kTraceSidecar
             << " under it. The corpus is declared present, so this is a wiring error — unset the "
-               "variable if this machine has no §2a slice.";
+               "variable if this machine has no local copy of the private corpus.";
         ASSERT_TRUE(std::filesystem::is_regular_file(root_ / kWfapiStages))
             << kCorpusVar << ": missing " << kWfapiStages;
         ASSERT_TRUE(std::filesystem::is_regular_file(root_ / kConsoleStages))
@@ -809,7 +809,7 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
                 corpus.divergent_rows.push_back(
                     "console-vs-API divergence: " + row.path + " — API '" + row.result +
                     "', console " + outcome_name(engine.outcome) +
-                    " (the console's declared subordination to the API result, ADR-17 "
+                    " (the console's declared subordination to the API result, "
                     "D-OUT-RUN-1 — a counted cell, never a row defect)");
             }
             if (row.result == "UNSTABLE")
@@ -968,9 +968,9 @@ TEST_F(JenkinsRecognizerRetrofitGate, ThePopulationIsTheCommittedSidecarVerified
     EXPECT_EQ(result("ABORTED"), kResultAborted) << report(corpus);
     EXPECT_EQ(result("UNSTABLE"), kResultUnstable) << report(corpus);
     EXPECT_EQ(corpus.cross_surface, kResultVsWfapiCrossSurface)
-        << "the result-vs-wfapi cross-surface cell: result rules the run grain (§2's authority "
-           "map); the design prose said 1, the committed oracle carries 2 — the oracle is the "
-           "record, pinned at the measured value."
+        << "the result-vs-wfapi cross-surface cell: the API result rules the run grain and "
+           "outranks the wfapi view; the design prose said 1, the committed oracle carries 2 — "
+           "the oracle is the record, pinned at the measured value."
         << report(corpus);
 
     // The stamp-class partition (a GENERATED sidecar column — one classifier, one owner). A
@@ -1000,8 +1000,8 @@ TEST_F(JenkinsRecognizerRetrofitGate, LTTranscriptionTheShippedChainEqualsTheFro
     // bug row. ═══
     EXPECT_EQ(corpus.transcription_mismatches, kTranscriptionMismatches)
         << "the shipped chain and the frozen instrument disagree on at least one trace's "
-           "(stage sequence, step count, Finished token). Attribute every row below to a §4.4 "
-           "named delta or ESCALATE — this is the retraction event, pre-named."
+           "(stage sequence, step count, Finished token). Attribute every row below to one of the "
+           "named deltas above or ESCALATE — this is the retraction event, pre-named."
         << report(corpus);
     EXPECT_EQ(corpus.console_finished_absent, kConsoleFinishedAbsent)
         << "the v2 true-tail capture has an epilogue on every trace — an absent oracle token is "
@@ -1074,7 +1074,8 @@ TEST_F(JenkinsRecognizerRetrofitGate, LOTheRunOutcomeRecoversThePlatformVerdict)
     // ═══ Unstable is FIRST-CLASS, pinned 4/4 BY NAME — never recovered as Failure/Success ═══
     EXPECT_EQ(corpus.unstable_recovered, kAgreeUnstable)
         << "an UNSTABLE run did not recover as RunOutcome::Unstable — the four-class run-grain "
-           "vocabulary folded (ADR-17)."
+           "vocabulary folded: Unstable is neither Success nor Failure and must never collapse "
+           "into either."
         << report(corpus);
 
     // The agreement cells, per API class — denominator 113, cells sum per class (clause 5).

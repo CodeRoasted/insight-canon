@@ -40,8 +40,8 @@
 //
 // WHY A LITERAL AND NOT A CORPUS GATE. Same homing as the 436's follow-up: the property is a
 // single-component claim about one classifier on one known-hazardous input, which is what a fixture
-// is good at ([[test-homing-integration-vs-single-component]]). The corpus was needed to FIND the
-// shape; it is not needed to pin it, and a corpus gate here would buy nothing the literal does not.
+// is good at — no seam is needed to state it. The corpus was needed to FIND the shape; it is not
+// needed to pin it, and a corpus gate here would buy nothing the literal does not.
 
 #include <gtest/gtest.h>
 

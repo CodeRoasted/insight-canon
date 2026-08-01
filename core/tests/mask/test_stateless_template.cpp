@@ -193,7 +193,7 @@ TEST(StatelessTemplate, DiagnosticCompositeCollapsesChromiumPrefix)
 // A digit segment that is a status value (≤ max digits, immediately preceded WITHIN the
 // composite by a status keyword: exit/code/signal/status) is KEPT, exactly as the bare-token
 // rule keeps `exit code 0`→`exit code 1`. So a varying id masks while the status flip stays
-// split — never collapse a categorical status change. [[diff-engine-significance-cut-invariant]]
+// split — never collapse a categorical status change.
 TEST(StatelessTemplate, DiagnosticCompositeKeepsStatusValuePerSegment)
 {
     ArenaAllocator arena{256U * 1024U};

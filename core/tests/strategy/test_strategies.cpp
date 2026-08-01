@@ -1794,7 +1794,7 @@ static constexpr std::array kStrategyTable{
 // `import insight.canon.test` trips a gcc-15 BMI defect: the CRTP `_Derived` of the first closure
 // type in the TU leaks into every later `_Partial`, so the second and third helpers fail to deduce
 // (`use of operator| ... before deduction of auto`). clang-21/libc++ accepts the pipe form, so this
-// only ever breaks on the ship toolchain. See [[gcc15-and-cxx-modules]].
+// only ever breaks on the ship toolchain.
 [[nodiscard]] std::vector<StrategyCase> rows_with_canonical_line()
 {
     return std::ranges::to<std::vector>(

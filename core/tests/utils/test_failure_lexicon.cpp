@@ -195,7 +195,7 @@ TEST(FailureLexicon, PassWordOrTrailingGlyphDoesNotDemote)
 // line is simply not a verdict. The discriminator is the same decoration CI/test
 // tooling uses to MARK an outcome — caps / `:` / `[ ]` / `( )` / CamelCase type /
 // the "segmentation fault" phrase / a self-anchoring outcome VERB. A term-noun
-// carries none → it does not classify. [[sift-failure-lexicon-must-be-outcome-aware]]
+// carries none → it does not classify.
 TEST(FailureLexicon, InformationalFailureWordIsNotAVerdictCue)
 {
     EXPECT_FALSE(
@@ -247,7 +247,7 @@ TEST(FailureLexicon, VerdictAnchoredFailureSurvives)
 // benignly (segfault / traceback / unhandled) → it fires BARE, no register; gating it
 // only suppressed recall ("unhandled exception" / "unhandled promise rejection" are
 // real, lowercase failures). These pin the role assignment — a future re-tag of any
-// of these to RegisterAnchored breaks this test. [[sift-failure-lexicon-must-be-outcome-aware]]
+// of these to RegisterAnchored breaks this test.
 TEST(FailureLexicon, SelfAnchoringNounsFireBare)
 {
     EXPECT_TRUE(contains_failure_cue("segfault in worker 3 during teardown"))
@@ -304,7 +304,7 @@ TEST(FailureLexicon, LeadingFailGlyphAnchorsButNeverCreates)
 // is surfaced by RECURRENCE/NOVELTY, not the failure level — orthogonal to verdict-
 // register classification. The caps anchor only CONFIRMS an already-matched failure
 // word; with no match it is never consulted. Pinned so this boundary can't shift
-// silently. [[sift-failure-lexicon-must-be-outcome-aware]]
+// silently.
 TEST(FailureLexicon, UnderscoreCompoundIsOneAtomNotADecomposedCue)
 {
     EXPECT_FALSE(contains_failure_cue("ERR_FAILED (-2) loading 'about:blank'"))
@@ -319,7 +319,6 @@ TEST(FailureLexicon, UnderscoreCompoundIsOneAtomNotADecomposedCue)
 // a verdict anchor (a counted noun is a summary even with a trailing colon). The P5 root:
 // `There was 1 failure:` read as a Fatal verdict outranked the named `testSitesStats
 // (FAILED)` it summarized. Count register is checked BEFORE the verdict anchors.
-// [[sift-failure-lexicon-must-be-outcome-aware]]
 TEST(FailureLexicon, CountRegisterFailureWordIsSummaryNotVerdict)
 {
     EXPECT_FALSE(contains_failure_cue("There was 1 failure:"))
@@ -435,7 +434,7 @@ TEST(FailureLexicon, CompilerNoteDiagnosticCarriesNoFailureVerdict)
         << "a verdict-anchored CamelCase error TYPE inside a note message is the note's word too";
 
     // ── Two-sidedness. Without these the demoter could be a blanket suppressor and this
-    // test would still be green ([[synthetic-gate-vacuity-vs-judgment]] — green-BLIND).
+    // test would still be green — green-BLIND.
     EXPECT_TRUE(contains_failure_cue("/opt/gcc-15.3/include/c++/15.3.0/bits/fs_path.h:542:14: "
                                      "error: no match for ‘operator<<’"))
         << "the REAL error line in the same cascade must still fire — that is the whole point";

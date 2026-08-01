@@ -478,7 +478,7 @@ enum class LogLevel : uint8_t
 
 // ── Run outcome (ADR-17 / insight_run_outcome_model.md §2) ──
 // The CI run's terminal verdict — a run-level sibling of LogLevel, NOT a per-event field (never on
-// CanonicalEvent) and NOT a cube dimension (OUTCOME is the run LABEL — [[cube-dimension-model]]).
+// CanonicalEvent) and NOT a cube dimension (OUTCOME is the run LABEL, never an axis of the cube).
 // Universal outcome CATEGORIES; the strings that name them per dialect are semantic-package data
 // (OutcomeTokenRow, insight.canon.spi). The five span the CI outcome space: Jenkins/GHA/GitLab all
 // map into them. UNSTABLE (ran, partially failed, continued) is neither Success nor Failure and is
@@ -1006,9 +1006,9 @@ struct MaskConfig
     // line whose NATIVE component is empty (GHA carries none) gets its recognize_location()
     // test-file as `component` — populating the cube WHERE axis ABOVE the empty native tier
     // (never faking it — GHA WHERE is identity-derived by construction). OFF by default so every
-    // existing path is byte-identical (the [[additive-gated-metalog-block-keeps-wire-version]]
-    // discipline: no output change, no golden movement, no version bump); the batch aligned
-    // pipeline turns it on to feed the where_set_shift coverage verdict (§5.4).
+    // existing path is byte-identical (an additive gated block keeps the wire version: no output
+    // change, no golden movement, no version bump); the batch aligned pipeline turns it on to
+    // feed the where_set_shift coverage verdict (§5.4).
     bool recognize_test_where{false};
 };
 

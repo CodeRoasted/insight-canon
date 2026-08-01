@@ -26,7 +26,8 @@ import insight.canon.internal;
 //   (`(1/10)`, `(Shard 1/5)`, `(ubuntu-latest)`) — first `)` (non-greedy)
 // A single bare digit (no `v`, no dot) is KEPT — collapsing it would over-merge (`Shard 1` vs
 // `Shard 2` are distinct WHERE, separated as instances, not fused). ASCII-only classification (no
-// locale isalnum — the [[determinism-musts]] locale hazard); pure function of the name's bytes.
+// locale isalnum — a locale-dependent classifier is a determinism hazard); pure function of the
+// name's bytes.
 //
 // `intent_id_of` = template_id_of(canonicalize_intent(name)): the 16-byte SHA-256 structural key
 // (II-1). Identity IS "the hash under the registry version", so it is co-located here, exactly as
@@ -42,7 +43,7 @@ namespace
     constexpr std::size_t kMinMaskedDigits{2}; // R3: \d{2,} — a single digit is kept
 
     // ASCII \w = [A-Za-z0-9_]. Manual (never <cctype> isalnum — locale-dependent, a determinism
-    // hazard [[determinism-musts]]); a word boundary is a transition word↔non-word.
+    // hazard); a word boundary is a transition word↔non-word.
     [[nodiscard]] constexpr bool is_word(char chr) noexcept
     {
         return (chr >= 'a' && chr <= 'z') || (chr >= 'A' && chr <= 'Z') ||

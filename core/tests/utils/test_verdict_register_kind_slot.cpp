@@ -18,7 +18,7 @@
 //   * KindSlotNegative is the SAME STRING as its positive with ONE non-prefix token inserted. Same
 //     words, same colon, one token moved — it varies POSITION while holding vocabulary fixed.
 //   * CapsAnchorSurvives re-runs every negative in CAPS. Without it, a fix that over-tightened and
-//     killed anchor #1 would pass every other row and read green ([[synthetic-gate-vacuity-vs-judgment]]).
+//     killed anchor #1 would pass every other row and read green — blind, not correct.
 //   * PrefixLengthInvariance is METAMORPHIC over ONE input — it sweeps a padding length and asserts
 //     the verdict is constant — so no constant can be tuned to satisfy it. It pins the HEAD defect
 //     (a byte budget deciding a claim) where the rows above pin the ANCHOR.

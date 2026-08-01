@@ -312,7 +312,7 @@ class JenkinsBareNullGate : public ::testing::Test
         const char* const raw{std::getenv(kCorpusVar)};
         if (raw == nullptr || *raw == '\0')
             GTEST_SKIP() << kCorpusVar
-                         << " unset — the §2a-private Jenkins marker corpus is not present.";
+                         << " unset — the private Jenkins marker corpus is not present.";
         root_ = std::filesystem::path{raw};
         ASSERT_TRUE(std::filesystem::is_regular_file(root_ / kTraceSidecar))
             << kCorpusVar << " set but " << kTraceSidecar << " missing — a wiring error.";

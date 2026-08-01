@@ -20,7 +20,7 @@
 //
 // FALSIFIABILITY — what this file DOES discharge, and what it explicitly does NOT.
 // Falsifiability is a requirement here, not a note: G1 must be OBSERVED red under a one-byte
-// mutation of the peel path, never asserted red-capable ([[synthetic-gate-vacuity-vs-judgment]]).
+// mutation of the peel path, never merely asserted red-capable.
 // A gate that cannot fail is vacuous, and "the empty stack changes nothing" is exactly the shape of
 // claim that passes for the wrong reason — it would stay green if `peel` were hard-coded to return
 // its argument for EVERY stack, which would make the whole transform vocabulary a no-op.
@@ -58,7 +58,7 @@ namespace
 
 // The shipped catalogue name. Spelled as a literal rather than read from the catalogue: a test that
 // looks the name up from the thing under test cannot notice the name changing, which is the
-// SUT==ORACLE tautology one layer down ([[synthetic-gate-vacuity-vs-judgment]]).
+// SUT==ORACLE tautology one layer down.
 constexpr std::string_view kGhaTransform{"api-rfc3339-line-prefix"};
 
 // ── The line table ────────────────────────────────────────────────────────────────────────────
@@ -77,9 +77,9 @@ struct LineCase
 constexpr std::string_view kStamp{"2026-04-15T22:20:38.2879579Z"};
 
 // Embedded NUL: built with an explicit length so the view carries the NUL rather than stopping at
-// it. Real CI logs carry these (the corpus is read with `rg -a` for exactly this reason,
-// [[workspace-search-rg-not-raw-grep]]), and a peel that round-tripped through a C string would
-// silently truncate here while every other row stayed green.
+// it. Real CI logs carry these (the corpus is read with `rg -a` for exactly this reason — a
+// text-mode read would skip the NUL-bearing lines), and a peel that round-tripped through a C
+// string would silently truncate here while every other row stayed green.
 // 28 B stamp + " ok" + NUL + "after-nul" = 41 bytes. The length is spelled out because the whole
 // point of this row is that the view must NOT stop at the NUL.
 constexpr std::string_view kNulBearing{"2026-04-15T22:20:38.2879579Z ok\0after-nul", 41U};
@@ -161,8 +161,8 @@ TEST(TransportDeclaration, DefaultDeclarationResolvesToTheDegenerateStack)
     const TransportStack stack{resolve_transport_stack(declaration)};
 
     EXPECT_TRUE(stack.empty()) << "a default-constructed IngestDeclaration must resolve to the "
-                                  "degenerate stack (ADR-23 — declaring is SUBTRACTIVE: a "
-                                  "caller who says nothing loses nothing). Got size "
+                                  "degenerate stack — declaring is SUBTRACTIVE: a caller who "
+                                  "says nothing loses nothing. Got size "
                                << stack.size();
     EXPECT_EQ(stack.size(), 0U);
 
@@ -250,8 +250,9 @@ TEST(TransportDeclaration, DeclaredStackActuallyPeels)
             // rule's effect being nothing — NOT the transform asking "is this line mine?".
             EXPECT_EQ(peeled.content, line.bytes)
                 << "case [" << idx << "] '" << line.label
-                << "': the declared row must leave an unstamped line untouched (§2 — its EFFECT is "
-                   "nothing; it does not get to decline).\n"
+                << "': the declared row must leave an unstamped line untouched — the row applies "
+                   "to every line, and on these bytes its EFFECT is nothing; it does not get to "
+                   "decline.\n"
                 << "  in : \"" << escape(line.bytes) << "\"\n"
                 << "  out: \"" << escape(peeled.content) << "\"";
         }
@@ -283,7 +284,7 @@ TEST(TransportDeclaration, DeclaredStackExtractsObservationTimeOnlyWhenTheStampP
 
     const RawPeeledLine stamped{stack.peel_raw("2026-04-15T22:20:38.2879579Z ok")};
     EXPECT_EQ(stamped.content, "ok") << "declared peel must strip the stamp AND the separator "
-                                        "space (strip_leading_space is load-bearing, ADR-23)";
+                                        "space (strip_leading_space is load-bearing)";
     EXPECT_TRUE(stamped.observation_time.has_value())
         << "the shipped row declares TransportExtract::EventObservationTime, so a parseable stamp "
            "must yield one";
@@ -311,8 +312,7 @@ TEST(TransportCatalog, ShippedRowsAreExactlyWhatTheCatalogDeclares)
     // seven; this workspace does not ship enum members with no algorithm, no row and no gate).
     // The second landed at T5 5.2 (`bracket-rfc3339-line-prefix` + G-T5-PEEL) — the co-fire the
     // version comment predicted. Pinned so that adding a member without its algorithm and its
-    // gate fails here — the anti-dormant rule with teeth
-    // ([[rip-dormant-no-premature-specialization]]).
+    // gate fails here — the anti-dormant rule with teeth.
     ASSERT_EQ(kTransportCatalogRows.size(), 2U)
         << "a new catalogue row is a catalogue-VERSION bump landing WITH its algorithm and its "
            "gate. If you are here because you added one, bump kTransportCatalogVersion and add "
@@ -334,7 +334,8 @@ TEST(TransportCatalog, ShippedRowsAreExactlyWhatTheCatalogDeclares)
         << "the bracketed form is VARIABLE width — the field is unread (the LocationRow "
            "unread-parameter precedent) and 0 says so";
     EXPECT_TRUE(bracket_row.strip_leading_space)
-        << "bundled #3 (the greedy [ \\t]+ strip) reproduced byte-exactly — ADR-23 verdict (a)";
+        << "the bracketed row must strip the separator run too — bundled behavior #3 (the greedy "
+           "[ \\t]+ strip) is reproduced by the declared row, byte-exactly";
 
     // The catalogue version is a component of every composed semantic_identity. Pinned as a
     // LITERAL: a silent bump would move every digest in the workspace, and a test that read the
@@ -474,7 +475,7 @@ constexpr std::chrono::sys_days kLastProbeDay{kClockCeiling < kCalendarCeiling ?
 
 // The oracle for "which year is this day in" is the standard calendar, deliberately NOT the
 // renderer's own `civil_from_days`: an expectation computed by the code under test is the
-// SUT==ORACLE tautology ([[synthetic-gate-vacuity-vs-judgment]]).
+// SUT==ORACLE tautology.
 [[nodiscard]] int civil_year_of(std::chrono::sys_days day) noexcept
 {
     return int{std::chrono::year_month_day{day}.year()};

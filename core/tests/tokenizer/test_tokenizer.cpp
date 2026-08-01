@@ -79,7 +79,7 @@ TEST_F(TokenizerTest, ProcessesKVLine)
 // canon-level guarantee.
 //
 // Re-homed from the former e2e do-operator substrate precondition (28-31's
-// `KvCanonPopulatesFlowCubeDimsCleanly`, ROADMAP Topic-H): that test asserted the
+// `KvCanonPopulatesFlowCubeDimsCleanly`): that test asserted the
 // same tuple on LIVE LogCraft-generated kv flow records, but the wiring it guards is
 // a single-component canon property — proven here on hand-built kv lines, decoupled
 // from the generator. The do-axis collapse claim itself stays in the playground

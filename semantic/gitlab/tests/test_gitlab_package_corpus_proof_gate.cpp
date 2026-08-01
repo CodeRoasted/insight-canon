@@ -506,7 +506,7 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
         const char* const raw{std::getenv(kCorpusVar)};
         if (raw == nullptr || *raw == '\0')
             GTEST_SKIP() << kCorpusVar
-                         << " unset — the §2a-private GitLab marker corpus is not present. Point it "
+                         << " unset — the private GitLab marker corpus is not present. Point it "
                             "at the tree holding " << kSidecarFile << ", " << kOracleFile
                          << " and data/v1/ (i.e. .../coderoast-corpora/gitlab_corpora/marker_corpus).";
 
@@ -516,7 +516,7 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
         ASSERT_TRUE(std::filesystem::is_regular_file(root_ / kSidecarFile))
             << kCorpusVar << " is set to '" << raw << "' but there is no " << kSidecarFile
             << " under it. The corpus is declared present, so this is a wiring error — unset the "
-               "variable if this machine has no §2a slice.";
+               "variable if this machine has no local copy of the private corpus.";
         ASSERT_TRUE(std::filesystem::is_regular_file(root_ / kOracleFile))
             << kCorpusVar << " is set to '" << raw << "' but there is no " << kOracleFile
             << " under it.";
@@ -821,7 +821,7 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
                         std::to_string(row.job_id) + ", banner leg '" + row.leg + "'): API '" +
                         row.job_status + "', console " + outcome_name(result.outcome) +
                         " — the console's declared subordination to the API result "
-                        "(ADR-17 D-OUT-RUN-1), a counted cell, never a row defect");
+                        "(D-OUT-RUN-1), a counted cell, never a row defect");
                 }
             }
         }
@@ -858,7 +858,7 @@ std::filesystem::path GitLabPackageCorpusProofGate::root_{};
         << "\n  markers, unstamped         : " << corpus.markers_unstamped << " (pinned "
         << kMarkersUnstamped << ")"
         << "\n  markers, STAMPED axis      : " << corpus.markers_stamped_axis << " (pinned "
-        << kMarkersStampedAxisTotal << " — studies/012's numerator)"
+        << kMarkersStampedAxisTotal << " — the recall claim's numerator)"
         << "\n  per-trace marker mismatches: " << corpus.per_trace_marker_mismatches
         << " (pinned 0)   <<< THE TRANSCRIPTION CLAIM"
         << "\n  outcome banner-modern      : " << corpus.outcome_banner_modern.success << " S / "
@@ -912,8 +912,8 @@ TEST_F(GitLabPackageCorpusProofGate, ThePopulationIsTheCommittedSidecarVerifiedA
            "failure attributed to the engine."
         << report(corpus);
     EXPECT_EQ(corpus.unclassified, kUnclassifiedTraces)
-        << "a banner the frozen classifier could not read is a named cell — studies/012 measured "
-           "0, so a nonzero count is a corpus finding, not a formatting detail."
+        << "a banner the frozen classifier could not read is a named cell — the prevalence study "
+           "measured 0, so a nonzero count is a corpus finding, not a formatting detail."
         << report(corpus);
     EXPECT_EQ(corpus.banner_modern + corpus.banner_old + corpus.void_rows + corpus.unclassified,
               corpus.rows)
@@ -947,7 +947,7 @@ TEST_F(GitLabPackageCorpusProofGate, TheMarkerLegCarriesTheRecordedDepthPerTrace
     EXPECT_EQ(corpus.stamped_traces, kStampedTraces) << report(corpus);
     EXPECT_EQ(corpus.stamped_banner_modern, kStampedBannerModern)
         << "every banner-modern trace is stamped — a drift here re-opens the leg-vocabulary "
-           "collision § 4.9(e) closed."
+           "collision (stamped and banner-modern are two axes, and only their crossing is a cell)."
         << report(corpus);
     EXPECT_EQ(corpus.stamped_banner_old, kStampedBannerOld)
         << "the 37 stamped∧banner-old contaminants are a named, scored, never-averaged cell."
@@ -960,16 +960,16 @@ TEST_F(GitLabPackageCorpusProofGate, TheMarkerLegCarriesTheRecordedDepthPerTrace
            "through stage 1 + the shipped strategy peel + the shipped recognize()."
         << report(corpus);
     EXPECT_EQ(corpus.markers_stamped_banner_old, kMarkersStampedBannerOld)
-        << "stamped∧banner-old — scored and reported, never gated as depth (§ 4.5: the old banner "
-           "leg's claim was withdrawn); pinned so the contaminant cell cannot drift silently."
+        << "stamped∧banner-old — scored and reported, never gated as depth (the old banner leg's "
+           "depth claim was withdrawn); pinned so the contaminant cell cannot drift silently."
         << report(corpus);
     EXPECT_EQ(corpus.markers_unstamped, kMarkersUnstamped)
-        << "unstamped (all banner-old) — studies/012's old-leg numerator, on the axis that study "
-           "actually cut."
+        << "unstamped (all banner-old) — the old-leg numerator, on the banner axis the prevalence "
+           "study actually cut."
         << report(corpus);
     EXPECT_EQ(corpus.markers_stamped_axis, kMarkersStampedAxisTotal)
-        << "the STAMPED-axis total — studies/012's 3193, the figure the package header's recall "
-           "claim rests on. This cell names the stamped axis: it is NOT a banner-leg number."
+        << "the STAMPED-axis total — 3193, the measured figure the package header's recall claim "
+           "rests on. This cell names the stamped axis: it is NOT a banner-leg number."
         << report(corpus);
     // Clause 5 for markers: the three cells partition every recognized marker.
     EXPECT_EQ(corpus.markers_banner_modern + corpus.markers_stamped_banner_old +
@@ -1007,8 +1007,7 @@ TEST_F(GitLabPackageCorpusProofGate, TheOutcomeLegRecoversThePlatformVerdictFrom
     EXPECT_EQ(corpus.outcome_banner_modern.aborted, kOutcomeBannerModern.aborted) << report(corpus);
     EXPECT_EQ(corpus.outcome_banner_modern.none, kOutcomeBannerModern.none)
         << "banner-modern `none` is 12 traces with NO terminal outcome line anywhere in the "
-           "console — the engine is CORRECT to report none; there is no evidence to recover "
-           "(§ 4.9(c) cell 2)."
+           "console — the engine is CORRECT to report none; there is no evidence to recover."
         << report(corpus);
     EXPECT_EQ(corpus.outcome_banner_old.success, kOutcomeBannerOld.success) << report(corpus);
     EXPECT_EQ(corpus.outcome_banner_old.failure, kOutcomeBannerOld.failure) << report(corpus);
@@ -1041,8 +1040,8 @@ TEST_F(GitLabPackageCorpusProofGate, TheOutcomeLegRecoversThePlatformVerdictFrom
     EXPECT_EQ(corpus.disagreements, kDisagreements)
         << "the disagreement cell is 3 console-vs-API divergences, ALL DECLARED — GitLab's console "
            "and GitLab's API disagreeing with each other, our rows faithfully reporting the "
-           "console. A gate pinning zero here would be pinning an artefact of not seeing "
-           "(§ 4.9(c): the pre-anchor zero was exactly that)."
+           "console. A gate pinning zero here would be pinning an artefact of not seeing — the "
+           "pre-anchor zero was exactly that."
         << report(corpus);
     EXPECT_EQ(corpus.disagreements_api_canceled, kDisagreements)
         << "every recorded divergence has API verdict `canceled` — a divergence on any other API "

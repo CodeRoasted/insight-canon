@@ -150,9 +150,8 @@ TEST(NormalizedContentDoors, NormalizedContentHasExactlyTheTwoAuditedFriends)
     const std::vector<std::string> expected{
         "friend class NormalizedLine", "friend class insight::tokenization::LogParserPasskey"};
     EXPECT_EQ(found, expected)
-        << "NormalizedContent's friend list moved — that list is the DOOR CENSUS "
-           "(ADR-21.D3): every entry is a producer "
-           "of the walkers' currency, and growth is a ruling, not an edit. Found:\n"
+        << "NormalizedContent's friend list moved — that list is the DOOR CENSUS: every entry is "
+           "a producer of the walkers' currency, so growth is a ruling, not an edit. Found:\n"
         << ::testing::PrintToString(found);
 }
 
@@ -163,9 +162,10 @@ TEST(NormalizedContentDoors, TheMintKeyHasExactlyOneFriendAndItIsTheParser)
     const std::vector<std::string> found{friends_of(parse, "LogParserPasskey")};
     const std::vector<std::string> expected{"friend class LogParser"};
     EXPECT_EQ(found, expected)
-        << "the passkey's friend list is pinned at ONE (Eqya ruling 1 on DONE Daidalos-1: "
-           "asserted, not watched). Growing it — e.g. to reach the mint from the conformance kit "
-           "— deletes the mechanism (§12.5.2's named shortcut). Found:\n"
+        << "the passkey's friend list is pinned at ONE, and that one is the parser — asserted "
+           "here, not merely watched. Growing it — e.g. to reach the mint from the conformance "
+           "kit — deletes the mechanism: the passkey exists so that LogParser is the only minter "
+           "of normalized content. Found:\n"
         << ::testing::PrintToString(found);
 }
 

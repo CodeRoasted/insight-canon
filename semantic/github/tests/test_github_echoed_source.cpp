@@ -62,7 +62,7 @@ TEST(GithubEchoedSource, CommandEchoWrappedLineIsRecognized)
     EXPECT_TRUE(is_echoed_source("\x1b[36;1mset -e\x1b[0m"))
         << "a wrapped script line, no timestamp";
     EXPECT_FALSE(is_echoed_source(gha("\x1b[36;1m    exit 1\x1b[0m")))
-        << "⚠ T4 (ADR-23): the hook's own leading-stamp skip is RIPPED. It used to call "
+        << "⚠ T4: the hook's own leading-stamp skip is RIPPED. It used to call "
            "is_github_actions_prefix and skip 28 bytes — a per-line CONTENT test deciding where the "
            "visible content starts, i.e. a second, undeclared transport strip hidden inside a "
            "provenance predicate. A still-stamped line is now correctly NOT recognized; the caller "
