@@ -26,6 +26,45 @@ export namespace insight::tokenization
 // cross-line data (D-TID-2: discover→decide). This is the sole identity source (the clustering tree
 // it replaced is RIPPED — SRC-D-TID-3).
 //
+// ── The composite-normalizer contracts, DECLARED ────────────────────────────────────
+// These govern what `stateless_template()` OBSERVABLY returns, so they are interface
+// content, not implementation detail: each names a token class and the normal form it
+// collapses to. The normalizers themselves are TU-local statics in `mask.cpp`, which
+// CITES this block. Where the rule's boundary matters more than its action, the boundary
+// is stated too.
+//
+//
+// SRC-D-MSK-1 — DIAGNOSTIC_COMPOSITE. A token is split on `:` and `/` and each SEGMENT is
+//   masked independently when it is digit-leading. Collapses the Chromium/glog prefix
+//   `[PID:DATE/TIME:LEVEL:file.cc:line]` and SUBSUMES the older source-location rule: one
+//   general segment rule replaces a family of shape-specific ones.
+// SRC-D-MSK-2 — EPHEMERAL_ROOT, the standalone form. A path under a CATALOGUED root
+//   (`/tmp/…`) masks the instance component only: `/tmp/<*>`, never the remainder. The
+//   root is the decidable thing; what sits under it is content a bug report needs kept.
+// SRC-D-MSK-4 — the ephemeral-root CATALOG plus its matcher, applied at every call site
+//   from ONE table. The matcher reads a trailing window of up to `kMaxRootSegments`
+//   components (M2); the same catalog serves the in-token path (M3/M4) and the standalone
+//   rule above (M5). One catalog, three call sites: a second copy is how two maskers
+//   diverge and template identity stops being a pure function of the line.
+// D-MSK-5 — BRACKET_TIMESTAMP (declaration written, prefix DEFERRED: this code is the
+//   worked example of the bare form inside ADR-6.D8, and that file cannot be edited
+//   in-session; migrating here would falsify it). A WHOLE-token bracketed RFC3339 datetime
+//   (`[2026-06-23T15:11:09.020Z]`) masks to `[<*>]` instead of falling through to literal
+//   KEEP. The bracket is the entire difference: an unbracketed stamp is digit-leading and
+//   was already masked, so only this token class moves.
+// SRC-D-TID-13b — a class PREFIX inside the bracket survives the mask: `make[<*>]:`,
+//   `[gw<*>]`. The prefix is vocabulary and identifies the producer; only the index is
+//   high-cardinality, so masking the whole bracket would destroy the distinction the
+//   template exists to carry.
+// SRC-D-TID-17 — `key=<numeric-value>` masks the VALUE and keeps the KEY. The key is the
+//   field's name and is low-cardinality; the value is the instance.
+// SRC-D-TID-5 — a line's own tokens are the ONLY input. Equating two spellings of a
+//   varying word (a synonym, a reworded message) would require cross-line learning, which
+//   is what the ripped clustering did and what made template_id order-dependent. That work
+//   belongs to the deferred registry (SRC-D-TID-14), never to this masker: the cost of the
+//   miss is a Vanished+New pair, which is honest; the cost of the fix here is a false
+//   identity, which is not.
+//
 // Result is arena-stable until out_arena.reset() (or destruction); `params` are the
 // raw tokens at fully-masked (<*>) positions, as views into `content` (which the
 // caller must keep stable for the params' lifetime).

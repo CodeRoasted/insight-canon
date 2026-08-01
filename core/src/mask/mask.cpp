@@ -18,6 +18,9 @@ import insight.canon.detail.scan; // canonical char-class predicates (is_digit /
 // RIPPED; only the per-token mask predicates and the masker survive. Token masking
 // (IPv4, hex, digit-leading, UUID/long-hash, composites) uses constexpr hand-written
 // scanners — zero RE2.
+//
+// The composite-normalizer CONTRACTS are declared in `canon.detail.mask.cppm`, beside the
+// exported masker whose observable output they govern — see there (ADR-6.D8 house form).
 
 namespace insight::tokenization
 {
@@ -150,7 +153,7 @@ namespace
                equals_ascii_lower(tok, "exit") || equals_ascii_lower(tok, "signal");
     }
 
-    // ── Ephemeral-root catalog + matcher (D-MSK-4) ───────────────────────────
+    // ── Ephemeral-root catalog + matcher (SRC-D-MSK-4) ───────────────────────────
     // A path component sitting DIRECTLY under a declared ephemeral root is a per-run instance by
     // construction (a conan build dir `.conan2/p/b/insig247e3d1dffc33`, a nix store hash, a random
     // `/tmp/pw-electron-userdata-Kw9v4a`). study 011 proved NO hex/length rule can separate
@@ -222,7 +225,7 @@ namespace
         bool at_token_start{false};
     };
 
-    // THE MATCHER (D-MSK-4 M2). Given the trailing window of up to kMaxRootSegments components
+    // THE MATCHER (SRC-D-MSK-4 M2). Given the trailing window of up to kMaxRootSegments components
     // ending at the CURRENT one (window.back()), does a declared root END here, and with what
     // scope? Longest declared root ending here wins (order-independent). Returns nullopt otherwise.
     [[nodiscard]] inline std::optional<RootScope>
@@ -269,7 +272,7 @@ namespace
         return best;
     }
 
-    // Composite-token masking, DIAGNOSTIC_COMPOSITE class (D-MSK-1).
+    // Composite-token masking, DIAGNOSTIC_COMPOSITE class (SRC-D-MSK-1).
     //
     // The fixed masks mask only WHOLE tokens that are digit-leading / IPv4 / hex. A
     // `:`/`/`-structured diagnostic token is none of those, so every numeric instance
@@ -302,7 +305,7 @@ namespace
     // bit-identical. Returns true and fills `out` only when ≥1 segment was masked AND an anchor
     // exists; false (leaving the dispatch to fall through) otherwise.
     // One coherent per-token masking routine: the `:`/`/` segment walk, the letter-KEEP /
-    // digit-MASK / status carve-out classification, and the D-MSK-4 ephemeral-root instance masking
+    // digit-MASK / status carve-out classification, and the SRC-D-MSK-4 ephemeral-root instance masking
     // all share the same left-to-right pass over `out`/prev_core/window — a split fragments the
     // single scan and its determinism.
     // NOLINTNEXTLINE(readability-function-cognitive-complexity)
@@ -324,7 +327,7 @@ namespace
         bool has_letter_anchor{false};
         std::string_view prev_core{}; // the previous segment's core — for the status carve-out
         std::size_t seg_start{0};
-        // D-MSK-4 M3/M4: the ephemeral-root matcher over the SAME catalog as call site B. When a
+        // SRC-D-MSK-4 M3/M4: the ephemeral-root matcher over the SAME catalog as call site B. When a
         // declared root ends at a component, the NEXT component is a per-run instance and masks to
         // <*> regardless of its leading char (overriding the letter-leading KEEP); scope is CLAMPED
         // to Instance here so the file:line tail is never masked, and classification resumes from
@@ -425,7 +428,7 @@ namespace
         return masked && has_letter_anchor;
     }
 
-    // EPHEMERAL_ROOT standalone rule (D-MSK-2, re-expressed for D-MSK-4 M5). Reached only for
+    // EPHEMERAL_ROOT standalone rule (SRC-D-MSK-2, re-expressed for SRC-D-MSK-4 M5). Reached only for
     // tokens rule #1 did not claim (no ':digit'). Split the path on '/', run the shared matcher
     // (kEphemeralRoots above), and honor the DECLARED scope: `Subtree` collapses the whole
     // remainder (`<root>/<*>`, byte-identical to -5 for every existing entry); `Instance` masks the
@@ -575,7 +578,7 @@ namespace
     // BRACKET_INDEX composite: `<word>[<short-alpha>?<digits>]<rest>`. Recursion depth,
     // worker/shard indices ("make[2]:", "thread[15]", pytest-xdist "[gw0]") otherwise
     // template per index. Normalize the bracketed digit run, KEEPING any short alpha
-    // class-prefix inside the bracket → `make[<*>]:`, `[gw<*>]` (D-TID-13b generalizes
+    // class-prefix inside the bracket → `make[<*>]:`, `[gw<*>]` (SRC-D-TID-13b generalizes
     // pure-`[N]` to `[<prefix><N>]`: keep the stable class marker, mask the varying index).
     [[nodiscard]] inline bool normalize_bracket_index(std::string_view tok, std::string& out)
     {
@@ -785,7 +788,7 @@ namespace
     // new/vanished pair per run). EXCLUDES a status value (`code=0` / `status=500`) so a
     // green→red flip stays distinct — the KV form of the #1 status-value KEEP carve-out.
     // A value-WORD (`user=alice`) is NOT masked (value not digit-leading → kept); that
-    // varying word is the deferred registry's job (D-TID-5/SRC-D-TID-14). The CI-revert re-measure
+    // varying word is the deferred registry's job (SRC-D-TID-5/SRC-D-TID-14). The CI-revert re-measure
     // (§8) did not surface this — CI tokens are space-separated, LogCraft wraps in `key=`.
     [[nodiscard]] inline bool normalize_kv_value(std::string_view tok, std::string& out)
     {
@@ -835,15 +838,15 @@ namespace
     // stated so future drift between them has a rule to violate loudly.
     constexpr std::array<CompositeRule, 9U> kCompositeRules{{
         {.name = "diagnostic_composite",
-         .normalize = normalize_diagnostic_composite},                           // D-MSK-1  (-4)
-        {.name = "ephemeral_root", .normalize = normalize_ephemeral_root},       // D-MSK-2  (-4)
+         .normalize = normalize_diagnostic_composite},                           // SRC-D-MSK-1  (-4)
+        {.name = "ephemeral_root", .normalize = normalize_ephemeral_root},       // SRC-D-MSK-2  (-4)
         {.name = "versioned_ref", .normalize = normalize_versioned_ref},         // D-TID-12 #2
         {.name = "bracket_timestamp", .normalize = normalize_bracket_timestamp}, // D-MSK-5  (-8)
         {.name = "bracket_index", .normalize = normalize_bracket_index},         // SRC-D-TID-13(b)
         {.name = "hash_counter", .normalize = normalize_hash_counter},           // SRC-D-TID-13(a)
         {.name = "marker_number", .normalize = normalize_marker_number}, // SRC-D-TID-22 (-3)
         {.name = "embedded_identity", .normalize = normalize_embedded_identity}, // D-TID-12 #3
-        {.name = "kv_value", .normalize = normalize_kv_value},                   // D-TID-17
+        {.name = "kv_value", .normalize = normalize_kv_value},                   // SRC-D-TID-17
     }};
 
     template <typename Cb>

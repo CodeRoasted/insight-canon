@@ -162,12 +162,12 @@ TEST(StatelessTemplate, BracketTimestampDeclinesEverythingAdjacentToTheClass)
     EXPECT_EQ(masked("[42] x", arena), "[<*>] x") << "bracket_index's claim, unchanged";
 }
 
-// ── D-MSK-1 — generalized composite-numeric masking (Chromium/Electron prefix) ─────────
+// ── SRC-D-MSK-1 — generalized composite-numeric masking (Chromium/Electron prefix) ─────────
 // The glog/Chromium diagnostic prefix `[PID:MMDD/HHMMSS.micros:ERROR:file.cc:line]` is ONE
 // whitespace-delimited token. The old source-location normalizer masked only the trailing
 // `:line` and kept the whole `/`-bearing prefix as "path-like", so the high-cardinality
 // PID/date/time segments survived → a line byte-identical in baseline read as a NEW error
-// pattern (P6 dbus, 12×/12×). D-MSK-1 masks EVERY digit-leading sub-segment independently,
+// pattern (P6 dbus, 12×/12×). SRC-D-MSK-1 masks EVERY digit-leading sub-segment independently,
 // keeping the letter-leading class anchors (ERROR, dbus, bus.cc) → both sides collapse to
 // one template → not-new → dropped.
 TEST(StatelessTemplate, DiagnosticCompositeCollapsesChromiumPrefix)
@@ -208,7 +208,7 @@ TEST(StatelessTemplate, DiagnosticCompositeKeepsStatusValuePerSegment)
         << "exit:0 ≠ exit:1 — the colon-form of the exit-code carve-out, per-segment";
 }
 
-// ── D-MSK-2 — ephemeral-root path masking (randomized temp dirs, P6) ────────────
+// ── SRC-D-MSK-2 — ephemeral-root path masking (randomized temp dirs, P6) ────────────
 // Playwright temp dirs `/tmp/pw-electron-userdata-Kw9v4a` carry a random base-62 suffix —
 // letter-leading, not hex/UUID, so the existing masks keep it literal → a new template per
 // run → novelty fatigue. The suffix is undecidable, but the ROOT is an enumerable byte-exact
@@ -479,7 +479,7 @@ TEST(StatelessTemplate, HexClassifierFoldsAsciiCase)
         << " (kept)\n  actual: " << non_hex;
 }
 
-// ── D-MSK-4 gates: ephemeral-root masking ──
+// ── SRC-D-MSK-4 gates: ephemeral-root masking ──
 // The ROOT — not a hex/length heuristic (study 011 falsified that) — is the decidable thing. A
 // path component directly under a declared ephemeral root is a per-run instance and masks to <*>;
 // the location tail is protected. G-MSK-1..7 are the builder's contract.
@@ -513,7 +513,7 @@ TEST(EphemeralRootMask, G2_TailSurvives)
 TEST(EphemeralRootMask, G3_ContentClassStaysLiteral)
 {
     ArenaAllocator arena{256U * 1024U};
-    // None of these sits under a catalogued root, so D-MSK-4 must not touch them (over-mask check).
+    // None of these sits under a catalogued root, so SRC-D-MSK-4 must not touch them (over-mask check).
     // A pinned action SHA path (its change is drift we WANT surfaced) keeps its class anchors and
     // gains NO ephemeral artifact.
     const std::string sha{masked("_actions/actions/create-github-app-token/"
@@ -533,7 +533,7 @@ TEST(EphemeralRootMask, G3_ContentClassStaysLiteral)
 TEST(EphemeralRootMask, G4_TmpSubtreeRegressionByteIdentical)
 {
     ArenaAllocator arena{256U * 1024U};
-    // D-MSK-2 regression: a /tmp subtree collapses exactly as under -5.
+    // SRC-D-MSK-2 regression: a /tmp subtree collapses exactly as under -5.
     EXPECT_EQ(masked("/tmp/pw-electron-userdata-Kw9v4a", arena), "/tmp/<*>");
 }
 

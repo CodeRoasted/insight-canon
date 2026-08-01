@@ -43,14 +43,14 @@ using EventID = uint64_t;
 // (severity-from-severity_number + trace-context routing + the trace-scoped graph —
 // ADR-29 D-OTEL-2, unconditional); -3 = currency-marker numerics
 // (stateless_template_id.md SRC-D-TID-22 — `$463`/`total=$463` mask to `$<*>`/`total=$<*>`); -4 =
-// the 1.6.4 masking batch (detection_provenance_and_legibility.md): D-MSK-1 generalized
+// the 1.6.4 masking batch (detection_provenance_and_legibility.md): SRC-D-MSK-1 generalized
 // diagnostic-composite masking (per-`:`/`/`-segment digit-leading rule — collapses the
-// Chromium/glog prefix `[PID:DATE/TIME:LEVEL:file.cc:line]`, subsumes source-location), D-MSK-2
+// Chromium/glog prefix `[PID:DATE/TIME:LEVEL:file.cc:line]`, subsumes source-location), SRC-D-MSK-2
 // ephemeral-root path catalog (`/tmp/…` → `/tmp/<*>`), and SRC-D-MSK-3 JSON nested-`fields`
 // component/level descent (a cube-axis change folded into the same bump). The -4 content changes
 // ONLY for inputs carrying a diagnostic-composite / ephemeral-root token or a nested-`fields` JSON
 // record; every other document is byte-identical except this version string. -5 = D-OTEL-15
-// (`4e46af0`); -6 = the D-MSK-4 batch — canon ephemeral-root masking + the lexicon-context
+// (`4e46af0`); -6 = the SRC-D-MSK-4 batch — canon ephemeral-root masking + the lexicon-context
 // precision fix (`9c5db20`); -7 = SRC-D-NOTE-1, the NOTE register: a failure word inside a compiler
 // note's message (`<path>:<line>:<col>: note: … failed:`) no longer confers a failure verdict, so
 // the serialized `dominant_level` of a gcc/clang cascade's note lines moves Error → Unknown.

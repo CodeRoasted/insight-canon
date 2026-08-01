@@ -351,7 +351,7 @@ TEST(InferLeadingLogLevel, EmbeddedFailureSubstringIsNotError)
         << "'fault' is not a standalone failure cue (only 'segfault' is)";
 }
 // Recall guard: a CamelCase exception type in verdict register is the failure cue even with
-// no other error word on the line. D-MSK-4 (2026-07-21): the type anchors ONLY in verdict
+// no other error word on the line. SRC-D-MSK-4 (2026-07-21): the type anchors ONLY in verdict
 // register (colon/caps/bracket/✗-led); a bare `raise ValueError(...)` source echo no longer
 // promotes to Error — but the thrown `ValueError: …` verdict line still does.
 TEST(InferLeadingLogLevel, CamelCaseErrorTypeIsError)

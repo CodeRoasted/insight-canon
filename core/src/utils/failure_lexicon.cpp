@@ -404,7 +404,7 @@ namespace
         return false; // no leading fail glyph within the head
     }
 
-    // SRC-D-OUT-4b (D-MSK-4 cut, 2026-07-21 ruling): a CamelCase error-TYPE token anchors a failure
+    // SRC-D-OUT-4b (SRC-D-MSK-4 cut, 2026-07-21 ruling): a CamelCase error-TYPE token anchors a failure
     // cue ONLY when it is verdict-anchored — the register/position discriminator, stated literally.
     // A thrown verdict (`TypeError:`, `[Error]`, CAPS) fires; a type NAMED but not thrown does not.
     // The prior `|| !leads_with_descriptive_glyph(line)` fallback was a one-entry denylist built

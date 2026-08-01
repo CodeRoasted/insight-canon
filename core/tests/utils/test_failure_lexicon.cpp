@@ -40,7 +40,7 @@ TEST(FailureLexicon, StandaloneWordIsACue)
     EXPECT_TRUE(contains_failure_cue("kernel: segfault at 0x0 ip ...")) << "'segfault'";
 }
 
-// ── CamelCase exception types are a cue ONLY in verdict register (D-MSK-4 ruling) ──
+// ── CamelCase exception types are a cue ONLY in verdict register (SRC-D-MSK-4 ruling) ──
 // SRC-D-OUT-4b re-baselined 2026-07-21: error_type_anchors == is_verdict_anchored. A …Error/
 // …Exception type fires when it carries verdict register (a `:` verdict colon, caps, a
 // [bracket], or a ✗-led line); a BARE type in prose / a source-echo (`raise ValueError`,
@@ -91,7 +91,7 @@ TEST(FailureLexicon, CamelCaseErrorTypeDemotedInDescriptiveRegister)
     EXPECT_TRUE(contains_failure_cue("FrameworkError: connection reset by peer"))
         << "a `:`-bound thrown type is a verdict — still fires (no ▶ lead)";
     EXPECT_FALSE(contains_failure_cue("raise FrameworkError"))
-        << "D-MSK-4: a bare non-▶ echo with no verdict register no longer fires — the "
+        << "SRC-D-MSK-4: a bare non-▶ echo with no verdict register no longer fires — the "
            "discriminator "
            "is register (is_verdict_anchored), and the actual `FrameworkError: …` line still fires";
     EXPECT_TRUE(contains_failure_cue("\xE2\x9C\x97 teardown threw FrameworkError"))
@@ -228,7 +228,7 @@ TEST(FailureLexicon, VerdictAnchoredFailureSurvives)
     EXPECT_TRUE(contains_failure_cue("testSitesStats (FAILED)")) << "paren+caps '(FAILED)'";
     EXPECT_TRUE(contains_failure_cue("##[error]Process completed with exit code 1"))
         << "bracket-bound '[error]' (GitHub Actions marker)";
-    // CamelCase error TYPE in verdict register (a `:` verdict colon) — D-MSK-4: the type is a
+    // CamelCase error TYPE in verdict register (a `:` verdict colon) — SRC-D-MSK-4: the type is a
     // cue only in register; the `raise ValueError("bad input")` source echo (shape `Type(`, no
     // colon) is NOT verdict register and no longer fires, but the thrown `ValueError:` line does.
     EXPECT_TRUE(contains_failure_cue("ValueError: bad input")) << "CamelCase error TYPE, colon";
@@ -470,7 +470,7 @@ TEST(FailureLexicon, ScanLimitBoundsTheHead)
     EXPECT_FALSE(contains_failure_cue(line, 20))
         << "the late 'ERROR' STARTS past a 20-char head — out of head, not unanchored";
     // A token that STARTS within the head but extends past it is fully captured. Uses a
-    // verdict-register cue (colon) — D-MSK-4: a bare `OperationalError` echo is no longer a cue.
+    // verdict-register cue (colon) — SRC-D-MSK-4: a bare `OperationalError` echo is no longer a cue.
     EXPECT_TRUE(contains_failure_cue("OperationalError: happened later", 5))
         << "the cue token starts at offset 0, within the head";
 }
