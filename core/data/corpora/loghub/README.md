@@ -2,8 +2,8 @@
 
 Real-world log datasets from the academic **LogHub** collection — the structural ground truth for
 cube measurement, the cross-stdlib determinism measurement, and the rich-format AMI re-measure
-(decision #1). Registered in [../REGISTRY.md](../REGISTRY.md); governed by
-[ADR-7](../../../../../technical_docs/adr/007-corpus-storage-and-governance.md).
+(decision #1). Registered in [../REGISTRY.md](../REGISTRY.md); governed by ADR-7, corpus storage &
+governance (an internal CodeRoast record, not shipped here).
 
 ## Intent / test-purpose
 
