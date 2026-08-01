@@ -2,7 +2,7 @@
 // Unit tests: allow short identifiers and test-specific patterns
 // tests/utils/test_ingest_normalization_level_flip.cpp
 //
-// THE ONE TO-PASSING FLIP, pinned as a literal (ADR-21 · the register half is ADR-20.D3).
+// THE ONE TO-PASSING FLIP, pinned as a literal (· the register half is).
 // The ingest-normalization measurement moved 436 GHA quanta to-FAILING and — on the GitLab
 // control — a single quantum to-PASSING. A to-passing flip is a possible RECALL LOSS: a real failure
 // the change would suppress. It was the only measurement pointing that way, so it was carried as

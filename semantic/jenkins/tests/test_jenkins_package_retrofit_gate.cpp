@@ -17,7 +17,7 @@
 //     (the REST `result` rules the run grain; wfapi's run status is a corroborate surface —
 //     §2's pre-registered authority map). Unstable is FIRST-CLASS and pinned 4/4 by name.
 //   * The frozen external Jenkins depth/outcome claim does NOT widen on a green — a green makes
-//     the existing words AUDITED, which is the entire deliverable (§5).
+//     the existing words AUDITED, which is the entire deliverable.
 //
 // ═══ THE POPULATION AND THE THREE COMMITTED ORACLE FILES (clauses 1/4; §3) ═══
 //   * `RETRO-v2.trace-sidecar.tsv` — the committed projection of the 113 corpus.jsonl records
@@ -54,7 +54,7 @@
 // TRANSCRIPTION-DIVERGED event: stop, report to the Founder — pre-named claim retraction, never
 // a bug row.
 //
-// ═══ CLAUSE MAP (corpus_backed_gates.md §2) ═══
+// ═══ CLAUSE MAP ═══════════════════════════════
 //   1 committed population, sorted, uncapped     → the trace sidecar
 //   2 UNSET ⇒ skip; SET-BUT-BROKEN ⇒ hard fail   → SetUp()
 //   3 population SIZE selects the pins (113 asserted, not observed); unrecognized ⇒ FAIL
@@ -152,7 +152,7 @@ constexpr std::size_t kWorkflowJobs{67}; // wfapi ⟺ WorkflowJob exactly — ab
 constexpr std::size_t kStageBearingTrees{64};
 constexpr std::size_t kWfapiStageRows{442};
 constexpr std::size_t kWfapiStepSum{2145};
-constexpr std::size_t kUnstableWfapiStages{12}; // counted HERE, asserted nowhere else (§9.4)
+constexpr std::size_t kUnstableWfapiStages{12}; // counted HERE, asserted nowhere else
 constexpr std::size_t kElided{12};
 constexpr std::size_t kResultSuccess{72};
 constexpr std::size_t kResultFailure{28};
@@ -1010,7 +1010,7 @@ TEST_F(JenkinsRecognizerRetrofitGate, LS1StageNamesAgreeWithThePlatformTree)
     // per-trace hits — a compensating-error pass across traces is structurally excluded.
     EXPECT_EQ(corpus.s1_per_trace_mismatches, 0U) << report(corpus);
 
-    // The cells, by depth_type × elided (elided segregated — one-signed confound, §9.3).
+    // The cells, by depth_type × elided (elided segregated — one-signed confound).
     // Axis: 64 stage-bearing trees / 442 wfapi stages. Declarative is the claim carrier;
     // scripted / matrix-pipe corroborate. Depth sums reproduce TABLE 2b: 220/220 · 27/27 ·
     // 160/195.

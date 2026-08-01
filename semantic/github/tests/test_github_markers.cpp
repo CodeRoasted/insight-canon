@@ -32,7 +32,7 @@ using insight::tokenization::recognize;
 namespace
 {
 // The composition under test: the github package alone, RESOLVED for a stream that declared this
-// dialect and ONE IntentChannel (ADR-22 / ADR-22). Both coordinates are REQUIRED here
+// dialect and ONE IntentChannel. Both coordinates are REQUIRED here
 // on purpose — GHA is the dialect that actually has two materializations, so "which channel" is
 // part of every recognition question about it, and after T4 "which dialect" is part of every one
 // too. A test that did not say would be asking an ill-posed question. `channel` names a declared
@@ -87,7 +87,7 @@ TEST(GithubMarkers, RecognizesJobAndStepBanners)
     EXPECT_EQ(step.name, "actions/checkout@v4") << "raw step payload wrong: " << show(step);
 }
 
-// ── One Step intent, the real channel and our ablation, ONE identity (ADR-22) ──
+// ── One Step intent, the real channel and our ablation, ONE identity ──
 // The same step banner reads back to the same identity from GHA's real `##[group]Run <cmd>` and
 // from the bare `Run <cmd>` our degrade() ablation produces. Each fires under ITS declared channel
 // and both extract the IDENTICAL payload — which is what makes the channel a materialization detail

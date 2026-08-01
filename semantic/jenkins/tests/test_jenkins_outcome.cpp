@@ -100,7 +100,7 @@ TEST(JenkinsOutcome, BareFreestyleEpilogueStillResolves)
 {
     const ComposedSemantics composed{jenkins_only()};
     // A freestyle console: NO [Pipeline] skeleton, NO timestamper — the epilogue alone latches the
-    // dialect and carries the verdict (outcome depth is universal to any Jenkins job, §8).
+    // dialect and carries the verdict (outcome depth is universal to any Jenkins job).
     const std::vector<std::string> lines{"checking out sources", "compiling", "Finished: ABORTED"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
     ASSERT_TRUE(scan.marker_present);

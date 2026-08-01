@@ -3,7 +3,7 @@
 // (DN-15; the G1-PEEL shape one row over; ADR-23 Part 1's owed
 // obligation for Timestamper, discharged).
 //
-// ═══ THE ORACLE IS A FROZEN COPY (ADR-8) ═══
+// ═══ THE ORACLE IS A FROZEN COPY ═══════════
 // Taken VERBATIM from `semantic/jenkins/src/jenkins_strategy.cpp` at insight-canon commit
 // `f5e4838` — the last commit before T5 5.2 deleted that detection from production. Its
 // provenance lives HERE, in the gate, and not only in the `git log` of a deleted file. It is

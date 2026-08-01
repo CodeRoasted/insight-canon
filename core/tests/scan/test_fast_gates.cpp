@@ -271,7 +271,7 @@ TEST(FastGatesScan, SvTakeBracketedAndQuoted)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TokenShape — the one-pass per-token byte profile (canon.detail.scan §8.2).
+// TokenShape — the one-pass per-token byte profile (canon.detail.scan).
 //
 // TokenShape collapses three scans the masker's KEEP/MASK/NORMALIZE dispatch used
 // to run per token (is_all_digits, is_digit_leading, the maybe_composite separator

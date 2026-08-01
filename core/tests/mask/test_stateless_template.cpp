@@ -4,7 +4,7 @@
 // (the whole point, §9.5). The F13 masker-cardinality RE-MEASURE lived here as an
 // env-gated CardinalityOnCorpus test; it is a measurement over an operator-mounted
 // population, not a regression property, so it moved out of the unit tree to the CLI
-// instrument `core/tools/f13_cardinality_measure.cpp` (corpus_backed_gates.md § 3.3).
+// instrument `core/tools/f13_cardinality_measure.cpp`.
 
 #include <gtest/gtest.h>
 
@@ -332,7 +332,7 @@ TEST(StatelessTemplate, CurrencyMarkerNumberMasked)
     EXPECT_NE(masked("ref $42abc", arena), masked("ref $99xyz", arena));
 }
 
-// ── Constant-pinning guards (studies/011 §7) ─────────────────────────────────────
+// ── Constant-pinning guards ──────────────────────────────────────────────────────
 // WHY THESE EXIST, and why the suite above does not already cover them: every test
 // above asserts a COLLAPSE (`masked(a) == masked(b)`), which stays green for ANY hash
 // floor — both sides mask, or both stay literal, either way they match. Mutation
@@ -479,7 +479,7 @@ TEST(StatelessTemplate, HexClassifierFoldsAsciiCase)
         << " (kept)\n  actual: " << non_hex;
 }
 
-// ── D-MSK-4 gates: ephemeral-root masking (canon_ephemeral_root_masking.md §7) ──
+// ── D-MSK-4 gates: ephemeral-root masking ──
 // The ROOT — not a hex/length heuristic (study 011 falsified that) — is the decidable thing. A
 // path component directly under a declared ephemeral root is a per-run instance and masks to <*>;
 // the location tail is protected. G-MSK-1..7 are the builder's contract.

@@ -503,7 +503,7 @@ TEST(InferLeadingLogLevel, LeadingBareLevelWordDemotedWhenUnanchored)
         << "caps + colon — authoritative, preserved";
 }
 
-// ── SRC-D-CNT-1 — count register at the LEVEL altitude (§3.2) ──────────────────────
+// ── SRC-D-CNT-1 — count register at the LEVEL altitude ─────────────────────────────
 // infer_leading_log_level is what the diff consumes. A count-register failure word
 // ("1 failure", "5 failed") is a SUMMARY: it must NOT confer an alerting verdict tier
 // (Error/Fatal), but it still surfaces — capped at Warn (demote, never suppress). This is
@@ -525,7 +525,7 @@ TEST(InferLeadingLogLevel, CountRegisterSummaryCapsAtWarn)
         << "'failed' preceded by 'test' (not the count '1') — a real per-item failure, stays Error";
 }
 
-// ── SRC-D-OUT-2 — leading pass WORD demotes the level (§3.3) ───────────────────────
+// ── SRC-D-OUT-2 — leading pass WORD demotes the level ──────────────────────────────
 // A passing TAP/node-runner assertion ("ok 1 - … failed …") whose description embeds
 // failure vocab must not earn an alerting level. The pass WORD demotes ONLY as the first
 // significant token (the count register is the independent backstop for "25 passed, …").

@@ -16,7 +16,7 @@
 //     `test_transport_peel_equivalence_gate.cpp` in THIS directory. It once homed in
 //     `semantic/github/tests/` because it needed the shipped `GitHubActionsStrategy::parse` in
 //     scope; post-T4 the oracle is frozen INLINE in the gate and the SUT is core's
-//     `TransportStack::peel`, so it is core's (corpus_backed_gates.md § 5).
+//     `TransportStack::peel`, so it is core's.
 //
 // FALSIFIABILITY — what this file DOES discharge, and what it explicitly does NOT.
 // §9 makes falsifiability a requirement, not a note: G1 must be OBSERVED red under a one-byte
@@ -245,7 +245,7 @@ TEST(TransportDeclaration, DeclaredStackActuallyPeels)
         }
         else
         {
-            // TOTALITY IS ABOUT APPLICATION, NOT EFFECT (ADR-23). The row is applied to every
+            // TOTALITY IS ABOUT APPLICATION, NOT EFFECT. The row is applied to every
             // line unconditionally; on these bytes its effect is nothing. That is the declared
             // rule's effect being nothing — NOT the transform asking "is this line mine?".
             EXPECT_EQ(peeled.content, line.bytes)

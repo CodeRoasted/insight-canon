@@ -1,6 +1,6 @@
 // NOLINTBEGIN — unit test: short identifiers and literals are fine.
 // test_template_id.cpp — the D-TIR-1 invariants for canon's TemplateId
-// (insight_perf_template_id.md §2). These are the golden-preserving guards the whole
+// These are the golden-preserving guards the whole
 // perf refactor rests on: byte-lexicographic order == "h:"+hex order, render/parse
 // round-trip, content determinism, and a working std::hash specialization.
 

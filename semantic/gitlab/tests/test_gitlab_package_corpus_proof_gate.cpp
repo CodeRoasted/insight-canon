@@ -12,7 +12,7 @@
 //   * OUTCOME AXIS — RECOVERY OF THE PLATFORM'S RECORDED VERDICT from console bytes alone, on a
 //     declared leg (§ 4.9(c)): the oracle is GitLab's own REST `job_status`, a producer this
 //     codebase never authored. Stronger than transcription; still NOT external validity — one
-//     corpus, one roster (§ 4.7).
+//     corpus, one roster.
 //   * It does NOT re-earn, widen, or re-open the depth claim (outcome A is Eqya's and rests on the
 //     corpus); it says NOTHING about prevalence beyond the corpus's declared residuals.
 //
@@ -53,7 +53,7 @@
 //     repo's governance (§ 4.9(a)), not this binary's — this gate cannot see the JSON and does not
 //     try to.
 //
-// ═══ CLAUSE MAP (§ 2) ═══
+// ═══ CLAUSE MAP ═════════
 //   1 committed population, sorted, uncapped     → the sidecar, above
 //   2 UNSET ⇒ skip; SET-BUT-BROKEN ⇒ hard fail   → SetUp()
 //   3 population SIZE selects the pins; an unrecognized population FAILS, never skips
@@ -162,7 +162,7 @@ constexpr std::size_t kApiCanceled{25};
 constexpr std::size_t kStampedTraces{482};
 constexpr std::size_t kStampedBannerModern{445}; // every banner-modern trace is stamped
 constexpr std::size_t kStampedBannerOld{37};     // the contaminant cell — scored, never averaged in
-// CORROBORATED — markers through the shipped ingest assembly (§ 4.9(e)'s join + studies/012):
+// CORROBORATED — markers through the shipped ingest assembly ((e)'s join):
 constexpr std::size_t kMarkersBannerModern{2963};     // banner-modern (all stamped)
 constexpr std::size_t kMarkersStampedBannerOld{230};  // stamped ∧ banner-old
 constexpr std::size_t kMarkersUnstamped{294};         // unstamped (all banner-old) — studies/012's 294
@@ -921,7 +921,7 @@ TEST_F(GitLabPackageCorpusProofGate, TheMarkerLegCarriesTheRecordedDepthPerTrace
     const CorpusScore& corpus{score()};
     ASSERT_EQ(corpus.rows, kTraceRows) << report(corpus); // clause 3 gates every cell below
 
-    // ── THE TRANSCRIPTION CLAIM — per trace, so compensating errors cannot cancel (§ 4.4) ──
+    // ── THE TRANSCRIPTION CLAIM — per trace, so compensating errors cannot cancel ──
     EXPECT_EQ(corpus.per_trace_marker_mismatches, 0U)
         << "the shipped package and the committed oracle disagree on at least one trace's marker "
            "count. Aggregates may still balance — that is exactly why this cell exists."

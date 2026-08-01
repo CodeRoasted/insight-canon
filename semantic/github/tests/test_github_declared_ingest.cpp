@@ -1,20 +1,20 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_github_declared_ingest.cpp — the GitHub-Actions dialect over the DECLARED ingest path
-// (ADR-23, ADR-22, ADR-22). This file replaces `test_github_strategy.cpp`, whose whole
+// This file replaces `test_github_strategy.cpp`, whose whole
 // subject — `GitHubActionsStrategy`: `format()`, `confidence()`, the detection race against Syslog,
 // the in-`parse()` timestamp strip — was DELETED by T4.
 //
 // WHAT REPLACED IT, and why the tests could not simply be ported. The GHA per-line RFC 3339 stamp
 // is a property of GitHub's *delivery*, not of the GHA *dialect* (ADR-23): the host format of
 // a GHA job log is RawText and always was, and the dialect is the workflow-command VOCABULARY over
-// it (ADR-22). So there is nothing left to DETECT — the caller DECLARES the transform
+// it. So there is nothing left to DETECT — the caller DECLARES the transform
 // and the dialect, canon verifies both, `TransportStack::peel` unwinds the stamp, and only
 // `RawPeeledLine::content` crosses into the Tokenizer. A "does the strategy claim this line" test
 // has no subject any more; a "does the declared path read this line" test does.
 //
 // The equivalence between the two — that the declared peel produces the same bytes the deleted
 // detector did — is NOT re-asserted here. It is G1-PEEL's, scored against the frozen oracle over
-// 4 082 logs / 22 490 937 lines in `test_transport_peel_equivalence_gate.cpp` (ADR-8). This file
+// 4 082 logs / 22 490 937 lines in `test_transport_peel_equivalence_gate.cpp`. This file
 // asserts what the PACKAGE owns: that its declared vocabulary reaches a decision on that path.
 //
 // Determinism: byte-only peel + byte-only walks; no RNG, no clock, no float.

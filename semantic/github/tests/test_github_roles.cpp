@@ -30,7 +30,7 @@ using insight::tokenization::Tokenizer;
 
 namespace
 {
-// The RESOLVED view of a stream declaring this dialect (ADR-22).
+// The RESOLVED view of a stream declaring this dialect.
 [[nodiscard]] ComposedSemantics github_only()
 {
     const std::array manifests{insight::semantic::github::kManifest};

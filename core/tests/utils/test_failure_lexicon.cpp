@@ -45,7 +45,7 @@ TEST(FailureLexicon, StandaloneWordIsACue)
 // …Exception type fires when it carries verdict register (a `:` verdict colon, caps, a
 // [bracket], or a ✗-led line); a BARE type in prose / a source-echo (`raise ValueError`,
 // no register) does NOT — the actual thrown line `ValueError: …` carries the colon and still
-// fires, so the lost recall is on non-verdict echoes only (precision-first, ADR-9).
+// fires, so the lost recall is on non-verdict echoes only (precision-first).
 //
 // SRC-D-OUT-4c re-baselined the colon half 2026-07-29: the colon anchors only in the line's KIND
 // SLOT. error_type_anchors IS is_verdict_anchored, so this consumer moved with the kernel — by

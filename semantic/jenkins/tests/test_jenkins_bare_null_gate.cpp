@@ -4,7 +4,7 @@
 // ANYTHING on the 82 bare traces — a template byte, a quantum, the epilogue token — this gate is
 // red and the identity cut does not stand as landed (the masker coupling discipline, repeated).
 //
-// ═══ THE ORACLE IS THE COMMITTED PRE-CUT FILE (ADR-8) ═══
+// ═══ THE ORACLE IS THE COMMITTED PRE-CUT FILE ═══════════
 // `BARE-v2.precut-oracle.tsv`, beside this TU — emitted from the SHIPPED chain (JenkinsStrategy
 // live) at insight-canon e6f5494 by the since-deleted JenkinsBareNullPrecutOracleEmitter, 2-run
 // byte-identical at emit time, provenance in the file's own header. The "pre" side of this
@@ -27,7 +27,7 @@
 //   digest  := sha256(section T + '\n' + section Q) — the whole-surface byte compare; the
 //              per-column counts exist so a red names its axis without hexdump archaeology.
 //
-// ═══ CLAUSE MAP (corpus_backed_gates.md §2) ═══
+// ═══ CLAUSE MAP ═══════════════════════════════
 //   1 population = the committed oracle rows ∩ the sidecar's frozen `stamp_class` labels, closure
 //     asserted BOTH ways (an oracle row without a bare sidecar row, or the converse, is red)
 //   2 UNSET ⇒ skip; SET-BUT-BROKEN ⇒ hard fail   3 population SIZE pinned (82)

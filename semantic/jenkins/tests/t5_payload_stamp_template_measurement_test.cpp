@@ -7,7 +7,7 @@
 // timestamper stamps stay in CONTENT and those lines lose their Jenkins claim → they re-route to
 // RawText and template WITH the stamp. The templates change; that is settled. What is NOT settled
 // is whether the template COUNT changes with them, and that difference is the difference between a
-// cosmetic re-baseline and a precision-first regression (ADR-9).
+// cosmetic re-baseline and a precision-first regression.
 //
 // THE ARMS, and why arm B is constructed the way it is.
 //   A (+strip, the shipped world) — POST-CUT (T5 5.2): the DECLARED catalogue peel

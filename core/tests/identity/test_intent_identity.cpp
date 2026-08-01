@@ -2,7 +2,7 @@
 // test_intent_identity.cpp — the frozen `intent-gha-2` canonicalizer contract
 // (bibles/intent_identity.md §9; canon d2d460d). These pin the closure-as-identity
 // constructor: matrix legs / shards / version-parameterized jobs of ONE intent
-// canonicalize to ONE CLASS and pair across homologous runs (G1, studies/004),
+// canonicalize to ONE CLASS and pair across homologous runs.
 // WITHOUT over-collapsing distinct WHERE (SRC-II-2: alignment must never eat the signal).
 // canonicalize_intent is canon's SEMANTIC-UNAWARE algorithm, frozen under kCanonicalizationVersion;
 // the composed-ruleset comparability key (II-7) is now semantic_identity (ADR-17,

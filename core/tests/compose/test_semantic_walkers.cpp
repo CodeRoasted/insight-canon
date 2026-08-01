@@ -115,7 +115,7 @@ void operator delete[](void* ptr, std::size_t) noexcept
 // ════════════════════════════════════════════════════════════════════════════════════════════════════
 namespace
 {
-// TWO synthetic packages, because after T4 the gate is a composed package NAME (ADR-22)
+// TWO synthetic packages, because after T4 the gate is a composed package NAME
 // and the "does not leak across dialects" leg needs a real, different, composed name to declare.
 // `synth` carries the rows under test; `synth_other` carries one level-lift row and exists so a
 // FOREIGN declaration is expressible without fatalling the unknown-dialect path.

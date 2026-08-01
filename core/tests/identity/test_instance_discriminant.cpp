@@ -4,7 +4,7 @@
 // drift tokens to group siblings; the discriminant KEEPS the raw declared coordinate verbatim to
 // SEPARATE co-occurring / cross-run-drifted siblings — same R1–R4 scan, first masked span kept raw.
 // Runner-agnostic by construction (it reads the declared tuple, never a hardcoded runner lexicon).
-// A diff here re-draws alignment (II-7) — it rides the composed semantic_identity (ADR-17);
+// A diff here re-draws alignment (II-7) — it rides the composed semantic_identity;
 // fix the code, never the assertion.
 
 #include <gtest/gtest.h>

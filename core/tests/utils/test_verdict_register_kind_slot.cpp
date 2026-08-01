@@ -3,7 +3,7 @@
 // tests/utils/test_verdict_register_kind_slot.cpp
 //
 // SRC-D-OUT-4c — the verdict register is a POSITION claim, not an adjacency.
-// (bibles/canon_pipeline.md; the property set is its §7.)
+// (the property set is its .)
 //
 // THE RULE. A trailing `:` anchors token `T` only when `T` occupies the line's KIND SLOT: every
 // token preceding `T` is itself colon-terminated (`ld:`, `src/main.rs:`, `357:`) or bracket-

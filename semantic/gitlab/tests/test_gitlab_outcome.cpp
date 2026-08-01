@@ -1,5 +1,5 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_gitlab_outcome.cpp — the GitLab run-verdict VOCABULARY (ADR-17, studies/012 §1.4).
+// test_gitlab_outcome.cpp — the GitLab run-verdict VOCABULARY.
 // What it guards:
 //   the API `status` token map — success/failed/canceled/skipped/manual, with the last two mapping
 //     to Unknown DELIBERATELY (the Jenkins NOT_BUILT precedent: a known token that carries no

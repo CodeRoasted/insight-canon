@@ -42,7 +42,7 @@ constexpr std::array<std::string_view, 1> kGhaStack{{"api-rfc3339-line-prefix"}}
 
 // The ONE call a caller makes at stream open. The peel runs BEFORE the tokenizer, so the line the
 // provenance hook sees starts at the visible content — which is exactly why the hook's own
-// leading-stamp skip could be RIPPED at T4 (ADR-23).
+// leading-stamp skip could be RIPPED at T4.
 [[nodiscard]] insight::semantic::ResolvedStream gha_stream(const ComposedSemantics& composed)
 {
     return insight::semantic::resolve_stream(

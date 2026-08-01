@@ -15,7 +15,7 @@ export import insight.canon.detail.parse;
 // module instead.
 export import insight.canon.spi;
 
-// Shared core-test composition helper (ADR-17). A core test whose property is SEMANTIC-UNAWARE
+// Shared core-test composition helper. A core test whose property is SEMANTIC-UNAWARE
 // (the universal formats tokenize; no dialect rows fire) feeds the Tokenizer a degenerate,
 // zero-package composition — core tests never link the semantic packages (that would invert the
 // dependency arrow). The returned ComposedSemantics MUST outlive the Tokenizer it feeds: bind it to
