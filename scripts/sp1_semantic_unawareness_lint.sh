@@ -157,7 +157,7 @@ if [ "$violations" -ne 0 ]; then
   echo "::error::SRC-SP-1 VIOLATION — ${violations} ecosystem literal(s) fused into canon CORE (must live in a semantic package):"
   printf '%s' "$report"
   echo
-  echo "Core is semantic-unaware (ADR 0024 §9.1). Move the marker/prefix/suffix into semantic/github"
+  echo "Core is semantic-unaware: the mechanism carries no ecosystem literal. Move the marker/prefix/suffix into semantic/github"
   echo "or semantic/test_frameworks as a rule row (the closed grammar), or — if it is a documentation"
   echo "reference — keep it in a comment, not a code string literal."
   exit 1

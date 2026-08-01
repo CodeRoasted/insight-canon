@@ -201,13 +201,16 @@ namespace
             }
     }
 
+    // ADR-17 — an exact-duplicate match key has no deterministic resolution, so composition fails
+    // closed rather than picking a winner by package order. The operator-facing text below states
+    // that rule and its remedy without naming this record: canon ships public, and a reader of the
+    // message cannot open the shelf it lives on.
     [[noreturn]] void fail_closed(const ConflictInfo& conflict)
     {
         std::cerr << "FATAL: insight::semantic::compose — exact-duplicate " << conflict.kind
                   << " match key \"" << conflict.key
-                  << "\" across the composed packages. Composition fails closed (ADR-17): a "
-                     "duplicate rule has no deterministic resolution. Fix the package rows or gate "
-                     "them.\n";
+                  << "\" across the composed packages. Composition fails closed: a duplicate rule "
+                     "has no deterministic resolution. Fix the package rows or gate them.\n";
         std::terminate();
     }
 
@@ -226,10 +229,9 @@ namespace
         for (std::size_t i{0}; i < declared.size(); ++i)
             std::cerr << (i == 0 ? "" : ", ") << '"' << declared[i] << '"';
         std::cerr
-            << ".\nAn IntentChannel is caller-declared provenance (ADR-22), never guessed. An "
-               "unknown channel is a MISTAKE and fails closed here; an ABSENT channel is a CHOICE "
-               "and "
-               "degrades to the raw-text fallback. Pass one of the declared names, or none.\n";
+            << ".\nAn IntentChannel is caller-declared provenance, never guessed. An unknown "
+               "channel is a MISTAKE and fails closed here; an ABSENT channel is a CHOICE and "
+               "degrades to the raw-text fallback. Declare one of the names above, or none.\n";
         std::terminate();
     }
 
@@ -245,10 +247,10 @@ namespace
             std::cerr << "<none>";
         for (std::size_t i{0}; i < packages.size(); ++i)
             std::cerr << (i == 0 ? "" : ", ") << '"' << packages[i].name << '"';
-        std::cerr << ".\nA dialect is caller-declared provenance (ADR-23), never guessed: "
-                     "canon VERIFIES, it does not infer. An unknown dialect is a MISTAKE and fails "
-                     "closed here; an ABSENT dialect is a CHOICE and asserts nothing. Pass one of "
-                     "the names above, or none.\n";
+        std::cerr << ".\nA dialect is caller-declared provenance, never guessed: canon VERIFIES, it "
+                     "does not infer. An unknown dialect is a MISTAKE and fails closed here; an "
+                     "ABSENT dialect is a CHOICE and asserts nothing. Declare one of the names "
+                     "above, or none.\n";
         std::terminate();
     }
 

@@ -151,6 +151,10 @@ namespace
         pos += 2U;
     }
 
+    // ADR-23 — an UNKNOWN transform name is a hard error, symmetric with an unknown dialect and an
+    // unknown channel: a MISTAKE must not share a code path with an ABSENT stack, which is a
+    // CHOICE. The operator-facing text below states that rule and its remedy without naming this
+    // record: canon ships public, and a reader of the message cannot open the shelf it lives on.
     [[noreturn]] void fail_unknown_transform(std::string_view name)
     {
         std::cerr << "FATAL: insight::transport::resolve_transport_stack — unknown transport "
@@ -158,10 +162,10 @@ namespace
                   << name << "\". The catalogue (" << kTransportCatalogVersion << ") declares: ";
         for (std::size_t i{0}; i < kTransportCatalogRows.size(); ++i)
             std::cerr << (i == 0 ? "" : ", ") << '"' << kTransportCatalogRows[i].name << '"';
-        std::cerr << ".\nA transport stack is caller-declared provenance (ADR-23), never "
-                     "guessed: canon VERIFIES, it does not infer. An unknown transform is a "
-                     "MISTAKE and fails closed here; an ABSENT stack is a CHOICE and peels "
-                     "nothing. Declare one of the names above, or none.\n";
+        std::cerr << ".\nA transport stack is caller-declared provenance, never guessed: canon "
+                     "VERIFIES, it does not infer. An unknown transform is a MISTAKE and fails "
+                     "closed here; an ABSENT stack is a CHOICE and peels nothing. Declare one of "
+                     "the names above, or none.\n";
         std::terminate();
     }
 
