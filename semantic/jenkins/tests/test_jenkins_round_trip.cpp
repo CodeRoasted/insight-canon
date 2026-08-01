@@ -1,14 +1,14 @@
-// test_jenkins_round_trip.cpp — studies/008 G2 round-trip closure on the Jenkins Pipeline dialect.
-// The RUNTIME (value) half of the C2 bidirectionality obligation the DialectIntent concept enforces
-// at compile time (shared_intent_declaration §3.2/§6): for every recognition marker, materialize
-// its PAIRED generation row (render_row) and assert canon recognizes the declared (kind,
-// child_order, payload) back — recognize(render_row(W)) == R. Exercises PayloadThenClosingParen
-// (the STAGE `[Pipeline] { (<name>)` dual of RemainderToClosingParen) alongside PayloadAfterPrefix
-// (the STEP verb). The probe payload is a REAL step verb, never a kStepExcludes structural token —
-// the writer only ever emits a real quantum, so the reader's exclusion set has no generation dual
-// and the round-trip closes. Verbose-on-failure. Determinism: seedless, single-threaded, pure byte
-// functions. Target: 100% (studies/008 §5 G2). NOLINTBEGIN — unit test: short identifiers and
-// string literals are fine.
+// test_jenkins_round_trip.cpp — round-trip closure on the Jenkins Pipeline dialect. The RUNTIME
+// (value) half of the bidirectionality obligation the DialectIntent concept enforces at compile
+// time (a package shipping a reader with no writer does not compile): for every recognition
+// marker, materialize its PAIRED generation row (render_row) and assert canon recognizes the
+// declared (kind, child_order, payload) back — recognize(render_row(W)) == R. Exercises
+// PayloadThenClosingParen (the STAGE `[Pipeline] { (<name>)` dual of RemainderToClosingParen)
+// alongside PayloadAfterPrefix (the STEP verb). The probe payload is a REAL step verb, never a
+// kStepExcludes structural token — the writer only ever emits a real quantum, so the reader's
+// exclusion set has no generation dual and the round-trip closes. Verbose-on-failure.
+// Determinism: seedless, single-threaded, pure byte functions. Every declared marker must close:
+// target 100%. NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 #include <gtest/gtest.h>
 
 import std;
@@ -18,7 +18,7 @@ import insight.semantic.jenkins;  // kManifest (markers + emits)
 
 TEST(JenkinsRoundTrip, RecognizeRendersBackToDeclaredIntent)
 {
-    // BOTH projections come off the ONE manifest (ADR-23) — the same `emits` span
+    // BOTH projections come off the ONE manifest — the same `emits` span
     // `semantic_identity` hashes.
     const std::array<insight::semantic::SemanticPackageManifest, 1> one{
         insight::semantic::jenkins::kManifest};

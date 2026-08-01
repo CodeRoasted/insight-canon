@@ -1,13 +1,12 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_intent_identity.cpp — the frozen `intent-gha-2` canonicalizer contract
-// (bibles/intent_identity.md §9; canon d2d460d). These pin the closure-as-identity
-// constructor: matrix legs / shards / version-parameterized jobs of ONE intent
-// canonicalize to ONE CLASS and pair across homologous runs.
+// test_intent_identity.cpp — the frozen `intent-gha-2` canonicalizer contract (canon d2d460d).
+// These pin the closure-as-identity constructor: matrix legs / shards / version-parameterized
+// jobs of ONE intent canonicalize to ONE CLASS and pair across homologous runs,
 // WITHOUT over-collapsing distinct WHERE (SRC-II-2: alignment must never eat the signal).
 // canonicalize_intent is canon's SEMANTIC-UNAWARE algorithm, frozen under kCanonicalizationVersion;
-// the composed-ruleset comparability key (II-7) is now semantic_identity (ADR-17,
-// tests/compose/ test_composition.cpp). A diff here is a cross-run comparability break, not a
-// retune — fix the code, never the assertion.
+// the comparability key — the ruleset is part of the comparison's identity — is now the composed
+// `semantic_identity`, pinned in tests/compose/test_composition.cpp. A diff here is a cross-run
+// comparability break, not a retune — fix the code, never the assertion.
 
 #include <gtest/gtest.h>
 
@@ -62,7 +61,7 @@ void expect_distinct_intent(std::string_view lhs, std::string_view rhs)
 
 } // namespace
 
-// ── G1: matrix / shard / version recovery (studies/004, the load-bearing property) ──
+// ── G1: matrix / shard / version recovery — the load-bearing alignment property ──
 // Version-parameterized jobs (R2), index tuples and matrix groups (R4) of ONE intent
 // canonicalize to ONE class → identical id, so they pair across homologous runs. This is
 // the exact mask G1 measured: ESLint v6/v7 go 0%→100% alignment once the tokens are masked.
@@ -114,13 +113,13 @@ TEST(IntentCanonicalize, FrozenRuleSet)
     expect_distinct_intent("Lint", "Build");   // distinct jobs never collapse
 }
 
-// NOTE: the II-7 comparability-version assertion (formerly RegistryVersionIsFrozen, pinning
-// kIntentRegistryVersion == "intent-gha-2") RETIRED with the constant (ADR-17): the
+// NOTE: the comparability-version assertion (formerly RegistryVersionIsFrozen, pinning
+// kIntentRegistryVersion == "intent-gha-2") RETIRED with the constant: the
 // composed-ruleset content hash `semantic_identity` supersedes it and is pinned in
 // tests/compose/test_composition.cpp (stability + reproducibility + order-independence).
 // canonicalize_intent below stays canon's frozen semantic-unaware algorithm.
 
-// ── Co-location invariant (II-1) ──
+// ── Co-location invariant: the identity is a structural key, never a retained value ──
 // intent_id_of is BY DEFINITION template_id_of(canonicalize_intent(name)): the identity is
 // "the structural hash under the registry version", never a separate hashing path.
 TEST(IntentIdentity, IdIsHashOfCanonicalForm)

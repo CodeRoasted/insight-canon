@@ -386,7 +386,7 @@ TEST(InferLeadingLogLevel, AnsiColourWrappedLevelRecovered)
         << "ANSI-wrapped PASSED is not a level";
 }
 
-// ── SRC-D-OUT-1b — outcome-awareness at the LEVEL altitude (§4A.6) ────────────────
+// ── SRC-D-OUT-1b — outcome-awareness at the LEVEL altitude ────────────────────────
 // infer_leading_log_level is what the diff consumes (→ dominant_level → salience →
 // eidos NewErrorPattern). It has TWO severity feeders and D-OUT-1 guarded only one:
 //   • Stage 2 (contains_failure_cue) — D-OUT-1-guarded, caps at Error.
@@ -394,7 +394,7 @@ TEST(InferLeadingLogLevel, AnsiColourWrappedLevelRecovered)
 //     UNGUARDED: the bare words `failure`/`fatal`/`critical` → Fatal, `error` → Error.
 // So a passing test whose NAME embeds an explicit level word ("✔ … failure …") is
 // classified Fatal by Stage 1, bypassing the glyph guard, and the diff fires
-// NewErrorPattern [CRITICAL] on a GREEN test (the cardinal FP — the §6.7 reassess P3
+// NewErrorPattern [CRITICAL] on a GREEN test (the cardinal FP — the reassess P3
 // storm). The pass GLYPH leading the line says it PASSED → an alerting tier (Warn/
 // Error/Fatal) must demote to Unknown.
 //
@@ -428,7 +428,7 @@ TEST(InferLeadingLogLevel, AnsiWrappedLeadingPassGlyphDemotesStage1Level)
 // true ONLY when the first outcome-bearing token is a pass glyph: a genuine leading
 // failure WORD leads → stop → false, and a summary with no leading glyph stays a
 // failure. These must NOT regress when the guard lands — they are the rejected
-// "true-leading only" recall loss made into a standing assertion (§4A.6 SRC-D-OUT-1b).
+// "true-leading only" recall loss made into a standing assertion (SRC-D-OUT-1b).
 TEST(InferLeadingLogLevel, GenuineLeadingFailureSurvivesWithoutPassGlyph)
 {
     EXPECT_EQ(infer_leading_log_level("ERROR: db connection failed"), LogLevel::Error)
@@ -448,11 +448,11 @@ TEST(InferLeadingLogLevel, GenuineLeadingFailureSurvivesWithoutPassGlyph)
         << "leading FAIL glyph ✗ must NOT demote — Stage-1 'failure' stays Fatal";
 }
 
-// ── SRC-D-OUT-4 — verdict-register awareness at the LEVEL altitude (§4A.6) ─────────
+// ── SRC-D-OUT-4 — verdict-register awareness at the LEVEL altitude ─────────────────
 // The level (infer_leading_log_level) is what the diff consumes (→ dominant_level →
 // salience → eidos NewErrorPattern). One level past SRC-D-OUT-1b: not "does a pass glyph
 // lead?" but "is the line a failure VERDICT at all?" A non-verdict line carrying a
-// failure NOUN ("crash"/"fail", no register) must infer Unknown, not Error — the §6.7
+// failure NOUN ("crash"/"fail", no register) must infer Unknown, not Error — the
 // re-run P3 FPs (`Storing crash reports into '<path>'`, `… watcher fail event`). These
 // route through Stage 2 (contains_failure_cue): neither "crash" nor "fail" is a
 // parse_log_level vocabulary word, so Stage 1 is silent — the cue fix alone demotes
@@ -480,7 +480,7 @@ TEST(InferLeadingLogLevel, VerdictAnchoredFailureLevelSurvives)
     EXPECT_EQ(infer_leading_log_level("Segmentation fault (core dumped)"), LogLevel::Error)
         << "the crash phrase — still Error";
 }
-// ── SRC-D-OUT-4 Stage-1 completion — the LATENT TWIN (§4A.6), GATED ────────────────
+// ── SRC-D-OUT-4 Stage-1 completion — the LATENT TWIN, GATED ────────────────────────
 // SEPARABLE from the blocker (the design marks Stage 1 a deferred-able twin): KEEP
 // this block IFF Heph lands the Stage-1 completion (gate the leading bare LEVEL word
 // on the same register kernel); DELETE it if he ships only the Stage-2 cue fix — these

@@ -1,7 +1,7 @@
 // NOLINTBEGIN — corpus gate: literals and printed diagnostics are intended.
 // test_bracket_peel_equivalence_gate.cpp — G-T5-PEEL: the bracket row's peel-equivalence gate
-// (DN-15; the G1-PEEL shape one row over; ADR-23 Part 1's owed
-// obligation for Timestamper, discharged).
+// (the G1-PEEL shape one row over; the transport contract's owed obligation for the Jenkins
+// Timestamper row, discharged).
 //
 // ═══ THE ORACLE IS A FROZEN COPY ═══════════
 // Taken VERBATIM from `semantic/jenkins/src/jenkins_strategy.cpp` at insight-canon commit
@@ -14,17 +14,17 @@
 // exists to call — the P2b discipline: implementation drift from the frozen spelling is red here,
 // never a silent oracle shift).
 //
-// ═══ WHAT SHARING `rfc3339_datetime_length` MEANS (the can't-PASS ledger, §6) ═══
-// The CHARACTER grammar is deliberately the one shared owner (bibles/jenkins_dialect.md §4
-// item 3) — oracle and SUT both call it, so this gate cannot catch a defect INSIDE that grammar.
+// ═══ WHAT SHARING `rfc3339_datetime_length` MEANS (the can't-PASS ledger) ═══════
+// The CHARACTER grammar is deliberately the ONE shared owner — oracle and SUT both call it, so
+// this gate cannot catch a defect INSIDE that grammar.
 // What it scores is exactly the residual independent surface: the position logic, the strip, the
 // blank decline, and the extract — the surfaces that were re-spelled in the catalogue peel.
-// CLAIM WORD: REFACTOR-EQUIVALENCE, never external validity (ADR-23 verbatim: no sentence
-// may cite this green as evidence the transport model is right about the world).
+// CLAIM WORD: REFACTOR-EQUIVALENCE, never external validity — no sentence
+// may cite this green as evidence the transport model is right about the world.
 //
 // ═══ POPULATION (clauses 1/3/4/5) ═══
 // The 12 whole-stream traces of jenkins-markers/v2, EVERY `\n`-split line — selected by the
-// committed sidecar's frozen `stamp_class` column (the studies/010 §6.2 classifier, generated
+// committed sidecar's frozen `stamp_class` column (that classifier is generated
 // corpora-side; never by inspection here), bytes verified against the attested sha256 digests.
 // The per-line partition closes: stamped-equal + blank-dropped + unclaimed-identity + mismatch
 // == total lines.
@@ -64,7 +64,7 @@ constexpr std::string_view kBracketRow{"bracket-rfc3339-line-prefix"};
 constexpr std::size_t kMaxReportedLines{10};
 
 // ── The pins ──────────────────────────────────────────────────────────────────────────────────
-// CORROBORATED — the stamp-class partition's whole-stream cell (studies/010 §6.2, the frozen
+// CORROBORATED — the stamp-class partition's whole-stream cell (the frozen
 // sidecar column): 12 traces.
 constexpr std::size_t kWholeStreamTraces{12};
 // CHARACTERIZATION — measured by this gate's first run (2026-07-30), pinned so the population
@@ -77,7 +77,7 @@ constexpr std::size_t kUnclaimedIdentity{12};
 // extract-equal), per line.
 constexpr std::size_t kMismatches{0};
 
-// ═══ THE FROZEN ORACLE (ADR-8) — do not tidy, do not modernize ═══
+// ═══ THE FROZEN ORACLE — do not tidy, do not modernize ═══════════
 [[nodiscard]] constexpr bool oracle_is_space(char chr) noexcept
 {
     return chr == ' ' || chr == '\t';
@@ -424,7 +424,7 @@ TEST_F(BracketPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheFrozenStrateg
     GTEST_LOG_(INFO) << "G-T5-PEEL green" << report;
 }
 
-// ═══ The synthetic arms — no corpus, run everywhere (the §6 decline + strip laws) ═══════════════
+// ═══ The synthetic arms — no corpus, run everywhere (the decline + strip laws) ══════════════════
 
 TEST(BracketPeelSyntheticArms, DeclineArmsAreIdentityAndExtractNothing)
 {

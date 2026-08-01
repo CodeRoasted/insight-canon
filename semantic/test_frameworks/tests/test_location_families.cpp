@@ -1,5 +1,5 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_location_families.cpp — the test-framework FILE-LOCATION vocabulary (ADR-17, SRC-II-8).
+// test_location_families.cpp — the test-framework FILE-LOCATION vocabulary (SRC-II-8).
 // Migrated from canon tests/identity/test_location_recognizer.cpp: the matching MECHANISM
 // (insight::recognize_location, the three closed LocationMatchKind algorithms over the composed
 // location rows) is CANON's; the VOCABULARY — the jest/vitest/playwright `.test.`/`.spec.`
@@ -28,8 +28,9 @@ namespace
 void expect_loc(const ComposedSemantics& composed, std::string_view content,
                 std::string_view expected)
 {
-    // The walker takes NormalizedContent (ADR-21's precondition as a type); every probe here is
-    // an escape-free literal, so normalize() is the zero-copy fixed point over a shared scratch.
+    // The walker takes NormalizedContent — canon's ingest-normalization precondition carried by a
+    // type unforgeable outside canon; every probe here is an escape-free literal, so normalize()
+    // is the zero-copy fixed point over a shared scratch.
     static std::string scratch;
     const std::string_view got{recognize_location(
         insight::tokenization::normalize(content, scratch).undeclared_suffix(0), composed)};

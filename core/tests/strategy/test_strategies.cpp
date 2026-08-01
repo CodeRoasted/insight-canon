@@ -164,7 +164,7 @@ TEST_F(JsonStrategyTest, FallsBackToJSONDumpWhenNoMessageKey)
     EXPECT_FALSE(result.value().content.empty());
 }
 
-// ── SRC-D-MSK-3 (§4.3) — nested-`fields` component/level descent (bugs.md:27) ───────
+// ── SRC-D-MSK-3 — nested-`fields` component/level descent ───────────────────────────
 // App loggers (and LogCraft) nest custom fields under "fields":{…}; the top-level
 // component/level lookups miss, so the cube WHERE axis went blind on JSON. When the
 // top-level lookup misses, descend ONE level into "fields" and read {component, level}.
@@ -237,7 +237,7 @@ TEST_F(JsonStrategyTest, LevelErrorParsed)
     EXPECT_EQ(result.value().level, LogLevel::Error);
 }
 
-// ── OTEL/OTLP ingestion (ADR-29 O1, SRC-D-OTEL-1) ────────────────────────────────
+// ── OTEL/OTLP ingestion (SRC-D-OTEL-1) ───────────────────────────────────────────
 // One OTLP/JSON LogRecord as the LogCraft producer emits it: nested body.stringValue,
 // numeric severityNumber, top-level traceId(32 hex)/spanId(16 hex)/parentSpanId.
 static constexpr std::string_view kOtelLine{
@@ -298,7 +298,7 @@ TEST_F(JsonStrategyTest, NonOtelJsonHasNoTraceContext)
     EXPECT_EQ(result.value().trace.trace_id.value, 0U);
 }
 
-// ── OTEL span ingestion (ADR-29, D-OTEL-10 shape 2 / D-OTEL-18) ──────────────────────────────
+// ── OTEL span ingestion (D-OTEL-10 shape 2 / D-OTEL-18) ──────────────────────────────────────
 // The canonical flat-span record the lab emits (name / start+end times / status / service.name),
 // distinct from the OTLP log record above. Detected by the span-specific startTimeUnixNano key.
 static constexpr std::string_view kSpanLine{

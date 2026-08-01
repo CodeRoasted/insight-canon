@@ -1,6 +1,6 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_github_echoed_source.cpp — the GitHub-Actions echoed-source CODE TIER (ADR-17,
-// SRC-D-PROV-1). Migrated from canon tests/parse/test_echoed_source.cpp. Two altitudes:
+// test_github_echoed_source.cpp — the GitHub-Actions echoed-source CODE TIER (SRC-D-PROV-1).
+// Migrated from canon tests/parse/test_echoed_source.cpp. Two altitudes:
 //   1. RECOGNITION — github::is_echoed_source(raw): the byte-exact command-echo SGR predicate,
 //   relocated
 //      into this package (the `\x1b[36;1m … \x1b[0m` grammar is GHA dialect knowledge).
@@ -115,7 +115,7 @@ TEST(GithubEchoedSource, TokenizerDemotesEchoedFailureLevelToUnknown)
 // ── The demotion outranks the DECLARED level lift, not merely the body inference ──
 // An echoed script line that echoes a workflow command (`echo "##[error]…"`) is still SCRIPT TEXT,
 // so SRC-D-PROV-1 drives it to Unknown. This pins the ORDER of two things that both write
-// `ParsedLine::level` in LogParser: the composed level-lift walk (ADR-22) runs FIRST and
+// `ParsedLine::level` in LogParser: the composed level-lift walk runs FIRST and
 // the echoed-source demotion overwrites it. That was the order when the lift lived inside the GHA
 // strategy's parse(), and the relocation had to preserve it — swap the two and this line comes back
 // Error, alerting on a string that only ever appeared inside a shell command echo.

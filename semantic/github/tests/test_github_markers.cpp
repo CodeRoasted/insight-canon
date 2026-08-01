@@ -1,5 +1,5 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_github_markers.cpp — the GitHub-Actions INTENT-MARKER vocabulary (ADR-17). Migrated from
+// test_github_markers.cpp — the GitHub-Actions INTENT-MARKER vocabulary. Migrated from
 // canon tests/identity/test_intent_marker.cpp: the recognition MECHANISM
 // (insight::tokenization::recognize over the composed marker rows) is CANON's algorithm; the
 // VOCABULARY it walks — `Complete job name: ` → Job (Unordered), `Run ` → Step (Ordered),
@@ -21,8 +21,9 @@ using insight::tokenization::IntentMarker;
 using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::recognize;
 
-// The walkers take NormalizedContent (ADR-21's precondition as a type); every probe here is an
-// escape-free literal, so normalize() is the zero-copy fixed point over a shared scratch.
+// The walkers take NormalizedContent — canon's ingest-normalization precondition carried by a type
+// unforgeable outside canon; every probe here is an escape-free literal, so normalize() is the
+// zero-copy fixed point over a shared scratch.
 [[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
 {
     static std::string scratch;
@@ -36,8 +37,8 @@ namespace
 // on purpose — GHA is the dialect that actually has two materializations, so "which channel" is
 // part of every recognition question about it, and after T4 "which dialect" is part of every one
 // too. A test that did not say would be asking an ill-posed question. `channel` names a declared
-// channel ("annotated" / "stripped"); kAnyChannel models the caller that declares no channel (D5 —
-// concretely-gated rows stay dark).
+// channel ("annotated" / "stripped"); kAnyChannel models the caller that declares no channel —
+// concretely-gated rows stay dark.
 [[nodiscard]] ComposedSemantics github_only(std::string_view channel)
 {
     const std::array manifests{insight::semantic::github::kManifest};
@@ -91,9 +92,9 @@ TEST(GithubMarkers, RecognizesJobAndStepBanners)
 // The same step banner reads back to the same identity from GHA's real `##[group]Run <cmd>` and
 // from the bare `Run <cmd>` our degrade() ablation produces. Each fires under ITS declared channel
 // and both extract the IDENTICAL payload — which is what makes the channel a materialization detail
-// and never an axis (D6).
+// and never an axis.
 //
-// ⚠ WHAT THIS IS NOT (ADR-22 — the premise correction): this is NOT "materialization
+// ⚠ WHAT THIS IS NOT: this is NOT "materialization
 // invariance across two real GHA materializations". The stripped arm is OUR OWN lab ablation
 // (ci_revert_corpus.transform.degrade()), not bytes GitHub ever served. The property asserted here
 // is canon reading our ablation back to the same intent as the real channel — genuinely
@@ -145,7 +146,7 @@ TEST(GithubMarkers, StepIdentityIsInvariantAcrossTheRealChannelAndOurAblation)
         << "::group:: form unexpectedly recognized: " << show(colon);
 }
 
-// ── D5: an UNDECLARED channel fails closed on DEPTH — no phantom, and no structure either ──
+// ── An UNDECLARED channel fails closed on DEPTH — no phantom, and no structure either ──────
 // The caller that declares nothing gets the kAnyChannel rows (the Job banner) and NONE of the
 // channel-gated
 // Step rows: no dialect step structure, and — critically — no phantom either. Never a concrete
@@ -168,7 +169,7 @@ TEST(GithubMarkers, UndeclaredChannelFiresNoStepRowEitherWay)
 }
 
 // ── SRC-II-6: DIALECT-gated to this package — the dialect never fires on a stream that did not
-// declare it (ADR-22). The gate is the ONLY difference (proven by the declared sanity
+// declare it. The gate is the ONLY difference (proven by the declared sanity
 // line).
 //
 // ⚠ WHAT CHANGED AND WHY IT MATTERS. This test used to loop over `LogFormat` values, passing each
@@ -208,7 +209,7 @@ TEST(GithubMarkers, NoFalseStepOnRunningOrEmpty)
         << "empty content opened a quantum: " << show(empty);
 }
 
-// ── child_order is a declared per-level ROW property (ADR-18): job=Unordered, step=Ordered ──
+// ── child_order is a declared per-level ROW property: job=Unordered, step=Ordered ───────────
 // Migrated from test_instance_discriminant::JobUnorderedStepOrdered — it asserts THIS package's
 // kMarkers child_order data (the level-typed alignment declaration), plus the marker carries its
 // raw discriminant.
@@ -224,7 +225,8 @@ TEST(GithubMarkers, JobUnorderedStepOrdered)
 }
 
 // ── The payoff: the RAW payload this package emits composes with canon's canonicalize_intent into
-// the alignment CLASS (§5.2→§5.1). The COLLAPSE is canon's algorithm (pinned in canon's suite);
+// the alignment CLASS — the aggressive canonical mask over the raw marker name, which is what
+// groups siblings. The COLLAPSE is canon's algorithm (pinned in canon's suite);
 // here we pin that THIS package's recognition delivers the raw payload the collapse consumes — the
 // composed contract.
 TEST(GithubMarkers, RawPayloadFeedsAlignmentClass)

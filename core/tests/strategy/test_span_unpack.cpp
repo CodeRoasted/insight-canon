@@ -6,7 +6,7 @@ import insight.canon.test;
 using namespace insight;
 using namespace insight::tokenization;
 
-// OTEL span-export DOCUMENT unpack (ADR-29, D-OTEL-18 / D-OTEL-18a): one OTLP
+// OTEL span-export DOCUMENT unpack (D-OTEL-18 / D-OTEL-18a): one OTLP
 // `resourceSpans` export (shape 1) is unpacked into N CANONICAL flat-span records (shape 2) —
 // byte-form-identical to the lab's emission, so the flat-span parser is authored once and
 // shape-1 ≡ shape-2 is golden-tested (the two-paths-drift bug class dies here). resource

@@ -1,5 +1,5 @@
 // NOLINTBEGIN
-// Unit tests for the W1 declared ordinal field-route (§4A.4 D-W1-3): JsonStrategy recognizes a
+// Unit tests for the W1 declared ordinal field-route (D-W1-3): JsonStrategy recognizes a
 // declared structured numeric field (kOrdinalFieldCatalog) by EXACT top-level key and captures it
 // as a consumed-not-tokenized CanonicalEvent.ordinals observation — value parsed from the decimal
 // TEXT to a canonical-unit int64 (ns / bytes), NEVER via double (the determinism pin). Covers both

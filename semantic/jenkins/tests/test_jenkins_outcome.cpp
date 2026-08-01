@@ -1,10 +1,10 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_jenkins_outcome.cpp — the Jenkins run-outcome VOCABULARY (ADR-17, studies/006 Table 4):
-// the five native `result` strings map into the core four-class RunOutcome, and the console-tail
-// `Finished: <RESULT>` epilogue is recognized through this package's own strategy + marker row over
-// a realistic mini console (timestamper-prefixed AND bare). The D-OUT-RUN-1 LADDER mechanics are
-// core's (tests/compose/test_run_outcome.cpp, synthetic manifests) and the G-OUT-* gate suite is
-// Kleio's — this file guards only the JENKINS DATA and its end-to-end recognizability.
+// test_jenkins_outcome.cpp — the Jenkins run-outcome VOCABULARY: the five native `result` strings
+// map into the core four-class RunOutcome, and the console-tail `Finished: <RESULT>` epilogue is
+// recognized through this package's own strategy + marker row over a realistic mini console
+// (timestamper-prefixed AND bare). The LADDER mechanics — authoritative side-input, then the
+// console tail's LAST match, then Unknown — are core's (tests/compose/test_run_outcome.cpp,
+// synthetic manifests); this file guards only the JENKINS DATA and its end-to-end recognizability.
 #include <gtest/gtest.h>
 
 import std;
@@ -20,8 +20,8 @@ using insight::semantic::ComposedSemantics;
 
 namespace
 {
-// The RESOLVED view of a stream that declared this dialect (ADR-22) — after T4 the
-// concretely-gated rows are reachable only through a declaration.
+// The RESOLVED view of a stream that declared this dialect — the concretely-gated rows are
+// reachable only through a declaration, never through per-line format detection.
 [[nodiscard]] ComposedSemantics jenkins_only()
 {
     const std::array manifests{insight::semantic::jenkins::kManifest};
@@ -88,7 +88,7 @@ TEST(JenkinsOutcome, ConsoleTailRecoveredFromADeclaredWholeStreamConsole)
     EXPECT_EQ(res.outcome, RunOutcome::Unstable)
         << "the degenerate only-a-console-log path preserves the four-class verdict";
 
-    // The FAIL-CLOSED arm (T5 §4 item 4 — the ruling's intent, not its price): the SAME console
+    // The FAIL-CLOSED arm: the SAME console
     // scanned UNDECLARED (raw, stamps in content) recovers NO verdict marker — an undeclared
     // stamped stream yields nothing, it never falls open to detection.
     const RunOutcomeScan raw_scan{scan_run_outcome(raw_lines, composed)};
@@ -110,10 +110,11 @@ TEST(JenkinsOutcome, BareFreestyleEpilogueStillResolves)
 TEST(JenkinsOutcome, AuthoritativeSideInputOverridesDivergentConsole)
 {
     const ComposedSemantics composed{jenkins_only()};
-    // The Accumulo #498 live counterexample (studies/006 v2-Table 4): API result SUCCESS vs console
-    // `Finished: ABORTED` — a real present-but-divergent disagreement. D-OUT-RUN-1: the
-    // authoritative side-input stands; the divergence is flagged, never a tiebreak. (The named
-    // G-OUT-3 fixture is Kleio's; this guards the Jenkins DATA end of it.)
+    // The Accumulo #498 live counterexample: API result SUCCESS vs console `Finished: ABORTED` — a
+    // real present-but-divergent disagreement, measured on a real console. The ladder is a total
+    // precedence, never a reconciliation: the authoritative side-input stands and the divergence is
+    // flagged, never a tiebreak (a present console verdict can be a nested/caught outcome the
+    // whole-run API verdict correctly overrides).
     const std::vector<std::string> lines{"[Pipeline] { (ci)", "nested build interrupted",
                                          "Finished: ABORTED"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};

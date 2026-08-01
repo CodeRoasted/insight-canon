@@ -1,11 +1,12 @@
-// test_gitlab_round_trip.cpp — studies/008 G2 round-trip closure on the GitLab CI dialect. The
-// RUNTIME (value) half of the C2 bidirectionality obligation the DialectIntent concept enforces at
-// compile time (shared_intent_declaration §3.2/§6): for every recognition marker, materialize its
-// PAIRED generation row (render_row) and assert canon recognizes the declared (kind, child_order,
-// payload) back — recognize(render_row(W)) == R. Exercises PlaceholderNumericFieldThenPayload, the
-// grammar-5 dual of NumericFieldThenRemainder. Verbose-on-failure. Determinism: seedless,
-// single-threaded, pure byte functions. Target: 100% (studies/008 §5 G2). NOLINTBEGIN — unit test:
-// short identifiers and string literals are fine.
+// test_gitlab_round_trip.cpp — round-trip closure on the GitLab CI dialect. The RUNTIME (value)
+// half of the bidirectionality obligation the DialectIntent concept enforces at compile time (a
+// package shipping a reader with no writer does not compile): for every recognition marker,
+// materialize its PAIRED generation row (render_row) and assert canon recognizes the declared
+// (kind, child_order, payload) back — recognize(render_row(W)) == R. Exercises
+// PlaceholderNumericFieldThenPayload, the grammar-5 dual of NumericFieldThenRemainder.
+// Verbose-on-failure. Determinism: seedless, single-threaded, pure byte functions. Every declared
+// marker must close: target 100%. NOLINTBEGIN — unit test: short identifiers and string literals
+// are fine.
 #include <gtest/gtest.h>
 
 import std;
@@ -15,7 +16,7 @@ import insight.semantic.gitlab;   // kManifest (markers + emits)
 
 TEST(GitLabRoundTrip, RecognizeRendersBackToDeclaredIntent)
 {
-    // BOTH projections come off the ONE manifest (ADR-23) — the same `emits` span
+    // BOTH projections come off the ONE manifest — the same `emits` span
     // `semantic_identity` hashes.
     const std::array<insight::semantic::SemanticPackageManifest, 1> one{
         insight::semantic::gitlab::kManifest};

@@ -1,8 +1,9 @@
 // NOLINTBEGIN — measurement harness: long literals, wide reports and raw loops are the point.
-// t5_payload_stamp_template_measurement_test.cpp — the pre-registered measurement owed by
-// ADR-23 Part 2 clause 2 (and the evidence that settles clause 3).
+// t5_payload_stamp_template_measurement_test.cpp — the pre-registered measurement owed by the
+// ruling that a PAYLOAD stamp is dialect content, never a transport envelope (and the evidence
+// that settles what the masker then owes).
 //
-// THE QUESTION. ADR-23 rules the Jenkins `payload-stamped` class NOT declarable as transport
+// THE QUESTION. The Jenkins `payload-stamped` class is NOT declarable as transport
 // (the stamp is a payload-determined subset, not a stream property), so on that class the
 // timestamper stamps stay in CONTENT and those lines lose their Jenkins claim → they re-route to
 // RawText and template WITH the stamp. The templates change; that is settled. What is NOT settled
@@ -10,13 +11,13 @@
 // cosmetic re-baseline and a precision-first regression.
 //
 // THE ARMS, and why arm B is constructed the way it is.
-//   A (+strip, the shipped world) — POST-CUT (T5 5.2): the DECLARED catalogue peel
+//   A (+strip, the shipped world) — POST-CUT: the DECLARED catalogue peel
 //       (`bracket-rfc3339-line-prefix`) strips the stamp, then the tokenizer templates the
 //       peeled content. (Pre-cut this arm was JenkinsStrategy claiming and stripping; the
 //       strategy died at the identity cut and G-T5-PEEL certifies the peel equals its strip.)
-//   B (−strip, the ADR-23 world) — Tokenizer composed with NO semantic package. A stamped
-//       line is claimed by nobody and falls to the RawText floor with the stamp in content.
-// B is the right vehicle for the §1 world ONLY IF removing the whole package changes nothing for
+//   B (−strip, the stamp-stays-in-content world) — Tokenizer composed with NO semantic package. A
+//       stamped line is claimed by nobody and falls to the RawText floor with the stamp in content.
+// B is the right vehicle for that world ONLY IF removing the whole package changes nothing for
 // the lines that are not supposed to move. That is not assumed: `TemplateCountUnderTheStrip`
 // asserts the moving set is EXACTLY the stamped set (an unstamped line must template identically
 // in both arms — the "byte-identical RawText fallback" the strategy comment claims, verified on
@@ -24,27 +25,27 @@
 // package removal instead of the strip, and the assertion says so loudly.
 //
 // PRE-REGISTERED DECISION RULE (fixed here, in the commit that precedes the numbers — the commit
-// order is the audit trail, studies/010 §2 discipline). Let `distinct_A` / `distinct_B` be the
+// order is the audit trail). Let `distinct_A` / `distinct_B` be the
 // distinct template counts over the whole payload-stamped slice, and `ceiling` the distinct RAW
 // stamped-line count (what "no collapse at all" would score):
-//   * STABLE   ⇒ distinct_B == distinct_A. ADR-23 branch 1 (honesty-only + re-baseline; the move
-//                rides T5 as specified) — the id SETS still move, which is why the id counts are
+//   * STABLE   ⇒ distinct_B == distinct_A. Branch 1 (honesty-only + re-baseline; the move rides
+//                the cut as specified) — the id SETS still move, which is why the id counts are
 //                reported alongside.
 //   * EXPLODES ⇒ distinct_B >= 2 × distinct_A, or the stamped-subset arm-B distinct count reaches
 //                >= 0.5 × ceiling (the token defeating collapse toward per-line uniqueness).
-//                ADR-23 branch 2 (precision-first regression under ADR-9; T5 blocked until the
-//                masker claims the token to a stable normal form).
+//                Branch 2 (a precision-first regression against the degradation contract; the
+//                cut is blocked until the masker claims the token to a stable normal form).
 //   * Anything strictly between is a THIRD outcome and is reported as such — it is never rounded
 //     into a branch.
 //
-// STATUS OF THAT CLASSIFIER AFTER THE D-MSK-5 REPAIR (bibles/jenkins_dialect.md §4, amended
-// 2fe2e85): it is the FROZEN RECORD of the pre-fix measurement it correctly scored (EXPLODES at
+// STATUS OF THAT CLASSIFIER AFTER THE D-MSK-5 BRACKETED-STAMP REPAIR (2fe2e85): it is the
+// FROZEN RECORD of the pre-fix measurement it correctly scored (EXPLODES at
 // 95.9% of ceiling), and it is NOT the repair's fitness predicate — its ceiling leg is can't-PASS
 // on these bytes from the pre-fix record alone (arm A alone at 3 138/6 055 = 51.8% ≥ the 0.5 bar,
 // and B ≥ A is a theorem of the bracket-keeping normal form plus the strip), and its STABLE leg's
 // exact equality is foreclosed by any template whose raw population is both stamped and
 // unstamped. It keeps REPORTING its counts below — the post-fix counts enter the record there, as
-// scored evidence — while the §6.5 PREFIX-IMAGE triangle (PrefixImageExitGate, this file) carries
+// scored evidence — while the PREFIX-IMAGE triangle (PrefixImageExitGate, this file) carries
 // the exit assertions: an identity, not a threshold, ratified before each application (Eqya,
 // 2026-07-30).
 //
@@ -54,12 +55,12 @@
 // line count — so a green "count stable" on the corpus is a fact about the corpus, not a saturated
 // instrument.
 //
-// CORPUS-GATED. The Jenkins marker corpus is §2a-private and out-of-tree, so this SKIPS cleanly
+// CORPUS-GATED. The Jenkins marker corpus is private and out-of-tree, so this SKIPS cleanly
 // when the manifest env is unset/missing — green in CI and on every clone.
 //   JENKINS_T5_MANIFEST  one absolute log path per line (the 19 payload-stamped logs of
-//                        jenkins-markers/v2; the class definition is studies/010 §6.2's triage,
-//                        reused via coderoast-corpora .../scripts/t0_transport.py — never
-//                        re-invented)
+//                        jenkins-markers/v2; the class definition is the frozen triage in
+//                        coderoast-corpora .../scripts/t0_transport.py — one classifier, one
+//                        owner, never re-invented here)
 //   JENKINS_T5_OUT       (optional) directory for a per-line TSV dump, for the offline cross-check
 //
 // BYTE FIDELITY. Every read is binary; lines are split on '\n' ONLY and no '\r' is trimmed
@@ -161,10 +162,10 @@ struct LineOutcome
     return outcomes;
 }
 
-// ── POST-CUT (T5 5.2): the +strip arm and the stampedness lens, re-owned ──
+// ── POST-CUT: the +strip arm and the stampedness lens, re-owned ──
 // JenkinsStrategy died at the identity cut; the strip is now the DECLARED catalogue row
 // (`bracket-rfc3339-line-prefix`, peel-equivalence certified by G-T5-PEEL against the strip
-// frozen per ADR-8). This harness's +strip arm therefore peels through the declared stack and
+// frozen into that gate). This harness's +strip arm therefore peels through the declared stack and
 // tokenizes the peeled content — the arm delta against `run_arm` on the SAME composed view is the
 // peel ALONE, which is a strictly cleaner construction than the pre-cut package-±-composition
 // arms (the old premise check "an unstamped line must not move" is now structural rather than
@@ -225,7 +226,7 @@ run_declared_peel_arm(const std::vector<std::string>& lines,
             // never re-claimed by a second strategy. Feeding the peeled payload back through
             // detection instead would let a logfmt-shaped payload be claimed by KeyValue — a
             // world neither the pre-cut chain nor any production path produces (the
-            // payload-stamped class is NOT declarable, ADR-23). MEASURED when this rework
+            // payload-stamped class is NOT declarable as transport). MEASURED when this rework
             // first ran without the fence (2026-07-30): 45/6 416 stamped lines diverged exactly
             // that way — the corruption the M-oracle's carrier comment below pre-named.
             const insight::transport::RawPeeledLine peeled{bracket_stack().peel_raw(line)};
@@ -258,7 +259,7 @@ run_declared_peel_arm(const std::vector<std::string>& lines,
     return outcomes;
 }
 
-// Distinct-set accumulator: the two counts ADR-23 asks for, kept side by side so their
+// Distinct-set accumulator: the two counts the decision rule asks for, kept side by side so their
 // AGREEMENT is itself observable (template_id is SHA-256 of the template string — a divergence
 // would be a collision and is reported, not assumed away).
 struct DistinctCounter
@@ -328,18 +329,18 @@ TEST(JenkinsPayloadStampMeasurement, CounterCanReportAnExplosion)
 // What the real masker does to the real token, run through the real chain — MEASURED, both ways.
 //
 // HISTORY, because this test is the record of an intended failure. As written at `c848c52` it was
-// the CHARACTERIZATION of the ADR-23-erratum-2 defect: the whole-token bracketed RFC3339 stamp
+// the CHARACTERIZATION of the bracketed-stamp literal-keep defect: the whole-token RFC3339 stamp
 // fell through every rule to LITERAL KEEP (rule #1's `:digit` trigger fired but its letter-leading
 // ANCHOR gate did not; `bracket_index` declined at the `-`; the digit-leading whole-token mask
 // never saw the `[`-leading byte), so three same-shape stamped lines were THREE templates, each
 // equal to its raw line, and the header declared: "the day the masker claims `[<RFC3339>]` to a
 // stable normal form, this test goes RED and must be rewritten to the new normal form. That is the
 // intended failure, not a regression." That day came with D-MSK-5 `bracket_timestamp`
-// (kCanonicalizationVersion -8, bibles/jenkins_dialect.md §4): the RED fired exactly as designed
+// (kCanonicalizationVersion -8): the RED fired exactly as designed
 // (observed 2026-07-30, all three per-line verbatim EXPECTs), and this is the rewrite it demanded.
 //
 // What it asserts NOW: the stamp class collapses to the `[<*>]` normal form — the unit-mechanism
-// arm behind the §6.5 prefix-image exit predicate (the corpus arms are PrefixImageExitGate below;
+// arm behind the prefix-image exit predicate (the corpus arms are PrefixImageExitGate below;
 // the frozen clause-2 classifier keeps reporting in TemplateCountUnderTheStrip, unchanged). The
 // bracket remains the ENTIRE difference, now in the fixed direction: the bracketed and unbracketed
 // forms of the same token BOTH collapse, through different rules (bracket_timestamp → `[<*>]`,
@@ -572,10 +573,10 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
     SUCCEED();
 }
 
-// ═══ The PREFIX-IMAGE exit gate — the TRIANGLE (bibles/jenkins_dialect.md §4, 2fe2e85) ═══
+// ═══ The PREFIX-IMAGE exit gate — the TRIANGLE (repair landed at 2fe2e85) ═══
 //
 // Derived a priori from the normal form's structure AND the shipped chain's ENUMERATED behaviors
-// (ADR-23's bundled list: #2 the stamp strip, #3 the greedy `[ \t]+` leading-whitespace strip,
+// (the chain's enumerated bundled list: #2 the stamp strip, #3 the greedy `[ \t]+` space strip,
 // #4 the blank-line decline). Per stamped raw line `[STAMP]<sep>rest-tail`, with
 // `rest := everything after the ']'` and `rest′ := strip_ws(rest)` computed by THIS HARNESS'S OWN
 // frozen `[ \t]+` spelling — never by calling the strategy (an oracle that called the strategy
@@ -592,7 +593,7 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
 // HOW M IS REACHED, stated because the mask module is sealed (PRIVATE file set — this package
 // test cannot import insight.canon.detail.mask): M(x) is obtained through the REAL chain behind a
 // neutral RawText CARRIER token — template("maskerprobe " ⧺ x) minus the carrier — resting on the
-// same prev-neutrality the §6.5 derivation verifies at source (the single prev-consulting rule
+// same prev-neutrality the derivation verifies at source (the single prev-consulting rule
 // tests is_status_keyword, and "maskerprobe" is not one), and guarded per line: the carrier
 // template must begin with the carrier token verbatim, or the line is counted as a CARRIER
 // failure (INSTRUMENT arm, never silently absorbed). The carrier also fences M from strategy
@@ -603,12 +604,13 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
 // carrier fails → INSTRUMENT; P2a/P2b/P3 fail with P1(a)=0 (incl. glued cell > 0) →
 // NEW PHENOMENON, escalated, never rounded into a branch.
 //
-// Declared limitation (§6.5): the triangle is OVER-MASKING-BLIND by construction — a leaking rule
-// appears on both sides of each identity and cancels. Named holders: the §6 decline-list unit
-// arms (canon core) and the D11 collateral leg. And P2 asserts CONFORMANCE to the 0046
-// enumeration, not the enumeration's wisdom — the merit of bundled #3 (a stack frame's leading
-// tab is content by any reasonable reading) is held by the strategy's own unit arms and the
-// flaws.md parked entry (Eqya·9), measurement-gated, never a second change in this pass.
+// Declared limitation: the triangle is OVER-MASKING-BLIND by construction — a leaking rule
+// appears on both sides of each identity and cancels. Whoever reads a green must not credit it a
+// precision it cannot see. Named holders: the decline-list unit arms (canon core) and the D11
+// collateral leg. And P2 asserts CONFORMANCE to the bundled enumeration above, not the
+// enumeration's wisdom — the merit of bundled #3 (a stack frame's leading tab is content by any
+// reasonable reading) is held by the strategy's own unit arms and by a parked review item
+// (Eqya·9), measurement-gated, never a second change in this pass.
 TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
 {
     const auto manifest_path{env_value("JENKINS_T5_MANIFEST")};

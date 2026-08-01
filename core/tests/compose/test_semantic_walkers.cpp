@@ -1,5 +1,5 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_semantic_walkers.cpp — the composed-recognition ALGORITHMS (ADR-17), canon's
+// test_semantic_walkers.cpp — the composed-recognition ALGORITHMS, canon's
 // semantic-unaware core code, exercised over SYNTHETIC rows so the mechanism is proven
 // VOCABULARY-FREE. This is the homing counterpart to the package suites: the github/test_frameworks
 // suites prove the real VOCABULARY; here we prove canon's ALGORITHM (gate matching, longest-match,
@@ -35,10 +35,10 @@ using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::lift_level;
 using insight::tokenization::recognize;
 
-// The walkers take NormalizedContent (the ADR-21 precondition as a type). Every probe in this
-// suite is an escape-free literal, so normalize() is the zero-copy FIXED POINT: the content views
-// the literal itself and the shared scratch is never written — which is what keeps the SP-5
-// no-allocation guard meaningful over the full probe path below.
+// The walkers take NormalizedContent (the stage-1 normalization precondition as a type). Every
+// probe in this suite is an escape-free literal, so normalize() is the zero-copy FIXED POINT: the
+// content views the literal itself and the shared scratch is never written — which is what keeps
+// the SP-5 no-allocation guard meaningful over the full probe path below.
 [[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
 {
     static std::string scratch;
@@ -230,7 +230,7 @@ constexpr SemanticPackageManifest kOtherManifest{
 }
 } // namespace
 
-// ── The DIALECT gate (ADR-22.D6): kAnyDialect fires under EVERY declaration; a concrete
+// ── The DIALECT gate: kAnyDialect fires under EVERY declaration; a concrete
 // gate fires only on a stream declaring ITS package — and NOT on an undeclared stream, which is the
 // fail-closed half.
 //
@@ -306,8 +306,8 @@ TEST(SemanticWalkers, LocationFamiliesAndTokenBoundaries)
 }
 
 // ── lift_level(): FIRST match in declared order wins — NOT longest match ──
-// ADR-22 relocates the level-lift walk from the GHA package into core "with the rows,
-// their order and the first-match rule unchanged". This is the assertion that the first-match rule
+// The level-lift walk was relocated from the GHA package into core with the rows, their order and
+// the first-match rule unchanged. This is the assertion that the first-match rule
 // actually survived the move: a longest-match walker (the rule classify/recognize use, and the
 // natural thing to "fix" this to) returns Error here and fails.
 TEST(SemanticWalkers, LevelLiftFirstDeclaredMatchWins)

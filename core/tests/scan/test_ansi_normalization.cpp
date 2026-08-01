@@ -2,8 +2,8 @@
 // tests/scan/test_ansi_normalization.cpp
 //
 // Unit coverage for STAGE 1 — `normalize()`, canon's universal ANSI ingest normalization
-// (SRC-D-TID-11), now the FACTORY that mints `NormalizedLine` (ADR-21.D2/D3: the out-parameter
-// strip form is REMOVED; the return type carries the proof that stage 1 ran).
+// (SRC-D-TID-11), now the FACTORY that mints `NormalizedLine` (the out-parameter strip form is
+// REMOVED; the return type carries the proof that stage 1 ran).
 //
 // WHY THIS FILE EXISTS AT ALL. Stage 1's only coverage used to be three assertions inside
 // `tests/mask/test_stateless_template.cpp`, filed under `mask/` because the template-identity path

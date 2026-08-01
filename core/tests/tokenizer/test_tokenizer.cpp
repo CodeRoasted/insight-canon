@@ -356,7 +356,7 @@ TEST_F(TokenizerTest, ReportsParsedLineCount)
 }
 
 // (ReportsClusterCount retired — the stateless masker has no cluster state; cluster_count()
-//  was removed with the Drain clustering, stateless_template_id.md SRC-D-TID-3.)
+//  was removed with the Drain clustering — SRC-D-TID-3.)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Edge cases / robustness

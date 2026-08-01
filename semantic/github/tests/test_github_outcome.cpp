@@ -1,11 +1,12 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_github_outcome.cpp — the GHA run-outcome VOCABULARY (ADR-17, the G-OUT-1 GHA half):
+// test_github_outcome.cpp — the GHA run-outcome VOCABULARY, the GHA half of the outcome mapping:
 // the seven native `result`/`conclusion` strings map into the core four-class RunOutcome, the
 // no-verdict conclusions (skipped/neutral/action_required) MAP to Unknown (never a guess, never a
 // miss), and the package honestly ships NO OutcomeMarkerRow — GHA has no run-verdict console line
 // (`Process completed with exit code N` is per-step), so the degenerate console path is Unknown and
-// only the authoritative side-input carries a GHA verdict. The D-OUT-RUN-1 LADDER mechanics are
-// core's (canon tests/compose/test_run_outcome.cpp); this file guards the GITHUB DATA end.
+// only the authoritative side-input carries a GHA verdict. The LADDER mechanics — authoritative
+// side-input, then the console tail's LAST match, then Unknown — are core's (canon
+// tests/compose/test_run_outcome.cpp); this file guards the GITHUB DATA end.
 #include <gtest/gtest.h>
 
 import std;
@@ -21,8 +22,8 @@ using insight::semantic::ComposedSemantics;
 
 namespace
 {
-// The RESOLVED view of a stream that declared this dialect (ADR-22) — after T4 the
-// outcome vocabulary is reachable only through a declaration.
+// The RESOLVED view of a stream that declared this dialect — the outcome vocabulary is reachable
+// only through a declaration, never through per-line format detection.
 [[nodiscard]] ComposedSemantics github_only()
 {
     const std::array manifests{insight::semantic::github::kManifest};
@@ -63,7 +64,7 @@ TEST(GithubOutcome, TheSevenNativeConclusionStringsMap)
     EXPECT_EQ(map_outcome_token("failure", composed),
               RunOutcome::Failure);
     // Both non-completion conclusions are the SAME class: an incomplete run (log truncated at the
-    // stop point) — the §6.3 suppression semantics apply to either.
+    // stop point) — either one suppresses vanished-quantum alarms rather than raising them.
     EXPECT_EQ(map_outcome_token("cancelled", composed),
               RunOutcome::Aborted);
     EXPECT_EQ(map_outcome_token("timed_out", composed),
@@ -101,7 +102,7 @@ TEST(GithubOutcome, NoMarkerMeansTheConsolePathIsHonestlyUnknown)
            "token '"
         << scan.token << "'";
     // …and rung 2 falls to Unknown. (There is no dialect LATCH any more: the dialect is declared,
-    // so `RunOutcomeScan` carries no LogFormat at all — ADR-22.)
+    // so `RunOutcomeScan` carries no LogFormat at all.)
     const auto degenerate{resolve_run_outcome("", scan, composed)};
     EXPECT_EQ(degenerate.outcome, RunOutcome::Unknown)
         << "only-a-console-log GHA is Unknown — never a guess from per-step exit codes";
@@ -112,7 +113,7 @@ TEST(GithubOutcome, NoMarkerMeansTheConsolePathIsHonestlyUnknown)
 TEST(GithubOutcome, AuthoritativeSideInputCarriesTheGhaVerdict)
 {
     const ComposedSemantics composed{github_only()};
-    // The Action forwards `${{ needs.<job>.result }}` verbatim (ADR-17) — the ONLY channel
+    // The Action forwards `${{ needs.<job>.result }}` verbatim, untranslated — the ONLY channel
     // a GHA verdict reaches the engine (no marker). On a green-looking console, `cancelled` must
     // still resolve Aborted: the side-input needs no console corroboration.
     const auto lines{gha_console(/*failing=*/false)};

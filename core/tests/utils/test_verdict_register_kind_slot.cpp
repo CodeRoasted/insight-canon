@@ -3,7 +3,7 @@
 // tests/utils/test_verdict_register_kind_slot.cpp
 //
 // SRC-D-OUT-4c — the verdict register is a POSITION claim, not an adjacency.
-// (the property set is its .)
+// The five numbered properties below are the whole property set for that claim.
 //
 // THE RULE. A trailing `:` anchors token `T` only when `T` occupies the line's KIND SLOT: every
 // token preceding `T` is itself colon-terminated (`ld:`, `src/main.rs:`, `357:`) or bracket-
@@ -80,7 +80,7 @@ constexpr std::array<KindSlotRow, 7U> kRows{{
 }
 } // namespace
 
-// ── §7.1 — one positive per DECLARED prefix class ──────────────────────────────
+// ── Property 1 — one positive per DECLARED prefix class ────────────────────────
 TEST(VerdictRegisterKindSlot, EveryDeclaredPrefixClassKeepsTheAnchor)
 {
     for (const KindSlotRow& row : kRows)
@@ -89,11 +89,11 @@ TEST(VerdictRegisterKindSlot, EveryDeclaredPrefixClassKeepsTheAnchor)
             << row.in_slot;
 
     // A kind slot is necessary, not sufficient, and the interaction is worth stating because the
-    // design's own §4.1 table lists this exact bazel line. `<WORKSPACE>:16: error:` IS in the kind
-    // slot, and it still does not classify Error — the level word's immediate predecessor is the
-    // bare integer `16`, so SRC-D-CNT-1's COUNT register reads it as an aggregate ("16 errors") and
-    // caps the line at Warn. That register is checked independently of this one and is unmoved by
-    // SRC-D-OUT-4c; the row above uses `:16:1:` so the `1`'s own predecessor is digit-leading,
+    // declared prefix-class table lists this exact bazel line. `<WORKSPACE>:16: error:` IS in the
+    // kind slot, and it still does not classify Error — the level word's immediate predecessor is
+    // the bare integer `16`, so SRC-D-CNT-1's COUNT register reads it as an aggregate ("16 errors")
+    // and caps the line at Warn. That register is checked independently of this one and is unmoved
+    // by SRC-D-OUT-4c; the row above uses `:16:1:` so the `1`'s own predecessor is digit-leading,
     // which is exactly the numeric-chain guard SRC-D-CNT-1 already carries for timestamps.
     EXPECT_EQ(infer_leading_log_level("<WORKSPACE>:16: error: no comment on the exported symbol"),
               LogLevel::Warn)
@@ -102,7 +102,7 @@ TEST(VerdictRegisterKindSlot, EveryDeclaredPrefixClassKeepsTheAnchor)
            "word makes it a summary, and a summary caps at Warn";
 }
 
-// ── §7.2 — THE DISCRIMINATING ROW: one token, not one vocabulary ───────────────
+// ── Property 2 — THE DISCRIMINATING ROW: one token, not one vocabulary ─────────
 // Each line here is its positive above with a single non-prefix token inserted before the level
 // word. Same words, same colon, one token moved. A rule that keyed on vocabulary (a denylist of
 // "error" contexts) would classify these identically to their positives; a POSITION rule cannot.
@@ -116,9 +116,10 @@ TEST(VerdictRegisterKindSlot, OneInsertedNonPrefixTokenDisplacesTheKindSlot)
             << row.in_slot << "\n  displaced: " << row.displaced;
 }
 
-// ── §7.3 — the green-but-BLIND guard: anchor #1 is independent ─────────────────
+// ── Property 3 — the green-but-BLIND guard: anchor #1 is independent ───────────
 // Every negative above, in CAPS, must still classify Error. Without this row a fix that
-// over-tightened and took anchor #1 down with anchor #2 would pass §7.1 and §7.2 and read green.
+// over-tightened and took anchor #1 down with anchor #2 would pass properties 1 and 2, and read
+// green.
 TEST(VerdictRegisterKindSlot, CapsRegisterStillFiresOnEveryDisplacedRow)
 {
     for (const KindSlotRow& row : kRows)
@@ -131,7 +132,7 @@ TEST(VerdictRegisterKindSlot, CapsRegisterStillFiresOnEveryDisplacedRow)
     }
 }
 
-// ── §7.4 — the property whose ABSENCE is the 436: byte-length invariance ───────
+// ── Property 4 — the property whose ABSENCE is the 436: byte-length invariance ─
 // METAMORPHIC OVER ONE INPUT, which is what makes it untunable: it sweeps a bracket-enclosed
 // padding run across the 40-byte kLeadingScanHead boundary and asserts the verdict never moves. No
 // choice of head constant satisfies it; only removing the head from the CLAIM does.
@@ -165,11 +166,11 @@ TEST(VerdictRegisterKindSlot, VerdictIsInvariantUnderPrefixLengthAcrossTheScanHe
     }
 }
 
-// ── §7.5 — monotone-demoting, and the ONE surface where it does not carry ──────
+// ── Property 5 — monotone-demoting, and the ONE surface it does not carry ──────
 // SRC-D-OUT-4c only ever REMOVES an anchor, so on the CUE surface (contains_failure_cue) no line
 // that did not fire can start firing: the anchors confirm an already-matched failure word and there
-// is no branch in which losing one creates a cue. That is the ADR-9 clause-2 direction the
-// ruling rests on, and these rows pin it.
+// is no branch in which losing one creates a cue. That is the precision-first direction the ruling
+// rests on — a degradation may drop signal, never fabricate one — and these rows pin it.
 TEST(VerdictRegisterKindSlot, TheCueSurfaceOnlyEverLosesAnchors)
 {
     EXPECT_FALSE(contains_failure_cue("Writing tsc-error-report.json"));
@@ -204,7 +205,8 @@ TEST(VerdictRegisterKindSlot, TheLevelSurfaceIsNotMonotoneAndThisIsTheMeasuredFa
 }
 
 // ── DECLARED LIMITATION: a leading TIMESTAMP is not prefix material ────────────
-// The design's §4.1 lists `2026-…T10:00:00.123Z error: msg` as firing, on the reading that
+// The declared prefix-class catalogue lists `2026-…T10:00:00.123Z error: msg` as firing, on the
+// reading that
 // "timestamp segments are colon-terminated". The LAST segment is not: under the shared canon
 // tokenization `2026-05-29T10:00:00.123Z` is three tokens — `2026-05-29T10`, `00`, `00.123Z` — and
 // the third is followed by a SPACE, so it is neither colon-terminated nor bracket-enclosed and the

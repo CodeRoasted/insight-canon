@@ -1,24 +1,28 @@
 // NOLINTBEGIN — integration gate: literals and printed diagnostics are intended.
-// test_gitlab_package_corpus_proof_gate.cpp — the GitLab PACKAGE PROOF over marker_corpus_v1
-// (technical_docs/history/architecture-v1/corpus_backed_gates.md § 4; homed here by Kleio,
-// § 4.1/§ 4.2; the live gates-shelf register is DN-18).
+// test_gitlab_package_corpus_proof_gate.cpp — the GitLab PACKAGE PROOF over marker_corpus_v1.
+// The property: does the SHIPPED `insight.semantic.gitlab` see on real GitLab traces what the
+// frozen Python instrument that authored its rows saw? That is one component over bytes it does
+// not author and needs no seam, so it homes in the package's own suite.
 //
-// ═══ WHAT IS BEING CLAIMED, IN THE WORDS § 4.4 REQUIRES ═══
+// ═══ WHAT IS BEING CLAIMED, IN THESE EXACT WORDS ═══
 //
 //   * MARKER AXIS — FIDELITY OF TRANSCRIPTION, never independent validation. The package's rows
-//     were written from studies/012's recognizers; this gate proves the shipped C++ package carries
-//     what the frozen instrument measured, per trace and per leg, on the frozen corpus. The
-//     external GitLab depth claim may not exceed that word.
+//     were written by reading the frozen instrument's recognizers, so oracle and SUT share an
+//     author's intent; what this gate proves is that the shipped C++ package carries what the
+//     frozen instrument measured, per trace and per leg, on the frozen corpus. That is the honest
+//     word and it is stated rather than left implicit — a transcription from Python regexes to
+//     composed C++ rows across 430 real traces is exactly where a faithful-looking port silently
+//     narrows. The external GitLab depth claim may not exceed that word.
 //   * OUTCOME AXIS — RECOVERY OF THE PLATFORM'S RECORDED VERDICT from console bytes alone, on a
-//     declared leg (§ 4.9(c)): the oracle is GitLab's own REST `job_status`, a producer this
-//     codebase never authored. Stronger than transcription; still NOT external validity — one
-//     corpus, one roster.
-//   * It does NOT re-earn, widen, or re-open the depth claim (outcome A is Eqya's and rests on the
-//     corpus); it says NOTHING about prevalence beyond the corpus's declared residuals.
+//     declared leg: the oracle is GitLab's own REST `job_status`, a producer this codebase never
+//     authored. Stronger than transcription; still NOT external validity — one corpus, one roster.
+//   * It does NOT re-earn, widen, or re-open the depth claim — that claim is the PO's and rests on
+//     the corpus, not on this gate; it says NOTHING about prevalence beyond the corpus's declared
+//     residuals, and NOTHING about the old leg in either direction.
 //
-// ═══ AXIS VOCABULARY — THREE AXES, NEVER A BARE "MODERN LEG" (§ 4.9(e)) ═══
-// "Modern leg" denotes three different populations across the live documents, so every cell here
-// names its axis:
+// ═══ AXIS VOCABULARY — THREE AXES, NEVER A BARE "MODERN LEG" ═══
+// "Modern leg" has denoted three different populations in this project's record, so every cell
+// here names its axis:
 //   * BANNER leg — the `Running with gitlab-runner …` banner version, ≥ 18.9 vs < 18.9, read from
 //     the trace BYTES by the frozen scorer's `leg_of` and carried in the committed sidecar's `leg`
 //     column (banner-modern 445 · banner-old 174 · void 8). A C++ re-derivation of that classifier
@@ -26,32 +30,36 @@
 //     re-derived.
 //   * STAMPED axis — the 32-byte runner transport prefix is present (482 traces). Derived IN-BAND
 //     by the SHIPPED strategy (an engaged `ParsedLine::timestamp`), then cross-checked against the
-//     committed oracle's own `stamped` column. studies/012's recall legs are cut on THIS axis.
-//   * ran-job — § 4.5's exogenous predicate (15 never-ran). Not needed by any cell below; named so
-//     nobody reads the 445 as a ran-job count (ran-job banner-modern is 430).
+//     committed oracle's own `stamped` column. The frozen study's recall legs are cut on THIS axis.
+//   * ran-job — the exogenous never-ran predicate (15 traces), segregated and counted. Not needed
+//     by any cell below; named so nobody reads the 445 as a ran-job count (ran-job banner-modern
+//     is 430).
 // The mixed stamped-axis loss rate (the headline percentage) is NEVER asserted here: 7.7 % of the
 // stamped traces carry 17.7 % of the loss, so the mixed figure is not attributable to any
-// assertion leg (§ 4.9(e) — Eqya's hard rule for this gate).
+// assertion leg. The hard rule for this gate: no reported figure may span two legs, and every one
+// carries its leg in the assertion's own name.
 //
-// ═══ THE POPULATION AND THE TWO COMMITTED ORACLE FILES (clauses 1/4; § 4.9(a)) ═══
+// ═══ THE POPULATION AND THE TWO COMMITTED ORACLE FILES (clauses 1/4) ═══
 //   * `PROBE-v1.trace-sidecar.tsv` — the committed projection of the 627 `kind == "trace"` rows of
 //     `PROBE-v1.manifest.json` (627 = 445 banner-modern + 174 banner-old + 8 void, unclassified 0),
 //     emitted by `emit_trace_sidecar.py`, which IMPORTS `g0_gitlab.leg_of`. Read sorted as
 //     committed (manifest order), uncapped, never a directory walk. Per-row `sha256` and `bytes`
 //     are VERIFIED against the trace bytes (clause 4) — a right count over wrong bytes is the
-//     fabricated-pass shape that produced this corpus family's P4 incident.
+//     fabricated-pass shape, and counts cannot see it.
 //   * `PROBE-v1.recognition-delta.tsv` — the standing harness `emit_recognition_delta.py`'s
 //     committed emission: per-trace `study_starts` (the FROZEN instrument's own section-start
 //     count, via its frozen `P_SECTION`) and `markers_canon` (the harness's model of the shipped
 //     ingest path). Its licence to be read as the engine's numbers is its reproduction check —
-//     nine recorded figures exactly, per class (§ 4.9(e)) — and THIS gate closes the loop from the
-//     other side: the SHIPPED symbols must agree with it PER TRACE, so a compensating pair of
-//     errors that preserves an aggregate cannot pass (§ 4.4). The eidos pre/post-seam columns in
-//     that file are NOT asserted here: they are P1's cells (§ 6, `insight_sift_tests` — the only
-//     binary linking both paths), carried in the emission for the join's completeness.
+//     nine recorded figures exactly, per class — and THIS gate closes the loop from the other
+//     side: the SHIPPED symbols must agree with it PER TRACE. An aggregate ("coverage 100 % on
+//     430 traces") is satisfiable by a recognizer wrong per trace in compensating directions;
+//     per-trace agreement is what closes that. The eidos pre/post-seam columns in that file are
+//     NOT asserted here: they belong to the two-path agreement gate in `insight_sift_tests` — the
+//     only binary that links both paths — and ride the emission for the join's completeness.
 //   * The corpora-side check that the sidecar equals `projection(PROBE-v1.manifest.json)` is that
-//     repo's governance (§ 4.9(a)), not this binary's — this gate cannot see the JSON and does not
-//     try to.
+//     repo's governance, not this binary's — this gate cannot see the JSON and does not try to.
+//     Without it, "pure function of a committed manifest" quietly becomes "of a committed copy
+//     nobody reconciles".
 //
 // ═══ CLAUSE MAP ═════════
 //   1 committed population, sorted, uncapped     → the sidecar, above
@@ -63,26 +71,26 @@
 //   7 red-capability OBSERVED and recorded below
 //   8 the SUT is the shipped symbols — `make_strategy()`, `recognize()`, `scan_run_outcome`,
 //     `resolve_run_outcome`, `map_outcome_token`, with stage 1 = the public
-//     `normalize` (§ 4.9(b): the marker leg discharges the type-borne precondition and
-//     scores the package's rows on content normalized as canon normalizes it — stated in those
-//     words; the outcome leg is the shipped `scan_run_outcome` outright)
+//     `normalize` (the marker leg discharges the type-borne precondition, then scores the
+//     package's rows on content normalized as canon normalizes it — stated in those words; the
+//     outcome leg is the shipped `scan_run_outcome` outright, no assembly)
 //   9 registered as RUN in `scripts/run_corpus_gates.sh` in the same pass that writes this file
 //
-// ═══ THE INGEST ASSEMBLY THE MARKER LEG SCORES (§ 4.9(b), path A) ═══
+// ═══ THE INGEST ASSEMBLY THE MARKER LEG SCORES ═══
 // Per `\n`-split line: stage 1 `normalize` (skip a line that was all escape bytes,
 // the LogParser discipline) → the SHIPPED strategy's `parse` (peels the 32-byte transport prefix
 // where present; claims the bare marker/verdict shapes; declines everything else, which then
 // scores verbatim — the RawText fall-through) → the SHIPPED `recognize()` over the composed rows.
-// The marker axis has no public parser-driven entry point in any binary (§ 4.9(b)), so this
-// assembly IS the consumer path, and the anti-phantom guard is specified against exactly this
+// The marker axis has no public parser-driven entry point in any binary — which is precisely why
+// every marker consumer hand-assembles the ingest, and why two of three assembled it wrong — so
+// this assembly IS the consumer path, and the anti-phantom guard is specified against exactly this
 // input. Per-trace agreement is at COUNT grain; name-grain agreement within a trace is carried by
-// the package's byte-form fixtures and by P1's keyed multiset, not re-checked here (declared, not
-// smuggled).
+// the package's byte-form fixtures and by the two-path keyed multiset, not re-checked here
+// (declared, not smuggled).
 //
 // ═══ PIN PROVENANCE — two strengths, labelled (the G1-PEEL discipline) ═══
-//   CORROBORATED    — recorded closed measurements (Kleio 2026-07-29, corpus_backed_gates.md
-//                     § 4.5/§ 4.9(c)/§ 4.9(e); studies/012), reproduced independently by the
-//                     standing harness AND by this gate's first run.
+//   CORROBORATED    — recorded closed measurements (Kleio 2026-07-29), reproduced independently by
+//                     the standing harness AND by this gate's first run.
 //   CHARACTERIZATION — measured HERE first (2026-07-29), pinned so it cannot move silently. It
 //                     guards regression; it confirms no prediction.
 //
@@ -95,17 +103,17 @@
 //        disagreements + 482 stamped-axis disagreements, each naming its trace, banner leg and
 //        expected count (first row: `…/job_2728336.log`, banner-modern, engine 0 vs oracle 7).
 //        `markers, unstamped` stayed 294 — the bare-marker shapes on unstamped traces never
-//        needed the peel. This is the ingest-assembly defect class that cost 1 077 markers
-//        (normalization contract § 0), seen by every cell that must see it.
+//        needed the peel. This is the ingest-assembly defect class that cost 1 077 markers when a
+//        consumer peeled without normalizing, seen by every cell that must see it.
 //   M-B  the outcome scan's `\r`-anchor reverted to `\n`-only (`find('\r')` → npos, i.e. the
 //        pre-c6a1e84 engine): RED — banner-old collapsed to Success 19 (pinned 111) / Failure 20
 //        (52) / Aborted 0 (6) / none 135 (5) while banner-modern stood at 329/93/11/12 (its
 //        verdicts are `\n`-delimited); recovered/agree/diverge 472/471/1 (pinned 602/599/3);
 //        Aborted total 11 (pinned 17, the console ceiling). Summed with the 8 void, the mutated
 //        engine reads 348 S · 113 F · 11 A · 155 none — the RECORDED pre-anchor engine, per class
-//        (§ 4.9(c)) — so the mutation reproduces the historical defect exactly, and the gate is
-//        red on eight named cells. This is the recognizer defect class that fabricated P4 on this
-//        corpus family (§ 4.6.5(b)); a gate that cannot see it has learned nothing from the
+//        — so the mutation reproduces the historical defect exactly, and the gate is red on eight
+//        named cells. This is the `\r`-blind recognizer defect class that once manufactured a
+//        score on this corpus family; a gate that cannot see it has learned nothing from the
 //        incident that produced its corpus.
 //
 // Determinism: byte-only — committed-order population, integer counts, no RNG, no clock, no float,
@@ -148,30 +156,31 @@ constexpr std::string_view kLegUnclassified{"unclassified"};
 constexpr std::size_t kMaxReportedRows{10};
 
 // ── The pins ──────────────────────────────────────────────────────────────────────────────────
-// CORROBORATED — population (§ 4.5, reproduced by the sidecar emission 2026-07-29):
+// CORROBORATED — population (reproduced by the sidecar emission 2026-07-29):
 constexpr std::size_t kTraceRows{627};
 constexpr std::size_t kBannerModernTraces{445};
 constexpr std::size_t kBannerOldTraces{174};
 constexpr std::size_t kVoidTraces{8};
 constexpr std::size_t kUnclassifiedTraces{0};
-// CORROBORATED — the producer-authored verdict distribution (§ 4.9(c): 458 / 144 / 25):
+// CORROBORATED — the producer-authored verdict distribution, 458 / 144 / 25 over the 627:
 constexpr std::size_t kApiSuccess{458};
 constexpr std::size_t kApiFailed{144};
 constexpr std::size_t kApiCanceled{25};
-// CORROBORATED — the STAMPED axis crossed with the BANNER axis (§ 4.9(e): 482 = 445 + 37):
+// CORROBORATED — the STAMPED axis crossed with the BANNER axis (482 = 445 + 37):
 constexpr std::size_t kStampedTraces{482};
 constexpr std::size_t kStampedBannerModern{445}; // every banner-modern trace is stamped
 constexpr std::size_t kStampedBannerOld{37};     // the contaminant cell — scored, never averaged in
-// CORROBORATED — markers through the shipped ingest assembly ((e)'s join):
+// CORROBORATED — markers through the shipped ingest assembly, as crossed cells never a subtraction:
 constexpr std::size_t kMarkersBannerModern{2963};     // banner-modern (all stamped)
 constexpr std::size_t kMarkersStampedBannerOld{230};  // stamped ∧ banner-old
-constexpr std::size_t kMarkersUnstamped{294};         // unstamped (all banner-old) — studies/012's 294
-constexpr std::size_t kMarkersStampedAxisTotal{3193}; // the STAMPED-axis total, studies/012's numerator
+constexpr std::size_t kMarkersUnstamped{294};         // unstamped (all banner-old) — the study's 294
+constexpr std::size_t kMarkersStampedAxisTotal{3193}; // the STAMPED-axis total, the study's numerator
 // CORROBORATED — the frozen instrument's own per-leg numerators (the oracle file's integrity pins):
 constexpr std::size_t kStudyStartsBannerModern{3001};
 constexpr std::size_t kStudyStartsStampedAxis{3231};
 constexpr std::size_t kStudyStartsUnstamped{1054};
-// CORROBORATED — the outcome cells, POST `\r`-aware anchor, cut by BANNER leg (§ 4.9(c) P5):
+// CORROBORATED — the outcome cells, POST `\r`-aware anchor, cut by BANNER leg (a verdict cell
+// names its leg — these are never summed into one figure):
 struct OutcomeLegPins
 {
     std::size_t success;
@@ -186,18 +195,19 @@ constexpr OutcomeLegPins kOutcomeBannerOld{.success = 111, .failure = 52, .abort
 // lone `\r` as well as after `\n` (insight-canon c6a1e84). The number is a property of where a row
 // may MATCH; pinning 25 would be red for a property of GitLab's producer, not of our rows.
 constexpr std::size_t kAbortedConsoleCeiling{17};
-// CORROBORATED — agreement against the producer's verdict, over the 602 recovered (§ 4.9(c)):
+// CORROBORATED — agreement against the producer's verdict, over the 602 recovered:
 constexpr std::size_t kRecoveredTraces{602};
 constexpr std::size_t kAgreements{599};
 // All 3 disagreements are one class: GitLab's console and GitLab's API disagreeing with each
-// other, our rows faithfully reporting the console (ADR-17 D-OUT-RUN-1's declared subordination
-// as a counted cell). 2 × `canceled`-but-`Job succeeded`, 1 × `canceled`-but-exit-code-128.
+// other, our rows faithfully reporting the console — the console's declared subordination to the
+// authoritative API result, as a counted cell and never a row defect. 2 × `canceled`-but-`Job
+// succeeded`, 1 × `canceled`-but-exit-code-128.
 constexpr std::size_t kDisagreements{3};
 constexpr std::size_t kDisagreementsConsoleSuccess{2};
 constexpr std::size_t kDisagreementsConsoleFailure{1};
 // CHARACTERIZATION (measured here first, 2026-07-29) — `section_start:`-shaped content at OFFSET 0
 // of normalized+peeled `\n`-line content that the row grammar DECLINES: measured ZERO. The
-// wireshark-class malformed stamps (§ 4.6.4) are still a counted reality — 60 `%s`/`$(date +%s)`
+// wireshark-class malformed stamps are still a counted reality — 60 `%s`/`$(date +%s)`
 // occurrences across 21 traces at `\n`-line grain, verified 2026-07-29 — but every one sits behind
 // the runner's SGR-wrapped `$ printf "\e[0K` COMMAND ECHO, so it is rejected by POSITION (the
 // anti-phantom anchor) before the shape rule is ever consulted, and none reaches offset 0. The
@@ -444,7 +454,8 @@ struct CorpusScore
 
         // The outcome scan receives the raw `\n`-split line: `scan_run_outcome` owns its own
         // stage 1 (it drives the real LogParser) and its own `\r` anchoring. Handing it stripped
-        // content would double-normalize (the § 6 P2 violation, inside the gate built to catch it).
+        // content would double-normalize — the consumer defect this gate exists to catch, committed
+        // inside the gate built to catch it.
         outcome_lines.emplace_back(raw_line);
 
         // ── marker leg: stage 1 (the typed factory) → shipped strategy → shipped recognize() ──
@@ -472,7 +483,7 @@ struct CorpusScore
         if (marker.kind != IntentMarkerKind::None)
             ++result.markers;
         else if (content.bytes().starts_with("section_start:"))
-            ++result.section_declined; // § 4.6.4's counted cell (malformed `%s`, empty-name, …)
+            ++result.section_declined; // the declared-limitation cell (malformed `%s`, empty-name)
         arena.reset();
     }
 
@@ -741,7 +752,8 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
             else
                 corpus.oracle_study_unstamped += expect.study_starts;
 
-            // ── per-trace agreement with the committed oracle (§ 4.4's anti-compensation leg) ──
+            // ── per-trace agreement with the committed oracle — the anti-compensation leg: an
+            // aggregate is satisfiable by per-trace errors that cancel; this is not ──
             if (result.markers != expect.markers_canon)
             {
                 ++corpus.per_trace_marker_mismatches;
@@ -822,7 +834,7 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
 std::filesystem::path GitLabPackageCorpusProofGate::root_{};
 
 // The shared diagnostic block — printed on ANY failure so a red is diagnosable without re-running
-// under a debugger (verbose-on-failure, root CLAUDE.md § Observability).
+// under a debugger — verbose on failure, actual-vs-expected with the trace named.
 [[nodiscard]] std::string report(const CorpusScore& corpus)
 {
     std::ostringstream out;
@@ -909,8 +921,8 @@ TEST_F(GitLabPackageCorpusProofGate, ThePopulationIsTheCommittedSidecarVerifiedA
            "nobody counted."
         << report(corpus);
 
-    // The producer-authored verdict distribution (§ 4.9(c)) — a population property of the
-    // committed sidecar, pinned before any engine number is trusted.
+    // The producer-authored verdict distribution — a population property of the committed
+    // sidecar, pinned before any engine number is trusted.
     EXPECT_EQ(corpus.api_success, kApiSuccess) << report(corpus);
     EXPECT_EQ(corpus.api_failed, kApiFailed) << report(corpus);
     EXPECT_EQ(corpus.api_canceled, kApiCanceled) << report(corpus);
@@ -931,7 +943,7 @@ TEST_F(GitLabPackageCorpusProofGate, TheMarkerLegCarriesTheRecordedDepthPerTrace
            "least one trace — the in-band derivation and the model have diverged."
         << report(corpus);
 
-    // ── the STAMPED axis, crossed with the BANNER axis (§ 4.9(e)) ──
+    // ── the STAMPED axis, crossed with the BANNER axis — a crossed cell, never a subtraction ──
     EXPECT_EQ(corpus.stamped_traces, kStampedTraces) << report(corpus);
     EXPECT_EQ(corpus.stamped_banner_modern, kStampedBannerModern)
         << "every banner-modern trace is stamped — a drift here re-opens the leg-vocabulary "
@@ -970,7 +982,7 @@ TEST_F(GitLabPackageCorpusProofGate, TheMarkerLegCarriesTheRecordedDepthPerTrace
     EXPECT_EQ(corpus.oracle_study_stamped_axis, kStudyStartsStampedAxis) << report(corpus);
     EXPECT_EQ(corpus.oracle_study_unstamped, kStudyStartsUnstamped) << report(corpus);
 
-    // ── § 4.6.4's declared-limitation cell (CHARACTERIZATION, measured 2026-07-29) ──
+    // ── the malformed-stamp declared-limitation cell (CHARACTERIZATION, measured 2026-07-29) ──
     EXPECT_EQ(corpus.section_shaped_declined, kSectionShapedDeclined)
         << "`section_start:`-shaped content at offset 0 was DECLINED by the row grammar — on this "
            "corpus that cell is pinned ZERO (the malformed `%s` class never reaches a line start; "
@@ -1013,7 +1025,7 @@ TEST_F(GitLabPackageCorpusProofGate, TheOutcomeLegRecoversThePlatformVerdictFrom
               kBannerOldTraces)
         << "the banner-old outcome partition does not close." << report(corpus);
 
-    // ── the cancel ceiling, pinned WITH ITS ANCHOR NAMED (§ 4.8/§ 4.9(c) cell 4) ──
+    // ── the cancel ceiling, pinned WITH ITS ANCHOR NAMED (17 of 17, never 25) ──
     EXPECT_EQ(corpus.outcome_banner_modern.aborted + corpus.outcome_banner_old.aborted,
               kAbortedConsoleCeiling)
         << "Aborted must equal the console CEILING: GitLab put `ERROR: Job failed: canceled` on "

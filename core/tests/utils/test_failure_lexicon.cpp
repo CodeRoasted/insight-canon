@@ -184,10 +184,10 @@ TEST(FailureLexicon, PassWordOrTrailingGlyphDoesNotDemote)
         << "✗ is a FAIL glyph (not a pass glyph), skipped — the failure word 'failed' stands";
 }
 
-// ── SRC-D-OUT-4 — verdict-register awareness (§4A.6): a failure WORD is a cue ───────
+// ── SRC-D-OUT-4 — verdict-register awareness: a failure WORD is a cue ───────────────
 // ONLY in verdict register. A bare base-form failure NOUN in prose ("crash", "fail",
 // "error", "timeout" with no decoration) is NOT a verdict and must not fire — the
-// §6.7 re-run hard-floor false positives: P3 rank 1 `Storing crash reports into
+// re-run hard-floor false positives: P3 rank 1 `Storing crash reports into
 // '<path>'` (an informational startup line, the NOUN "crash") and P3 rank 2
 // `- deleting watched path emits watcher fail event` (a mocha test DESCRIPTION,
 // "fail" modifying "event"). This is one level past D-OUT-1/SRC-D-OUT-1b: D-OUT-1 demotes a
@@ -296,7 +296,7 @@ TEST(FailureLexicon, LeadingFailGlyphAnchorsButNeverCreates)
         << "❌ leads but NO failure word — anchors nothing, stays silent (never CREATES a cue)";
 }
 
-// ── Tokenization boundary the §6.7 P3 finding identified (documenting pin) ─────
+// ── Tokenization boundary the P3 re-run finding identified (documenting pin) ───
 // `_` is NOT a token delimiter and the ends are alnum, so "ERR_FAILED" is ONE atom —
 // it matches no kFailureLexicon word and is no CamelCase `…Error` type, so it fires no
 // cue (and infer_leading_log_level → Unknown). This is BY DESIGN, not a gap SRC-D-OUT-4
@@ -312,7 +312,7 @@ TEST(FailureLexicon, UnderscoreCompoundIsOneAtomNotADecomposedCue)
            "word; the 20x crash is caught by recurrence, not the failure level";
 }
 
-// ── SRC-D-CNT-1 — the count register (§3.2): a counted-noun failure word is a SUMMARY ──
+// ── SRC-D-CNT-1 — the count register: a counted-noun failure word is a SUMMARY ─────────
 // The symmetric dual of the "25 passed, 5 failed" pass-count: a failure word whose
 // IMMEDIATELY-preceding token is a bare integer ("1 failure", "5 failed") asserts an
 // aggregate, not a per-item verdict — so it does NOT fire as a cue, even when it carries

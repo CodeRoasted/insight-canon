@@ -1,7 +1,7 @@
 // NOLINTBEGIN
-// Unit tests for the stateless template masker (stateless_template_id.md D-TID-1/D-TID-2).
+// Unit tests for the stateless template masker (D-TID-1/D-TID-2).
 // The property tests are committed regression guards — chiefly the phantom-pair kill
-// (the whole point, §9.5). The F13 masker-cardinality RE-MEASURE lived here as an
+// (the whole point). The F13 masker-cardinality RE-MEASURE lived here as an
 // env-gated CardinalityOnCorpus test; it is a measurement over an operator-mounted
 // population, not a regression property, so it moved out of the unit tree to the CLI
 // instrument `core/tools/f13_cardinality_measure.cpp`.
@@ -109,20 +109,20 @@ TEST(StatelessTemplate, CompositesNormalized)
               masked("error at parser.cpp:1:1: bad token", arena));
 }
 
-// ── D-MSK-5 (bibles/jenkins_dialect.md §4, ADR-23 erratum 2) — bracket_timestamp ──
+// ── D-MSK-5 — bracket_timestamp ───────────────────────────────────────────────────
 // The whole-token bracketed RFC3339 stamp fell through every rule to literal KEEP ("the bracket
 // is the entire difference"): unbracketed the same token is digit-leading and masks, so on an
 // undeclared Jenkins timestamper stream every stamped line was its own template (95.9% of the
-// no-collapse ceiling, ADR-23). These arms are the fix's UNIT gate: the stamp class
-// collapses to `[<*>]`, and the §6.2 decline list stays byte-identical — the rule claims the
-// bracketed full-datetime class and NOTHING adjacent to it (precision-first, ADR-9). These
-// arms are also one of the two NAMED holders of the §6.5 P2 over-masking blind spot: the A/B
+// no-collapse ceiling). These arms are the fix's UNIT gate: the stamp class
+// collapses to `[<*>]`, and the decline list stays byte-identical — the rule claims the
+// bracketed full-datetime class and NOTHING adjacent to it (precision-first). These
+// arms are also one of the two NAMED holders of the P2 over-masking blind spot: the A/B
 // prefix-image comparison cancels a leak that hits both arms, so the decline list HERE (plus the
 // D11 collateral leg) is what carries that hazard.
 TEST(StatelessTemplate, BracketTimestampCollapsesTheStampClass)
 {
     ArenaAllocator arena{256U * 1024U};
-    // Three same-shape lines differing only in the stamp → ONE template (the ADR-23 measured
+    // Three same-shape lines differing only in the stamp → ONE template (the measured
     // shape, inverted: pre-fix these were three templates, each equal to its raw line).
     const std::string first{masked("[2026-06-23T15:11:09.020Z] + git fetch --tags", arena)};
     const std::string second{masked("[2026-06-23T15:11:10.884Z] + git fetch --tags", arena)};
@@ -145,7 +145,7 @@ TEST(StatelessTemplate, BracketTimestampCollapsesTheStampClass)
 TEST(StatelessTemplate, BracketTimestampDeclinesEverythingAdjacentToTheClass)
 {
     ArenaAllocator arena{256U * 1024U};
-    // The §6.2 decline list, byte-identical through the masker: date-only, time-only, word,
+    // The decline list, byte-identical through the masker: date-only, time-only, word,
     // version, and trailing-punctuation forms are NOT the claimed class and stay literal KEEPs.
     EXPECT_EQ(masked("[2026-06-23] x", arena), "[2026-06-23] x") << "date-only interior declined";
     EXPECT_EQ(masked("[15:11:09] x", arena), "[15:11:09] x") << "time-only interior declined";
@@ -162,7 +162,7 @@ TEST(StatelessTemplate, BracketTimestampDeclinesEverythingAdjacentToTheClass)
     EXPECT_EQ(masked("[42] x", arena), "[<*>] x") << "bracket_index's claim, unchanged";
 }
 
-// ── D-MSK-1 (§4.1) — generalized composite-numeric masking (Chromium/Electron prefix) ──
+// ── D-MSK-1 — generalized composite-numeric masking (Chromium/Electron prefix) ─────────
 // The glog/Chromium diagnostic prefix `[PID:MMDD/HHMMSS.micros:ERROR:file.cc:line]` is ONE
 // whitespace-delimited token. The old source-location normalizer masked only the trailing
 // `:line` and kept the whole `/`-bearing prefix as "path-like", so the high-cardinality
@@ -208,7 +208,7 @@ TEST(StatelessTemplate, DiagnosticCompositeKeepsStatusValuePerSegment)
         << "exit:0 ≠ exit:1 — the colon-form of the exit-code carve-out, per-segment";
 }
 
-// ── D-MSK-2 (§4.2) — ephemeral-root path masking (randomized temp dirs, P6) ─────
+// ── D-MSK-2 — ephemeral-root path masking (randomized temp dirs, P6) ────────────
 // Playwright temp dirs `/tmp/pw-electron-userdata-Kw9v4a` carry a random base-62 suffix —
 // letter-leading, not hex/UUID, so the existing masks keep it literal → a new template per
 // run → novelty fatigue. The suffix is undecidable, but the ROOT is an enumerable byte-exact
@@ -246,7 +246,7 @@ TEST(StatelessTemplate, NonEphemeralPathsAndSourcePathsUntouched)
            "masks";
 }
 
-// ── F13 strengthening (§8 / SRC-D-TID-11..13) — the re-measure rule set ──────────────
+// ── F13 strengthening (SRC-D-TID-11..13) — the re-measure rule set ───────────────────
 
 TEST(StatelessTemplate, DigitLeadingTokensMask)
 {
@@ -336,7 +336,7 @@ TEST(StatelessTemplate, CurrencyMarkerNumberMasked)
 // WHY THESE EXIST, and why the suite above does not already cover them: every test
 // above asserts a COLLAPSE (`masked(a) == masked(b)`), which stays green for ANY hash
 // floor — both sides mask, or both stay literal, either way they match. Mutation
-// testing (studies/011 §7.1) confirmed it: shipping kMinHashLen 16 → 8 left all 43
+// testing confirmed it: shipping kMinHashLen 16 → 8 left all 43
 // committed expectations green, and the floor's stated rationale ("keeps deadbeef,
 // cafe literal", mask.cpp) was asserted nowhere. Pinning a threshold requires EXACT
 // template strings on BOTH sides of the boundary — literal at floor-1, `<*>` at floor.
@@ -347,7 +347,7 @@ TEST(StatelessTemplate, CurrencyMarkerNumberMasked)
 // larger token). A guard on one leaves the other free to drift, so both are pinned.
 //
 // These assert CURRENT SHIPPED BEHAVIOUR; they do not argue the floor is correct.
-// studies/011 rules the value is not tunable by a threshold study — a red here means
+// The value is not tunable by a threshold study — a red here means
 // someone moved a load-bearing masking constant, which is an identity-affecting change
 // requiring a kCanonicalizationVersion bump (SRC-D-TID-16), not a test to retune.
 
@@ -443,8 +443,8 @@ TEST(StatelessTemplate, HashFloorKeepsShortHexWordsLiteral)
     }
 }
 
-// `is_hex_char` folds ASCII case (`chr | 32`). No committed test exercised the fold
-// (studies/011 §7.2), so dropping it would leave every UPPERCASE hash unmasked — real
+// `is_hex_char` folds ASCII case (`chr | 32`). No committed test exercised the
+// fold, so dropping it would leave every UPPERCASE hash unmasked — real
 // corpus content (uppercase git SHAs, checksum tables) silently over-splitting. Pin
 // both the fold AND its bound: folding must not turn non-hex letters into hex.
 TEST(StatelessTemplate, HexClassifierFoldsAsciiCase)

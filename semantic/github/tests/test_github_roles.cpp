@@ -1,5 +1,5 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_github_roles.cpp — the GitHub-Actions STRUCTURAL-ROLE vocabulary (ADR-17). Migrated from
+// test_github_roles.cpp — the GitHub-Actions STRUCTURAL-ROLE vocabulary. Migrated from
 // canon tests/utils/test_structural_role.cpp: the classification MECHANISM
 // (insight::tokenization::classify, longest-match over the composed role rows) is CANON's; the
 // VOCABULARY — `##[group]`/`::group::` → GroupBegin, `##[endgroup]`/`::endgroup::` → GroupEnd,
@@ -18,8 +18,9 @@ using insight::semantic::ComposedSemantics;
 using insight::tokenization::ArenaAllocator;
 using insight::tokenization::classify;
 
-// The walkers take NormalizedContent (ADR-21's precondition as a type); every probe here is an
-// escape-free literal, so normalize() is the zero-copy fixed point over a shared scratch.
+// The walkers take NormalizedContent — canon's ingest-normalization precondition carried by a type
+// unforgeable outside canon; every probe here is an escape-free literal, so normalize() is the
+// zero-copy fixed point over a shared scratch.
 [[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
 {
     static std::string scratch;
@@ -89,12 +90,12 @@ TEST(GithubRoles, NoFalseRoleOnPlainContent)
     EXPECT_EQ(classify(norm_probe("error: undefined reference to foo"), gh), StructuralRole::None);
 }
 
-// ── End-to-end, over the DECLARED path (ADR-23, T4): the caller resolves a stream, peels
+// ── End-to-end, over the DECLARED path: the caller resolves a stream, peels
 // the transport, and hands only `RawPeeledLine::content` to the Tokenizer, which then tags the role
 // on CanonicalEvent.
 //
-// ⚠ THE PEEL IS THE CALLER'S, and these tests are the smallest place that says so. Before T4 the
-// same lines worked because `GitHubActionsStrategy` DETECTED the stamp and stripped it inside
+// ⚠ THE PEEL IS THE CALLER'S, and these tests are the smallest place that says so. These same
+// lines once worked because `GitHubActionsStrategy` DETECTED the stamp and stripped it inside
 // `parse()`. That detection is gone; a caller that hands canon a stamped line without declaring
 // `api-rfc3339-line-prefix` gets the stamp in its template and no role — which is not a defect, it
 // is the declaration contract, and `TokenizerSeesTheStampWithoutADeclaration` below pins it.

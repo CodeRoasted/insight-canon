@@ -1,14 +1,14 @@
 // NOLINTBEGIN — unit test: short identifiers, string literals and printed diagnostics are intended.
-// test_transport_declaration.cpp — G1's SHAPE arm (ADR-23), homed as a canon-core unit suite.
+// test_transport_declaration.cpp — G1's SHAPE arm, homed as a canon-core unit suite.
 //
-// HOMING (Kleio). ADR-23 states G1's property and leaves the test design to me; the property
-// decomposes into three grains with three different homes, and this file is the first:
+// HOMING (Kleio). The transport contract states G1's property and leaves the test design to me;
+// the property decomposes into three grains with three different homes, and this file is the first:
 //
 //   • THIS FILE — the degenerate declaration's shape: empty stack, `peel` is byte-identity, the
 //     catalogue's contract, and fail-closed resolution. Every one of these is a property of ONE
 //     component (`insight.canon.transport`) over bytes this file authors. It needs no seam and no
 //     corpus, so it is a UNIT test and belongs in `core/tests/transport/`, 1:1 with `src/transport/`
-//     (ADR-3.D4's per-domain mirror). Homing it as a corpus gate would have been the mis-homing this
+//     (the per-domain test mirror). Homing it as a corpus gate would have been the mis-homing this
 //     role exists to stop: real bytes cannot prove a property that is about the empty stack.
 //   • `tests/compose/test_transport_identity.cpp` — that declaring transport does not move
 //     `semantic_identity`. Also unit, but its seam is compose's, not transport's.
@@ -19,7 +19,7 @@
 //     `TransportStack::peel`, so it is core's.
 //
 // FALSIFIABILITY — what this file DOES discharge, and what it explicitly does NOT.
-// §9 makes falsifiability a requirement, not a note: G1 must be OBSERVED red under a one-byte
+// Falsifiability is a requirement here, not a note: G1 must be OBSERVED red under a one-byte
 // mutation of the peel path, never asserted red-capable ([[synthetic-gate-vacuity-vs-judgment]]).
 // A gate that cannot fail is vacuous, and "the empty stack changes nothing" is exactly the shape of
 // claim that passes for the wrong reason — it would stay green if `peel` were hard-coded to return
@@ -31,7 +31,7 @@
 // no single implementation satisfies both by accident. That is what makes the empty-stack green
 // mean something.
 //
-// What it does NOT discharge: §9's mutation observation on the CORPUS arm. That one is owed and
+// What it does NOT discharge: the mutation observation on the CORPUS arm. That one is owed and
 // remains owed; it cannot be faked at unit grain, and no sentence here may be read as having paid
 // it.
 //
@@ -98,7 +98,7 @@ const std::array<LineCase, 14> kLines{{
     {.label = "stamped + indented content",
      .bytes = "2026-04-15T22:20:38.2879579Z    indented",
      .carries_stamp = true},
-    // Offset-0 BOM — the live shipped defect (bugs.md 2026-07-27). Present here as a CASE, not as a
+    // Offset-0 BOM — a live shipped defect. Present here as a CASE, not as a
     // fix: the empty stack must leave it alone exactly like everything else, and the declared stack
     // must NOT claim it (the stamp is not at offset 0). Pinning the current behavior is what lets
     // the BOM ruling land later without this file quietly agreeing in advance.
@@ -295,7 +295,7 @@ TEST(TransportDeclaration, DeclaredStackExtractsObservationTimeOnlyWhenTheStampP
 
     // A line that is ENTIRELY transport peels to empty, and empty means DROP — not an empty
     // template. This is how the shipped GHA strategy's "a timestamp-only line is a blank line"
-    // behavior survives the move to a declared peel (ADR-23's bundled behavior 3).
+    // behavior survives the move to a declared peel (bundled behavior 3).
     const RawPeeledLine bare{stack.peel_raw("2026-04-15T22:20:38.2879579Z ")};
     EXPECT_TRUE(bare.is_blank()) << "a stamp-only line must peel to blank, got \""
                                  << escape(bare.content) << "\"";
@@ -307,7 +307,7 @@ TEST(TransportDeclaration, DeclaredStackExtractsObservationTimeOnlyWhenTheStampP
 
 TEST(TransportCatalog, ShippedRowsAreExactlyWhatTheCatalogDeclares)
 {
-    // TWO rows today, each landed WITH its algorithm, its row and its gate (ADR-23 sketches
+    // TWO rows today, each landed WITH its algorithm, its row and its gate (the design sketched
     // seven; this workspace does not ship enum members with no algorithm, no row and no gate).
     // The second landed at T5 5.2 (`bracket-rfc3339-line-prefix` + G-T5-PEEL) — the co-fire the
     // version comment predicted. Pinned so that adding a member without its algorithm and its
@@ -363,7 +363,7 @@ TEST(TransportCatalog, NamesAreUniqueAndLookupRoundTrips)
 
 TEST(TransportDeclarationDeathTest, UnknownTransformFailsClosedNamingTheCatalog)
 {
-    // canon VERIFIES, never infers (ADR-23 / ADR-22's split). An UNKNOWN name is a MISTAKE
+    // canon VERIFIES a declared coordinate, never infers it. An UNKNOWN name is a MISTAKE
     // and fails closed; an ABSENT name is a CHOICE and degrades. They must never share a code path,
     // so the death message is part of the contract, not decoration.
     constexpr std::array<std::string_view, 1> kTypo{{"gha-api-line-prefx"}}; // one byte dropped
@@ -381,7 +381,7 @@ TEST(TransportDeclarationDeathTest, UnknownTransformFailsClosedNamingTheCatalog)
     EXPECT_DEATH({ (void)resolve_transport_stack(declaration); }, "transport-catalog-2");
 }
 
-// ── The WRITER dual's laws (T5 §2.3 — render_transport_prefix, the emit side of the catalogue) ──
+// ── The WRITER dual's laws — render_transport_prefix, the emit side of the catalogue ────────────
 TEST(TransportRenderer, BracketPrefixRendersOneFixedFormAndRoundTrips)
 {
     const auto* bracket_row{find_transform("bracket-rfc3339-line-prefix")};
@@ -398,7 +398,7 @@ TEST(TransportRenderer, BracketPrefixRendersOneFixedFormAndRoundTrips)
     ASSERT_TRUE(insight::transport::render_transport_prefix(*bracket_row, stamp, second));
     EXPECT_EQ(rendered, second);
 
-    // The round-trip laws at the honest boundary (§2.3): peel_raw(render ∥ ℓ) recovers
+    // The round-trip laws at the honest boundary: peel_raw(render ∥ ℓ) recovers
     // strip_ws(ℓ), and the extracted observation time equals the parser's whole-second reading
     // of the rendered interior (parse_iso8601 skips the fraction BY DESIGN — the law holds at
     // the parser's grain; the millisecond digits are covered by the byte-exact form pin above).
@@ -411,7 +411,7 @@ TEST(TransportRenderer, BracketPrefixRendersOneFixedFormAndRoundTrips)
     ASSERT_TRUE(peeled.observation_time.has_value());
     EXPECT_EQ(*peeled.observation_time, stamp);
 
-    // `LinePrefixTimestamp` has NO writer dual, deliberately (T5 §3.3): the GHA API stamp is the
+    // `LinePrefixTimestamp` has NO writer dual, deliberately: the GHA API stamp is the
     // platform's, baked into the GHA IntentFormat's own writer — false, and the buffer untouched.
     const auto* gha_row{find_transform(kGhaTransform)};
     ASSERT_NE(gha_row, nullptr);
@@ -420,7 +420,7 @@ TEST(TransportRenderer, BracketPrefixRendersOneFixedFormAndRoundTrips)
     EXPECT_TRUE(untouched.empty());
 }
 
-// ── The renderer's DOMAIN (T5 §2.3) — which stamps the writer ACCEPTS, as opposed to what it
+// ── The renderer's DOMAIN — which stamps the writer ACCEPTS, as opposed to what it
 // spells for the ones it does. Split from the form/round-trip law above because a failure must be
 // able to name the window, and because the domain is the one property of this function whose very
 // EXPRESSIBILITY varies by build.

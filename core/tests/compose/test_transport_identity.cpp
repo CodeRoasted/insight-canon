@@ -1,8 +1,9 @@
 // NOLINTBEGIN — unit test: short identifiers, string literals and printed diagnostics are intended.
-// test_transport_identity.cpp — G1's IDENTITY arm (ADR-23), homed in canon core's compose
+// test_transport_identity.cpp — G1's IDENTITY arm, homed in canon core's compose
 // suite.
 //
-// THE PROPERTY, and why it is the load-bearing half of G1. ADR-23 states it as a MUST:
+// THE PROPERTY, and why it is the load-bearing half of G1. The transport-envelope contract states
+// it as a MUST:
 //
 //     Two runs ±a transform MUST carry the same `semantic_identity`, or transport-invariance is not
 //     being built.
@@ -59,9 +60,9 @@ constexpr std::string_view kGhaTransform{"api-rfc3339-line-prefix"};
 constexpr std::array<std::string_view, 1> kDeclaredGha{{kGhaTransform}};
 
 // ── A synthetic package, and the same package with ONE byte changed ────────────────────────────
-// Core tests compose SYNTHETIC manifests to exercise the algorithms vocabulary-free (ADR-17
-// §2.4). `kRolesMutated` differs from `kRoles` in exactly one character of one prefix — the
-// smallest change that must still move the digest.
+// Core tests compose SYNTHETIC manifests to exercise the algorithms
+// vocabulary-free. `kRolesMutated` differs from `kRoles` in exactly one character of one prefix —
+// the smallest change that must still move the digest.
 constexpr std::array<StructuralRoleRow, 1> kRoles{
     {{.prefix = "<TRANSPORT-A>", .role = StructuralRole::GroupBegin, .dialect_gate = kAnyDialect}}};
 constexpr std::array<StructuralRoleRow, 1> kRolesMutated{
@@ -152,7 +153,7 @@ TEST(TransportIdentity, IdentityIsSensitiveToTheRuleset)
 
 // The other half of vacuity: `resolve_stream` must actually READ the declaration. An invariance
 // over an argument that is dropped on the floor proves nothing at all. An unknown dialect fatals
-// (ADR-23 — canon VERIFIES, never infers), which is observable proof the coordinate is read.
+// (canon VERIFIES a declared coordinate, never infers it), which is observable proof it is read.
 TEST(TransportIdentityDeathTest, DeclarationCoordinatesAreActuallyRead)
 {
     const ComposedSemantics composed{compose(kPackages)};

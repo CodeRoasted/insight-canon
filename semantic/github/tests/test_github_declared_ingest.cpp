@@ -2,10 +2,10 @@
 // test_github_declared_ingest.cpp — the GitHub-Actions dialect over the DECLARED ingest path
 // This file replaces `test_github_strategy.cpp`, whose whole
 // subject — `GitHubActionsStrategy`: `format()`, `confidence()`, the detection race against Syslog,
-// the in-`parse()` timestamp strip — was DELETED by T4.
+// the in-`parse()` timestamp strip — no longer exists.
 //
 // WHAT REPLACED IT, and why the tests could not simply be ported. The GHA per-line RFC 3339 stamp
-// is a property of GitHub's *delivery*, not of the GHA *dialect* (ADR-23): the host format of
+// is a property of GitHub's *delivery*, not of the GHA *dialect*: the host format of
 // a GHA job log is RawText and always was, and the dialect is the workflow-command VOCABULARY over
 // it. So there is nothing left to DETECT — the caller DECLARES the transform
 // and the dialect, canon verifies both, `TransportStack::peel` unwinds the stamp, and only
@@ -96,7 +96,7 @@ TEST(GithubDeclaredIngest, StampOnlyLinePeelsToBlank)
 // ── Level lift: the workflow-command vocabulary (kLevelLifts) → LogLevel, over the PRODUCTION path
 // ──
 // The rows are this package's DATA; the walk is canon's (`insight::tokenization::lift_level` over
-// the resolved view's table, applied by LogParser — ADR-22). So the gate drives the
+// the resolved view's table, applied by LogParser). So the gate drives the
 // composed pipeline end to end: that is the only place the declared rows reach a decision, and it
 // is the path a product binary takes.
 //
@@ -238,7 +238,7 @@ TEST(GithubDeclaredIngest, InfersErrorFromBodyCueWhenUnmarked)
 }
 
 // ── The package's code tier is now ONE hook, and the composed report says so ──
-// ADR-22: deleting the strategy removes the only hand-written PARSER in a dialect
+// Deleting the strategy removes the only hand-written PARSER in a dialect
 // package, leaving `echoed_source` — a provenance hook, not a grammar. That is what makes this
 // dialect DATA-ONLY, which is the door the LogCraft-generated dialect parser would come through.
 TEST(GithubDeclaredIngest, ThePackageShipsNoStrategyAndOneProvenanceHook)

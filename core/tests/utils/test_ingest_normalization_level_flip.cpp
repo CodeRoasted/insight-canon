@@ -2,7 +2,8 @@
 // Unit tests: allow short identifiers and test-specific patterns
 // tests/utils/test_ingest_normalization_level_flip.cpp
 //
-// THE ONE TO-PASSING FLIP, pinned as a literal (· the register half is).
+// THE ONE TO-PASSING FLIP, pinned as a literal (the register half of the same measurement is
+// pinned in tests/utils/test_verdict_register_kind_slot.cpp).
 // The ingest-normalization measurement moved 436 GHA quanta to-FAILING and — on the GitLab
 // control — a single quantum to-PASSING. A to-passing flip is a possible RECALL LOSS: a real failure
 // the change would suppress. It was the only measurement pointing that way, so it was carried as
@@ -23,8 +24,8 @@
 // real failure here; it removes a false positive, and the normalized verdict is the one that AGREES
 // with the producer's declared severity.
 //
-// ⚠ THE BARE `\r` IS LOAD-BEARING, and this row is the cheapest live proof of clause 6 in the tree
-// (technical_docs/adr/008-corpus-gates-oracles-and-measurement.md D2 — *a `\r` is content in CI logs, not a delimiter*). Stage 1
+// ⚠ THE BARE `\r` IS LOAD-BEARING — *a `\r` is CONTENT in CI logs, not a delimiter* — and this row
+// is the cheapest live proof of that rule in the tree. Stage 1
 // removes the escape run and CORRECTLY leaves the `\r`, which keeps `WARNING` a separate token and
 // is why the normalized line reads Warn. Trim that one byte — as a `\r`-stripping read path would —
 // and `after_script` fuses with `WARNING` into `after_scriptWARNING`; the warning token is gone, the

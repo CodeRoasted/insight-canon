@@ -1,6 +1,6 @@
 // NOLINTBEGIN — corpus gate: literals and printed diagnostics are intended.
-// test_jenkins_bare_null_gate.cpp — G-T5-BARE: the bare-class null (DN-15
-// §6). The purification's own tripwire, and the pass's ABORT WIRE: if the purified chain moves
+// test_jenkins_bare_null_gate.cpp — G-T5-BARE: the bare-class null. The purification's own
+// tripwire, and the pass's ABORT WIRE: if the purified chain moves
 // ANYTHING on the 82 bare traces — a template byte, a quantum, the epilogue token — this gate is
 // red and the identity cut does not stand as landed (the masker coupling discipline, repeated).
 //
@@ -41,7 +41,7 @@
 //         DialectIntent still compiles): G-T5-BARE stayed GREEN (section Q runs under the jenkins
 //         declaration, where the row fires either way; section T never consumes marker rows), and
 //         so did G-T5-RETRO and the conformance kit (its marker legs SKIP kAnyDialect rows by
-//         design). The catcher was the package's own ADR-22 gating unit test —
+//         design). The catcher was the package's own dialect-gating unit test —
 //         `JenkinsMarkers.DialectGatedToTheDeclaringStream` RED (an undeclared stream recovered
 //         Step structure) — plus `JenkinsOutcome` collaterally. SCOPE NOTE, recorded so nobody
 //         later "simplifies" that unit test believing the corpus gates cover gating width: they

@@ -9,9 +9,9 @@
 //     GitLab announces a cancel with the FAILURE prefix (`ERROR: Job failed: canceled`), 17 of the
 //     25 cancelled jobs in marker_corpus_v1. A Jenkins-shaped row set reads all 17 as Failure — a
 //     WRONG verdict, not a missing one — and longest-prefix-wins is what resolves it;
-//   D-OUT-RUN-1 — the API result is authoritative, the console tail is the degenerate fallback, and
-//     the measured divergence (2 cancelled jobs ending on `Job succeeded`) is exactly what that
-//     precedence is for.
+//   the resolution LADDER — the API result is authoritative, the console tail is the degenerate
+//     fallback, and the measured divergence (2 cancelled jobs ending on `Job succeeded`) is
+//     exactly what that total precedence is for: it is never a reconciliation.
 // Every terminal-line form here was taken from marker_corpus_v1. Determinism: byte-only scan +
 // integer line index; no RNG/clock/float.
 #include <gtest/gtest.h>
@@ -98,8 +98,8 @@ TEST(GitLabOutcome, TheFailureTailHasAFreeFormRemainderAndStillResolves)
 TEST(GitLabOutcome, ACancellationAnnouncedWithTheFailurePrefixResolvesToAborted)
 {
     const ComposedSemantics composed{gitlab_only()};
-    // THE finding studies/012 owed this package. Longest-prefix-wins is what makes it work, and it
-    // must not depend on where the three rows sit in the array.
+    // The finding the corpus study owed this package. Longest-VALID-prefix-wins is what makes it
+    // work, and it must not depend on where the three rows sit in the array.
     const std::vector<std::string> lines{"building", "ERROR: Job failed: canceled"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
     ASSERT_TRUE(scan.marker_present);
@@ -111,8 +111,9 @@ TEST(GitLabOutcome, ACancellationAnnouncedWithTheFailurePrefixResolvesToAborted)
 TEST(GitLabOutcome, TheApiResultOutranksADivergentConsoleTail)
 {
     const ComposedSemantics composed{gitlab_only()};
-    // The measured divergence: 2 cancelled jobs end on `Job succeeded`. D-OUT-RUN-1 says the
-    // authoritative side-input wins and the divergence is FLAGGED, never a tiebreak.
+    // The measured divergence: 2 cancelled jobs end on `Job succeeded`. The ladder is a total
+    // precedence — the authoritative side-input wins and the divergence is FLAGGED, never a
+    // tiebreak.
     const std::vector<std::string> lines{"working", "Job succeeded"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
     const auto resolution{resolve_run_outcome("canceled", scan, composed)};

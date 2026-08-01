@@ -1,6 +1,6 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_gitlab_markers.cpp — the GitLab section VOCABULARY (studies/012, graduated into grammar-5
-// rows). What it guards:
+// test_gitlab_markers.cpp — the GitLab section VOCABULARY (measured on real traces, then graduated
+// into grammar-5 rows). What it guards:
 //   SECTION = a line-anchored `section_start:<unix-ts>:<name>[<options>]` open, kind=Step (a GitLab
 //             trace IS one job; its phases are steps under an implicit job), ORDERED (one runner,
 //             one job, one phase at a time — a transposition IS a signal);
@@ -24,9 +24,10 @@ using insight::tokenization::ChildOrder;
 using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::recognize;
 
-// The walkers take NormalizedContent (ADR-21's precondition as a type); every probe here is an
-// escape-free literal (the xtrace probe's `\\e` is TWO prose bytes, not an escape — the P3
-// precision leg), so normalize() is the zero-copy fixed point over a shared scratch.
+// The walkers take NormalizedContent — canon's ingest-normalization precondition carried by a type
+// unforgeable outside canon; every probe here is an escape-free literal (the xtrace probe's `\\e`
+// is TWO prose bytes, not an escape byte, so normalization has nothing to remove), so normalize()
+// is the zero-copy fixed point over a shared scratch.
 [[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
 {
     static std::string scratch;
@@ -35,8 +36,8 @@ using insight::tokenization::recognize;
 
 namespace
 {
-// The RESOLVED view of a stream that declared this dialect (ADR-22) — after T4 the
-// concretely-gated rows are reachable only through a declaration.
+// The RESOLVED view of a stream that declared this dialect — the concretely-gated rows are
+// reachable only through a declaration, never through per-line format detection.
 [[nodiscard]] ComposedSemantics gitlab_only()
 {
     const std::array manifests{insight::semantic::gitlab::kManifest};
@@ -68,7 +69,7 @@ TEST(GitLabMarkers, TheEpochIsSkippedNotFoldedIntoTheName)
 {
     const ComposedSemantics composed{gitlab_only()};
     // The whole reason the extractor exists: `IntentMarker::name` is the raw payload
-    // `compare_skeletons` keys on (ADR-18). Two runs of the same phase carry different epochs and
+    // `compare_skeletons` keys on. Two runs of the same phase carry different epochs and
     // must still carry the SAME name.
     EXPECT_EQ(recognize(norm_probe("section_start:1784657178:get_sources"), composed).name,
               "get_sources");
@@ -106,7 +107,7 @@ TEST(GitLabMarkers, TheCarriageReturnTerminatesTheNameAndTheOptionGroupIsDropped
 TEST(GitLabMarkers, TheMalformedProducerMarkerIsDeclinedNotMisParsed)
 {
     const ComposedSemantics composed{gitlab_only()};
-    // The wireshark class studies/012 required be carried as declared: 95 markers in
+    // The wireshark class, carried as a DECLARED limitation rather than filtered: 95 markers in
     // marker_corpus_v1 carry an unexpanded `%s` / `$(date +%s)` where the stamp belongs. Structure
     // present, stamp absent — and a section must NOT end up named after a shell expression.
     EXPECT_EQ(recognize(norm_probe("section_start:%s:build"), composed).kind,

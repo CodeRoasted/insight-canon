@@ -1,6 +1,6 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_run_outcome.cpp — the grammar-2 run-outcome MECHANISMS (ADR-17 /
-// insight_run_outcome_model.md §3–§4) over SYNTHETIC manifests (canon core stays semantic-unaware —
+// test_run_outcome.cpp — the grammar-2 run-outcome MECHANISMS over SYNTHETIC manifests
+// (canon core stays semantic-unaware —
 // no dialect literal here; the Jenkins/GHA vocabularies are package data, tested in their packages;
 // the G-OUT-* gate suite is Kleio's homing). What CORE owns and this file guards:
 //   • map_outcome_token — resolved-view lookup, byte-exact; "no row" (nullopt) is distinct from "a row that
@@ -8,7 +8,7 @@
 //   • the IntentMarkerRow grammar-2 shapes — RemainderToClosingParen strictness + the payload
 //     exclusion set's word-boundary semantics.
 //   • scan_run_outcome — last-match-wins, strict verdict-word remainder (no dialect latch: the
-//     dialect is DECLARED, so the scan carries no LogFormat at all — ADR-22).
+//     dialect is DECLARED, so the scan carries no LogFormat at all).
 //   • resolve_run_outcome — the D-OUT-RUN-1 strict ladder: authoritative wins over a present-but-
 //     divergent console tail (the divergence is FLAGGED, never a tiebreak), unmapped tokens surface
 //     a note and fall down the ladder (fail-closed), absence resolves Unknown.
@@ -42,8 +42,9 @@ using insight::tokenization::ChildOrder;
 using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::recognize;
 
-// The walkers take NormalizedContent (ADR-21's precondition as a type); every probe here is an
-// escape-free literal, so normalize() is the zero-copy fixed point over a shared scratch.
+// The walkers take NormalizedContent (the stage-1 normalization precondition as a type); every
+// probe here is an escape-free literal, so normalize() is the zero-copy fixed point over a shared
+// scratch.
 [[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
 {
     static std::string scratch;
@@ -52,7 +53,7 @@ using insight::tokenization::recognize;
 
 namespace
 {
-// ── A synthetic outcome-bearing dialect, gated on its OWN package name (ADR-22 — the
+// ── A synthetic outcome-bearing dialect, gated on its OWN package name (the
 // gate is a composed package NAME, so canon core stays semantic-unaware and there is still no
 // dialect literal from a real ecosystem here). Mirrors the Jenkins SHAPE: four verdict classes +
 // one token that maps TO Unknown (the NOT_BUILT form) + a console-tail marker. ──
@@ -105,15 +106,15 @@ constexpr std::array<OutcomeTokenRow, 1> kOtherGateToken{
 constexpr SemanticPackageManifest kOtherGatePkg{
     .name = "synthetic_other", .version = "1.0.0", .outcome_tokens = kOtherGateToken};
 
-// The RESOLVED view of a stream that declared this synthetic dialect — the ONE door (ADR-22
-// clause 2). Everything below scores against a declared stream, because after T4 an undeclared one
-// carries no concretely-gated row at all.
+// The RESOLVED view of a stream that declared this synthetic dialect — for_stream is the ONE door.
+// Everything below scores against a declared stream, because after T4 an undeclared one carries no
+// concretely-gated row at all.
 [[nodiscard]] ComposedSemantics composed_outcome()
 {
     return compose(std::array{kOutcomePkg}).for_stream(kSyntheticDialect, {});
 }
 
-// ── grammar-5 (ADR-17) — a second synthetic dialect exercising the two shapes GitLab forced:
+// ── grammar-5 — a second synthetic dialect exercising the two shapes GitLab forced:
 // a marker payload behind a variable-length numeric field, and terminal lines whose PREFIX carries
 // the verdict with a free-form remainder. Both projections are declared so the round trip is
 // scored here too, at the level that owns the algorithms. Still no real ecosystem literal: canon
@@ -566,7 +567,7 @@ TEST(RunOutcomeResolve, MappedToUnknownIsAuthoritative)
     EXPECT_TRUE(res.note.empty());
 }
 
-// ── outcome_regressed: the §6.1 pass↔fail axis ──
+// ── outcome_regressed: the pass↔fail axis only ──
 TEST(OutcomeRegressed, StrictlyWorseOnTheAxisOnly)
 {
     // Strictly worse.

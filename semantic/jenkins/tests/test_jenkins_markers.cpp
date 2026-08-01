@@ -1,6 +1,6 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_jenkins_markers.cpp — the Jenkins stage/step VOCABULARY (studies/006 §Reproduction,
-// graduated into grammar-2 rows). What it guards, against the spike's ratified semantics:
+// test_jenkins_markers.cpp — the Jenkins stage/step VOCABULARY (measured on real consoles by the
+// frozen spike, then graduated into grammar-2 rows). What it guards, against those semantics:
 //   STAGE = a NAMED `[Pipeline] { (<name>)` block open (declared stage OR parallel/matrix Branch),
 //           kind=Job (the container level), UNORDERED (branches co-occur like matrix legs);
 //   STEP  = `[Pipeline] <verb>`, kind=Step, ORDERED — excluding the closed structural-token set
@@ -18,9 +18,10 @@ using insight::tokenization::ChildOrder;
 using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::recognize;
 
-// The walkers take NormalizedContent (ADR-21's precondition as a type); every probe here is an
-// escape-free literal (the xtrace probe's `\\e` is TWO prose bytes, not an escape — the P3
-// precision leg), so normalize() is the zero-copy fixed point over a shared scratch.
+// The walkers take NormalizedContent — canon's ingest-normalization precondition carried by a type
+// unforgeable outside canon; every probe here is an escape-free literal (the xtrace probe's `\\e`
+// is TWO prose bytes, not an escape byte, so normalization has nothing to remove), so normalize()
+// is the zero-copy fixed point over a shared scratch.
 [[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
 {
     static std::string scratch;
@@ -29,8 +30,8 @@ using insight::tokenization::recognize;
 
 namespace
 {
-// The RESOLVED view of a stream that declared this dialect (ADR-22) — after T4 the
-// concretely-gated rows are reachable only through a declaration.
+// The RESOLVED view of a stream that declared this dialect — the concretely-gated rows are
+// reachable only through a declaration, never through per-line format detection.
 [[nodiscard]] ComposedSemantics jenkins_only()
 {
     const std::array manifests{insight::semantic::jenkins::kManifest};
@@ -61,7 +62,8 @@ TEST(JenkinsMarkers, ParallelBranchIsAStageWithItsDiscriminant)
 {
     const ComposedSemantics composed{jenkins_only()};
     // A matrix/parallel leg: the axis tuple stays VERBATIM in the discriminant (SRC-II-9) while
-    // canonicalize_intent (downstream) collapses the class — the studies/004 vanish-storm guard.
+    // canonicalize_intent (downstream) collapses the class — the guard against the measured
+    // phantom vanish/insert storm a masked-away discriminant produces.
     const auto branch{recognize(norm_probe("[Pipeline] { (Branch: maven (lts))"), composed)};
     EXPECT_EQ(branch.kind, IntentMarkerKind::Job);
     EXPECT_EQ(branch.name, "Branch: maven (lts)") << "nested parens stay inside the payload";
@@ -72,8 +74,8 @@ TEST(JenkinsMarkers, DeclarativeSyntheticStageRecognized)
 {
     const ComposedSemantics composed{jenkins_only()};
     // The declarative engine's synthetic stages are console-visible named blocks — real stages for
-    // the recognizer (studies/006: the over-granularity vs the flat wfapi oracle,
-    // richer-not-wrong).
+    // the recognizer. Measured against the platform's flat stage tree this reads as
+    // over-granularity: richer, not wrong.
     const auto synthetic{
         recognize(norm_probe("[Pipeline] { (Declarative: Checkout SCM)"), composed)};
     EXPECT_EQ(synthetic.kind, IntentMarkerKind::Job);
@@ -110,7 +112,7 @@ TEST(JenkinsMarkers, StructuralTokensAreScaffoldNotQuanta)
 }
 
 // ── SRC-II-6, now against the DECLARATION rather than against per-line format detection ──
-// The rows are gated to this package's NAME (ADR-22), so a stream that declared no
+// The rows are gated to this package's NAME, so a stream that declared no
 // dialect fires nothing. The old form of this test passed a `LogFormat` per call, sourced in
 // production from `LogParser::routed_format()` — the per-line detector winner under a sticky
 // strategy — which made "does the Jenkins dialect fire" a question about the line's own bytes.

@@ -1,13 +1,13 @@
-// test_github_round_trip.cpp — studies/008 G2 round-trip closure on the GitHub Actions dialect.
-// The RUNTIME (value) half of the C2 bidirectionality obligation the DialectIntent concept enforces
-// at compile time (shared_intent_declaration §3.2/§6): for every recognition marker, materialize
-// its PAIRED generation row (render_row) and assert canon recognizes the declared (kind,
-// child_order, payload) back — recognize(render_row(W)) == R. The kit is package-agnostic
-// (canon-shipped, self-adapting over the row spans); this file is the ~10-line GitHub
-// instantiation. Verbose-on-failure: each check prints the rendered line + the expected-vs-got
-// intent tuple. Determinism: seedless, single-threaded, pure byte functions over the composed
-// manifest — no RNG, no wall-clock. Target: 100% (studies/008 §5 G2). NOLINTBEGIN — unit test:
-// short identifiers and string literals are fine.
+// test_github_round_trip.cpp — round-trip closure on the GitHub Actions dialect. The RUNTIME
+// (value) half of the bidirectionality obligation the DialectIntent concept enforces at compile
+// time (a package shipping a reader with no writer does not compile): for every recognition
+// marker, materialize its PAIRED generation row (render_row) and assert canon recognizes the
+// declared (kind, child_order, payload) back — recognize(render_row(W)) == R. The kit is
+// package-agnostic (canon-shipped, self-adapting over the row spans); this file is the ~10-line
+// GitHub instantiation. Verbose-on-failure: each check prints the rendered line + the
+// expected-vs-got intent tuple. Determinism: seedless, single-threaded, pure byte functions over
+// the composed manifest — no RNG, no wall-clock. Every declared marker must close: target 100%.
+// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 #include <gtest/gtest.h>
 
 import std;
@@ -17,7 +17,7 @@ import insight.semantic.github;   // kManifest (markers + emits)
 
 TEST(GithubRoundTrip, RecognizeRendersBackToDeclaredIntent)
 {
-    // BOTH projections come off the ONE manifest (ADR-23): the recognizer is the shipped
+    // BOTH projections come off the ONE manifest: the recognizer is the shipped
     // reader composed from it, and the generation rows are the same `emits` span
     // `semantic_identity` hashes — so what closes here is what the digest claims.
     const std::array<insight::semantic::SemanticPackageManifest, 1> one{

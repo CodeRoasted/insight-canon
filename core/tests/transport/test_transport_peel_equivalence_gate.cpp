@@ -1,7 +1,7 @@
 // NOLINTBEGIN — integration gate: literals and printed diagnostics are intended.
-// test_transport_peel_equivalence_gate.cpp — G1's CORPUS arm + G1-PEEL (ADR-23), homed here.
+// test_transport_peel_equivalence_gate.cpp — G1's CORPUS arm + G1-PEEL, homed here.
 //
-// ⚠ THE ORACLE IS FROZEN, AND THIS GATE HAS CHANGED KIND (ADR-8.D2 clauses 1/2/4). Read this before
+// ⚠ THE ORACLE IS FROZEN, AND THIS GATE HAS CHANGED KIND. Read this before
 // citing anything below.
 //
 //   * THE ORACLE IS A FROZEN COPY, taken VERBATIM from `semantic/github/src/github_strategy.cpp` at
@@ -10,8 +10,9 @@
 //     deleted file. It is FROZEN: an "improvement" to it is a DEFECT, not maintenance.
 //   * ONLY THE DECISION FUNCTION `line ↦ (claimed?, content)` TRAVELLED. The level lift,
 //     `parse_iso8601`, `confidence()`, `format()`, the echoed-source SGR machinery and the arena
-//     did NOT (0062 clause 2) — the gate reads `has_value()` and `content` and nothing else, and a
-//     frozen oracle carrying limbs no assertion exercises is the dormant-code smell reproduced
+//     did NOT — every function a frozen oracle carries must be reached by an assertion, so the
+//     gate reads `has_value()` and `content` and nothing else; a frozen oracle carrying limbs no
+//     assertion exercises is the dormant-code smell reproduced
 //     inside a test. The SIGNATURE changed (`std::optional<std::string_view>` instead of
 //     `std::expected<ParsedLine, std::string>`, which existed only to serve `IFormatStrategy`); the
 //     BYTE LOGIC did not, and may not.
@@ -26,7 +27,7 @@
 //     location. Copying bytes cannot manufacture provenance. What relocation preserves is the
 //     ability to RE-RUN the same comparison — nothing more, and no document may read it as more.
 //
-// HOMING (Kleio's — corpus_backed_gates.md § 5). `core/tests/transport/`, 1:1 with
+// HOMING (Kleio's). `core/tests/transport/`, 1:1 with
 // `core/src/transport/` under the per-domain mirror, beside the sibling G1 grain
 // `test_transport_declaration.cpp` (the third grain is `core/tests/compose/test_transport_identity.cpp`).
 // The SUT is `insight::transport::TransportStack::peel` — core's; the oracle is inline; the corpus
@@ -35,7 +36,8 @@
 // core → semantic/github and never back. With the oracle frozen inline this file imports only
 // `insight.canon`, and leaving it in the package compiled the whole `insight.semantic.github`
 // module into a binary that never referenced it while making a core-owned characterization pin
-// look like a dialect-package obligation (the misreading ADR-8 guards against).
+// look like a dialect-package obligation (the misreading the frozen-oracle discipline guards
+// against).
 //   • NOT insight-eidos, which already has the `CORPUS_D11_*` plumbing. Reusing that wiring would
 //     home a canon-internal refactor-equivalence claim inside a downstream consumer — homing by
 //     convenience past the package that owns the property.
@@ -43,9 +45,8 @@
 //     value: the oracle is an implementation written years before the SUT, scored on third-party
 //     logs neither was tuned against.
 //
-// WHAT IS BEING CLAIMED, AND WHAT IS NOT (ADR-23 block-quotes this, UNCHANGED and UNWEAKENED;
-// it will be tempting to overstate, so it is restated at the top of the instrument that produces
-// the number):
+// WHAT IS BEING CLAIMED, AND WHAT IS NOT (it will be tempting to overstate, so it is restated at
+// the top of the instrument that produces the number):
 //
 //     G1-PEEL is REFACTOR-EQUIVALENCE, never external validity. Zero mismatches proves the declared
 //     transform is behavior-preserving against the shipped detector. It proves NOTHING about the
@@ -66,18 +67,18 @@
 // ONLY — the lines the oracle claims. The other cells are lines the oracle DECLINES, and each
 // decline has a different cause that must be counted separately, not summed into a failure rate:
 //   A            the oracle claims the line            ⇒ peeled content MUST be byte-identical
-//   blank        timestamp-only; peels to empty        ⇒ §8 bundled behavior (3) surviving the move
+//   blank        timestamp-only; peels to empty        ⇒ bundled behavior (3) surviving the move
 //   empty-input  the source line was already empty     ⇒ split out from `blank`; see below
-//   B            declined solely for a leading BOM     ⇒ a REAL SHIPPED DEFECT (bugs.md 2026-07-27)
-//   C            unstamped; the peel is a no-op        ⇒ §2 totality is about APPLICATION not EFFECT
+//   B            declined solely for a leading BOM     ⇒ a REAL SHIPPED DEFECT, still open
+//   C            unstamped; the peel is a no-op        ⇒ totality is about APPLICATION not EFFECT
 //   violation    declined, yet peel changed the bytes  ⇒ the invariant that must stay 0
 //
 // WHY B IS NOT "FIXED" HERE. A G1-PEEL that corrected the BOM drop would break the very equivalence
 // it asserts — the gate must reproduce the shipped peel INCLUDING its warts. B is its own cell so
 // that when the BOM row closes, this gate reports the change loudly instead of absorbing it.
 //
-// FALSIFIABILITY — OBSERVED, not asserted (§9 makes this a requirement, not a note). Three peel-path
-// mutations were run against this gate; each was reverted:
+// FALSIFIABILITY — OBSERVED, not asserted (red-capability is a requirement, not a note). Three
+// peel-path mutations were run against this gate; each was reverted:
 //   D  `strip_leading_space` ignored      ⇒ sample RED: 292 985/292 985 cell-A mismatches, AND
 //                                            10 420 decline-side violations. Note WHICH cell caught
 //                                            what: the timestamp-only lines stopped peeling to
@@ -118,7 +119,7 @@ constexpr std::array<std::string_view, 1> kDeclaredGha{{kGhaTransform}};
 constexpr std::string_view kUtf8Bom{"\xEF\xBB\xBF"};
 
 // ══════════════════════════════════════════════════════════════════════════════════════════════
-// THE FROZEN ORACLE (ADR-8.D2 clauses 1–2) — `GitHubActionsStrategy`'s peel decision, byte-for-byte
+// THE FROZEN ORACLE — `GitHubActionsStrategy`'s peel decision, byte-for-byte
 // as it stood in `semantic/github/src/github_strategy.cpp` at insight-canon `ac94aff`, the last
 // commit before T4 removed that detection from production.
 //
@@ -325,8 +326,8 @@ struct ManifestField
 // answer about itself. Spelled out here so the two never collapse into one implementation.
 //
 // It stays a SECOND, separately-spelled derivation now that the frozen oracle lives in the same
-// file (ADR-8 cites this pre-existing duplication as the precedent for freezing the
-// oracle here at all). Collapsing it into `oracle_is_github_actions_prefix` would answer cell B's
+// file — this pre-existing duplication is the precedent for freezing the
+// oracle here at all. Collapsing it into `oracle_is_github_actions_prefix` would answer cell B's
 // counterfactual with the very implementation the counterfactual is about.
 [[nodiscard]] bool is_gha_stamp(std::string_view str) noexcept
 {
@@ -629,7 +630,7 @@ TEST_F(TransportPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheShippedDete
     EXPECT_EQ(score.unstamped, pins->unstamped) << report();
 
     // ── Cell B — the SHIPPED DEFECT, pinned so its closure is loud ──
-    // When the BOM row (bugs.md 2026-07-27) is fixed, this number goes to 0 and those lines move
+    // When the BOM row is fixed, this number goes to 0 and those lines move
     // into cell A. That MUST fail here rather than be absorbed: the gate asserts equivalence with
     // the shipped peel including its warts, so a behavior change has to be a deliberate re-pin.
     EXPECT_EQ(score.bom_decline, pins->bom_declines)

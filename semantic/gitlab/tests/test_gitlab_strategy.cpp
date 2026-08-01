@@ -1,5 +1,5 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_gitlab_strategy.cpp — the GitLab dialect CODE TIER (ADR-17): the line-selective
+// test_gitlab_strategy.cpp — the GitLab dialect CODE TIER: the line-selective
 // format strategy. What it guards: the strategy claims EXACTLY the dialect-marked shapes (a line
 // carrying the 32-byte runner transport prefix, a bare `section_start:` marker, the terminal verdict
 // line), PEELS the prefix and parses its timestamp as the event time, and stays silent on every

@@ -1,9 +1,9 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_where_wiring.cpp — MaskConfig.recognize_test_where, the flag-gated identity-derived WHERE on
-// the tokenizer (bibles/intent_identity.md §8, SRC-II-8). REPLACES the 1.7.4
+// the tokenizer (SRC-II-8 — the WHERE has ONE source, the identity spine). REPLACES the 1.7.4
 // tests/identity/test_where_wiring.cpp, re-homed to core as a SYNTHETIC-composition mechanism test
 // after the SRC-SP-1 fix removed the dialect gate (was `event.format == LogFormat::GitHubActions`;
-// now purely `component.empty()` — tokenizer_engine.cpp:89, bugs.md 2026-07-08). The property is
+// now purely `component.empty()` — tokenizer_engine.cpp:89). The property is
 // now FORMAT-AGNOSTIC, so it is a core Tokenizer property provable with a synthetic location row
 // over a RawText line — no package linked. This test is also the SRC-SP-1 regression guard: a line
 // WITHOUT a native component (RawText here, any future dialect tomorrow) gets the identity-derived

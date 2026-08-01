@@ -1,17 +1,17 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_normalized_content_doors.cpp — the DOOR CENSUS of the typed ingest precondition
-// (ADR-21.D3's door census and ADR-21.D4's pinned-absence traits, plus Eqya's ruling-1 addition).
+// (the door census, the pinned-absence traits, plus Eqya's ruling-1 addition).
 //
 // Homed beside the walker tests because the walkers are what the doors guard (flagged for Kleio's
 // confirmation — test homing is hers). Four legs:
 //
-//   1. THE ABSENT CONSTRUCTOR, pinned as negative type traits. §12.5.5 item 4: an absence is the
+//   1. THE ABSENT CONSTRUCTOR, pinned as negative type traits. An absence is the
 //      one thing no green test observes — expressed here as static_asserts on PUBLIC
 //      constructibility, which run in every build of this TU (stronger than a build-failing
 //      fixture: it cannot be skipped). `std::is_constructible` tests accessibility from a
 //      non-friend context, which is exactly the boundary claim.
 //   2. THE OUTBOUND ACCESSOR EXISTS — NormalizedContent → string_view must remain expressible
-//      (the seam's two byte-readers have no other edit; §12.5.2's "do not harden it away").
+//      (the seam's two byte-readers have no other edit; it must not be hardened away).
 //   3. THE DECLARED PEEL DOOR — TransportStack::peel(NormalizedLine) → PeeledLine carries a
 //      NormalizedContent, observation time and the blank-drop, over the catalogue's shipped row.
 //      (The raw door peel_raw is covered by the transport suite; it mints nothing.)
@@ -33,7 +33,7 @@ using insight::tokenization::normalize;
 using insight::tokenization::NormalizedContent;
 using insight::tokenization::NormalizedLine;
 
-// ── Leg 1: the absent constructor (the whole mechanism, §12.2) ──────────────────────────────────
+// ── Leg 1: the absent constructor (the whole mechanism) ─────────────────────────────────────────
 static_assert(!std::is_constructible_v<NormalizedContent, std::string_view>,
               "NormalizedContent must NOT be constructible from raw bytes — that single absence "
               "is the completeness theorem's premise");
@@ -43,7 +43,8 @@ static_assert(!std::is_default_constructible_v<NormalizedContent>);
 static_assert(!std::is_constructible_v<NormalizedLine, std::string_view>,
               "NormalizedLine is produced ONLY by normalize()");
 static_assert(!std::is_default_constructible_v<NormalizedLine>);
-// The §12.2 shape guard is asserted at the declaration site (canon.api.cppm); re-asserted here so
+// The shape guard — view-sized and trivially copyable — is asserted at the declaration site
+// (canon.api.cppm); re-asserted here so
 // this census file fails closed even if the declaration-site asserts are ever moved.
 static_assert(sizeof(NormalizedContent) == sizeof(std::string_view));
 static_assert(std::is_trivially_copyable_v<NormalizedContent>);
@@ -77,7 +78,7 @@ TEST(NormalizedContentDoors, DeclaredPeelYieldsTypedContentAndObservationTime)
     EXPECT_TRUE(peeled.observation_time.has_value())
         << "the declared LinePrefixTimestamp must extract the observation time";
 
-    // The blank-drop survives the typed door (ADR-23's bundled decline).
+    // The blank-drop survives the typed door (the bundled decline behavior).
     const NormalizedLine bare{normalize("2026-04-15T22:20:38.2879579Z ", scratch)};
     EXPECT_TRUE(stack.peel(bare).is_blank());
 

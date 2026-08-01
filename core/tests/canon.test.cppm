@@ -1,4 +1,5 @@
-// insight.canon.test — shared white-box test infrastructure (ADR-3.D4, the logcraft.test pattern).
+// insight.canon.test — shared white-box test infrastructure (the logcraft.test pattern: one test
+// module per domain, mirroring the package's own module layout).
 // All test TUs import this instead of spelling out the full import block.
 // Re-exports the complete canon module surface (public facade + the sealed detail shards), so a
 // test TU needs no further imports beyond gtest (textual, third-party).
@@ -9,10 +10,10 @@ export import insight.canon.detail.scan;
 export import insight.canon.detail.strategy;
 export import insight.canon.detail.mask;
 export import insight.canon.detail.parse;
-// The provider contract (ADR-17) — core tests construct SYNTHETIC manifests / rows to
-// exercise the composition + recognition ALGORITHMS vocabulary-free (the facade does not surface
-// spi; a white-box core test legitimately does). Package suites import spi via their own package
-// module instead.
+// The provider contract between core and the vocabulary packages — core tests construct SYNTHETIC
+// manifests / rows to exercise the composition + recognition ALGORITHMS vocabulary-free (the
+// facade does not surface spi; a white-box core test legitimately does). Package suites import spi
+// via their own package module instead.
 export import insight.canon.spi;
 
 // Shared core-test composition helper. A core test whose property is SEMANTIC-UNAWARE
