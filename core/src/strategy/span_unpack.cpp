@@ -8,12 +8,12 @@ import insight.canon.api;
 
 // src/strategy/span_unpack.cpp
 //
-// OTEL span-export DOCUMENT unpack (ADR-29, D-OTEL-18 / D-OTEL-18a): the
+// OTEL span-export DOCUMENT unpack (ADR-29, SRC-D-OTEL-18 / SRC-D-OTEL-18a): the
 // record-source layer's 1→N step. An OTLP/JSON `resourceSpans` trace export (shape 1) is walked
 // and re-emitted as N CANONICAL flat-span records (shape 2) — byte-form-identical to what the
 // LogCraft lab emits for the same spans, so the flat-span parser (json.cpp) is authored ONCE and
 // only ever sees shape 2, and shape-1 ≡ shape-2 is a golden-tested property. `IFormatStrategy`
-// stays 1:1 (D-OTEL-18): this is a PRE-tokenization unpack, not a 1→N strategy.
+// stays 1:1 (SRC-D-OTEL-18): this is a PRE-tokenization unpack, not a 1→N strategy.
 
 namespace insight::tokenization
 {
@@ -102,7 +102,7 @@ namespace
     }
 
     // Append one span object as a canonical flat-span record. Field order + serialization match the
-    // lab's fmt_otel_json span seam exactly (D-OTEL-18a): string ids/name/times pass through as
+    // lab's fmt_otel_json span seam exactly (SRC-D-OTEL-18a): string ids/name/times pass through as
     // their raw JSON (quotes + escaping preserved, byte-faithful); kind/status are normalized to
     // the string enum; service.name (from the resource) is injected first, then the span's own
     // attributes verbatim.

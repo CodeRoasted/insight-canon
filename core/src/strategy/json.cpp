@@ -17,7 +17,7 @@ namespace insight::tokenization
 namespace
 {
 
-    // Route the declared OTEL field-map (D-OTEL-4a) over the parsed OTLP object: severity_number
+    // Route the declared OTEL field-map (SRC-D-OTEL-4a) over the parsed OTLP object: severity_number
     // → the LogLevel band (declared > inferred — it runs after the level-string route, so it
     // overrides), and traceId/spanId/parentSpanId → the consumed trace context. Returns true iff
     // the record is OTEL (a severityNumber or traceId was present), which the caller uses to route
@@ -82,9 +82,9 @@ namespace
     [[nodiscard]] std::span<const OrdinalObservation>
     store_ordinals(std::span<const OrdinalObservation> observations, ArenaAllocator& arena);
 
-    // True iff the raw line is a flat OTLP/JSON span (D-OTEL-10 shape 2 / D-OTEL-18) — detected by
+    // True iff the raw line is a flat OTLP/JSON span (D-OTEL-10 shape 2 / SRC-D-OTEL-18) — detected by
     // the span-specific startTimeUnixNano key (logs carry timeUnixNano), excluding a resourceSpans
-    // DOCUMENT (the record-source unpack handles those before the strategy — D-OTEL-18). A cheap
+    // DOCUMENT (the record-source unpack handles those before the strategy — SRC-D-OTEL-18). A cheap
     // raw-byte check, no simdjson cursor spent.
     [[nodiscard]] bool is_otel_span_line(std::string_view line) noexcept
     {
@@ -105,7 +105,7 @@ namespace
         return value;
     }
 
-    // Parse a flat OTLP/JSON span (D-OTEL-10 / D-OTEL-18) in ONE forward pass over the object — the
+    // Parse a flat OTLP/JSON span (D-OTEL-10 / SRC-D-OTEL-18) in ONE forward pass over the object — the
     // on-demand idiom that descends into status/attributes inline with no rewind. The §13.1
     // mapping: name→content (the templated operation), startTimeUnixNano→event time, end−start→the
     // span_duration_ns ordinal (SRC-D-OTEL-12, integer ns by construction), status.code→level
@@ -406,7 +406,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
 
-    // Flat OTLP/JSON span (D-OTEL-10 shape 2 / D-OTEL-18): a distinct shape (name / start+end /
+    // Flat OTLP/JSON span (D-OTEL-10 shape 2 / SRC-D-OTEL-18): a distinct shape (name / start+end /
     // status / service.name), parsed in its own forward pass. Routed on the raw-byte span signal
     // BEFORE spending the root cursor on the log-record field lookups below.
     if (is_otel_span_line(line))
@@ -430,7 +430,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     if (try_get_string(root, kComponentKeys, scratch_view))
         parsed_line.component = arena.store_string(scratch_view);
 
-    // ── OTEL/OTLP field-map (ADR-29 SRC-D-OTEL-1, the declared catalog D-OTEL-4a) ──
+    // ── OTEL/OTLP field-map (ADR-29 SRC-D-OTEL-1, the declared catalog SRC-D-OTEL-4a) ──
     // severity_number → the LogLevel band (declared > inferred) + the trace context, all
     // consumed structural metadata; the trace keys are top-level → never tokenized → dropped
     // from the template by construction (OR1). is_otel routes the message to the nested

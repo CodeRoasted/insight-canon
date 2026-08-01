@@ -232,7 +232,7 @@ TEST_F(TokenizerTest, BatchReturnsOneResultPerNonDocumentLine)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Batch record-source fan-out (D-OTEL-18): ONE line, N results
+// Batch record-source fan-out (SRC-D-OTEL-18): ONE line, N results
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // An OTLP `resourceSpans` export is ONE input line carrying N spans, and process_batch unpacks it

@@ -298,7 +298,7 @@ TEST_F(JsonStrategyTest, NonOtelJsonHasNoTraceContext)
     EXPECT_EQ(result.value().trace.trace_id.value, 0U);
 }
 
-// ── OTEL span ingestion (D-OTEL-10 shape 2 / D-OTEL-18) ──────────────────────────────────────
+// ── OTEL span ingestion (D-OTEL-10 shape 2 / SRC-D-OTEL-18) ──────────────────────────────────────
 // The canonical flat-span record the lab emits (name / start+end times / status / service.name),
 // distinct from the OTLP log record above. Detected by the span-specific startTimeUnixNano key.
 static constexpr std::string_view kSpanLine{

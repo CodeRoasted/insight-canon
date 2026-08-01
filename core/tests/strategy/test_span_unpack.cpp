@@ -6,7 +6,7 @@ import insight.canon.test;
 using namespace insight;
 using namespace insight::tokenization;
 
-// OTEL span-export DOCUMENT unpack (D-OTEL-18 / D-OTEL-18a): one OTLP
+// OTEL span-export DOCUMENT unpack (SRC-D-OTEL-18 / SRC-D-OTEL-18a): one OTLP
 // `resourceSpans` export (shape 1) is unpacked into N CANONICAL flat-span records (shape 2) —
 // byte-form-identical to the lab's emission, so the flat-span parser is authored once and
 // shape-1 ≡ shape-2 is golden-tested (the two-paths-drift bug class dies here). resource
@@ -57,7 +57,7 @@ TEST(SpanUnpack, UnpacksDocumentToByteIdenticalCanonicalRecords)
     const std::size_t count{unpack_otel_spans(kDocument, records)};
     ASSERT_EQ(count, 2U);
     ASSERT_EQ(records.size(), 2U);
-    // Byte-identical to the lab's flat-span emission (the shape-1 ≡ shape-2 property, D-OTEL-18a).
+    // Byte-identical to the lab's flat-span emission (the shape-1 ≡ shape-2 property, SRC-D-OTEL-18a).
     EXPECT_EQ(records[0], kExpectedSpan0) << "got: " << records[0];
     EXPECT_EQ(records[1], kExpectedSpan1) << "got: " << records[1];
 }

@@ -290,7 +290,7 @@ TEST(StatelessTemplate, HashCounterAndWorkerBracketCollapse)
 TEST(StatelessTemplate, KvNumericValueMaskedWordKept)
 {
     ArenaAllocator arena{256U * 1024U};
-    // D-TID-13 extension: a key=<digit-leading-value> token masks the VALUE, keeps the
+    // SRC-D-TID-13 extension: a key=<digit-leading-value> token masks the VALUE, keeps the
     // key — so per-id KV lines collapse to one template (no error-singleton false-diff).
     EXPECT_EQ(masked("checkout completed order=100000", arena),
               masked("checkout completed order=999999", arena));

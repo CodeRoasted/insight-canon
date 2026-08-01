@@ -644,7 +644,7 @@ namespace
         return false;
     }
 
-    // D-TID-13(a): `#`-counter (`#42`, buildkit `#NN`) → `#<*>` — keep the marker, mask
+    // SRC-D-TID-13(a): `#`-counter (`#42`, buildkit `#NN`) → `#<*>` — keep the marker, mask
     // the index. The digit run must run to end-or-punctuation (so `#main` is not a counter).
     [[nodiscard]] inline bool normalize_hash_counter(std::string_view tok, std::string& out)
     {
@@ -665,7 +665,7 @@ namespace
     // SRC-D-TID-22 currency-marker catalog: FROZEN, DECLARED byte sequences. ASCII `$` only for
     // now; `€`/`£`/`¥` would be added here as their literal UTF-8 byte strings ("€" etc.) iff a
     // corpus shows them — byte-exact, NO Unicode property lookup (cross-stdlib determinism +
-    // portability, the D-TID-9 oracle). Adding a marker here auto-extends both touch points (the
+    // portability, the SRC-D-TID-9 oracle). Adding a marker here auto-extends both touch points (the
     // pre-gate + normalize_marker_number) — single source of truth.
     inline constexpr std::array<std::string_view, 1> kCurrencyMarkers{std::string_view{"$"}};
 
@@ -681,7 +681,7 @@ namespace
 
     // SRC-D-TID-22: a declared currency MARKER glued to a digit-led numeric core (`$463`, `$1.50`)
     // →
-    // `$<*>` — keep the marker, mask the high-card amount (the D-TID-13 `#42 → #<*>` keep-class/
+    // `$<*>` — keep the marker, mask the high-card amount (the SRC-D-TID-13 `#42 → #<*>` keep-class/
     // mask-instance shape). A DECIDABLE numeric: there is no low-card *keyword* of shape
     // `<marker><digits>` worth protecting (shell positionals `$1`/`$2` are negligible-in-logs and
     // lossless to mask), so it joins the D-TID-12 #5 digit-leading numerics that the first-char
@@ -775,7 +775,7 @@ namespace
         return masked;
     }
 
-    // D-TID-13 extension (discovered at playground integration — LogCraft's KV-heavy
+    // SRC-D-TID-13 extension (discovered at playground integration — LogCraft's KV-heavy
     // message templates + the pre-existing KV regression guards in raw_log_fidelity):
     // `<key>=<digit-leading-value>` → `<key>=<*>` (keep the key, mask the high-card
     // numeric value). A SYNTACTIC class (SRC-D-TID-14 IN scope), the same keep-class/
@@ -839,8 +839,8 @@ namespace
         {.name = "ephemeral_root", .normalize = normalize_ephemeral_root},       // D-MSK-2  (-4)
         {.name = "versioned_ref", .normalize = normalize_versioned_ref},         // D-TID-12 #2
         {.name = "bracket_timestamp", .normalize = normalize_bracket_timestamp}, // D-MSK-5  (-8)
-        {.name = "bracket_index", .normalize = normalize_bracket_index},         // D-TID-13(b)
-        {.name = "hash_counter", .normalize = normalize_hash_counter},           // D-TID-13(a)
+        {.name = "bracket_index", .normalize = normalize_bracket_index},         // SRC-D-TID-13(b)
+        {.name = "hash_counter", .normalize = normalize_hash_counter},           // SRC-D-TID-13(a)
         {.name = "marker_number", .normalize = normalize_marker_number}, // SRC-D-TID-22 (-3)
         {.name = "embedded_identity", .normalize = normalize_embedded_identity}, // D-TID-12 #3
         {.name = "kv_value", .normalize = normalize_kv_value},                   // D-TID-17
@@ -882,7 +882,7 @@ namespace
 // sequence is the template; the SHA-256 of it (computed downstream, unchanged) is the
 // run-independent template_id. Pure: a function of `content`'s bytes only — no float, no
 // map iteration, no state — so it is cross-stdlib bit-identical and order-/stream-
-// independent by construction (D-TID-9).
+// independent by construction (SRC-D-TID-9).
 StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& out_arena,
                                      const MaskConfig& config)
 {

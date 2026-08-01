@@ -89,7 +89,7 @@ export namespace insight::tokenization
 // reads fields instead of re-scanning. Each field is the byte-exact equivalent of the scan it
 // replaces — same KEEP/MASK/NORMALIZE decision per token → masked template (hence template_id)
 // unchanged. Pure byte-only, single-token, no float, order-independent → cross-stdlib + MSVC
-// bit-identical (the D-TID-9 oracle). The composite normalizers keep their own segment walks;
+// bit-identical (the SRC-D-TID-9 oracle). The composite normalizers keep their own segment walks;
 // this is the shared primitive for the common-case dispatch, and the seam A2's rule catalog reads.
 struct TokenShape
 {

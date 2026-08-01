@@ -36,7 +36,7 @@ using EventID = uint64_t;
 // rules that turn a raw line into its `template_str` (the stateless per-line masker +
 // the F13 class set). Every MetaLog producer DEFAULTS to this (MetaLogConfig), so a
 // rules change is one edit HERE and impossible to skip: bump it and old/new metalogs
-// become incomparable at the §2.4 gate (re-derive, never migrate — D-TID-9). It names
+// become incomparable at the §2.4 gate (re-derive, never migrate — SRC-D-TID-9). It names
 // the rules generation, NOT the package version (decoupled — a patch release that does
 // not touch the masking rules must NOT change it). Bump the suffix on any output-affecting
 // canonicalization change. Generations: -1 = stateless masker + F13; -2 = OTEL-awareness
@@ -68,7 +68,7 @@ inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-8"};
 // SHA-256(masked template_str), carried as a fixed-size POD through the whole
 // metalog/eidos domain. The 34-byte "h:"+hex string is materialised only at the
 // serialize seam (render()). Owned by canon because identity IS "the hash under
-// kCanonicalizationVersion" (D-TID-9/SRC-D-TID-16) — identity and its comparability
+// kCanonicalizationVersion" (SRC-D-TID-9/SRC-D-TID-16) — identity and its comparability
 // version belong in one place.
 struct TemplateId
 {
@@ -222,7 +222,7 @@ struct OtelTraceContext
     return SpanId{otel_id_hash(hex)};
 }
 
-// ── Declared OTEL field-map catalog (D-OTEL-4a) ──
+// ── Declared OTEL field-map catalog (SRC-D-OTEL-4a) ──
 // The four schema-declared OTLP fields canon recognizes, as a structured (class → recognizer
 // key) catalog — the christened ValueClassRegistry (ADR-17) is the composed view over THIS
 // catalog + kOrdinalFieldCatalog + the KEEP lexicons + the package ValueClassRow seat
@@ -543,7 +543,7 @@ enum class RunOutcome : std::uint8_t
 // Error(17–20)/Fatal(21–24). Integer-only (no float — D-OTEL-3); n<1 clamps to Trace,
 // n>24 clamps to Fatal. This is the *declared* severity channel for OTEL inputs and wins
 // over the failure_lexicon when present (declared > inferred); canon keeps its own 6-level
-// model and DISCARDS the raw 1–24 number (MetaLog ≠ OTEL — D-OTEL-8). The 24-band
+// model and DISCARDS the raw 1–24 number (MetaLog ≠ OTEL — SRC-D-OTEL-8). The 24-band
 // granularity is deliberately not inherited.
 [[nodiscard]] constexpr LogLevel
 log_level_from_severity_number(std::int64_t severity_number) noexcept
@@ -1837,7 +1837,7 @@ constexpr NormalizedContent NormalizedLine::undeclared_suffix(std::size_t offset
 //
 // Strip CSI / SGR / OSC and bare-ESC terminal escape sequences from a line as an UNCONDITIONAL
 // content normalization at canon ingest — BEFORE tokenization. Colour is presentation, never
-// content (D-TID-10); the escapes interleave within/between tokens (`\x1b[31mERROR\x1b[0m`) so a
+// content (SRC-D-TID-10); the escapes interleave within/between tokens (`\x1b[31mERROR\x1b[0m`) so a
 // per-token mask cannot reach them — they must die here. A pure byte state machine: no float,
 // order-independent → cross-stdlib bit-identical.
 //

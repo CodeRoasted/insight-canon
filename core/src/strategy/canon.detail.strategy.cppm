@@ -369,7 +369,7 @@ class SystemdJournalStrategy final : public IFormatStrategy
 
 } // namespace insight::tokenization
 
-// ──────── OTEL span-export document unpack (ADR-29, D-OTEL-18) ──────────────────────────
+// ──────── OTEL span-export document unpack (ADR-29, SRC-D-OTEL-18) ──────────────────────────
 export namespace insight::tokenization
 {
 
@@ -379,7 +379,7 @@ export namespace insight::tokenization
 [[nodiscard]] bool is_otel_span_document(std::string_view line) noexcept;
 
 // Unpack one OTLP/JSON resourceSpans trace-export DOCUMENT into N CANONICAL flat-span record
-// strings (D-OTEL-10 shape 1 → shape 2, D-OTEL-18a) — byte-form-identical to what the LogCraft
+// strings (D-OTEL-10 shape 1 → shape 2, SRC-D-OTEL-18a) — byte-form-identical to what the LogCraft
 // lab emits for the same spans, so the flat-span parser is authored once and shape-1 ≡ shape-2 is
 // a golden-tested property. resource `service.name` is injected into each span's attributes (the
 // declared allowlist); span attributes are copied verbatim. Appends to `out`; returns the count
