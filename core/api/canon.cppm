@@ -104,7 +104,7 @@ export namespace insight
 {
 
 // ── Run-outcome recognition + resolution (ADR-17 / insight_run_outcome_model.md §3–§4) ──────────
-// Canon owns the ALGORITHMS (the format-gated token map, the console-tail scan, the D-OUT-RUN-1
+// Canon owns the ALGORITHMS (the format-gated token map, the console-tail scan, the SRC-D-OUT-RUN-1
 // precedence resolver); the composed OutcomeTokenRow/OutcomeMarkerRow sets are the DATA. Homed in
 // the facade (they consume ComposedSemantics; the scan drives the sealed LogParser).
 
@@ -153,7 +153,7 @@ struct RunOutcomeScan
 [[nodiscard]] RunOutcomeScan scan_run_outcome(std::span<const std::string> lines,
                                               const insight::semantic::ComposedSemantics& composed);
 
-// D-OUT-RUN-1 — the strict total resolution order, NEVER a reconciliation:
+// SRC-D-OUT-RUN-1 — the strict total resolution order, NEVER a reconciliation:
 //   1. the authoritative side-input token, if provided AND it maps in the detected dialect;
 //   2. else the console-tail marker's last match, if present AND it maps;
 //   3. else Unknown.

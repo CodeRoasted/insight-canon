@@ -109,9 +109,9 @@ struct NgramId
 // the sequence's id bytes; transient (never serialized), order-sensitive.
 [[nodiscard]] NgramId ngram_id_of(const std::vector<TemplateId>& sequence) noexcept;
 
-// ── Intent identity (bibles/intent_identity.md §2-§4, SRC-II-1/SRC-II-6/II-7) ──
+// ── Intent identity (bibles/intent_identity.md §2-§4, SRC-II-1/SRC-II-6/SRC-II-7) ──
 // kIntentRegistryVersion RETIRED (ADR-17): it was a dead constant (zero downstream readers),
-// and its job — the II-7 comparability identity of the recognizer/marker rule set — is now
+// and its job — the SRC-II-7 comparability identity of the recognizer/marker rule set — is now
 // discharged by the composed `semantic_identity` (insight::semantic::ComposedSemantics), a CONTENT
 // hash over the actual marker/role/level rows the packages ship (content, not a hand-bumped label).
 // A rule change is a package version bump → a new semantic_identity → re-segment-or-refuse, wired
@@ -261,7 +261,7 @@ inline constexpr std::array<OtelFieldDescriptor, 4> kOtelFieldCatalog{{
     {.field_class = OtelFieldClass::SeverityNumber, .key = "severityNumber"},
 }};
 
-// ── Declared ordinal-field catalog (W1 ordinal channel, §4A.4 SRC-D-W1-2/D-W1-3/D-W1-8) ──
+// ── Declared ordinal-field catalog (W1 ordinal channel, §4A.4 SRC-D-W1-2/SRC-D-W1-3/D-W1-8) ──
 // The "now" tier (SRC-D-TID-6): a declared, registry-free catalog of structured numeric fields
 // whose VALUE is ordinal (metric structure — magnitude + distance), recognized by EXACT top-level
 // field name in the JsonStrategy field-route (mirror kOtelFieldCatalog). A declared-key hit is
@@ -270,9 +270,9 @@ inline constexpr std::array<OtelFieldDescriptor, 4> kOtelFieldCatalog{{
 // UNIVERSAL value class → stays core (this catalog); arbitrary/client ordinals await a package
 // ValueClassRow (the ValueClassRegistry seat, ADR-17 — no package ships one in 1.7.5; we do
 // not build dormant vocabulary — the SRC-D-TID-14 anti-monster boundary). EXACT keys only — uniform
-// across the fast/slow JSON paths, no value-syntax guessing (the D-W1-5 mis-route hazard);
+// across the fast/slow JSON paths, no value-syntax guessing (the SRC-D-W1-5 mis-route hazard);
 // suffix/pattern matching is a future extension when a scenario needs it. Unit-explicit names only,
-// so each value's unit is unambiguous (D-W1-3).
+// so each value's unit is unambiguous (SRC-D-W1-3).
 
 // Which ordinal SCHEDULE (canonical unit + log ladder) a field bins onto. The schedule is a
 // versioned catalog (SRC-D-W1-4): its stable string id is the eidos diff's comparability key.
@@ -317,7 +317,7 @@ inline constexpr std::array<OrdinalScheduleSpec, 2> kOrdinalScheduleCatalog{{
 
 // A declared ordinal field: exact name → schedule + the integer factor scaling the field's declared
 // unit to the schedule's CANONICAL unit (ns for durations, bytes for sizes). Every factor is a
-// power of ten (or 1) so the decimal→fixed-point parse is EXACT (D-W1-3 pin: the value is parsed
+// power of ten (or 1) so the decimal→fixed-point parse is EXACT (SRC-D-W1-3 pin: the value is parsed
 // from the JSON number's decimal TEXT, never via double — a get_double()→cast would be the
 // forbidden float→int on the deterministic-content path).
 struct OrdinalFieldDescriptor
@@ -380,7 +380,7 @@ match_ordinal_field(std::string_view key) noexcept
 
 // Parse a non-negative JSON numeric token's decimal TEXT to an int64 in the schedule's canonical
 // unit, multiplying by `scale` (a power of ten, or 1). Integer/decimal-string arithmetic only —
-// NEVER via double (D-W1-3 determinism pin). Returns nullopt on a malformed / negative / exponent /
+// NEVER via double (SRC-D-W1-3 determinism pin). Returns nullopt on a malformed / negative / exponent /
 // overflowing token (the observation is then omitted — omit-when-absent). Fractional digits beyond
 // the scale's decimal places are truncated (deterministic). `scale` MUST be a power of ten or 1.
 [[nodiscard]] constexpr std::optional<std::int64_t>
@@ -430,7 +430,7 @@ parse_decimal_scaled(std::string_view text, std::int64_t scale) noexcept
     return value;
 }
 
-// A recognized ordinal observation (W1, D-W1-3): the matched declared field, its schedule, and the
+// A recognized ordinal observation (W1, SRC-D-W1-3): the matched declared field, its schedule, and the
 // value parsed to the canonical-unit int64. Consumed-not-tokenized — carried on CanonicalEvent
 // parallel to the params/trace, NEVER serialized as a param. `field_name` is the catalog's static
 // key (stable for the program lifetime — no arena), surfaced on the diff row for `attributable_to`.
@@ -954,7 +954,7 @@ struct CanonicalEvent
     // span_id/parent_span_id feed the deferred O3 DAG) and NEVER serialized — the MetaLog wire
     // shape is unchanged (OR1). `present == false` for every non-OTEL input → zero added cost.
     OtelTraceContext trace{};
-    // Declared ordinal observations (W1, §4A.4 D-W1-3), captured by the strategy layer from
+    // Declared ordinal observations (W1, §4A.4 SRC-D-W1-3), captured by the strategy layer from
     // recognized structured numeric fields (kOrdinalFieldCatalog). Consumed-not-tokenized: metalog
     // bins these per schedule into TopKEntry.ordinal_histograms (the W1 carrier); they are NEVER
     // params. A span over arena-allocated storage (like `params`); EMPTY for every non-ordinal line

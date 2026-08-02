@@ -10,7 +10,7 @@
 //   - FAIL-CLOSED: an exact-duplicate match key across rows is a build error (constexpr
 //     `find_conflict`, usable in static_assert) / a startup fatal invariant (the runtime compose).
 //   - IDENTITY-BEARING: the composed rule set gets a content hash (semantic_identity, §4) over its
-//     canonical serialization — the II-7 comparability key.
+//     canonical serialization — the SRC-II-7 comparability key.
 //
 // Public + installed (product binaries call compose). The facade `export import`s this so
 // `import insight.canon;` yields Tokenizer + compose + ComposedSemantics. It plain-imports spi

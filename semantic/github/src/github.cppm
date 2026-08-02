@@ -304,7 +304,7 @@ inline constexpr std::array<OutcomeTokenRow, 7> kOutcomeTokens{{
 // moved) and every gated row's coordinate became the package NAME. 1.3.0 was the IntentChannel
 // coordinate (the declared
 // channel vocabulary + the channel-gated Step rows). SRC-SP-7 immutable-release discipline: a released
-// version's rows are frozen, a content change is a new version; the bump also rides the II-7
+// version's rows are frozen, a content change is a new version; the bump also rides the SRC-II-7
 // semantic_identity hash, an honest comparability boundary — a diff across this boundary is
 // comparing two different recognition rulesets, and the digest says so.
 //

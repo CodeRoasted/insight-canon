@@ -1,5 +1,5 @@
 // NOLINTBEGIN
-// Unit tests for the W1 declared ordinal field-route (D-W1-3): JsonStrategy recognizes a
+// Unit tests for the W1 declared ordinal field-route (SRC-D-W1-3): JsonStrategy recognizes a
 // declared structured numeric field (kOrdinalFieldCatalog) by EXACT top-level key and captures it
 // as a consumed-not-tokenized CanonicalEvent.ordinals observation — value parsed from the decimal
 // TEXT to a canonical-unit int64 (ns / bytes), NEVER via double (the determinism pin). Covers both
@@ -65,7 +65,7 @@ TEST_F(OrdinalFieldTest, FastPathLatencyMsToNanos)
 
 TEST_F(OrdinalFieldTest, FastPathDecimalParsedWithoutDouble)
 {
-    // 100.5 ms → 100_500_000 ns by integer/decimal-string arithmetic (the D-W1-3 pin).
+    // 100.5 ms → 100_500_000 ns by integer/decimal-string arithmetic (the SRC-D-W1-3 pin).
     const auto result{tokenizer.process_line(R"({"message":"x","latency_ms":100.5})")};
     ASSERT_TRUE(result.has_value());
     const auto* obs{find(result.value(), "latency_ms")};

@@ -267,7 +267,7 @@ namespace
         parsed_line.linked_span_ids = store_span_ids(linked, arena);
     }
 
-    // Copy the matched ordinal observations (W1, D-W1-3) into arena-stable storage and return a
+    // Copy the matched ordinal observations (W1, SRC-D-W1-3) into arena-stable storage and return a
     // span over them. Empty in → empty out (no allocation) so a non-ordinal line stays zero-cost.
     // The observations' `field_name` views point at the declared catalog's static keys (stable for
     // the program lifetime), so only the small POD array is arena-copied.
@@ -284,7 +284,7 @@ namespace
         return std::span<const OrdinalObservation>{dst, observations.size()};
     }
 
-    // W1 fast-path field-route (D-W1-3): match the scanner's numeric candidates against the
+    // W1 fast-path field-route (SRC-D-W1-3): match the scanner's numeric candidates against the
     // declared catalog; each hit → a consumed ordinal observation. The decimal TEXT → int64 (no
     // float→int).
     [[nodiscard]] std::span<const OrdinalObservation>
@@ -311,8 +311,8 @@ namespace
                               arena);
     }
 
-    // W1 slow-path field-route (D-W1-3): find_field_unordered per declared key (the OTEL-route
-    // pattern); the value's raw decimal TOKEN → int64 (never get_double() — the D-W1-3 pin). MUST
+    // W1 slow-path field-route (SRC-D-W1-3): find_field_unordered per declared key (the OTEL-route
+    // pattern); the value's raw decimal TOKEN → int64 (never get_double() — the SRC-D-W1-3 pin). MUST
     // run before the OTLP body descent below (which spends the on-demand cursor).
     [[nodiscard]] std::span<const OrdinalObservation>
     extract_ordinals_slow(simdjson::ondemand::object& root, ArenaAllocator& arena)
@@ -358,7 +358,7 @@ namespace
             parsed_line.component = arena.store_string(fast.component_str);
         parsed_line.content = fast.message_str.empty() ? arena.store_string(line)
                                                        : arena.store_string(fast.message_str);
-        parsed_line.ordinals = extract_ordinals_fast(fast, arena); // W1 (D-W1-3)
+        parsed_line.ordinals = extract_ordinals_fast(fast, arena); // W1 (SRC-D-W1-3)
         INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                           "strategy=JSON fast_path component={} level={} has_timestamp={}",
                           parsed_line.component, to_string(parsed_line.level),
@@ -437,7 +437,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     // OTLP body.stringValue (extract_otel_fields keeps parse() within the complexity budget).
     const bool is_otel{extract_otel_fields(root, parsed_line)};
 
-    // W1 ordinal field-route (D-W1-3) — MUST precede the body descent below (which spends the
+    // W1 ordinal field-route (SRC-D-W1-3) — MUST precede the body descent below (which spends the
     // on-demand cursor); find_field_unordered per declared key, like the OTEL route above.
     parsed_line.ordinals = extract_ordinals_slow(root, arena);
 

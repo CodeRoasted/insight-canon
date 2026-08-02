@@ -144,7 +144,7 @@ inline constexpr std::array<OutcomeTokenRow, 5> kOutcomeTokens{{
 // in this array.
 //
 // The console tail stays the DEGENERATE fallback; the API result is authoritative (ADR-17,
-// D-OUT-RUN-1). Measured divergence exists and is exactly what that precedence is for: 2 cancelled
+// SRC-D-OUT-RUN-1). Measured divergence exists and is exactly what that precedence is for: 2 cancelled
 // jobs end on `Job succeeded`.
 inline constexpr std::array<OutcomeMarkerRow, 3> kOutcomeMarkers{{
     {.prefix = "Job succeeded",

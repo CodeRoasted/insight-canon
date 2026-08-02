@@ -10,7 +10,7 @@
 //            `Branch:` branch (un-named `[Pipeline] {` wrappers are scaffold, not quanta);
 //   STEP   = `[Pipeline] <verb>`, excluding the closed structural-token set;
 //   OUTCOME = the four-class token map + the console-tail `Finished: ` epilogue (truncation-fragile
-//            fallback — the API result side-input is the authoritative source, D-OUT-RUN-1).
+//            fallback — the API result side-input is the authoritative source, SRC-D-OUT-RUN-1).
 // Ships NO structural-role / level-lift / location / value-class rows: studies/006 surfaced none —
 // we do not build dormant vocabulary (rip-dormant discipline).
 //

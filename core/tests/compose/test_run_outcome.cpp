@@ -9,7 +9,7 @@
 //     exclusion set's word-boundary semantics.
 //   • scan_run_outcome — last-match-wins, strict verdict-word remainder (no dialect latch: the
 //     dialect is DECLARED, so the scan carries no LogFormat at all).
-//   • resolve_run_outcome — the D-OUT-RUN-1 strict ladder: authoritative wins over a present-but-
+//   • resolve_run_outcome — the SRC-D-OUT-RUN-1 strict ladder: authoritative wins over a present-but-
 //     divergent console tail (the divergence is FLAGGED, never a tiebreak), unmapped tokens surface
 //     a note and fall down the ladder (fail-closed), absence resolves Unknown.
 //   • find_conflict — a cross-package duplicate outcome token / marker prefix fails the build.
@@ -486,7 +486,7 @@ TEST(RunOutcomeGrammar5, LastVerdictLineStillWinsAcrossLines)
     EXPECT_EQ(*scan.verdict, RunOutcome::Success) << "a run has ONE terminal verdict — the LAST one";
 }
 
-// ── resolve_run_outcome: the D-OUT-RUN-1 strict ladder ──
+// ── resolve_run_outcome: the SRC-D-OUT-RUN-1 strict ladder ──
 TEST(RunOutcomeResolve, AuthoritativeWinsOverPresentDivergentConsole)
 {
     // The Accumulo #498 SHAPE: authoritative Success vs a present console tail saying Aborted.

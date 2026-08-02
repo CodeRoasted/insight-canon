@@ -53,7 +53,7 @@ struct ParsedLine
     // (today: JsonStrategy on OTLP/JSON). Consumed downstream (O2 grouping; O3 DAG), never
     // serialized; `present == false` for every non-OTEL input.
     OtelTraceContext trace{};
-    // Declared ordinal observations (W1, D-W1-3), populated by a strategy that recognizes declared
+    // Declared ordinal observations (W1, SRC-D-W1-3), populated by a strategy that recognizes declared
     // structured numeric fields (today: JsonStrategy via kOrdinalFieldCatalog). A span over
     // arena-stable storage; empty for every non-ordinal line. Consumed metalog-side (W1 binning),
     // never tokenized into the template.
@@ -416,7 +416,7 @@ struct IntentEmitRow
     // ADR-22 — the CHANNEL gate, symmetric to IntentMarkerRow's. The writer's dual of the
     // reader's question: not "which prefix do I match" but "which IntentChannel am I materializing
     // into". This is what dissolves the apparent C2 contradiction — the writer never inspects
-    // prefixes (the SID-1 smell C2 exists to kill), it applies the channel adaptation the Medium
+    // prefixes (the SRC-SID-1 smell C2 exists to kill), it applies the channel adaptation the Medium
     // names. Paired with the reader's gate by paired_writer_row, so the two projections cannot
     // drift onto different channels.
     //
@@ -456,7 +456,7 @@ struct LocationRow
 // ── Run-outcome rows (grammar-2, ADR-17 / insight_run_outcome_model.md §4) ──
 // The dialect's run-verdict MAPPING — native verdict string → the core-owned RunOutcome — plus the
 // console-tail fallback marker. Matcher algorithms live in core (map_outcome_token /
-// scan_run_outcome / resolve_run_outcome, the D-OUT-RUN-1 precedence); a package ships only rows,
+// scan_run_outcome / resolve_run_outcome, the SRC-D-OUT-RUN-1 precedence); a package ships only rows,
 // and either set may be empty (GHA ships tokens but no marker — it has no run-verdict console
 // line).
 

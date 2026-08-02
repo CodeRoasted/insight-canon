@@ -810,7 +810,7 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
                     "console-vs-API divergence: " + row.path + " — API '" + row.result +
                     "', console " + outcome_name(engine.outcome) +
                     " (the console's declared subordination to the API result, "
-                    "D-OUT-RUN-1 — a counted cell, never a row defect)");
+                    "SRC-D-OUT-RUN-1 — a counted cell, never a row defect)");
             }
             if (row.result == "UNSTABLE")
             {

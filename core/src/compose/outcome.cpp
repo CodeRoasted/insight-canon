@@ -10,7 +10,7 @@ import insight.canon.detail.parse; // LogParser — the scan is a parse-only pas
 
 // outcome.cpp — the run-outcome ALGORITHMS over the composed grammar-2 vocabulary (ADR-17 /
 // insight_run_outcome_model.md §3–§4). Canon owns the token map, the console-tail
-// scan, and the D-OUT-RUN-1 precedence resolver; the semantic packages own only the rows. Homed as
+// scan, and the SRC-D-OUT-RUN-1 precedence resolver; the semantic packages own only the rows. Homed as
 // a facade impl unit (module insight.canon, the semantic_walkers.cpp precedent) because it consumes
 // ComposedSemantics and drives the sealed LogParser.
 //
@@ -190,7 +190,7 @@ RunOutcomeResolution resolve_run_outcome(std::string_view side_input_token,
                 resolution.divergent = true;
                 INSIGHT_LOG_TRACE(logging::parser_logger(),
                                   "run_outcome: authoritative={} console={} -> {} (divergent "
-                                  "console tail not consulted, D-OUT-RUN-1)",
+                                  "console tail not consulted, SRC-D-OUT-RUN-1)",
                                   to_string(*mapped), to_string(*console_mapped),
                                   to_string(resolution.outcome));
             }
