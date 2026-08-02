@@ -383,7 +383,7 @@ struct IntentMarkerRow
     // needs it: the verb set is open (any pipeline step), the structural tokens that share the
     // prefix (`{`, `}`, `stage`, `node`, `parallel`, `//`, `End of Pipeline`) are closed dialect
     // data. Empty for rows without exclusions (every pre-grammar-2 row). The span points at
-    // package-static constexpr storage (SP-7 lifetime); serialized into semantic_identity.
+    // package-static constexpr storage (SRC-SP-7 lifetime); serialized into semantic_identity.
     std::span<const std::string_view> payload_excludes;
     // ADR-22 — the CHANNEL gate: this row fires only on a stream the caller declared as this
     // IntentChannel. kAnyChannel (the default) = fires on any channel, so every
@@ -439,7 +439,7 @@ struct LevelLiftRow
 
 // A location rule: recognizes a test-file WHERE coordinate (§5.3/SRC-II-8). `kind` selects the core
 // matching algorithm; the params are the dialect-independent file-naming vocabulary it walks. The
-// spans point at package-static constexpr arrays (SP-7 immutable-release lifetime). Not every param
+// spans point at package-static constexpr arrays (SRC-SP-7 immutable-release lifetime). Not every param
 // is used by every kind — `extensions` for TestSpecExtension/PrefixAndExtension, `suffixes` for
 // SuffixSet, `prefixes` for PrefixAndExtension (the basename `test_`/`_test` forms).
 struct LocationRow
@@ -541,7 +541,7 @@ using ProvenanceHook = bool (*)(std::string_view raw_line) noexcept;
 struct SemanticPackageManifest
 {
     std::string_view name;    // "github"
-    std::string_view version; // "1.0.0" — immutable release discipline (SP-7)
+    std::string_view version; // "1.0.0" — immutable release discipline (SRC-SP-7)
     std::span<const StructuralRoleRow> roles;
     std::span<const IntentMarkerRow> markers;
     // grammar-3 (ADR-23): the GENERATION projection — the writer dual of `markers`, declared
@@ -567,7 +567,7 @@ struct SemanticPackageManifest
     // single-materialization dialect (Jenkins, test_frameworks), whose rows are all kAnyChannel —
     // the degenerate case. Only the dialect that HAS multiple materializations declares channels.
     // This is the vocabulary a caller's `--channel` is validated against: declared ⇒ fires; unknown
-    // ⇒ HARD ERROR listing these names. The span points at package-static constexpr storage (SP-7
+    // ⇒ HARD ERROR listing these names. The span points at package-static constexpr storage (SRC-SP-7
     // lifetime); serialized into semantic_identity alongside the rows it gates.
     std::span<const std::string_view> channels;
     StrategyFactory strategy{nullptr};     // nullable — the dialect format-strategy code tier

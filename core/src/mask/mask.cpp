@@ -9,7 +9,7 @@ import insight.canon.detail.scan; // canonical char-class predicates (is_digit /
 // function of a line's own whitespace-delimited tokens, each classified KEEP / MASK /
 // composite-normalize by its OWN class (no cross-line state, no clustering). The joined
 // masked sequence is the template; its SHA-256 (computed downstream, unchanged) is the
-// run-independent template_id. See ADR-16.D5 (D-TID-1/D-TID-2; SRC-D-TID-11, SRC-D-TID-12, SRC-D-TID-13, SRC-D-TID-14).
+// run-independent template_id. See ADR-16.D5 (SRC-D-TID-1/SRC-D-TID-2; SRC-D-TID-11, SRC-D-TID-12, SRC-D-TID-13, SRC-D-TID-14).
 //
 // History: this file was the stateful Drain online log-template miner (intern table +
 // SoA cluster store + bucket index + similarity match + absorb_into wildcard learning).
@@ -876,7 +876,7 @@ namespace
 
 } // namespace
 
-// ── Stateless per-line template masker (D-TID-1/D-TID-2) ──────────────────────────────
+// ── Stateless per-line template masker (SRC-D-TID-1/SRC-D-TID-2) ──────────────────────────────
 // Per token, EMIT its canonical form by its OWN class — DECIDED per token (no cluster
 // lookup, no cross-line discovery): status-value KEEP → the literal; bare-number / empty
 // / IPv4 / hex / UUID / long-hash → "<*>" (a param); source-location / versioned-ref /

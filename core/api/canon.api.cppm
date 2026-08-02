@@ -63,7 +63,7 @@ using EventID = uint64_t;
 // carrying that token class, every other document is byte-identical except this version string.
 inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-8"};
 
-// ── Template identity (insight_perf_template_id.md D-TIR-1) ──
+// ── Template identity (insight_perf_template_id.md SRC-D-TIR-1) ──
 // The structural identity of a canonicalised template: the first 16 bytes of
 // SHA-256(masked template_str), carried as a fixed-size POD through the whole
 // metalog/eidos domain. The 34-byte "h:"+hex string is materialised only at the
@@ -81,7 +81,7 @@ struct TemplateId
     bool operator==(const TemplateId&) const = default;
 };
 
-// NgramId (D-TIR-4(2)): a fixed-width 128-bit key for an n-gram SEQUENCE
+// NgramId (SRC-D-TIR-4(2)): a fixed-width 128-bit key for an n-gram SEQUENCE
 // (std::vector<TemplateId>), so metalog's merge_behavior / diff_ngram_delta key on a
 // scalar instead of rehashing+recomparing the variable-length sequence on every map op.
 // NEVER serialized — a purely in-memory keying optimisation (the n-gram maps emit their
@@ -97,19 +97,19 @@ struct NgramId
 
 // SHA-256 the canonical (masked) template; the first 16 bytes are the id. Same content
 // as the former MetaLogEngine::compute_template_id (spec §3.2) — render(template_id_of(s))
-// is byte-identical to the old string for every s (D-TIR-1 invariant 2).
+// is byte-identical to the old string for every s (SRC-D-TIR-1 invariant 2).
 [[nodiscard]] TemplateId template_id_of(std::string_view canonical_template) noexcept;
 // Wire rendering: "h:" + 32 lowercase hex. The ONLY place the id string materialises.
 [[nodiscard]] std::string render(TemplateId template_id);
 // Inverse of render() — a TEST / fixture helper only (fixtures construct synthetic ids).
-// NOT on any product path: the wire is a one-way terminal render (D-TIR-1 §1).
+// NOT on any product path: the wire is a one-way terminal render (SRC-D-TIR-1 §1).
 [[nodiscard]] TemplateId parse_template_id(std::string_view rendered);
 
-// 128-bit content key for an n-gram sequence (D-TIR-4(2)). Fast non-crypto combine over
+// 128-bit content key for an n-gram sequence (SRC-D-TIR-4(2)). Fast non-crypto combine over
 // the sequence's id bytes; transient (never serialized), order-sensitive.
 [[nodiscard]] NgramId ngram_id_of(const std::vector<TemplateId>& sequence) noexcept;
 
-// ── Intent identity (bibles/intent_identity.md §2-§4, II-1/SRC-II-6/II-7) ──
+// ── Intent identity (bibles/intent_identity.md §2-§4, SRC-II-1/SRC-II-6/II-7) ──
 // kIntentRegistryVersion RETIRED (ADR-17): it was a dead constant (zero downstream readers),
 // and its job — the II-7 comparability identity of the recognizer/marker rule set — is now
 // discharged by the composed `semantic_identity` (insight::semantic::ComposedSemantics), a CONTENT
@@ -142,7 +142,7 @@ struct NgramId
 [[nodiscard]] std::string_view discriminant_of(std::string_view name) noexcept;
 
 // The intent identity: the 16-byte SHA-256 of the canonicalized name — a STRUCTURAL
-// grouping key derived from the marker, never a retained value (II-1, the O1/SRC-D-OTEL-1
+// grouping key derived from the marker, never a retained value (SRC-II-1, the O1/SRC-D-OTEL-1
 // discipline verbatim). Byte-identical to template_id_of(canonicalize_intent(name));
 // one call keeps `intent_id` co-located with its comparability version.
 [[nodiscard]] TemplateId intent_id_of(std::string_view name);
@@ -162,7 +162,7 @@ inline std::ostream& operator<<(std::ostream& out, const TemplateId& template_id
 
 // ── OTEL trace context (ADR-29, SRC-D-OTEL-1) ──
 // The OTEL hex ids (traceId/spanId/parentSpanId) are hashed to fixed-width scalar PODs at
-// the strategy seam — the D-TIR-4 hash-to-POD discipline — carried IN-MEMORY on the
+// the strategy seam — the SRC-D-TIR-4 hash-to-POD discipline — carried IN-MEMORY on the
 // CanonicalEvent, CONSUMED by the structural layer (trace_id groups the n-gram graph in O2;
 // span_id/parent_span_id feed the deferred O3 observed-DAG) and NEVER serialized into the
 // MetaLog (OR1 — the per-transaction-unique hex would be a cardinality bomb). A zero `value`
@@ -699,7 +699,7 @@ enum class StructuralRole : uint8_t
 
 } // namespace insight
 
-// std::hash<TemplateId> (D-TIR-1 invariant 3): the content is already a uniform
+// std::hash<TemplateId> (SRC-D-TIR-1 invariant 3): the content is already a uniform
 // cryptographic hash, so the first 8 bytes ARE a good size_t — no mixing, no allocation.
 // Reachable to importers of this module so `unordered_map<TemplateId,…>` in metalog/eidos
 // resolves it. (A specialization need not be exported; importing the module suffices.)
@@ -715,7 +715,7 @@ template <> struct hash<insight::TemplateId>
     }
 };
 
-// std::hash<NgramId> (D-TIR-4(2)): keys metalog's n-gram-sequence maps. NgramId is
+// std::hash<NgramId> (SRC-D-TIR-4(2)): keys metalog's n-gram-sequence maps. NgramId is
 // already a uniform 128-bit hash, so the first 8 bytes ARE a good size_t — no mixing,
 // no allocation (mirrors std::hash<TemplateId>). The maps re-sort their output, so the
 // unordered iteration order is not a determinism surface (ADR-16).
@@ -1193,7 +1193,7 @@ export namespace insight::utils
 //   • an error-TYPE NAME alone (`…RaisesValueError`) is demoted to a non-failure when
 //     the text also DECLARES a pass verdict ("Passed" / gtest "[ OK ]" / "PASSED"); and
 //   • a line carrying a real failure cue but LED by a pass GLYPH (✓/✔/✅/√) is a passing
-//     test whose name embeds failure vocabulary, not a regression (D-OUT-1).
+//     test whose name embeds failure vocabulary, not a regression (SRC-D-OUT-1).
 //
 // `scan_limit` bounds the head: a token must START within the first `scan_limit`
 // chars (it may extend past them — the full word is captured). 0 = scan all of
@@ -1272,7 +1272,7 @@ namespace detail
     // but `01`'s predecessor `00` is the `:MM` minutes, marking `01` a timestamp second). An
     // aggregate statistic, not a per-item verdict. Checked BEFORE the verdict anchors (a counted
     // noun is a summary even with a trailing colon: "1 failure:" is a summary, not Fatal). The
-    // symmetric dual of the "25 passed, 5 failed" disconfirming case that forced D-OUT-1 to be
+    // symmetric dual of the "25 passed, 5 failed" disconfirming case that forced SRC-D-OUT-1 to be
     // glyph-gated: count-quantified outcome vocab is a summary, not a verdict. A count-register
     // word does NOT confer an alerting level — it caps at Warn (demote, never suppress).
     // PRECONDITION: `token` MUST be a sub-view of `line`. Pure byte/case test, order-independent ⇒
@@ -1308,7 +1308,7 @@ namespace detail
     // strictly worse. It is REGISTER-scoped, not LINE-scoped — a verdict anchored EARLIER on the
     // same line (an `##[error]` wrapper) is a different author's claim and survives. And it
     // DEMOTES, NEVER SUPPRESSES: the cue does not fire, the line lands at Unknown and still
-    // surfaces (the D-OUT-1 / SRC-D-PROV-1 precedent). The lexicon is untouched — the defect is
+    // surfaces (the SRC-D-OUT-1 / SRC-D-PROV-1 precedent). The lexicon is untouched — the defect is
     // CONTEXT, not vocabulary.
 } // namespace detail
 

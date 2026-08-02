@@ -111,7 +111,7 @@ void operator delete[](void* ptr, std::size_t) noexcept
 // ════════════════════════════════════════════════════════════════════════════════════════════════════
 // Synthetic vocabulary — deliberately NOT any real ecosystem's tokens, so a failure implicates the
 // ALGORITHM, never a package's data. Static storage: the composed rows' string_views point here
-// (SP-7).
+// (SRC-SP-7).
 // ════════════════════════════════════════════════════════════════════════════════════════════════════
 namespace
 {

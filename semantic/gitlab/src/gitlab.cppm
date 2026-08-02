@@ -162,7 +162,7 @@ inline constexpr std::array<OutcomeMarkerRow, 3> kOutcomeMarkers{{
 }};
 
 // ── The manifest (§2.5) — the package's single composed contribution ──
-// name "gitlab", version "1.0.0" (SP-7 immutable-release discipline).
+// name "gitlab", version "1.0.0" (SRC-SP-7 immutable-release discipline).
 export inline constexpr SemanticPackageManifest kManifest{
     .name = "gitlab",
     .version = "1.0.0",

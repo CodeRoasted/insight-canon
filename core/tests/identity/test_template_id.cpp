@@ -1,5 +1,5 @@
 // NOLINTBEGIN — unit test: short identifiers and literals are fine.
-// test_template_id.cpp — the D-TIR-1 invariants for canon's TemplateId
+// test_template_id.cpp — the SRC-D-TIR-1 invariants for canon's TemplateId
 // These are the golden-preserving guards the whole
 // perf refactor rests on: byte-lexicographic order == "h:"+hex order, render/parse
 // round-trip, content determinism, and a working std::hash specialization.
@@ -92,7 +92,7 @@ TEST(TemplateIdInvariants, StdHashUsableInUnorderedContainer)
     EXPECT_GE(by_id.size(), kSamples.size() - 1U); // -1 tolerates any dup in the literal list
 }
 
-// ── NgramId (D-TIR-4(2)): the scalar key for n-gram SEQUENCES ──
+// ── NgramId (SRC-D-TIR-4(2)): the scalar key for n-gram SEQUENCES ──
 // Transient (never serialized), so the contract is in-memory keying only: deterministic,
 // order-sensitive, distinct-per-distinct-sequence, and usable in an unordered_map.
 namespace

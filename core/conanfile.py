@@ -73,7 +73,7 @@ class InsightCanonConan(ConanFile):
         self.requires("spdlog/1.17.0", transitive_headers=True, transitive_libs=True)
         self.requires("fmt/12.1.0",    transitive_headers=True, transitive_libs=True)
         self.requires("simdjson/4.6.3")
-        # picosha2 — header-only SHA-256 for template_id_of (impl-only; D-TIR-1 moved the
+        # picosha2 — header-only SHA-256 for template_id_of (impl-only; SRC-D-TIR-1 moved the
         # hash here from metalog). Not in any public header → no transitive_headers.
         self.requires("picosha2/1.0.0")
         # NUMA-aware arena allocation (hot path). OPT-IN (see the `with_numa` option):

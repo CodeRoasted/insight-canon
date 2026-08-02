@@ -139,7 +139,7 @@ inline constexpr std::array<OutcomeMarkerRow, 1> kOutcomeMarkers{{
 }};
 
 // ── The manifest (§2.5) — the package's single composed contribution ──
-// name "jenkins", version "1.1.0" (SP-7 immutable-release discipline; bumped from 1.0.0 for T5
+// name "jenkins", version "1.1.0" (SRC-SP-7 immutable-release discipline; bumped from 1.0.0 for T5
 // 5.2: the package's CODE TIER lost its format strategy — `.strategy` is serialized as a presence
 // byte, so the manifest's content genuinely moved; the GHA 1.3.0→1.4.0 precedent at T4). The
 // depth claim this vocabulary carries is scoped to DECLARATIVE Pipeline (studies/006: 100% stage

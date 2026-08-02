@@ -388,7 +388,7 @@ TEST(InferLeadingLogLevel, AnsiColourWrappedLevelRecovered)
 
 // ── SRC-D-OUT-1b — outcome-awareness at the LEVEL altitude ────────────────────────
 // infer_leading_log_level is what the diff consumes (→ dominant_level → salience →
-// eidos NewErrorPattern). It has TWO severity feeders and D-OUT-1 guarded only one:
+// eidos NewErrorPattern). It has TWO severity feeders and SRC-D-OUT-1 guarded only one:
 //   • Stage 2 (contains_failure_cue) — D-OUT-1-guarded, caps at Error.
 //   • Stage 1 (explicit level token via parse_log_level) — runs FIRST, authoritative,
 //     UNGUARDED: the bare words `failure`/`fatal`/`critical` → Fatal, `error` → Error.
@@ -398,7 +398,7 @@ TEST(InferLeadingLogLevel, AnsiColourWrappedLevelRecovered)
 // storm). The pass GLYPH leading the line says it PASSED → an alerting tier (Warn/
 // Error/Fatal) must demote to Unknown.
 //
-// THE TEST HOLE THIS CLOSES: the D-OUT-1 RED asserted contains_failure_cue (the cue
+// THE TEST HOLE THIS CLOSES: the SRC-D-OUT-1 RED asserted contains_failure_cue (the cue
 // boolean) and went green while the LEVEL of the same line was Fatal — outcome-
 // awareness asserted at the wrong altitude. These cases assert the LEVEL the diff
 // actually consumes.

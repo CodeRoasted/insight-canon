@@ -137,10 +137,10 @@ TEST(FailureLexicon, PassVerdictDemotesBareErrorTypeName)
         << "gtest '[ FAILED ]' — the failure word wins";
     EXPECT_TRUE(contains_failure_cue("ERROR teardown failed though setup was ok"))
         << "a pass WORD never overrides a failure word; only an unambiguous leading pass "
-           "GLYPH does (D-OUT-1) — here the line is led by a failure word, not a glyph";
+           "GLYPH does (SRC-D-OUT-1) — here the line is led by a failure word, not a glyph";
 }
 
-// ── A leading PASS GLYPH demotes even an explicit failure WORD (D-OUT-1) ───────
+// ── A leading PASS GLYPH demotes even an explicit failure WORD (SRC-D-OUT-1) ───────
 // CI test logs are full of PASSING tests whose NAMES carry failure vocabulary
 // ("✓ marks runs failed when the runtime throws", "✔ write_bash failure returns …").
 // The per-test pass glyph (✓/✔/✅/√) is an unambiguous verdict — it appears as a result
@@ -165,7 +165,7 @@ TEST(FailureLexicon, LeadingPassGlyphDemotesFailureWord)
         << "ANSI-wrapped ✓ leads — the colour SGR is skipped, the glyph still demotes";
 }
 
-// ── The pass demotion is GLYPH-gated, NOT word-gated (D-OUT-1 disconfirming) ───
+// ── The pass demotion is GLYPH-gated, NOT word-gated (SRC-D-OUT-1 disconfirming) ───
 // A leading pass WORD or a non-leading glyph must NOT demote a real failure — the
 // discriminator is "first outcome token is a pass glyph", nothing weaker.
 TEST(FailureLexicon, PassWordOrTrailingGlyphDoesNotDemote)
@@ -190,7 +190,7 @@ TEST(FailureLexicon, PassWordOrTrailingGlyphDoesNotDemote)
 // re-run hard-floor false positives: P3 rank 1 `Storing crash reports into
 // '<path>'` (an informational startup line, the NOUN "crash") and P3 rank 2
 // `- deleting watched path emits watcher fail event` (a mocha test DESCRIPTION,
-// "fail" modifying "event"). This is one level past D-OUT-1/SRC-D-OUT-1b: D-OUT-1 demotes a
+// "fail" modifying "event"). This is one level past SRC-D-OUT-1/SRC-D-OUT-1b: SRC-D-OUT-1 demotes a
 // pass-MARKED verdict (a ✓ leads); here there is NO marker to demote against — the
 // line is simply not a verdict. The discriminator is the same decoration CI/test
 // tooling uses to MARK an outcome — caps / `:` / `[ ]` / `( )` / CamelCase type /
@@ -338,7 +338,7 @@ TEST(FailureLexicon, CountRegisterFailureWordIsSummaryNotVerdict)
 }
 
 // ── SRC-D-OUT-2 — a leading pass WORD demotes, but ONLY as the first significant token ──
-// D-OUT-1 is glyph-gated (a leading pass GLYPH demotes; a pass WORD does not) to protect
+// SRC-D-OUT-1 is glyph-gated (a leading pass GLYPH demotes; a pass WORD does not) to protect
 // the "25 passed, 5 failed" summary. SRC-D-OUT-2 closes the TAP/node-runner recall gap: a
 // kSuccessVerdicts WORD (passed/ok/success/succeeded) leading the line (first significant
 // token, mirroring the glyph rule) demotes a failure word — `ok 1 - … failed` is a PASSING

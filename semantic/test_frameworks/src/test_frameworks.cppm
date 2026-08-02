@@ -17,7 +17,7 @@ export import insight.canon.spi;
 namespace insight::semantic::test_frameworks
 {
 
-// ── Family vocabulary (package-static; the LocationRow spans point here — SP-7 lifetime) ──
+// ── Family vocabulary (package-static; the LocationRow spans point here — SRC-SP-7 lifetime) ──
 // jest/vitest/playwright/pytest `.test.<ext>` / `.spec.<ext>` with ext ∈ this set.
 inline constexpr std::array<std::string_view, 2> kTestSpecInfixes{".test.", ".spec."};
 inline constexpr std::array<std::string_view, 7> kTestSpecExtensions{"ts",  "tsx", "js", "jsx",
@@ -51,7 +51,7 @@ inline constexpr std::array<LocationRow, 3> kLocations{{
 
 // ── The manifest (§2.5) — the package's single composed contribution ──
 // Ships only location rows (no roles/markers/level-lifts/value-classes, no code tier). version
-// "1.0.0" (SP-7). name sorts after "github" → github rows precede test_frameworks rows in canonical
+// "1.0.0" (SRC-SP-7). name sorts after "github" → github rows precede test_frameworks rows in canonical
 // order.
 export inline constexpr SemanticPackageManifest kManifest{
     .name = "test_frameworks",

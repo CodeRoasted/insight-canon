@@ -4,7 +4,7 @@ module;
 module insight.canon.api;
 import insight.canon.internal;
 
-// template_id.cpp — the canon-owned template identity (insight_perf_template_id.md D-TIR-1).
+// template_id.cpp — the canon-owned template identity (insight_perf_template_id.md SRC-D-TIR-1).
 //
 // `template_id_of` is the SHA-256 body moved verbatim out of MetaLogEngine::compute_template_id
 // (spec §3.2): first 16 bytes of SHA-256(masked template_str). `render` is the sole place the

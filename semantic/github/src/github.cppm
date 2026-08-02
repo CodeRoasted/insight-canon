@@ -303,14 +303,14 @@ inline constexpr std::array<OutcomeTokenRow, 7> kOutcomeTokens{{
 // format strategy (`.strategy` is serialized as a presence byte, so the manifest's content genuinely
 // moved) and every gated row's coordinate became the package NAME. 1.3.0 was the IntentChannel
 // coordinate (the declared
-// channel vocabulary + the channel-gated Step rows). SP-7 immutable-release discipline: a released
+// channel vocabulary + the channel-gated Step rows). SRC-SP-7 immutable-release discipline: a released
 // version's rows are frozen, a content change is a new version; the bump also rides the II-7
 // semantic_identity hash, an honest comparability boundary — a diff across this boundary is
 // comparing two different recognition rulesets, and the digest says so.
 //
 // ADR-22's rename (Sink → IntentChannel) did NOT bump this, deliberately: it renamed C++
 // identifiers, and what enters the digest is the channel NAMES ("annotated"/"stripped" — ruled
-// unchanged) and the row content, neither of which moved. SP-7 keys on CONTENT, not on spelling;
+// unchanged) and the row content, neither of which moved. SRC-SP-7 keys on CONTENT, not on spelling;
 // bumping for a rename would declare a new ruleset that recognizes exactly what the old one did,
 // and make two identical rulesets look incomparable. Ships no locations (that is the
 // test_frameworks package) and no value classes (none has a consumer yet). Code tier: the

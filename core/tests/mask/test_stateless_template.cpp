@@ -1,5 +1,5 @@
 // NOLINTBEGIN
-// Unit tests for the stateless template masker (D-TID-1/D-TID-2).
+// Unit tests for the stateless template masker (SRC-D-TID-1/SRC-D-TID-2).
 // The property tests are committed regression guards — chiefly the phantom-pair kill
 // (the whole point). The F13 masker-cardinality RE-MEASURE lived here as an
 // env-gated CardinalityOnCorpus test; it is a measurement over an operator-mounted

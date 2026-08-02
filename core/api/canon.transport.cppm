@@ -323,7 +323,7 @@ struct RawPeeledLine
 // catalogue-static rows.
 //
 // NORMATIVE, and the reason this type exists at all: LINE IDENTITY IS A PURE FUNCTION OF PEELED
-// CONTENT. SID-1/II-1 is preserved BY CONSTRUCTION, not by review — `peel()` hands back a
+// CONTENT. SID-1/SRC-II-1 is preserved BY CONSTRUCTION, not by review — `peel()` hands back a
 // `string_view` and the tokenizer takes a `string_view`, so there is NO parameter anywhere on the
 // identity path through which a declaration could reach an identity. No future edit can make an
 // identity depend on a declaration without first adding such a parameter, which is a visible,

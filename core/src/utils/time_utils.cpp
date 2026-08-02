@@ -764,7 +764,7 @@ namespace
 {
     // An alerting tier (Warn/Error/Fatal) is the only severity a pass-glyph-led line can FALSELY
     // earn (SRC-D-OUT-1b): Info/Debug/Trace never alert, so the outcome guard below is paid only on
-    // a would-be-positive result — the D-OUT-1 hot-path discipline.
+    // a would-be-positive result — the SRC-D-OUT-1 hot-path discipline.
     [[nodiscard]] constexpr bool is_alerting_level(LogLevel level) noexcept
     {
         return level == LogLevel::Warn || level == LogLevel::Error || level == LogLevel::Fatal;
@@ -879,7 +879,7 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
     // tsc-error-report.json`) is not misread as Error — that substring over-match
     // spuriously promoted new templates to HIGH "New error" downstream in the diff.
     if (contains_failure_cue(line, kKeywordHead))
-        return LogLevel::Error; // contains_failure_cue self-guards (D-OUT-1) — no double call
+        return LogLevel::Error; // contains_failure_cue self-guards (SRC-D-OUT-1) — no double call
     // SRC-D-CNT-1: a count-register failure word ("1 failure", "5 failed") is a SUMMARY — it did
     // not fire as a verdict cue above, but it still surfaces, capped at Warn (below per-item
     // verdicts; demote, never suppress — the "25 passed, 5 failed" dual). A leading pass GLYPH

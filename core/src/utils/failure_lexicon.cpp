@@ -211,7 +211,7 @@ namespace
     // that weak, name-based signal; it NEVER demotes an explicit failure WORD
     // ("error"/"failed"/…), because a leading pass WORD would false-demote a genuine
     // failure summary ("25 passed, 5 failed"). The strong failure WORD is demoted only by
-    // an unambiguous leading pass GLYPH (D-OUT-1, leading_outcome_is_pass), never a word.
+    // an unambiguous leading pass GLYPH (SRC-D-OUT-1, leading_outcome_is_pass), never a word.
     constexpr std::array<std::string_view, 4U> kSuccessVerdicts{"passed", "ok", "success",
                                                                 "succeeded"};
 
@@ -231,7 +231,7 @@ namespace
                               });
     }
 
-    // ── Outcome-aware demotion: a leading PASS GLYPH (D-OUT-1) ───────────────────────
+    // ── Outcome-aware demotion: a leading PASS GLYPH (SRC-D-OUT-1) ───────────────────────
     // Per-test PASS glyphs (3-byte UTF-8, lead byte 0xE2) are unambiguous verdicts: they
     // appear in CI output as a result marker and NOWHERE else, unlike the words
     // "passed"/"ok" (which double as summary counts, prose, and test names). They are
@@ -698,7 +698,7 @@ bool contains_failure_cue(std::string_view text, std::size_t scan_limit) noexcep
     const bool result{saw_failure_word ||
                       (saw_error_type && !any_standalone_word(text, kSuccessVerdicts,
                                                               /*scan_limit=*/0U))};
-    // Outcome guard (D-OUT-1): a line that carries a failure cue but is LED by an
+    // Outcome guard (SRC-D-OUT-1): a line that carries a failure cue but is LED by an
     // unambiguous pass GLYPH (✓/✔/✅/√) is a passing test whose NAME embeds failure
     // vocabulary ("✓ marks runs failed …"), not a regression. Only a leading pass GLYPH
     // demotes a failure WORD; a leading pass WORD ("25 passed, 5 failed") must not, so

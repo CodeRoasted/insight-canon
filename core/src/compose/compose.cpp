@@ -61,7 +61,7 @@ namespace
     }
 
     // Sorted canonical package order: a stable index permutation by name (byte-wise string_view
-    // compare — locale-independent, deterministic). Ties by name are impossible under SP-7 (a
+    // compare — locale-independent, deterministic). Ties by name are impossible under SRC-SP-7 (a
     // package name is unique); a defensive tiebreak on version keeps the sort total regardless.
     [[nodiscard]] std::vector<std::size_t>
     canonical_order(std::span<const SemanticPackageManifest> packages)
