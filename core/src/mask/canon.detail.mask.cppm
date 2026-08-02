@@ -6,7 +6,7 @@
 //
 // History: this domain was the stateful Drain online log-template miner (clustering tree +
 // absorb_into wildcard learning). That cross-line learning made `template_id` order-dependent — the
-// "phantom pair" false-diff (stateless_template_id.md SRC-D-TID-3). The clustering was RIPPED; the
+// "phantom pair" false-diff (SRC-D-TID-3). The clustering was RIPPED; the
 // stateless masker below is the sole identity source.
 export module insight.canon.detail.mask;
 import insight.canon.internal; // std + global C types

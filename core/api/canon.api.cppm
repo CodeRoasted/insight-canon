@@ -31,7 +31,7 @@ using Duration = std::chrono::system_clock::duration;
 // ── Identifiers ──
 using EventID = uint64_t;
 
-// ── Canonicalization-contract version (stateless_template_id.md SRC-D-TID-16) ──
+// ── Canonicalization-contract version (SRC-D-TID-16) ──
 // The single canon-owned identifier of the canonicalization CONTRACT — the masking
 // rules that turn a raw line into its `template_str` (the stateless per-line masker +
 // the F13 class set). Every MetaLog producer DEFAULTS to this (MetaLogConfig), so a
@@ -42,7 +42,7 @@ using EventID = uint64_t;
 // canonicalization change. Generations: -1 = stateless masker + F13; -2 = OTEL-awareness
 // (severity-from-severity_number + trace-context routing + the trace-scoped graph —
 // ADR-29 D-OTEL-2, unconditional); -3 = currency-marker numerics
-// (stateless_template_id.md SRC-D-TID-22 — `$463`/`total=$463` mask to `$<*>`/`total=$<*>`); -4 =
+// (SRC-D-TID-22 — `$463`/`total=$463` mask to `$<*>`/`total=$<*>`); -4 =
 // the 1.6.4 masking batch (detection_provenance_and_legibility.md): SRC-D-MSK-1 generalized
 // diagnostic-composite masking (per-`:`/`/`-segment digit-leading rule — collapses the
 // Chromium/glog prefix `[PID:DATE/TIME:LEVEL:file.cc:line]`, subsumes source-location), SRC-D-MSK-2
@@ -984,7 +984,7 @@ export namespace insight::tokenization
 
 // Token-masking configuration for the stateless per-line masker (stateless_template).
 // The Drain clustering knobs (max_depth / similarity_threshold / max_clusters) were
-// removed with the clustering itself (stateless_template_id.md SRC-D-TID-3) — a stateless
+// removed with the clustering itself (SRC-D-TID-3) — a stateless
 // masker has no tree, no similarity match, and no cluster cap to bound.
 //
 // SRC-D-TID-14 — THE ANTI-MONSTER BOUNDARY, the rule every mask rule is admitted against.
