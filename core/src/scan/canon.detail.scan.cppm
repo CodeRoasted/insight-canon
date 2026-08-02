@@ -81,7 +81,7 @@ export namespace insight::tokenization
     return chr == ' ' || chr == '\t';
 }
 
-// ── TokenShape — one-pass per-token byte profile (stateless_template_id.md §8.2) ──────
+// ── TokenShape — one-pass per-token byte profile (ADR-16.D5, the precedence) ──────
 // The masker classifies each whitespace token KEEP / MASK / NORMALIZE in a fixed precedence
 // (D-TID-12). Several steps of that dispatch each re-walked the token: is_all_digits (the
 // status-value KEEP), the composite-trigger any_of, and is_digit_leading (the digit mask).

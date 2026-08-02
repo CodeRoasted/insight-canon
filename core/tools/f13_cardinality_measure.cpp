@@ -11,7 +11,7 @@
 // deterministic tree.
 //
 // WHAT THE NUMBER IS FOR. Distinct-template count + singleton fraction size the F13 masking rules
-// (stateless_template_id.md § 8): re-run after any F13 rule change. The one-time over-split ratio
+// (ADR-16.D5): re-run after any F13 rule change. The one-time over-split ratio
 // vs the now-ripped Drain was 4.12x → 1.79x at the § 8 gate; that comparison cannot re-run post-rip,
 // and the standing production guard is the K_dim cardinality monitor (D-TID-7), not this tool.
 // A number printed here is citable ONLY next to its population block — that is the whole contract.

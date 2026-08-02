@@ -9,7 +9,7 @@ import insight.canon.detail.scan; // canonical char-class predicates (is_digit /
 // function of a line's own whitespace-delimited tokens, each classified KEEP / MASK /
 // composite-normalize by its OWN class (no cross-line state, no clustering). The joined
 // masked sequence is the template; its SHA-256 (computed downstream, unchanged) is the
-// run-independent template_id. See stateless_template_id.md (D-TID-1/D-TID-2; §8 SRC-D-TID-11..14).
+// run-independent template_id. See ADR-16.D5 (D-TID-1/D-TID-2; SRC-D-TID-11, SRC-D-TID-12, SRC-D-TID-13, SRC-D-TID-14).
 //
 // History: this file was the stateful Drain online log-template miner (intern table +
 // SoA cluster store + bucket index + similarity match + absorb_into wildcard learning).
@@ -39,7 +39,7 @@ namespace
     // ── Hand-written token-mask predicates ───────────────────────────────────
     // Pure, byte-only classifiers over a single token (zero RE2). Each masks or
     // normalizes a structurally high-card token class so logically-identical lines
-    // share a template (stateless_template_id.md §8).
+    // share a template (ADR-16.D5).
 
     [[nodiscard]] constexpr bool is_hex_char(char chr) noexcept
     {
@@ -607,7 +607,7 @@ namespace
         return true;
     }
 
-    // ── F13 composite-masking (stateless_template_id.md §8 / D-TID-12,13) ────────
+    // ── F13 composite-masking (ADR-16.D5; D-TID-12, D-TID-13) ────────
     // Per-line masking is the SOLE generalizer once Drain's learning is retired, so
     // these classify the high-card SYNTACTIC token classes the fixed masks missed.
     // Admitted under SRC-D-TID-14 (contract: canon.api.cppm) — all byte-only and

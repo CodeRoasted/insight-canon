@@ -14,7 +14,7 @@ import insight.canon.api;      // MaskConfig, ArenaAllocator
 export namespace insight::tokenization
 {
 
-// ── Stateless per-line template masker (stateless_template_id.md D-TID-1/D-TID-2) ──────
+// ── Stateless per-line template masker (ADR-16.D5; D-TID-1, D-TID-2) ──────
 // A deterministic, run-independent function of the line's OWN masked/kept tokens —
 // NO cluster state, NO cross-line learning. The same logical line yields the same
 // template_str (hence the same SHA-256 template_id, computed downstream) in any run,

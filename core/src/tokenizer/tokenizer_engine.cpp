@@ -20,7 +20,7 @@ import insight.canon.detail.parse;    // LogParser
 //                                   (a pure function of the line's own masked tokens —
 //                                    no clustering state, no cross-line learning, so the
 //                                    template_id derived downstream is run-independent;
-//                                    the phantom pair cannot form — stateless_template_id.md)
+//                                    the phantom pair cannot form — ADR-16.D5)
 //     →  CanonicalEvent
 //
 // Ownership: the arena is external; all string_views in CanonicalEvent point
