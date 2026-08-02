@@ -41,7 +41,7 @@ namespace insight::semantic::jenkins
 // THE 19-LOG PAYLOAD-STAMPED RE-BASELINE, recorded here because this is the strategy's successor
 // surface (ADR-23 Part 2 clause 1; T5 §4 item 5): that class is NOT declarable (the stamp is a
 // payload-determined subset, ADR-23), so post-purification its stamps stay CONTENT and those
-// lines template with the stamp under D-MSK-5's `[<*>]` normal form. Template IDs move; the count
+// lines template with the stamp under SRC-D-MSK-5's `[<*>]` normal form. Template IDs move; the count
 // is stable — measured ±strip 3 337 vs 3 339, the +2 fully attributed (one dual-occurrence twin +
 // the bare-`[<*>]` cell from 134 timestamp-only lines; the §6.5 prefix-image triangle returned
 // REPAIRED 2026-07-30, per stamped line template(unstripped) == "[<*>]" ⧺ M(rest), zero exceptions

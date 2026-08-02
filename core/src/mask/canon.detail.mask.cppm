@@ -46,9 +46,7 @@ export namespace insight::tokenization
 //   components (M2); the same catalog serves the in-token path (M3/M4) and the standalone
 //   rule above (M5). One catalog, three call sites: a second copy is how two maskers
 //   diverge and template identity stops being a pure function of the line.
-// D-MSK-5 — BRACKET_TIMESTAMP (declaration written, prefix DEFERRED: this code is the
-//   worked example of the bare form inside ADR-6.D8, and that file cannot be edited
-//   in-session; migrating here would falsify it). A WHOLE-token bracketed RFC3339 datetime
+// SRC-D-MSK-5 — BRACKET_TIMESTAMP. A WHOLE-token bracketed RFC3339 datetime
 //   (`[2026-06-23T15:11:09.020Z]`) masks to `[<*>]` instead of falling through to literal
 //   KEEP. The bracket is the entire difference: an unbracketed stamp is digit-leading and
 //   was already masked, so only this token class moves.

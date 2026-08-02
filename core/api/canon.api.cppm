@@ -56,7 +56,7 @@ using EventID = uint64_t;
 // the serialized `dominant_level` of a gcc/clang cascade's note lines moves Error → Unknown.
 // `template_str` and `template_id` do NOT move under -7 — the masker is untouched — but
 // `dominant_level` is serialized and gates NewErrorPattern and diff polarity, so it is an
-// output-affecting canonicalization change and takes the bump. -8 = D-MSK-5 bracket_timestamp
+// output-affecting canonicalization change and takes the bump. -8 = SRC-D-MSK-5 bracket_timestamp
 // (bibles/jenkins_dialect.md §4, ADR-23 erratum 2 — "the bracket is the entire difference"): a
 // WHOLE-token bracketed RFC3339 full datetime (`[2026-06-23T15:11:09.020Z]`) masks to `[<*>]`
 // instead of falling through to literal KEEP; `template_str`/`template_id` move ONLY for lines
@@ -1333,7 +1333,7 @@ inline constexpr int kDefaultReferenceYear{2024};
 
 // The RFC3339 full-datetime byte GRAMMAR — one owner, two consumers (ADR-23 erratum 2's "three
 // spellings of one shape", collapsed): the Jenkins strategy's `timestamper_prefix_end` delegates
-// its character grammar here, and the masker's `bracket_timestamp` composite rule (D-MSK-5) tests
+// its character grammar here, and the masker's `bracket_timestamp` composite rule (SRC-D-MSK-5) tests
 // a bracket interior with the same function. Homed PUBLIC (not in the mask detail) because the
 // Jenkins package imports only insight.canon.api/spi — canon's detail shards are sealed, so a
 // detail-homed grammar could not be delegated to (bibles/jenkins_dialect.md §4, homing note).

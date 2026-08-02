@@ -38,7 +38,7 @@
 //   * Anything strictly between is a THIRD outcome and is reported as such — it is never rounded
 //     into a branch.
 //
-// STATUS OF THAT CLASSIFIER AFTER THE D-MSK-5 BRACKETED-STAMP REPAIR (2fe2e85): it is the
+// STATUS OF THAT CLASSIFIER AFTER THE SRC-D-MSK-5 BRACKETED-STAMP REPAIR (2fe2e85): it is the
 // FROZEN RECORD of the pre-fix measurement it correctly scored (EXPLODES at
 // 95.9% of ceiling), and it is NOT the repair's fitness predicate — its ceiling leg is can't-PASS
 // on these bytes from the pre-fix record alone (arm A alone at 3 138/6 055 = 51.8% ≥ the 0.5 bar,
@@ -334,7 +334,7 @@ TEST(JenkinsPayloadStampMeasurement, CounterCanReportAnExplosion)
 // never saw the `[`-leading byte), so three same-shape stamped lines were THREE templates, each
 // equal to its raw line, and the header declared: "the day the masker claims `[<RFC3339>]` to a
 // stable normal form, this test goes RED and must be rewritten to the new normal form. That is the
-// intended failure, not a regression." That day came with D-MSK-5 `bracket_timestamp`
+// intended failure, not a regression." That day came with SRC-D-MSK-5 `bracket_timestamp`
 // (kCanonicalizationVersion -8): the RED fired exactly as designed
 // (observed 2026-07-30, all three per-line verbatim EXPECTs), and this is the rewrite it demanded.
 //
@@ -360,7 +360,7 @@ TEST(JenkinsPayloadStampMeasurement, TheMaskerClaimsTheTimestamperTokenToTheBrac
         std::cout << "  unstripped[" << index << "] = \"" << outcomes[index].template_str << "\"\n";
         EXPECT_EQ(outcomes[index].template_str, "[<*>] + git fetch --tags")
             << "the bracketed RFC3339 token must mask to the bracket normal form `[<*>]` — the "
-               "D-MSK-5 claim, the bracketed branch of the stamp rule discharged";
+               "SRC-D-MSK-5 claim, the bracketed branch of the stamp rule discharged";
     }
     EXPECT_EQ(outcomes[0].template_str, outcomes[1].template_str)
         << "two lines differing ONLY in the stamp's milliseconds must now share ONE template — "
@@ -380,7 +380,7 @@ TEST(JenkinsPayloadStampMeasurement, TheMaskerClaimsTheTimestamperTokenToTheBrac
     ASSERT_TRUE(bare_outcomes[1].produced);
     std::cout << "  unbracketed[0] = \"" << bare_outcomes[0].template_str << "\"\n";
     EXPECT_EQ(bare_outcomes[0].template_str, bare_outcomes[1].template_str)
-        << "the unbracketed token is digit-leading → masked → collapses (unchanged by D-MSK-5)";
+        << "the unbracketed token is digit-leading → masked → collapses (unchanged by SRC-D-MSK-5)";
     const std::array<std::string, 2> bracketed{"fetched at [2026-06-23T15:11:09.020Z] ok",
                                                "fetched at [2026-06-24T09:02:44.001Z] ok"};
     std::vector<std::string> kept{bracketed.begin(), bracketed.end()};

@@ -109,7 +109,7 @@ TEST(StatelessTemplate, CompositesNormalized)
               masked("error at parser.cpp:1:1: bad token", arena));
 }
 
-// ── D-MSK-5 — bracket_timestamp ───────────────────────────────────────────────────
+// ── SRC-D-MSK-5 — bracket_timestamp ───────────────────────────────────────────────────
 // The whole-token bracketed RFC3339 stamp fell through every rule to literal KEEP ("the bracket
 // is the entire difference"): unbracketed the same token is digit-leading and masks, so on an
 // undeclared Jenkins timestamper stream every stamped line was its own template (95.9% of the
