@@ -1,6 +1,6 @@
 // f13_cardinality_measure — the standing F13 masker-cardinality RE-MEASURE instrument.
 //
-// WHY THIS IS A CLI TOOL AND NOT A TEST (corpus_backed_gates.md § 3.3, Eqya ruling 2026-07-29).
+// WHY THIS IS A CLI TOOL AND NOT A TEST (DN-18.D1 § 3.3, Eqya ruling 2026-07-29).
 // This measurement lived as `StatelessTemplate.CardinalityOnCorpus` inside the unit suite, env-gated
 // on CORPUS_DIR. Its population is whatever directory the operator mounts — unnameable by
 // construction, so the same invocation on two machines is not the same measurement, and clause 1 of
