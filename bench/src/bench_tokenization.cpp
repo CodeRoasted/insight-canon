@@ -1,5 +1,5 @@
 // NOLINTBEGIN
-// Tokenization throughput benchmark — two arms (ADR-17 / SP-5).
+// Tokenization throughput benchmark — two arms (ADR-17 / SRC-SP-5).
 //
 // Measures end-to-end Tokenizer::process_line() cost — stateless per-line template
 // masking plus arena-backed CanonicalEvent emission — on a synthetic Zipf-ish corpus.
@@ -7,9 +7,9 @@
 //   * BM_TokenizationThroughput            — the COMPOSED set (github + test_frameworks):
 //     the gate metric. This is the shape every product binary runs.
 //   * BM_TokenizationThroughputDegenerate  — compose({}): the format-partition control.
-//     The corpus carries no CI-dialect content, so the composed-vs-degenerate delta on it
-//     IS the SP-5 claim ("recognition cost independent of package count for non-matching
-//     lines"), measured directly. Expected delta: noise.
+//     The corpus carries no CI-dialect content, so the composed-vs-degenerate delta on it is
+//     what measures SRC-SP-5 — see canon.compose.cppm for the contract. Expected delta: noise.
+//     A non-noise delta is a mechanism regression here, never a benchmark to re-baseline.
 //
 // Reported metrics:
 //   * `items_per_second`  — log lines tokenized per wall second
@@ -141,7 +141,7 @@ void BM_TokenizationThroughput(benchmark::State& state)
 }
 
 // The control arm — core-only. Delta vs the gate arm on this non-dialect corpus = the
-// SP-5 composition overhead (expected: noise; dialect rows are format-partitioned).
+// SRC-SP-5 composition overhead (expected: noise; dialect rows are format-partitioned).
 void BM_TokenizationThroughputDegenerate(benchmark::State& state)
 {
     static const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};

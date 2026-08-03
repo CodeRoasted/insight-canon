@@ -5,7 +5,7 @@
 // suites prove the real VOCABULARY; here we prove canon's ALGORITHM (gate matching, longest-match,
 // payload extraction, the three LocationMatchKind families + token-boundary mechanics) independent
 // of any package — so a core-algorithm regression is caught in CORE's suite even with no package
-// linked. Also carries the SP-5 dynamic guard: the recognizer probe path performs ZERO heap
+// linked. Also carries the SRC-SP-5 dynamic guard: the recognizer probe path performs ZERO heap
 // allocations (a global operator-new counter, legitimate in a test binary, never in the shipped
 // library). Determinism: byte-only, no RNG/clock/float.
 #include <cstdlib>
@@ -38,7 +38,7 @@ using insight::tokenization::recognize;
 // The walkers take NormalizedContent (the stage-1 normalization precondition as a type). Every
 // probe in this suite is an escape-free literal, so normalize() is the zero-copy FIXED POINT: the
 // content views the literal itself and the shared scratch is never written — which is what keeps
-// the SP-5 no-allocation guard meaningful over the full probe path below.
+// the SRC-SP-5 no-allocation guard meaningful over the full probe path below.
 [[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
 {
     static std::string scratch;
@@ -46,7 +46,7 @@ using insight::tokenization::recognize;
 }
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════════
-// SP-5 heap-allocation guard — a global operator-new replacement counting allocations while ARMED.
+// SRC-SP-5 heap-allocation guard — a global operator-new replacement counting allocations while ARMED.
 // The replacement is a plain passthrough (forwards to malloc) unless a RAII AllocGuard is live, so
 // it never perturbs the rest of the test binary; armed only around the recognizer probe path. This
 // lives in the TEST binary — a global new override must NEVER ship in the canon library (it would
@@ -366,7 +366,7 @@ TEST(SemanticWalkers, LevelLiftUnclaimedLineIsUnknown)
     }
 }
 
-// ── SP-5: the recognizer probe path performs ZERO heap allocations (byte-scan pure) ──
+// ── SRC-SP-5: the recognizer probe path performs ZERO heap allocations (byte-scan pure) ──
 TEST(SemanticWalkers, RecognizersDoNotHeapAllocate)
 {
     const ComposedSemantics sc{synth()}; // compose() may allocate — done BEFORE arming.
@@ -385,7 +385,7 @@ TEST(SemanticWalkers, RecognizersDoNotHeapAllocate)
         observed = guard.count();
     }
     EXPECT_EQ(observed, 0U)
-        << "the composed recognition walkers must be heap-free (SP-5): observed " << observed
+        << "the composed recognition walkers must be heap-free (SRC-SP-5): observed " << observed
         << " allocation(s) over the probe path.";
 }
 // NOLINTEND

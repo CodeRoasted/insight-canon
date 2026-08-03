@@ -41,7 +41,7 @@ packages:
     public: true
     release: true
     depends: [insight_canon]
-  # The composed benchmark harness (ADR 0024 / SP-5): a leaf APPLICATION package — the perf gate
+  # The composed benchmark harness (ADR 0024 / SRC-SP-5): a leaf APPLICATION package — the perf gate
   # must link the vocabulary packages, which core never may (SRC-SP-1/R1). Built + run by `malf bench`
   # and the on-tag measure-benchmark gate; never published as a release artifact.
   insight_canon_bench:

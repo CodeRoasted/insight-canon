@@ -11,6 +11,16 @@
 //     `find_conflict`, usable in static_assert) / a startup fatal invariant (the runtime compose).
 //   - IDENTITY-BEARING: the composed rule set gets a content hash (semantic_identity, §4) over its
 //     canonical serialization — the SRC-II-7 comparability key.
+//   - HOT-PATH-INVISIBLE (SRC-SP-5): composing MORE packages costs the tokenizer nothing on a line
+//     no package claims. Three mechanism constraints carry it — no unconditional per-token
+//     indirection, no per-line allocation on the recognizer probe path (byte-scan pure), and rows
+//     partitioned by FORMAT so a non-matching format pays only its partition test. The claim is a
+//     MEASUREMENT, never an assertion: `BM_TokenizationThroughput` over the composed set against
+//     its Degenerate control arm (`compose({})`) on a corpus carrying no dialect content — that
+//     delta IS the claim, expected noise, and every composition-mechanism change re-runs it. The
+//     gate lives in the `insight_canon_bench` leaf, which must link the vocabulary packages that
+//     core never may (SRC-SP-1/R1); the contract is declared HERE, beside the mechanism, because
+//     the harness has already moved package once and a rule declared in it would move with it.
 //
 // Public + installed (product binaries call compose). The facade `export import`s this so
 // `import insight.canon;` yields Tokenizer + compose + ComposedSemantics. It plain-imports spi
