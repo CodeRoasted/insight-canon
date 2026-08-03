@@ -246,7 +246,7 @@ TEST(StatelessTemplate, NonEphemeralPathsAndSourcePathsUntouched)
            "masks";
 }
 
-// ── F13 strengthening (SRC-D-TID-11..13) — the re-measure rule set ───────────────────
+// ── F13 strengthening (SRC-D-TID-11/SRC-D-TID-12/SRC-D-TID-13) — the re-measure rule set ───────────────────
 
 TEST(StatelessTemplate, DigitLeadingTokensMask)
 {
