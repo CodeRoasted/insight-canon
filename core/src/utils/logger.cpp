@@ -53,14 +53,12 @@ void init_logging(spdlog::level::level_enum default_level)
                    {
                        shared_sink() = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
 
-                       // Module loggers — order does not matter; names must match kXxxLogger
-                       // constants in logger.hpp.
-                       const std::vector<std::string_view> logger_names{
-                           kArenaLogger,  kMaskLogger,     kDetectorLogger,
-                           kParserLogger, kStrategyLogger, kTokenizerLogger,
-                       };
-
-                       for (const auto name : logger_names)
+                       // Module loggers — order does not matter. The SET is `kAllLoggers`
+                       // in canon.api.cppm, beside the name constants; this unit no longer
+                       // keeps a copy. The copy it used to keep had silently lost
+                       // `kPipelineLogger`, so `pipeline_logger()` resolved to spdlog's
+                       // default logger and every pipeline WARN shipped untagged.
+                       for (const auto name : kAllLoggers)
                        {
                            make_logger(name, default_level);
                        }

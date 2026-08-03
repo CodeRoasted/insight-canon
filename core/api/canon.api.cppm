@@ -1496,6 +1496,19 @@ inline constexpr std::string_view kParserLogger{"insight.parser"};
 inline constexpr std::string_view kStrategyLogger{"insight.strategy"};
 inline constexpr std::string_view kTokenizerLogger{"insight.tokenizer"};
 
+// The registration set, HERE beside the names rather than hand-copied into the impl unit.
+// `init_logging` iterates exactly this, so a name that exists but is not registered cannot
+// happen without deleting it from a list three lines under the constant you just wrote.
+// It is not merely tidier: the impl unit's private copy had drifted, and `kPipelineLogger`
+// was the one it had lost — so `pipeline_logger()` fell through to spdlog's DEFAULT logger
+// and every pipeline WARN (the §13 cube-collapse one, the n-gram truncation one) was
+// emitted untagged, unroutable by name, and invisible to any sink attached to
+// "insight.pipeline". A hand-enumerated mirror of a declaration list is the defect class;
+// this removes the mirror.
+inline constexpr std::array kAllLoggers{kArenaLogger,     kMaskLogger,     kPipelineLogger,
+                                        kDetectorLogger,  kParserLogger,   kStrategyLogger,
+                                        kTokenizerLogger};
+
 // Creates all named loggers with a shared stdout colour sink. Call once before any logging
 // (thread-safe; first call wins). Defined in the logger.cpp impl unit.
 void init_logging(spdlog::level::level_enum default_level = spdlog::level::info);
