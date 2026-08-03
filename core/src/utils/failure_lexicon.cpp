@@ -383,7 +383,7 @@ namespace
     // its own role/anchor — this predicate only adds the GLYPH register). End-of-head ⇒
     // false. Used ONLY to ANCHOR an already-matched failure word, never to create a cue, so
     // a glyph-only line ("✗ 1920×1080") with no failure word stays silent — provably safe
-    // against the deferred D-OUT-3 ×-risk. Pure byte-compare ⇒ MSVC bit-identical (F5).
+    // against the D-OUT-3 ×-risk. Pure byte-compare ⇒ MSVC bit-identical (F5).
     [[nodiscard]] bool leading_outcome_is_fail(std::string_view line) noexcept
     {
         static constexpr std::size_t kOutcomeHead{128U}; // matches leading_outcome_is_pass

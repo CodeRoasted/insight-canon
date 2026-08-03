@@ -115,12 +115,12 @@ class ComposedSemantics
         return locations_;
     }
     // The christened ValueClassRegistry (ADR-17): the composed view over the package
-    // ValueClassRow seat. In 1.7.5 no package ships a value class (we do not build dormant
+    // ValueClassRow seat. No package ships a value class (we do not build dormant
     // vocabulary), so this is empty — the UNIVERSAL value concepts (kOrdinalFieldCatalog /
     // kOtelFieldCatalog / the KEEP lexicons) stay core (the ratified rule), consumed directly. The
-    // registry is the point where a future package's client-ordinal / domain value classes compose
-    // in — the grammar seat exists, its unification with the core catalogs waits for a real
-    // consumer.
+    // registry is the point where a package's client-ordinal / domain value classes compose
+    // in — the grammar seat exists; it is not unified with the core catalogs, which have no
+    // package consumer.
     [[nodiscard]] std::span<const ValueClassRow> value_classes() const noexcept
     {
         return value_classes_;

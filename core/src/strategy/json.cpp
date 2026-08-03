@@ -110,9 +110,9 @@ namespace
     // mapping: name→content (the templated operation), startTimeUnixNano→event time, end−start→the
     // span_duration_ns ordinal (SRC-D-OTEL-12, integer ns by construction), status.code→level
     // (ERROR→Error else Info; declared > inferred), service.name (from attributes[])→component (the
-    // WHERE tier), traceId/spanId/parentSpanId→the consumed trace context (OR1). `kind` is a
-    // deferred diagnostic field (SRC-D-OTEL-18b — it needs a categorical-field→value_counts channel
-    // canon lacks today; not load-bearing for the structural exhibits). O4b Span Links
+    // WHERE tier), traceId/spanId/parentSpanId→the consumed trace context (OR1). `kind` is an
+    // ABSENT diagnostic field (SRC-D-OTEL-18b — it needs a categorical-field→value_counts channel
+    // canon lacks; not load-bearing for the structural exhibits). O4b Span Links
     // (SRC-D-OTEL-9): copy the collected linked span_ids into arena-stable storage (mirrors
     // store_ordinals). Empty in → empty out (no allocation) so a span without links stays
     // zero-cost.

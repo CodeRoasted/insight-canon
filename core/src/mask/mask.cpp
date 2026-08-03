@@ -788,7 +788,7 @@ namespace
     // new/vanished pair per run). EXCLUDES a status value (`code=0` / `status=500`) so a
     // green→red flip stays distinct — the KV form of the #1 status-value KEEP carve-out.
     // A value-WORD (`user=alice`) is NOT masked (value not digit-leading → kept); that
-    // varying word is the deferred registry's job (SRC-D-TID-5/SRC-D-TID-14). The CI-revert re-measure
+    // varying word is the unbuilt registry's job (SRC-D-TID-5/SRC-D-TID-14). The CI-revert re-measure
     // (§8) did not surface this — CI tokens are space-separated, LogCraft wraps in `key=`.
     [[nodiscard]] inline bool normalize_kv_value(std::string_view tok, std::string& out)
     {

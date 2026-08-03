@@ -253,9 +253,8 @@ FormatDetector::FormatDetector(const insight::semantic::ComposedSemantics& compo
 
     // Composed DIALECT strategies (ADR-17): each factory the composition carries produces one
     // strategy, registered through the existing injection seam (probed once-per-line via
-    // custom_strategies_). In 1.7.5 this is the GitHub-Actions strategy from
-    // insight_semantic_github; canon core names no dialect. The factories are in canonical
-    // (package-sorted) order.
+    // custom_strategies_). Canon core names no dialect: every dialect strategy arrives from a
+    // semantic package. The factories are in canonical (package-sorted) order.
     for (const insight::semantic::StrategyFactory factory : composed.strategy_factories())
         register_strategy(factory());
 

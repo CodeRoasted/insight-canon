@@ -36,8 +36,8 @@ LogParser::LogParser(ArenaAllocator& arena, const insight::semantic::ComposedSem
 // stage-1 normalize() before any strategy sees the line, so the composed provenance hooks
 // classify the RAW (ANSI-bearing) line — the only place it survives. Strategy-INDEPENDENT (a
 // wrapped line is echoed source whatever it routed to), reproducing the pre-split
-// is_echoed_source_line exactly. In 1.7.5 the single hook is the GitHub-Actions one from
-// insight_semantic_github.
+// is_echoed_source_line exactly. Canon core names no hook: every provenance hook arrives from a
+// semantic package.
 [[nodiscard]] static bool
 is_echoed_source(std::string_view raw_line,
                  const insight::semantic::ComposedSemantics& composed) noexcept

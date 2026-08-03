@@ -275,7 +275,7 @@ TEST(FailureLexicon, RegisterAnchoredNounDemotesInProseFiresAnchored)
 // ── SRC-D-OUT-4a — a leading FAIL glyph (✗/✕/✖/✘) ANCHORS a RegisterAnchored word but ──
 // never CREATES a cue. So a failing test "✗ should not crash …" surfaces (✗ anchors
 // "crash"), while a glyph-only line with no failure word stays silent — provably safe
-// against the deferred D-OUT-3 ×-risk: × U+00D7 (the "1920×1080" dimension separator)
+// against the D-OUT-3 ×-risk: × U+00D7 (the "1920×1080" dimension separator)
 // is excluded from the fail-glyph set on purpose.
 TEST(FailureLexicon, LeadingFailGlyphAnchorsButNeverCreates)
 {

@@ -59,7 +59,7 @@ export namespace insight::tokenization
 // SRC-D-TID-5 — a line's own tokens are the ONLY input. Equating two spellings of a
 //   varying word (a synonym, a reworded message) would require cross-line learning, which
 //   is what the ripped clustering did and what made template_id order-dependent. That work
-//   belongs to the deferred registry (SRC-D-TID-14), never to this masker: the cost of the
+//   belongs to the unbuilt registry (SRC-D-TID-14), never to this masker: the cost of the
 //   miss is a Vanished+New pair, which is honest; the cost of the fix here is a false
 //   identity, which is not.
 //

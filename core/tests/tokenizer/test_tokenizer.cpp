@@ -444,7 +444,7 @@ TEST_F(TokenizerTest, JSONWithKVContentMaskedStatelessly)
     // The JSON strategy extracts the message; the stateless masker classifies each KV
     // token by its OWN content. A `key=value` pair is a single letter-leading token →
     // KEPT literal (the SRC-D-TID-14 boundary: a varying value-WORD is not a syntactic
-    // high-card class; masking it needs the deferred SemanticClassRegistry). So two
+    // high-card class; masking it needs the unbuilt SemanticClassRegistry). So two
     // lines differing only in a KV value-word are DISTINCT templates — the accepted
     // stateless over-split, NOT Drain's old cross-line wildcard.
     auto ra{tokenizer.process_line(R"({"msg":"action=login user=alice status=ok"})")};

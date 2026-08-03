@@ -164,9 +164,9 @@ inline std::ostream& operator<<(std::ostream& out, const TemplateId& template_id
 // The OTEL hex ids (traceId/spanId/parentSpanId) are hashed to fixed-width scalar PODs at
 // the strategy seam — the SRC-D-TIR-4 hash-to-POD discipline — carried IN-MEMORY on the
 // CanonicalEvent, CONSUMED by the structural layer (trace_id groups the n-gram graph in O2;
-// span_id/parent_span_id feed the deferred O3 observed-DAG) and NEVER serialized into the
-// MetaLog (OR1 — the per-transaction-unique hex would be a cardinality bomb). A zero `value`
-// means "absent"; the hash forces non-zero on any non-empty input so absent ≠ present.
+// span_id/parent_span_id feed the O3 observed-DAG, which is not built) and NEVER serialized
+// into the MetaLog (OR1 — the per-transaction-unique hex would be a cardinality bomb). A zero
+// `value` means "absent"; the hash forces non-zero on any non-empty input so absent ≠ present.
 struct TraceId
 {
     std::uint64_t value{};
@@ -249,7 +249,7 @@ struct OtelFieldDescriptor
 // The OTLP/JSON top-level keys per the OpenTelemetry Log Data Model. Keys are exact (OTLP is
 // a declared schema); a structured catalog, not scattered inline predicates.
 //
-// SRC-D-OTEL-18b: the span `kind` field is DEFERRED, deliberately and not by oversight. It is a
+// SRC-D-OTEL-18b: the span `kind` field is ABSENT, deliberately and not by oversight. It is a
 // categorical value, so carrying it would need a categorical-field→value_counts channel canon does
 // not have; routing it through any existing channel would either fabricate an ordinal or smuggle a
 // vocabulary into the semantic-unaware core. It is not load-bearing for the structural exhibits,
@@ -268,10 +268,10 @@ inline constexpr std::array<OtelFieldDescriptor, 4> kOtelFieldCatalog{{
 // captured as a consumed-not-tokenized ordinal observation (CanonicalEvent.ordinals) — NEVER a
 // param — which metalog bins per schedule into the W1 carrier (TopKEntry.ordinal_histograms). A
 // UNIVERSAL value class → stays core (this catalog); arbitrary/client ordinals await a package
-// ValueClassRow (the ValueClassRegistry seat, ADR-17 — no package ships one in 1.7.5; we do
+// ValueClassRow (the ValueClassRegistry seat, ADR-17 — no package ships one; we do
 // not build dormant vocabulary — the SRC-D-TID-14 anti-monster boundary). EXACT keys only — uniform
-// across the fast/slow JSON paths, no value-syntax guessing (the SRC-D-W1-5 mis-route hazard);
-// suffix/pattern matching is a future extension when a scenario needs it. Unit-explicit names only,
+// across the fast/slow JSON paths, no suffix/pattern matching and no value-syntax guessing (the
+// SRC-D-W1-5 mis-route hazard). Unit-explicit names only,
 // so each value's unit is unambiguous (SRC-D-W1-3).
 
 // Which ordinal SCHEDULE (canonical unit + log ladder) a field bins onto. The schedule is a
@@ -951,8 +951,9 @@ struct CanonicalEvent
     StructuralRole structural_role{StructuralRole::None};
     // OTEL trace context (ADR-29 SRC-D-OTEL-1), extracted by the strategy layer for
     // OTEL inputs. CONSUMED in-memory (trace_id groups the n-gram graph in O2;
-    // span_id/parent_span_id feed the deferred O3 DAG) and NEVER serialized — the MetaLog wire
-    // shape is unchanged (OR1). `present == false` for every non-OTEL input → zero added cost.
+    // span_id/parent_span_id feed the O3 DAG, which is not built) and NEVER serialized — the
+    // MetaLog wire shape is unchanged (OR1). `present == false` for every non-OTEL input → zero
+    // added cost.
     OtelTraceContext trace{};
     // Declared ordinal observations (W1, §4A.4 SRC-D-W1-3), captured by the strategy layer from
     // recognized structured numeric fields (kOrdinalFieldCatalog). Consumed-not-tokenized: metalog
@@ -993,9 +994,9 @@ export namespace insight::tokenization
 // no lexicon. Varying WORDS stay LITERAL — a categorical value is a KEEP-lexicon concern, and
 // the lexicon is a seed that grows on calibration EVIDENCE, never on anticipation. The
 // boundary is what stops the masker becoming a vocabulary: every widening that needs a list
-// of words is out of scope here by construction, and belongs to the deferred value-class
-// registry (ADR-17). It is also why byte-only single-token rules are the only admissible
-// shape — that is what makes them cross-stdlib identical.
+// of words is out of scope here by construction, and belongs to the value-class registry
+// (ADR-17), which no package populates. It is also why byte-only single-token rules are the only
+// admissible shape — that is what makes them cross-stdlib identical.
 struct MaskConfig
 {
     // Structurally variable tokens are replaced with "<*>" before the masked template

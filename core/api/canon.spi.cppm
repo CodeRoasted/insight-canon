@@ -504,7 +504,7 @@ struct OutcomeMarkerRow
 };
 
 // A value-class rule (the grammar SEAT for package value classes, §5). No package ships domain
-// value classes in 1.7.5 — the composed ValueClassRegistry is the VIEW over the core catalogs
+// value classes — the composed ValueClassRegistry is the VIEW over the core catalogs
 // (kOrdinalFieldCatalog/kOtelFieldCatalog/KEEP). Present so the manifest shape is final and the
 // identity hash slot is stable.
 enum class ValueClass : std::uint8_t
