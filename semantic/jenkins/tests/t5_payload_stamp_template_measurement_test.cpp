@@ -563,7 +563,7 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
                             kExplosionCeilingShare * static_cast<double>(stamped_raw.size())};
     std::cout << "FROZEN clause-2 CLASSIFIER reads: "
               << (explodes ? "EXPLODES" : (stable ? "COUNT STABLE" : "NEITHER branch"))
-              << "  — the frozen record's reading, NOT the exit verdict: post-D-MSK-5 the exit "
+              << "  — the frozen record's reading, NOT the exit verdict: post-SRC-D-MSK-5 the exit "
                  "predicate is the prefix-image triangle (PrefixImageExitGate, below), and this "
                  "classifier's ceiling leg is can't-PASS on these bytes by construction\n\n";
 

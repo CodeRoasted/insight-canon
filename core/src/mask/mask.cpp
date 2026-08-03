@@ -607,7 +607,7 @@ namespace
         return true;
     }
 
-    // ── F13 composite-masking (ADR-16.D5; D-TID-12, D-TID-13) ────────
+    // ── F13 composite-masking (ADR-16.D5; SRC-D-TID-12, SRC-D-TID-13) ────────
     // Per-line masking is the SOLE generalizer once Drain's learning is retired, so
     // these classify the high-card SYNTACTIC token classes the fixed masks missed.
     // Admitted under SRC-D-TID-14 (contract: canon.api.cppm) — all byte-only and

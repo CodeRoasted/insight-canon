@@ -822,8 +822,9 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
     // kOutcomeHead: a VERDICT ANCHOR can sit at the END of a long line — a deeply-namespaced CI
     // test verdict (`Tests\E2E\…\DocumentsDBCustomServerTest::testTimeout (FAILED)`) puts the
     // `(FAILED)` anchor at col ~69, past the old 64 head, so the strongest possible failure signal
-    // was invisible and the line classified as a benign new template (D-RNK-2 measure-first: the
-    // P5 `testTimeout (FAILED)` recall miss is THIS head bound, not the significance cut). 128
+    // was invisible and the line classified as a benign new template (SRC-D-RNK-2
+    // measure-first: the P5 `testTimeout (FAILED)` recall miss is THIS head bound, not the
+    // significance cut). 128
     // covers realistic verdict lines with margin; a pathological >128-char prefix is the accepted
     // residual (the measure-first catalog discipline). Still bounded → no hot-path scan blow-up.
     constexpr std::size_t kKeywordHead{128};
