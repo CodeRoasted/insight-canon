@@ -163,10 +163,13 @@ inline std::ostream& operator<<(std::ostream& out, const TemplateId& template_id
 // ── OTEL trace context (ADR-29, SRC-D-OTEL-1) ──
 // The OTEL hex ids (traceId/spanId/parentSpanId) are hashed to fixed-width scalar PODs at
 // the strategy seam — the SRC-D-TIR-4 hash-to-POD discipline — carried IN-MEMORY on the
-// CanonicalEvent, CONSUMED by the structural layer (trace_id groups the n-gram graph in O2;
-// span_id/parent_span_id feed the O3 observed-DAG, which is not built) and NEVER serialized
-// into the MetaLog (OR1 — the per-transaction-unique hex would be a cardinality bomb). A zero
-// `value` means "absent"; the hash forces non-zero on any non-empty input so absent ≠ present.
+// CanonicalEvent, CONSUMED by the structural layer (trace_id scopes the n-gram graph per
+// trace; span_id/parent_span_id feed metalog's observed causal DAG, which IS built and tested
+// — SRC-D-OTEL-11 resolves each declared parent edge into that same n-gram graph at window
+// close) and NEVER serialized into the MetaLog (OR1 — the per-transaction-unique hex would be
+// a cardinality bomb). What is NOT built is Régime B proper (ADR-29.O1): consuming a declared
+// edge as ground truth rather than folding it into the inferred graph. A zero `value` means
+// "absent"; the hash forces non-zero on any non-empty input so absent ≠ present.
 struct TraceId
 {
     std::uint64_t value{};
@@ -182,19 +185,19 @@ struct SpanId
 
 // The per-record OTEL trace context extracted by the strategy layer (SRC-D-OTEL-1). All fields
 // are consumed downstream and never serialized. `present` is true iff the record carried a
-// trace_id (the O2 grouping key); span_id/parent_span_id are carried for O3 (the causal
-// vertex/edge) and unread by O2.
+// trace_id (the graph-scoping key); span_id/parent_span_id carry the DECLARED causal
+// vertex/edge (ADR-29.D2) and are unread by the trace-scoping path.
 struct OtelTraceContext
 {
-    bool present{false};    // the record carried a trace_id (the O2 grouping key)
-    bool has_parent{false}; // a parent_span_id was present (O3 edge; usually absent on logs)
-    bool is_span{false}; // O3 (SRC-D-OTEL-11): a SPAN record (declared causality → observed edge),
-                         // not a log record with trace context (positional causality → O2 ring).
-                         // Set by the flat-span parser; false on the OTEL-log path. Metalog
-                         // routes spans to the observed-DAG, never the adjacency ring.
-    TraceId trace_id{};     // the transaction grouping key (O2)
-    SpanId span_id{};       // the causal vertex identity (carried for O3)
-    SpanId parent_span_id{}; // the observed causal edge span→parent (carried for O3)
+    bool present{false};    // the record carried a trace_id (the graph-scoping key)
+    bool has_parent{false}; // a parent_span_id was present (declared edge; usually absent on logs)
+    bool is_span{false}; // SRC-D-OTEL-11: a SPAN record (declared causality → observed edge), not a
+                         // log record with trace context (positional causality → the adjacency
+                         // ring). Set by the flat-span parser; false on the OTEL-log path. Metalog
+                         // routes spans to the observed DAG, never the adjacency ring.
+    TraceId trace_id{};     // the transaction grouping key
+    SpanId span_id{};       // the declared causal vertex identity
+    SpanId parent_span_id{}; // the declared causal edge span→parent
 };
 
 // fnv1a-64 of the OTEL hex string → a scalar id (content-addressed: same hex → same id,
@@ -234,9 +237,9 @@ struct OtelTraceContext
 // from the template, never tokenized); severity_number → the LogLevel band.
 enum class OtelFieldClass : std::uint8_t
 {
-    TraceId,        // → OtelTraceContext::trace_id (O2 grouping key)
-    SpanId,         // → OtelTraceContext::span_id (O3 vertex)
-    ParentSpanId,   // → OtelTraceContext::parent_span_id (O3 edge)
+    TraceId,        // → OtelTraceContext::trace_id (the graph-scoping key)
+    SpanId,         // → OtelTraceContext::span_id (the declared causal vertex)
+    ParentSpanId,   // → OtelTraceContext::parent_span_id (the declared causal edge)
     SeverityNumber, // → LogLevel band (declared > inferred)
 };
 
@@ -738,8 +741,9 @@ template <> struct hash<insight::TraceId>
         return static_cast<std::size_t>(trace_id.value);
     }
 };
-// std::hash<SpanId> (SRC-D-OTEL-11): keys O3's per-window span_id → template map for close-time
-// observed-edge resolution. `value` is already an fnv1a hash of the OTEL hex → a good size_t.
+// std::hash<SpanId> (SRC-D-OTEL-11): keys metalog's per-window span_id → template map for the
+// close-time observed-edge resolution. `value` is already an fnv1a hash of the OTEL hex → a
+// good size_t.
 template <> struct hash<insight::SpanId>
 {
     [[nodiscard]] std::size_t operator()(const insight::SpanId& span_id) const noexcept
@@ -950,10 +954,11 @@ struct CanonicalEvent
     // structural surprise (Phase 2/4); None for the vast majority of lines.
     StructuralRole structural_role{StructuralRole::None};
     // OTEL trace context (ADR-29 SRC-D-OTEL-1), extracted by the strategy layer for
-    // OTEL inputs. CONSUMED in-memory (trace_id groups the n-gram graph in O2;
-    // span_id/parent_span_id feed the O3 DAG, which is not built) and NEVER serialized — the
-    // MetaLog wire shape is unchanged (OR1). `present == false` for every non-OTEL input → zero
-    // added cost.
+    // OTEL inputs. CONSUMED in-memory (trace_id scopes the n-gram graph per trace;
+    // span_id/parent_span_id feed metalog's observed causal DAG, which IS built and tested —
+    // SRC-D-OTEL-11 folds each declared parent edge into that same n-gram graph at window close;
+    // what is NOT built is Régime B proper, ADR-29.O1) and NEVER serialized — the MetaLog wire
+    // shape is unchanged (OR1). `present == false` for every non-OTEL input → zero added cost.
     OtelTraceContext trace{};
     // Declared ordinal observations (W1, §4A.4 SRC-D-W1-3), captured by the strategy layer from
     // recognized structured numeric fields (kOrdinalFieldCatalog). Consumed-not-tokenized: metalog

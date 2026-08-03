@@ -240,7 +240,7 @@ namespace
         }
 
         // Apply the mapping. Event time + duration are integer ns (D-OTEL-3, by construction).
-        // O3 (SRC-D-OTEL-11): declared causality → the observed DAG
+        // SRC-D-OTEL-11: declared causality → the observed DAG
         parsed_line.trace.is_span = true;
         parsed_line.timestamp = utils::parse_unix_nano_timestamp(start_nano);
         parsed_line.level = is_error ? LogLevel::Error : LogLevel::Info;

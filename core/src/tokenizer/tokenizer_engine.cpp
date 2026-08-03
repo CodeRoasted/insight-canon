@@ -103,8 +103,9 @@ struct Tokenizer::Impl
         if (config.recognize_test_where && event.component.empty())
             event.component =
                 insight::recognize_location(parser.attest(parsed_line.content), composed);
-        event.trace = parsed_line.trace; // OTEL trace context (SRC-D-OTEL-1): consumed by O2/O3,
-                                         // never serialized; default-empty for non-OTEL inputs
+        event.trace = parsed_line.trace; // OTEL trace context (SRC-D-OTEL-1): consumed by the
+                                         // structural layer, never serialized; default-empty for
+                                         // non-OTEL inputs
         event.ordinals = parsed_line.ordinals; // W1 ordinal observations (SRC-D-W1-3): consumed by
                                                // metalog binning; empty span for non-ordinal lines
         event.linked_span_ids =
@@ -164,7 +165,7 @@ Tokenizer::process_batch(std::span<const std::string_view> lines)
     {
         // SRC-D-OTEL-18 record-source 1→N: an OTLP `resourceSpans` export is unpacked into N canonical
         // flat-span records, each tokenized 1:1 (the strategy stays 1:1). A flat span (shape 2) and
-        // every non-OTEL line take the direct path — byte-identical to pre-O3.
+        // every non-OTEL line take the direct path — byte-identical to the pre-span-ingest path.
         if (is_otel_span_document(line))
         {
             span_records.clear();

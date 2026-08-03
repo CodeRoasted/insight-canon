@@ -50,8 +50,9 @@ struct ParsedLine
     // non-echoed line.
     bool echoed_source{false};
     // OTEL trace context (SRC-D-OTEL-1), populated by a strategy that recognizes OTEL log records
-    // (today: JsonStrategy on OTLP/JSON). Consumed downstream (O2 grouping; O3 DAG), never
-    // serialized; `present == false` for every non-OTEL input.
+    // (today: JsonStrategy on OTLP/JSON). Consumed downstream — trace-scoped n-gram grouping, and
+    // the observed causal DAG for the declared vertex/edge (ADR-29.D2) — never serialized;
+    // `present == false` for every non-OTEL input.
     OtelTraceContext trace{};
     // Declared ordinal observations (W1, SRC-D-W1-3), populated by a strategy that recognizes declared
     // structured numeric fields (today: JsonStrategy via kOrdinalFieldCatalog). A span over
