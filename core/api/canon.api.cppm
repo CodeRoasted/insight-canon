@@ -1414,7 +1414,7 @@ parse_bsd_syslog_ts(std::string_view timestamp_str,
 parse_epoch_timestamp(std::string_view timestamp_str) noexcept;
 
 // Parse OTLP `timeUnixNano` — Unix epoch NANOSECONDS as a digit string (e.g.
-// "1705312200000000000") to Timestamp (ADR-29 O1). Integer-only (from_chars +
+// "1705312200000000000") to Timestamp (ADR-29.D5). Integer-only (from_chars +
 // integer duration_cast, no float); the OTEL event-time channel so OTEL inputs window like any
 // other format. Sub-`system_clock::duration` resolution truncates deterministically per stdlib
 // (the OTLP producer emits millisecond-granular nanos → lossless on both libc++/libstdc++).
