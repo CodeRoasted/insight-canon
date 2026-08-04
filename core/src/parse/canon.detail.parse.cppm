@@ -66,7 +66,8 @@ class LogParser;
 // WHY IT EXISTS: canon's own tokenizer hands strategy-produced `ParsedLine::content` to the
 // walkers, and six of the 22 strategies REBUILD content into arena bytes — not a suffix of the
 // line — so no public narrowing door can express them. The attestation is issued by `LogParser`
-// (the object that PERFORMS stage 1, unconditionally, at its one named site — SRC-D-TID-11), not
+// (the object that PERFORMS stage 1, unconditionally, at its one named site;
+// SRC-D-TID-11 — see canon.api.cppm (normalize()) for the contract.), not
 // asserted by the consumer.
 //
 // WHY `extern "C++"`: a linkage-specification attaches the class to the GLOBAL module, which is
@@ -132,7 +133,8 @@ class LogParser
 
     // The §12.5.1(c) attestation — issued by the PERFORMER of stage 1. Every byte a strategy's
     // `ParsedLine::content` carries derives from a line this parser normalized unconditionally at
-    // its one named site (parse_line's SRC-D-TID-11 step) — including the six strategies that
+    // its one named site (parse_line's stage-1 step; SRC-D-TID-11 — see canon.api.cppm (normalize()) for the contract.)
+    // — including the six strategies that
     // REBUILD content into arena bytes, which assemble from post-strip input. That invariant is
     // local to this class, reviewable in one place, which is what entitles it to hold the one
     // passkey. ⚠ For strategy-produced content ONLY. Anything else goes through `normalize()`.
@@ -175,9 +177,10 @@ class LogParser
     LogFormat last_format_{LogFormat::Unknown}; // the format the last routed line was parsed with
     std::size_t parsed_count_{0};
     std::size_t failed_count_{0};
-    // Reusable buffer for the SRC-D-TID-11 ANSI/escape strip applied to every raw line
-    // at ingest (before detection & tokenization). Result is ≤ input, so the retained
-    // capacity makes the strip allocation-free in steady state.
+    // Reusable buffer for the stage-1 strip.
+    // SRC-D-TID-11 — see canon.api.cppm (normalize()) for the contract.
+    // Local: result is ≤ input, so the retained capacity makes the strip
+    // allocation-free in steady state.
     std::string escape_scratch_;
 };
 

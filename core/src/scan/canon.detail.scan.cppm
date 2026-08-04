@@ -725,7 +725,8 @@ inline void sv_skip_ws(std::string_view& str) noexcept
     return tag;
 }
 
-// ── ANSI / terminal escape stripping (SRC-D-TID-11) relocated to insight.canon.api
+// ── ANSI / terminal escape stripping. SRC-D-TID-11 — see canon.api.cppm (normalize()) for the contract.
+// Relocated to insight.canon.api
 // ─────────────────── The stage-1 factory `normalize()` + kEsc/kBel + the two body scanners live in
 // the PUBLIC api unit. They were never detail-scan knowledge: the cluster depends on nothing in
 // this shard (no strategy, no gate, no SSE2 primitive) and sat here only because its one caller,

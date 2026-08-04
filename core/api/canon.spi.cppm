@@ -295,8 +295,9 @@ enum class PayloadExtract : std::uint8_t
     // producer-owned boundaries, bundled into the extractor exactly as RemainderToClosingParen
     // bundles its required ')':
     //   * '\r' TERMINATES the marker. GitLab closes it with `\r\x1b[0K` (CR + erase-line) and may
-    //     continue the SAME line with the section's human-readable header. Canon's SRC-D-TID-11
-    //     ingest strip kills the escape and leaves the CR, so a rule that merely trimmed a TRAILING
+    //     continue the SAME line with the section's human-readable header.
+    //     SRC-D-TID-11 — see canon.api.cppm (normalize()) for the contract. Local: the strip kills the
+    //     escape and leaves the CR, so a rule that merely trimmed a TRAILING
     //     CR would name a section `build_tools_section\rTools build`. It is handled HERE rather
     //     than in the dialect strategy because the strategy is not the only recognition path —
     //     eidos's `strip_leading_timestamp` pre-pass calls `recognize()` with no strategy in the

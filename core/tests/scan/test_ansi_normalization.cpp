@@ -1,8 +1,9 @@
 // NOLINTBEGIN : Unit tests may intentionally violate some style rules for clarity or simplicity.
 // tests/scan/test_ansi_normalization.cpp
 //
-// Unit coverage for STAGE 1 — `normalize()`, canon's universal ANSI ingest normalization
-// (SRC-D-TID-11), now the FACTORY that mints `NormalizedLine` (the out-parameter strip form is
+// Unit coverage for STAGE 1 — `normalize()`.
+// SRC-D-TID-11 — see canon.api.cppm (normalize()) for the contract.
+// Local: it is now the FACTORY that mints `NormalizedLine` (the out-parameter strip form is
 // REMOVED; the return type carries the proof that stage 1 ran).
 //
 // WHY THIS FILE EXISTS AT ALL. Stage 1's only coverage used to be three assertions inside
@@ -26,7 +27,8 @@ import insight.canon.test;
 
 using namespace insight::tokenization;
 
-// SRC-D-TID-11's core claim: colour is presentation, never content. Two coloured variants of one
+// SRC-D-TID-11 — see canon.api.cppm (normalize()) for the contract.
+// Asserted here: two coloured variants of one
 // line fold to the same colour-free bytes, so they cannot mint two templates.
 TEST(AnsiNormalization, EscapesInterleavedWithTokensAreRemoved)
 {
