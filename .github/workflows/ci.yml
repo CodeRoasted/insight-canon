@@ -13,7 +13,7 @@ jobs:
       actions: read
     uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-ci.yml@main
     with:
-      # canon is a tower root (no first-party deps to vendor). Post-ADR-0024 it is a MULTI-package
+      # canon is a tower root (no first-party deps to vendor). Post-ADR-17 it is a MULTI-package
       # repo: the core under core/ (the logcraft/server layout — the repo root is the shelf), the three
       # semantic vocabulary packages under semantic/ (github, gitlab, jenkins, test_frameworks), and the composed
       # bench harness under bench/. Dependency-ordered — each row's `create` publishes into the local
