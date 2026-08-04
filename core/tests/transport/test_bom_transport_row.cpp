@@ -153,7 +153,7 @@ constexpr std::string_view kNulAfterBom{"\xEF\xBB\xBF"
                                         15U};
 constexpr std::string_view kNulAfterBomPeeled{"ok\0after-nul", 12U};
 
-const std::array<Case, 16> kCases{{
+const std::array<Case, 17> kCases{{
     {.label = "production shape: BOM + stamp + content",
      .bytes = "\xEF\xBB\xBF"
               "2026-04-15T22:20:38.2879579Z ok",
@@ -178,6 +178,22 @@ const std::array<Case, 16> kCases{{
               "about the transform and not about removing a LINE (DN-25.D8). The bound is "
               "STRUCTURAL, not a promise: is_blank() is bytes().empty() and is never "
               "whitespace-trimmed, so <BOM> followed by spaces peels to \"   \" and SURVIVES."},
+    // The OTHER side of that bound, and the case that ENFORCES it. Its twin above says a line that
+    // is entirely transport DROPS; this one says a line that is transport plus whitespace does NOT.
+    // Together they pin exactly where DN-25.D8's licence stops.
+    {.label = "BOM + whitespace only (the D8 bound)",
+     .bytes = "\xEF\xBB\xBF"
+              "   ",
+     .expected = "   ",
+     .kills = "a blank test that treats whitespace as blank ON A PEELED LINE. DN-25.D8's bound is "
+              "structural — is_blank() is bytes().empty(), never trimmed — and a bound stated in "
+              "prose and enforced by nothing is not a bound. Grow a trim and this line silently "
+              "DROPS: real content, three spaces wide, gone with no diagnostic. ⚠ MEASURED "
+              "SHARING, not sole guardianship: mutating is_blank() itself to trim also reddens "
+              "TransportDeclaration.DegenerateStackPeelIsByteIdentity, which holds the same law "
+              "over the EMPTY stack. What only this case can see is the bound breaking on the "
+              "PEEL path — a row that decided whitespace-after-a-strip means blank leaves that "
+              "sibling green."},
     {.label = "double BOM",
      .bytes = "\xEF\xBB\xBF\xEF\xBB\xBF"
               "x",
