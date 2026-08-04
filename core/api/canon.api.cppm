@@ -1040,10 +1040,10 @@ export namespace insight::tokenization
 // bottoms at job▸step). The payload is the RAW name; canonicalize_intent turns it into the
 // alignment CLASS (so `test (win-msvc, …)` → `test (M)` pairs across runs).
 //
-// FORMAT-GATED (SRC-II-6 — a dialect never fires cross-format): the GHA-dialect rules fire only
-// for LogFormat::GitHubActions; every other format returns None. This is why the recognizer
-// takes the format (unlike StructuralRoleRegistry's universal `##[group]` markers): `Run ` is
-// GHA-runner-specific and WOULD misfire on a "Run daemon started" content line elsewhere. The
+// DIALECT-GATED — SRC-II-6 — see canon.spi.cppm (dialect_gate / dialect_admits) for the
+// contract. Local: `Run ` is GHA-runner-specific and WOULD misfire on a "Run daemon started"
+// content line elsewhere (unlike StructuralRoleRegistry's universal `##[group]` markers), which
+// is why the row is gated at all. The
 // residual within-GHA phantom rate (content lines beginning `Run `) is the measured 0.8%
 // (studies/004 Table 2) — a phantom step-quantum simply fails to align (VANISHED+INSERTED,
 // low-sev), never a silent mispair (SRC-II-2). Deterministic, ASCII-safe, no cross-line state.

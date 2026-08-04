@@ -19,7 +19,7 @@
 //     its Degenerate control arm (`compose({})`) on a corpus carrying no dialect content — that
 //     delta IS the claim, expected noise, and every composition-mechanism change re-runs it. The
 //     gate lives in the `insight_canon_bench` leaf, which must link the vocabulary packages that
-//     core never may (SRC-SP-1/R1); the contract is declared HERE, beside the mechanism, because
+//     core never may (SRC-SP-1 / R1); the contract is declared HERE, beside the mechanism, because
 //     the harness has already moved package once and a rule declared in it would move with it.
 //
 // Public + installed (product binaries call compose). The facade `export import`s this so

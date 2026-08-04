@@ -18,7 +18,7 @@
 //
 // The pipeline is the production one: Tokenizer::process_line (parse → mask) over a degenerate,
 // zero-package composition — generic corpus masking is semantic-unaware, and the tool must never
-// link the semantic packages (SRC-SP-1/R1 dependency arrow).
+// link the semantic packages (SRC-SP-1 / R1 dependency arrow).
 
 // Textual, not `import std`-provided: `stderr` is a macro whose expansion needs the FILE*
 // declaration visible in this TU, which only the header brings.
