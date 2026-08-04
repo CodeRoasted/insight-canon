@@ -36,12 +36,17 @@
 //     ... a SECOND BOM                         0                 0   <<< strip-once
 //     a BOM anywhere but offset 0              0                 0   <<< prefix, not `find`
 //
-// So a corpus-homed G-BOM-1 would stay GREEN under `strip_leading_space = true`, GREEN under a
-// greedy multi-BOM strip, and GREEN under a `find`-anywhere strip — three of the four decisions
-// DN-25.D3 actually makes. Every real BOM line in both slices has the single production shape
-// `<BOM><stamp><space><content>`, so the corpus scores one shape and pronounces on four. The
-// authored table below is the CARRYING leg for those defect classes; the corpus arm is the carrying
-// leg for the count. Neither substitutes for the other.
+// So a corpus-homed G-BOM-1 would stay GREEN under `strip_leading_space = true` (DN-25.D3), GREEN
+// under a greedy multi-BOM strip (DN-25.D7), and GREEN under a `find`-anywhere strip. Every real
+// BOM line in both slices has the single production shape `<BOM><stamp><space><content>`, so the
+// corpus scores one shape and would pronounce on four decisions. The authored table below is the
+// CARRYING leg for those defect classes; the corpus arm is the carrying leg for the count. Neither
+// substitutes for the other.
+//
+// ⚠ THIS TABLE IS A HOMING ARGUMENT, NEVER A REASON FOR ANY DECISION, and DN-25.D7 says so in as
+// many words about the strip-once case. "Zero doubles in the corpus" is why the corpus cannot TEST
+// the rule; it is emphatically not why the rule is what it is. Reading a measured absence as a
+// justification is how a pin acquires a reason that a wider population would refute.
 //
 // ── FALSIFIABILITY — every arm names the implementation it kills ──────────────────────────────
 // Red-capability is a requirement, not a note, so each case in `kCases` carries the defect it is
@@ -168,16 +173,23 @@ const std::array<Case, 16> kCases{{
     {.label = "BOM alone (the whole line is transport)",
      .bytes = "\xEF\xBB\xBF",
      .expected = "",
-     .kills = "a peel that refuses to shorten a line to nothing; empty means DROP, never an empty "
-              "template (PeeledLine::is_blank)"},
+     .kills = "a peel that refuses to shorten a line to nothing. Empty means DROP, and the licence "
+              "is ADR-23.D4 — 'declaring is purely SUBTRACTIVE' — never ADR-23.D2, which speaks "
+              "about the transform and not about removing a LINE (DN-25.D8). The bound is "
+              "STRUCTURAL, not a promise: is_blank() is bytes().empty() and is never "
+              "whitespace-trimmed, so <BOM> followed by spaces peels to \"   \" and SURVIVES."},
     {.label = "double BOM",
      .bytes = "\xEF\xBB\xBF\xEF\xBB\xBF"
               "x",
      .expected = "\xEF\xBB\xBF"
                  "x",
-     .kills = "a greedy `while (starts_with(BOM)) remove` loop. The row removes a FIXED three-byte "
-              "prefix ONCE (DN-25.D3); zero instances in either slice, so nothing but this case "
-              "decides it."},
+     .kills = "a greedy `while (starts_with(BOM)) remove` loop. ONE removal is BY DEFINITION "
+              "(DN-25.D7): U+FEFF is a byte-order mark only at STREAM HEAD — anywhere else it is "
+              "ZWNBSP, a CONTENT character, so a loop would delete a codepoint and call it "
+              "delivery. A loop is also ADR-23.D2's DETECTION shape N times over, which would "
+              "retro-weaken the very argument that made this row admissible. The corpus is "
+              "explicitly NOT the reason (zero doubles in either slice); it is only why nothing "
+              "but this case can TEST it."},
     {.label = "truncated BOM (2 bytes, EF BB)",
      .bytes = "\xEF\xBB",
      .expected = "\xEF\xBB",
