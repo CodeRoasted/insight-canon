@@ -313,7 +313,7 @@ TEST(TransportCatalog, ShippedRowsAreExactlyWhatTheCatalogDeclares)
     // The second landed at T5 5.2 (`bracket-rfc3339-line-prefix` + G-T5-PEEL) — the co-fire the
     // version comment predicted. Pinned so that adding a member without its algorithm and its
     // gate fails here — the anti-dormant rule with teeth.
-    ASSERT_EQ(kTransportCatalogRows.size(), 2U)
+    ASSERT_EQ(kTransportCatalogRows.size(), 3U)
         << "a new catalogue row is a catalogue-VERSION bump landing WITH its algorithm and its "
            "gate. If you are here because you added one, bump kTransportCatalogVersion and add "
            "its arm — the version is part of every composed semantic_identity.";
@@ -339,8 +339,9 @@ TEST(TransportCatalog, ShippedRowsAreExactlyWhatTheCatalogDeclares)
 
     // The catalogue version is a component of every composed semantic_identity. Pinned as a
     // LITERAL: a silent bump would move every digest in the workspace, and a test that read the
-    // constant back from the constant could never say so. `-2` = the second shape (T5 5.2).
-    EXPECT_EQ(kTransportCatalogVersion, "transport-catalog-2");
+    // constant back from the constant could never say so. `-3` = the third shape (DN-25, the
+    // `utf8-bom-line-prefix` row co-firing with its algorithm and its gate).
+    EXPECT_EQ(kTransportCatalogVersion, "transport-catalog-3");
 }
 
 TEST(TransportCatalog, NamesAreUniqueAndLookupRoundTrips)
@@ -379,7 +380,7 @@ TEST(TransportDeclarationDeathTest, UnknownTransformFailsClosedNamingTheCatalog)
     // only half the posture.
     EXPECT_DEATH({ (void)resolve_transport_stack(declaration); }, "api-rfc3339-line-prefix");
     EXPECT_DEATH({ (void)resolve_transport_stack(declaration); }, "bracket-rfc3339-line-prefix");
-    EXPECT_DEATH({ (void)resolve_transport_stack(declaration); }, "transport-catalog-2");
+    EXPECT_DEATH({ (void)resolve_transport_stack(declaration); }, "transport-catalog-3");
 }
 
 // ── The WRITER dual's laws — render_transport_prefix, the emit side of the catalogue ────────────

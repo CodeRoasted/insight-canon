@@ -48,8 +48,10 @@ export namespace insight::transport
 // NORMATIVE): the value means "the Nth shape", and which change causes the Nth shape is not
 // knowable in advance. `-2` was taken when the SECOND transform landed with its row (T5 5.2:
 // `bracket-rfc3339-line-prefix`, DN-15 — the co-fire the comment above
-// predicted); `-3` moves next, at whatever ship makes the third shape.
-inline constexpr std::string_view kTransportCatalogVersion{"transport-catalog-2"};
+// predicted); `-3` was taken when the THIRD transform landed with its row
+// (`utf8-bom-line-prefix`, DN-25 — the same co-fire again); `-4` moves next, at whatever
+// ship makes the fourth shape.
+inline constexpr std::string_view kTransportCatalogVersion{"transport-catalog-3"};
 
 // ⚠ NORMATIVE — CATALOGUE ENUM VALUES ARE IDENTITY-BEARING: NEW MEMBERS APPEND (ADR-2
 // clause 2.2). A value is never renumbered and never inserted mid-enum. Both enums below serialize
@@ -100,6 +102,12 @@ enum class TransportTransformKind : std::uint8_t
     // carries — the invariance cell stays empty (ADR-23: no world vehicle exists), so declaring
     // it certifies OUR refactor and nothing about the world.
     LinePrefixBracketedTimestamp,
+    // A UTF-8 byte-order mark at the head of a line, `EF BB BF`. A FIXED three-byte prefix
+    // removed ONCE — not a greedy loop and not a `find` anywhere in the line: the BOM is a
+    // delivery artifact of the stream's first bytes, so a second one is content and is left
+    // alone. `prefix_width` is unread (the width is the grammar, not a parameter) and
+    // `strip_leading_space` is false: a space after a BOM is a real content byte.
+    LinePrefixByteOrderMark,
 };
 
 // What the peeled bytes YIELD, if anything. 0031's ternary extract routing, now typed: identity
@@ -161,7 +169,7 @@ struct TransportTransformRow
 // below still records where the 28-byte width was measured.
 inline constexpr std::uint32_t kGhaApiPrefixWidth{28U}; // "YYYY-MM-DDTHH:MM:SS.fffffffZ"
 
-inline constexpr std::array<TransportTransformRow, 2> kTransportCatalogRows{{
+inline constexpr std::array<TransportTransformRow, 3> kTransportCatalogRows{{
     {.name = "api-rfc3339-line-prefix",
      .kind = TransportTransformKind::LinePrefixTimestamp,
      .extract = TransportExtract::EventObservationTime,
@@ -183,6 +191,20 @@ inline constexpr std::array<TransportTransformRow, 2> kTransportCatalogRows{{
      .extract = TransportExtract::EventObservationTime,
      .prefix_width = 0U,
      .strip_leading_space = true},
+    // The UTF-8 BOM at line head (DN-25). Delivery-shaped name, same argument as the two rows
+    // above: a BOM is a property of how the bytes were DELIVERED, never of an ecosystem, so the
+    // row is named for the byte grammar it peels. It is the first row in this catalogue that
+    // extracts NOTHING — a BOM carries no datum, only noise, so `extract = None` and the peel is
+    // pure removal. `prefix_width` unread (the three bytes ARE the grammar, and carrying the
+    // width as a parameter is what would let a row declare 2 and silently eat a UTF-16 BOM's
+    // first two bytes); `strip_leading_space` FALSE, because `<BOM><space>` has a real content
+    // space and the GHA row's true is what makes that distinction load-bearing rather than
+    // cosmetic.
+    {.name = "utf8-bom-line-prefix",
+     .kind = TransportTransformKind::LinePrefixByteOrderMark,
+     .extract = TransportExtract::None,
+     .prefix_width = 0U,
+     .strip_leading_space = false},
 }};
 
 // Look a declared name up in the catalogue. Returns nullptr when unknown — the caller decides

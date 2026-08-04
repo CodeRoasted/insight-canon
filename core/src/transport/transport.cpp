@@ -111,6 +111,22 @@ namespace
             strip_separator(row, peeled);
             break;
         }
+        case TransportTransformKind::LinePrefixByteOrderMark:
+        {
+            // A FIXED three-byte prefix, removed ONCE. All three bytes are shape-checked rather
+            // than a declared width being trusted: `EF BB` alone, `EF BB BE`, and the UTF-16 marks
+            // `FF FE` / `FE FF` must all survive untouched, and a width-2 acceptor would eat the
+            // first two bytes of the last two silently. Never a `while` loop: a second BOM is
+            // content (DN-25.D3). Never a `find`: only offset 0 is delivery.
+            static constexpr std::string_view kUtf8Bom{"\xEF\xBB\xBF"};
+            if (!peeled.content.starts_with(kUtf8Bom))
+                return; // the rule's effect on these bytes is nothing (§2)
+            peeled.content.remove_prefix(kUtf8Bom.size());
+            // No `strip_separator`: the row declares `strip_leading_space = false`, so a space
+            // after the mark is a content byte and stays. Nothing is extracted — a BOM carries no
+            // datum, which is why this is the catalogue's first `TransportExtract::None` row.
+            break;
+        }
         }
     }
 
@@ -205,6 +221,10 @@ bool render_transport_prefix(const TransportTransformRow& row, insight::Timestam
         return false;
     case TransportTransformKind::LinePrefixBracketedTimestamp:
         break;
+    case TransportTransformKind::LinePrefixByteOrderMark:
+        // NO writer dual, and unlike the GHA row's absence this one is structural rather than a
+        // homing choice: a BOM is not a rendering of any datum, so there is nothing to render.
+        return false;
     }
 
     // The ONE fixed lexical form: `[YYYY-MM-DDTHH:MM:SS.mmmZ]` + one separator space — 27 bytes,
