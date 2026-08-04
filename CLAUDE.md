@@ -28,8 +28,8 @@ design — this repo is the verifiable half of the determinism claim.
 - `core` never links a vocabulary package; anything needing composed semantics
   (the perf gate included) lives in `bench/` or downstream.
 - Onboarding a new dialect touches ~30 points across 6 repos — follow the
-  superproject's `technical_docs/operations/dialect_onboarding_runbook.md`
-  (present only in a full workspace checkout), never memory.
+  superproject's `OPS-2` (present only in a full workspace checkout), never
+  memory.
 - The determinism contract (no libm, integer fixed-point, `-ffp-contract=off`
   consumers) is owned by `technical_docs/determinism.md` — point, don't restate.
 - **Hot-path performance is a first-class requirement here — act, don't flag.**
