@@ -133,7 +133,8 @@ class LogParser
 
     // The §12.5.1(c) attestation — issued by the PERFORMER of stage 1. Every byte a strategy's
     // `ParsedLine::content` carries derives from a line this parser normalized unconditionally at
-    // its one named site (parse_line's stage-1 step; SRC-D-TID-11 — see canon.api.cppm (normalize()) for the contract.)
+    // its one named site (parse_line's stage-1 step; SRC-D-TID-11 — see
+    // canon.api.cppm (normalize()) for the contract.)
     // — including the six strategies that
     // REBUILD content into arena bytes, which assemble from post-strip input. That invariant is
     // local to this class, reviewable in one place, which is what entitles it to hold the one
