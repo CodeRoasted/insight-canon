@@ -54,15 +54,15 @@ struct ParsedLine
     // the observed causal DAG for the declared vertex/edge (ADR-29.D2) — never serialized;
     // `present == false` for every non-OTEL input.
     OtelTraceContext trace{};
-    // Declared ordinal observations (W1, SRC-D-W1-3), populated by a strategy that recognizes declared
-    // structured numeric fields (today: JsonStrategy via kOrdinalFieldCatalog). A span over
-    // arena-stable storage; empty for every non-ordinal line. Consumed metalog-side (W1 binning),
-    // never tokenized into the template.
+    // Declared ordinal observations (W1, SRC-D-W1-3), populated by a strategy that recognizes
+    // declared structured numeric fields (today: JsonStrategy via kOrdinalFieldCatalog). A span
+    // over arena-stable storage; empty for every non-ordinal line. Consumed metalog-side (W1
+    // binning), never tokenized into the template.
     std::span<const OrdinalObservation> ordinals;
-    // O4b Span Links (SRC-D-OTEL-9/SRC-D-OTEL-21): the span_ids this span declares a cross-trace edge to (OTLP
-    // `links[]`), populated by the span strategy. A span over arena-stable storage; empty for every
-    // line without links. Consumed metalog-side (distilled into the service topology), never
-    // tokenized.
+    // O4b Span Links (SRC-D-OTEL-9/SRC-D-OTEL-21): the span_ids this span declares a cross-trace
+    // edge to (OTLP `links[]`), populated by the span strategy. A span over arena-stable storage;
+    // empty for every line without links. Consumed metalog-side (distilled into the service
+    // topology), never tokenized.
     std::span<const SpanId> linked_span_ids;
 };
 
@@ -141,12 +141,12 @@ export namespace insight::semantic
 // content" — and ADR-2.3 sharpened exactly it for the sibling transport token.
 //
 // ⚠ ADR-22 says T4 "spends no version token". That reading is right about the two tokens
-// it measured — `canonicalization_version` (the MASKING token; canon.api.cppm owns the value) and the
-// MetaLog wire version, neither of which T4 touches — and it did not enumerate THIS one. The bump
-// costs Eqya's sequencing nothing: `kSemanticGrammarVersion` appears at exactly one site, inside
-// the `semantic_identity` preimage (compose.cpp), reaches no wire field and no MetaLog block, and
-// the digest it feeds is moving anyway. It is not reserved by a plan — the shape shipped, so it
-// takes the token (ADR-2).
+// it measured — `canonicalization_version` (the MASKING token; canon.api.cppm owns the value) and
+// the MetaLog wire version, neither of which T4 touches — and it did not enumerate THIS one. The
+// bump costs Eqya's sequencing nothing: `kSemanticGrammarVersion` appears at exactly one site,
+// inside the `semantic_identity` preimage (compose.cpp), reaches no wire field and no MetaLog
+// block, and the digest it feeds is moving anyway. It is not reserved by a plan — the shape
+// shipped, so it takes the token (ADR-2).
 //
 // grammar-5 (ADR-17, the GitLab CI dialect): three shape changes, all forced by bytes GitLab
 // emits and none expressible in grammar-4 — the `NumericFieldThenRemainder` extractor and its
@@ -333,9 +333,9 @@ enum class PayloadEmit : std::uint8_t
     // Emitting a VARYING stamp is a step_duration capability, not a writer detail.
     //
     // The two reader-side suffix drops have no generation dual — the writer never emits a producer
-    // option group and never emits the CR terminator — the same asymmetry `payload_excludes` already
-    // carries. So the round trip closes on every payload the writer can produce, which is what G2
-    // asserts.
+    // option group and never emits the CR terminator — the same asymmetry `payload_excludes`
+    // already carries. So the round trip closes on every payload the writer can produce, which is
+    // what G2 asserts.
     PlaceholderNumericFieldThenPayload,
 };
 
@@ -419,9 +419,9 @@ struct IntentEmitRow
     // ADR-22 — the CHANNEL gate, symmetric to IntentMarkerRow's. The writer's dual of the
     // reader's question: not "which prefix do I match" but "which IntentChannel am I materializing
     // into". This is what dissolves the apparent C2 contradiction — the writer never inspects
-    // prefixes (the SRC-SID-1 smell C2 exists to kill), it applies the channel adaptation the Medium
-    // names. Paired with the reader's gate by paired_writer_row, so the two projections cannot
-    // drift onto different channels.
+    // prefixes (the SRC-SID-1 smell C2 exists to kill), it applies the channel adaptation the
+    // Medium names. Paired with the reader's gate by paired_writer_row, so the two projections
+    // cannot drift onto different channels.
     //
     // It is also the MEDIUM SELECTOR's input (ADR-22): a writer picks the emit row whose
     // channel_gate matches the channel it was told to render, never the first row that matches by
@@ -442,9 +442,9 @@ struct LevelLiftRow
 
 // A location rule: recognizes a test-file WHERE coordinate (§5.3/SRC-II-8). `kind` selects the core
 // matching algorithm; the params are the dialect-independent file-naming vocabulary it walks. The
-// spans point at package-static constexpr arrays (SRC-SP-7 immutable-release lifetime). Not every param
-// is used by every kind — `extensions` for TestSpecExtension/PrefixAndExtension, `suffixes` for
-// SuffixSet, `prefixes` for PrefixAndExtension (the basename `test_`/`_test` forms).
+// spans point at package-static constexpr arrays (SRC-SP-7 immutable-release lifetime). Not every
+// param is used by every kind — `extensions` for TestSpecExtension/PrefixAndExtension, `suffixes`
+// for SuffixSet, `prefixes` for PrefixAndExtension (the basename `test_`/`_test` forms).
 struct LocationRow
 {
     LocationMatchKind kind;
@@ -459,8 +459,8 @@ struct LocationRow
 // ── Run-outcome rows (grammar-2, ADR-17 / insight_run_outcome_model.md §4) ──
 // The dialect's run-verdict MAPPING — native verdict string → the core-owned RunOutcome — plus the
 // console-tail fallback marker. Matcher algorithms live in core (map_outcome_token /
-// scan_run_outcome / resolve_run_outcome, the SRC-D-OUT-RUN-1 precedence); a package ships only rows,
-// and either set may be empty (GHA ships tokens but no marker — it has no run-verdict console
+// scan_run_outcome / resolve_run_outcome, the SRC-D-OUT-RUN-1 precedence); a package ships only
+// rows, and either set may be empty (GHA ships tokens but no marker — it has no run-verdict console
 // line).
 
 // One native verdict token → RunOutcome (byte-exact, format-gated). Consumed on BOTH resolution
@@ -570,8 +570,8 @@ struct SemanticPackageManifest
     // single-materialization dialect (Jenkins, test_frameworks), whose rows are all kAnyChannel —
     // the degenerate case. Only the dialect that HAS multiple materializations declares channels.
     // This is the vocabulary a caller's `--channel` is validated against: declared ⇒ fires; unknown
-    // ⇒ HARD ERROR listing these names. The span points at package-static constexpr storage (SRC-SP-7
-    // lifetime); serialized into semantic_identity alongside the rows it gates.
+    // ⇒ HARD ERROR listing these names. The span points at package-static constexpr storage
+    // (SRC-SP-7 lifetime); serialized into semantic_identity alongside the rows it gates.
     std::span<const std::string_view> channels;
     StrategyFactory strategy{nullptr};     // nullable — the dialect format-strategy code tier
     ProvenanceHook echoed_source{nullptr}; // nullable — the raw-line echoed-source code tier
@@ -742,7 +742,8 @@ all_dialect_gates_owned(const SemanticPackageManifest& manifest) noexcept
                                { return owned(row.dialect_gate); }) &&
            std::ranges::all_of(manifest.level_lifts, [&owned](const LevelLiftRow& row) noexcept
                                { return owned(row.dialect_gate); }) &&
-           std::ranges::all_of(manifest.outcome_tokens, [&owned](const OutcomeTokenRow& row) noexcept
+           std::ranges::all_of(manifest.outcome_tokens,
+                               [&owned](const OutcomeTokenRow& row) noexcept
                                { return owned(row.dialect_gate); }) &&
            std::ranges::all_of(manifest.outcome_markers,
                                [&owned](const OutcomeMarkerRow& row) noexcept
