@@ -94,22 +94,6 @@ namespace
         return pos == str.size();
     }
 
-    // Hex: 0x[0-9a-fA-F]+[,;:\.\]]?
-    [[nodiscard]] constexpr bool is_hex_token(std::string_view str) noexcept
-    {
-        if (str.size() < 3U || str[0] != '0' || str[1] != 'x')
-            return false;
-        std::size_t pos{2U};
-        if (!is_hex_char(str[pos]))
-            return false;
-        while (pos < str.size() && is_hex_char(str[pos]))
-            ++pos;
-        if (pos < str.size() && (str[pos] == ',' || str[pos] == ';' || str[pos] == ':' ||
-                                 str[pos] == '.' || str[pos] == ']'))
-            ++pos;
-        return pos == str.size();
-    }
-
     // ── Helpers ──────────────────────────────────────────────────────────────
     [[nodiscard]] inline bool is_all_digits(std::string_view str) noexcept
     {
@@ -941,11 +925,13 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                     }
             }
             // 3. UUID / long hash → MASK.
-            // 4. IPv4 / 0x-hex → MASK.
-            // 5. digit-leading numeric (or empty) → MASK.
+            // 4. IPv4 → MASK.
+            // 5. digit-leading numeric (or empty) → MASK. `0x`-hex needs no arm of its own:
+            //    a `0x…` token starts with '0', a digit, so `digit_leading` already carries it.
+            //    The former rule-5 predicate accepted a STRICT SUBSET of digit_leading and could
+            //    never be the reason a token masked (DN-027, proven over all inputs).
             if (shape.empty || is_uuid_or_long_hash(tok) ||
-                (config.mask_ip_addresses && is_ipv4_token(tok)) ||
-                (config.mask_hex_addresses && is_hex_token(tok)) || shape.digit_leading)
+                (config.mask_ip_addresses && is_ipv4_token(tok)) || shape.digit_leading)
             {
                 mask();
                 prev = tok;

@@ -16,7 +16,7 @@ namespace
 {
 MaskConfig cfg()
 {
-    return MaskConfig{}; // defaults: mask_ip_addresses / mask_hex_addresses on
+    return MaskConfig{}; // defaults: mask_ip_addresses on
 }
 
 // Copy the masked template out immediately (the arena is reused across calls).
@@ -656,28 +656,26 @@ TEST(StatelessTemplate, Ipv4KnobGatesTheBracketedFormThatDigitLeadingCannotReach
            "the knob's domain just widened silently.";
 }
 
-// The boundary the hex rip must not cross. `is_hex_token` is dead at the output level, so removing
-// it must move NOTHING: these tokens are digit-leading and mask on that ground alone, with the hex
-// knob in either position. This arm is the rip's safety net, and it is deliberately NOT a test of
-// rule 5 — rule 5 cannot be tested, which is why it is going.
+// The boundary the hex rip must not cross. Written by Kleio BEFORE the rip, when it toggled
+// `mask_hex_addresses` to prove the tokens masked with the knob in either position; the rip
+// removed the knob, so the toggle is now unrepresentable and only the surviving half is kept.
+// That half is the whole property: these tokens mask on digit-leading GROUND ALONE, which is why
+// removing rule 5 moved nothing. Deliberately NOT a test of rule 5 — rule 5 cannot be tested,
+// which is why it is gone, and there is no predicate left to mutate (mutation X-A, DN-027).
 TEST(StatelessTemplate, HexTokensStillMaskViaDigitLeadingAfterTheRuleFiveRip)
 {
     ArenaAllocator arena{256U * 1024U};
-    MaskConfig hex_off{};
-    hex_off.mask_hex_addresses = false;
 
     for (const std::string_view tok : {"0xDEADBEEF", "0x1f,", "0xdeadbeef"})
     {
-        const std::string on{masked_with(tok, arena, MaskConfig{})};
-        const std::string off{masked_with(tok, arena, hex_off)};
-        EXPECT_EQ(on, "<*>") << "token '" << tok
-                             << "' must mask (digit-leading: it starts with '0')\n  actual: " << on;
-        EXPECT_EQ(off, "<*>")
+        const std::string masked{masked_with(tok, arena, MaskConfig{})};
+        EXPECT_EQ(masked, "<*>")
             << "token '" << tok
-            << "' must STILL mask with the hex knob off — that is the whole reason rule 5 can be "
-               "removed without moving a single template. If this KEEPS, the rip is not safe and "
-               "digit-leading is not the cover it was measured to be.\n  actual: "
-            << off;
+            << "' must mask via digit-leading (it starts with '0'). With rule 5 gone this is "
+               "the "
+               "ONLY thing that can catch it. If this KEEPS, the rip was not behaviour-preserving "
+               "and digit-leading is not the cover it was measured to be.\n  actual: "
+            << masked;
     }
 }
 

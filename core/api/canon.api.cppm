@@ -1006,8 +1006,12 @@ struct MaskConfig
 {
     // Structurally variable tokens are replaced with "<*>" before the masked template
     // is formed, so they never fossilise into the template identity.
-    bool mask_ip_addresses{true};  // IPv4 address tokens (e.g. "192.168.1.1:")
-    bool mask_hex_addresses{true}; // hex address tokens  (e.g. "0xdeadbeef")
+    bool mask_ip_addresses{true}; // IPv4 address tokens (e.g. "192.168.1.1:")
+    // NO hex knob. It was removed with its predicate (DN-027): the rule-5 acceptor required
+    // a leading '0', so every token it accepted was already digit-leading — a strict subset,
+    // inert over ALL inputs rather than merely on a sample. `mask_ip_addresses` stays because
+    // its grammar admits a leading '[', and a bracketed token is NOT digit-leading, so it
+    // genuinely gates: `[10.20.30.40]` masks on and stays literal off.
     // Identity-derived WHERE (bibles/intent_identity.md §8, SRC-II-8): when set, a GitHub-Actions
     // line whose NATIVE component is empty (GHA carries none) gets its recognize_location()
     // test-file as `component` — populating the cube WHERE axis ABOVE the empty native tier

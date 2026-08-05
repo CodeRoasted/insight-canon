@@ -39,9 +39,8 @@ Each whitespace token is classified by the **first** matching rule:
 | 2 | **Composite** — the token carries a structural delimiter; one of the normalizers (§4) matches | KEEP normalized (embeds `<*>`) |
 | 3 | **UUID / long hash** | MASK `<*>` |
 | 4 | **IPv4** (when `mask_ip_addresses`) | MASK `<*>` |
-| 5 | **`0x`-hex** (when `mask_hex_addresses`) | MASK `<*>` |
-| 6 | **Digit-leading numeric** | MASK `<*>` |
-| 7 | **Literal** — none of the above | KEEP literal |
+| 5 | **Digit-leading numeric** | MASK `<*>` — this also carries `0x`-hex: a `0x…` token starts with a digit |
+| 6 | **Literal** — none of the above | KEEP literal |
 
 Rule 1 wins first on purpose: it protects the **green→red distinction** that downstream diffing depends on —
 `exit code 0` and `exit code 1` must stay *different* templates, so a short status value after a status keyword
@@ -65,8 +64,9 @@ data-learned. This is what keeps masking decidable and deterministic.
 | **Min hash length** | `16` | Rule 3 / §4 embedded-identity — a hex-only run this long is an instance hash, not a word. |
 | **Wildcard** | `<*>` | The mask placeholder. |
 
-`mask_ip_addresses` and `mask_hex_addresses` are the two `MaskConfig` knobs (both default **on**) gating rules
-4 and 5.
+`mask_ip_addresses` is the one `MaskConfig` knob (default **on**) gating a rule — rule 4. It gates for a
+reason the retired hex knob never did: its grammar admits a leading `[`, and a bracketed token is not
+digit-leading, so `[10.20.30.40]` masks with the knob on and stays **literal** with it off.
 
 ### 3.1 The ephemeral-root catalog — the root is the decidable thing
 
