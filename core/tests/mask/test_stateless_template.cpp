@@ -567,4 +567,118 @@ TEST(EphemeralRootMask, G7_NoCatalogedRootNoOverFire)
               "/home/user/project/src/main.cpp:<*>:<*>");
 }
 
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+// The MaskConfig knobs — which of the two actually gates, and on which token shape (DN-027)
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// WHY THIS EXISTS. Rules 4 and 5 sit in ONE disjunction with `shape.digit_leading` as a later
+// disjunct (mask.cpp), so a rule whose whole domain is digit-leading can never change an
+// outcome — its knob is inert and the predicate is dead at the output level. That is measured
+// true of rule 5 (`is_hex_token` requires `str[0] == '0'`, and '0' is a digit: a STRICT SUBSET of
+// digit-leading, so no input distinguishes) and it is why the hex predicate, its knob and its
+// doc line are being ripped.
+//
+// ⚠ IT IS NOT TRUE OF RULE 4, AND THE DIFFERENCE IS ONE CHARACTER. `is_ipv4_token`'s grammar
+// admits an optional leading `[` — `\[?\d{1,3}(\.\d{1,3}){3}(:\d+)?\]?[,;:.\]]?` — and a token
+// starting with `[` is NOT digit-leading. So the BRACKETED form reaches rule 4 and nothing else
+// catches it, which makes `mask_ip_addresses` a live gate on exactly that shape.
+//
+// ⚠ AND THAT DISTINCTION WAS MISSED BY A 14-TOKEN PROBE OF MINE THAT CARRIED NO BRACKET. The
+// sample said "both knobs inert"; the population disagrees. Recorded here rather than in a
+// report, because the next person to shrink this test will be tempted by the same sample: the
+// bracket is not one more case, it is the ONLY case that separates the two knobs.
+//
+// `[10.20.30.40]` is not synthetic: it is an attested Proxifier line, a catalogued row in
+// formats.md, and the literal already ships inside test_bracket_peel_equivalence_gate.cpp. With
+// the knob off it falls to literal KEEP — a raw client IP into the template, the fingerprint,
+// MetaLog and any rendered evidence. On a product whose claim is about what leaves the machine
+// that is a privacy surface, not a config nicety.
+//
+// ═══ FALSIFIABILITY — OBSERVED, then reverted ═══════════════════════════════════════════════
+//   I-A  `is_ipv4_token` returning false wholesale (rule 4 disabled): RED, and the whole-suite
+//        run says this arm is the SOLE guard — 1 failure out of 601, everything else green.
+//        Before this arm, deleting rule 4 outright moved no test in the repository.
+//            on  Which is: "[10.20.30.40]"   vs   "<*>"
+//        Note WHICH leg caught it: the knob-ON leg. The knob-OFF leg stayed green under I-A —
+//        correctly, since "stays literal" is what a dead rule 4 also produces. The two legs are
+//        not redundant, they fail in opposite directions, and only holding both distinguishes
+//        "the knob gates" from "nothing masks this at all".
+//   X-A  `is_hex_token` returning false wholesale (rule 5 disabled): the entire canon suite
+//        stayed GREEN, 596/596. That is the measurement the rip rests on, and it is recorded
+//        here because after the rip there will be no predicate left to mutate.
+
+namespace
+{
+// The masker under a CALLER-CHOSEN config. The file's `masked()` helper hardcodes the defaults,
+// which is exactly why no committed test could ever have observed a knob.
+[[nodiscard]] std::string masked_with(std::string_view content, ArenaAllocator& arena,
+                                      const MaskConfig& conf)
+{
+    arena.reset();
+    return std::string{stateless_template(content, arena, conf).template_str};
+}
+
+[[nodiscard]] MaskConfig cfg_without_ip_masking()
+{
+    MaskConfig conf{};
+    conf.mask_ip_addresses = false;
+    return conf;
+}
+} // namespace
+
+TEST(StatelessTemplate, Ipv4KnobGatesTheBracketedFormThatDigitLeadingCannotReach)
+{
+    ArenaAllocator arena{256U * 1024U};
+    constexpr std::string_view kBracketed{"[10.20.30.40]"}; // attested Proxifier
+    constexpr std::string_view kBare{"10.20.30.40"};
+
+    // ── The decisive leg. ON must mask; OFF must KEEP. ──
+    const std::string on{masked_with(kBracketed, arena, MaskConfig{})};
+    EXPECT_EQ(on, "<*>") << "the bracketed IPv4 must mask with mask_ip_addresses ON — this is rule "
+                            "4 doing the only work no other rule can do.\n  token: "
+                         << kBracketed << "\n  actual: " << on;
+
+    const std::string off{masked_with(kBracketed, arena, cfg_without_ip_masking())};
+    EXPECT_EQ(off, kBracketed)
+        << "the bracketed IPv4 must stay LITERAL with mask_ip_addresses OFF. If this masked "
+           "anyway, rule 4 is inert exactly as rule 5 is — something upstream (a composite rule "
+           "reached through the `maybe_composite` pre-gate, which runs BEFORE this disjunction) is "
+           "claiming the token first, and the IP knob joins the rip.\n  token: "
+        << kBracketed << "\n  expected: " << kBracketed << " (kept)\n  actual: " << off;
+
+    // ── The CONTRAST that names which shape the knob governs. The BARE form is digit-leading, so
+    // it masks either way — and a reader who saw only the bare form would conclude the knob works
+    // when it is doing nothing. Pinning both is what makes the leg above interpretable. ──
+    EXPECT_EQ(masked_with(kBare, arena, MaskConfig{}), "<*>");
+    EXPECT_EQ(masked_with(kBare, arena, cfg_without_ip_masking()), "<*>")
+        << "the BARE IPv4 is digit-leading, so it masks regardless of the knob — rule 4 is not "
+           "what catches it. If this ever KEEPS, digit-leading stopped covering the bare form and "
+           "the knob's domain just widened silently.";
+}
+
+// The boundary the hex rip must not cross. `is_hex_token` is dead at the output level, so removing
+// it must move NOTHING: these tokens are digit-leading and mask on that ground alone, with the hex
+// knob in either position. This arm is the rip's safety net, and it is deliberately NOT a test of
+// rule 5 — rule 5 cannot be tested, which is why it is going.
+TEST(StatelessTemplate, HexTokensStillMaskViaDigitLeadingAfterTheRuleFiveRip)
+{
+    ArenaAllocator arena{256U * 1024U};
+    MaskConfig hex_off{};
+    hex_off.mask_hex_addresses = false;
+
+    for (const std::string_view tok : {"0xDEADBEEF", "0x1f,", "0xdeadbeef"})
+    {
+        const std::string on{masked_with(tok, arena, MaskConfig{})};
+        const std::string off{masked_with(tok, arena, hex_off)};
+        EXPECT_EQ(on, "<*>") << "token '" << tok
+                             << "' must mask (digit-leading: it starts with '0')\n  actual: " << on;
+        EXPECT_EQ(off, "<*>")
+            << "token '" << tok
+            << "' must STILL mask with the hex knob off — that is the whole reason rule 5 can be "
+               "removed without moving a single template. If this KEEPS, the rip is not safe and "
+               "digit-leading is not the cover it was measured to be.\n  actual: "
+            << off;
+    }
+}
+
 // NOLINTEND
