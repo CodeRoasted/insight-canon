@@ -193,8 +193,8 @@ inline constexpr std::string_view kAnyDialect{};
 
 // Does a row gated to `dialect_gate` fire on a stream whose caller declared `declared_dialect`?
 // Deliberately a SECOND predicate beside `channel_admits` rather than one shared helper, on the
-// house precedent that `gates_intersect` and `gate_matches` are kept apart with a comment saying
-// why: the two coordinates answer different questions against different vocabularies (0029 D5's
+// house precedent set when `gates_intersect` and the since-retired `gate_matches` were kept
+// apart with a comment saying why: the two coordinates answer different questions against different vocabularies (0029 D5's
 // materialization vs 0064's vocabulary-over-a-host), each is documented against its own ADR, and a
 // merged predicate would make a call site read as if the two axes were one.
 //   * kAnyDialect row              → always fires (a universal role row is untouched)
