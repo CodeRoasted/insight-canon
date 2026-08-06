@@ -214,8 +214,18 @@ namespace
     // (startTimeUnixNano…status/attributes/links); a coherent deterministic parser whose else-if
     // dispatch is not safely re-expressible as a handler map.
     // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-    void parse_otel_span(simdjson::ondemand::object& root, ParsedLine& parsed_line,
-                         ArenaAllocator& arena)
+    // ── CONFIRM OR DECLINE (DN-29.D17) — returns false when the nomination was wrong ───────────
+    // A cheap probe NOMINATES; the parser it routes to CONFIRMS its own precondition or DECLINES.
+    // `is_otel_span_line` is a raw byte scan and matches `startTimeUnixNano` at ANY DEPTH; this
+    // walk matches at DEPTH 0 ONLY. On an export document the two disagree — the key is real but
+    // nested inside the spans — and a `void` return had no way to say so, so the caller emitted a
+    // confident record for a line it had not parsed.
+    //
+    // Declining is NOT an exclusion rule for documents. A key-name denylist names one intruder and
+    // rots on the next envelope; this enumerates nothing, so it holds for every probe, parser and
+    // format that ever routes here. The rule is "do not emit what you did not parse."
+    [[nodiscard]] bool parse_otel_span(simdjson::ondemand::object& root, ParsedLine& parsed_line,
+                                       ArenaAllocator& arena)
     {
         std::string_view start_nano;
         std::string_view end_nano;
@@ -321,6 +331,14 @@ namespace
             }
         }
 
+        // THE CONFIRMATION, and it is free: `start_nano` is empty exactly when the key the probe
+        // promised is not at depth 0. Checked BEFORE the mapping below, because applying a mapping
+        // over fields that were never found is how an unparsed line acquires a plausible event
+        // time, an Info level and a content fallback — the confident record this ruling ends.
+        // A span with no declared event time is not a span we parsed (ADR-29.D5's corollary).
+        if (start_nano.empty())
+            return false;
+
         // Apply the mapping. Event time + duration are integer ns (D-OTEL-3, by construction).
         // SRC-D-OTEL-11: declared causality → the observed DAG
         parsed_line.trace.is_span = true;
@@ -347,6 +365,7 @@ namespace
         // O4b Span Links (SRC-D-OTEL-9): publish the declared cross-trace edge targets (empty ⇒ no
         // allocation).
         parsed_line.linked_span_ids = store_span_ids(linked, arena);
+        return true;
     }
 
     // Copy the matched ordinal observations (W1, SRC-D-W1-3) into arena-stable storage and return a
@@ -515,8 +534,35 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     // BEFORE spending the root cursor on the log-record field lookups below.
     if (is_otel_span_line(line))
     {
-        parse_otel_span(root, parsed_line, arena);
-        return parsed_line;
+        if (parse_otel_span(root, parsed_line, arena))
+            return parsed_line;
+
+        // DECLINED (DN-29.D17): the probe nominated on a raw byte scan, the parser looked at depth
+        // 0 and the promised key was not there. Return the line to the chain instead of emitting a
+        // record we did not parse — the generic path below then recognizes no role and L2 marks it,
+        // which is the whole reason the marker was reachable at all on this input.
+        //
+        // Discard whatever the walk wrote. It matches at depth 0 only, so on an export document it
+        // writes nothing — but a line with a depth-0 `traceId` and no depth-0 `startTimeUnixNano`
+        // would leave a half-populated trace context, and a declined parse must leave NO trace of
+        // itself. Cheap, and it makes the decline total rather than nearly total.
+        parsed_line = ParsedLine{};
+        parsed_line.raw_line = line;
+
+        // The walk spent the on-demand cursor, which is forward-only and cannot rewind, so the
+        // generic path below needs a fresh one. Re-iterating is a second parse of this line and it
+        // is paid ONLY here — on a line that was mis-nominated, which is rare by construction. The
+        // alternative (pre-checking depth 0 before the walk) costs every genuine span a second
+        // pass to spare the exceptional one.
+        if (scratch.parser.iterate(padded).get(doc) != simdjson::SUCCESS ||
+            doc.get_object().get(root) != simdjson::SUCCESS)
+        {
+            INSIGHT_LOG_TRACE(logging::strategy_logger(),
+                              "strategy=JSON span decline: re-iterate failed");
+            return std::unexpected(
+                std::string("JsonStrategy: span nomination declined and the line could not be "
+                            "re-read for the generic path"));
+        }
     }
 
     std::string_view scratch_view;

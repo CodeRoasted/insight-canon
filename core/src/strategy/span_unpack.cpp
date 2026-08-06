@@ -291,9 +291,29 @@ bool is_otel_span_document(std::string_view line) noexcept
 // one coherent traversal of the OTLP resourceSpans→scopeSpans→spans nesting emitting one line per
 // span; splitting the nested walk fragments a single-responsibility unpacker.
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
+// ── L3 (DN-29.D15) — the ACQUISITION-side check: broad, and deliberately over-triggering ───────
+// It must NOT be L1's O(1) first-key compare, and the asymmetry is the whole ruling. The record
+// path is charged for its probe on every JSON line of every stream, the overwhelming majority of
+// which are not OTEL, so it is tuned for PRECISION and pays for it with a dated premise about key
+// order. This path is reached only once something already decided to hand it a whole document; it
+// holds the entire input by definition (ADR-22.D5) and is not the hot path, so thoroughness is
+// free and RECALL is what matters.
+//
+// The error directions are opposite, which is why one predicate could not serve both: here a false
+// positive costs one walk that finds nothing and returns 0, while a false negative is a conformant
+// export silently not unpacked. An unbounded scan is the right instrument in exactly this place and
+// the wrong one in the other — the cost that condemns it on the record path is not charged here.
+//
+// It is also what makes the closed set's dated premise survivable: if OTLP grows a top-level field
+// and a producer emits it first, L1 stops recognising, L2 marks the line, and THIS still unpacks.
+[[nodiscard]] bool is_otel_span_document_broad(std::string_view document) noexcept
+{
+    return document.contains(R"("resourceSpans")");
+}
+
 std::size_t unpack_otel_spans(std::string_view document, std::vector<std::string>& out)
 {
-    if (!is_otel_span_document(document))
+    if (!is_otel_span_document_broad(document))
         return 0;
 
     auto& scratch{json_scratch()};
