@@ -17,13 +17,13 @@ namespace insight::tokenization
 namespace
 {
 
-    // Route the declared OTEL field-map (SRC-D-OTEL-4a) over the parsed OTLP object: severity_number
-    // → the LogLevel band (declared > inferred — it runs after the level-string route, so it
-    // overrides), and traceId/spanId/parentSpanId → the consumed trace context. Returns true iff
-    // the record is OTEL (a severityNumber or traceId was present), which the caller uses to route
-    // the message to the nested body.stringValue. Trace ids are hashed to scalar PODs and never
-    // retained as values (OR1). Kept separate so JsonStrategy::parse stays within its complexity
-    // budget.
+    // Route the declared OTEL field-map (SRC-D-OTEL-4a) over the parsed OTLP object:
+    // severity_number → the LogLevel band (declared > inferred — it runs after the level-string
+    // route, so it overrides), and traceId/spanId/parentSpanId → the consumed trace context.
+    // Returns true iff the record is OTEL (a severityNumber or traceId was present), which the
+    // caller uses to route the message to the nested body.stringValue. Trace ids are hashed to
+    // scalar PODs and never retained as values (OR1). Kept separate so JsonStrategy::parse stays
+    // within its complexity budget.
     [[nodiscard]] bool extract_otel_fields(simdjson::ondemand::object& root,
                                            ParsedLine& parsed_line)
     {
@@ -82,13 +82,23 @@ namespace
     [[nodiscard]] std::span<const OrdinalObservation>
     store_ordinals(std::span<const OrdinalObservation> observations, ArenaAllocator& arena);
 
-    // True iff the raw line is a flat OTLP/JSON span (D-OTEL-10 shape 2 / SRC-D-OTEL-18) — detected by
-    // the span-specific startTimeUnixNano key (logs carry timeUnixNano), excluding a resourceSpans
-    // DOCUMENT (the record-source unpack handles those before the strategy — SRC-D-OTEL-18). A cheap
-    // raw-byte check, no simdjson cursor spent.
+    // True iff the raw line is a flat OTLP/JSON span (D-OTEL-10 shape 2 / SRC-D-OTEL-18) — detected
+    // by the span-specific startTimeUnixNano key (logs carry timeUnixNano). A cheap raw-byte check,
+    // no simdjson cursor spent.
+    //
+    // It does NOT exclude a resourceSpans EXPORT DOCUMENT, and that is not an omission: parse()
+    // refuses one above, before this ever runs, so by the time control arrives here a document is
+    // already impossible. The exclusion used to live here as `&& !line.contains("resourceSpans")`
+    // and was dropped as REDUNDANT, not as expensive — `&&` short-circuits, so on a non-OTEL line
+    // the first scan already returned false and the second one never ran at all. It cost only the
+    // lines that genuinely carry `startTimeUnixNano`. Recorded because the opposite was believed,
+    // and measured false.
+    //
+    // The ordering in parse() is what the removal rests on, and it is load-bearing: this predicate
+    // is true of a document too, because a document carries `startTimeUnixNano` inside its spans.
     [[nodiscard]] bool is_otel_span_line(std::string_view line) noexcept
     {
-        return line.contains(R"("startTimeUnixNano")") && !line.contains(R"("resourceSpans")");
+        return line.contains(R"("startTimeUnixNano")");
     }
 
     // Parse an OTLP quoted decimal-ns string → int64. Digit byte-loop (no float, no charconv dep);
@@ -105,8 +115,8 @@ namespace
         return value;
     }
 
-    // Parse a flat OTLP/JSON span (D-OTEL-10 / SRC-D-OTEL-18) in ONE forward pass over the object — the
-    // on-demand idiom that descends into status/attributes inline with no rewind. The §13.1
+    // Parse a flat OTLP/JSON span (D-OTEL-10 / SRC-D-OTEL-18) in ONE forward pass over the object —
+    // the on-demand idiom that descends into status/attributes inline with no rewind. The §13.1
     // mapping: name→content (the templated operation), startTimeUnixNano→event time, end−start→the
     // span_duration_ns ordinal (SRC-D-OTEL-12, integer ns by construction), status.code→level
     // (ERROR→Error else Info; declared > inferred), service.name (from attributes[])→component (the
@@ -312,8 +322,8 @@ namespace
     }
 
     // W1 slow-path field-route (SRC-D-W1-3): find_field_unordered per declared key (the OTEL-route
-    // pattern); the value's raw decimal TOKEN → int64 (never get_double() — the SRC-D-W1-3 pin). MUST
-    // run before the OTLP body descent below (which spends the on-demand cursor).
+    // pattern); the value's raw decimal TOKEN → int64 (never get_double() — the SRC-D-W1-3 pin).
+    // MUST run before the OTLP body descent below (which spends the on-demand cursor).
     [[nodiscard]] std::span<const OrdinalObservation>
     extract_ordinals_slow(simdjson::ondemand::object& root, ArenaAllocator& arena)
     {
@@ -384,6 +394,28 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     if (std::optional<ParsedLine> fast_parsed{try_fast_parse(line, arena)})
         return std::expected<ParsedLine, std::string>{*std::move(fast_parsed)};
     // ── Slow path: full simdjson (handles escapes, nested objects, etc.) ──────
+
+    // An OTLP `resourceSpans` EXPORT DOCUMENT is REFUSED here, and the refusal is the feature.
+    //
+    // Without it the document falls through to the generic log-record route below and yields ONE
+    // plausible-looking event for an export carrying N spans — no error, no diagnostic. That is
+    // the silent-wrong-answer class ADR-29.D5 names as the one failure this product may not ship,
+    // and a refusal a caller can see is strictly better than a number a caller cannot doubt.
+    //
+    // Refused rather than unpacked because document mode is ACQUISITION-tier, never record-tier:
+    // this entry is frame-oriented (the SHM plane carries a fixed 4096-byte payload) and an export
+    // has no declared size, so unpacking here would put an unbounded object inside a
+    // bounded-memory instrument — the same refusal ADR-29.D3 makes about retaining a `trace_id`.
+    // A collector-shaped acquisition fans the export out and puts flat SPANS on the wire, which is
+    // what ADR-29.D7's "a span enters as a record" already says.
+    //
+    // ⚠ THIS MUST PRECEDE is_otel_span_line: that predicate tests only for `startTimeUnixNano`,
+    // and a document carries that key inside its spans.
+    if (is_otel_span_document(line))
+        return std::unexpected(
+            std::string("JsonStrategy: OTLP resourceSpans export DOCUMENT on the record-oriented "
+                        "entry — document mode is acquisition-tier; this wire carries one flat "
+                        "span per record (ADR-29.D7)"));
 
     auto& scratch{json_scratch()};
     const auto padded{load_padded(scratch, line)};

@@ -192,9 +192,30 @@ namespace
 
 } // namespace
 
+// The probe COMPARES the root object's first key; it does not SEARCH for it. That is a measured
+// choice, not a stylistic one (ADR-29.D7 requires "bounded", and the first form that met the
+// letter of it still cost 12%):
+//
+//   * a bounded WINDOW search — `substr(0, 256).contains("\"resourceSpans\"")` — measured
+//     +154 ns/line (1286 → 1440 µs per 1000 lines, 7 reps, stddev ≈ 13-15 µs) on the non-OTEL
+//     nested-JSON workload. The needle begins with `"`, and structured JSON is dense in `"`, so a
+//     naive substring search restarts on nearly every byte of the window.
+//   * comparing the first key is O(1): two whitespace skips and a 15-byte prefix compare, with no
+//     window constant to justify.
+//
+// The strictness this buys is free, because OTLP's ExportTraceServiceRequest has exactly ONE
+// top-level field: in any export of that message `"resourceSpans"` IS the first key. A payload
+// that puts something else first is not that message, and is handled as content.
 bool is_otel_span_document(std::string_view line) noexcept
 {
-    return line.contains(R"("resourceSpans")");
+    static constexpr std::string_view kWhitespace{" \t\n\r"};
+    const std::size_t open{line.find_first_not_of(kWhitespace)};
+    if (open == std::string_view::npos || line[open] != '{')
+        return false;
+    const std::size_t key{line.find_first_not_of(kWhitespace, open + 1)};
+    if (key == std::string_view::npos)
+        return false;
+    return line.substr(key).starts_with(R"("resourceSpans")");
 }
 
 // one coherent traversal of the OTLP resourceSpans→scopeSpans→spans nesting emitting one line per

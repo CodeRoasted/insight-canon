@@ -376,6 +376,13 @@ export namespace insight::tokenization
 // True iff `line` is an OTLP/JSON resourceSpans trace-export DOCUMENT (shape 1) — the record-
 // source layer routes these to unpack_otel_spans before tokenization; a flat span (shape 2)
 // and every non-OTEL line return false. A cheap raw-byte check, no simdjson cursor spent.
+//
+// ADR-29.D7 — the probe is GATED and O(1), and that is a shipping condition, not a tuning
+// preference: it runs on every JSON line of every stream, and the overwhelming majority of those
+// streams are not OTEL at all. The gate is the JSON-family layout check (first non-whitespace byte
+// is '{', the same test JsonStrategy::confidence applies); behind it the root object's FIRST KEY is
+// COMPARED, never searched for. A whole-line substring scan is what D7 forbids — and a bounded
+// windowed search is not the cheap answer either (the measurement is at the definition site).
 [[nodiscard]] bool is_otel_span_document(std::string_view line) noexcept;
 
 // Unpack one OTLP/JSON resourceSpans trace-export DOCUMENT into N CANONICAL flat-span record

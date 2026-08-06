@@ -51,13 +51,57 @@ TEST(SpanUnpack, DetectsDocumentNotFlatSpan)
     EXPECT_FALSE(is_otel_span_document(R"({"level":"info","message":"hi"})"));
 }
 
+// ── The probe's SHAPE, not just its verdict (ADR-29.D7 / DN-29.D9) ───────────────────────────
+// The bar is two-part — first-non-whitespace `{`, then a BOUNDED prefix key probe — and it is a
+// shipping condition, because this probe is charged to lines of streams that are not OTEL at all.
+// A verdict-only test is satisfied by the unbounded whole-line scan the bar forbids, so the gate
+// and the bound each get an assertion that the forbidden form would fail.
+
+TEST(SpanUnpack, ProbeIsGatedOnTheJsonLayoutSoNonJsonLinesAreNeverScanned)
+{
+    // Leading whitespace is skipped, exactly as JsonStrategy::confidence skips it.
+    EXPECT_TRUE(is_otel_span_document("  \t" + std::string{kDocument}));
+
+    // The gate: a line that is not a JSON object is rejected on its FIRST byte, whatever it goes
+    // on to contain. An unbounded `.contains("resourceSpans")` says true here.
+    EXPECT_FALSE(is_otel_span_document(R"(2026-01-01 INFO exporting "resourceSpans" to disk)"))
+        << "a plain log line mentioning the key was read as an OTLP export — the `{` gate is not "
+           "being applied, so every non-JSON stream pays a whole-line scan";
+    EXPECT_FALSE(is_otel_span_document(R"([{"resourceSpans":[]}])"))
+        << "a top-level ARRAY is not the ExportTraceServiceRequest object";
+    EXPECT_FALSE(is_otel_span_document(""));
+    EXPECT_FALSE(is_otel_span_document("   "));
+}
+
+TEST(SpanUnpack, ProbeComparesTheFirstKeyInsteadOfSearchingForIt)
+{
+    // OTLP's ExportTraceServiceRequest has exactly one top-level field, so in a real export
+    // `"resourceSpans"` IS the root object's first key. The probe compares it there; it does not
+    // search. A payload that puts the key anywhere else is NOT claimed — a positive statement of
+    // the declared boundary, not a defect, and the assertion any searching form fails.
+    const std::string buried{R"({"pad":")" + std::string(4096, 'x') +
+                             R"(","resourceSpans":[{"resource":{},"scopeSpans":[]}]})"};
+    EXPECT_FALSE(is_otel_span_document(buried))
+        << "the key was found behind a 4 KiB prefix — the probe is searching the line rather than "
+           "reading its first key, which is the cost ADR-29.D7 refuses";
+    EXPECT_FALSE(is_otel_span_document(R"({"schemaUrl":"x","resourceSpans":[]})"))
+        << "a second-position key is outside the declared shape";
+
+    // ...and the shapes that DO occur are still claimed: a pretty-printed export whose first key
+    // sits behind a newline and an indent.
+    EXPECT_TRUE(is_otel_span_document("{\n    \"resourceSpans\": [\n    ]\n}"))
+        << "a pretty-printed collector export must still be claimed";
+    EXPECT_TRUE(is_otel_span_document(R"({ "resourceSpans": [] })"));
+}
+
 TEST(SpanUnpack, UnpacksDocumentToByteIdenticalCanonicalRecords)
 {
     std::vector<std::string> records;
     const std::size_t count{unpack_otel_spans(kDocument, records)};
     ASSERT_EQ(count, 2U);
     ASSERT_EQ(records.size(), 2U);
-    // Byte-identical to the lab's flat-span emission (the shape-1 ≡ shape-2 property, SRC-D-OTEL-18a).
+    // Byte-identical to the lab's flat-span emission (the shape-1 ≡ shape-2 property,
+    // SRC-D-OTEL-18a).
     EXPECT_EQ(records[0], kExpectedSpan0) << "got: " << records[0];
     EXPECT_EQ(records[1], kExpectedSpan1) << "got: " << records[1];
 }

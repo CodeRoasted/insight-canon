@@ -308,6 +308,49 @@ TEST_F(TokenizerTest, BatchFanOutKeepsSurroundingLinesInPlace)
     EXPECT_EQ(results[3]->template_str, "after");
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// The record entry REFUSES a document (DN-29.D6)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// process_line is the record-oriented entry — the one every live consumer uses (the SHM consumer
+// loop, the MCP sidecar, sift). Document mode is acquisition-tier and does not live there, so the
+// question is what process_line does when a document arrives anyway.
+//
+// It used to answer it silently and wrongly: `is_otel_span_line` excluded documents, so an export
+// carrying N spans fell through to the generic log-record route and produced ONE plausible event.
+// Nothing distinguished that event from a real one. This is the paired assertion to the fan-out
+// tests above — the same input, the two entries, two DIFFERENT and both-correct answers.
+
+TEST_F(TokenizerTest, RecordEntryRefusesASpanDocumentInsteadOfCollapsingIt)
+{
+    const auto result{tokenizer.process_line(kSpanDocument)};
+
+    ASSERT_FALSE(result.has_value())
+        << "process_line accepted an OTLP export document and produced a single event with "
+           "template \""
+        << (result.has_value() ? result->template_str : std::string_view{})
+        << "\" — a document carrying 2 spans collapsed to 1 plausible event, which is "
+           "indistinguishable downstream from a genuine one-line stream";
+    EXPECT_NE(result.error().find("resourceSpans"), std::string::npos)
+        << "the refusal must name what was refused so a caller can act on it; got: "
+        << result.error();
+    EXPECT_EQ(tokenizer.events_produced(), 0U) << "a refused line must not count as produced";
+}
+
+TEST_F(TokenizerTest, RecordEntryStillAcceptsAFlatSpan)
+{
+    // The control arm: refusing the DOCUMENT must not refuse the shape the wire actually carries.
+    // A refusal that also swallowed flat spans would pass the test above and delete the feature.
+    const auto result{tokenizer.process_line(
+        R"({"traceId":"aabb","spanId":"0001","name":"checkout","kind":"SPAN_KIND_SERVER",)"
+        R"("startTimeUnixNano":"1000","endTimeUnixNano":"1500","status":{"code":"STATUS_CODE_UNSET"},)"
+        R"("attributes":[{"key":"service.name","value":{"stringValue":"checkout-svc"}}]})")};
+
+    ASSERT_TRUE(result.has_value()) << "a flat span was refused: " << result.error();
+    EXPECT_EQ(result->template_str, "checkout");
+    EXPECT_EQ(result->component, "checkout-svc");
+}
+
 TEST_F(TokenizerTest, BatchCountsEventsProduced)
 {
     const std::vector<std::string_view> lines = {

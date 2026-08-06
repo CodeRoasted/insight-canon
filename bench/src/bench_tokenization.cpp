@@ -92,6 +92,55 @@ SyntheticCorpus make_corpus(std::size_t n_templates, std::size_t n_lines, std::u
     return corpus;
 }
 
+// The NON-OTEL NESTED-JSON workload (DN-29.D9's measure-first gate). The two arms above are
+// plaintext KV lines: they never reach JsonStrategy, so they cannot see the cost of the OTLP
+// document probe at all. This corpus is the population that DOES pay it — structured JSON whose
+// nesting and escapes defeat the escape-free fast path, so every line lands on the simdjson slow
+// path where the probe sits, while carrying no OTEL field whatsoever.
+//
+// Lines are deliberately LONG (a nested context object + an escaped message): the quantity under
+// measurement is a whole-line scan versus a bounded prefix read, and on a short line the two are
+// the same thing. This is the honest shape of an application's structured logging, not a
+// worst case built to flatter the bound.
+SyntheticCorpus make_nested_json_corpus(std::size_t n_lines, std::uint32_t seed)
+{
+    static constexpr const char* kMessages[] = {
+        "connection reset by peer while reading \\\"upstream\\\" response",
+        "retry budget exhausted for shard \\\"primary\\\"; falling back",
+        "schema validation failed: expected \\\"integer\\\", saw \\\"string\\\"",
+        "lease renewal deadline exceeded, releasing \\\"write\\\" lock",
+    };
+    constexpr std::size_t kMessageCount{sizeof(kMessages) / sizeof(kMessages[0])};
+
+    std::mt19937 rng{seed};
+    std::uniform_int_distribution<std::size_t> msg_dist{0, kMessageCount - 1};
+    std::uniform_int_distribution<std::uint32_t> val_dist{0, 999'999};
+
+    SyntheticCorpus corpus;
+    corpus.lines.reserve(n_lines);
+    for (std::size_t i{0}; i < n_lines; ++i)
+    {
+        std::string line;
+        line.reserve(512);
+        line += R"({"ts":"2026-01-15T10:22:)";
+        line += std::to_string(i % 60 < 10 ? 0 : (i % 60) / 10);
+        line += std::to_string((i % 60) % 10);
+        line += R"(Z","level":"warn","component":"orders-api","message":")";
+        line += kMessages[msg_dist(rng)];
+        line += R"(","context":{"request":{"id":")";
+        line += std::to_string(val_dist(rng));
+        line += R"(","method":"POST","path":"/api/v1/orders"},"upstream":{"host":"10.0.0.)";
+        line += std::to_string(val_dist(rng) % 256);
+        line += R"(","attempt":)";
+        line += std::to_string(val_dist(rng) % 5);
+        line += R"(,"latency_ms":)";
+        line += std::to_string(val_dist(rng) % 4000);
+        line += R"(}},"tags":["orders","retry","degraded"]})";
+        corpus.lines.push_back(std::move(line));
+    }
+    return corpus;
+}
+
 // Shared body: both arms run the identical corpus/loop; only the composition differs.
 void run_throughput(benchmark::State& state, const insight::semantic::ComposedSemantics& composed)
 {
@@ -148,8 +197,45 @@ void BM_TokenizationThroughputDegenerate(benchmark::State& state)
     run_throughput(state, composed);
 }
 
+// The non-OTEL nested-JSON arm. Not a gate metric and NOT part of the canon-#1 ordering
+// assertion — it is the population the JSON slow-path probes are charged to, measured on its own
+// so a probe's cost is attributable instead of diluted into a plaintext average.
+void BM_TokenizationThroughputNestedJson(benchmark::State& state)
+{
+    static const std::array<insight::semantic::SemanticPackageManifest, 4> kManifests{
+        insight::semantic::github::kManifest, insight::semantic::gitlab::kManifest,
+        insight::semantic::jenkins::kManifest, insight::semantic::test_frameworks::kManifest};
+    static const insight::semantic::ComposedSemantics composed{
+        insight::semantic::compose(kManifests)};
+
+    constexpr std::size_t kLinesPerIter{1'000};
+    const auto corpus{make_nested_json_corpus(kLinesPerIter, 42)};
+
+    tok::ArenaAllocator arena{1U << 22U};
+    tok::Tokenizer tokenizer{arena, tok::MaskConfig{}, composed};
+
+    for (const auto& line : corpus.lines)
+        benchmark::DoNotOptimize(tokenizer.process_line(line));
+    arena.reset();
+
+    for (auto _ : state)
+    {
+        for (const auto& line : corpus.lines)
+            benchmark::DoNotOptimize(tokenizer.process_line(line));
+        state.PauseTiming();
+        arena.reset();
+        state.ResumeTiming();
+    }
+
+    state.SetItemsProcessed(static_cast<std::int64_t>(state.iterations() * kLinesPerIter));
+    state.counters["ns_per_line"] = benchmark::Counter(
+        static_cast<double>(kLinesPerIter),
+        benchmark::Counter::kIsIterationInvariantRate | benchmark::Counter::kInvert);
+}
+
 BENCHMARK(BM_TokenizationThroughput)->Arg(4)->Arg(8)->Unit(benchmark::kMicrosecond);
 BENCHMARK(BM_TokenizationThroughputDegenerate)->Arg(4)->Arg(8)->Unit(benchmark::kMicrosecond);
+BENCHMARK(BM_TokenizationThroughputNestedJson)->Unit(benchmark::kMicrosecond);
 
 } // namespace
 // NOLINTEND
