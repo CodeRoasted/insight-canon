@@ -476,4 +476,77 @@ TEST(ArenaAllocator_Accessors, UsedNeverExceedsCapacity)
     EXPECT_EQ(arena.used(), arena.capacity());
 }
 
+// ── The reset-poison instrument (DN-29.D13) ──────────────────────────────────────────────────
+// These do not test the arena; they test the INSTRUMENT the arena carries, because a detector
+// nobody has seen detect anything is not evidence. Read a released span deliberately — the exact
+// thing a use-after-reset does by accident — and require that the bytes CHANGED.
+//
+// Deliberately NOT written as `poisoned == 0xDD…`: that would pin the fill value, and the value is
+// an implementation choice. The property is "the released bytes no longer read as what was stored",
+// which is what makes a stale `string_view` observable, and it survives a change of poison byte.
+
+TEST(ArenaAllocator_ResetPoison, InstrumentIsDeclaredAndReadableAtRuntime)
+{
+    // The provenance query must agree with how this TU was compiled. If these ever disagree, a
+    // downstream lifetime gate is being told the wrong thing about the build it is running in,
+    // and its skip/assert decision is unsound — which is worse than having no gate.
+#ifdef INSIGHT_CANON_ARENA_POISON
+    EXPECT_TRUE(insight::tokenization::arena_poisons_on_reset())
+        << "built WITH INSIGHT_CANON_ARENA_POISON but the runtime query denies it — downstream "
+           "gates would skip a check this build can actually make";
+#else
+    EXPECT_FALSE(insight::tokenization::arena_poisons_on_reset())
+        << "built WITHOUT INSIGHT_CANON_ARENA_POISON but the runtime query claims poisoning — "
+           "downstream gates would ASSERT a lifetime this build cannot observe, and pass blindly";
+#endif
+}
+
+TEST(ArenaAllocator_ResetPoison, ReleasedBytesAreOverwrittenSoAUseAfterResetIsObservable)
+{
+    if (!insight::tokenization::arena_poisons_on_reset())
+        GTEST_SKIP() << "release build: reset() rewinds without overwriting, by design — under a "
+                        "rewind a use-after-reset is INDISTINGUISHABLE from a correct read, so "
+                        "there is nothing here to assert (this skip is the honest outcome, not a "
+                        "gap). Run the debug or --asan leg to exercise the instrument.";
+
+    ArenaAllocator arena{4096};
+    constexpr std::string_view kStored{"GET /api/users -> 200"};
+    const std::string_view held{arena.store_string(kStored)};
+    ASSERT_EQ(held, kStored) << "precondition failed: store_string did not round-trip";
+
+    arena.reset();
+
+    // `held` is now a dangling view into released arena memory. Reading it is the defect under
+    // test, performed on purpose: the instrument's whole job is to make this read WRONG.
+    EXPECT_NE(held, kStored)
+        << "a view into released arena memory still reads its old contents — the reset poison did "
+           "NOT fire, so every use-after-reset in the codebase is invisible to every test";
+}
+
+TEST(ArenaAllocator_ResetPoison, PoisonSpansTheWholeHandedOutExtentNotJustTheFirstBytes)
+{
+    if (!insight::tokenization::arena_poisons_on_reset())
+        GTEST_SKIP() << "release build: reset() rewinds without overwriting, by design.";
+
+    // A partial fill would leave later allocations readable and make the instrument's coverage a
+    // function of WHERE in the line the stale view happened to point — a detector that fires
+    // sometimes is worse than none, because its green would then be trusted.
+    ArenaAllocator arena{4096};
+    std::vector<std::string_view> views;
+    views.reserve(32);
+    for (int index{0}; index < 32; ++index)
+        views.push_back(arena.store_string("payload-" + std::to_string(index)));
+
+    arena.reset();
+
+    for (std::size_t index{0}; index < views.size(); ++index)
+    {
+        const std::string expected{"payload-" + std::to_string(index)};
+        EXPECT_NE(views[index], expected)
+            << "allocation #" << index << " of " << views.size()
+            << " survived the reset intact — the poison does not cover the full handed-out extent, "
+               "so the instrument detects a use-after-reset only for some offsets";
+    }
+}
+
 // NOLINTEND

@@ -1165,6 +1165,17 @@ class ArenaAllocator
     std::size_t initial_block_size_{0};
     ArenaNumaPolicy policy_{};
 };
+
+// Was THIS canon built with the arena reset-poison instrument (arena_allocator.cpp)? True only in a
+// poisoning build, where `reset()` overwrites the bytes it releases instead of merely rewinding the
+// bump pointer — which is what makes a use-after-reset observable at all.
+//
+// A runtime query on purpose: the switch is PRIVATE to canon's translation units, so a constant
+// evaluated in a consumer's own compile would report the CONSUMER's flags and be silently wrong.
+// A lifetime gate downstream must SKIP on false, never pass — under a rewinding reset it cannot
+// distinguish a correct lifetime from a lucky one, and a pass would assert something it did not
+// test.
+[[nodiscard]] bool arena_poisons_on_reset() noexcept;
 } // namespace insight::tokenization
 
 // ──────── from api/insight/utils/failure_lexicon.hpp ────────

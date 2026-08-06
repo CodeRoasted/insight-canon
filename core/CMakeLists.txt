@@ -18,6 +18,43 @@ option(INSIGHT_CANON_BUILD_TESTS  "Build unit and regression tests" ${PROJECT_IS
 # from the `with_numa` option — default False — and a raw cmake build stays safe).
 option(INSIGHT_CANON_ENABLE_NUMA  "Enable NUMA-aware arena allocation (libnuma, LGPL-2.1, vendored via conan)" OFF)
 
+# Arena reset poison — a DEBUG-BUILD INSTRUMENT (arena_allocator.cpp explains what and why).
+# Default ON for Debug, which is also what the ASan/MSan profiles set (malf/profiles/*-asan,
+# *-msan carry build_type=Debug), so `malf test --asan` gets it without a second switch.
+#
+# Keyed on the BUILD TYPE, deliberately not on a bare NDEBUG: NDEBUG is a property of whatever
+# flags happened to reach the compiler, so gating on it makes the instrument's presence an
+# accident that nobody declares and nobody can read back. An option with a build-type default is a
+# DECLARED instrument — it can be forced on in a release build to reproduce a report, and forced
+# off in a debug build to isolate a perf question, and either choice is visible in the cache.
+# A TRI-STATE re-derived on EVERY configure, deliberately NOT an option().
+#
+# option() seeds the cache once and never re-defaults — and malf reconfigures a build tree IN
+# PLACE when the build type changes, reusing the same directory. So a build-type-defaulted
+# option() is STICKY: a directory first configured Debug keeps the poison ON through every later
+# Release build of that same directory. That is not hypothetical — it was measured here, and the
+# consequence is a memset live on the hot path of a RELEASE canon, which silently pollutes any
+# benchmark run against that tree. A perf instrument that turns itself on in release is worse than
+# no instrument.
+#
+# AUTO (the default) is recomputed from CMAKE_BUILD_TYPE at each configure, so an in-place build
+# type flip flips the instrument with it. An explicit ON/OFF still wins, so a release build can be
+# poisoned deliberately to reproduce a report, and a debug build can be un-poisoned to isolate a
+# perf question — both visible in the cache rather than inferred from flags.
+unset(INSIGHT_CANON_ARENA_POISON CACHE) # purge the sticky BOOL this replaces (see above)
+set(INSIGHT_CANON_ARENA_POISON_MODE AUTO CACHE STRING
+    "Arena reset-poison instrument: ON | OFF | AUTO (AUTO = ON for Debug builds only)")
+set_property(CACHE INSIGHT_CANON_ARENA_POISON_MODE PROPERTY STRINGS AUTO ON OFF)
+if(INSIGHT_CANON_ARENA_POISON_MODE STREQUAL "AUTO")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(INSIGHT_CANON_ARENA_POISON ON)
+    else()
+        set(INSIGHT_CANON_ARENA_POISON OFF)
+    endif()
+else()
+    set(INSIGHT_CANON_ARENA_POISON ${INSIGHT_CANON_ARENA_POISON_MODE})
+endif()
+
 ###########################################################
 #  External dependencies
 ###########################################################
@@ -116,6 +153,15 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(insight_canon PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
 else()
     target_compile_definitions(insight_canon PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO)
+endif()
+
+# PRIVATE like the level above, and for a stronger reason: this switch changes canon's BEHAVIOUR,
+# so it must be decided once, where reset() is compiled. Riding it onto consumers would let a
+# consumer's own compile of the api module disagree with the linked implementation. The runtime
+# `arena_poisons_on_reset()` exists so downstream can still read the answer truthfully.
+if(INSIGHT_CANON_ARENA_POISON)
+    target_compile_definitions(insight_canon PRIVATE INSIGHT_CANON_ARENA_POISON)
+    message(STATUS "insight_canon: arena reset-poison instrument ENABLED (debug instrument; release builds rewind)")
 endif()
 
 ###########################################################
@@ -243,6 +289,13 @@ if(INSIGHT_CANON_BUILD_TESTS)
         set_target_properties(insight_canon_tests PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
         target_compile_definitions(insight_canon_tests PRIVATE
             $<IF:$<CONFIG:Debug>,SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE,SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO>)
+        # The test target RECOMPILES arena_allocator.cpp (white-box, above), so it needs the switch
+        # in its own right — inheriting the library's PRIVATE define is not a thing. Without this
+        # the arena's own instrument test would read `arena_poisons_on_reset() == false` inside a
+        # poisoning build and skip itself: the instrument would ship untested.
+        if(INSIGHT_CANON_ARENA_POISON)
+            target_compile_definitions(insight_canon_tests PRIVATE INSIGHT_CANON_ARENA_POISON)
+        endif()
         target_compile_options(insight_canon_tests PRIVATE
             $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-ffp-contract=off>)
         include(GoogleTest)

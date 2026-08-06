@@ -20,6 +20,36 @@ namespace
         return value != 0 && (value & (value - 1U)) == 0;
     }
 
+    // ── The reset poison: a DEBUG-BUILD INSTRUMENT, not a safety feature ────────────────────────
+    //
+    // WHY IT EXISTS. `reset()` is a bump-pointer rewind: the bytes it releases are still there and
+    // still readable. So a caller that resets the arena while a `CanonicalEvent`'s `template_str`
+    // still points into it reads the right bytes anyway, and NO test can tell correct from lucky
+    // — the suite is green and stays green whatever the lifetime actually is. That is the
+    // green-BLIND failure mode: the gate cannot fail, so its green carries no information.
+    // Overwriting the released bytes is what makes the whole class observable at all; it turns
+    // every existing test into a detector for it, which is the deliverable — not any one case.
+    //
+    // WHY IT COSTS NOTHING IN RELEASE, AND WHY IT ADDS NO FIELD. The fill is `if constexpr`, so a
+    // release `reset()` is byte-for-byte the loop it always was. It deliberately introduces NO
+    // member and NO block field: `offset` already says exactly how much was handed out, so the
+    // instrument reads state that exists rather than adding state. That keeps `ArenaAllocator` and
+    // `Block` layout-identical in every build — the property that makes it safe to link a poisoned
+    // canon against a release consumer, which is precisely the configuration the eidos-side arm
+    // needs (an ODR/layout mismatch there would be a far worse bug than the one being hunted).
+    //
+    // 0xDD is the conventional "released memory" fill. Any non-zero value works; a NON-printable,
+    // non-zero one is chosen so a corrupted read is loud in a diff (garbage, not an empty string)
+    // and can never coincide with test content.
+    inline constexpr bool kPoisonOnReset{
+#ifdef INSIGHT_CANON_ARENA_POISON
+        true
+#else
+        false
+#endif
+    };
+    inline constexpr int kResetPoisonByte{0xDD};
+
     [[nodiscard]] std::uintptr_t align_up(std::uintptr_t value, std::size_t alignment) noexcept
     {
         assert(is_power_of_two(alignment));
@@ -276,9 +306,31 @@ std::string_view ArenaAllocator::store_string(std::string_view str)
 void ArenaAllocator::reset() noexcept
 {
     for (auto& block : blocks_)
+    {
+        // Poison BEFORE the rewind: `offset` is the handed-out extent, and after the rewind that
+        // information is gone. Release compiles this branch away entirely (see kPoisonOnReset).
+        if constexpr (kPoisonOnReset)
+        {
+            if (block.storage != nullptr && block.offset > 0)
+                std::memset(block.storage, kResetPoisonByte, block.offset);
+        }
         block.offset = 0;
+    }
     active_index_ = 0;
     bytes_used_ = 0;
+}
+
+// Build provenance, deliberately a RUNTIME query rather than a constant on the api surface.
+// `INSIGHT_CANON_ARENA_POISON` is PRIVATE to canon's own translation units, so a consumer that
+// compiled the api module itself would read a compile-time constant reflecting ITS flags, not the
+// flags the linked `reset()` was built with — i.e. exactly the wrong answer, and silently. Reading
+// it through a function defined in this TU makes the answer come from the build that owns the
+// behaviour. A downstream lifetime gate MUST consult this and SKIP rather than pass when the
+// instrument is absent: a gate that quietly passes under a non-poisoning build is the green-BLIND
+// shape this instrument exists to remove.
+bool arena_poisons_on_reset() noexcept
+{
+    return kPoisonOnReset;
 }
 
 std::size_t ArenaAllocator::used() const noexcept
