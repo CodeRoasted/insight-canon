@@ -119,6 +119,7 @@ namespace
         std::string_view kind{"SPAN_KIND_INTERNAL"};
         std::string_view status{"STATUS_CODE_UNSET"};
         std::string_view span_attributes; // raw JSON of the span's own attributes[] (verbatim)
+        std::string_view span_links;      // raw JSON of the span's links[] (verbatim)
 
         for (auto field : span)
         {
@@ -151,6 +152,8 @@ namespace
             }
             else if (key == "attributes")
                 read_raw_json_or_keep(field.value(), span_attributes);
+            else if (key == "links")
+                read_raw_json_or_keep(field.value(), span_links);
         }
 
         out += R"({"traceId":)";
@@ -161,6 +164,22 @@ namespace
         {
             out += R"(,"parentSpanId":)";
             out += parent_span_id;
+        }
+        // ── Span Links: the one field this unpack may not drop (DN-29.D7) ──────────────────────
+        // A Span Link is the DECLARED cross-trace Régime-B edge (ADR-29.D2) — the argument the
+        // whole OTEL subject was minted on (ADR-29.D1). Dropping it here made the document path
+        // silently delete the fact that distinguishes this subject from a dialect, and the
+        // byte-equivalence golden went green over it because its fixture carried no link.
+        //
+        // Carried VERBATIM, and positioned after parentSpanId / before name because that is where
+        // the lab writes it (logcraft `fmt_otel_span`) — the flat-span parser is authored once
+        // against the lab's byte form, so a re-serializer that carries links in a different slot
+        // is not shape-1 ≡ shape-2. Empty ⇒ nothing written, matching the lab's own
+        // empty-links rule, so a span without links stays byte-identical to the pre-links form.
+        if (span_links.size() > 2 && span_links.front() == '[' && span_links.back() == ']')
+        {
+            out += R"(,"links":)";
+            out += span_links;
         }
         out += R"(,"name":)";
         out += name;
@@ -192,20 +211,67 @@ namespace
 
 } // namespace
 
-// The probe COMPARES the root object's first key; it does not SEARCH for it. That is a measured
-// choice, not a stylistic one (ADR-29.D7 requires "bounded", and the first form that met the
-// letter of it still cost 12%):
+// The probe COMPARES the root object's first key against a closed set; it does not SEARCH the line
+// for a key. That is a measured choice, and BOTH its numbers belong here — the rejected form's and
+// the accepted form's.
 //
-//   * a bounded WINDOW search — `substr(0, 256).contains("\"resourceSpans\"")` — measured
-//     +154 ns/line (1286 → 1440 µs per 1000 lines, 7 reps, stddev ≈ 13-15 µs) on the non-OTEL
-//     nested-JSON workload. The needle begins with `"`, and structured JSON is dense in `"`, so a
+// THE BASELINE ALL THREE FIGURES ARE A FRACTION OF: `Tokenizer::process_line` over the non-OTEL
+// nested-JSON workload (`BM_TokenizationThroughputNestedJson`, insight-canon/bench), 1000 lines per
+// iteration, 2 independent builds x 7 repetitions, clang-21/libc++ release, one box. That
+// population — structured JSON that reaches the simdjson slow path and carries no OTEL field — is
+// the one charged for this probe, and the percentages below are of ITS per-line tokenize cost,
+// not of a window, a pipeline stage, or the product path.
+//
+//   HEAD, no probe on this path      1286 / 1321 us per 1000 lines   (stddev 14.9 / 11.7)
+//   bounded WINDOW search + refusal        1440 us                   (stddev 12.9)  +10.5%
+//   first-key COMPARE + refusal      1354 / 1363 us                  (stddev 12.1 / 7.4)  +4.2%
+//
+//   * The WINDOW form — `substr(0, 256).contains("\"resourceSpans\"")` — meets ADR-29.D7's letter
+//     and is the worst arm. Its needle begins with `"` and structured JSON is dense in `"`, so a
 //     naive substring search restarts on nearly every byte of the window.
-//   * comparing the first key is O(1): two whitespace skips and a 15-byte prefix compare, with no
+//   * Comparing the first key is O(1): two whitespace skips and a bounded prefix compare, with no
 //     window constant to justify.
 //
-// The strictness this buys is free, because OTLP's ExportTraceServiceRequest has exactly ONE
-// top-level field: in any export of that message `"resourceSpans"` IS the first key. A payload
-// that puts something else first is not that message, and is handled as content.
+// THE ACCEPTED FORM IS NOT FREE, AND IT WAS ACCEPTED ON JUDGMENT. +4.2% is above this bench's
+// build-to-build spread (~2.7%, measured by rebuilding HEAD twice), so it is a real cost, paid to
+// convert a silent wrong answer into a refusal. No threshold was pre-registered for it — the
+// measurement ran AFTER the rewrite, so there was no declared budget for it to come in under, and
+// calling it "within budget" would invent one after the fact.
+//
+// ── The closed set, its DATED premise, and what breaks when OTLP grows a top-level field ─────
+//
+// JSON object key order is NOT semantically significant. "The first key is resourceSpans" is
+// therefore a statement about what PRODUCERS emit, never about what the format guarantees — which
+// is exactly why this is a closed SET rather than one hard-coded compare.
+//
+// THE PREMISE, DATED, because an assumed premise is not auditable and a dated one is (DN-29.D15):
+//   * Claim: OTLP's `ExportTraceServiceRequest` carries exactly ONE top-level field
+//     (`resource_spans`), so in any export of that message `"resourceSpans"` is the first key.
+//   * Established: 2026-08-06, from the OTLP wire contract as known to the author.
+//   * NOT established by: a fetched or vendored schema artifact. No opentelemetry-proto is
+//     vendored anywhere in this workspace, so nothing in-repo can re-derive or re-check this.
+//     Stated so a reader weighs the claim by its actual evidence rather than by its confidence.
+//
+// WHAT BREAKS IF OTLP ADDS A SIBLING FIELD AND A PRODUCER EMITS IT FIRST: this probe (L1) stops
+// claiming a real export, so the hard refusal does not fire. It does NOT follow that the export is
+// then read silently, and that is the whole point of DN-29.D15's layering:
+//
+//   L1  record, pre-parse   this predicate, against the dated set   hard REFUSAL
+//   L2  record, post-parse  zero recognized roles (json.cpp)        WARN naming the keys seen
+//   L3  acquisition         broad, over-triggering                  UNPACK
+//
+// L2 does not depend on this premise AT ALL — it knows nothing about OTLP, so the same schema
+// change cannot defeat both. A stale premise therefore degrades to: L1 stops recognising, L2
+// diagnoses, L3 still unpacks. Lost capability with a log line, never a wrong answer.
+//
+// ⚠ L3 DOES NOT EXIST YET (DN-29.D6(a) is unbuilt), so today a non-canonical export is not
+// unpacked. It is no longer SILENT, which is what DN-29.D6(b) actually requires — L2 is live in
+// this same unit. Adding a member here is a one-line fix if OTLP moves.
+//
+// DO NOT VENDOR AN opentelemetry-proto TO "FIX" THE UNVERIFIABLE PREMISE. That takes a real
+// dependency to support a comment, and L2 already removes the consequence that would justify it.
+constexpr std::array<std::string_view, 1> kExportFirstKeys{R"("resourceSpans")"};
+
 bool is_otel_span_document(std::string_view line) noexcept
 {
     static constexpr std::string_view kWhitespace{" \t\n\r"};
@@ -215,7 +281,11 @@ bool is_otel_span_document(std::string_view line) noexcept
     const std::size_t key{line.find_first_not_of(kWhitespace, open + 1)};
     if (key == std::string_view::npos)
         return false;
-    return line.substr(key).starts_with(R"("resourceSpans")");
+    const std::string_view first_key{line.substr(key)};
+    for (const std::string_view accepted : kExportFirstKeys)
+        if (first_key.starts_with(accepted))
+            return true;
+    return false;
 }
 
 // one coherent traversal of the OTLP resourceSpans→scopeSpans→spans nesting emitting one line per

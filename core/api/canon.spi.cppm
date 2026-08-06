@@ -49,6 +49,24 @@ struct ParsedLine
     // a failure WORD in echoed shell source never confers an alerting level. `false` for every
     // non-echoed line.
     bool echoed_source{false};
+    // ── The LEGIBILITY MARKER (DN-29.D16, L2 of DN-29.D15) ─────────────────────────────────────
+    // EMPTY when the parse recognized at least one declared role (timestamp / level / component /
+    // message, or an OTEL record). NON-EMPTY when it recognized NONE — and then it holds a WITNESS
+    // KEY that WAS present in the input, so a consumer can see not merely THAT nothing was read but
+    // WHAT arrived. A view into the raw line or the arena: no allocation, on any path.
+    //
+    // A DISTINCT SPECIES from `echoed_source` above, and the distinction is load-bearing rather
+    // than pedantic. That one is OBSERVATION-provenance — how the line was observed. This is the
+    // parse's own statement that it produced a value it could not interpret. Keeping it
+    // schema-blind — it knows nothing about OTLP, ECS, or any format — is exactly what lets it
+    // survive a schema move that defeats every format-aware check.
+    //
+    // ⚠ IT IS A STATEMENT, NEVER A VERDICT. A marked line is still emitted, still analysed, still
+    // improvable — the marker MUST NOT be turned into a rejection. Rejecting the role-less
+    // population would foreclose reading it better later, which is the direction DN-030 takes; and
+    // `std::expected`'s error channel is the wrong home for it besides, because zero roles is a
+    // SUCCESSFUL parse of low information, not a failure to produce a value.
+    std::string_view no_role_witness_key;
     // OTEL trace context (SRC-D-OTEL-1), populated by a strategy that recognizes OTEL log records
     // (today: JsonStrategy on OTLP/JSON). Consumed downstream — trace-scoped n-gram grouping, and
     // the observed causal DAG for the declared vertex/edge (ADR-29.D2) — never serialized;
@@ -194,9 +212,10 @@ inline constexpr std::string_view kAnyDialect{};
 // Does a row gated to `dialect_gate` fire on a stream whose caller declared `declared_dialect`?
 // Deliberately a SECOND predicate beside `channel_admits` rather than one shared helper, on the
 // house precedent set when `gates_intersect` and the since-retired `gate_matches` were kept
-// apart with a comment saying why: the two coordinates answer different questions against different vocabularies (0029 D5's
-// materialization vs 0064's vocabulary-over-a-host), each is documented against its own ADR, and a
-// merged predicate would make a call site read as if the two axes were one.
+// apart with a comment saying why: the two coordinates answer different questions against different
+// vocabularies (0029 D5's materialization vs 0064's vocabulary-over-a-host), each is documented
+// against its own ADR, and a merged predicate would make a call site read as if the two axes were
+// one.
 //   * kAnyDialect row              → always fires (a universal role row is untouched)
 //   * concrete row, same dialect   → fires
 //   * concrete row, other dialect  → does NOT fire (a Jenkins row never fires on a GHA stream)

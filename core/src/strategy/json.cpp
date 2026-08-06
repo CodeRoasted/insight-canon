@@ -77,6 +77,78 @@ namespace
         return is_otel;
     }
 
+    // L2's rate limit (DN-29.D15). First occurrence, then every Nth: an entirely unreadable stream
+    // would otherwise flood the log from the hot path, and the tenth identical line carries nothing
+    // the first did not. Same principle as LogParser's failure warning and the n-gram cap notice.
+    constexpr std::uint64_t kWarnEveryNRoleless{1000};
+
+    // The witness key L2 puts ON the returned value (DN-29.D16). Returns a view into `line` itself
+    // — never into simdjson's padded buffer, which is thread-local scratch the next line
+    // overwrites, and never into a local, which would dangle the moment this returns. `line` is the
+    // bytes LogParser already made arena-stable before calling parse(), so the view outlives the
+    // event.
+    //
+    // The FIRST top-level key is the witness: extracting it is the same O(1) walk the document
+    // probe does (skip whitespace, expect `{`, take the quoted key), it needs no simdjson cursor,
+    // and one key that was genuinely present answers "what arrived?" — which is the question a
+    // reader has. The full key list is the WARN's job, not the value's.
+    [[nodiscard]] std::string_view first_top_level_key(std::string_view line) noexcept
+    {
+        // Non-empty by construction so the marker is never silently blank on a line that failed to
+        // yield one: an empty marker MEANS "roles were recognized", and a blank here would assert
+        // exactly the opposite of what happened. Static storage, so the view is always valid.
+        static constexpr std::string_view kUnreadable{"<no readable top-level key>"};
+        static constexpr std::string_view kWhitespace{" \t\n\r"};
+        const std::size_t open{line.find_first_not_of(kWhitespace)};
+        if (open == std::string_view::npos || line[open] != '{')
+            return kUnreadable;
+        const std::size_t quote{line.find('"', open + 1)};
+        if (quote == std::string_view::npos)
+            return kUnreadable;
+        const std::size_t end{line.find('"', quote + 1)};
+        if (end == std::string_view::npos || end == quote + 1)
+            return kUnreadable;
+        return line.substr(quote + 1, end - quote - 1);
+    }
+
+    // Name the object's top-level keys for L2's diagnostic. COLD PATH ONLY — called after the line
+    // is already known to have yielded no role, and behind the rate limit, so a re-walk is free
+    // where it matters and never paid where it does not. Uses its OWN parser rather than the
+    // thread-local scratch, whose cursor is still held by the caller's live document. Output is
+    // bounded in both key count and key length: a diagnostic that can be made arbitrarily large by
+    // its own input is a second defect, not an aid.
+    [[nodiscard]] std::string top_level_keys_for_diagnosis(std::string_view line)
+    {
+        constexpr std::size_t kMaxKeys{8};
+        constexpr std::size_t kMaxKeyChars{40};
+        simdjson::ondemand::parser parser;
+        simdjson::padded_string padded{line};
+        simdjson::ondemand::document doc;
+        if (parser.iterate(padded).get(doc) != simdjson::SUCCESS)
+            return "<unparseable>";
+        simdjson::ondemand::object root;
+        if (doc.get_object().get(root) != simdjson::SUCCESS)
+            return "<not a JSON object>";
+        std::string out;
+        std::size_t shown{0};
+        for (auto field : root)
+        {
+            std::string_view key;
+            if (field.unescaped_key().get(key) != simdjson::SUCCESS)
+                continue;
+            if (shown == kMaxKeys)
+            {
+                out += ", ...";
+                break;
+            }
+            if (shown > 0)
+                out += ", ";
+            out += key.substr(0, kMaxKeyChars);
+            ++shown;
+        }
+        return out;
+    }
+
     // Forward decl: parse_otel_span (just below) stores its span_duration_ns ordinal through this,
     // which is defined further down alongside the other ordinal helpers.
     [[nodiscard]] std::span<const OrdinalObservation>
@@ -448,6 +520,11 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     }
 
     std::string_view scratch_view;
+    // The fourth role probe's own result. The other three are readable off `parsed_line`, but
+    // `content` is set on BOTH branches — a recognized message and the raw-line fallback are
+    // indistinguishable afterwards, and treating the fallback as a role is exactly what would make
+    // L2 below silent on the input it exists for.
+    bool recognized_message{false};
 
     if (try_get_string(root, kTimestampKeys, scratch_view))
     {
@@ -487,6 +564,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
         if (try_get_string(root, kMessageKeys, scratch_view))
         {
             parsed_line.content = arena.store_string(scratch_view);
+            recognized_message = true;
         }
         else
         {
@@ -519,6 +597,68 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
                     parsed_line.level = utils::parse_log_level(scratch_view);
             }
         }
+    }
+
+    // ── L2 — the independent backstop against a SILENT wrong answer (DN-29.D15) ─────────────
+    //
+    // L1 above (is_otel_span_document) is a hard refusal, but it can only refuse what it
+    // RECOGNISES, and it recognises via a dated premise about OTLP's top-level key. Nothing in this
+    // repo can re-derive that premise — no opentelemetry-proto is vendored anywhere — so L1 alone
+    // would leave a schema change reading as a clean parse. L2 is the layer that cannot be defeated
+    // by the same change, because it knows nothing about OTLP at all.
+    //
+    // THE PREDICATE IS ALREADY COMPUTED. By this point all four role probes have run, so "this
+    // object yielded no role we understand" costs one integer test. There is no needle, no window
+    // constant and no second pass on the ~100% of lines that yield a role. Naming the keys DOES
+    // cost a re-walk, and it is paid only on the diagnostic path — i.e. only once we already know
+    // the line was not understood.
+    //
+    // WHAT IT GUARANTEES, EXACTLY — the record path never SILENTLY emits a canonical event for
+    // input it understood nothing of. It does NOT promise to recognise a non-canonical export;
+    // it promises not to be silent about one. That is DN-29.D6(b)'s actual requirement (the word
+    // is "silently"), and it holds for a re-ordered resourceSpans, for a resourceLogs envelope,
+    // and for OTLP shapes that do not exist yet.
+    //
+    // A MARKER, NOT A REFUSAL. A role-less JSON object is not necessarily a document — it may be an
+    // application record whose vocabulary we do not read yet, which is the subject DN-030 exists to
+    // improve. Refusing it would convert a reading gap into data loss, and would foreclose reading
+    // it better later. So the line is emitted, analysed, and MARKED.
+    //
+    // THE DISCHARGE IS THIS ASSIGNMENT, NOT THE LOG LINE BELOW. A WARN desilences the console; a
+    // caller consuming parse() would still receive a value indistinguishable from a well-parsed
+    // record, which by DN-30.O1's verb 2 is a precision-first defect rather than a declared
+    // limitation. It is also untestable here — canon has no test-observable log sink, so an arm
+    // written against a log line goes green the day this code is deleted (the can't-FAIL row of
+    // MEM:synthetic-gate-vacuity-vs-judgment).
+    if (!is_otel && parsed_line.timestamp == std::nullopt &&
+        parsed_line.level == LogLevel::Unknown && parsed_line.component.empty() &&
+        !recognized_message)
+    {
+        // ⚠ UNCONDITIONAL, AND IT MUST STAY ABOVE THE RATE LIMIT BELOW. The marker is set on EVERY
+        // role-less record; the sampling governs ONLY the log emission. Moving this inside the
+        // `if` would leave 999 of every 1000 role-less events carrying an EMPTY marker —
+        // indistinguishable to a consumer from a well-parsed record, which is precisely the
+        // console-desilenced / contract-mute state DN-29.D16 was ruled to end. Two statements about
+        // one condition, and only the console's may be sampled.
+        parsed_line.no_role_witness_key = first_top_level_key(line);
+
+        // ERGONOMICS, never the contract, and no test may assert against it. Rate-limited on the
+        // precedent in close_metalog_window_at: the n-gram cap warns once per WINDOW, not once per
+        // drop, because a per-event warn floods from the hot path. Thread-local because `parse` is
+        // const and a strategy instance is per-tokenizer, i.e. per thread.
+        //
+        // CONSEQUENCE OF THE THREAD-LOCAL, so nobody builds on it: "first occurrence" fires once
+        // per WORKER, so diagnostic VOLUME varies with worker count. That is fine for a log and it
+        // is not deterministic content — but it means no test may ever assert on the number of
+        // lines emitted here. Assert on the marker, which is per-record and exact.
+        thread_local std::uint64_t roleless_count{0};
+        ++roleless_count;
+        if (roleless_count == 1 || roleless_count % kWarnEveryNRoleless == 0)
+            INSIGHT_LOG_WARN(logging::strategy_logger(),
+                             "JSON object yielded NO recognized role (no timestamp, level, "
+                             "component or message) — the event is emitted and MARKED, not "
+                             "dropped. Top-level keys: [{}] (total such lines={})",
+                             top_level_keys_for_diagnosis(line), roleless_count);
     }
 
     INSIGHT_LOG_TRACE(

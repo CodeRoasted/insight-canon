@@ -195,8 +195,8 @@ struct OtelTraceContext
                          // log record with trace context (positional causality → the adjacency
                          // ring). Set by the flat-span parser; false on the OTEL-log path. Metalog
                          // routes spans to the observed DAG, never the adjacency ring.
-    TraceId trace_id{};     // the transaction grouping key
-    SpanId span_id{};       // the declared causal vertex identity
+    TraceId trace_id{};  // the transaction grouping key
+    SpanId span_id{};    // the declared causal vertex identity
     SpanId parent_span_id{}; // the declared causal edge span→parent
 };
 
@@ -320,8 +320,8 @@ inline constexpr std::array<OrdinalScheduleSpec, 2> kOrdinalScheduleCatalog{{
 
 // A declared ordinal field: exact name → schedule + the integer factor scaling the field's declared
 // unit to the schedule's CANONICAL unit (ns for durations, bytes for sizes). Every factor is a
-// power of ten (or 1) so the decimal→fixed-point parse is EXACT (SRC-D-W1-3 pin: the value is parsed
-// from the JSON number's decimal TEXT, never via double — a get_double()→cast would be the
+// power of ten (or 1) so the decimal→fixed-point parse is EXACT (SRC-D-W1-3 pin: the value is
+// parsed from the JSON number's decimal TEXT, never via double — a get_double()→cast would be the
 // forbidden float→int on the deterministic-content path).
 struct OrdinalFieldDescriptor
 {
@@ -383,9 +383,10 @@ match_ordinal_field(std::string_view key) noexcept
 
 // Parse a non-negative JSON numeric token's decimal TEXT to an int64 in the schedule's canonical
 // unit, multiplying by `scale` (a power of ten, or 1). Integer/decimal-string arithmetic only —
-// NEVER via double (SRC-D-W1-3 determinism pin). Returns nullopt on a malformed / negative / exponent /
-// overflowing token (the observation is then omitted — omit-when-absent). Fractional digits beyond
-// the scale's decimal places are truncated (deterministic). `scale` MUST be a power of ten or 1.
+// NEVER via double (SRC-D-W1-3 determinism pin). Returns nullopt on a malformed / negative /
+// exponent / overflowing token (the observation is then omitted — omit-when-absent). Fractional
+// digits beyond the scale's decimal places are truncated (deterministic). `scale` MUST be a power
+// of ten or 1.
 [[nodiscard]] constexpr std::optional<std::int64_t>
 parse_decimal_scaled(std::string_view text, std::int64_t scale) noexcept
 {
@@ -433,8 +434,8 @@ parse_decimal_scaled(std::string_view text, std::int64_t scale) noexcept
     return value;
 }
 
-// A recognized ordinal observation (W1, SRC-D-W1-3): the matched declared field, its schedule, and the
-// value parsed to the canonical-unit int64. Consumed-not-tokenized — carried on CanonicalEvent
+// A recognized ordinal observation (W1, SRC-D-W1-3): the matched declared field, its schedule, and
+// the value parsed to the canonical-unit int64. Consumed-not-tokenized — carried on CanonicalEvent
 // parallel to the params/trace, NEVER serialized as a param. `field_name` is the catalog's static
 // key (stable for the program lifetime — no arena), surfaced on the diff row for `attributable_to`.
 struct OrdinalObservation
@@ -980,6 +981,21 @@ struct CanonicalEvent
     // failure-cue tier for an all-echoed template (§3.1) — and NEVER serialized: the MetaLog wire
     // shape is unchanged (like `trace`/`ordinals`). `false` for every non-echoed line.
     bool echoed_source{false};
+    // ── The LEGIBILITY MARKER (DN-29.D16) — the guarantee at the PIPELINE boundary ─────────────
+    // EMPTY when the parse recognized at least one declared role; NON-EMPTY when it recognized
+    // none, holding a WITNESS KEY that WAS present in the input. Carried here, and not left on
+    // `ParsedLine`, because this is where the guarantee binds: the record path NEVER SILENTLY emits
+    // a canonical event for input it understood nothing of, and a marker a consumer cannot see
+    // desilences the console rather than the contract.
+    //
+    // A view into arena-stable bytes; CONSUMED in-memory and NEVER serialized — the MetaLog wire
+    // shape is unchanged, exactly like `trace` / `ordinals` / `echoed_source`. A DISTINCT species
+    // from `echoed_source` (see canon.spi.cppm's declaration for why that separation is what keeps
+    // this schema-blind).
+    //
+    // ⚠ A STATEMENT, NEVER A VERDICT — a marked event is still analysed. Consumers may report it,
+    // count it, or route it for improvement; none may drop it on this field alone.
+    std::string_view no_role_witness_key;
 };
 
 } // namespace insight::tokenization
@@ -1354,9 +1370,9 @@ inline constexpr int kDefaultReferenceYear{2024};
 
 // The RFC3339 full-datetime byte GRAMMAR — one owner, two consumers (ADR-23 erratum 2's "three
 // spellings of one shape", collapsed): the Jenkins strategy's `timestamper_prefix_end` delegates
-// its character grammar here, and the masker's `bracket_timestamp` composite rule (SRC-D-MSK-5) tests
-// a bracket interior with the same function. Homed PUBLIC (not in the mask detail) because the
-// Jenkins package imports only insight.canon.api/spi — canon's detail shards are sealed, so a
+// its character grammar here, and the masker's `bracket_timestamp` composite rule (SRC-D-MSK-5)
+// tests a bracket interior with the same function. Homed PUBLIC (not in the mask detail) because
+// the Jenkins package imports only insight.canon.api/spi — canon's detail shards are sealed, so a
 // detail-homed grammar could not be delegated to (bibles/jenkins_dialect.md §4, homing note).
 // Returns the number of bytes consumed by a COMPLETE datetime starting at `pos`, or 0 when the
 // bytes at `pos` do not carry one. Accepted shape, byte-exact — `YYYY-MM-DDTHH:MM:SS`, optional
@@ -1373,9 +1389,9 @@ inline constexpr int kDefaultReferenceYear{2024};
     constexpr std::size_t kDateLen{10U};
     constexpr std::size_t kTimeLen{8U};
     constexpr unsigned kDecimalBase{10U};
-    const auto digit_at{[&text](std::size_t at) noexcept {
-        return at < text.size() && static_cast<unsigned>(text[at]) - '0' < kDecimalBase;
-    }};
+    const auto digit_at{
+        [&text](std::size_t at) noexcept
+        { return at < text.size() && static_cast<unsigned>(text[at]) - '0' < kDecimalBase; }};
     const std::size_t start{pos};
     if (pos + kDateLen + 1U + kTimeLen > text.size())
         return 0;
@@ -1388,8 +1404,7 @@ inline constexpr int kDefaultReferenceYear{2024};
         return 0;
     ++pos;
     if (!(digit_at(pos) && digit_at(pos + 1U) && text[pos + 2U] == ':' && digit_at(pos + 3U) &&
-          digit_at(pos + 4U) && text[pos + 5U] == ':' && digit_at(pos + 6U) &&
-          digit_at(pos + 7U)))
+          digit_at(pos + 4U) && text[pos + 5U] == ':' && digit_at(pos + 6U) && digit_at(pos + 7U)))
         return 0;
     pos += kTimeLen;
     if (pos < text.size() && text[pos] == '.') // optional fraction
@@ -1526,8 +1541,8 @@ inline constexpr std::string_view kTokenizerLogger{"insight.tokenizer"};
 // emitted untagged, unroutable by name, and invisible to any sink attached to
 // "insight.pipeline". A hand-enumerated mirror of a declaration list is the defect class;
 // this removes the mirror.
-inline constexpr std::array kAllLoggers{kArenaLogger,     kMaskLogger,     kPipelineLogger,
-                                        kDetectorLogger,  kParserLogger,   kStrategyLogger,
+inline constexpr std::array kAllLoggers{kArenaLogger,    kMaskLogger,   kPipelineLogger,
+                                        kDetectorLogger, kParserLogger, kStrategyLogger,
                                         kTokenizerLogger};
 
 // Creates all named loggers with a shared stdout colour sink. Call once before any logging
@@ -1871,8 +1886,8 @@ constexpr NormalizedContent NormalizedLine::undeclared_suffix(std::size_t offset
 //
 // Strip CSI / SGR / OSC and bare-ESC terminal escape sequences from a line as an UNCONDITIONAL
 // content normalization at canon ingest — BEFORE tokenization. Colour is presentation, never
-// content (SRC-D-TID-10); the escapes interleave within/between tokens (`\x1b[31mERROR\x1b[0m`) so a
-// per-token mask cannot reach them — they must die here. A pure byte state machine: no float,
+// content (SRC-D-TID-10); the escapes interleave within/between tokens (`\x1b[31mERROR\x1b[0m`) so
+// a per-token mask cannot reach them — they must die here. A pure byte state machine: no float,
 // order-independent → cross-stdlib bit-identical.
 //
 // FAST PATH, now inside the factory (the gate LogParser used to carry at its call site): a line

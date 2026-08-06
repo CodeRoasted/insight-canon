@@ -116,6 +116,12 @@ struct Tokenizer::Impl
                                                          // a runtime event; consumed (salience tier
                                                          // gate), never serialized; false for the
                                                          // vast majority of lines
+        // DN-29.D16 — the legibility marker crosses to the event by the same copy `component` and
+        // `host` take above. This is where L2's guarantee actually binds: a marker that stopped at
+        // ParsedLine would leave the pipeline receiving a confident, unmarked event, which
+        // desilences canon's internals and not the contract. Empty for every line that yielded a
+        // role, i.e. for the overwhelming majority.
+        event.no_role_witness_key = parsed_line.no_role_witness_key;
 
         ++produced;
 
@@ -163,9 +169,10 @@ Tokenizer::process_batch(std::span<const std::string_view> lines)
     std::vector<std::string> span_records; // reused scratch for the document unpack
     for (auto line : lines)
     {
-        // SRC-D-OTEL-18 record-source 1→N: an OTLP `resourceSpans` export is unpacked into N canonical
-        // flat-span records, each tokenized 1:1 (the strategy stays 1:1). A flat span (shape 2) and
-        // every non-OTEL line take the direct path — byte-identical to the pre-span-ingest path.
+        // SRC-D-OTEL-18 record-source 1→N: an OTLP `resourceSpans` export is unpacked into N
+        // canonical flat-span records, each tokenized 1:1 (the strategy stays 1:1). A flat span
+        // (shape 2) and every non-OTEL line take the direct path — byte-identical to the
+        // pre-span-ingest path.
         if (is_otel_span_document(line))
         {
             span_records.clear();
