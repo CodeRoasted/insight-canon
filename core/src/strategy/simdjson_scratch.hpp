@@ -259,10 +259,40 @@ inline void skip_json_ws(std::string_view line, std::size_t& pos) noexcept
         ++pos;
 }
 
+// SRC-D-ECS-1 shape 1 — resolve a compound key to its LAST SEGMENT. `log.level` → `level`;
+// `a.b.c` → `c`; a key with no dot is returned unchanged, so this is the identity on every
+// ordinary key and needs no caller branch.
+//
+// IT LIVES IN THIS HEADER SO THE TWO KEY-MATCHING SITES SHARE ONE DEFINITION. json.cpp has two
+// paths that classify keys — the escape-free fast scanner below and the simdjson slow path — and
+// parse() RETURNS EARLY on a fast-path hit, so a rule applied only on the slow path is invisible
+// to every flat line. That is exactly the shape a namespaced producer emits, so the rule would
+// have been dead on its main population. Defining it once here is what stops the two paths
+// disagreeing about what a key means.
+// ⚠ THE BOUND IS ONE DOT, and it is shared with the nested shape's one descent. `log.level` →
+// `level`; `a.b.level` resolves to NOTHING and is claimed by no role. Taking the last segment at
+// any depth would have made the dotted spelling read `a.b.level` while the nested spelling
+// `{"a":{"b":{"level":…}}}` refused it — the same logical document read differently depending on
+// which wire form its producer chose. One grammar, one bound, both shapes.
+[[nodiscard]] inline constexpr std::string_view compound_key_name(std::string_view key) noexcept
+{
+    const std::size_t dot{key.find('.')};
+    if (dot == std::string_view::npos)
+        return key; // ordinary key — the identity, so no caller needs a branch
+    const std::string_view tail{key.substr(dot + 1)};
+    if (tail.find('.') != std::string_view::npos)
+        return {}; // beyond the bound: matches no role name, which are all non-empty
+    return tail;
+}
+
 // Assign a string value to the first matching field in result.
-inline void assign_string_field(FastJsonResult& result, std::string_view key,
+inline void assign_string_field(FastJsonResult& result, std::string_view raw_key,
                                 std::string_view value) noexcept
 {
+    // The compound SHAPE, applied before any name comparison (SRC-D-ECS-1). No vendor field name
+    // is added to the comparisons below — they are unchanged; only the key handed to them is
+    // resolved first.
+    const std::string_view key{compound_key_name(raw_key)};
     const bool no_ts = result.timestamp_str.empty() && result.timestamp_ms == 0;
     if (no_ts && (key == "ts" || key == "timestamp" || key == "@timestamp" || key == "time" ||
                   key == "datetime"))

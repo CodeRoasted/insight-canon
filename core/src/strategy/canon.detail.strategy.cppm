@@ -174,15 +174,11 @@ class JsonStrategy final : public IFormatStrategy
     [[nodiscard]] LogFormat format() const noexcept override;
     [[nodiscard]] double confidence(std::string_view line) const noexcept override;
 
-  private:
-    static constexpr std::array<std::string_view, 5> kTimestampKeys{"timestamp", "ts", "@timestamp",
-                                                                    "time", "datetime"};
-    static constexpr std::array<std::string_view, 4> kLevelKeys{"level", "severity", "loglevel",
-                                                                "log_level"};
-    static constexpr std::array<std::string_view, 5> kMessageKeys{"message", "msg", "log", "text",
-                                                                  "body"};
-    static constexpr std::array<std::string_view, 5> kComponentKeys{"component", "source", "logger",
-                                                                    "service", "module"};
+    // The four role-name vocabularies moved to json.cpp's implementation scope (SRC-D-ECS-1): they
+    // are the strategy's private business, nothing outside its own TU ever named them, and the
+    // compound-key router needs them at namespace scope. A module interface that carries a
+    // private lookup table publishes an implementation detail and forces every consumer to
+    // recompile when a name is added.
 };
 
 } // namespace insight::tokenization

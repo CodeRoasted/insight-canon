@@ -17,6 +17,193 @@ namespace insight::tokenization
 namespace
 {
 
+    // ── The four role-name vocabularies (moved off the class, SRC-D-ECS-1) ─────────────────────
+    // These are canon's OWN names for the four roles it reads. They are deliberately NOT a
+    // registry of vendor field names, and SRC-D-ECS-1 below is what keeps them that way.
+    constexpr std::array<std::string_view, 5> kTimestampKeys{"timestamp", "ts", "@timestamp",
+                                                             "time", "datetime"};
+    constexpr std::array<std::string_view, 4> kLevelKeys{"level", "severity", "loglevel",
+                                                         "log_level"};
+    constexpr std::array<std::string_view, 5> kMessageKeys{"message", "msg", "log", "text", "body"};
+    constexpr std::array<std::string_view, 5> kComponentKeys{"component", "source", "logger",
+                                                             "service", "module"};
+
+    // ── SRC-D-ECS-1 — canon reads two SHAPES of compound key, and ZERO new field names ─────────
+    //
+    // THE RULE, and the form IS the decision: a compound key is resolved to the name AFTER ITS
+    // SINGLE DOT, and that name is matched against the vocabularies above. `log.level` → `level`.
+    // `"log":{"level":…}` → `level`. Nothing named `log.level` is added anywhere, and nothing may
+    // be.
+    //
+    // WHY NOT A FIELD NAME, NOT EVEN ONE. Adding `"log.level"` to kLevelKeys would read as the
+    // cheaper fix and it is the one that must not happen: it converts a language feature into a
+    // vendor dialect, and canon's core tier is not a dialect (ADR-17.D1 — dialects are semantic
+    // PACKAGES, composed, never core's business). One vendor name is the back door to an ECS
+    // package living in core, and the second name is then unarguable. Learning the SHAPE instead
+    // is convergence-proof: it covers pino, Serilog, Bunyan, GELF and OTLP bodies at once, and it
+    // costs nothing when the next vocabulary appears because there is no list to extend.
+    //
+    // ⚠ THE FIELD POSITION ONLY — the NAMESPACE position is REFUSED, and this is a DECLARED
+    // LIMITATION, not an oversight (DN-30.D11). `log.level` → `level` and `log.logger` → `logger`
+    // resolve because the FIELD segment is a role name. `service.name` does NOT resolve: its role
+    // word is the NAMESPACE (`service`), and canon reads that position for nobody.
+    //
+    // THE REASON IS STRUCTURAL, NOT A TUNING FAILURE. Under every predicate expressible over the
+    // four vocabularies above, `service.name` and `source.ip` are the SAME shape — a role-word
+    // namespace followed by a field that is in no list. The information that would separate them
+    // (`name` denotes an identity, `ip` denotes an address) is not present in the instrument, so
+    // no rule written here can admit one and refuse the other.
+    //
+    // AND THE CONSEQUENCE IS NOT A CARDINALITY RISK — IT IS A CATEGORY ERROR THE STRUCT ALREADY
+    // NAMES. `ParsedLine::component` is declared the LOW-CARD FUNCTIONAL SOURCE and is a cube
+    // dimension; `host` is the high-card node identity and is deliberately HORS-CUBE. Admitting
+    // the namespace position would put `source.ip` — a host-class value — into the field that
+    // declares it is not one, on a cube dimension. `host.ip`, `client.address` and
+    // `service.node.name` are all ordinary ECS, and that counterexample space is UNMEASURED.
+    //
+    // Two escapes were considered and refused, recorded so they are not re-proposed: keying on
+    // "exactly one string child" FAILS on LogCraft's own ECS (`"service":{"name":…,"type":…}` has
+    // two) and ADMITS the trap (`"source":{"ip":…,"port":54321}` has one, `port` being numeric) —
+    // wrong on the target and dangerous on the counterexample.
+    //
+    // REFUSED, NOT UNKNOWN. The reopening condition is a measurement, not an argument: the
+    // DN-29.D16 legibility marker can report, from a real stream, the cardinality a
+    // namespace-carried resolution would place on the WHERE axis. Until that number exists this
+    // stays a boundary — and a red arm is not a licence to add the missing word to a vocabulary.
+    //
+    // BOUNDED AT EXACTLY ONE LEVEL, both shapes. One dot, one descent. Unbounded descent would
+    // make an arbitrarily nested document's `level` field anywhere in the tree a severity claim,
+    // which is a different and much weaker statement than "this producer namespaced its top-level
+    // fields". The bound is what makes the shape a grammar rather than a search.
+    enum class JsonRole : std::uint8_t
+    {
+        None,
+        Timestamp,
+        Level,
+        Component,
+        Message
+    };
+
+    [[nodiscard]] constexpr bool name_in(std::string_view name,
+                                         std::span<const std::string_view> vocabulary) noexcept
+    {
+        for (const std::string_view candidate : vocabulary)
+            if (name == candidate)
+                return true;
+        return false;
+    }
+
+    // The role a BARE name carries, or None. Order matches parse()'s own precedence.
+    [[nodiscard]] constexpr JsonRole role_of(std::string_view name) noexcept
+    {
+        if (name_in(name, kTimestampKeys))
+            return JsonRole::Timestamp;
+        if (name_in(name, kLevelKeys))
+            return JsonRole::Level;
+        if (name_in(name, kComponentKeys))
+            return JsonRole::Component;
+        if (name_in(name, kMessageKeys))
+            return JsonRole::Message;
+        return JsonRole::None;
+    }
+
+    // Shape 1 (`compound_key_name`) is defined in simdjson_scratch.hpp, NOT here: the escape-free
+    // fast scanner classifies keys too, and parse() returns early on a fast-path hit, so the rule
+    // must be the same object at both sites or a flat namespaced line silently keeps the old
+    // behaviour.
+
+    // Fill ONE role from a compound key's resolved name — but only if that role is still MISSING.
+    // The exact-name pass always wins, which is the property that keeps an already-readable line
+    // byte-identical: a compound key can add a role, never move one.
+    void fill_missing_role(JsonRole role, std::string_view value, ParsedLine& parsed_line,
+                           ArenaAllocator& arena, bool& recognized_message)
+    {
+        switch (role)
+        {
+        case JsonRole::Timestamp:
+            if (!parsed_line.timestamp.has_value())
+            {
+                parsed_line.timestamp = utils::parse_iso8601(value);
+                if (!parsed_line.timestamp)
+                    parsed_line.timestamp = utils::parse_bsd_syslog_ts(value);
+            }
+            break;
+        case JsonRole::Level:
+            if (parsed_line.level == LogLevel::Unknown)
+                parsed_line.level = utils::parse_log_level(value);
+            break;
+        case JsonRole::Component:
+            if (parsed_line.component.empty())
+                parsed_line.component = arena.store_string(value);
+            break;
+        case JsonRole::Message:
+            if (!recognized_message)
+            {
+                parsed_line.content = arena.store_string(value);
+                recognized_message = true;
+            }
+            break;
+        case JsonRole::None:
+            break;
+        }
+    }
+
+    // The compound-key pass (SRC-D-ECS-1). ONE forward walk over the root object: each string
+    // value is offered under its single-dot resolved name (shape 1), and each object value is
+    // descended EXACTLY ONCE with its children offered under their own bare names (shape 2). No key
+    // name is consulted to decide whether to descend — the VALUE's type decides, which is what
+    // makes this a grammar rather than a list.
+    //
+    // It subsumes the hard-coded `"fields"` descent this replaces: that was a single vendor name
+    // (app loggers and LogCraft nest under `fields`) doing by enumeration what shape 2 now does by
+    // structure. Removing it is a name REMOVED from core, not added.
+    void route_compound_keys(simdjson::ondemand::object& root, ParsedLine& parsed_line,
+                             ArenaAllocator& arena, bool& recognized_message)
+    {
+        for (auto field : root)
+        {
+            std::string_view key;
+            if (field.unescaped_key().get(key) != simdjson::SUCCESS)
+                continue;
+            auto value{field.value()};
+            simdjson::ondemand::json_type type{};
+            if (value.type().get(type) != simdjson::SUCCESS)
+                continue;
+
+            if (type == simdjson::ondemand::json_type::object)
+            {
+                simdjson::ondemand::object child;
+                if (value.get_object().get(child) != simdjson::SUCCESS)
+                    continue;
+                for (auto sub : child)
+                {
+                    std::string_view sub_key;
+                    if (sub.unescaped_key().get(sub_key) != simdjson::SUCCESS)
+                        continue;
+                    // Bare name only: the descent is the one level, so a dotted key INSIDE it
+                    // would be a second level of compounding and is deliberately not read.
+                    if (const JsonRole role{role_of(sub_key)}; role != JsonRole::None)
+                    {
+                        std::string_view sub_value;
+                        if (sub.value().get_string().get(sub_value) == simdjson::SUCCESS)
+                            fill_missing_role(role, sub_value, parsed_line, arena,
+                                              recognized_message);
+                    }
+                }
+                continue;
+            }
+
+            if (type != simdjson::ondemand::json_type::string)
+                continue;
+            if (const JsonRole role{role_of(compound_key_name(key))}; role != JsonRole::None)
+            {
+                std::string_view text;
+                if (value.get_string().get(text) == simdjson::SUCCESS)
+                    fill_missing_role(role, text, parsed_line, arena, recognized_message);
+            }
+        }
+    }
+
     // Route the declared OTEL field-map (SRC-D-OTEL-4a) over the parsed OTLP object:
     // severity_number → the LogLevel band (declared > inferred — it runs after the level-string
     // route, so it overrides), and traceId/spanId/parentSpanId → the consumed trace context.
@@ -620,28 +807,28 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
             parsed_line.content = arena.store_string(line);
         }
 
-        // ── Nested-fields fallback (SRC-D-MSK-3) ──────────────────────────────────────
-        // App loggers (and LogCraft) nest custom fields under "fields":{…}, so the
-        // top-level component/level lookups above miss → the cube WHERE axis goes blind
-        // on JSON (bugs.md:27). When either missed, descend ONE level into "fields" and
-        // read {component, level} from it. MUST be the LAST root access — get_nested_object
-        // descends into a child and the parent cursor cannot rewind to a sibling afterward
-        // (so it sits after the top-level message read, and only on the non-OTEL path:
-        // OTEL records use resource attributes, not "fields", and already spent the cursor
-        // on body). A nested object also forces try_fast_parse to bail, so every
-        // nested-fields line reaches this slow path.
-        if (parsed_line.component.empty() || parsed_line.level == LogLevel::Unknown)
+        // ── The COMPOUND-KEY pass (SRC-D-ECS-1) — replaces the hard-coded "fields" descent ─────
+        // Runs only when a role is still missing after the exact-name lookups above, so an
+        // already-readable line never reaches it and cannot be changed by it. That is what makes
+        // this additive: it closes a blindness, it does not re-decide anything.
+        //
+        // The predecessor descended into a literally-named `"fields"` object (app loggers and
+        // LogCraft nest there), which read ONE producer's namespacing convention by enumeration.
+        // Shape 2 does it by structure and therefore also covers `log`, `service`, `host`, and
+        // every namespace a producer invents — while shape 1 covers the same producers' flat
+        // dotted spelling. Net effect on core's vocabulary: one name REMOVED, none added.
+        //
+        // A fresh cursor is required and it is not free: the on-demand cursor is forward-only and
+        // the lookups above spent it. Paid ONLY on a line that is still missing a role — which is
+        // exactly the population this exists for, and never on a canon-named line.
+        if (parsed_line.component.empty() || parsed_line.level == LogLevel::Unknown ||
+            !parsed_line.timestamp.has_value() || !recognized_message)
         {
-            if (simdjson::ondemand::object fields_obj;
-                get_nested_object(root, "fields", fields_obj))
-            {
-                if (parsed_line.component.empty() &&
-                    try_get_string(fields_obj, kComponentKeys, scratch_view))
-                    parsed_line.component = arena.store_string(scratch_view);
-                if (parsed_line.level == LogLevel::Unknown &&
-                    try_get_string(fields_obj, kLevelKeys, scratch_view))
-                    parsed_line.level = utils::parse_log_level(scratch_view);
-            }
+            simdjson::ondemand::document compound_doc;
+            simdjson::ondemand::object compound_root;
+            if (scratch.parser.iterate(padded).get(compound_doc) == simdjson::SUCCESS &&
+                compound_doc.get_object().get(compound_root) == simdjson::SUCCESS)
+                route_compound_keys(compound_root, parsed_line, arena, recognized_message);
         }
     }
 

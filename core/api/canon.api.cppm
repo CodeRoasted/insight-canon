@@ -61,7 +61,18 @@ using EventID = uint64_t;
 // WHOLE-token bracketed RFC3339 full datetime (`[2026-06-23T15:11:09.020Z]`) masks to `[<*>]`
 // instead of falling through to literal KEEP; `template_str`/`template_id` move ONLY for lines
 // carrying that token class, every other document is byte-identical except this version string.
-inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-8"};
+// -9 = SRC-D-ECS-1, the compound-key SHAPES (json.cpp): a top-level key is resolved to its LAST
+// SEGMENT (`log.level` → `level`) and an object value is descended EXACTLY ONE level
+// (`"log":{"level":…}`), each resolved name matched against canon's existing four role
+// vocabularies. ZERO field names are added — the grammar learns two shapes, never a vendor's
+// spelling. Same class as -7 and it takes the bump for the same stated reason: the masker is
+// untouched, so `template_str`/`template_id` do NOT move, but a producer that namespaces its
+// fields (ECS, pino, Serilog, Bunyan, GELF) now yields `level` and `component` where it previously
+// yielded none — and both are SERIALIZED (`dominant_level` gates NewErrorPattern and diff
+// polarity; component is the cube's WHERE axis), so it is output-affecting. A stream whose fields
+// were already canon-named is byte-identical except this string: the compound pass runs only when
+// a role is still MISSING and can add a role, never move one.
+inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-9"};
 
 // ── Template identity (insight_perf_template_id.md SRC-D-TIR-1) ──
 // The structural identity of a canonicalised template: the first 16 bytes of
