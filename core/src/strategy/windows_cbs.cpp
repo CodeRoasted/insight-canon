@@ -56,7 +56,7 @@ std::expected<ParsedLine, std::string> WindowsCBSStrategy::parse(std::string_vie
 
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
-    parsed_line.timestamp = utils::parse_iso8601(ts_str);
+    parsed_line.timestamp = EventTime::parsed(utils::parse_iso8601(ts_str));
     parsed_line.level = utils::parse_log_level(level_sv);
     parsed_line.component = component;
     parsed_line.content = rest;

@@ -24,6 +24,87 @@ import insight.canon.api;      // LogFormat, LogLevel, StructuralRole, IntentMar
 export namespace insight::tokenization
 {
 
+// ── EventTime — a timestamp AND where it came from, as ONE value (DN-29.D12 / DN-29.D14) ───────
+//
+// THE CLAUSE THIS TYPE EXISTS TO MAKE STRUCTURAL: *the timestamp and its provenance are assigned
+// together, through one site, and are not independently settable.* A `bool` beside an
+// `optional<Timestamp>` would be two fields, and the failure mode is then a future declared-time
+// field read WITHOUT setting the flag — the same class as the `links[]` drop, discovered the same
+// way, months later. Here there is nothing to forget: the provenance IS the value.
+//
+// THERE IS DELIBERATELY NO IMPLICIT CONVERSION from `std::optional<Timestamp>`. One would make
+// `timestamp = parse_unix_nano(...)` compile and silently mean PARSED, which re-opens exactly the
+// hole this closes. Every assignment names its provenance, and the compiler enforces it.
+//
+// The read surface forwards, so a consumer asking "is there a time?" is unchanged; only WRITERS
+// were made to say more.
+class EventTime
+{
+  public:
+    EventTime() = default;
+
+    // The strategy INFERRED this time from bytes whose authorship is ambiguous — a printf stamp,
+    // a syslog prefix, a JSON field canon happens to know the name of. This is the default species
+    // and what all nineteen representation strategies produce.
+    [[nodiscard]] static EventTime parsed(std::optional<Timestamp> value) noexcept
+    {
+        EventTime out;
+        out.value_ = value;
+        return out;
+    }
+
+    // The PRODUCER declared this time in a schema field whose meaning is the event time — OTLP
+    // `startTimeUnixNano` / `timeUnixNano`. Not content that resembles a time: the same species of
+    // fact as `trace_id`, which is why it outranks a transport stamp (DN-29.D12 rung 1) where a
+    // parsed one does not.
+    [[nodiscard]] static EventTime declared(Timestamp value) noexcept
+    {
+        EventTime out;
+        out.value_ = value;
+        out.declared_ = true;
+        return out;
+    }
+
+    [[nodiscard]] bool has_value() const noexcept
+    {
+        return value_.has_value();
+    }
+    explicit operator bool() const noexcept
+    {
+        return value_.has_value();
+    }
+    [[nodiscard]] Timestamp value_or(Timestamp fallback) const noexcept
+    {
+        return value_.value_or(fallback);
+    }
+    [[nodiscard]] std::optional<Timestamp> value() const noexcept
+    {
+        return value_;
+    }
+    // Deref forwards too, so `timestamp->time_since_epoch()` reads exactly as it did against the
+    // bare optional. The point of this type is to constrain WRITERS; making readers rewrite would
+    // have been churn with no guarantee attached to it. Precondition is the optional's own.
+    [[nodiscard]] const Timestamp& operator*() const noexcept
+    {
+        return *value_;
+    }
+    [[nodiscard]] const Timestamp* operator->() const noexcept
+    {
+        return &*value_;
+    }
+
+    // True only for rung 1. A time that is absent is never declared, so this cannot disagree with
+    // has_value() — one field, one truth.
+    [[nodiscard]] bool is_declared() const noexcept
+    {
+        return declared_ && value_.has_value();
+    }
+
+  private:
+    std::optional<Timestamp> value_;
+    bool declared_{false};
+};
+
 // Intermediate representation produced by a format strategy.
 //
 // All string_view fields point into arena-managed storage. They remain valid until the owning
@@ -36,7 +117,9 @@ export namespace insight::tokenization
 struct ParsedLine
 {
     std::string_view raw_line;
-    std::optional<Timestamp> timestamp;
+    // The event time AND its provenance — see EventTime above. Assign with EventTime::parsed(...)
+    // or EventTime::declared(...); there is no third way and no implicit one.
+    EventTime timestamp;
     LogLevel level{LogLevel::Unknown};
     std::string_view component; // F3b: the low-card functional source (subsystem/daemon/job)
     std::string_view host;      // F3b: the high-card node/host identity (hors-cube)

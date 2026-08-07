@@ -77,7 +77,11 @@ struct Tokenizer::Impl
 
         CanonicalEvent event;
         event.id = next_id++;
+        // THE ONE SITE (DN-29.D14). Time and provenance are copied together, off a single
+        // EventTime that carries both — so there is no ordering in which one lands without the
+        // other, and no future edit that can set a declared time here and forget the marker.
         event.timestamp = parsed_line.timestamp.value_or(Timestamp{});
+        event.declared_timestamp = parsed_line.timestamp.is_declared();
         event.level = parsed_line.level;
         event.format =
             parser.routed_format(); // the routed winner for THIS line (set by parse_line)

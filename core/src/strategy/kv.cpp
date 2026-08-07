@@ -91,7 +91,7 @@ std::expected<ParsedLine, std::string> KVStrategy::parse(std::string_view line,
         {
             if (key == "ts" || key == "timestamp" || key == "time" || key == "@timestamp")
             {
-                parsed_line.timestamp = try_parse_timestamp(value);
+                parsed_line.timestamp = EventTime::parsed(try_parse_timestamp(value));
                 continue;
             }
         }

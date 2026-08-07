@@ -52,7 +52,7 @@ std::expected<ParsedLine, std::string> BGLStrategy::parse(std::string_view line,
 
         ParsedLine parsed_line;
         parsed_line.raw_line = line;
-        parsed_line.timestamp = utils::parse_epoch_timestamp(epoch);
+        parsed_line.timestamp = EventTime::parsed(utils::parse_epoch_timestamp(epoch));
         parsed_line.level = utils::parse_log_level(level_sv);
         parsed_line.component = subsystem; // F3b D-F3b-1: KERNEL/APP/DISCOVERY/MMCS… (the cube dim)
         parsed_line.host = node;           // F3b D-F3b-1: the node identity (hors-cube)
@@ -77,7 +77,7 @@ std::expected<ParsedLine, std::string> BGLStrategy::parse(std::string_view line,
 
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
-    parsed_line.timestamp = utils::parse_epoch_timestamp(epoch);
+    parsed_line.timestamp = EventTime::parsed(utils::parse_epoch_timestamp(epoch));
     parsed_line.level = utils::infer_leading_log_level(tail); // token-aware severity proxy
     parsed_line.component = daemon;
     parsed_line.host = node;

@@ -6,9 +6,9 @@ import insight.canon.api;
 import insight.canon.spi;
 
 // gitlab_strategy.cpp — the GitLab CI dialect CODE TIER (ADR-17): the format strategy. Like
-// Jenkins and unlike GHA, a GitLab trace has no single uniform line shape across runner generations,
-// so the strategy is LINE-SELECTIVE — it claims exactly the shapes this dialect marks, and
-// everything else falls through (typically to RawText):
+// Jenkins and unlike GHA, a GitLab trace has no single uniform line shape across runner
+// generations, so the strategy is LINE-SELECTIVE — it claims exactly the shapes this dialect marks,
+// and everything else falls through (typically to RawText):
 //   1. a line carrying the runner's fixed-width transport prefix
 //      `<RFC3339-with-6-digit-fraction>Z <NN><O|E><' '|'+'>` — 32 bytes, PEELED, and its timestamp
 //      parsed as the event time;
@@ -53,18 +53,19 @@ namespace
     // fraction is always 6 digits and the zone always 'Z'; the '+' continuation flag occupies the
     // same column the separator space otherwise holds, which is why both forms land on 32.
     //
-    // The shape check is STRICT, and strictness is the anti-phantom guard: a Syslog or GHA line also
-    // opens with an RFC3339 token, and only the fixed fraction width plus the stream tag tell them
-    // apart. A producer emitting some other fraction width is DECLINED — the line falls through to
-    // RawText and yields no marker, which is a fail-closed miss rather than a wrong answer, and it
-    // is the same fixed-width property T2's declaration will assert.
+    // The shape check is STRICT, and strictness is the anti-phantom guard: a Syslog or GHA line
+    // also opens with an RFC3339 token, and only the fixed fraction width plus the stream tag tell
+    // them apart. A producer emitting some other fraction width is DECLINED — the line falls
+    // through to RawText and yields no marker, which is a fail-closed miss rather than a wrong
+    // answer, and it is the same fixed-width property T2's declaration will assert.
     constexpr std::size_t kTimestampWidth{27U}; // YYYY-MM-DDTHH:MM:SS.ffffffZ
     constexpr std::size_t kFractionDigits{6U};
-    constexpr std::size_t kSeparatorWidth{1U};   // the space between timestamp and stream tag
-    constexpr std::size_t kStreamTagWidth{3U};   // NN + (O|E)
-    constexpr std::size_t kContinuationFlagWidth{1U}; // ' ' (new logical line) or '+' (continuation)
-    constexpr std::size_t kTransportPrefixWidth{kTimestampWidth + kSeparatorWidth + kStreamTagWidth +
-                                                kContinuationFlagWidth};
+    constexpr std::size_t kSeparatorWidth{1U}; // the space between timestamp and stream tag
+    constexpr std::size_t kStreamTagWidth{3U}; // NN + (O|E)
+    constexpr std::size_t kContinuationFlagWidth{
+        1U}; // ' ' (new logical line) or '+' (continuation)
+    constexpr std::size_t kTransportPrefixWidth{kTimestampWidth + kSeparatorWidth +
+                                                kStreamTagWidth + kContinuationFlagWidth};
     static_assert(kTransportPrefixWidth == 32U,
                   "the measured GitLab runner prefix is 32 bytes; a change here changes what is "
                   "peeled off every line of every stamped trace");
@@ -98,32 +99,29 @@ namespace
             return false;
         if (line[31] != ' ' && line[31] != '+')
             return false;
-        return digits_at(line, 0U, 4U) &&                     // YYYY
+        return digits_at(line, 0U, 4U) &&                              // YYYY
                digits_at(line, 5U, 2U) && digits_at(line, 8U, 2U) &&   // MM DD
                digits_at(line, 11U, 2U) && digits_at(line, 14U, 2U) && // HH MM
-               digits_at(line, 17U, 2U) &&                            // SS
-               digits_at(line, 20U, kFractionDigits) &&               // .ffffff
-               digits_at(line, 28U, 2U);                              // the stream-tag number
+               digits_at(line, 17U, 2U) &&                             // SS
+               digits_at(line, 20U, kFractionDigits) &&                // .ffffff
+               digits_at(line, 28U, 2U);                               // the stream-tag number
     }
 
     constexpr std::string_view kSectionPrefix{"section_start:"};
 
-    // Every outcome-marker row this package ships carries the verdict in its PREFIX with a free-form
-    // remainder, so prefix-matching IS the row's match predicate and this walk is complete. The
-    // static_assert is what keeps that true: adding a RemainderToken row without teaching this
-    // function the word-remainder rule would silently make the strategy over-claim.
-    static_assert(std::ranges::all_of(kOutcomeMarkers,
-                                      [](const OutcomeMarkerRow& row) noexcept
-                                      {
-                                          return row.shape == OutcomeMarkerShape::PrefixIsVerdict;
-                                      }),
-                  "gitlab: a RemainderToken outcome row would need a verdict-word check here — this "
-                  "strategy claims a terminal line on prefix alone");
+    // Every outcome-marker row this package ships carries the verdict in its PREFIX with a
+    // free-form remainder, so prefix-matching IS the row's match predicate and this walk is
+    // complete. The static_assert is what keeps that true: adding a RemainderToken row without
+    // teaching this function the word-remainder rule would silently make the strategy over-claim.
+    static_assert(
+        std::ranges::all_of(kOutcomeMarkers, [](const OutcomeMarkerRow& row) noexcept
+                            { return row.shape == OutcomeMarkerShape::PrefixIsVerdict; }),
+        "gitlab: a RemainderToken outcome row would need a verdict-word check here — this "
+        "strategy claims a terminal line on prefix alone");
 
     [[nodiscard]] constexpr bool is_terminal_verdict(std::string_view content) noexcept
     {
-        return std::ranges::any_of(kOutcomeMarkers,
-                                   [content](const OutcomeMarkerRow& row) noexcept
+        return std::ranges::any_of(kOutcomeMarkers, [content](const OutcomeMarkerRow& row) noexcept
                                    { return content.starts_with(row.prefix); });
     }
 
@@ -162,7 +160,7 @@ namespace
 
             insight::tokenization::ParsedLine parsed;
             parsed.raw_line = line;
-            parsed.timestamp = timestamp;
+            parsed.timestamp = insight::tokenization::EventTime::parsed(timestamp);
             // No level-lift rows: the body is console output, so the level comes from the same
             // leading-level / failure-cue inference RawTextStrategy uses (byte-identical fallback).
             parsed.level = insight::utils::infer_leading_log_level(content);

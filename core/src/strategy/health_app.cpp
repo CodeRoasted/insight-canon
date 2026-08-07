@@ -40,7 +40,7 @@ std::expected<ParsedLine, std::string> HealthAppStrategy::parse(std::string_view
 
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
-    parsed_line.timestamp = utils::parse_health_app_ts(ts_str);
+    parsed_line.timestamp = EventTime::parsed(utils::parse_health_app_ts(ts_str));
     parsed_line.level = LogLevel::Unknown;
     parsed_line.component = component;
     parsed_line.content = rest;

@@ -115,7 +115,7 @@ std::expected<ParsedLine, std::string> IISW3CStrategy::parse(std::string_view li
         }
         ParsedLine parsed;
         parsed.raw_line = line;
-        parsed.timestamp = utils::parse_iso8601(ts_str);
+        parsed.timestamp = EventTime::parsed(utils::parse_iso8601(ts_str));
         parsed.level = status_to_level(rest);
         parsed.component = component;
         parsed.content = build_content(arena, method, uri, rest);
@@ -129,7 +129,7 @@ std::expected<ParsedLine, std::string> IISW3CStrategy::parse(std::string_view li
     const std::string_view uri{sv_take_token(rest)};
     ParsedLine parsed;
     parsed.raw_line = line;
-    parsed.timestamp = utils::parse_iso8601(ts_str);
+    parsed.timestamp = EventTime::parsed(utils::parse_iso8601(ts_str));
     parsed.level = status_to_level(rest);
     parsed.component = "IIS";
     parsed.content = build_content(arena, tok1, uri, rest);

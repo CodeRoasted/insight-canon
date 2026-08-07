@@ -62,11 +62,12 @@ std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_vie
             {
                 const auto epoch_secs{
                     static_cast<std::time_t>(fast.timestamp_ms / kMillisecondsPerSecond)};
-                parsed.timestamp = std::chrono::system_clock::from_time_t(epoch_secs);
+                parsed.timestamp =
+                    EventTime::parsed(std::chrono::system_clock::from_time_t(epoch_secs));
             }
             else if (!fast.timestamp_str.empty())
             {
-                parsed.timestamp = utils::parse_iso8601(fast.timestamp_str);
+                parsed.timestamp = EventTime::parsed(utils::parse_iso8601(fast.timestamp_str));
             }
             if (!fast.level_str.empty())
                 parsed.level = utils::parse_log_level(fast.level_str);
@@ -109,7 +110,7 @@ std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_vie
     if (try_get_int64(root, kTimestampKeys, millis))
     {
         const auto epoch_secs{static_cast<std::time_t>(millis / kMillisecondsPerSecond)};
-        parsed.timestamp = std::chrono::system_clock::from_time_t(epoch_secs);
+        parsed.timestamp = EventTime::parsed(std::chrono::system_clock::from_time_t(epoch_secs));
     }
 
     std::string_view scratch_view;

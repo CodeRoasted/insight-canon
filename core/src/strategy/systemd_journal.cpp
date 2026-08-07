@@ -118,7 +118,8 @@ std::expected<ParsedLine, std::string> SystemdJournalStrategy::parse(std::string
         if (res.ec == std::errc{})
         {
             const auto epoch_secs{static_cast<std::time_t>(microsecs / kMicrosecondsPerSecond)};
-            parsed.timestamp = std::chrono::system_clock::from_time_t(epoch_secs);
+            parsed.timestamp =
+                EventTime::parsed(std::chrono::system_clock::from_time_t(epoch_secs));
         }
     }
 

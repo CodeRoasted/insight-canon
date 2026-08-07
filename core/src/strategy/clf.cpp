@@ -94,7 +94,7 @@ std::expected<ParsedLine, std::string> CLFStrategy::parse(std::string_view line,
 
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
-    parsed_line.timestamp = parse_clf_timestamp(raw_ts);
+    parsed_line.timestamp = EventTime::parsed(parse_clf_timestamp(raw_ts));
     parsed_line.level = status_code_to_level(status_code);
     parsed_line.component = host;
     parsed_line.content = {buf.data(), clen};

@@ -57,7 +57,7 @@ std::expected<ParsedLine, std::string> SyslogStrategy::parse(std::string_view li
 
         ParsedLine parsed_line;
         parsed_line.raw_line = line;
-        parsed_line.timestamp = utils::parse_bsd_syslog_ts(raw_ts);
+        parsed_line.timestamp = EventTime::parsed(utils::parse_bsd_syslog_ts(raw_ts));
         parsed_line.level = LogLevel::Unknown;
         parsed_line.component = tag;
         parsed_line.content = rest;
@@ -78,7 +78,7 @@ std::expected<ParsedLine, std::string> SyslogStrategy::parse(std::string_view li
 
         ParsedLine parsed_line;
         parsed_line.raw_line = line;
-        parsed_line.timestamp = utils::parse_iso8601(raw_ts);
+        parsed_line.timestamp = EventTime::parsed(utils::parse_iso8601(raw_ts));
         parsed_line.level = LogLevel::Unknown;
         parsed_line.component = tag;
         parsed_line.content = rest;

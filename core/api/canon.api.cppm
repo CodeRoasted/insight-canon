@@ -946,6 +946,20 @@ struct CanonicalEvent
 {
     EventID id{};
     Timestamp timestamp;
+    // Was `timestamp` DECLARED by the producer in a schema event-time field (OTLP
+    // startTimeUnixNano / timeUnixNano), or INFERRED by a strategy from bytes of ambiguous
+    // authorship? Rung 1 of the DN-29.D12 ladder versus rung 3, and the pipeline needs the
+    // difference: a declared time outranks a transport observation stamp, a parsed one does not.
+    //
+    // Written ONLY in make_event, beside `timestamp`, off ParsedLine::EventTime — which is one
+    // field carrying both, so the pair cannot be split on the way here. CONSUMED in-memory and
+    // NEVER serialized: the MetaLog wire is unchanged, like `trace` / `ordinals` /
+    // `echoed_source`. `false` for every line whose time was parsed or absent.
+    //
+    // ⚠ NOT derivable from `trace.is_span` and it must never be re-derived that way: an OTLP LOG
+    // record carries a declared time with `is_span == false` and often `present == false`.
+    // Rejecting that overload is the reason this field exists.
+    bool declared_timestamp{false};
     LogLevel level{LogLevel::Unknown};
     // The format the line was ROUTED to by the strategy layer (the sticky/auto-detect winner).
     // Observability metadata — NOT deterministic MetaLog content; downstream may group/correlate

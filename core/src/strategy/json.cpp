@@ -123,9 +123,9 @@ namespace
         case JsonRole::Timestamp:
             if (!parsed_line.timestamp.has_value())
             {
-                parsed_line.timestamp = utils::parse_iso8601(value);
+                parsed_line.timestamp = EventTime::parsed(utils::parse_iso8601(value));
                 if (!parsed_line.timestamp)
-                    parsed_line.timestamp = utils::parse_bsd_syslog_ts(value);
+                    parsed_line.timestamp = EventTime::parsed(utils::parse_bsd_syslog_ts(value));
             }
             break;
         case JsonRole::Level:
@@ -225,7 +225,12 @@ namespace
                            scratch_view))
             if (auto timestamp{utils::parse_unix_nano_timestamp(scratch_view)})
             {
-                parsed_line.timestamp = timestamp;
+                // DECLARED (DN-29.D12 rung 1): OTLP `timeUnixNano` is the LOG record's schema
+                // field for when the event happened — not content that resembles a time. This is
+                // the second of exactly two declared-time sites, and it is the one that made
+                // `is_span` unusable as the marker: an OTLP log record carries a declared time
+                // with is_span == false.
+                parsed_line.timestamp = EventTime::declared(*timestamp);
                 is_otel = true;
             }
         for (const auto& descriptor : kOtelFieldCatalog)
@@ -529,7 +534,13 @@ namespace
         // Apply the mapping. Event time + duration are integer ns (D-OTEL-3, by construction).
         // SRC-D-OTEL-11: declared causality → the observed DAG
         parsed_line.trace.is_span = true;
-        parsed_line.timestamp = utils::parse_unix_nano_timestamp(start_nano);
+        // DECLARED (DN-29.D12 rung 1): `startTimeUnixNano` is the producer's own statement of
+        // when the span began. Rung 1 is why this must outrank a transport stamp, which a merely
+        // PARSED time does not.
+        if (const auto declared_start{utils::parse_unix_nano_timestamp(start_nano)})
+            parsed_line.timestamp = EventTime::declared(*declared_start);
+        else
+            parsed_line.timestamp = EventTime::parsed(std::nullopt);
         parsed_line.level = is_error ? LogLevel::Error : LogLevel::Info;
         if (!service_name.empty())
             parsed_line.component = arena.store_string(service_name);
@@ -636,9 +647,10 @@ namespace
         parsed_line.raw_line = line;
         if (!fast.timestamp_str.empty())
         {
-            parsed_line.timestamp = utils::parse_iso8601(fast.timestamp_str);
+            parsed_line.timestamp = EventTime::parsed(utils::parse_iso8601(fast.timestamp_str));
             if (!parsed_line.timestamp)
-                parsed_line.timestamp = utils::parse_bsd_syslog_ts(fast.timestamp_str);
+                parsed_line.timestamp =
+                    EventTime::parsed(utils::parse_bsd_syslog_ts(fast.timestamp_str));
         }
         if (!fast.level_str.empty())
             parsed_line.level = utils::parse_log_level(fast.level_str);
@@ -761,9 +773,9 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
 
     if (try_get_string(root, kTimestampKeys, scratch_view))
     {
-        parsed_line.timestamp = utils::parse_iso8601(scratch_view);
+        parsed_line.timestamp = EventTime::parsed(utils::parse_iso8601(scratch_view));
         if (!parsed_line.timestamp)
-            parsed_line.timestamp = utils::parse_bsd_syslog_ts(scratch_view);
+            parsed_line.timestamp = EventTime::parsed(utils::parse_bsd_syslog_ts(scratch_view));
     }
 
     if (try_get_string(root, kLevelKeys, scratch_view))
@@ -863,9 +875,8 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     // limitation. It is also untestable here — canon has no test-observable log sink, so an arm
     // written against a log line goes green the day this code is deleted (the can't-FAIL row of
     // MEM:synthetic-gate-vacuity-vs-judgment).
-    if (!is_otel && parsed_line.timestamp == std::nullopt &&
-        parsed_line.level == LogLevel::Unknown && parsed_line.component.empty() &&
-        !recognized_message)
+    if (!is_otel && !parsed_line.timestamp.has_value() && parsed_line.level == LogLevel::Unknown &&
+        parsed_line.component.empty() && !recognized_message)
     {
         // ⚠ UNCONDITIONAL, AND IT MUST STAY ABOVE THE RATE LIMIT BELOW. The marker is set on EVERY
         // role-less record; the sampling governs ONLY the log emission. Moving this inside the

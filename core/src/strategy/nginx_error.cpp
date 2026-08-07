@@ -43,7 +43,7 @@ std::expected<ParsedLine, std::string> NginxErrorStrategy::parse(std::string_vie
 
     ParsedLine parsed;
     parsed.raw_line = line;
-    parsed.timestamp = utils::parse_nginx_error_ts(ts_str);
+    parsed.timestamp = EventTime::parsed(utils::parse_nginx_error_ts(ts_str));
     parsed.level = utils::parse_log_level(level_sv);
     parsed.component = "nginx";
     parsed.content = rest;

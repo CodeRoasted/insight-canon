@@ -44,7 +44,7 @@ std::expected<ParsedLine, std::string> HPCStrategy::parse(std::string_view line,
 
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
-    parsed_line.timestamp = utils::parse_epoch_timestamp(epoch);
+    parsed_line.timestamp = EventTime::parsed(utils::parse_epoch_timestamp(epoch));
     parsed_line.level = LogLevel::Unknown;
     parsed_line.component = {cbuf, clen};
     parsed_line.content = rest;

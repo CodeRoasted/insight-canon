@@ -24,7 +24,7 @@ std::expected<ParsedLine, std::string> RawTextStrategy::parse(std::string_view l
 
     ParsedLine parsed;
     parsed.raw_line = line;
-    parsed.timestamp = std::nullopt;
+    parsed.timestamp = EventTime::parsed(std::nullopt);
     parsed.component = {};
     // Subview of the arena-stable input: no store_string(), no allocation.
     parsed.content = line.substr(start);

@@ -79,7 +79,7 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
 
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
-    parsed_line.timestamp = utils::parse_log4j_timestamp(ts_str);
+    parsed_line.timestamp = EventTime::parsed(utils::parse_log4j_timestamp(ts_str));
 
     // ── Dash variant: "ts - LEVEL [thread] - msg" ─────────────────────────
     if (rest[0] == '-' && (rest.size() < 2U || is_space(rest[1])))

@@ -42,7 +42,7 @@ std::expected<ParsedLine, std::string> SparkHDFSStrategy::parse(std::string_view
 
         ParsedLine parsed_line;
         parsed_line.raw_line = line;
-        parsed_line.timestamp = utils::parse_short_year_slash(ts_str);
+        parsed_line.timestamp = EventTime::parsed(utils::parse_short_year_slash(ts_str));
         parsed_line.level = utils::parse_log_level(level_sv);
         parsed_line.component = component;
         parsed_line.content = rest;
@@ -74,7 +74,7 @@ std::expected<ParsedLine, std::string> SparkHDFSStrategy::parse(std::string_view
 
         ParsedLine parsed_line;
         parsed_line.raw_line = line;
-        parsed_line.timestamp = utils::parse_compact_date_time(date, time_str);
+        parsed_line.timestamp = EventTime::parsed(utils::parse_compact_date_time(date, time_str));
         parsed_line.level = utils::parse_log_level(level_sv);
         parsed_line.component = component;
         parsed_line.content = rest;

@@ -90,7 +90,7 @@ std::expected<ParsedLine, std::string> RFC5424Strategy::parse(std::string_view l
 
     ParsedLine parsed;
     parsed.raw_line = line;
-    parsed.timestamp = utils::parse_iso8601(timestamp_str);
+    parsed.timestamp = EventTime::parsed(utils::parse_iso8601(timestamp_str));
     parsed.level = severity_to_level(pri);
     parsed.component = (appname != "-") ? appname : hostname;
     parsed.content = msg;

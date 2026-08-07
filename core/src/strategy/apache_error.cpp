@@ -68,7 +68,7 @@ ApacheErrorLogStrategy::parse(std::string_view line, ArenaAllocator& /*arena*/) 
 
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
-    parsed_line.timestamp = utils::parse_apache_error_ts(raw_ts);
+    parsed_line.timestamp = EventTime::parsed(utils::parse_apache_error_ts(raw_ts));
     parsed_line.level = utils::parse_log_level(level_word);
     parsed_line.component = "httpd";
     parsed_line.content = rest;

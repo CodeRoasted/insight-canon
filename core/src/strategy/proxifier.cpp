@@ -37,7 +37,7 @@ std::expected<ParsedLine, std::string> ProxifierStrategy::parse(std::string_view
 
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
-    parsed_line.timestamp = std::nullopt; // Proxifier ts lacks full date
+    parsed_line.timestamp = EventTime::parsed(std::nullopt); // Proxifier ts lacks full date
     parsed_line.level = LogLevel::Unknown;
     parsed_line.component = process;
     parsed_line.content = rest;
