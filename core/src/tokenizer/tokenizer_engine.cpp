@@ -165,6 +165,25 @@ Tokenizer::process_stable_line(std::string_view stable_line)
     return impl_->make_event(impl_->parser.parse_stable(stable_line));
 }
 
+bool Tokenizer::unpack_span_document(std::string_view raw_line, std::vector<std::string>& records)
+{
+    // L3's broad recogniser, not L1's first-key compare: this door exists to catch a conformant
+    // export whatever order its producer emitted the top-level keys in, and JSON does not make
+    // that order significant.
+    if (!is_otel_span_document_broad(raw_line))
+        return false;
+
+    records.clear();
+    if (unpack_otel_spans(raw_line, records) == 0)
+        // Recognised but yielded nothing: a truncated or malformed export. The line is consumed
+        // and produces no event, which downstream reads as a quiet stream — the silent-wrong-answer
+        // shape — so it gets a permanent record here rather than a debugger session later.
+        INSIGHT_LOG_WARN(logging::tokenizer_logger(),
+                         "otel span document recognised but unpacked 0 spans: bytes={}",
+                         raw_line.size());
+    return true;
+}
+
 std::vector<std::expected<CanonicalEvent, std::string>>
 Tokenizer::process_batch(std::span<const std::string_view> lines)
 {

@@ -264,9 +264,11 @@ namespace
 // change cannot defeat both. A stale premise therefore degrades to: L1 stops recognising, L2
 // diagnoses, L3 still unpacks. Lost capability with a log line, never a wrong answer.
 //
-// ⚠ L3 DOES NOT EXIST YET (DN-29.D6(a) is unbuilt), so today a non-canonical export is not
-// unpacked. It is no longer SILENT, which is what DN-29.D6(b) actually requires — L2 is live in
-// this same unit. Adding a member here is a one-line fix if OTLP moves.
+// ALL THREE LAYERS ARE LIVE. L3's consumer is the acquisition entry
+// (Tokenizer::unpack_span_document → InsightPipeline::ingest_line, DN-29.D6(a)), so the sentence
+// above is STATE and no longer intention: a non-canonical export IS unpacked on the file/CLI path
+// today. Adding a member here is a one-line fix if OTLP moves, and it changes only which layer
+// catches it — never whether one does.
 //
 // DO NOT VENDOR AN opentelemetry-proto TO "FIX" THE UNVERIFIABLE PREMISE. That takes a real
 // dependency to support a comment, and L2 already removes the consequence that would justify it.

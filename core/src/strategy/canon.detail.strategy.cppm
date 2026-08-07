@@ -389,6 +389,13 @@ export namespace insight::tokenization
 // of spans emitted (0 if `document` is not a resourceSpans export).
 std::size_t unpack_otel_spans(std::string_view document, std::vector<std::string>& out);
 
+// L3 (DN-29.D15) — the ACQUISITION-side recogniser: broad and deliberately over-triggering. NOT
+// is_otel_span_document (L1), which is the record path's O(1) first-key compare and is defeated by
+// a non-canonical key order. The acquisition entry holds the whole input by definition and is not
+// the hot path, so recall is what matters there and precision is what matters on the record path.
+// See the definition site for why one predicate could not serve both.
+[[nodiscard]] bool is_otel_span_document_broad(std::string_view document) noexcept;
+
 } // namespace insight::tokenization
 
 // ──────── from src/insight/tokenization/strategies/windows_cbs.hpp ────────

@@ -90,6 +90,24 @@ class Tokenizer
     [[nodiscard]] std::vector<std::expected<CanonicalEvent, std::string>>
     process_batch(std::span<const std::string_view> lines);
 
+    // ── The ACQUISITION-tier record-source unpack (DN-29.D6, L3 of DN-29.D15) ─────────────────
+    // If `raw_line` is recognised as an OTLP span-export DOCUMENT, replace `records` with the N
+    // canonical flat-span records it carries and return true; otherwise return false with
+    // `records` untouched and the caller stays on its ordinary 1:1 path.
+    //
+    // ⚠ FOR THE ENTRY THAT HOLDS THE WHOLE INPUT — a file, a CLI read, a receiver body — and NEVER
+    // for a frame-oriented streaming path. The SHM plane carries a fixed 4096-byte payload while
+    // an export has no declared size, so a document crossing it arrives truncated; document mode
+    // there would put an unbounded object inside a bounded-memory instrument. That is why the
+    // record entry REFUSES a document rather than unpacking one, and why this is a separate,
+    // deliberately over-triggering door rather than a widening of that one.
+    //
+    // It yields RECORDS, not events: window closure resets the caller's arena, so the caller must
+    // be free to tokenize record k only once it is done with k-1. Tokenize each with process_line
+    // — never process_stable_line — because `records` is caller scratch the next document reuses.
+    [[nodiscard]] static bool unpack_span_document(std::string_view raw_line,
+                                                   std::vector<std::string>& records);
+
     [[nodiscard]] std::size_t events_produced() const noexcept;
     [[nodiscard]] std::size_t lines_parsed() const noexcept;
 
@@ -118,8 +136,8 @@ map_outcome_token(std::string_view token,
                   const insight::semantic::ComposedSemantics& composed) noexcept;
 
 // The whole-log console-tail scan (§3.2 — the degenerate "only a console log" source). One
-// parse-only pass (no masking): per line, the resolved view's OutcomeMarkerRow set is walked and the
-// LONGEST matching prefix wins within the line; the LAST such line wins across the log.
+// parse-only pass (no masking): per line, the resolved view's OutcomeMarkerRow set is walked and
+// the LONGEST matching prefix wins within the line; the LAST such line wins across the log.
 //
 // Longest-prefix-wins is grammar-5 (ADR-17) and it replaces "the last row that matched overwrites"
 // — a walk whose winner was a function of DECLARATION ORDER. GitLab needs
