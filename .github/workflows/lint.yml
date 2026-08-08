@@ -33,3 +33,9 @@ jobs:
       - uses: actions/checkout@v5
       - name: SRC-SP-1 — canon core carries no behavioral ecosystem literal
         run: bash scripts/sp1_semantic_unawareness_lint.sh
+
+      # DN-29.D14 — the seam keeps Timestamp + a separate provenance bool (EventTime deliberately
+      # does not cross it), so the pairing is held by ONE write site. Armed here, not left to
+      # review: a second write site fails on the commit that adds it.
+      - name: DN-29.D14 — declared_timestamp has exactly one write site
+        run: bash scripts/declared_timestamp_one_write_site_lint.sh
