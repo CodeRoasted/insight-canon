@@ -24,14 +24,34 @@
 # before any test would notice, and long before a wrong event time reaches a user.
 #
 # ── WHAT IT COUNTS: writes, never mentions ───────────────────────────────────
-# A write is an ASSIGNMENT through an object — `x.declared_timestamp =` or
-# `x->declared_timestamp =`. Deliberately NOT counted:
-#   * the DECLARATION (`bool declared_timestamp{false};`) — no object, no `=`
+# TWO write forms, because there are two ways to write a member:
+#   * ASSIGNMENT through an object — `x.declared_timestamp =`, `x->declared_timestamp =`,
+#     and the designated-initialiser form `{.declared_timestamp = true}` (it carries
+#     the same leading dot, so one pattern covers all three);
+#   * BRACE-INIT — `declared_timestamp{true}`, e.g. a member-init list if
+#     CanonicalEvent ever gains a constructor.
+#
+# The brace form was MISSING from the first version of this lint, and it was found by
+# Kleio's sibling sweep rather than by this gate — her pattern is deliberately broader
+# because a SWEEP should over-trigger (classify a false positive by hand rather than
+# miss a real write), where a GATE should not (a false red costs everyone). Both
+# calibrations were right; the bug was that a genuine write construct was absent from
+# the tighter one.
+#
+# Deliberately NOT counted:
+#   * the DECLARATION (`bool declared_timestamp{false};`) — brace-init preceded by its
+#     TYPE, which is what separates it from a member-init-list write
 #   * comparisons (`== / != / >= / <=`) — reads
 #   * comments and doc prose — stripped before the scan
 #   * this script's own diagnostics — it never scans itself
 # Counting mentions instead would fire on the declaration and on the error
 # message that explains the failure, which is a gate that cannot pass.
+#
+# ⚠ ONE BLIND SPOT, DECLARED RATHER THAN IMPLIED: a POSITIONAL aggregate init
+# (`CanonicalEvent e{id, ts, true, …}`) writes the field while naming nothing, so no
+# textual pattern can see it — neither this gate's nor the broader sweep's. It is not
+# reachable today (the struct has 15+ members and no call site initialises it
+# positionally), and the honest statement is that this lint checks NAMED writes.
 #
 # ── SCOPE, and its declared boundary ─────────────────────────────────────────
 # canon PRODUCTION code only: core/src, core/api, semantic/*/src. Tests are
@@ -53,9 +73,14 @@ cd "$CANON"
 FIELD='declared_timestamp'
 EXPECTED_WRITES=1
 
-# An assignment THROUGH AN OBJECT, and not a comparison: `= ` not preceded by
-# [=!<>] and not followed by `=`.
-WRITE_RE="(\.|->)[[:space:]]*${FIELD}[[:space:]]*[^=!<>[:space:]]?[[:space:]]*=[^=]"
+# Form 1 — assignment through an object (covers `.x =`, `->x =`, and `{.x = …}`),
+# and not a comparison: `=` not preceded by [=!<>] and not followed by `=`.
+ASSIGN_RE="(\.|->)[[:space:]]*${FIELD}[[:space:]]*[^=!<>[:space:]]?[[:space:]]*=[^=]"
+# Form 2 — brace-init (`x{true}`), e.g. a member-init list.
+BRACE_RE="${FIELD}[[:space:]]*\{"
+# ...minus the DECLARATION, which is the same shape preceded by its type. Excluded at
+# LINE granularity: a declaration and a brace-init write never share a line.
+DECL_RE="\bbool[[:space:]]+${FIELD}[[:space:]]*\{"
 
 # Comment-stripping, string-literals preserved, newline-preserving for block
 # comments so reported line numbers stay true. Same helper as the SRC-SP-1 lint.
@@ -76,7 +101,13 @@ scanned=0
 report=""
 while IFS= read -r -d '' f; do
   scanned=$((scanned + 1))
-  hits="$(strip_comments "$f" | grep -nE "$WRITE_RE" || true)"
+  stripped="$(strip_comments "$f")"
+  hits="$(
+    {
+      printf '%s\n' "$stripped" | grep -nE "$ASSIGN_RE" || true
+      printf '%s\n' "$stripped" | grep -nE "$BRACE_RE" | grep -vE "$DECL_RE" || true
+    } | sort -t: -k1,1n -u
+  )"
   if [ -n "$hits" ]; then
     while IFS= read -r line; do
       report+="  ${f}:${line}"$'\n'
