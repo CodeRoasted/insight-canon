@@ -116,12 +116,13 @@ std::expected<ParsedLine, std::string> IISW3CStrategy::parse(std::string_view li
         ParsedLine parsed;
         parsed.raw_line = line;
         parsed.timestamp = EventTime::parsed(utils::parse_iso8601(ts_str));
-        parsed.level = status_to_level(rest);
+        parsed.level = EventLevel::declared(status_to_level(rest));
         parsed.component = component;
         parsed.content = build_content(arena, method, uri, rest);
         INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                           "strategy=IISW3C parsed component={} level={} has_timestamp={}",
-                          parsed.component, to_string(parsed.level), parsed.timestamp.has_value());
+                          parsed.component, to_string(parsed.level.value()),
+                          parsed.timestamp.has_value());
         return std::expected<ParsedLine, std::string>{parsed};
     }
 
@@ -130,12 +131,12 @@ std::expected<ParsedLine, std::string> IISW3CStrategy::parse(std::string_view li
     ParsedLine parsed;
     parsed.raw_line = line;
     parsed.timestamp = EventTime::parsed(utils::parse_iso8601(ts_str));
-    parsed.level = status_to_level(rest);
+    parsed.level = EventLevel::declared(status_to_level(rest));
     parsed.component = "IIS";
     parsed.content = build_content(arena, tok1, uri, rest);
-    INSIGHT_LOG_DEBUG(logging::strategy_logger(),
-                      "strategy=IISW3C parsed component={} level={} has_timestamp={}",
-                      parsed.component, to_string(parsed.level), parsed.timestamp.has_value());
+    INSIGHT_LOG_DEBUG(
+        logging::strategy_logger(), "strategy=IISW3C parsed component={} level={} has_timestamp={}",
+        parsed.component, to_string(parsed.level.value()), parsed.timestamp.has_value());
     return std::expected<ParsedLine, std::string>{parsed};
 }
 

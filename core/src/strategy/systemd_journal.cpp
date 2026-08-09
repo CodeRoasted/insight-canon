@@ -124,7 +124,7 @@ std::expected<ParsedLine, std::string> SystemdJournalStrategy::parse(std::string
     }
 
     if (try_get_string(root, kPriorityKeys, scratch_view))
-        parsed.level = priority_to_level(parse_priority(scratch_view));
+        parsed.level = EventLevel::declared(priority_to_level(parse_priority(scratch_view)));
 
     // Component: prefer _COMM, fall back to SYSLOG_IDENTIFIER, then _SYSTEMD_UNIT.
     if (try_get_string(root, kCommKeys, scratch_view) ||
@@ -144,7 +144,8 @@ std::expected<ParsedLine, std::string> SystemdJournalStrategy::parse(std::string
 
     INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                       "strategy=SystemdJournal parsed component={} level={} has_timestamp={}",
-                      parsed.component, to_string(parsed.level), parsed.timestamp.has_value());
+                      parsed.component, to_string(parsed.level.value()),
+                      parsed.timestamp.has_value());
     return std::expected<ParsedLine, std::string>{parsed};
 }
 

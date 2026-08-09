@@ -45,13 +45,14 @@ std::expected<ParsedLine, std::string> HPCStrategy::parse(std::string_view line,
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
     parsed_line.timestamp = EventTime::parsed(utils::parse_epoch_timestamp(epoch));
-    parsed_line.level = LogLevel::Unknown;
+    parsed_line.level = EventLevel{};
     parsed_line.component = {cbuf, clen};
     parsed_line.content = rest;
 
-    INSIGHT_LOG_DEBUG(
-        logging::strategy_logger(), "strategy=HPC parsed component={} level={} has_timestamp={}",
-        parsed_line.component, to_string(parsed_line.level), parsed_line.timestamp.has_value());
+    INSIGHT_LOG_DEBUG(logging::strategy_logger(),
+                      "strategy=HPC parsed component={} level={} has_timestamp={}",
+                      parsed_line.component, to_string(parsed_line.level.value()),
+                      parsed_line.timestamp.has_value());
     return std::expected<ParsedLine, std::string>{parsed_line};
 }
 

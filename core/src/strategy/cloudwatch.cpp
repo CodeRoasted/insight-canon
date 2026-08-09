@@ -70,7 +70,7 @@ std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_vie
                 parsed.timestamp = EventTime::parsed(utils::parse_iso8601(fast.timestamp_str));
             }
             if (!fast.level_str.empty())
-                parsed.level = utils::parse_log_level(fast.level_str);
+                parsed.level = EventLevel::declared(utils::parse_log_level(fast.level_str));
             if (!fast.component_str.empty())
                 parsed.component = arena.store_string(fast.component_str);
             parsed.content = fast.message_str.empty() ? arena.store_string(line)
@@ -78,7 +78,7 @@ std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_vie
             INSIGHT_LOG_DEBUG(
                 logging::strategy_logger(),
                 "strategy=CloudWatch fast_path component={} level={} has_timestamp={}",
-                parsed.component, to_string(parsed.level), parsed.timestamp.has_value());
+                parsed.component, to_string(parsed.level.value()), parsed.timestamp.has_value());
             return std::expected<ParsedLine, std::string>{parsed};
         }
     }
@@ -116,7 +116,7 @@ std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_vie
     std::string_view scratch_view;
 
     if (try_get_string(root, kLevelKeys, scratch_view))
-        parsed.level = utils::parse_log_level(scratch_view);
+        parsed.level = EventLevel::declared(utils::parse_log_level(scratch_view));
 
     // Component: prefer logGroup, fall back to logStream
     if (try_get_string(root, kComponentLogGroup, scratch_view) ||
@@ -135,7 +135,8 @@ std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_vie
 
     INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                       "strategy=CloudWatch parsed component={} level={} has_timestamp={}",
-                      parsed.component, to_string(parsed.level), parsed.timestamp.has_value());
+                      parsed.component, to_string(parsed.level.value()),
+                      parsed.timestamp.has_value());
     return std::expected<ParsedLine, std::string>{parsed};
 }
 

@@ -491,6 +491,109 @@ enum class LogLevel : uint8_t
     }
 }
 
+// ── EventLevel — a level AND where it came from, as ONE value (DN-32.D3) ────────────────────────
+//
+// THE CLAUSE THIS TYPE EXISTS TO MAKE STRUCTURAL: *a level and the provenance of that level are
+// assigned together and are not independently settable.* It is `EventTime`'s clause (DN-29.D14) on
+// the level channel, and it exists for the same reason: a `bool` beside a `LogLevel` is two fields
+// a writer can set one of.
+//
+// WHY THE DISTINCTION IS LOAD-BEARING, and it is not a nicety. Canon has a DECLARED layer (schema
+// level fields, syslog PRI, OTLP severity_number, a dialect's announced level marker) and, where
+// nothing is declared, a CONTENT-INFERENCE layer (ADR-22.D3: level-from-content, the failure
+// lexicon). The inference layer READS WORDS. `-- Performing Test <FLAG> - Failed` is a successful
+// compiler feature probe and the word `Failed` is CMake's normal vocabulary for it; the lexicon
+// cannot know that, and it is not supposed to — its job is to guess, and a guess is a legitimate
+// signal. What is NOT legitimate is a guess arriving downstream spelled identically to a fact, so
+// that a detector mints an incident-grade claim from it. THIS TYPE IS THE ERROR TERM: a declared
+// level carries none, an inferred one does, and a consumer that must not over-claim can finally
+// tell which it holds.
+//
+// `inferred` is the DEFAULT SPECIES and the default-constructed state, deliberately: absent an
+// explicit act of declaration there IS no declaration, so a writer that forgets under-claims. The
+// opposite default would let a new strategy silently promote a guess to a fact.
+//
+// THERE IS DELIBERATELY NO IMPLICIT CONVERSION from `LogLevel`. Constraining WRITERS is the whole
+// point; readers keep the ergonomics (`==` against a bare `LogLevel`, `value()`), because making
+// them rewrite would have been churn with no guarantee attached to it — EventTime's reasoning
+// verbatim.
+class EventLevel
+{
+  public:
+    EventLevel() = default;
+
+    // Canon INFERRED this level from line content whose authorship is ambiguous — a leading word
+    // that parses as a level, or a failure/warning cue in the head. The default species and what
+    // the whole content-inference layer produces.
+    [[nodiscard]] static constexpr EventLevel inferred(LogLevel value) noexcept
+    {
+        EventLevel out;
+        out.value_ = value;
+        return out;
+    }
+
+    // The PRODUCER declared this level in a position whose MEANING is the level — a schema field,
+    // a syslog priority, an OTLP severity_number, a dialect's announced level marker. Not content
+    // that resembles a level. The same species of fact as a run's outcome, which is why a claim
+    // resting on one is qualitatively different from a claim resting on a guess.
+    [[nodiscard]] static constexpr EventLevel declared(LogLevel value) noexcept
+    {
+        EventLevel out;
+        out.value_ = value;
+        out.declared_ = true;
+        return out;
+    }
+
+    [[nodiscard]] constexpr LogLevel value() const noexcept
+    {
+        return value_;
+    }
+
+    // True only for an actually-declared, actually-present level. `Unknown` is this type's
+    // absence, and an absent level is never declared — so this cannot disagree with `value()`,
+    // one field, one truth. It is what lets `declared(parse_log_level(bytes))` stay a single
+    // honest expression when the declared field held a token canon does not know.
+    [[nodiscard]] constexpr bool is_declared() const noexcept
+    {
+        return declared_ && value_ != LogLevel::Unknown;
+    }
+
+    // Read forwarding, so `level == LogLevel::Error` reads exactly as it did against the bare enum.
+    [[nodiscard]] friend constexpr bool operator==(EventLevel lhs, LogLevel rhs) noexcept
+    {
+        return lhs.value_ == rhs;
+    }
+    [[nodiscard]] friend constexpr bool operator==(EventLevel lhs, EventLevel rhs) noexcept
+    {
+        return lhs.value_ == rhs.value_ && lhs.declared_ == rhs.declared_;
+    }
+
+  private:
+    LogLevel value_{LogLevel::Unknown};
+    bool declared_{false};
+};
+
+// The type's algebra, asserted where the type is — a behavioural test can be deleted or skipped,
+// and this cannot. Each line is a claim a later edit could break silently:
+static_assert(!EventLevel{}.is_declared(),
+              "the default-constructed species must be UNDECLARED — a writer that forgets must "
+              "under-claim, never promote a guess to a fact");
+static_assert(EventLevel{}.value() == LogLevel::Unknown, "the default species must be absent");
+static_assert(!EventLevel::inferred(LogLevel::Error).is_declared(),
+              "a level read out of message content is never declared, whatever it reads");
+static_assert(EventLevel::declared(LogLevel::Error).is_declared());
+static_assert(!EventLevel::declared(LogLevel::Unknown).is_declared(),
+              "an ABSENT level is never declared — so `declared(parse_log_level(bytes))` stays one "
+              "honest expression when the declared field held a token canon does not know");
+static_assert(EventLevel::inferred(LogLevel::Error) == LogLevel::Error,
+              "read forwarding: `== LogLevel::X` must ignore provenance, or every existing reader "
+              "silently changes meaning");
+static_assert(!(EventLevel::inferred(LogLevel::Error) == EventLevel::declared(LogLevel::Error)),
+              "two EventLevels are equal only if BOTH halves agree — the whole point is that these "
+              "two are not the same fact");
+static_assert(std::is_trivially_copyable_v<EventLevel>,
+              "CanonicalEvent/ParsedLine are hot-path aggregates; this must stay a 2-byte value");
+
 // ── Run outcome (ADR-17 / insight_run_outcome_model.md §2) ──
 // The CI run's terminal verdict — a run-level sibling of LogLevel, NOT a per-event field (never on
 // CanonicalEvent) and NOT a cube dimension (OUTCOME is the run LABEL, never an axis of the cube).
@@ -961,6 +1064,25 @@ struct CanonicalEvent
     // Rejecting that overload is the reason this field exists.
     bool declared_timestamp{false};
     LogLevel level{LogLevel::Unknown};
+    // Did `level` come from a position whose MEANING is the level (a schema field, a syslog PRI,
+    // an OTLP severity_number, a dialect's announced level marker), or from canon's
+    // CONTENT-INFERENCE layer reading words out of the message (ADR-22.D3)? DN-32.D3: a claim whose
+    // severity rests on the inference layer carries an error term a declared one does not, and a
+    // consumer must be able to see that WITHOUT re-reading the words — re-deriving it downstream is
+    // how a tool-specific vocabulary denylist gets built, and it rots on the next tool.
+    //
+    // Written ONLY in make_event, beside `level`, off ParsedLine::EventLevel — which is one field
+    // carrying both, so the pair cannot be split on the way here. CONSUMED in-memory and NEVER
+    // serialized: the MetaLog wire is unchanged, like `trace` / `ordinals` / `echoed_source` /
+    // `declared_timestamp`. `false` for every inferred or absent level.
+    //
+    // WHY A FLATTENED PAIR HERE AND A TYPE ON ParsedLine — the same split, for the same reason, as
+    // `declared_timestamp` beside `EventTime` (DN-29.D14): CanonicalEvent is the hot-path POD every
+    // downstream package reads, and it already spells absence as `LogLevel::Unknown`. The one-ness
+    // of the write site is therefore held by the LINT (scripts/declared_level_one_write_site_lint
+    // .sh), not by the type — and it is CHECKED rather than trusted, because "correct today, held
+    // by discipline" is the sentence that was wrong four times in the timestamp tail.
+    bool declared_level{false};
     // The format the line was ROUTED to by the strategy layer (the sticky/auto-detect winner).
     // Observability metadata — NOT deterministic MetaLog content; downstream may group/correlate
     // by it (e.g. mixed-stream router diagnostics). Unknown when no strategy matched (RawText
@@ -1511,7 +1633,14 @@ parse_log4j_timestamp(std::string_view timestamp_str) noexcept;
 // Markers like "ERROR", "##[error]", "[WARN]", "FAILED" sit at the start of
 // real logs; a benign mid-line word ("error rate" on an INFO line) must not
 // misclassify it. Bounded + alloc-free — safe on the tokenizer hot path.
-[[nodiscard]] LogLevel infer_leading_log_level(std::string_view line) noexcept;
+//
+// THIS IS canon's CONTENT-INFERENCE LAYER (ADR-22.D3), and the return type says so at the site
+// that consults it (DN-32.D3): every value it produces is `EventLevel::inferred`, including the
+// Stage-1 leading-level-word arm — a word that parses as a level is still canon guessing that the
+// word IS the line's level, not a producer declaring it in a position that means "level". A caller
+// therefore cannot mistake the guess for a declaration, and no consumer has to re-derive the
+// distinction by re-reading the words (which is how a tool-specific denylist gets built).
+[[nodiscard]] EventLevel infer_leading_log_level(std::string_view line) noexcept;
 
 // Parse Nginx error-log timestamp (same format as Apache error logs).
 [[nodiscard]] std::optional<Timestamp>

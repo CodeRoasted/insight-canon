@@ -66,11 +66,17 @@ is_echoed_source(std::string_view raw_line,
 //
 // Unknown from the walk means "no declared row claims this line" — it is the ABSENCE of a lift, not
 // a level, so it must never overwrite the strategy's inference.
+//
+// DN-32.D3: a lifted level is DECLARED, and this is the seam that knows it. A LevelLiftRow is a
+// dialect's ANNOUNCED level marker — the producer saying "this line is an error" in a position
+// whose meaning is exactly that — which is the declared layer ADR-22.D3 separates from canon's
+// content inference. So the lift both overwrites the strategy's value AND upgrades its provenance;
+// the two are one assignment because they are one fact.
 static void apply_level_lift(ParsedLine& parsed,
                              const insight::semantic::ComposedSemantics& composed) noexcept
 {
     if (const LogLevel lifted{lift_level(parsed.content, composed)}; lifted != LogLevel::Unknown)
-        parsed.level = lifted;
+        parsed.level = EventLevel::declared(lifted);
 }
 
 // O(1) fast path: tries sticky strategy first; falls back to full detect.
@@ -188,7 +194,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
         if (is_echoed_source(raw_line, composed_))
         {
             result->echoed_source = true;
-            result->level = LogLevel::Unknown;
+            result->level = EventLevel{}; // absence, and an absent level is never declared
         }
         INSIGHT_LOG_TRACE(logging::parser_logger(), "parse ok: strategy={} echoed_source={}",
                           to_string(strategy->format()), result->echoed_source);
@@ -266,7 +272,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_stable(std::string_view 
         if (is_echoed_source(stable_line, composed_))
         {
             result->echoed_source = true;
-            result->level = LogLevel::Unknown;
+            result->level = EventLevel{}; // absence, and an absent level is never declared
         }
         INSIGHT_LOG_TRACE(logging::parser_logger(), "parse_stable ok: strategy={} echoed_source={}",
                           to_string(strategy->format()), result->echoed_source);

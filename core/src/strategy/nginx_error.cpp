@@ -44,13 +44,14 @@ std::expected<ParsedLine, std::string> NginxErrorStrategy::parse(std::string_vie
     ParsedLine parsed;
     parsed.raw_line = line;
     parsed.timestamp = EventTime::parsed(utils::parse_nginx_error_ts(ts_str));
-    parsed.level = utils::parse_log_level(level_sv);
+    parsed.level = EventLevel::declared(utils::parse_log_level(level_sv));
     parsed.component = "nginx";
     parsed.content = rest;
 
     INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                       "strategy=NginxError parsed component={} level={} has_timestamp={}",
-                      parsed.component, to_string(parsed.level), parsed.timestamp.has_value());
+                      parsed.component, to_string(parsed.level.value()),
+                      parsed.timestamp.has_value());
     return std::expected<ParsedLine, std::string>{parsed};
 }
 

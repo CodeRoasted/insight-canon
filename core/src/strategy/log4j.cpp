@@ -91,12 +91,12 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
         if (!rest.empty() && rest[0] == '-')
             (void)sv_take_token(rest); // consume trailing '-'
 
-        parsed_line.level = utils::parse_log_level(level_sv);
+        parsed_line.level = EventLevel::declared(utils::parse_log_level(level_sv));
         parsed_line.component = thread_name;
         parsed_line.content = rest;
         INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                           "strategy=Log4j dash component={} level={} has_timestamp={}",
-                          parsed_line.component, to_string(parsed_line.level),
+                          parsed_line.component, to_string(parsed_line.level.value()),
                           parsed_line.timestamp.has_value());
         return std::expected<ParsedLine, std::string>{parsed_line};
     }
@@ -126,12 +126,12 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
         if (!rest.empty() && rest[0] == '[')
             (void)sv_take_bracketed(rest);
 
-        parsed_line.level = utils::parse_log_level(level_sv);
+        parsed_line.level = EventLevel::declared(utils::parse_log_level(level_sv));
         parsed_line.component = component;
         parsed_line.content = rest;
         INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                           "strategy=Log4j openstack component={} level={} has_timestamp={}",
-                          parsed_line.component, to_string(parsed_line.level),
+                          parsed_line.component, to_string(parsed_line.level.value()),
                           parsed_line.timestamp.has_value());
         return std::expected<ParsedLine, std::string>{parsed_line};
     }
@@ -148,12 +148,12 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
     if (!rest.empty() && rest[0] == '-')
         (void)sv_take_token(rest);
 
-    parsed_line.level = utils::parse_log_level(level_sv);
+    parsed_line.level = EventLevel::declared(utils::parse_log_level(level_sv));
     parsed_line.component = component;
     parsed_line.content = rest;
     INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                       "strategy=Log4j standard component={} level={} has_timestamp={}",
-                      parsed_line.component, to_string(parsed_line.level),
+                      parsed_line.component, to_string(parsed_line.level.value()),
                       parsed_line.timestamp.has_value());
     return std::expected<ParsedLine, std::string>{parsed_line};
 }

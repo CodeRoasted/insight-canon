@@ -41,13 +41,13 @@ std::expected<ParsedLine, std::string> HealthAppStrategy::parse(std::string_view
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
     parsed_line.timestamp = EventTime::parsed(utils::parse_health_app_ts(ts_str));
-    parsed_line.level = LogLevel::Unknown;
+    parsed_line.level = EventLevel{};
     parsed_line.component = component;
     parsed_line.content = rest;
 
     INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                       "strategy=HealthApp parsed component={} level={} has_timestamp={}",
-                      parsed_line.component, to_string(parsed_line.level),
+                      parsed_line.component, to_string(parsed_line.level.value()),
                       parsed_line.timestamp.has_value());
     return std::expected<ParsedLine, std::string>{parsed_line};
 }

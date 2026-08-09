@@ -784,15 +784,14 @@ namespace
     [[nodiscard]] bool token_follows(std::string_view line, std::string_view token) noexcept
     {
         const std::size_t end{static_cast<std::size_t>(token.data() - line.data()) + token.size()};
-        return for_each_token(line.substr(end), 0U,
-                              [](std::string_view) noexcept { return true; });
+        return for_each_token(line.substr(end), 0U, [](std::string_view) noexcept { return true; });
     }
 } // namespace
 
 // Only throw path is for_each_token's substr(begin, ...) with begin <= line.size()
 // (see token_scan.hpp); the noexcept body cannot throw.
 // NOLINTNEXTLINE(bugprone-exception-escape)
-LogLevel infer_leading_log_level(std::string_view line) noexcept
+EventLevel infer_leading_log_level(std::string_view line) noexcept
 {
     // Two bounded, alloc-free stages over a SHARED tokenisation (token_scan.hpp):
     // tokens split on whitespace + structural punctuation, but identifier/path
@@ -870,8 +869,8 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
         // to Unknown. A genuine "ERROR:"/"FATAL:" leads with the WORD, so
         // leading_outcome_is_pass returns false and the level is preserved (no recall loss).
         if (is_alerting_level(leading) && detail::leading_outcome_is_pass(line))
-            return LogLevel::Unknown;
-        return leading;
+            return EventLevel::inferred(LogLevel::Unknown);
+        return EventLevel::inferred(leading);
     }
 
     // Stage 2 — a failure/warning cue as a standalone word in the head. The match
@@ -880,17 +879,20 @@ LogLevel infer_leading_log_level(std::string_view line) noexcept
     // tsc-error-report.json`) is not misread as Error — that substring over-match
     // spuriously promoted new templates to HIGH "New error" downstream in the diff.
     if (contains_failure_cue(line, kKeywordHead))
-        return LogLevel::Error; // contains_failure_cue self-guards (SRC-D-OUT-1) — no double call
+        // contains_failure_cue self-guards (SRC-D-OUT-1) — no double call
+        return EventLevel::inferred(LogLevel::Error);
     // SRC-D-CNT-1: a count-register failure word ("1 failure", "5 failed") is a SUMMARY — it did
     // not fire as a verdict cue above, but it still surfaces, capped at Warn (below per-item
     // verdicts; demote, never suppress — the "25 passed, 5 failed" dual). A leading pass GLYPH
     // still demotes.
     if (detail::contains_failure_summary_cue(line, kKeywordHead))
-        return detail::leading_outcome_is_pass(line) ? LogLevel::Unknown : LogLevel::Warn;
+        return EventLevel::inferred(detail::leading_outcome_is_pass(line) ? LogLevel::Unknown
+                                                                          : LogLevel::Warn);
     if (contains_warning_cue(line, kKeywordHead))
         // SRC-D-OUT-1b: contains_warning_cue has no outcome guard, so apply it here (Warn alerts).
-        return detail::leading_outcome_is_pass(line) ? LogLevel::Unknown : LogLevel::Warn;
-    return LogLevel::Unknown;
+        return EventLevel::inferred(detail::leading_outcome_is_pass(line) ? LogLevel::Unknown
+                                                                          : LogLevel::Warn);
+    return EventLevel::inferred(LogLevel::Unknown);
 }
 
 // Parse Nginx error-log timestamp: "YYYY/MM/DD HH:MM:SS"

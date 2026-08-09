@@ -34,8 +34,11 @@ jobs:
       - name: SRC-SP-1 — canon core carries no behavioral ecosystem literal
         run: bash scripts/sp1_semantic_unawareness_lint.sh
 
-      # DN-29.D14 — the seam keeps Timestamp + a separate provenance bool (EventTime deliberately
-      # does not cross it), so the pairing is held by ONE write site. Armed here, not left to
-      # review: a second write site fails on the commit that adds it.
+      # DN-29.D14 / DN-32.D3 — on both provenance pairs the seam keeps the plain datum + a separate
+      # bool (EventTime/EventLevel deliberately do not cross it), so each pairing is held by ONE
+      # write site. Armed here, not left to review: a second write site fails on the commit that
+      # adds it. Two steps, not a loop — a red must name WHICH pair broke in its own step title.
       - name: DN-29.D14 — declared_timestamp has exactly one write site
-        run: bash scripts/declared_timestamp_one_write_site_lint.sh
+        run: bash scripts/provenance_one_write_site_lint.sh declared_timestamp
+      - name: DN-32.D3 — declared_level has exactly one write site
+        run: bash scripts/provenance_one_write_site_lint.sh declared_level

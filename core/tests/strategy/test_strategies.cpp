@@ -393,8 +393,9 @@ TEST_F(JsonStrategyTest, OtelSeverityNumberBands)
         ArenaAllocator local_arena{1024};
         auto result{strategy.parse(line, local_arena)};
         ASSERT_TRUE(result.has_value()) << "severity_number=" << cas.severity_number;
-        EXPECT_EQ(result.value().level, cas.expected) << "severity_number=" << cas.severity_number
-                                                      << " got=" << to_string(result.value().level);
+        EXPECT_EQ(result.value().level, cas.expected)
+            << "severity_number=" << cas.severity_number
+            << " got=" << to_string(result.value().level.value());
     }
 }
 

@@ -130,7 +130,7 @@ namespace
             break;
         case JsonRole::Level:
             if (parsed_line.level == LogLevel::Unknown)
-                parsed_line.level = utils::parse_log_level(value);
+                parsed_line.level = EventLevel::declared(utils::parse_log_level(value));
             break;
         case JsonRole::Component:
             if (parsed_line.component.empty())
@@ -241,7 +241,8 @@ namespace
             case OtelFieldClass::SeverityNumber:
                 if (std::int64_t severity_number{}; try_get_int64(root, key_span, severity_number))
                 {
-                    parsed_line.level = log_level_from_severity_number(severity_number);
+                    parsed_line.level =
+                        EventLevel::declared(log_level_from_severity_number(severity_number));
                     is_otel = true;
                 }
                 break;
@@ -541,7 +542,7 @@ namespace
             parsed_line.timestamp = EventTime::declared(*declared_start);
         else
             parsed_line.timestamp = EventTime::parsed(std::nullopt);
-        parsed_line.level = is_error ? LogLevel::Error : LogLevel::Info;
+        parsed_line.level = EventLevel::declared(is_error ? LogLevel::Error : LogLevel::Info);
         if (!service_name.empty())
             parsed_line.component = arena.store_string(service_name);
         parsed_line.content =
@@ -653,7 +654,7 @@ namespace
                     EventTime::parsed(utils::parse_bsd_syslog_ts(fast.timestamp_str));
         }
         if (!fast.level_str.empty())
-            parsed_line.level = utils::parse_log_level(fast.level_str);
+            parsed_line.level = EventLevel::declared(utils::parse_log_level(fast.level_str));
         if (!fast.component_str.empty())
             parsed_line.component = arena.store_string(fast.component_str);
         parsed_line.content = fast.message_str.empty() ? arena.store_string(line)
@@ -661,7 +662,7 @@ namespace
         parsed_line.ordinals = extract_ordinals_fast(fast, arena); // W1 (SRC-D-W1-3)
         INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                           "strategy=JSON fast_path component={} level={} has_timestamp={}",
-                          parsed_line.component, to_string(parsed_line.level),
+                          parsed_line.component, to_string(parsed_line.level.value()),
                           parsed_line.timestamp.has_value());
         return parsed_line;
     }
@@ -779,7 +780,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     }
 
     if (try_get_string(root, kLevelKeys, scratch_view))
-        parsed_line.level = utils::parse_log_level(scratch_view);
+        parsed_line.level = EventLevel::declared(utils::parse_log_level(scratch_view));
 
     if (try_get_string(root, kComponentKeys, scratch_view))
         parsed_line.component = arena.store_string(scratch_view);
@@ -905,9 +906,10 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
                              top_level_keys_for_diagnosis(line), roleless_count);
     }
 
-    INSIGHT_LOG_TRACE(
-        logging::strategy_logger(), "strategy=JSON parsed component={} level={} has_timestamp={}",
-        parsed_line.component, to_string(parsed_line.level), parsed_line.timestamp.has_value());
+    INSIGHT_LOG_TRACE(logging::strategy_logger(),
+                      "strategy=JSON parsed component={} level={} has_timestamp={}",
+                      parsed_line.component, to_string(parsed_line.level.value()),
+                      parsed_line.timestamp.has_value());
     return std::expected<ParsedLine, std::string>{parsed_line};
 }
 

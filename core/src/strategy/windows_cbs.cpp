@@ -57,13 +57,13 @@ std::expected<ParsedLine, std::string> WindowsCBSStrategy::parse(std::string_vie
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
     parsed_line.timestamp = EventTime::parsed(utils::parse_iso8601(ts_str));
-    parsed_line.level = utils::parse_log_level(level_sv);
+    parsed_line.level = EventLevel::declared(utils::parse_log_level(level_sv));
     parsed_line.component = component;
     parsed_line.content = rest;
 
     INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                       "strategy=WindowsCBS parsed component={} level={} has_timestamp={}",
-                      parsed_line.component, to_string(parsed_line.level),
+                      parsed_line.component, to_string(parsed_line.level.value()),
                       parsed_line.timestamp.has_value());
     return std::expected<ParsedLine, std::string>{parsed_line};
 }

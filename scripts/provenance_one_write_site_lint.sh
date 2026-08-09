@@ -1,22 +1,32 @@
 #!/usr/bin/env bash
 ###############################################################################
-# DN-29.D14 / DN-29.D16 — the `declared_timestamp` ONE-WRITE-SITE lint
+# DN-29.D14 / DN-29.D16 / DN-32.D3 — the PROVENANCE-PAIR ONE-WRITE-SITE lint
 #
-#   "The timestamp and its provenance are assigned together, through one site,
-#    and are not independently settable."
+#   "A value and its provenance are assigned together, through one site, and are
+#    not independently settable."
+#
+# Takes the field to check as its argument, because canon now carries TWO of these
+# pairs on CanonicalEvent and a copy-pasted second script would drift from the first
+# the way the brace-init blind spot drifted from the assignment one (see below). One
+# script, one argument, one behaviour:
+#
+#     provenance_one_write_site_lint.sh declared_timestamp
+#     provenance_one_write_site_lint.sh declared_level
 #
 # ── Why this gate exists, and why it is a LINT rather than a test ─────────────
-# `ParsedLine::timestamp` is an `EventTime`: one value carrying the timestamp AND
-# its provenance, so on that side the clause is STRUCTURAL — there is no way to
-# write one without the other, and nothing to enforce.
+# `ParsedLine::timestamp` is an `EventTime` and `ParsedLine::level` is an
+# `EventLevel`: one value carrying the datum AND its provenance, so on that side
+# each clause is STRUCTURAL — there is no way to write one without the other, and
+# nothing to enforce.
 #
-# `CanonicalEvent` deliberately does NOT carry `EventTime`. It uses the
-# `Timestamp{}` sentinel for absence, and that sentinel is load-bearing
-# downstream (`resolve_event_time` keys on `parsed_ts != Timestamp{}`). Pushing
-# `EventTime` across the seam would either drag `std::optional` into every
-# consumer or give `EventTime` TWO representations of absence — worse than two
-# types with one each. So the seam keeps `Timestamp` + a separate
-# `declared_timestamp` bool, and on THAT side the pairing is held by discipline.
+# `CanonicalEvent` deliberately carries NEITHER type. For the timestamp it uses the
+# `Timestamp{}` sentinel for absence, and that sentinel is load-bearing downstream
+# (`resolve_event_time` keys on `parsed_ts != Timestamp{}`). Pushing `EventTime`
+# across the seam would either drag `std::optional` into every consumer or give
+# `EventTime` TWO representations of absence — worse than two types with one each.
+# For the level it is the hot-path POD every downstream package reads by value, and
+# `LogLevel::Unknown` already spells absence there. So the seam keeps the plain datum
+# + a separate `declared_*` bool, and on THAT side each pairing is held by discipline.
 #
 # "Correct today, held by discipline" is exactly the sentence that was wrong four
 # times in this tail. So the one-ness is made the CHECKED THING rather than a
@@ -70,8 +80,23 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CANON="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$CANON"
 
-FIELD='declared_timestamp'
+if [ "$#" -ne 1 ]; then
+  echo "usage: $(basename "$0") <declared_timestamp|declared_level>" >&2
+  exit 2
+fi
+FIELD="$1"
 EXPECTED_WRITES=1
+
+# The pairing each field belongs to, named so a failure explains ITSELF rather than
+# sending the reader to a doc. Anything else is a typo, and a typo must not scan to a
+# green: an unknown field has zero write sites everywhere, which would read as
+# "the write site is GONE" on a field that never existed.
+case "$FIELD" in
+  declared_timestamp) PAIR='the timestamp and its provenance'; PARTNER='EventTime'; SLOT='DN-29.D14' ;;
+  declared_level)     PAIR='the level and its provenance';     PARTNER='EventLevel'; SLOT='DN-32.D3' ;;
+  *) echo "::error::unknown field '${FIELD}' — this lint covers declared_timestamp and declared_level." >&2
+     exit 2 ;;
+esac
 
 # Form 1 — assignment through an object (covers `.x =`, `->x =`, and `{.x = …}`),
 # and not a comparison: `=` not preceded by [=!<>] and not followed by `=`.
@@ -122,7 +147,7 @@ done < <(
   done
 )
 
-echo "DN-29.D14 one-write-site lint — field: ${FIELD}"
+echo "${SLOT} one-write-site lint — field: ${FIELD}"
 echo "scanned: ${scanned} production file(s) under core/src, core/api, semantic (tests excluded by design)"
 echo "write sites found: ${writes} (expected exactly ${EXPECTED_WRITES})"
 [ -n "$report" ] && printf '%s' "$report"
@@ -140,25 +165,25 @@ if [ "$writes" -ne "$EXPECTED_WRITES" ]; then
   if [ "$writes" -gt "$EXPECTED_WRITES" ]; then
     printf '%s' "$report"
     echo
-    echo "DN-29.D14: the timestamp and its provenance are assigned TOGETHER, through ONE site."
-    echo "A second write site is a path that can set a declared time without setting the marker, or"
-    echo "set the marker without the time — the two-field failure the EventTime type exists to"
+    echo "${SLOT}: ${PAIR} are assigned TOGETHER, through ONE site."
+    echo "A second write site is a path that can set a declared value without setting the marker, or"
+    echo "set the marker without the value — the two-field failure the ${PARTNER} type exists to"
     echo "prevent on the ParsedLine side, reappearing on the CanonicalEvent side of the seam."
     echo
     echo "IF THIS FIRED BECAUSE A SECOND LEGITIMATE CONSTRUCTION SITE NOW EXISTS — an acquisition"
     echo "path building CanonicalEvents without going through make_event — then this gate has done"
     echo "its real job: it is the trigger telling you the boundary is void. The seam's split"
-    echo "representation (EventTime on ParsedLine, Timestamp + bool on CanonicalEvent) was"
-    echo "affordable ONLY because every path funnelled through one site. On that day EventTime (or"
-    echo "a sentinel-tier twin) crosses the seam and DN-29.D16's slot is rewritten — do not silence"
+    echo "representation (${PARTNER} on ParsedLine, the plain datum + a bool on CanonicalEvent) was"
+    echo "affordable ONLY because every path funnelled through one site. On that day ${PARTNER} (or"
+    echo "a sentinel-tier twin) crosses the seam and the owning slot is rewritten — do not silence"
     echo "this gate to keep the split."
   else
     echo "The write site is GONE. Either make_event no longer sets ${FIELD} — in which case every"
-    echo "event now claims its time was parsed, and the DN-29.D12 ladder silently loses rung 1 —"
-    echo "or the field was renamed and this lint was not updated with it."
+    echo "event now claims the UNDECLARED species, silently collapsing the distinction the marker"
+    echo "exists to carry — or the field was renamed and this lint was not updated with it."
   fi
   exit 1
 fi
 
-echo "PASS: ${FIELD} is written at exactly one site — provenance cannot be set apart from its timestamp."
+echo "PASS: ${FIELD} is written at exactly one site — provenance cannot be set apart from its value."
 exit 0

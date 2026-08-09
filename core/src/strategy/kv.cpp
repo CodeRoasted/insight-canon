@@ -100,7 +100,7 @@ std::expected<ParsedLine, std::string> KVStrategy::parse(std::string_view line,
         {
             if (key == "level" || key == "severity" || key == "loglevel" || key == "log_level")
             {
-                parsed_line.level = try_parse_level(value);
+                parsed_line.level = EventLevel::declared(try_parse_level(value));
                 continue;
             }
         }
@@ -148,7 +148,7 @@ std::expected<ParsedLine, std::string> KVStrategy::parse(std::string_view line,
 
     INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                       "strategy=KeyValue parsed component={} level={} has_timestamp={}",
-                      parsed_line.component, to_string(parsed_line.level),
+                      parsed_line.component, to_string(parsed_line.level.value()),
                       parsed_line.timestamp.has_value());
     return std::expected<ParsedLine, std::string>{parsed_line};
 }

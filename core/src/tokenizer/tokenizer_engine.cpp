@@ -82,7 +82,10 @@ struct Tokenizer::Impl
         // other, and no future edit that can set a declared time here and forget the marker.
         event.timestamp = parsed_line.timestamp.value_or(Timestamp{});
         event.declared_timestamp = parsed_line.timestamp.is_declared();
-        event.level = parsed_line.level;
+        // THE ONE SITE (DN-32.D3), the level channel's twin of the two lines above and held by the
+        // same species of lint. Level and provenance are copied together, off a single EventLevel.
+        event.level = parsed_line.level.value();
+        event.declared_level = parsed_line.level.is_declared();
         event.format =
             parser.routed_format(); // the routed winner for THIS line (set by parse_line)
         event.component = parsed_line.component;

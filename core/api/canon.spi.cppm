@@ -120,7 +120,12 @@ struct ParsedLine
     // The event time AND its provenance — see EventTime above. Assign with EventTime::parsed(...)
     // or EventTime::declared(...); there is no third way and no implicit one.
     EventTime timestamp;
-    LogLevel level{LogLevel::Unknown};
+    // The level AND its provenance — see EventLevel (canon.api.cppm). Assign with
+    // EventLevel::declared(...) when the bytes came from a position whose MEANING is the level (a
+    // schema field, a syslog PRI, an OTLP severity_number, a dialect's announced level marker), or
+    // EventLevel::inferred(...) when canon read it out of message content; there is no third way
+    // and no implicit one. DN-32.D3: this is the error term a downstream claim is bounded by.
+    EventLevel level;
     std::string_view component; // F3b: the low-card functional source (subsystem/daemon/job)
     std::string_view host;      // F3b: the high-card node/host identity (hors-cube)
     std::string_view content;

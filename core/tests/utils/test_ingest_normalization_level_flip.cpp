@@ -5,9 +5,9 @@
 // THE ONE TO-PASSING FLIP, pinned as a literal (the register half of the same measurement is
 // pinned in tests/utils/test_verdict_register_kind_slot.cpp).
 // The ingest-normalization measurement moved 436 GHA quanta to-FAILING and — on the GitLab
-// control — a single quantum to-PASSING. A to-passing flip is a possible RECALL LOSS: a real failure
-// the change would suppress. It was the only measurement pointing that way, so it was carried as
-// owed rather than assumed benign.
+// control — a single quantum to-PASSING. A to-passing flip is a possible RECALL LOSS: a real
+// failure the change would suppress. It was the only measurement pointing that way, so it was
+// carried as owed rather than assumed benign.
 //
 // RULED BENIGN, and the bytes are the argument (Kleio, 2026-07-29). Measured with the SHIPPED
 // classifier over the 627 traces of marker_corpus_v1 (5 956 626 lines): every to-passing flip is
@@ -28,15 +28,16 @@
 // is the cheapest live proof of that rule in the tree. Stage 1
 // removes the escape run and CORRECTLY leaves the `\r`, which keeps `WARNING` a separate token and
 // is why the normalized line reads Warn. Trim that one byte — as a `\r`-stripping read path would —
-// and `after_script` fuses with `WARNING` into `after_scriptWARNING`; the warning token is gone, the
-// classifier falls through to `failed`, and the line reads **Error** again. So a `\r`-folding reader
-// would silently re-manufacture the very false positive this flip removed. Verified by running this
-// row's literal with the `\r` deleted: Warn → Error.
+// and `after_script` fuses with `WARNING` into `after_scriptWARNING`; the warning token is gone,
+// the classifier falls through to `failed`, and the line reads **Error** again. So a `\r`-folding
+// reader would silently re-manufacture the very false positive this flip removed. Verified by
+// running this row's literal with the `\r` deleted: Warn → Error.
 //
 // ⚠ THE GRAIN DIFFERS FROM THE HEADLINE, and that is not a discrepancy to reconcile away. The
 // measurement counted ONE QUANTUM; this counts NINE LINES. `lines_failed` fires only on UNMATCHED
-// structural nodes, so eight of the nine sit inside matched quanta and never reach the quantum-grain
-// count. Nine lines and one quantum are consistent readings of the same corpus at two grains.
+// structural nodes, so eight of the nine sit inside matched quanta and never reach the
+// quantum-grain count. Nine lines and one quantum are consistent readings of the same corpus at two
+// grains.
 //
 // WHY A LITERAL AND NOT A CORPUS GATE. Same homing as the 436's follow-up: the property is a
 // single-component claim about one classifier on one known-hazardous input, which is what a fixture
@@ -80,16 +81,16 @@ TEST(IngestNormalizationLevelFlip, TheAfterScriptWarningReadsWarnOnceNormalized)
     const std::string_view normalized{
         insight::tokenization::normalize(kRawAfterScriptWarning, scratch).bytes()};
 
-    // The RAW line reads as failing — recorded, because it is the state the flip moved AWAY from and
-    // a test that only pinned the destination could not tell a fix from a classifier that had
+    // The RAW line reads as failing — recorded, because it is the state the flip moved AWAY from
+    // and a test that only pinned the destination could not tell a fix from a classifier that had
     // stopped working.
-    EXPECT_TRUE(is_failing(infer_leading_log_level(kRawAfterScriptWarning)))
-        << "raw reads " << to_string(infer_leading_log_level(kRawAfterScriptWarning))
+    EXPECT_TRUE(is_failing(infer_leading_log_level(kRawAfterScriptWarning).value()))
+        << "raw reads " << to_string(infer_leading_log_level(kRawAfterScriptWarning).value())
         << " — the escape run makes the line's head parse as a failure";
 
     // And the NORMALIZED line does not. This is the pin: it agrees with the producer, which marked
     // the line WARNING in its text and yellow in its colour.
-    const LogLevel normalized_level{infer_leading_log_level(normalized)};
+    const LogLevel normalized_level{infer_leading_log_level(normalized).value()};
     EXPECT_FALSE(is_failing(normalized_level))
         << "normalized reads " << to_string(normalized_level)
         << " — a failing verdict here would re-introduce the false positive the flip removed. The "
@@ -107,8 +108,9 @@ TEST(IngestNormalizationLevelFlip, FoldingTheBareCarriageReturnReManufacturesThe
     std::string scratch;
     const std::string_view normalized{
         insight::tokenization::normalize(kRawWithoutCarriageReturn, scratch).bytes()};
-    EXPECT_TRUE(is_failing(infer_leading_log_level(normalized)))
-        << "without the \\r this line reads " << to_string(infer_leading_log_level(normalized))
+    EXPECT_TRUE(is_failing(infer_leading_log_level(normalized).value()))
+        << "without the \\r this line reads "
+        << to_string(infer_leading_log_level(normalized).value())
         << " — if this ever stops being a failing read, the \\r is no longer what separates the "
            "WARNING token and this file's clause-6 argument needs re-deriving, not updating";
 }
@@ -125,9 +127,9 @@ TEST(IngestNormalizationLevelFlip, NormalizationDoesNotDisarmGenuineFailureLines
           std::string_view{"FATAL: unrecoverable"}})
     {
         const std::string_view normalized{insight::tokenization::normalize(raw, scratch).bytes()};
-        EXPECT_TRUE(is_failing(infer_leading_log_level(normalized)))
+        EXPECT_TRUE(is_failing(infer_leading_log_level(normalized).value()))
             << "a genuine failure line must stay failing after normalization; '" << normalized
-            << "' read " << to_string(infer_leading_log_level(normalized));
+            << "' read " << to_string(infer_leading_log_level(normalized).value());
     }
 }
 // NOLINTEND

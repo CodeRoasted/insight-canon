@@ -91,13 +91,14 @@ std::expected<ParsedLine, std::string> RFC5424Strategy::parse(std::string_view l
     ParsedLine parsed;
     parsed.raw_line = line;
     parsed.timestamp = EventTime::parsed(utils::parse_iso8601(timestamp_str));
-    parsed.level = severity_to_level(pri);
+    parsed.level = EventLevel::declared(severity_to_level(pri));
     parsed.component = (appname != "-") ? appname : hostname;
     parsed.content = msg;
 
     INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                       "strategy=RFC5424 parsed component={} level={} has_timestamp={}",
-                      parsed.component, to_string(parsed.level), parsed.timestamp.has_value());
+                      parsed.component, to_string(parsed.level.value()),
+                      parsed.timestamp.has_value());
     return std::expected<ParsedLine, std::string>{parsed};
 }
 

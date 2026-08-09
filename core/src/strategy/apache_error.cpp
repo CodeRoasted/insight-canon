@@ -69,13 +69,13 @@ ApacheErrorLogStrategy::parse(std::string_view line, ArenaAllocator& /*arena*/) 
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
     parsed_line.timestamp = EventTime::parsed(utils::parse_apache_error_ts(raw_ts));
-    parsed_line.level = utils::parse_log_level(level_word);
+    parsed_line.level = EventLevel::declared(utils::parse_log_level(level_word));
     parsed_line.component = "httpd";
     parsed_line.content = rest;
 
     INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                       "strategy=ApacheError parsed component={} level={} has_timestamp={}",
-                      parsed_line.component, to_string(parsed_line.level),
+                      parsed_line.component, to_string(parsed_line.level.value()),
                       parsed_line.timestamp.has_value());
     return std::expected<ParsedLine, std::string>{parsed_line};
 }

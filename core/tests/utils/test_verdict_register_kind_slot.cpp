@@ -39,8 +39,8 @@ namespace
 struct KindSlotRow
 {
     std::string_view label;
-    std::string_view in_slot;  ///< the level word occupies the kind slot -> Error
-    std::string_view displaced;///< one non-prefix token inserted before it -> Unknown
+    std::string_view in_slot;   ///< the level word occupies the kind slot -> Error
+    std::string_view displaced; ///< one non-prefix token inserted before it -> Unknown
 };
 
 constexpr std::array<KindSlotRow, 7U> kRows{{
@@ -85,8 +85,8 @@ TEST(VerdictRegisterKindSlot, EveryDeclaredPrefixClassKeepsTheAnchor)
 {
     for (const KindSlotRow& row : kRows)
         EXPECT_EQ(infer_leading_log_level(row.in_slot), LogLevel::Error)
-            << "prefix class '" << row.label << "' must keep the verdict colon anchored\n  line: "
-            << row.in_slot;
+            << "prefix class '" << row.label
+            << "' must keep the verdict colon anchored\n  line: " << row.in_slot;
 
     // A kind slot is necessary, not sufficient, and the interaction is worth stating because the
     // declared prefix-class table lists this exact bazel line. `<WORKSPACE>:16: error:` IS in the
@@ -151,7 +151,7 @@ TEST(VerdictRegisterKindSlot, VerdictIsInvariantUnderPrefixLengthAcrossTheScanHe
     const auto padded{[&](std::size_t pad)
                       { return "[" + std::string(pad, 'a') + "] " + std::string{kBody}; }};
 
-    const LogLevel reference{infer_leading_log_level(padded(kMinPad))};
+    const LogLevel reference{infer_leading_log_level(padded(kMinPad)).value()};
     EXPECT_EQ(reference, LogLevel::Error)
         << "the un-padded control must be Error — `Failed` is a self-anchoring verdict, so a "
            "vacuous 'everything is Unknown' invariance cannot pass this row";
@@ -160,8 +160,9 @@ TEST(VerdictRegisterKindSlot, VerdictIsInvariantUnderPrefixLengthAcrossTheScanHe
         const std::string line{padded(pad)};
         EXPECT_EQ(infer_leading_log_level(line), reference)
             << "the verdict moved at padding length " << pad << " (the level word starts at byte "
-            << line.find("info") << ", the head is 40) — a register decision must not depend on a "
-                                    "byte budget\n  line: "
+            << line.find("info")
+            << ", the head is 40) — a register decision must not depend on a "
+               "byte budget\n  line: "
             << line;
     }
 }

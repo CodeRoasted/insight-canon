@@ -53,14 +53,14 @@ std::expected<ParsedLine, std::string> BGLStrategy::parse(std::string_view line,
         ParsedLine parsed_line;
         parsed_line.raw_line = line;
         parsed_line.timestamp = EventTime::parsed(utils::parse_epoch_timestamp(epoch));
-        parsed_line.level = utils::parse_log_level(level_sv);
+        parsed_line.level = EventLevel::declared(utils::parse_log_level(level_sv));
         parsed_line.component = subsystem; // F3b D-F3b-1: KERNEL/APP/DISCOVERY/MMCS… (the cube dim)
         parsed_line.host = node;           // F3b D-F3b-1: the node identity (hors-cube)
         parsed_line.content = rest;
         INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                           "strategy=BGL parsed component={} host={} level={} has_timestamp={}",
-                          parsed_line.component, parsed_line.host, to_string(parsed_line.level),
-                          parsed_line.timestamp.has_value());
+                          parsed_line.component, parsed_line.host,
+                          to_string(parsed_line.level.value()), parsed_line.timestamp.has_value());
         return std::expected<ParsedLine, std::string>{parsed_line};
     }
 
@@ -84,7 +84,7 @@ std::expected<ParsedLine, std::string> BGLStrategy::parse(std::string_view line,
     parsed_line.content = tail;
     INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                       "strategy=BGL/syslog parsed component={} host={} level={} has_timestamp={}",
-                      parsed_line.component, parsed_line.host, to_string(parsed_line.level),
+                      parsed_line.component, parsed_line.host, to_string(parsed_line.level.value()),
                       parsed_line.timestamp.has_value());
     return std::expected<ParsedLine, std::string>{parsed_line};
 }
