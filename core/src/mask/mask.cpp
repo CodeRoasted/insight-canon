@@ -9,7 +9,8 @@ import insight.canon.detail.scan; // canonical char-class predicates (is_digit /
 // function of a line's own whitespace-delimited tokens, each classified KEEP / MASK /
 // composite-normalize by its OWN class (no cross-line state, no clustering). The joined
 // masked sequence is the template; its SHA-256 (computed downstream, unchanged) is the
-// run-independent template_id. See ADR-16.D5 (SRC-D-TID-1/SRC-D-TID-2; SRC-D-TID-11, SRC-D-TID-12, SRC-D-TID-13, SRC-D-TID-14).
+// run-independent template_id. See ADR-16.D5 (SRC-D-TID-1/SRC-D-TID-2; SRC-D-TID-11, SRC-D-TID-12,
+// SRC-D-TID-13, SRC-D-TID-14).
 //
 // History: this file was the stateful Drain online log-template miner (intern table +
 // SoA cluster store + bucket index + similarity match + absorb_into wildcard learning).
@@ -289,9 +290,9 @@ namespace
     // bit-identical. Returns true and fills `out` only when ≥1 segment was masked AND an anchor
     // exists; false (leaving the dispatch to fall through) otherwise.
     // One coherent per-token masking routine: the `:`/`/` segment walk, the letter-KEEP /
-    // digit-MASK / status carve-out classification, and the SRC-D-MSK-4 ephemeral-root instance masking
-    // all share the same left-to-right pass over `out`/prev_core/window — a split fragments the
-    // single scan and its determinism.
+    // digit-MASK / status carve-out classification, and the SRC-D-MSK-4 ephemeral-root instance
+    // masking all share the same left-to-right pass over `out`/prev_core/window — a split fragments
+    // the single scan and its determinism.
     // NOLINTNEXTLINE(readability-function-cognitive-complexity)
     [[nodiscard]] inline bool normalize_diagnostic_composite(std::string_view tok, std::string& out)
     {
@@ -311,8 +312,9 @@ namespace
         bool has_letter_anchor{false};
         std::string_view prev_core{}; // the previous segment's core — for the status carve-out
         std::size_t seg_start{0};
-        // SRC-D-MSK-4 M3/M4: the ephemeral-root matcher over the SAME catalog as call site B. When a
-        // declared root ends at a component, the NEXT component is a per-run instance and masks to
+        // SRC-D-MSK-4 M3/M4: the ephemeral-root matcher over the SAME catalog as call site B. When
+        // a declared root ends at a component, the NEXT component is a per-run instance and masks
+        // to
         // <*> regardless of its leading char (overriding the letter-leading KEEP); scope is CLAMPED
         // to Instance here so the file:line tail is never masked, and classification resumes from
         // the component after the instance. Root matching uses the FULL segment (`.conan2` keeps
@@ -412,8 +414,8 @@ namespace
         return masked && has_letter_anchor;
     }
 
-    // EPHEMERAL_ROOT standalone rule (SRC-D-MSK-2, re-expressed for SRC-D-MSK-4 M5). Reached only for
-    // tokens rule #1 did not claim (no ':digit'). Split the path on '/', run the shared matcher
+    // EPHEMERAL_ROOT standalone rule (SRC-D-MSK-2, re-expressed for SRC-D-MSK-4 M5). Reached only
+    // for tokens rule #1 did not claim (no ':digit'). Split the path on '/', run the shared matcher
     // (kEphemeralRoots above), and honor the DECLARED scope: `Subtree` collapses the whole
     // remainder (`<root>/<*>`, byte-identical to -5 for every existing entry); `Instance` masks the
     // one component under the root and KEEPS the tail (`<root>/<*>/<tail…>`). Being segment-
@@ -631,6 +633,109 @@ namespace
         return false;
     }
 
+    // DN-34.D2 #3b: an OPAQUE EPHEMERAL IDENTITY — the missing ALPHABET beside the two arms
+    // above. `is_uuid_or_long_hash`'s ≥16 floor is about HEX; `is_digit_leading` is about
+    // numbers. An autoscaler id is base36 AND letter-leading, so it sits outside both and
+    // reached literal KEEP — which put a value that changes every run into TEMPLATE IDENTITY.
+    // Measured on 66 real homologous GHA pairs: the id was the SOLE finding in 48 of them.
+    //
+    // A segment qualifies on THREE conjuncts. Each one is load-bearing; none is decoration.
+    //
+    //  (a) LENGTH ≥ 12. Keeps `x86`, `sha256`, `log4j`, `v2` literal. The floor is CALIBRATED,
+    //      not chosen: 12 is where the over-mask count measured ZERO. Lowering it to reach a
+    //      hypothetical shorter id is REFUSED (DN-34) — it would tune on an unmeasured
+    //      population and spend the very over-mask zero that makes this rule trustworthy.
+    //
+    //  (b) ≥ 2 letter/digit RUNS — the segment must MIX the two classes. A pure-alpha run is
+    //      excluded, and that exclusion is the one carrying the weight: at ≥12 chars a
+    //      single-case pure-alpha run is an English word (`dependencies` — measured 1245×,
+    //      `requirements`, `architecture`, `configurations`). Admitting it was measured and
+    //      REFUSED.
+    //      ⚠ CALIBRATED AT 2, NOT 3, AND THE DIFFERENCE WAS MEASURED, not reasoned. DN-34.D2
+    //      specified ≥3 (genuine interleaving). On the banked crawl ≥3 claims 59/62 ids and ≥2
+    //      claims 61/62, while the newly-masked set on real CI logs is BYTE-FOR-BYTE THE SAME
+    //      (489 instances, 367 distinct) — so 3 bought nothing and cost two ids. The ruling's
+    //      acceptance criterion is pair-level silence, and ≥3 measurably failed it (see below).
+    //
+    //  (b2) AT LEAST ONE NON-HEX LETTER (g–z). This is what makes this arm and
+    //      `is_uuid_or_long_hash` DISJOINT BY ALPHABET, which is the whole framing of DN-34.D1:
+    //      that arm owns hex and deliberately keeps hex runs SHORTER than 16 literal
+    //      (`deadbeef`, `cafe`). Without this clause a 15-char hex run like `deadbeefcafe0ba`
+    //      satisfies (a)+(b)+(c) and masks — silently LOWERING that arm's floor from 16 to 12
+    //      for any hex string containing a digit. Caught by
+    //      `StatelessTemplate.HashFloorPinnedAtSixteen*`, not by the corpus measurement, which
+    //      contained no 12–15-char hex word: the existing arm was the instrument that had it.
+    //  (c) SINGLE CASE, and this clause is the one a later reader will delete as redundant.
+    //      ⚠ DO NOT. It was not reasoned in; it was FORCED by measurement. The first candidate
+    //      was (a)+(b) alone, and on real CI bytes it masked
+    //      `MetricsSinkTest.P99LatencyAppearsInOutput` and
+    //      `DeterminismE2ETest.SameSeedProducesSameContent` — because `P99Latency` interleaves.
+    //      TEST NAMES ARE THE HIGHEST-VALUE TOKEN IN A CI LOG and SRC-D-RNK-1's specificity
+    //      tiebreak exists to rank them; masking them would have traded a real defect for a
+    //      worse one. Case VARIATION is word structure; an autoscaler id has none. Removing
+    //      this line re-opens that regression silently — the rows do not disappear, they
+    //      become wrong.
+    //
+    // ⚠ WHAT IT DEMONSTRABLY DOES NOT CLAIM — the can't-PASS check, because a masking rule that
+    // cannot fail to mask is worthless. A DIGITS-ONLY segment is never claimed (one run), so
+    // `prod-db-3` → `prod-db-4` stays a FULL FINDING: a genuinely-changed host in a fixed fleet
+    // is untouched. Nor mixed-case, nor short, nor single-class (`HAVE_CXX_FLAG_WSHORTEN_64_TO_32`
+    // is all single-class segments).
+    //
+    // ⚠ THE CLAIM BOUNDARY, so no surface overstates it: this masks a SHAPE, not "runner ids".
+    // All 62 ids in the measured population were Namespace `nsc-runner-*`; GitHub-HOSTED runner
+    // ids are UNMEASURED and UNCLAIMED, and a short one would not qualify under (a).
+    //
+    // Byte-only and single-token, like every other arm here — which is what keeps it
+    // cross-stdlib identical (SRC-D-TID-14).
+    [[nodiscard]] inline bool is_opaque_identity(std::string_view tok) noexcept
+    {
+        static constexpr std::size_t kMinOpaqueLen{12};
+        static constexpr int kMinAlnumRuns{2};
+        std::size_t begin{0};
+        while (begin <= tok.size())
+        {
+            std::size_t end{begin};
+            while (end < tok.size() && tok[end] != '-' && tok[end] != '_' && tok[end] != '.' &&
+                   tok[end] != '/')
+                ++end;
+            const std::string_view seg{tok.substr(begin, end - begin)};
+            begin = end + 1;
+            if (seg.size() < kMinOpaqueLen)
+                continue;
+            int runs{0};
+            int prev{0}; // 0 = none yet, 1 = alpha, 2 = digit
+            bool pure_alnum{true}, has_upper{false}, has_lower{false}, has_non_hex_alpha{false};
+            for (const char chr : seg)
+            {
+                int cls{0};
+                if (is_digit(chr))
+                    cls = 2;
+                else if ((chr >= 'a' && chr <= 'z') || (chr >= 'A' && chr <= 'Z'))
+                {
+                    cls = 1;
+                    (chr >= 'a' && chr <= 'z') ? has_lower = true : has_upper = true;
+                    if (!is_hex_char(chr))
+                        has_non_hex_alpha = true;
+                }
+                else
+                {
+                    pure_alnum = false;
+                    break;
+                }
+                if (cls != prev)
+                {
+                    ++runs;
+                    prev = cls;
+                }
+            }
+            if (pure_alnum && has_non_hex_alpha && runs >= kMinAlnumRuns &&
+                !(has_upper && has_lower))
+                return true;
+        }
+        return false;
+    }
+
     // SRC-D-TID-13(a): `#`-counter (`#42`, buildkit `#NN`) → `#<*>` — keep the marker, mask
     // the index. The digit run must run to end-or-punctuation (so `#main` is not a counter).
     [[nodiscard]] inline bool normalize_hash_counter(std::string_view tok, std::string& out)
@@ -652,8 +757,8 @@ namespace
     // SRC-D-TID-22 currency-marker catalog: FROZEN, DECLARED byte sequences. ASCII `$` only for
     // now; `€`/`£`/`¥` would be added here as their literal UTF-8 byte strings ("€" etc.) iff a
     // corpus shows them — byte-exact, NO Unicode property lookup (cross-stdlib determinism +
-    // portability, the SRC-D-TID-9 oracle). Adding a marker here auto-extends both touch points (the
-    // pre-gate + normalize_marker_number) — single source of truth.
+    // portability, the SRC-D-TID-9 oracle). Adding a marker here auto-extends both touch points
+    // (the pre-gate + normalize_marker_number) — single source of truth.
     inline constexpr std::array<std::string_view, 1> kCurrencyMarkers{std::string_view{"$"}};
 
     // Length in BYTES of the declared currency marker prefixing `tok` (0 if none). Requires at
@@ -668,8 +773,9 @@ namespace
 
     // SRC-D-TID-22: a declared currency MARKER glued to a digit-led numeric core (`$463`, `$1.50`)
     // →
-    // `$<*>` — keep the marker, mask the high-card amount (the SRC-D-TID-13 `#42 → #<*>` keep-class/
-    // mask-instance shape). A DECIDABLE numeric: there is no low-card *keyword* of shape
+    // `$<*>` — keep the marker, mask the high-card amount (the SRC-D-TID-13 `#42 → #<*>`
+    // keep-class/ mask-instance shape). A DECIDABLE numeric: there is no low-card *keyword* of
+    // shape
     // `<marker><digits>` worth protecting (shell positionals `$1`/`$2` are negligible-in-logs and
     // lossless to mask), so it joins the D-TID-12 #5 digit-leading numerics that the first-char
     // `is_digit_leading` test misses on a leading marker. The core is digits + one optional
@@ -772,8 +878,9 @@ namespace
     // new/vanished pair per run). EXCLUDES a status value (`code=0` / `status=500`) so a
     // green→red flip stays distinct — the KV form of the #1 status-value KEEP carve-out.
     // A value-WORD (`user=alice`) is NOT masked (value not digit-leading → kept); that
-    // varying word is the unbuilt registry's job (SRC-D-TID-5/SRC-D-TID-14). The CI-revert re-measure
-    // (§8) did not surface this — CI tokens are space-separated, LogCraft wraps in `key=`.
+    // varying word is the unbuilt registry's job (SRC-D-TID-5/SRC-D-TID-14). The CI-revert
+    // re-measure (§8) did not surface this — CI tokens are space-separated, LogCraft wraps in
+    // `key=`.
     [[nodiscard]] inline bool normalize_kv_value(std::string_view tok, std::string& out)
     {
         const std::size_t eq_pos{tok.find('=')};
@@ -822,10 +929,10 @@ namespace
     // stated so future drift between them has a rule to violate loudly.
     constexpr std::array<CompositeRule, 9U> kCompositeRules{{
         {.name = "diagnostic_composite",
-         .normalize = normalize_diagnostic_composite},                           // SRC-D-MSK-1  (-4)
-        {.name = "ephemeral_root", .normalize = normalize_ephemeral_root},       // SRC-D-MSK-2  (-4)
-        {.name = "versioned_ref", .normalize = normalize_versioned_ref},         // D-TID-12 #2
-        {.name = "bracket_timestamp", .normalize = normalize_bracket_timestamp}, // SRC-D-MSK-5  (-8)
+         .normalize = normalize_diagnostic_composite},                     // SRC-D-MSK-1  (-4)
+        {.name = "ephemeral_root", .normalize = normalize_ephemeral_root}, // SRC-D-MSK-2  (-4)
+        {.name = "versioned_ref", .normalize = normalize_versioned_ref},   // D-TID-12 #2
+        {.name = "bracket_timestamp", .normalize = normalize_bracket_timestamp}, // SRC-D-MSK-5 (-8)
         {.name = "bracket_index", .normalize = normalize_bracket_index},         // SRC-D-TID-13(b)
         {.name = "hash_counter", .normalize = normalize_hash_counter},           // SRC-D-TID-13(a)
         {.name = "marker_number", .normalize = normalize_marker_number}, // SRC-D-TID-22 (-3)
@@ -925,12 +1032,17 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                     }
             }
             // 3. UUID / long hash → MASK.
+            // 3b. opaque ephemeral identity (DN-34) → MASK. Sits with 3 because it is the same
+            //    JOB — claim a high-cardinality identity — on the alphabet 3 does not cover.
+            //    Ordered AFTER the composite catalog on purpose: a token a declared composite
+            //    rule already normalizes (a path, a kv value) keeps its richer KEEP-class
+            //    rendering, so this only ever reaches tokens that would otherwise be literal.
             // 4. IPv4 → MASK.
             // 5. digit-leading numeric (or empty) → MASK. `0x`-hex needs no arm of its own:
             //    a `0x…` token starts with '0', a digit, so `digit_leading` already carries it.
             //    The former rule-5 predicate accepted a STRICT SUBSET of digit_leading and could
             //    never be the reason a token masked (DN-027, proven over all inputs).
-            if (shape.empty || is_uuid_or_long_hash(tok) ||
+            if (shape.empty || is_uuid_or_long_hash(tok) || is_opaque_identity(tok) ||
                 (config.mask_ip_addresses && is_ipv4_token(tok)) || shape.digit_leading)
             {
                 mask();
