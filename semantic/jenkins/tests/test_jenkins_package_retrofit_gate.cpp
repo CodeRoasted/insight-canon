@@ -266,7 +266,8 @@ constexpr std::array<std::uint32_t, 64> kSha256RoundConstants{
                 (static_cast<std::uint32_t>(
                      static_cast<unsigned char>(padded[block + 4U * word + 2U]))
                  << 8U) |
-                static_cast<std::uint32_t>(static_cast<unsigned char>(padded[block + 4U * word + 3U]));
+                static_cast<std::uint32_t>(
+                    static_cast<unsigned char>(padded[block + 4U * word + 3U]));
         for (std::size_t word{16}; word < 64U; ++word)
         {
             const std::uint32_t sigma0{rotate_right(schedule[word - 15U], 7U) ^
@@ -327,13 +328,13 @@ struct TraceRow
     std::string depth_type;
     bool elided{false};
     std::string result;
-    std::string wfapi_status;               // "" = no wfapi
+    std::string wfapi_status; // "" = no wfapi
     std::optional<std::uint64_t> wfapi_stage_count;
     std::optional<std::uint64_t> wfapi_step_count;
     std::uint64_t console_stage_count{0};
     std::uint64_t console_step_count{0};
-    std::string console_finished;           // "" = the instrument found no epilogue
-    std::string stamp_class;                // whole-stream | payload-stamped | bare
+    std::string console_finished; // "" = the instrument found no epilogue
+    std::string stamp_class;      // whole-stream | payload-stamped | bare
 };
 
 [[nodiscard]] std::vector<std::string_view> split_tabs(std::string_view line)
@@ -373,11 +374,16 @@ struct TraceEngineResult
 {
     switch (outcome)
     {
-    case RunOutcome::Success: return "Success";
-    case RunOutcome::Failure: return "Failure";
-    case RunOutcome::Aborted: return "Aborted";
-    case RunOutcome::Unstable: return "Unstable";
-    case RunOutcome::Unknown: return "Unknown";
+    case RunOutcome::Success:
+        return "Success";
+    case RunOutcome::Failure:
+        return "Failure";
+    case RunOutcome::Aborted:
+        return "Aborted";
+    case RunOutcome::Unstable:
+        return "Unstable";
+    case RunOutcome::Unknown:
+        return "Unknown";
     }
     return "?";
 }
@@ -397,8 +403,9 @@ struct TraceEngineResult
 {
     static const insight::transport::TransportStack degenerate{};
     static const std::array<std::string_view, 1> bracket_names{"bracket-rfc3339-line-prefix"};
-    static const insight::transport::TransportStack bracket{insight::transport::
-        resolve_transport_stack(insight::transport::IngestDeclaration{.stack = bracket_names})};
+    static const insight::transport::TransportStack bracket{
+        insight::transport::resolve_transport_stack(
+            insight::transport::IngestDeclaration{.stack = bracket_names})};
     return stamp_class == "whole-stream" ? bracket : degenerate;
 }
 
@@ -449,7 +456,8 @@ struct TraceEngineResult
     if (scan.marker_present)
     {
         result.outcome_recovered = true;
-        result.outcome = resolve_run_outcome({}, scan, composed).outcome; // console bytes ALONE
+        result.outcome =
+            resolve_run_outcome({}, scan, composed, composed).outcome; // console bytes ALONE
     }
     return result;
 }
@@ -634,8 +642,8 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
             row.console_step_count = parse_count(fields[11], row_ok);
             if (!row_ok)
             {
-                corpus.integrity_errors.push_back("unparseable trace-sidecar row for '" +
-                                                  row.path + "'");
+                corpus.integrity_errors.push_back("unparseable trace-sidecar row for '" + row.path +
+                                                  "'");
                 continue;
             }
             traces.push_back(std::move(row));
@@ -682,7 +690,8 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
                 ++corpus.elided;
             if (row.wfapi_stage_count.has_value() != (row.job_class == "WorkflowJob"))
                 corpus.integrity_errors.push_back(
-                    "trace '" + row.path + "': wfapi presence and WorkflowJob disagree — the "
+                    "trace '" + row.path +
+                    "': wfapi presence and WorkflowJob disagree — the "
                     "wfapi ⟺ WorkflowJob biconditional broke");
             if (row.wfapi_stage_count.has_value())
             {
@@ -706,12 +715,13 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
                 continue;
             }
             if (bytes.size() != row.bytes)
-                corpus.integrity_errors.push_back(
-                    "trace '" + row.path + "' size " + std::to_string(bytes.size()) +
-                    " != attested " + std::to_string(row.bytes));
+                corpus.integrity_errors.push_back("trace '" + row.path + "' size " +
+                                                  std::to_string(bytes.size()) + " != attested " +
+                                                  std::to_string(row.bytes));
             if (sha256_hex(bytes) != row.sha256)
                 corpus.integrity_errors.push_back(
-                    "trace '" + row.path + "' sha256 differs from the attested digest — wrong "
+                    "trace '" + row.path +
+                    "' sha256 differs from the attested digest — wrong "
                     "bytes under a right count is the fabricated-pass shape");
 
             const TraceEngineResult engine{
@@ -745,7 +755,8 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
             }
             if (engine.stage_names.size() != row.console_stage_count && names_equal)
                 corpus.integrity_errors.push_back(
-                    "trace '" + row.path + "': the two committed oracle files disagree on the "
+                    "trace '" + row.path +
+                    "': the two committed oracle files disagree on the "
                     "console stage count — generator drift");
 
             // ── L-S1 / L-S2 over the stage-bearing wfapi axis ──
@@ -801,7 +812,8 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
                 else
                     corpus.vocabulary_errors.push_back("trace '" + row.path +
                                                        "': result class outside the recorded "
-                                                       "vocabulary: " + row.result);
+                                                       "vocabulary: " +
+                                                       row.result);
             }
             else
             {
@@ -834,23 +846,23 @@ std::filesystem::path JenkinsRecognizerRetrofitGate::root_{};
 // The shared diagnostic block — printed on ANY failure: actual-vs-expected, with the trace named.
 [[nodiscard]] std::string report(const CorpusScore& corpus)
 {
-    const auto cell{[&](const char* name, const std::map<std::string, std::size_t>& cells) {
-        std::string out{name};
-        for (const auto& [key, count] : cells)
-            out += " " + key + "=" + std::to_string(count);
-        return out;
-    }};
+    const auto cell{[&](const char* name, const std::map<std::string, std::size_t>& cells)
+                    {
+                        std::string out{name};
+                        for (const auto& [key, count] : cells)
+                            out += " " + key + "=" + std::to_string(count);
+                        return out;
+                    }};
     std::ostringstream out;
     out << "\n  population rows           : " << corpus.rows << " (pinned " << kTraces << ")"
-        << "\n  " << cell("depth cells              :", corpus.depth_cells)
-        << "\n  " << cell("result cells             :", corpus.result_cells)
+        << "\n  " << cell("depth cells              :", corpus.depth_cells) << "\n  "
+        << cell("result cells             :", corpus.result_cells)
         << "\n  WorkflowJob / wfapi       : " << corpus.workflow_jobs << " / "
         << corpus.wfapi_traces << " (pinned " << kWorkflowJobs << " — biconditional)"
         << "\n  stage-bearing trees       : " << corpus.stage_bearing << " (pinned "
         << kStageBearingTrees << ")"
         << "\n  wfapi stages / steps      : " << corpus.wfapi_stage_rows << " / "
-        << corpus.wfapi_step_sum << " (pinned " << kWfapiStageRows << " / " << kWfapiStepSum
-        << ")"
+        << corpus.wfapi_step_sum << " (pinned " << kWfapiStageRows << " / " << kWfapiStepSum << ")"
         << "\n  UNSTABLE wfapi stages     : " << corpus.unstable_wfapi_stages << " (pinned "
         << kUnstableWfapiStages << " — counted, asserted nowhere else)"
         << "\n  elided                    : " << corpus.elided << " (pinned " << kElided << ")"
@@ -860,8 +872,7 @@ std::filesystem::path JenkinsRecognizerRetrofitGate::root_{};
         << kConsoleStageRows << ")"
         << "\n  integrity errors          : " << corpus.integrity_errors.size() << " (pinned 0)"
         << "\n  L-T mismatches            : " << corpus.transcription_mismatches << " of "
-        << kTraces << " (pinned " << kTranscriptionMismatches
-        << ")   <<< THE TRANSCRIPTION CLAIM"
+        << kTraces << " (pinned " << kTranscriptionMismatches << ")   <<< THE TRANSCRIPTION CLAIM"
         << "\n  L-S1 per-trace mismatches : " << corpus.s1_per_trace_mismatches << " (pinned 0)"
         << "\n  L-O agree S/F/U/A         : " << corpus.agree_success << "/" << corpus.agree_failure
         << "/" << corpus.agree_unstable << "/" << corpus.agree_aborted << " (pinned "
@@ -870,11 +881,11 @@ std::filesystem::path JenkinsRecognizerRetrofitGate::root_{};
         << "\n  L-O absent / divergent    : " << corpus.console_absent << " / " << corpus.divergent
         << " (pinned " << kConsoleAbsent << " / " << kDivergent << ")";
     for (const auto& [key, value] : corpus.s1_cells)
-        out << "\n  L-S1 [" << key.first << (key.second ? ", elided" : "") << "] hits/wfapi/console: "
-            << value.hits << "/" << value.wfapi << "/" << value.console;
+        out << "\n  L-S1 [" << key.first << (key.second ? ", elided" : "")
+            << "] hits/wfapi/console: " << value.hits << "/" << value.wfapi << "/" << value.console;
     for (const auto& [key, value] : corpus.s2_cells)
-        out << "\n  L-S2 [" << key.first << (key.second ? ", elided" : "") << "] min/wfapi/engine : "
-            << value.hits << "/" << value.wfapi << "/" << value.console;
+        out << "\n  L-S2 [" << key.first << (key.second ? ", elided" : "")
+            << "] min/wfapi/engine : " << value.hits << "/" << value.wfapi << "/" << value.console;
     for (const std::string& row : corpus.integrity_errors)
         out << "\n  INTEGRITY: " << row;
     for (const std::string& row : corpus.vocabulary_errors)
@@ -890,9 +901,9 @@ std::filesystem::path JenkinsRecognizerRetrofitGate::root_{};
     return std::move(out).str();
 }
 
-[[nodiscard]] StructuralCell cell_of(const std::map<std::pair<std::string, bool>, StructuralCell>&
-                                         cells,
-                                     const char* depth, bool elided)
+[[nodiscard]] StructuralCell
+cell_of(const std::map<std::pair<std::string, bool>, StructuralCell>& cells, const char* depth,
+        bool elided)
 {
     const auto found{cells.find({std::string{depth}, elided})};
     return found == cells.end() ? StructuralCell{0, 0, 0} : found->second;
@@ -905,9 +916,8 @@ void expect_cell(const StructuralCell& actual, const StructuralCell& pinned, con
                                         << "] numerator moved" << report(corpus);
     EXPECT_EQ(actual.wfapi, pinned.wfapi) << leg << " [" << depth << (elided ? ", elided" : "")
                                           << "] oracle denominator moved" << report(corpus);
-    EXPECT_EQ(actual.console, pinned.console)
-        << leg << " [" << depth << (elided ? ", elided" : "") << "] engine denominator moved"
-        << report(corpus);
+    EXPECT_EQ(actual.console, pinned.console) << leg << " [" << depth << (elided ? ", elided" : "")
+                                              << "] engine denominator moved" << report(corpus);
 }
 
 TEST_F(JenkinsRecognizerRetrofitGate, ThePopulationIsTheCommittedSidecarVerifiedAgainstTheBytes)
@@ -926,10 +936,11 @@ TEST_F(JenkinsRecognizerRetrofitGate, ThePopulationIsTheCommittedSidecarVerified
         << report(corpus);
 
     // Clause 5 — the depth partition closes into named cells (authoritative recheck labels).
-    const auto depth{[&](const char* name) {
-        const auto found{corpus.depth_cells.find(name)};
-        return found == corpus.depth_cells.end() ? std::size_t{0} : found->second;
-    }};
+    const auto depth{[&](const char* name)
+                     {
+                         const auto found{corpus.depth_cells.find(name)};
+                         return found == corpus.depth_cells.end() ? std::size_t{0} : found->second;
+                     }};
     EXPECT_EQ(depth("declarative"), kDeclarative) << report(corpus);
     EXPECT_EQ(depth("scripted"), kScripted) << report(corpus);
     EXPECT_EQ(depth("matrix-pipe"), kMatrixPipe) << report(corpus);
@@ -959,10 +970,12 @@ TEST_F(JenkinsRecognizerRetrofitGate, ThePopulationIsTheCommittedSidecarVerified
     EXPECT_EQ(corpus.elided, kElided) << report(corpus);
     EXPECT_EQ(corpus.console_stage_rows, kConsoleStageRows) << report(corpus);
 
-    const auto result{[&](const char* name) {
-        const auto found{corpus.result_cells.find(name)};
-        return found == corpus.result_cells.end() ? std::size_t{0} : found->second;
-    }};
+    const auto result{[&](const char* name)
+                      {
+                          const auto found{corpus.result_cells.find(name)};
+                          return found == corpus.result_cells.end() ? std::size_t{0}
+                                                                    : found->second;
+                      }};
     EXPECT_EQ(result("SUCCESS"), kResultSuccess) << report(corpus);
     EXPECT_EQ(result("FAILURE"), kResultFailure) << report(corpus);
     EXPECT_EQ(result("ABORTED"), kResultAborted) << report(corpus);
@@ -975,10 +988,11 @@ TEST_F(JenkinsRecognizerRetrofitGate, ThePopulationIsTheCommittedSidecarVerified
 
     // The stamp-class partition (a GENERATED sidecar column — one classifier, one owner). A
     // second axis beside the depth partition, never cross-quoted; closes to 113.
-    const auto stamp{[&](const char* name) {
-        const auto found{corpus.stamp_cells.find(name)};
-        return found == corpus.stamp_cells.end() ? std::size_t{0} : found->second;
-    }};
+    const auto stamp{[&](const char* name)
+                     {
+                         const auto found{corpus.stamp_cells.find(name)};
+                         return found == corpus.stamp_cells.end() ? std::size_t{0} : found->second;
+                     }};
     EXPECT_EQ(stamp("whole-stream"), kWholeStream) << report(corpus);
     EXPECT_EQ(stamp("payload-stamped"), kPayloadStamped) << report(corpus);
     EXPECT_EQ(stamp("bare"), kBare) << report(corpus);
@@ -1005,7 +1019,8 @@ TEST_F(JenkinsRecognizerRetrofitGate, LTTranscriptionTheShippedChainEqualsTheFro
         << report(corpus);
     EXPECT_EQ(corpus.console_finished_absent, kConsoleFinishedAbsent)
         << "the v2 true-tail capture has an epilogue on every trace — an absent oracle token is "
-           "an oracle regression, not an engine finding." << report(corpus);
+           "an oracle regression, not an engine finding."
+        << report(corpus);
 }
 
 TEST_F(JenkinsRecognizerRetrofitGate, LS1StageNamesAgreeWithThePlatformTree)

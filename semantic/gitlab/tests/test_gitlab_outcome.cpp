@@ -32,7 +32,8 @@ namespace
 [[nodiscard]] ComposedSemantics gitlab_only()
 {
     const std::array manifests{insight::semantic::gitlab::kManifest};
-    return insight::semantic::compose(manifests).for_stream(insight::semantic::gitlab::kDialect, {});
+    return insight::semantic::compose(manifests).for_stream(insight::semantic::gitlab::kDialect,
+                                                            {});
 }
 } // namespace
 
@@ -42,9 +43,9 @@ TEST(GitLabOutcome, TheApiStatusVocabularyMapsToTheFourClassModel)
     EXPECT_EQ(map_outcome_token("success", composed), RunOutcome::Success);
     EXPECT_EQ(map_outcome_token("failed", composed), RunOutcome::Failure);
     EXPECT_EQ(map_outcome_token("canceled", composed), RunOutcome::Aborted);
-    // A row mapping TO Unknown still MAPS — engaged optional, value Unknown. The distinction from an
-    // ABSENT row is the whole point: absence produces a fail-closed note about a token this dialect
-    // does in fact define.
+    // A row mapping TO Unknown still MAPS — engaged optional, value Unknown. The distinction from
+    // an ABSENT row is the whole point: absence produces a fail-closed note about a token this
+    // dialect does in fact define.
     const auto skipped{map_outcome_token("skipped", composed)};
     ASSERT_TRUE(skipped.has_value());
     EXPECT_EQ(*skipped, RunOutcome::Unknown);
@@ -73,7 +74,7 @@ TEST(GitLabOutcome, TheSuccessTailResolvesWithNoRemainder)
     const std::vector<std::string> lines{"Running with gitlab-runner 18.9.0", "Job succeeded"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
     ASSERT_TRUE(scan.marker_present);
-    EXPECT_EQ(resolve_run_outcome({}, scan, composed).outcome, RunOutcome::Success);
+    EXPECT_EQ(resolve_run_outcome({}, scan, composed, composed).outcome, RunOutcome::Success);
 }
 
 TEST(GitLabOutcome, TheFailureTailHasAFreeFormRemainderAndStillResolves)
@@ -82,15 +83,14 @@ TEST(GitLabOutcome, TheFailureTailHasAFreeFormRemainderAndStillResolves)
     // These four forms are the whole reason OutcomeMarkerShape exists: not one of them has a
     // single-word remainder, so under the shipped Jenkins shape ALL of them were unrecognizable —
     // 144 of 619 corpus traces.
-    for (const std::string_view tail : {"ERROR: Job failed: exit code 1",
-                                        "ERROR: Job failed: exit status 137",
-                                        "ERROR: Job failed (system failure): prepare environment",
-                                        "ERROR: Job failed"})
+    for (const std::string_view tail :
+         {"ERROR: Job failed: exit code 1", "ERROR: Job failed: exit status 137",
+          "ERROR: Job failed (system failure): prepare environment", "ERROR: Job failed"})
     {
         const std::vector<std::string> lines{"building", std::string{tail}};
         const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
         ASSERT_TRUE(scan.marker_present) << "unrecognized terminal line: " << tail;
-        EXPECT_EQ(resolve_run_outcome({}, scan, composed).outcome, RunOutcome::Failure)
+        EXPECT_EQ(resolve_run_outcome({}, scan, composed, composed).outcome, RunOutcome::Failure)
             << "terminal line: " << tail;
     }
 }
@@ -103,7 +103,7 @@ TEST(GitLabOutcome, ACancellationAnnouncedWithTheFailurePrefixResolvesToAborted)
     const std::vector<std::string> lines{"building", "ERROR: Job failed: canceled"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
     ASSERT_TRUE(scan.marker_present);
-    EXPECT_EQ(resolve_run_outcome({}, scan, composed).outcome, RunOutcome::Aborted)
+    EXPECT_EQ(resolve_run_outcome({}, scan, composed, composed).outcome, RunOutcome::Aborted)
         << "GitLab announces a CANCELLATION with the FAILURE prefix — reading it as Failure is a "
            "wrong verdict, not a missing one (17 of 25 cancelled jobs in marker_corpus_v1)";
 }
@@ -116,7 +116,7 @@ TEST(GitLabOutcome, TheApiResultOutranksADivergentConsoleTail)
     // tiebreak.
     const std::vector<std::string> lines{"working", "Job succeeded"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
-    const auto resolution{resolve_run_outcome("canceled", scan, composed)};
+    const auto resolution{resolve_run_outcome({.token = "canceled"}, scan, composed, composed)};
     EXPECT_EQ(resolution.outcome, RunOutcome::Aborted);
     EXPECT_TRUE(resolution.authoritative);
     EXPECT_TRUE(resolution.divergent);
@@ -139,13 +139,15 @@ TEST(GitLabOutcome, AnIndentedBannerMatchesAndTheLastMatchIsWhatSaves)
     // STATE, not apology. Canon trims leading ASCII whitespace before the outcome walk
     // (RawTextStrategy, so that indented continuation lines group with their peers), so a QUOTED or
     // NESTED verdict banner does match the row — this dialect inherits that from core and does not
-    // get to opt out of it. What contains it is the rule the scan already carries: the LAST matching
-    // line wins, and a real GitLab trace ends on its own banner. Asserted rather than left implicit,
-    // because a reader who assumed anchoring alone excluded the nested case would be wrong.
+    // get to opt out of it. What contains it is the rule the scan already carries: the LAST
+    // matching line wins, and a real GitLab trace ends on its own banner. Asserted rather than left
+    // implicit, because a reader who assumed anchoring alone excluded the nested case would be
+    // wrong.
     const std::vector<std::string> quoted_then_real{"  ERROR: Job failed: exit code 1",
                                                     "retrying the child job", "Job succeeded"};
-    EXPECT_EQ(resolve_run_outcome({}, scan_run_outcome(quoted_then_real, composed), composed)
-                  .outcome,
-              RunOutcome::Success);
+    EXPECT_EQ(
+        resolve_run_outcome({}, scan_run_outcome(quoted_then_real, composed), composed, composed)
+            .outcome,
+        RunOutcome::Success);
 }
 // NOLINTEND

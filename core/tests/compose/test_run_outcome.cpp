@@ -3,13 +3,15 @@
 // (canon core stays semantic-unaware —
 // no dialect literal here; the Jenkins/GHA vocabularies are package data, tested in their packages;
 // the G-OUT-* gate suite is Kleio's homing). What CORE owns and this file guards:
-//   • map_outcome_token — resolved-view lookup, byte-exact; "no row" (nullopt) is distinct from "a row that
+//   • map_outcome_token — resolved-view lookup, byte-exact; "no row" (nullopt) is distinct from "a
+//   row that
 //     maps to Unknown" (the NOT_BUILT shape).
 //   • the IntentMarkerRow grammar-2 shapes — RemainderToClosingParen strictness + the payload
 //     exclusion set's word-boundary semantics.
 //   • scan_run_outcome — last-match-wins, strict verdict-word remainder (no dialect latch: the
 //     dialect is DECLARED, so the scan carries no LogFormat at all).
-//   • resolve_run_outcome — the SRC-D-OUT-RUN-1 strict ladder: authoritative wins over a present-but-
+//   • resolve_run_outcome — the SRC-D-OUT-RUN-1 strict ladder: authoritative wins over a
+//   present-but-
 //     divergent console tail (the divergence is FLAGGED, never a tiebreak), unmapped tokens surface
 //     a note and fall down the ladder (fail-closed), absence resolves Unknown.
 //   • find_conflict — a cross-package duplicate outcome token / marker prefix fails the build.
@@ -277,7 +279,8 @@ TEST(RunOutcomeGrammar5, NumericFieldIsSkippedAndThePayloadIsTheRemainder)
     const auto step{recognize(norm_probe("mark:1784657178:prepare_executor"), composed)};
     EXPECT_EQ(step.kind, IntentMarkerKind::Step);
     EXPECT_EQ(step.name, "prepare_executor")
-        << "the numeric field must be SKIPPED, not folded into the payload — a per-run epoch inside "
+        << "the numeric field must be SKIPPED, not folded into the payload — a per-run epoch "
+           "inside "
            "the name is the identity storm this extractor exists to prevent";
     // Field WIDTH is unconstrained: a width window would mirror the instrument that measured the
     // corpus, and it is anchoring — not the stamp — that excludes the echoed phantoms.
@@ -365,11 +368,11 @@ TEST(RunOutcomeGrammar5, PrefixIsVerdictReadsTheVerdictOffTheRowNotTheRemainder)
     ASSERT_TRUE(scan.verdict.has_value()) << "a PrefixIsVerdict row carries its own verdict";
     EXPECT_EQ(*scan.verdict, RunOutcome::Failure);
     EXPECT_TRUE(scan.token.empty()) << "this shape has no remainder token by construction";
-    EXPECT_EQ(resolve_run_outcome({}, scan, composed).outcome, RunOutcome::Failure);
+    EXPECT_EQ(resolve_run_outcome({}, scan, composed, composed).outcome, RunOutcome::Failure);
 
     // A bare prefix with NO remainder is still a match (the success form).
     const std::vector<std::string> ok{"Run finished"};
-    EXPECT_EQ(resolve_run_outcome({}, scan_run_outcome(ok, composed), composed).outcome,
+    EXPECT_EQ(resolve_run_outcome({}, scan_run_outcome(ok, composed), composed, composed).outcome,
               RunOutcome::Success);
 }
 
@@ -384,25 +387,27 @@ TEST(RunOutcomeGrammar5, AVerdictFramedByABareCarriageReturnIsAnchored)
 {
     const ComposedSemantics composed{composed_numeric()};
     // One `\n`-line, exactly as a byte-faithful splitter hands it over: the verdict is not at
-    // offset 0, it is behind a lone `\r`. CRLF would MASK this — the `\r` here is deliberately bare.
+    // offset 0, it is behind a lone `\r`. CRLF would MASK this — the `\r` here is deliberately
+    // bare.
     const std::vector<std::string> old_leg{"$ run tests\rFATAL: Run broke: code 1"};
     const RunOutcomeScan scan{scan_run_outcome(old_leg, composed)};
     ASSERT_TRUE(scan.marker_present)
         << "a verdict behind a lone \\r was not anchored; line=" << old_leg[0];
     ASSERT_TRUE(scan.verdict.has_value());
     EXPECT_EQ(*scan.verdict, RunOutcome::Failure);
-    EXPECT_EQ(resolve_run_outcome({}, scan, composed).outcome, RunOutcome::Failure);
+    EXPECT_EQ(resolve_run_outcome({}, scan, composed, composed).outcome, RunOutcome::Failure);
 
     // The longest-prefix rule composes with the new anchor rather than being bypassed by it.
     const std::vector<std::string> aborted{"cleanup\rFATAL: Run broke: stopped"};
-    EXPECT_EQ(resolve_run_outcome({}, scan_run_outcome(aborted, composed), composed).outcome,
-              RunOutcome::Aborted);
+    EXPECT_EQ(
+        resolve_run_outcome({}, scan_run_outcome(aborted, composed), composed, composed).outcome,
+        RunOutcome::Aborted);
 
     // CRLF is the masking case: a `\n`-splitter has already cut there, leaving the `\r` trailing on
     // the previous element. That empty trailing segment must anchor nothing, and the verdict must
     // resolve exactly once off the next element.
     const std::vector<std::string> crlf{"$ run tests\r", "Run finished"};
-    EXPECT_EQ(resolve_run_outcome({}, scan_run_outcome(crlf, composed), composed).outcome,
+    EXPECT_EQ(resolve_run_outcome({}, scan_run_outcome(crlf, composed), composed, composed).outcome,
               RunOutcome::Success);
 }
 
@@ -464,14 +469,14 @@ TEST(RunOutcomeGrammar5, LongestPrefixWinsRegardlessOfDeclarationOrder)
 {
     const ComposedSemantics composed{composed_numeric()};
     // `FATAL: Run broke: stopped` is a strict EXTENSION of `FATAL: Run broke`, and it is declared
-    // AFTER it — so under the pre-grammar-5 "last row that matched overwrites" walk the answer was a
-    // function of where the rows sit in an array. It must now be a function of the bytes.
+    // AFTER it — so under the pre-grammar-5 "last row that matched overwrites" walk the answer was
+    // a function of where the rows sit in an array. It must now be a function of the bytes.
     const std::vector<std::string> stopped{"FATAL: Run broke: stopped"};
     const RunOutcomeScan scan{scan_run_outcome(stopped, composed)};
     ASSERT_TRUE(scan.verdict.has_value());
-    EXPECT_EQ(*scan.verdict, RunOutcome::Aborted)
-        << "the LONGER prefix must win: a cancellation announced with the failure prefix is a WRONG "
-           "verdict, not a missing one";
+    EXPECT_EQ(*scan.verdict, RunOutcome::Aborted) << "the LONGER prefix must win: a cancellation "
+                                                     "announced with the failure prefix is a WRONG "
+                                                     "verdict, not a missing one";
     // And the shorter row still claims everything the longer one does not.
     const std::vector<std::string> plain{"FATAL: Run broke: code 137"};
     EXPECT_EQ(*scan_run_outcome(plain, composed).verdict, RunOutcome::Failure);
@@ -483,7 +488,8 @@ TEST(RunOutcomeGrammar5, LastVerdictLineStillWinsAcrossLines)
     const std::vector<std::string> lines{"FATAL: Run broke: code 1", "retrying", "Run finished"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
     ASSERT_TRUE(scan.verdict.has_value());
-    EXPECT_EQ(*scan.verdict, RunOutcome::Success) << "a run has ONE terminal verdict — the LAST one";
+    EXPECT_EQ(*scan.verdict, RunOutcome::Success)
+        << "a run has ONE terminal verdict — the LAST one";
 }
 
 // ── resolve_run_outcome: the SRC-D-OUT-RUN-1 strict ladder ──
@@ -493,7 +499,8 @@ TEST(RunOutcomeResolve, AuthoritativeWinsOverPresentDivergentConsole)
     const ComposedSemantics composed{composed_outcome()};
     const std::vector<std::string> lines{"working", "Ended: STOPPED"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
-    const RunOutcomeResolution res{resolve_run_outcome("GOOD", scan, composed)};
+    const RunOutcomeResolution res{
+        resolve_run_outcome({.token = "GOOD"}, scan, composed, composed)};
     EXPECT_EQ(res.outcome, RunOutcome::Success)
         << "rung 1 resolves; a present-but-divergent console tail is NOT a tiebreak";
     EXPECT_TRUE(res.authoritative);
@@ -508,7 +515,7 @@ TEST(RunOutcomeResolve, ConsoleTailIsTheFallback)
     const std::vector<std::string> lines{"working", "Ended: SHAKY"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
     // No side-input → rung 2: the console tail recovers the verdict — UNSTABLE stays UNSTABLE.
-    const RunOutcomeResolution res{resolve_run_outcome("", scan, composed)};
+    const RunOutcomeResolution res{resolve_run_outcome({.token = ""}, scan, composed, composed)};
     EXPECT_EQ(res.outcome, RunOutcome::Unstable);
     EXPECT_FALSE(res.authoritative);
     EXPECT_FALSE(res.divergent);
@@ -519,7 +526,8 @@ TEST(RunOutcomeResolve, UnmappedSideInputSurfacesANoteAndFallsThrough)
     const ComposedSemantics composed{composed_outcome()};
     const std::vector<std::string> lines{"working", "Ended: BAD"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
-    const RunOutcomeResolution res{resolve_run_outcome("WEIRD", scan, composed)};
+    const RunOutcomeResolution res{
+        resolve_run_outcome({.token = "WEIRD"}, scan, composed, composed)};
     EXPECT_EQ(res.outcome, RunOutcome::Failure) << "the ladder continues past an unmapped rung 1";
     EXPECT_FALSE(res.authoritative);
     EXPECT_FALSE(res.note.empty()) << "an unmapped token is NEVER silent (fail-closed)";
@@ -533,14 +541,16 @@ TEST(RunOutcomeResolve, AnUndeclaredStreamCannotResolveASideInput)
     // cannot resolve however unambiguous it looks. Before T4 the same test asked whether the log's
     // CONTENT had routed to an outcome-bearing format — a per-line detector output deciding what a
     // side-input meant.
-    const ComposedSemantics undeclared{compose(std::array{kOutcomePkg}).for_stream(kUndeclared, {})};
+    const ComposedSemantics undeclared{
+        compose(std::array{kOutcomePkg}).for_stream(kUndeclared, {})};
     const std::vector<std::string> lines{"working", "Ended: GOOD"};
     const RunOutcomeScan scan{scan_run_outcome(lines, undeclared)};
     EXPECT_FALSE(scan.marker_present)
         << "the console-tail marker row is itself dialect-gated, so it is not in this view either";
-    const RunOutcomeResolution res{resolve_run_outcome("GOOD", scan, undeclared)};
-    EXPECT_EQ(res.outcome, RunOutcome::Unknown)
-        << "a side-input cannot resolve on a stream that declared no dialect (fail-closed on depth)";
+    const RunOutcomeResolution res{
+        resolve_run_outcome({.token = "GOOD"}, scan, undeclared, undeclared)};
+    EXPECT_EQ(res.outcome, RunOutcome::Unknown) << "a side-input cannot resolve on a stream that "
+                                                   "declared no dialect (fail-closed on depth)";
     EXPECT_FALSE(res.note.empty()) << "and the refusal is surfaced, never silent";
 }
 
@@ -549,7 +559,7 @@ TEST(RunOutcomeResolve, AbsenceIsUnknownWithoutFraming)
     const ComposedSemantics composed{composed_outcome()};
     const std::vector<std::string> lines{"no epilogue here"};
     const RunOutcomeResolution res{
-        resolve_run_outcome("", scan_run_outcome(lines, composed), composed)};
+        resolve_run_outcome({.token = ""}, scan_run_outcome(lines, composed), composed, composed)};
     EXPECT_EQ(res.outcome, RunOutcome::Unknown);
     EXPECT_TRUE(res.note.empty()) << "absence is the legacy default, not an error";
 }
@@ -561,7 +571,8 @@ TEST(RunOutcomeResolve, MappedToUnknownIsAuthoritative)
     const ComposedSemantics composed{composed_outcome()};
     const std::vector<std::string> lines{"Ended: GOOD"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
-    const RunOutcomeResolution res{resolve_run_outcome("SKIPPED", scan, composed)};
+    const RunOutcomeResolution res{
+        resolve_run_outcome({.token = "SKIPPED"}, scan, composed, composed)};
     EXPECT_EQ(res.outcome, RunOutcome::Unknown);
     EXPECT_TRUE(res.authoritative) << "mapped-to-Unknown is a RESOLUTION, not a miss";
     EXPECT_TRUE(res.divergent) << "the mapped console tail disagrees — flagged, not consulted";

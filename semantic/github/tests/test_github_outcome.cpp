@@ -59,16 +59,12 @@ TEST(GithubOutcome, TheSevenNativeConclusionStringsMap)
 {
     const ComposedSemantics composed{github_only()};
     // The pass↔fail axis.
-    EXPECT_EQ(map_outcome_token("success", composed),
-              RunOutcome::Success);
-    EXPECT_EQ(map_outcome_token("failure", composed),
-              RunOutcome::Failure);
+    EXPECT_EQ(map_outcome_token("success", composed), RunOutcome::Success);
+    EXPECT_EQ(map_outcome_token("failure", composed), RunOutcome::Failure);
     // Both non-completion conclusions are the SAME class: an incomplete run (log truncated at the
     // stop point) — either one suppresses vanished-quantum alarms rather than raising them.
-    EXPECT_EQ(map_outcome_token("cancelled", composed),
-              RunOutcome::Aborted);
-    EXPECT_EQ(map_outcome_token("timed_out", composed),
-              RunOutcome::Aborted);
+    EXPECT_EQ(map_outcome_token("cancelled", composed), RunOutcome::Aborted);
+    EXPECT_EQ(map_outcome_token("timed_out", composed), RunOutcome::Aborted);
     // The no-verdict conclusions MAP (engaged optional) to Unknown — a resolution, not a miss:
     // rung 1 resolves and a stale console tail is never consulted (the NOT_BUILT shape).
     for (const std::string_view token : {"skipped", "neutral", "action_required"})
@@ -103,7 +99,7 @@ TEST(GithubOutcome, NoMarkerMeansTheConsolePathIsHonestlyUnknown)
         << scan.token << "'";
     // …and rung 2 falls to Unknown. (There is no dialect LATCH any more: the dialect is declared,
     // so `RunOutcomeScan` carries no LogFormat at all.)
-    const auto degenerate{resolve_run_outcome("", scan, composed)};
+    const auto degenerate{resolve_run_outcome({.token = ""}, scan, composed, composed)};
     EXPECT_EQ(degenerate.outcome, RunOutcome::Unknown)
         << "only-a-console-log GHA is Unknown — never a guess from per-step exit codes";
     EXPECT_TRUE(degenerate.note.empty())
@@ -118,7 +114,7 @@ TEST(GithubOutcome, AuthoritativeSideInputCarriesTheGhaVerdict)
     // still resolve Aborted: the side-input needs no console corroboration.
     const auto lines{gha_console(/*failing=*/false)};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
-    const auto res{resolve_run_outcome("cancelled", scan, composed)};
+    const auto res{resolve_run_outcome({.token = "cancelled"}, scan, composed, composed)};
     EXPECT_EQ(res.outcome, RunOutcome::Aborted);
     EXPECT_TRUE(res.authoritative);
     EXPECT_FALSE(res.divergent) << "no console verdict exists — nothing to diverge from";

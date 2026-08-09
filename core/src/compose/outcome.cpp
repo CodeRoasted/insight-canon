@@ -10,9 +10,9 @@ import insight.canon.detail.parse; // LogParser — the scan is a parse-only pas
 
 // outcome.cpp — the run-outcome ALGORITHMS over the composed grammar-2 vocabulary (ADR-17 /
 // insight_run_outcome_model.md §3–§4). Canon owns the token map, the console-tail
-// scan, and the SRC-D-OUT-RUN-1 precedence resolver; the semantic packages own only the rows. Homed as
-// a facade impl unit (module insight.canon, the semantic_walkers.cpp precedent) because it consumes
-// ComposedSemantics and drives the sealed LogParser.
+// scan, and the SRC-D-OUT-RUN-1 precedence resolver; the semantic packages own only the rows. Homed
+// as a facade impl unit (module insight.canon, the semantic_walkers.cpp precedent) because it
+// consumes ComposedSemantics and drives the sealed LogParser.
 //
 // Determinism (F5): byte-exact ASCII token/prefix compare + integer line index; no float, no
 // wall-clock; the LAST console-tail match wins (line-order deterministic — a run has one terminal
@@ -86,6 +86,49 @@ map_outcome_token(std::string_view token,
     return std::nullopt;
 }
 
+std::optional<RunOutcome> map_outcome_token_in(std::string_view token, std::string_view vocabulary,
+                                               const insight::semantic::ComposedSemantics& composed)
+{
+    if (vocabulary.empty())
+        return std::nullopt; // an unnamed pair is incomplete — it resolves nothing, by design
+    // The name is checked HERE, with a message that names the coordinate the caller actually
+    // declared. `for_stream` below would also fail closed on an unknown name — but its message says
+    // *"unknown dialect"*, and pointing an `--outcome-vocabulary` typo at the DIALECT is exactly
+    // the conflation DN-32.D6 exists to end. Two coordinates, two diagnostics; the shared filter
+    // stays shared, only the sentence differs.
+    const auto packages{composed.packages()};
+    if (std::ranges::none_of(packages, [vocabulary](const insight::semantic::ComposedPackage& pkg)
+                             { return pkg.name == vocabulary; }))
+    {
+        std::cerr << "FATAL: insight::map_outcome_token_in — unknown outcome vocabulary \""
+                  << vocabulary << "\". The composed packages are: ";
+        if (packages.empty())
+            std::cerr << "<none>";
+        for (std::size_t i{0}; i < packages.size(); ++i)
+            std::cerr << (i == 0 ? "" : ", ") << '"' << packages[i].name << '"';
+        std::cerr
+            << ".\nThis is the vocabulary that INTERPRETS a caller-supplied verdict (DN-32.D6) — "
+               "who SUPPLIED the verdict, which is not the same question as the stream's dialect "
+               "(who WROTE the bytes). An unknown name is a MISTAKE: it would resolve nothing and "
+               "silently disarm every rule that reads the verdict. Declare one of the names above, "
+               "or none.\n";
+        std::terminate();
+    }
+    // `for_stream` IS the dialect gate's one evaluation point, and it is reused rather than
+    // re-spelled here for two reasons that both bite. It re-derives from the UNFILTERED tables, so
+    // it sees rows this composition's own view has already dropped — and a FRESH composition is
+    // the doubly-Unspecified view, in which every concretely-gated row is ALREADY GONE. Walking
+    // `composed.outcome_tokens()` directly therefore matches nothing at all, silently, whatever
+    // the gate says. It also fails closed on an unknown NAME with the message that lists the
+    // composed packages, so a typo'd vocabulary terminates instead of quietly resolving nothing.
+    //
+    // Cold path by construction: once per side per diff, never per line, so the ~30-POD-row copy
+    // is not on any hot path — and no per-line code gains a gate coordinate, which is the
+    // determinism property ADR-22 protects.
+    const insight::semantic::ComposedSemantics view{composed.for_stream(vocabulary, {})};
+    return map_outcome_token(token, view);
+}
+
 RunOutcomeScan scan_run_outcome(std::span<const std::string> lines,
                                 const insight::semantic::ComposedSemantics& composed)
 {
@@ -149,10 +192,15 @@ RunOutcomeScan scan_run_outcome(std::span<const std::string> lines,
     return scan;
 }
 
-RunOutcomeResolution resolve_run_outcome(std::string_view side_input_token,
-                                         const RunOutcomeScan& scan,
-                                         const insight::semantic::ComposedSemantics& composed)
+RunOutcomeResolution resolve_run_outcome(SideInputVerdict side_input, const RunOutcomeScan& scan,
+                                         const insight::semantic::ComposedSemantics& stream_view,
+                                         const insight::semantic::ComposedSemantics& vocabularies)
 {
+    const std::string_view side_input_token{side_input.token};
+    // Rung 1's vocabulary (DN-32.D6). NAMED -> the full composition filtered to that package,
+    // whatever the stream is; UNNAMED -> the stream's own view, unchanged from before.
+    const bool named{!side_input.vocabulary.empty()};
+    const insight::semantic::ComposedSemantics& composed{stream_view};
     RunOutcomeResolution resolution;
 
     // The console-tail candidate's mapped value (rung 2 / the divergence check), resolved against
@@ -162,8 +210,8 @@ RunOutcomeResolution resolve_run_outcome(std::string_view side_input_token,
     {
         // grammar-5 (ADR-17): a PrefixIsVerdict row carries its verdict on the ROW, so there is
         // nothing to map and nothing that can fail to map. The token path — and with it the
-        // fail-closed note — stays exactly as it was for the RemainderToken shape, which is the only
-        // shape whose verdict comes off the LINE and can therefore be outside the vocabulary.
+        // fail-closed note — stays exactly as it was for the RemainderToken shape, which is the
+        // only shape whose verdict comes off the LINE and can therefore be outside the vocabulary.
         console_mapped = scan.verdict ? scan.verdict : map_outcome_token(scan.token, composed);
         if (console_mapped)
             resolution.console = *console_mapped;
@@ -178,7 +226,10 @@ RunOutcomeResolution resolve_run_outcome(std::string_view side_input_token,
     // fail-closed on depth, and the note below says so instead of naming a latched format.
     if (!side_input_token.empty())
     {
-        if (const std::optional<RunOutcome> mapped{map_outcome_token(side_input_token, composed)})
+        const std::optional<RunOutcome> mapped{
+            named ? map_outcome_token_in(side_input_token, side_input.vocabulary, vocabularies)
+                  : map_outcome_token(side_input_token, composed)};
+        if (mapped)
         {
             resolution.outcome = *mapped;
             resolution.authoritative = true;
@@ -201,13 +252,25 @@ RunOutcomeResolution resolve_run_outcome(std::string_view side_input_token,
         // means the stream declared no dialect (or one that ships no verdict tokens), which the
         // caller fixes by declaring; a non-empty one that does not carry the token means the token
         // is wrong for this dialect.
-        resolution.note =
-            "run-outcome: side-input '" + std::string{side_input_token} +
-            (composed.outcome_tokens().empty()
-                 ? "' cannot resolve: this stream's resolved vocabulary carries no run-outcome "
-                   "tokens (declare the stream's dialect to get them)"
-                 : std::string{"' is not in the declared dialect's outcome vocabulary "
-                               "(fail-closed: falling back)"});
+        // Three causes, kept apart because their fixes are different — and the third is the one
+        // that cost us the dogfood, so it names its own remedy rather than sending the reader to
+        // the stream's dialect, which is the wrong coordinate for a side input (DN-32.D6).
+        if (named)
+            resolution.note = "run-outcome: side-input '" + std::string{side_input_token} +
+                              "' is not in the '" + std::string{side_input.vocabulary} +
+                              "' outcome vocabulary (fail-closed: falling back)";
+        else if (composed.outcome_tokens().empty())
+            resolution.note =
+                "run-outcome: side-input '" + std::string{side_input_token} +
+                "' cannot resolve: no vocabulary was named for it and this stream's resolved "
+                "vocabulary carries no run-outcome tokens. A side-input verdict is interpreted by "
+                "the vocabulary of whoever SUPPLIED it, not by the dialect of whoever wrote the "
+                "bytes — name it (e.g. --outcome-vocabulary) rather than declaring a dialect the "
+                "bytes do not have";
+        else
+            resolution.note = "run-outcome: side-input '" + std::string{side_input_token} +
+                              "' is not in the declared dialect's outcome vocabulary "
+                              "(fail-closed: falling back)";
     }
 
     // Rung 2 — the console-tail marker's last match, if present AND it maps.

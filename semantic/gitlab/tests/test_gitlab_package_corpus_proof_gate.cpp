@@ -171,10 +171,11 @@ constexpr std::size_t kStampedTraces{482};
 constexpr std::size_t kStampedBannerModern{445}; // every banner-modern trace is stamped
 constexpr std::size_t kStampedBannerOld{37};     // the contaminant cell — scored, never averaged in
 // CORROBORATED — markers through the shipped ingest assembly, as crossed cells never a subtraction:
-constexpr std::size_t kMarkersBannerModern{2963};     // banner-modern (all stamped)
-constexpr std::size_t kMarkersStampedBannerOld{230};  // stamped ∧ banner-old
-constexpr std::size_t kMarkersUnstamped{294};         // unstamped (all banner-old) — the study's 294
-constexpr std::size_t kMarkersStampedAxisTotal{3193}; // the STAMPED-axis total, the study's numerator
+constexpr std::size_t kMarkersBannerModern{2963};    // banner-modern (all stamped)
+constexpr std::size_t kMarkersStampedBannerOld{230}; // stamped ∧ banner-old
+constexpr std::size_t kMarkersUnstamped{294};        // unstamped (all banner-old) — the study's 294
+constexpr std::size_t kMarkersStampedAxisTotal{
+    3193}; // the STAMPED-axis total, the study's numerator
 // CORROBORATED — the frozen instrument's own per-leg numerators (the oracle file's integrity pins):
 constexpr std::size_t kStudyStartsBannerModern{3001};
 constexpr std::size_t kStudyStartsStampedAxis{3231};
@@ -188,7 +189,8 @@ struct OutcomeLegPins
     std::size_t aborted;
     std::size_t none;
 };
-constexpr OutcomeLegPins kOutcomeBannerModern{.success = 329, .failure = 93, .aborted = 11, .none = 12};
+constexpr OutcomeLegPins kOutcomeBannerModern{
+    .success = 329, .failure = 93, .aborted = 11, .none = 12};
 constexpr OutcomeLegPins kOutcomeBannerOld{.success = 111, .failure = 52, .aborted = 6, .none = 5};
 // The cancel cell is pinned WITH ITS ANCHOR NAMED: 17 is the console CEILING (the producer put a
 // cancel line on 17 of the 25 cancelled jobs), reached exactly because the scan anchors after a
@@ -232,7 +234,8 @@ constexpr std::array<std::uint32_t, 64> kSha256RoundConstants{
     0x748f82eeU, 0x78a5636fU, 0x84c87814U, 0x8cc70208U, 0x90befffaU, 0xa4506cebU, 0xbef9a3f7U,
     0xc67178f2U};
 
-[[nodiscard]] constexpr std::uint32_t rotate_right(std::uint32_t value, std::uint32_t count) noexcept
+[[nodiscard]] constexpr std::uint32_t rotate_right(std::uint32_t value,
+                                                   std::uint32_t count) noexcept
 {
     return (value >> count) | (value << (32U - count));
 }
@@ -255,10 +258,16 @@ constexpr std::array<std::uint32_t, 64> kSha256RoundConstants{
     {
         for (std::size_t word{0}; word < 16U; ++word)
             schedule[word] =
-                (static_cast<std::uint32_t>(static_cast<unsigned char>(padded[block + 4U * word])) << 24U) |
-                (static_cast<std::uint32_t>(static_cast<unsigned char>(padded[block + 4U * word + 1U])) << 16U) |
-                (static_cast<std::uint32_t>(static_cast<unsigned char>(padded[block + 4U * word + 2U])) << 8U) |
-                static_cast<std::uint32_t>(static_cast<unsigned char>(padded[block + 4U * word + 3U]));
+                (static_cast<std::uint32_t>(static_cast<unsigned char>(padded[block + 4U * word]))
+                 << 24U) |
+                (static_cast<std::uint32_t>(
+                     static_cast<unsigned char>(padded[block + 4U * word + 1U]))
+                 << 16U) |
+                (static_cast<std::uint32_t>(
+                     static_cast<unsigned char>(padded[block + 4U * word + 2U]))
+                 << 8U) |
+                static_cast<std::uint32_t>(
+                    static_cast<unsigned char>(padded[block + 4U * word + 3U]));
         for (std::size_t word{16}; word < 64U; ++word)
         {
             const std::uint32_t sigma0{rotate_right(schedule[word - 15U], 7U) ^
@@ -365,11 +374,16 @@ struct TraceResult
 {
     switch (outcome)
     {
-    case RunOutcome::Success: return "Success";
-    case RunOutcome::Failure: return "Failure";
-    case RunOutcome::Aborted: return "Aborted";
-    case RunOutcome::Unstable: return "Unstable";
-    case RunOutcome::Unknown: return "Unknown";
+    case RunOutcome::Success:
+        return "Success";
+    case RunOutcome::Failure:
+        return "Failure";
+    case RunOutcome::Aborted:
+        return "Aborted";
+    case RunOutcome::Unstable:
+        return "Unstable";
+    case RunOutcome::Unknown:
+        return "Unknown";
     }
     return "?";
 }
@@ -422,14 +436,16 @@ struct CorpusScore
     std::size_t disagreements_console_success{0};
     std::size_t disagreements_console_failure{0};
     std::size_t disagreements_api_canceled{0};
-    std::vector<std::string> disagreement_rows;  // always printed in full (there are 3)
-    std::vector<std::string> vocabulary_errors;  // engine verdict outside {S,F,A} / unknown api token
+    std::vector<std::string> disagreement_rows; // always printed in full (there are 3)
+    std::vector<std::string>
+        vocabulary_errors; // engine verdict outside {S,F,A} / unknown api token
 };
 
 [[nodiscard]] ComposedSemantics gitlab_only()
 {
     const std::array manifests{insight::semantic::gitlab::kManifest};
-    return insight::semantic::compose(manifests).for_stream(insight::semantic::gitlab::kDialect, {});
+    return insight::semantic::compose(manifests).for_stream(insight::semantic::gitlab::kDialect,
+                                                            {});
 }
 
 // Score one trace through the SHIPPED symbols (clause 8; the assembly the file header states).
@@ -491,7 +507,8 @@ struct CorpusScore
     if (scan.marker_present)
     {
         result.outcome_recovered = true;
-        result.outcome = resolve_run_outcome({}, scan, composed).outcome; // console bytes ALONE
+        result.outcome =
+            resolve_run_outcome({}, scan, composed, composed).outcome; // console bytes ALONE
     }
     return result;
 }
@@ -505,10 +522,12 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
         // Empty counts as unset: an undefined `vars.X` expands to "" on a runner.
         const char* const raw{std::getenv(kCorpusVar)};
         if (raw == nullptr || *raw == '\0')
-            GTEST_SKIP() << kCorpusVar
-                         << " unset — the private GitLab marker corpus is not present. Point it "
-                            "at the tree holding " << kSidecarFile << ", " << kOracleFile
-                         << " and data/v1/ (i.e. .../coderoast-corpora/gitlab_corpora/marker_corpus).";
+            GTEST_SKIP()
+                << kCorpusVar
+                << " unset — the private GitLab marker corpus is not present. Point it "
+                   "at the tree holding "
+                << kSidecarFile << ", " << kOracleFile
+                << " and data/v1/ (i.e. .../coderoast-corpora/gitlab_corpora/marker_corpus).";
 
         root_ = std::filesystem::path{raw};
         // Set-but-broken is a WIRING FAILURE, not an absent corpus: the operator declared the
@@ -560,7 +579,8 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
         std::vector<SidecarRow> sidecar;
         std::unordered_map<std::string, OracleRow> oracle;
         {
-            constexpr std::string_view kSidecarHeader{"path\tsha256\tbytes\tjob_id\tjob_status\tleg"};
+            constexpr std::string_view kSidecarHeader{
+                "path\tsha256\tbytes\tjob_id\tjob_status\tleg"};
             std::size_t line_no{0};
             for (std::size_t begin{0}; begin < sidecar_text.size();)
             {
@@ -603,7 +623,8 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
             const std::string oracle_text{read_file(root_ / kOracleFile, oracle_ok)};
             if (!oracle_ok)
             {
-                corpus.integrity_errors.push_back("could not read the committed recognition oracle");
+                corpus.integrity_errors.push_back(
+                    "could not read the committed recognition oracle");
                 return corpus;
             }
             constexpr std::string_view kOracleHeader{
@@ -673,8 +694,8 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
             else if (row.job_status == "canceled")
                 ++corpus.api_canceled;
             else
-                corpus.vocabulary_errors.push_back("trace '" + row.path +
-                                                   "': job_status '" + row.job_status +
+                corpus.vocabulary_errors.push_back("trace '" + row.path + "': job_status '" +
+                                                   row.job_status +
                                                    "' is outside the recorded vocabulary");
 
             // clause 4 — bytes verified, not assumed.
@@ -687,9 +708,9 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
                 continue;
             }
             if (bytes.size() != row.bytes)
-                corpus.integrity_errors.push_back(
-                    "trace '" + row.path + "' size " + std::to_string(bytes.size()) +
-                    " != attested " + std::to_string(row.bytes));
+                corpus.integrity_errors.push_back("trace '" + row.path + "' size " +
+                                                  std::to_string(bytes.size()) + " != attested " +
+                                                  std::to_string(row.bytes));
             if (sha256_hex(bytes) != row.sha256)
                 corpus.integrity_errors.push_back("trace '" + row.path +
                                                   "' sha256 differs from the attested digest — "
@@ -706,8 +727,10 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
             const OracleRow& expect{oracle_it->second};
             if (expect.leg != row.leg)
                 corpus.integrity_errors.push_back(
-                    "trace '" + row.path + "': the two committed files disagree on the banner leg ('" +
-                    row.leg + "' vs '" + expect.leg + "') — one classifier, one owner, so this can "
+                    "trace '" + row.path +
+                    "': the two committed files disagree on the banner leg ('" + row.leg +
+                    "' vs '" + expect.leg +
+                    "') — one classifier, one owner, so this can "
                     "only be generator drift");
 
             // clause 5 — void is a counted cell, never scored; and it must BE the zero-byte cell.
@@ -786,9 +809,15 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
                 ++corpus.recovered;
                 switch (result.outcome)
                 {
-                case RunOutcome::Success: ++cells.success; break;
-                case RunOutcome::Failure: ++cells.failure; break;
-                case RunOutcome::Aborted: ++cells.aborted; break;
+                case RunOutcome::Success:
+                    ++cells.success;
+                    break;
+                case RunOutcome::Failure:
+                    ++cells.failure;
+                    break;
+                case RunOutcome::Aborted:
+                    ++cells.aborted;
+                    break;
                 default:
                     corpus.vocabulary_errors.push_back(
                         "trace '" + row.path + "': the console scan resolved to " +
@@ -799,9 +828,9 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
                 const auto api_mapped{map_outcome_token(row.job_status, composed)};
                 if (!api_mapped.has_value())
                 {
-                    corpus.vocabulary_errors.push_back(
-                        "trace '" + row.path + "': job_status '" + row.job_status +
-                        "' does not map in the composed vocabulary");
+                    corpus.vocabulary_errors.push_back("trace '" + row.path + "': job_status '" +
+                                                       row.job_status +
+                                                       "' does not map in the composed vocabulary");
                 }
                 else if (*api_mapped == result.outcome)
                 {
@@ -998,7 +1027,8 @@ TEST_F(GitLabPackageCorpusProofGate, TheOutcomeLegRecoversThePlatformVerdictFrom
     ASSERT_EQ(corpus.rows, kTraceRows) << report(corpus); // clause 3 gates every cell below
 
     EXPECT_TRUE(corpus.vocabulary_errors.empty())
-        << "a verdict left the recorded vocabulary — every cell below is suspect." << report(corpus);
+        << "a verdict left the recorded vocabulary — every cell below is suspect."
+        << report(corpus);
 
     // ── the cells, cut by BANNER leg BEFORE they are asserted (P5 — a verdict cell names its leg;
     //    the 627-wide totals are corroborating sums, not an assertion population) ──

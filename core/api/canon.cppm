@@ -135,6 +135,65 @@ export namespace insight
 map_outcome_token(std::string_view token,
                   const insight::semantic::ComposedSemantics& composed) noexcept;
 
+// ── A CALLER-DECLARED verdict (DN-32.D6) ────────────────────────────────────────────────────────
+//
+// A verdict supplied by the caller is a PAIR — `(vocabulary, token)` — never a bare string, and the
+// two halves answer different questions that ADR-22.D1's authorship test keeps apart:
+//
+//   * the STREAM's dialect answers *who wrote the bytes*. For a raw cmake/ninja build log the true
+//     answer is "no dialect", and that is a fact, not a gap.
+//   * the SIDE INPUT's vocabulary answers *who supplied the verdict* — a CI Action reading its own
+//     platform's job status.
+//
+// Requiring cmake's bytes to carry GitHub's vocabulary is a category error, and it is what made the
+// engine fail closed on our own dogfood: every `outcome_tokens` row is gated to its owning package,
+// the gate was evaluated against the STREAM's resolved dialect, and a dialect-free build log
+// therefore resolved nothing — *"this stream's resolved vocabulary carries no run-outcome tokens"*
+// — even though the vocabulary needed already existed and already covered the token exactly.
+//
+// ⚠ THIS IS NOT "resolve without a vocabulary". A bare token is NOT self-interpreting: GHA says
+// `failure`, GitLab says `failed`, Jenkins says `FAILURE` and also `UNSTABLE`, which has no
+// universal meaning at all. Resolving a bare string would force a native→canonical spelling list
+// into CORE. Naming the vocabulary keeps the mapping as package data (ADR-17.D1) and core learns
+// nothing.
+struct SideInputVerdict
+{
+    // The producer's own spelling, verbatim — never a pre-resolved RunOutcome. Empty = the caller
+    // declared nothing, which is a CHOICE and asserts nothing (DN-32.D7).
+    std::string_view token;
+    // The name of the package whose `outcome_tokens` interpret that spelling. Empty = not named,
+    // and then the token resolves against the STREAM's view exactly as before — an incomplete pair
+    // gains nothing, which is the fail-safe direction.
+    std::string_view vocabulary;
+};
+
+// Map a native verdict token through a NAMED vocabulary's `outcome_tokens`, INDEPENDENTLY of any
+// stream's resolved dialect. `composed` is the FULL composition (every package's rows), not a
+// stream view — the whole point is that the stream's dialect is not consulted.
+//
+// ⚠ IT DOES NOT REINTRODUCE A PER-LINE GATE INPUT, and that distinction is what makes it safe.
+// The determinism fix ADR-22 records is that a DECLARED ROW's gate must not be a function of
+// CONTENT — the old `LogParser::routed_format()` was the per-line detector winner, so which rows
+// fired depended on the bytes. This gate coordinate is a caller's declaration, fixed before the
+// first line and consulted exactly ONCE per side per diff, never on the hot path. Nothing here
+// walks a line.
+//
+// nullopt = no row in the named vocabulary claims the token (distinct from a row that maps it TO
+// RunOutcome::Unknown, e.g. Jenkins NOT_BUILT), or the vocabulary was not named at all. An UNKNOWN
+// vocabulary NAME terminates, for the same reason and through the same door as an unknown dialect
+// (ADR-22.D5): a typo that silently disabled the verdict would disarm every rule that reads it.
+//
+// ⚠ `composed` MUST be the FULL composition, and passing a stream view is a silent no-op rather
+// than an error: a view has already been filtered, and a FRESH composition is the
+// doubly-Unspecified view in which every concretely-gated row is already dropped. The
+// implementation re-derives through `for_stream`, the one ratified evaluation point of the dialect
+// gate, which reads the UNFILTERED tables — so this cannot be "fixed" by walking the view.
+//
+// Not noexcept: `for_stream` allocates. Cold path — once per side per diff, never per line.
+[[nodiscard]] std::optional<RunOutcome>
+map_outcome_token_in(std::string_view token, std::string_view vocabulary,
+                     const insight::semantic::ComposedSemantics& composed);
+
 // The whole-log console-tail scan (§3.2 — the degenerate "only a console log" source). One
 // parse-only pass (no masking): per line, the resolved view's OutcomeMarkerRow set is walked and
 // the LONGEST matching prefix wins within the line; the LAST such line wins across the log.
@@ -190,9 +249,18 @@ struct RunOutcomeResolution
     std::string note;          // surfaced fail-closed note ("" = clean)
 };
 
+//
+// TWO compositions, and they are not interchangeable (DN-32.D6):
+//   * `stream_view` — the resolved view of the stream being diffed. Rung 2 reads it, and must:
+//     a console marker came out of THESE bytes, so a Jenkins marker may not fire on a GHA stream.
+//   * `vocabularies` — the FULL composition. Rung 1 reads it, and only when the side input NAMES
+//     its vocabulary; the declarer's vocabulary has nothing to do with who wrote the bytes.
+// When the side input names no vocabulary the pair is incomplete and rung 1 falls back to
+// `stream_view`, which resolves exactly what it resolved before and gains nothing it did not.
 [[nodiscard]] RunOutcomeResolution
-resolve_run_outcome(std::string_view side_input_token, const RunOutcomeScan& scan,
-                    const insight::semantic::ComposedSemantics& composed);
+resolve_run_outcome(SideInputVerdict side_input, const RunOutcomeScan& scan,
+                    const insight::semantic::ComposedSemantics& stream_view,
+                    const insight::semantic::ComposedSemantics& vocabularies);
 
 // Location recognition (bibles/intent_identity.md §8, SRC-II-8) — the test-file WHERE coordinate,
 // homed in the facade because it walks the composed location rows (ComposedSemantics is in

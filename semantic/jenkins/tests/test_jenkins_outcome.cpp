@@ -84,7 +84,7 @@ TEST(JenkinsOutcome, ConsoleTailRecoveredFromADeclaredWholeStreamConsole)
     ASSERT_TRUE(scan.marker_present) << "the declared-peel epilogue must be recognized";
     EXPECT_EQ(scan.token, "UNSTABLE");
 
-    const auto res{resolve_run_outcome("", scan, composed)};
+    const auto res{resolve_run_outcome({.token = ""}, scan, composed, composed)};
     EXPECT_EQ(res.outcome, RunOutcome::Unstable)
         << "the degenerate only-a-console-log path preserves the four-class verdict";
 
@@ -104,7 +104,8 @@ TEST(JenkinsOutcome, BareFreestyleEpilogueStillResolves)
     const std::vector<std::string> lines{"checking out sources", "compiling", "Finished: ABORTED"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
     ASSERT_TRUE(scan.marker_present);
-    EXPECT_EQ(resolve_run_outcome("", scan, composed).outcome, RunOutcome::Aborted);
+    EXPECT_EQ(resolve_run_outcome({.token = ""}, scan, composed, composed).outcome,
+              RunOutcome::Aborted);
 }
 
 TEST(JenkinsOutcome, AuthoritativeSideInputOverridesDivergentConsole)
@@ -118,7 +119,7 @@ TEST(JenkinsOutcome, AuthoritativeSideInputOverridesDivergentConsole)
     const std::vector<std::string> lines{"[Pipeline] { (ci)", "nested build interrupted",
                                          "Finished: ABORTED"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
-    const auto res{resolve_run_outcome("SUCCESS", scan, composed)};
+    const auto res{resolve_run_outcome({.token = "SUCCESS"}, scan, composed, composed)};
     EXPECT_EQ(res.outcome, RunOutcome::Success);
     EXPECT_TRUE(res.authoritative);
     EXPECT_TRUE(res.divergent);
