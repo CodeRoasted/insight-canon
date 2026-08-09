@@ -154,11 +154,11 @@ int main(int argc, char** argv)
     // ── The declared ARMS (ADR-23 / ADR-22). ──
     //
     // EVERY arm is applied to EVERY file, on purpose. Choosing an arm per file would be inference —
-    // "this one looks like GHA" — which is precisely the per-line content dependence T4 deleted, and
-    // a proof binary that re-introduced it to look tidy would be proving the wrong thing. Applying
-    // all arms to all files also gives the compare the NEGATIVE cells for free: a Jenkins fixture
-    // read under the `github` declaration must produce no GHA structure, byte-identically, on every
-    // leg.
+    // "this one looks like GHA" — which is precisely the per-line content dependence T4 deleted,
+    // and a proof binary that re-introduced it to look tidy would be proving the wrong thing.
+    // Applying all arms to all files also gives the compare the NEGATIVE cells for free: a Jenkins
+    // fixture read under the `github` declaration must produce no GHA structure, byte-identically,
+    // on every leg.
     //
     // The stamped arm declares `api-rfc3339-line-prefix` because GitHub's serving API stamps every
     // line it returns; that peel used to be DETECTED by a strategy in the github package and is now
@@ -292,10 +292,21 @@ int main(int argc, char** argv)
             // construction; any cross-leg divergence here is an engine bug the gate must catch.
             const insight::RunOutcomeScan outcome_scan{
                 insight::scan_run_outcome(peeled_lines, stream.semantics)};
+            // `{}` is the empty SideInputVerdict — no token AND no vocabulary — which is exactly
+            // what the bare `""` meant here before DN-32.D6 made a caller-declared verdict a PAIR:
+            // this proof declares nothing and asserts rung 2, the console tail. Under DN-32.D7 an
+            // empty pair is the third state, never a defaulted success.
+            //
+            // `stream.semantics` is passed TWICE deliberately, and it cannot move a byte. The two
+            // parameters are different questions — rung 2 reads the STREAM view (a marker came out
+            // of these bytes), rung 1 reads the DECLARER's vocabulary — but rung 1's vocabulary
+            // argument is only ever evaluated when the pair NAMES one. With an empty pair the
+            // resolver never touches it, so the fourth argument is unread on this path and the
+            // proof's output is byte-identical to the pre-DN-32.D6 form.
             const insight::RunOutcomeResolution outcome_resolution{
-                insight::resolve_run_outcome("", outcome_scan, stream.semantics)};
-            std::cout << "### run_outcome marker="
-                      << (outcome_scan.marker_present ? '1' : '0') << " token="
+                insight::resolve_run_outcome({}, outcome_scan, stream.semantics, stream.semantics)};
+            std::cout << "### run_outcome marker=" << (outcome_scan.marker_present ? '1' : '0')
+                      << " token="
                       << (outcome_scan.marker_present ? std::string_view{outcome_scan.token}
                                                       : std::string_view{"-"})
                       << " resolved=" << insight::to_string(outcome_resolution.outcome) << '\n';
