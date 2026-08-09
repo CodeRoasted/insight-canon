@@ -246,7 +246,8 @@ TEST(StatelessTemplate, NonEphemeralPathsAndSourcePathsUntouched)
            "masks";
 }
 
-// ── F13 strengthening (SRC-D-TID-11/SRC-D-TID-12/SRC-D-TID-13) — the re-measure rule set ───────────────────
+// ── F13 strengthening (SRC-D-TID-11/SRC-D-TID-12/SRC-D-TID-13) — the re-measure rule set
+// ───────────────────
 
 TEST(StatelessTemplate, DigitLeadingTokensMask)
 {
@@ -513,9 +514,9 @@ TEST(EphemeralRootMask, G2_TailSurvives)
 TEST(EphemeralRootMask, G3_ContentClassStaysLiteral)
 {
     ArenaAllocator arena{256U * 1024U};
-    // None of these sits under a catalogued root, so SRC-D-MSK-4 must not touch them (over-mask check).
-    // A pinned action SHA path (its change is drift we WANT surfaced) keeps its class anchors and
-    // gains NO ephemeral artifact.
+    // None of these sits under a catalogued root, so SRC-D-MSK-4 must not touch them (over-mask
+    // check). A pinned action SHA path (its change is drift we WANT surfaced) keeps its class
+    // anchors and gains NO ephemeral artifact.
     const std::string sha{masked("_actions/actions/create-github-app-token/"
                                  "bcd2ba49abf26b56dd0dd2eb1c9dd5c77b096d4c/dist/main.cjs",
                                  arena)};
@@ -680,3 +681,146 @@ TEST(StatelessTemplate, HexTokensStillMaskViaDigitLeadingAfterTheRuleFiveRip)
 }
 
 // NOLINTEND
+
+// ── DN-34 · the opaque ephemeral identity mask — a SHAPE, and four named neighbours it must
+//    demonstrably FAIL to claim ────────────────────────────────────────────────────────────────
+//
+// FOUND BY MEASUREMENT: the first live-GHA crawl showed an unmasked runner id was the SOLE finding
+// in 48 of 66 real pairs. The rule claims a `-_./` SEGMENT that is >=12 chars, single-case, has
+// >=2 letter/digit runs, and carries >=1 NON-HEX letter.
+//
+// ⚠ CLAIM BOUNDARY — READ BEFORE WIDENING ANY ASSERTION HERE. All 62 measured ids were Namespace
+// `nsc-runner-*`. GITHUB-HOSTED RUNNER IDS ARE UNMEASURED AND UNCLAIMED, and a short one would not
+// qualify at floor 12 anyway. No test in this file may be worded, named, or extended to imply
+// "runner ids are masked" — the true statement names the SHAPE, and a test asserting the broader
+// sentence would claim coverage the measurement does not carry.
+//
+// ⚠ AND THE RESIDUE IS NOT ZERO. The ruling assumed the shipped parameter cost zero pairs; the
+// replay measured FOUR, left ASYMMETRIC (one side masked, one literal) so it reads as a real
+// template change rather than hiding. True ceiling: 2 pairs, one id, 13 lowercase letters with no
+// digit — byte-shaped exactly like a word. Nothing below asserts a zero-residue claim.
+//
+// WHY EACH NEGATIVE IS ITS OWN ARM rather than a loop over a table: a regression must NAME itself.
+// A table-driven arm reds once and says "some neighbour was claimed"; these red individually and
+// say WHICH property of the shape stopped holding, which is the difference between a bug report
+// and a starting point.
+namespace
+{
+// The measured shape: a Namespace runner id. Two of these, differing only in their opaque segment.
+constexpr std::string_view kRunnerA{"nsc-runner-h7k2m9qx4vlt"};
+constexpr std::string_view kRunnerB{"nsc-runner-b3n8p1wz6rjy"};
+} // namespace
+
+// POSITIVE — two distinct real-shaped ids collapse to ONE template. Asserted as EQUALITY between
+// the two masked forms rather than against a literal `<*>` spelling: the property is that the
+// high-cardinality identity stops distinguishing two otherwise-identical lines, and an equality
+// survives a change in how a masked segment is rendered.
+TEST(StatelessTemplate, OpaqueEphemeralIdentitiesCollapseToOneTemplate)
+{
+    ArenaAllocator arena{256U * 1024U};
+    const std::string a{masked(std::string{kRunnerA}, arena)};
+    const std::string b{masked(std::string{kRunnerB}, arena)};
+
+    ASSERT_NE(kRunnerA, kRunnerB) << "fixture drift: the two ids must differ, or this arm is void";
+    EXPECT_EQ(a, b) << "two distinct ephemeral runner ids did NOT collapse to one template, so an "
+                       "id that changes every run is the sole finding of every diff — the defect "
+                       "measured as the ONLY finding in 48 of 66 real pairs.\n"
+                    << "  a: " << kRunnerA << " -> " << a << "\n  b: " << kRunnerB << " -> " << b;
+}
+
+// NEGATIVE 1 — DIGITS-ONLY. `prod-db-3` and `prod-db-4` are different hosts in a fixed fleet, and a
+// genuinely-changed host must stay a full finding. This is the CAN'T-PASS check for the whole rule:
+// if this reds, the mask is eating real signal and every other green here is worthless.
+TEST(StatelessTemplate, OpaqueMaskDoesNotClaimADigitsOnlyFleetHost)
+{
+    ArenaAllocator arena{256U * 1024U};
+    const std::string three{masked(std::string{"prod-db-3"}, arena)};
+    const std::string four{masked(std::string{"prod-db-4"}, arena)};
+
+    EXPECT_NE(three, four)
+        << "two DIFFERENT hosts in a fixed fleet collapsed to one template. A changed host is a "
+           "real finding, not an ephemeral identity — this is the rule eating signal, which makes "
+           "every other assertion in this section meaningless.\n"
+        << "  prod-db-3 -> " << three << "\n  prod-db-4 -> " << four;
+}
+
+// NEGATIVE 2 — MIXED CASE. ⚠ DO NOT DELETE AS REDUNDANT, and the provenance is why: the single-case
+// clause exists because the FIRST candidate rule masked test names. A test name is the
+// highest-value token in a CI log — masking it turns "which test broke" into "something broke".
+// This arm is the only thing standing between that clause and a future simplification.
+TEST(StatelessTemplate, OpaqueMaskDoesNotClaimAMixedCaseTestName)
+{
+    ArenaAllocator arena{256U * 1024U};
+    constexpr std::string_view kTestName{"MetricsSinkTest.P99LatencyAppearsInOutput"};
+    const std::string out{masked(std::string{kTestName}, arena)};
+
+    EXPECT_EQ(out, kTestName)
+        << "a mixed-case TEST NAME was masked. The single-case clause is what prevents this, and "
+           "it "
+           "is load-bearing: a test name is the highest-value token in a CI log, so masking it "
+           "converts 'which test broke' into 'something broke'.\n"
+        << "  token    : " << kTestName << "\n  expected : " << kTestName << " (kept)\n"
+        << "  actual   : " << out;
+}
+
+// NEGATIVE 3 — SHORT. Below the 12-char segment floor, ordinary vocabulary must survive.
+TEST(StatelessTemplate, OpaqueMaskDoesNotClaimShortVocabulary)
+{
+    ArenaAllocator arena{256U * 1024U};
+    for (const std::string_view word : {std::string_view{"sha256"}, std::string_view{"log4j"}})
+    {
+        const std::string out{masked(std::string{word}, arena)};
+        EXPECT_EQ(out, word) << "a short mixed alnum word was masked — the 12-char segment floor "
+                                "moved DOWN and ordinary vocabulary is now template noise.\n"
+                             << "  token    : " << word << "\n  actual   : " << out;
+    }
+}
+
+// NEGATIVE 4 — PURE ALPHA AT LENGTH. `dependencies` is 12 chars and single-case, so it clears the
+// floor and the case clause; the >=2 alnum-RUNS clause is the only thing rejecting it.
+TEST(StatelessTemplate, OpaqueMaskDoesNotClaimAPureAlphaWordAtTheFloor)
+{
+    ArenaAllocator arena{256U * 1024U};
+    constexpr std::string_view kWord{"dependencies"};
+    ASSERT_GE(kWord.size(), 12U)
+        << "fixture drift: this word must CLEAR the length floor, or it is "
+           "rejected for the wrong reason and the arm is vacuous";
+    const std::string out{masked(std::string{kWord}, arena)};
+
+    EXPECT_EQ(out, kWord)
+        << "a pure-alphabetic word AT the length floor was masked. It clears both the length and "
+           "single-case clauses, so only the >=2 letter/digit-runs clause rejects it — this arm is "
+           "that clause's sole guard.\n"
+        << "  token    : " << kWord << "\n  actual   : " << out;
+}
+
+// NEGATIVE 5 — THE HASH ARM'S FLOOR, ASSERTED AS DISJOINTNESS. ⚠ THIS ONE ALREADY CAUGHT A DEFECT
+// BEFORE IT EXISTED AS A TEST: the first implementation silently lowered the hash arm's 16-char
+// floor to 12, and `HashFloorPinnedAtSixteen*` went red. The corpus measurement could NOT have
+// found it — an existing arm was the instrument that had it.
+//
+// The root fix was the >=1 NON-HEX LETTER clause, which makes the two arms DISJOINT BY ALPHABET.
+// So this asserts the DISJOINTNESS, not one literal: a pure-hex run is the hash arm's business at
+// its own floor of 16 and must never be claimed here, whatever its length. The literal is one
+// witness of that property, and pinning only the witness would let the arms overlap again anywhere
+// else along the length axis.
+TEST(StatelessTemplate, OpaqueMaskIsDisjointFromTheHashArmByAlphabet)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // Pure hex at 15 — below the hash floor of 16, and at/above the opaque floor of 12. If the
+    // opaque rule claimed the hex alphabet, THIS is where the overlap would show: the hash arm
+    // declines it and the opaque arm would pick it up, silently lowering the hash floor to 12.
+    constexpr std::string_view kHexBetweenFloors{"deadbeefcafe0ba"};
+    ASSERT_EQ(kHexBetweenFloors.size(), 15U)
+        << "fixture drift: this token must sit strictly BETWEEN the two floors (>=12, <16), or it "
+           "cannot witness the overlap";
+
+    const std::string out{masked(std::string{kHexBetweenFloors}, arena)};
+    EXPECT_EQ(out, kHexBetweenFloors)
+        << "a PURE-HEX run between the two floors was masked by the opaque rule. That silently "
+           "lowers the hash arm's 16-char floor to 12 — the exact defect this rule's first "
+           "implementation shipped with, caught by HashFloorPinnedAtSixteen*.\n"
+           "    The two arms are DISJOINT BY ALPHABET: the >=1 non-hex-letter clause is what keeps "
+           "the hex alphabet the hash arm's business. Do not fix this by moving a floor.\n"
+        << "  token    : " << kHexBetweenFloors << "\n  actual   : " << out;
+}
