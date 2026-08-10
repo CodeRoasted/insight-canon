@@ -29,6 +29,16 @@ using insight::semantic::ComposedSemantics;
 
 namespace
 {
+// The UNFILTERED composition — every package row, no stream view. This is what a
+// caller-declared verdict resolves against (DN-32.D6): the vocabulary answers WHO SUPPLIED
+// the verdict, so it must not be filtered by the dialect of whoever WROTE the bytes.
+// `map_outcome_token_in` re-derives through `for_stream` itself, so handing it an already
+// filtered view is a silent no-op — which is why these are two named helpers, not one.
+[[nodiscard]] ComposedSemantics gitlab_vocabularies()
+{
+    return insight::semantic::compose(std::array{insight::semantic::gitlab::kManifest});
+}
+
 [[nodiscard]] ComposedSemantics gitlab_only()
 {
     const std::array manifests{insight::semantic::gitlab::kManifest};
@@ -116,7 +126,9 @@ TEST(GitLabOutcome, TheApiResultOutranksADivergentConsoleTail)
     // tiebreak.
     const std::vector<std::string> lines{"working", "Job succeeded"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
-    const auto resolution{resolve_run_outcome({.token = "canceled"}, scan, composed, composed)};
+    const auto resolution{resolve_run_outcome(
+        {.token = "canceled", .vocabulary = insight::semantic::gitlab::kManifest.name}, scan,
+        composed, gitlab_vocabularies())};
     EXPECT_EQ(resolution.outcome, RunOutcome::Aborted);
     EXPECT_TRUE(resolution.authoritative);
     EXPECT_TRUE(resolution.divergent);

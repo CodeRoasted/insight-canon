@@ -24,6 +24,16 @@ namespace
 {
 // The RESOLVED view of a stream that declared this dialect — the outcome vocabulary is reachable
 // only through a declaration, never through per-line format detection.
+// The UNFILTERED composition — every package row, no stream view. This is what a
+// caller-declared verdict resolves against (DN-32.D6): the vocabulary answers WHO SUPPLIED
+// the verdict, so it must not be filtered by the dialect of whoever WROTE the bytes.
+// `map_outcome_token_in` re-derives through `for_stream` itself, so handing it an already
+// filtered view is a silent no-op — which is why these are two named helpers, not one.
+[[nodiscard]] ComposedSemantics github_vocabularies()
+{
+    return insight::semantic::compose(std::array{insight::semantic::github::kManifest});
+}
+
 [[nodiscard]] ComposedSemantics github_only()
 {
     const std::array manifests{insight::semantic::github::kManifest};
@@ -114,7 +124,9 @@ TEST(GithubOutcome, AuthoritativeSideInputCarriesTheGhaVerdict)
     // still resolve Aborted: the side-input needs no console corroboration.
     const auto lines{gha_console(/*failing=*/false)};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
-    const auto res{resolve_run_outcome({.token = "cancelled"}, scan, composed, composed)};
+    const auto res{resolve_run_outcome(
+        {.token = "cancelled", .vocabulary = insight::semantic::github::kManifest.name}, scan,
+        composed, github_vocabularies())};
     EXPECT_EQ(res.outcome, RunOutcome::Aborted);
     EXPECT_TRUE(res.authoritative);
     EXPECT_FALSE(res.divergent) << "no console verdict exists — nothing to diverge from";

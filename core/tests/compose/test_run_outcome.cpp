@@ -28,6 +28,7 @@ using insight::RunOutcome;
 using insight::RunOutcomeResolution;
 using insight::RunOutcomeScan;
 using insight::scan_run_outcome;
+using insight::SideInputVerdict;
 using insight::semantic::compose;
 using insight::semantic::ComposedSemantics;
 using insight::semantic::find_conflict;
@@ -499,8 +500,8 @@ TEST(RunOutcomeResolve, AuthoritativeWinsOverPresentDivergentConsole)
     const ComposedSemantics composed{composed_outcome()};
     const std::vector<std::string> lines{"working", "Ended: STOPPED"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
-    const RunOutcomeResolution res{
-        resolve_run_outcome({.token = "GOOD"}, scan, composed, composed)};
+    const RunOutcomeResolution res{resolve_run_outcome(
+        {.token = "GOOD", .vocabulary = kOutcomePkg.name}, scan, composed, composed)};
     EXPECT_EQ(res.outcome, RunOutcome::Success)
         << "rung 1 resolves; a present-but-divergent console tail is NOT a tiebreak";
     EXPECT_TRUE(res.authoritative);
@@ -526,32 +527,112 @@ TEST(RunOutcomeResolve, UnmappedSideInputSurfacesANoteAndFallsThrough)
     const ComposedSemantics composed{composed_outcome()};
     const std::vector<std::string> lines{"working", "Ended: BAD"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
-    const RunOutcomeResolution res{
-        resolve_run_outcome({.token = "WEIRD"}, scan, composed, composed)};
+    const RunOutcomeResolution res{resolve_run_outcome(
+        {.token = "WEIRD", .vocabulary = kOutcomePkg.name}, scan, composed, composed)};
     EXPECT_EQ(res.outcome, RunOutcome::Failure) << "the ladder continues past an unmapped rung 1";
     EXPECT_FALSE(res.authoritative);
     EXPECT_FALSE(res.note.empty()) << "an unmapped token is NEVER silent (fail-closed)";
     EXPECT_NE(res.note.find("WEIRD"), std::string::npos) << "the note names the offending token";
 }
 
-TEST(RunOutcomeResolve, AnUndeclaredStreamCannotResolveASideInput)
+// ── The HALF-PAIR: a structurally incomplete declaration is a WIRING error and terminates ─────
+//
+// The distinction this arm exists to hold, because the two neighbouring cases have different right
+// answers and collapsing them is what shipped the defect:
+//
+//   ABSENT   (no token, no vocabulary) — a CHOICE. Degrades to Unknown, no note. DN-32.D7.
+//   HALF     (token, no vocabulary)    — a WIRING MISTAKE. **Fatal**, here.
+//   UNMAPPED (token, named, not in it) — a VALUE error. Non-fatal note, ladder continues.
+//
+// The half-pair used to return nullopt "by design". `sift-crawl` then declared exactly that shape
+// on every pair it ever produced: 63 identical-commit pairs, ground truth silence, 60
+// critical/high `regression` rows, and the rule that should have bounded them never ran once. A
+// declaration that resolves nothing while LOOKING like a declaration is the failure mode with no
+// observable.
+//
+// ⚠ THE ARM ASSERTS BOTH THE MESSAGE AND THE DEATH, and that is not belt-and-braces. The
+// measured mutation is exact: degrade the fatal to `return std::nullopt` and the `cerr` line above
+// it survives — so the correct message prints, the process lives, and gtest reports "failed to
+// die" while echoing the full FATAL text. **"It said the right thing" is satisfiable without
+// dying**, and "prints, then continues" is the single most likely accidental refactor of a fatal,
+// because the message and the terminate are two statements and only one of them looks
+// load-bearing.
+TEST(RunOutcomeResolveDeathTest, AHalfDeclaredVerdictTerminatesNamingTheComposition)
 {
-    // THE FAIL-CLOSED LEG, and after T4 it is about the DECLARATION rather than about detection: an
-    // undeclared stream's view carries no concretely-gated outcome row, so the authoritative token
-    // cannot resolve however unambiguous it looks. Before T4 the same test asked whether the log's
-    // CONTENT had routed to an outcome-bearing format — a per-line detector output deciding what a
-    // side-input meant.
-    const ComposedSemantics undeclared{
-        compose(std::array{kOutcomePkg}).for_stream(kUndeclared, {})};
+    const ComposedSemantics vocabularies{compose(std::array{kOutcomePkg})};
+    const ComposedSemantics composed{vocabularies.for_stream(kSyntheticDialect, {})};
+    const std::vector<std::string> lines{"working", "Ended: GOOD"};
+    const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
+    // A token that WOULD resolve if its vocabulary were named — so the death is caused by the
+    // missing half and by nothing else about the token.
+    const SideInputVerdict half{.token = "GOOD", .vocabulary = {}};
+
+    EXPECT_DEATH(
+        { (void)resolve_run_outcome(half, scan, composed, vocabularies); },
+        "declared with NO outcome vocabulary")
+        << "a token declared without its vocabulary resolved something instead of terminating. It "
+           "is half a declaration, not a weak one — and the silent nullopt it used to return is "
+           "how 63 crawl pairs went out with every verdict-reading rule disarmed.";
+
+    // The message must NAME the composed packages — a fail-closed error the operator cannot act on
+    // is only half the posture (the transport catalogue's death arm holds the same line).
+    EXPECT_DEATH(
+        { (void)resolve_run_outcome(half, scan, composed, vocabularies); }, "synthetic_outcome")
+        << "the fatal does not list the vocabularies the caller could have named";
+    EXPECT_DEATH(
+        { (void)resolve_run_outcome(half, scan, composed, vocabularies); }, "--outcome-vocabulary")
+        << "the fatal does not carry the remedy. This sentence used to be a resolution NOTE, "
+           "printed after the damage; it belongs at the one moment it can still be acted on.";
+}
+
+// The ABSENT third state, asserted right beside its fatal sibling so the two cannot be conflated
+// by anyone reading either one. Declaring nothing is not a degenerate half-pair.
+TEST(RunOutcomeResolve, AnAbsentDeclarationDegradesWhereAHalfOneWouldTerminate)
+{
+    const ComposedSemantics vocabularies{compose(std::array{kOutcomePkg})};
+    const ComposedSemantics composed{vocabularies.for_stream(kSyntheticDialect, {})};
+    const std::vector<std::string> lines{"working", "no epilogue here"};
+    const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
+
+    const RunOutcomeResolution res{
+        resolve_run_outcome({.token = {}, .vocabulary = {}}, scan, composed, vocabularies)};
+    EXPECT_EQ(res.outcome, RunOutcome::Unknown);
+    EXPECT_FALSE(res.authoritative);
+    EXPECT_TRUE(res.note.empty())
+        << "declaring NOTHING is a choice and must stay silent. A note here would make absence "
+           "indistinguishable from a mistake, and ADR-22.D5 forbids the two sharing a path: "
+        << res.note;
+}
+
+TEST(RunOutcomeResolve, ACompletePairResolvesOnAStreamThatDeclaredNoDialect)
+{
+    // ⚠ THIS ARM'S CLAIM WAS INVERTED, and the withdrawn version is recorded rather than deleted
+    // because it was RIGHT about its mechanism and wrong about its subject. It read
+    // *"AnUndeclaredStreamCannotResolveASideInput"* and asserted Unknown + a note: an undeclared
+    // stream's view carries no concretely-gated outcome row, so the token could not resolve. True
+    // of the code, and it described the defect rather than the contract — DN-32.D6 ruled that a
+    // side input is interpreted by whoever SUPPLIED it, never by the dialect of whoever wrote the
+    // bytes, and this is the case that ruling exists for. A crawler holding GitHub's own
+    // `conclusion` for a raw build log is not missing a dialect; it is holding a verdict from a
+    // declarer the stream never mentions.
+    //
+    // What survives unchanged is the STREAM half: the console-tail marker row IS dialect-gated,
+    // it is absent from this view, and it must stay absent — the scan is canon reading the bytes,
+    // and nothing about the side-input rule may reach it.
+    const ComposedSemantics vocabularies{compose(std::array{kOutcomePkg})};
+    const ComposedSemantics undeclared{vocabularies.for_stream(kUndeclared, {})};
     const std::vector<std::string> lines{"working", "Ended: GOOD"};
     const RunOutcomeScan scan{scan_run_outcome(lines, undeclared)};
     EXPECT_FALSE(scan.marker_present)
         << "the console-tail marker row is itself dialect-gated, so it is not in this view either";
-    const RunOutcomeResolution res{
-        resolve_run_outcome({.token = "GOOD"}, scan, undeclared, undeclared)};
-    EXPECT_EQ(res.outcome, RunOutcome::Unknown) << "a side-input cannot resolve on a stream that "
-                                                   "declared no dialect (fail-closed on depth)";
-    EXPECT_FALSE(res.note.empty()) << "and the refusal is surfaced, never silent";
+
+    const RunOutcomeResolution res{resolve_run_outcome(
+        {.token = "GOOD", .vocabulary = kOutcomePkg.name}, scan, undeclared, vocabularies)};
+    EXPECT_EQ(res.outcome, RunOutcome::Success)
+        << "a COMPLETE pair must resolve on a stream that declared no dialect — that is the whole "
+           "point of naming the vocabulary, and the case the crawler needed and never had";
+    EXPECT_TRUE(res.authoritative) << "it is rung 1, not a fallback";
+    EXPECT_TRUE(res.note.empty()) << "nothing failed, so nothing is surfaced: " << res.note;
 }
 
 TEST(RunOutcomeResolve, AbsenceIsUnknownWithoutFraming)
@@ -571,8 +652,8 @@ TEST(RunOutcomeResolve, MappedToUnknownIsAuthoritative)
     const ComposedSemantics composed{composed_outcome()};
     const std::vector<std::string> lines{"Ended: GOOD"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
-    const RunOutcomeResolution res{
-        resolve_run_outcome({.token = "SKIPPED"}, scan, composed, composed)};
+    const RunOutcomeResolution res{resolve_run_outcome(
+        {.token = "SKIPPED", .vocabulary = kOutcomePkg.name}, scan, composed, composed)};
     EXPECT_EQ(res.outcome, RunOutcome::Unknown);
     EXPECT_TRUE(res.authoritative) << "mapped-to-Unknown is a RESOLUTION, not a miss";
     EXPECT_TRUE(res.divergent) << "the mapped console tail disagrees — flagged, not consulted";

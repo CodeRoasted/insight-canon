@@ -161,9 +161,12 @@ struct SideInputVerdict
     // The producer's own spelling, verbatim — never a pre-resolved RunOutcome. Empty = the caller
     // declared nothing, which is a CHOICE and asserts nothing (DN-32.D7).
     std::string_view token;
-    // The name of the package whose `outcome_tokens` interpret that spelling. Empty = not named,
-    // and then the token resolves against the STREAM's view exactly as before — an incomplete pair
-    // gains nothing, which is the fail-safe direction.
+    // The name of the package whose `outcome_tokens` interpret that spelling. REQUIRED whenever
+    // `token` is non-empty: the two fields are one declaration, and half of one is a wiring
+    // mistake, not a weak assertion (DN-32.D6). A non-empty token with an empty vocabulary
+    // TERMINATES — it used to resolve nothing in silence, which is precisely how `sift-crawl`
+    // shipped 63 identical-commit pairs' worth of unbounded claims. Declaring NOTHING (both empty)
+    // stays a first-class choice and degrades (DN-32.D7).
     std::string_view vocabulary;
 };
 
@@ -179,9 +182,17 @@ struct SideInputVerdict
 // walks a line.
 //
 // nullopt = no row in the named vocabulary claims the token (distinct from a row that maps it TO
-// RunOutcome::Unknown, e.g. Jenkins NOT_BUILT), or the vocabulary was not named at all. An UNKNOWN
-// vocabulary NAME terminates, for the same reason and through the same door as an unknown dialect
-// (ADR-22.D5): a typo that silently disabled the verdict would disarm every rule that reads it.
+// RunOutcome::Unknown, e.g. Jenkins NOT_BUILT). That is the one non-fatal miss, and it stays
+// non-fatal because it is a VALUE error: a legitimate runtime state under correct wiring, which a
+// caller survives by falling through the ladder with a note on the report.
+//
+// TWO shapes TERMINATE, and both are WIRING errors — unreachable from any log byte, identical on
+// the first invocation and the millionth. An UNKNOWN vocabulary NAME, for the same reason and
+// through the same door as an unknown dialect (ADR-22.D5). And an EMPTY vocabulary beside a
+// non-empty token: a caller-declared verdict is a PAIR (DN-32.D6), a bare string does not
+// interpret itself (`failure`/`failed`/`FAILURE`; `UNSTABLE` means nothing on two platforms of
+// three), and returning nullopt for it disarmed every verdict-reading rule in silence for as long
+// as it existed.
 //
 // ⚠ `composed` MUST be the FULL composition, and passing a stream view is a silent no-op rather
 // than an error: a view has already been filtered, and a FRESH composition is the

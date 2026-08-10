@@ -74,6 +74,20 @@ namespace
         }
     }
 
+    // The composed package list, appended to both wiring fatals below. Shared rather than
+    // re-spelled: a diagnostic that lists the legal names is only useful if it cannot drift from
+    // the composition it is describing, and the two fatals describe the same one.
+    void stream_composed_packages(std::span<const insight::semantic::ComposedPackage> packages)
+    {
+        if (packages.empty())
+        {
+            std::cerr << "<none>";
+            return;
+        }
+        for (std::size_t i{0}; i < packages.size(); ++i)
+            std::cerr << (i == 0 ? "" : ", ") << '"' << packages[i].name << '"';
+    }
+
 } // namespace
 
 std::optional<RunOutcome>
@@ -89,23 +103,51 @@ map_outcome_token(std::string_view token,
 std::optional<RunOutcome> map_outcome_token_in(std::string_view token, std::string_view vocabulary,
                                                const insight::semantic::ComposedSemantics& composed)
 {
+    const auto packages{composed.packages()};
+    // ── THE HALF-PAIR. A declaration that is STRUCTURALLY INCOMPLETE, and it is a WIRING error ──
+    //
+    // DN-32.D6 rules a caller-declared verdict is a PAIR — (vocabulary name, native token). A
+    // token without its vocabulary is not a weak declaration, it is half of one, and it used to
+    // return `nullopt` here "by design": the caller had declared something, the engine resolved
+    // nothing, and every rule that reads a verdict was disarmed in silence. That is not a
+    // hypothetical. `sift-crawl` shipped this exact shape on EVERY pair it ever produced, and it
+    // took 63 identical-commit pairs, and 60 critical/high `regression` rows against a ground
+    // truth of silence, to notice.
+    //
+    // WHY THIS IS FATAL AND THE UNMAPPED-TOKEN CASE BELOW IS NOT, which is the whole distinction:
+    // a missing half is a CONFIG error — it is unreachable from any log byte, it does not depend
+    // on what was fetched, and it fails identically on the first invocation and the millionth. A
+    // token that is simply not in a NAMED vocabulary is a VALUE error: a legitimate runtime state
+    // under correct wiring (a platform adds a conclusion string, an adapter forwards an unexpected
+    // one), and killing the process for that would delete a working safety mechanism.
     if (vocabulary.empty())
-        return std::nullopt; // an unnamed pair is incomplete — it resolves nothing, by design
+    {
+        std::cerr << "FATAL: insight::map_outcome_token_in — a verdict token (\"" << token
+                  << "\") was declared with NO outcome vocabulary to interpret it. The composed "
+                     "packages are: ";
+        stream_composed_packages(packages);
+        std::cerr
+            << ".\nA caller-declared verdict is a PAIR — (vocabulary, token) — never a bare "
+               "string (DN-32.D6): `failure` / `failed` / `FAILURE` mean the same thing on three "
+               "platforms and `UNSTABLE` means nothing on two of them, so a token does not "
+               "interpret itself. A side-input verdict is interpreted by the vocabulary of whoever "
+               "SUPPLIED it, not by the dialect of whoever WROTE the bytes — name it (e.g. "
+               "--outcome-vocabulary) rather than declaring a dialect the bytes do not have.\n"
+               "This is a WIRING error, not a resolution failure: the half-pair resolved nothing "
+               "and silently disarmed every rule that reads the verdict.\n";
+        std::terminate();
+    }
     // The name is checked HERE, with a message that names the coordinate the caller actually
     // declared. `for_stream` below would also fail closed on an unknown name — but its message says
     // *"unknown dialect"*, and pointing an `--outcome-vocabulary` typo at the DIALECT is exactly
     // the conflation DN-32.D6 exists to end. Two coordinates, two diagnostics; the shared filter
     // stays shared, only the sentence differs.
-    const auto packages{composed.packages()};
     if (std::ranges::none_of(packages, [vocabulary](const insight::semantic::ComposedPackage& pkg)
                              { return pkg.name == vocabulary; }))
     {
         std::cerr << "FATAL: insight::map_outcome_token_in — unknown outcome vocabulary \""
                   << vocabulary << "\". The composed packages are: ";
-        if (packages.empty())
-            std::cerr << "<none>";
-        for (std::size_t i{0}; i < packages.size(); ++i)
-            std::cerr << (i == 0 ? "" : ", ") << '"' << packages[i].name << '"';
+        stream_composed_packages(packages);
         std::cerr
             << ".\nThis is the vocabulary that INTERPRETS a caller-supplied verdict (DN-32.D6) — "
                "who SUPPLIED the verdict, which is not the same question as the stream's dialect "
@@ -197,9 +239,16 @@ RunOutcomeResolution resolve_run_outcome(SideInputVerdict side_input, const RunO
                                          const insight::semantic::ComposedSemantics& vocabularies)
 {
     const std::string_view side_input_token{side_input.token};
-    // Rung 1's vocabulary (DN-32.D6). NAMED -> the full composition filtered to that package,
-    // whatever the stream is; UNNAMED -> the stream's own view, unchanged from before.
-    const bool named{!side_input.vocabulary.empty()};
+    // Rung 1 resolves against the vocabulary its DECLARER named, drawn from the full composition —
+    // ALWAYS, with no unnamed alternative (DN-32.D6). The old fallback to the stream's own view was
+    // the half-pair's hiding place: it made an incomplete declaration look like a resolvable one
+    // and then resolved nothing, so `map_outcome_token_in` now refuses the empty name outright and
+    // this call is the site that reaches it.
+    //
+    // ⚠ SCOPE, and it is narrow ON PURPOSE: this governs the CALLER'S SIDE-INPUT declaration only.
+    // Canon's own console-tail resolution below still reads `stream_view`, because a verdict found
+    // IN the bytes is interpreted by whoever wrote them — that is the authorship test, not a
+    // second-class side input, and nothing here may reach it.
     const insight::semantic::ComposedSemantics& composed{stream_view};
     RunOutcomeResolution resolution;
 
@@ -220,15 +269,15 @@ RunOutcomeResolution resolve_run_outcome(SideInputVerdict side_input, const RunO
                               "' is not in the composed outcome vocabulary (fail-closed: Unknown)";
     }
 
-    // Rung 1 — the authoritative side-input, if provided AND it maps in the DECLARED dialect's
-    // vocabulary. "Declared", not "detected": the view was resolved once at stream open, so an
-    // undeclared stream carries no concretely-gated outcome row and the token cannot resolve —
-    // fail-closed on depth, and the note below says so instead of naming a latched format.
+    // Rung 1 — the authoritative side-input, if provided AND it maps in the vocabulary its
+    // declarer NAMED. An ABSENT declaration (empty token) skips the rung entirely and degrades,
+    // which is DN-32.D7's third state and is untouched here; an INCOMPLETE one never gets this
+    // far, because `map_outcome_token_in` refuses a missing vocabulary before it can resolve
+    // nothing quietly. Absent is a choice; half-declared is a mistake; only the first degrades.
     if (!side_input_token.empty())
     {
         const std::optional<RunOutcome> mapped{
-            named ? map_outcome_token_in(side_input_token, side_input.vocabulary, vocabularies)
-                  : map_outcome_token(side_input_token, composed)};
+            map_outcome_token_in(side_input_token, side_input.vocabulary, vocabularies)};
         if (mapped)
         {
             resolution.outcome = *mapped;
@@ -247,30 +296,18 @@ RunOutcomeResolution resolve_run_outcome(SideInputVerdict side_input, const RunO
             }
             return resolution;
         }
-        // Provided but unmapped — surfaced, never silent (fail-closed); the ladder continues. The
-        // two causes are kept apart because their fixes are different: an EMPTY outcome vocabulary
-        // means the stream declared no dialect (or one that ships no verdict tokens), which the
-        // caller fixes by declaring; a non-empty one that does not carry the token means the token
-        // is wrong for this dialect.
-        // Three causes, kept apart because their fixes are different — and the third is the one
-        // that cost us the dogfood, so it names its own remedy rather than sending the reader to
-        // the stream's dialect, which is the wrong coordinate for a side input (DN-32.D6).
-        if (named)
-            resolution.note = "run-outcome: side-input '" + std::string{side_input_token} +
-                              "' is not in the '" + std::string{side_input.vocabulary} +
-                              "' outcome vocabulary (fail-closed: falling back)";
-        else if (composed.outcome_tokens().empty())
-            resolution.note =
-                "run-outcome: side-input '" + std::string{side_input_token} +
-                "' cannot resolve: no vocabulary was named for it and this stream's resolved "
-                "vocabulary carries no run-outcome tokens. A side-input verdict is interpreted by "
-                "the vocabulary of whoever SUPPLIED it, not by the dialect of whoever wrote the "
-                "bytes — name it (e.g. --outcome-vocabulary) rather than declaring a dialect the "
-                "bytes do not have";
-        else
-            resolution.note = "run-outcome: side-input '" + std::string{side_input_token} +
-                              "' is not in the declared dialect's outcome vocabulary "
-                              "(fail-closed: falling back)";
+        // ONE cause now, because only one survives: a COMPLETE pair whose token is not in the
+        // vocabulary that was named. The two former siblings both described a missing vocabulary,
+        // and a missing vocabulary is no longer a resolution outcome that can be noted — it
+        // terminates at the wiring boundary, carrying the sentence that used to live here to the
+        // one moment it can still be acted on. What remains is the VALUE error, and it stays
+        // fail-closed and non-fatal: the ladder continues to the console tail, and the note
+        // travels ON THE REPORT (`ChangeReportSummary::*_outcome_note`), in the same surface as
+        // the claims it qualifies. A console line does not travel with a report row — that was the
+        // second half of how 63 crawl pairs went out unbounded with the diagnosis already computed.
+        resolution.note = "run-outcome: side-input '" + std::string{side_input_token} +
+                          "' is not in the '" + std::string{side_input.vocabulary} +
+                          "' outcome vocabulary (fail-closed: falling back)";
     }
 
     // Rung 2 — the console-tail marker's last match, if present AND it maps.

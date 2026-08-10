@@ -22,6 +22,16 @@ namespace
 {
 // The RESOLVED view of a stream that declared this dialect — the concretely-gated rows are
 // reachable only through a declaration, never through per-line format detection.
+// The UNFILTERED composition — every package row, no stream view. This is what a
+// caller-declared verdict resolves against (DN-32.D6): the vocabulary answers WHO SUPPLIED
+// the verdict, so it must not be filtered by the dialect of whoever WROTE the bytes.
+// `map_outcome_token_in` re-derives through `for_stream` itself, so handing it an already
+// filtered view is a silent no-op — which is why these are two named helpers, not one.
+[[nodiscard]] ComposedSemantics jenkins_vocabularies()
+{
+    return insight::semantic::compose(std::array{insight::semantic::jenkins::kManifest});
+}
+
 [[nodiscard]] ComposedSemantics jenkins_only()
 {
     const std::array manifests{insight::semantic::jenkins::kManifest};
@@ -119,7 +129,9 @@ TEST(JenkinsOutcome, AuthoritativeSideInputOverridesDivergentConsole)
     const std::vector<std::string> lines{"[Pipeline] { (ci)", "nested build interrupted",
                                          "Finished: ABORTED"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
-    const auto res{resolve_run_outcome({.token = "SUCCESS"}, scan, composed, composed)};
+    const auto res{resolve_run_outcome(
+        {.token = "SUCCESS", .vocabulary = insight::semantic::jenkins::kManifest.name}, scan,
+        composed, jenkins_vocabularies())};
     EXPECT_EQ(res.outcome, RunOutcome::Success);
     EXPECT_TRUE(res.authoritative);
     EXPECT_TRUE(res.divergent);
