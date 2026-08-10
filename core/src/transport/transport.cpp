@@ -151,8 +151,8 @@ namespace
             ((day_of_era - (day_of_era / 1460)) + (day_of_era / 36524) - (day_of_era / 146096)) /
             365};
         const std::int64_t year{static_cast<std::int64_t>(year_of_era) + (era * 400)};
-        const unsigned day_of_year{
-            day_of_era - ((365 * year_of_era) + (year_of_era / 4) - (year_of_era / 100))};
+        const unsigned day_of_year{day_of_era -
+                                   ((365 * year_of_era) + (year_of_era / 4) - (year_of_era / 100))};
         const unsigned shifted_month{((5 * day_of_year) + 2) / 153};
         const unsigned day{(day_of_year - (((153 * shifted_month) + 2) / 5)) + 1};
         const unsigned month{shifted_month < 10 ? shifted_month + 3 : shifted_month - 9};
@@ -181,7 +181,14 @@ namespace
         std::cerr << ".\nA transport stack is caller-declared provenance, never guessed: canon "
                      "VERIFIES, it does not infer. An unknown transform is a MISTAKE and fails "
                      "closed here; an ABSENT stack is a CHOICE and peels nothing. Declare one of "
-                     "the names above, or none.\n";
+                     "the names above, or declare no stack at all.\n"
+                     // The sentence used to end "or none.", which reads as a literal token. A
+                     // caller took it at its word, passed `none`, reached this check and got
+                     // SIGABRT (measured 3/3) — a diagnostic that recommends the input which kills
+                     // the process. `none` is not and never was a catalogue name; saying "no stack
+                     // at all" is the same instruction without the invitation.
+                     "(A driver may accept its own spelling for the empty stack — `sift` takes "
+                     "`--transport none` — but no such token reaches this catalogue.)\n";
         std::terminate();
     }
 
@@ -250,7 +257,8 @@ bool render_transport_prefix(const TransportTransformRow& row, insight::Timestam
     }
     const CivilDate date{civil_from_days(days)};
     if (date.year < 0 || date.year > kMaxRenderableYear)
-        return false; // outside the four-digit window the fixed form can spell — never a wrong prefix
+        return false; // outside the four-digit window the fixed form can spell — never a wrong
+                      // prefix
 
     const std::int64_t millis{millis_in_day % kMillisPerSecond};
     const std::int64_t seconds_in_day{millis_in_day / kMillisPerSecond};
