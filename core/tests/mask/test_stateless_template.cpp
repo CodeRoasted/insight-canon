@@ -685,12 +685,34 @@ TEST(StatelessTemplate, HexTokensStillMaskViaDigitLeadingAfterTheRuleFiveRip)
 // ── DN-34 · the opaque ephemeral identity mask — a SHAPE, and four named neighbours it must
 //    demonstrably FAIL to claim ────────────────────────────────────────────────────────────────
 //
-// FOUND BY MEASUREMENT: the first live-GHA crawl showed an unmasked runner id was the SOLE finding
-// in 48 of 66 real pairs. The rule claims a `-_./` SEGMENT that is >=12 chars, single-case, has
-// >=2 letter/digit runs, and carries >=1 NON-HEX letter.
+// THE RULE: a `-_./` SEGMENT that is >=12 chars, single-case, has >=2 letter/digit runs, and
+// carries >=1 NON-HEX letter.
 //
-// ⚠ CLAIM BOUNDARY — READ BEFORE WIDENING ANY ASSERTION HERE. All 62 measured ids were Namespace
-// `nsc-runner-*`. GITHUB-HOSTED RUNNER IDS ARE UNMEASURED AND UNCLAIMED, and a short one would not
+// ⚠ ITS ORIGINAL JUSTIFICATION IS WITHDRAWN, AND THE RULE STILL STANDS (DN-34.D6). This section
+// first cited "the SOLE finding in 48 of 66 real pairs" and "62 measured ids". `sift-crawl`'s
+// assembler was dropping 99%+ of every CI log, so that measurement was about `system.txt` framing,
+// not CI output.
+//
+// ⚠ AND THOSE FIGURES ARE STILL IN THE LOG. Commit 8869c64 (this section's own) states them in its
+// message, which cannot be corrected — history is immutable and rewriting it would be worse than
+// the error. So a reader tracing why these arms exist takes the shortest path, `git log` on this
+// file, and finds the SUPERSEDED justification with no marker on it. This header is the only
+// surface that can outrank the log, because it is the one reached afterwards and still editable.
+// Do not re-quote 8869c64's numbers from history.
+//
+// What survives is asymmetric, and the asymmetry is why the rule stays: the OVER-MASK zero was
+// measured on ~10,300 lines of genuine GHA job output and holds; only the UNDER-MASK need rested
+// on the withdrawn bytes. Over-masking harms permanently and invisibly — a masked test name is
+// unrecoverable downstream; under-firing is inert, costing a noisy diff nobody acts on. The
+// surviving evidence is on the side that can do harm.
+//
+// So these arms are the DURABLE half of this rule's justification: the numbers that motivated it
+// are withdrawn and the properties pinned below are not. A measurement justifies a change once and
+// then decays; a pinned boundary only fails when the rule stops being true.
+//
+// ⚠ CLAIM BOUNDARY — READ BEFORE WIDENING ANY ASSERTION HERE. The id population that motivated
+// this rule is withdrawn (above), so NO id family is measured today. GITHUB-HOSTED RUNNER IDS ARE
+// UNMEASURED AND UNCLAIMED, and a short one would not
 // qualify at floor 12 anyway. No test in this file may be worded, named, or extended to imply
 // "runner ids are masked" — the true statement names the SHAPE, and a test asserting the broader
 // sentence would claim coverage the measurement does not carry.
@@ -724,7 +746,8 @@ TEST(StatelessTemplate, OpaqueEphemeralIdentitiesCollapseToOneTemplate)
     ASSERT_NE(kRunnerA, kRunnerB) << "fixture drift: the two ids must differ, or this arm is void";
     EXPECT_EQ(a, b) << "two distinct ephemeral runner ids did NOT collapse to one template, so an "
                        "id that changes every run is the sole finding of every diff — the defect "
-                       "measured as the ONLY finding in 48 of 66 real pairs.\n"
+                       "which is the whole point of the rule: an identity that changes every run "
+                       "becomes the sole content of every diff.\n"
                     << "  a: " << kRunnerA << " -> " << a << "\n  b: " << kRunnerB << " -> " << b;
 }
 
