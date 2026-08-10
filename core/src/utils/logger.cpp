@@ -109,12 +109,20 @@ namespace
 
 } // namespace
 
-void init_logging(spdlog::level::level_enum default_level)
+void init_logging(spdlog::level::level_enum default_level, bool diagnostics_to_stderr)
 {
     std::call_once(init_flag(),
-                   [default_level]()
+                   [default_level, diagnostics_to_stderr]()
                    {
-                       shared_sink() = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+                       // The sink is chosen ONCE, by the first caller, like every other decision
+                       // under this call_once. A tool that owns a machine-readable stdout says so
+                       // here rather than hoping the level stays low — see the declaration.
+                       shared_sink() =
+                           diagnostics_to_stderr
+                               ? std::static_pointer_cast<spdlog::sinks::sink>(
+                                     std::make_shared<spdlog::sinks::stderr_color_sink_mt>())
+                               : std::static_pointer_cast<spdlog::sinks::sink>(
+                                     std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
 
                        // Module loggers — order does not matter. The SET is `kAllLoggers`
                        // in canon.api.cppm, beside the name constants; this unit no longer

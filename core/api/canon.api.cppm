@@ -1714,7 +1714,14 @@ inline constexpr std::array kAllLoggers{kArenaLogger,    kMaskLogger,   kPipelin
 
 // Creates all named loggers with a shared stdout colour sink. Call once before any logging
 // (thread-safe; first call wins). Defined in the logger.cpp impl unit.
-void init_logging(spdlog::level::level_enum default_level = spdlog::level::info);
+// `diagnostics_to_stderr` picks the SINK. Default false (stdout) — unchanged for every existing
+// caller. A tool whose STDOUT is a machine-readable stream (sift-crawl's JSONL work-list) must pass
+// true: otherwise opting into diagnostics corrupts the artifact, and the corruption scales with the
+// log level rather than announcing itself. Measured on a real crawl with CODEROAST_LOG_LEVEL=debug
+// set by the project's own .env.local: 9874 log lines interleaved with 34 records, the file
+// unparseable as JSONL while every record in it was correct.
+void init_logging(spdlog::level::level_enum default_level = spdlog::level::info,
+                  bool diagnostics_to_stderr = false);
 
 // Per-module logger accessors (named logger when registered, else the spdlog default).
 std::shared_ptr<spdlog::logger> arena_logger();
