@@ -5,8 +5,8 @@ normalized, format-agnostic **`CanonicalEvent`** that downstream layers process 
 syntax. It is a self-contained C++23 static library (Apache-2.0), consumed via the single CMake target
 `insight::canon`.
 
-This reference describes the **current shipped state** of the engine (`canonicalization_version =
-stateless-masks-7`). It is split by *kind of work* so each part stays maintainable on its own — when one
+This reference describes the **current shipped state** of the engine (the rules generation named by
+`kCanonicalizationVersion` in `core/api/canon.api.cppm`, which owns the value). It is split by *kind of work* so each part stays maintainable on its own — when one
 subsystem's rules change, exactly one doc moves with it.
 
 ## The doc map

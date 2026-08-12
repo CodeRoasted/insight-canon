@@ -72,20 +72,11 @@ using EventID = uint64_t;
 // polarity; component is the cube's WHERE axis), so it is output-affecting. A stream whose fields
 // were already canon-named is byte-identical except this string: the compound pass runs only when
 // a role is still MISSING and can add a role, never move one.
-// -10 = DN-34.D2, the OPAQUE EPHEMERAL IDENTITY mask (`is_opaque_identity`, mask.cpp). The masker
-// gains one high-cardinality arm on the ALPHABET the other two never covered: -9's `≥16 hex` floor
-// is about HEX and `digit_leading` is about NUMBERS, so a base36, letter-leading autoscaler id
-// (`nsc-runner-5mttut2knlnfe`) reached literal KEEP and a value that changes every run became
-// TEMPLATE IDENTITY. Measured on 66 real homologous GHA pairs: that id was the SOLE finding in 48.
-// This is a MASKER change, so unlike -9 and -7 `template_str`/`template_id` DO move — for any line
-// carrying a ≥12-char, single-case, ≥3-run alphanumeric segment. Every other document is
-// byte-identical except this string. It is therefore a COMPARABILITY EVENT: documents produced
-// under -9 and -10 are not comparable, which the §2.4 gate enforces rather than assumes.
-// PAID ONCE, DELIBERATELY: 3 of the 62 measured ids are shape-indistinguishable from words
-// (`lssibbathaobg` — 13 lowercase letters, no digit) and stay unmasked. They cost ZERO measured
-// pairs, so chasing them later would spend a SECOND comparability event for no pair-level gain
-// (DN-34.D3). Batch or do not spend.
-inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-10"};
+// -10 = RETIRED, never reused (DN-34.D9 tombstone): minted for DN-34.D2's `is_opaque_identity`
+// mask (`c70ee8d`), reverted before any tag — no document was ever produced under it, so the
+// revert restores -9 rather than minting a false incomparability. The number is BURNT: append-only
+// means a generation is never re-bound to different rules, so the next bump is -11.
+inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-9"};
 
 // ── Template identity (insight_perf_template_id.md SRC-D-TIR-1) ──
 // The structural identity of a canonicalised template: the first 16 bytes of
