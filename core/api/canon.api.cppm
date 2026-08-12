@@ -72,7 +72,7 @@ using EventID = uint64_t;
 // polarity; component is the cube's WHERE axis), so it is output-affecting. A stream whose fields
 // were already canon-named is byte-identical except this string: the compound pass runs only when
 // a role is still MISSING and can add a role, never move one.
-// -10 = RETIRED, never reused (DN-34.D9 tombstone): minted for DN-34.D2's `is_opaque_identity`
+// -10 = RETIRED, never reused (DN-34.D9 tombstone): minted for DN-34.D2's opaque-identity
 // mask (`c70ee8d`), reverted before any tag — no document was ever produced under it, so the
 // revert restores -9 rather than minting a false incomparability. The number is BURNT: append-only
 // means a generation is never re-bound to different rules, so the next bump is -11.
