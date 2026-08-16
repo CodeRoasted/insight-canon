@@ -72,10 +72,11 @@ using EventID = uint64_t;
 // polarity; component is the cube's WHERE axis), so it is output-affecting. A stream whose fields
 // were already canon-named is byte-identical except this string: the compound pass runs only when
 // a role is still MISSING and can add a role, never move one.
-// -10 = RETIRED, never reused (DN-34.D9 tombstone): minted for DN-34.D2's opaque-identity
-// mask (`c70ee8d`), reverted before any tag — no document was ever produced under it, so the
-// revert restores -9 rather than minting a false incomparability. The number is BURNT: append-only
-// means a generation is never re-bound to different rules, so the next bump is -11.
+// -10 = RETIRED, never reused (the ADR-2.D9 tombstone discipline): minted for the opaque-identity
+// mask (`c70ee8d`; the shape axis is closed for that class, ADR-16.D6), reverted before any tag —
+// no document was ever produced under it, so the revert restores -9 rather than minting a false
+// incomparability. The number is BURNT: append-only means a generation is never re-bound to
+// different rules, so the next bump is -11.
 inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-9"};
 
 // ── Template identity (insight_perf_template_id.md SRC-D-TIR-1) ──
