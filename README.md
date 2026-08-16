@@ -75,8 +75,8 @@ malf test core # just the core package
 conan install . \
   --output-folder=build \
   --build=missing \
-  --profile:host=linux-gcc15-release \
-  --profile:build=linux-gcc15-release
+  --profile:host=linux-gcc16-release \
+  --profile:build=linux-gcc16-release
 ```
 
 A `build/CMakePresets.json` will be generated. The repo root
@@ -120,7 +120,7 @@ conan cache restore /tmp/insight_canon-X.Y.Z.tgz
 ```bash
 git clone https://github.com/CodeRoasted/insight-canon.git
 cd insight-canon
-conan create . --profile:host=linux-gcc15-release --profile:build=linux-gcc15-release --build=missing
+conan create . --profile:host=linux-gcc16-release --profile:build=linux-gcc16-release --build=missing
 ```
 
 ### CMake usage in your project

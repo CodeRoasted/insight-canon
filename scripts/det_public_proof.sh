@@ -31,7 +31,7 @@
 #
 # Requires conan + a prior canon dep resolution (fmt/spdlog/simdjson in the cache;
 # `malf test` / `conan create .` populates it). The compiler×stdlib axis is a conan
-# profile (linux-gcc15-release = gcc-15/libstdc++, linux-clang21-release =
+# profile (linux-gcc16-release = gcc-15/libstdc++, linux-clang21-release =
 # clang-21/libstdc++); -O / -ffp-contract are appended per cell after the profile.
 #
 #   det_public_proof.sh                          run the cross-build determinism check (PASS/FAIL)
@@ -73,12 +73,12 @@ export CONAN_HOME="${CONAN_HOME:-$(cd "$CANON/.." && pwd)/.conan2}"
 # compiler is pinned explicitly (the conan toolchain's -stdlib flags would otherwise reach
 # a default g++). tag prefix (gpp_/clangpp_) feeds DETERMINISM_REQUIRE_COMPILERS.
 # The conan PROFILE per leg is overridable so the SAME proof runs on a second ISA: the arm64
-# determinism leg sets DETERMINISM_GCC_PROFILE=linux-gcc15-arm64-release /
+# determinism leg sets DETERMINISM_GCC_PROFILE=linux-gcc16-arm64-release /
 # DETERMINISM_CLANG_PROFILE=linux-clang21-libcxx-arm64-release (the only difference vs x86 is the
 # profile's arch/-march; the compiler binaries g++-15/clang++-21 are wired the same way on both
 # ISAs). Defaults are the x86 profiles → the x86 gate is byte-unchanged. The golden is shared, so an
 # arm64 run matching it IS the cross-ISA bit-identity assertion (the whole point of the 2nd-ISA leg).
-GCC_PROFILE="${DETERMINISM_GCC_PROFILE:-linux-gcc15-release}"
+GCC_PROFILE="${DETERMINISM_GCC_PROFILE:-linux-gcc16-release}"
 CLANG_PROFILE="${DETERMINISM_CLANG_PROFILE:-linux-clang21-libcxx-release}"
 LEGS=( "g++:g++-15:gcc-15:$GCC_PROFILE" "clang++:clang++-21:clang-21:$CLANG_PROFILE" )
 
