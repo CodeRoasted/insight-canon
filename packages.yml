@@ -53,20 +53,20 @@ packages:
     release: false
     depends: [insight_canon, insight_semantic_github, insight_semantic_gitlab, insight_semantic_jenkins, insight_semantic_test_frameworks]
 
-# ── The build system's INVENTORY (DN-33.D2) ─────────────────────────────────────────────────────
+# ── The build system's INVENTORY (ADR-3.D9) ─────────────────────────────────────────────────────
 # Projects that declare their own `project()` and belong to NO conan package. They are NOT
 # packages and must not become ones — a package carries one profile and one build, which is
 # exactly what would flatten this harness's 8-cell determinism matrix. Inventory membership and
-# package membership are two different things (DN-33.D2); conflating them is what produced the
+# package membership are two different things (ADR-3.D9); conflating them is what produced the
 # orphan. Every entry here is configured + built to a LINKED artifact in ONE canonical cell by
 # `malf inventory`, which the build/test sweep runs — so a translation unit can no longer be
 # invisible to `malf test` until the tag looks at it.
 inventory:
   # proof/ is a REPO-LEVEL harness spanning core/ and semantic/*, which is why no single package
   # could own it — and why it went unbuilt for a whole release cycle at a time. Its first compile
-  # used to BE the golden workflow (DN-33.D1).
+  # used to BE the golden workflow (ADR-3.D9).
   #
-  # ⚠ THE BOUNDARY, DECLARED (DN-33.D4): this entry proves proof/ BUILDS. The 8-cell matrix in
+  # ⚠ THE BOUNDARY, DECLARED (ADR-3.D9): this entry proves proof/ BUILDS. The 8-cell matrix in
   # scripts/det_public_proof.sh proves it is DETERMINISTIC, at the tag, and is untouched by this.
   # A digest drift still first appears at the cut, BY DESIGN. Do not widen this into an 8-cell run
   # to "make the daily gate complete" — the daily property is compile-and-link, nothing more.
