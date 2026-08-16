@@ -45,7 +45,7 @@ The result: identical logs yield an identical fingerprint *input* everywhere —
 
 | Tool | Minimum version |
 |---|---|
-| C++ compiler | GCC 15 or Clang 21 with C++23 support |
+| C++ compiler | GCC 16 or Clang 21 with C++23 support |
 | CMake | 3.28 |
 | Ninja | any recent |
 | Conan | 2.x |
