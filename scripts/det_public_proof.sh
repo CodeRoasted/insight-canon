@@ -5,7 +5,7 @@
 # (bibles/determinism_model.md §3).
 #
 # Canon-only by construction: it builds ONLY canon's public Apache module across
-# the (gcc-15/libstdc++ × clang-21/libc++)  x  -O{0,3}  x  -ffp-contract{off,fast}
+# the (ship gcc/libstdc++ × clang-21/libc++)  x  -O{0,3}  x  -ffp-contract{off,fast}
 # matrix — the cross-compiler AND cross-stdlib DIAGONAL (the modules build forces the
 # stdlib per compiler: clang's std module ships with libc++). Strictly stronger than
 # the pre-unwrap both-libstdc++ textual matrix, and the pairing the determinism
@@ -31,7 +31,7 @@
 #
 # Requires conan + a prior canon dep resolution (fmt/spdlog/simdjson in the cache;
 # `malf test` / `conan create .` populates it). The compiler×stdlib axis is a conan
-# profile (linux-gcc16-release = gcc-15/libstdc++, linux-clang21-release =
+# profile (linux-gcc16-release = ship gcc/libstdc++, linux-clang21-release =
 # clang-21/libstdc++); -O / -ffp-contract are appended per cell after the profile.
 #
 #   det_public_proof.sh                          run the cross-build determinism check (PASS/FAIL)
@@ -67,7 +67,7 @@ export CONAN_HOME="${CONAN_HOME:-$(cd "$CANON/.." && pwd)/.conan2}"
 
 # Compiler×stdlib legs → "tag:cxx-bin:cc-bin:conan-profile". The modules build (import
 # std) forces the stdlib per compiler — clang-21's std module ships with libc++, NOT
-# libstdc++ — so the public matrix is now the cross-stdlib DIAGONAL (gcc-15/libstdc++ ×
+# libstdc++ — so the public matrix is now the cross-stdlib DIAGONAL (ship gcc/libstdc++ ×
 # clang-21/libc++): cross-compiler AND cross-stdlib, strictly stronger than the old
 # both-libstdc++ textual matrix, and the very pairing the determinism contract pins. The
 # compiler is pinned explicitly (the conan toolchain's -stdlib flags would otherwise reach
@@ -80,7 +80,12 @@ export CONAN_HOME="${CONAN_HOME:-$(cd "$CANON/.." && pwd)/.conan2}"
 # arm64 run matching it IS the cross-ISA bit-identity assertion (the whole point of the 2nd-ISA leg).
 GCC_PROFILE="${DETERMINISM_GCC_PROFILE:-linux-gcc16-release}"
 CLANG_PROFILE="${DETERMINISM_CLANG_PROFILE:-linux-clang21-libcxx-release}"
-LEGS=( "g++:g++-15:gcc-15:$GCC_PROFILE" "clang++:clang++-21:clang-21:$CLANG_PROFILE" )
+# label:profile — the PROFILE is the ONLY compiler authority (its [buildenv] CXX/CC drive the
+# harness cmake). WHY (measured 2026-08-16, same defect as metalog's driver): hand-kept bins
+# (g++-15) passed as -DCMAKE_CXX_COMPILER beat the profile's compiler — conan_toolchain.cmake
+# sets none — so a gcc-16 profile leg silently built with the PATH's g++-15; and a runner
+# without that literal binary silently SKIPPED the leg. The profile can never mismatch itself.
+LEGS=( "g++:$GCC_PROFILE" "clang++:$CLANG_PROFILE" )
 
 # Optional single-leg selection (DETERMINISM_LEG=gcc|clang) so a per-compiler CI matrix can run
 # one leg per parallel job. Default (unset) = the full cross-stdlib diagonal, unchanged. Each leg
@@ -89,8 +94,8 @@ LEGS=( "g++:g++-15:gcc-15:$GCC_PROFILE" "clang++:clang++-21:clang-21:$CLANG_PROF
 # holds transitively (gcc==golden && clang==golden ⟹ gcc==clang).
 if [ -n "${DETERMINISM_LEG:-}" ]; then
   case "$DETERMINISM_LEG" in
-    gcc)   LEGS=( "g++:g++-15:gcc-15:$GCC_PROFILE" ) ;;
-    clang) LEGS=( "clang++:clang++-21:clang-21:$CLANG_PROFILE" ) ;;
+    gcc)   LEGS=( "g++:$GCC_PROFILE" ) ;;
+    clang) LEGS=( "clang++:$CLANG_PROFILE" ) ;;
     *) echo "::error::unknown DETERMINISM_LEG='$DETERMINISM_LEG' (expected gcc|clang)" >&2; exit 2 ;;
   esac
 fi
@@ -102,9 +107,19 @@ echo "canon=$CANON  conan_home=$CONAN_HOME  corpus=$(echo "$CORPUS" | wc -l) fil
 builds=()        # tags
 declare -A BIN   # tag -> det_proof binary path
 for leg in "${LEGS[@]}"; do
-  IFS=: read -r cxx cxxbin ccbin profile <<< "$leg"
-  command -v "$cxxbin" >/dev/null || { echo "skip $cxx ($cxxbin not installed)" >&2; continue; }
+  IFS=: read -r cxx profile <<< "$leg"
   [ -f "$CONAN_HOME/profiles/$profile" ] || { echo "skip $cxx ($profile not in $CONAN_HOME/profiles)" >&2; continue; }
+  # Compiler = the profile's [buildenv] CXX/CC, resolved and PRINTED — a wrong-compiler or
+  # missing-compiler leg must be impossible to miss (it was silently skipped before).
+  prof_cxx="$(sed -nE 's/^[[:space:]]*CXX[[:space:]]*=[[:space:]]*//p' "$CONAN_HOME/profiles/$profile" | tail -1)"
+  prof_cc="$(sed -nE 's/^[[:space:]]*CC[[:space:]]*=[[:space:]]*//p' "$CONAN_HOME/profiles/$profile" | tail -1)"
+  [ -n "$prof_cc" ] || prof_cc="$prof_cxx"
+  if [ -z "$prof_cxx" ] || ! { [ -x "$prof_cxx" ] || command -v "$prof_cxx" >/dev/null 2>&1; }; then
+    echo "skip $cxx (profile '$profile' CXX '${prof_cxx:-<unset>}' not present on this runner)" >&2; continue
+  fi
+  cxx_abs="$(command -v "$prof_cxx")" || cxx_abs="$prof_cxx"
+  cc_abs="$(command -v "$prof_cc")" || cc_abs="$prof_cc"
+  echo "leg $cxx: CXX=$cxx_abs ($("$cxx_abs" --version 2>/dev/null | head -1))" >&2
 
   # One conan install per leg → toolchain + dep configs for building canon from source.
   # $CANON = the repo root; the core recipe lives at core/ (the multi-package layout).
@@ -123,7 +138,7 @@ for leg in "${LEGS[@]}"; do
     cell_flags="$opt -ffp-contract=$fpc -DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF"
     if cmake -S "$PROOF" -B "$bdir" -G Ninja \
           -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_C_COMPILER="$ccbin" -DCMAKE_CXX_COMPILER="$cxxbin" \
+          -DCMAKE_C_COMPILER="$cc_abs" -DCMAKE_CXX_COMPILER="$cxx_abs" \
           -DCMAKE_TOOLCHAIN_FILE="$toolchain" \
           -DCANON_ROOT="$CANON" \
           -DCELL_FLAGS="$cell_flags" >"$bdir.cfg.log" 2>&1 \
