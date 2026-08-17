@@ -9,7 +9,8 @@ import insight.canon.detail.scan; // canonical char-class predicates (is_digit /
 // function of a line's own whitespace-delimited tokens, each classified KEEP / MASK /
 // composite-normalize by its OWN class (no cross-line state, no clustering). The joined
 // masked sequence is the template; its SHA-256 (computed downstream, unchanged) is the
-// run-independent template_id. See ADR-16.D5 (SRC-D-TID-1/SRC-D-TID-2; SRC-D-TID-11, SRC-D-TID-12, SRC-D-TID-13, SRC-D-TID-14).
+// run-independent template_id. See ADR-16.D5 (SRC-D-TID-1/SRC-D-TID-2; SRC-D-TID-11, SRC-D-TID-12,
+// SRC-D-TID-13, SRC-D-TID-14).
 //
 // History: this file was the stateful Drain online log-template miner (intern table +
 // SoA cluster store + bucket index + similarity match + absorb_into wildcard learning).
@@ -289,9 +290,9 @@ namespace
     // bit-identical. Returns true and fills `out` only when ≥1 segment was masked AND an anchor
     // exists; false (leaving the dispatch to fall through) otherwise.
     // One coherent per-token masking routine: the `:`/`/` segment walk, the letter-KEEP /
-    // digit-MASK / status carve-out classification, and the SRC-D-MSK-4 ephemeral-root instance masking
-    // all share the same left-to-right pass over `out`/prev_core/window — a split fragments the
-    // single scan and its determinism.
+    // digit-MASK / status carve-out classification, and the SRC-D-MSK-4 ephemeral-root instance
+    // masking all share the same left-to-right pass over `out`/prev_core/window — a split fragments
+    // the single scan and its determinism.
     // NOLINTNEXTLINE(readability-function-cognitive-complexity)
     [[nodiscard]] inline bool normalize_diagnostic_composite(std::string_view tok, std::string& out)
     {
@@ -311,8 +312,9 @@ namespace
         bool has_letter_anchor{false};
         std::string_view prev_core{}; // the previous segment's core — for the status carve-out
         std::size_t seg_start{0};
-        // SRC-D-MSK-4 M3/M4: the ephemeral-root matcher over the SAME catalog as call site B. When a
-        // declared root ends at a component, the NEXT component is a per-run instance and masks to
+        // SRC-D-MSK-4 M3/M4: the ephemeral-root matcher over the SAME catalog as call site B. When
+        // a declared root ends at a component, the NEXT component is a per-run instance and masks
+        // to
         // <*> regardless of its leading char (overriding the letter-leading KEEP); scope is CLAMPED
         // to Instance here so the file:line tail is never masked, and classification resumes from
         // the component after the instance. Root matching uses the FULL segment (`.conan2` keeps
@@ -412,8 +414,8 @@ namespace
         return masked && has_letter_anchor;
     }
 
-    // EPHEMERAL_ROOT standalone rule (SRC-D-MSK-2, re-expressed for SRC-D-MSK-4 M5). Reached only for
-    // tokens rule #1 did not claim (no ':digit'). Split the path on '/', run the shared matcher
+    // EPHEMERAL_ROOT standalone rule (SRC-D-MSK-2, re-expressed for SRC-D-MSK-4 M5). Reached only
+    // for tokens rule #1 did not claim (no ':digit'). Split the path on '/', run the shared matcher
     // (kEphemeralRoots above), and honor the DECLARED scope: `Subtree` collapses the whole
     // remainder (`<root>/<*>`, byte-identical to -5 for every existing entry); `Instance` masks the
     // one component under the root and KEEPS the tail (`<root>/<*>/<tail…>`). Being segment-
@@ -652,8 +654,8 @@ namespace
     // SRC-D-TID-22 currency-marker catalog: FROZEN, DECLARED byte sequences. ASCII `$` only for
     // now; `€`/`£`/`¥` would be added here as their literal UTF-8 byte strings ("€" etc.) iff a
     // corpus shows them — byte-exact, NO Unicode property lookup (cross-stdlib determinism +
-    // portability, the SRC-D-TID-9 oracle). Adding a marker here auto-extends both touch points (the
-    // pre-gate + normalize_marker_number) — single source of truth.
+    // portability, the SRC-D-TID-9 oracle). Adding a marker here auto-extends both touch points
+    // (the pre-gate + normalize_marker_number) — single source of truth.
     inline constexpr std::array<std::string_view, 1> kCurrencyMarkers{std::string_view{"$"}};
 
     // Length in BYTES of the declared currency marker prefixing `tok` (0 if none). Requires at
@@ -668,8 +670,9 @@ namespace
 
     // SRC-D-TID-22: a declared currency MARKER glued to a digit-led numeric core (`$463`, `$1.50`)
     // →
-    // `$<*>` — keep the marker, mask the high-card amount (the SRC-D-TID-13 `#42 → #<*>` keep-class/
-    // mask-instance shape). A DECIDABLE numeric: there is no low-card *keyword* of shape
+    // `$<*>` — keep the marker, mask the high-card amount (the SRC-D-TID-13 `#42 → #<*>`
+    // keep-class/ mask-instance shape). A DECIDABLE numeric: there is no low-card *keyword* of
+    // shape
     // `<marker><digits>` worth protecting (shell positionals `$1`/`$2` are negligible-in-logs and
     // lossless to mask), so it joins the D-TID-12 #5 digit-leading numerics that the first-char
     // `is_digit_leading` test misses on a leading marker. The core is digits + one optional
@@ -772,8 +775,9 @@ namespace
     // new/vanished pair per run). EXCLUDES a status value (`code=0` / `status=500`) so a
     // green→red flip stays distinct — the KV form of the #1 status-value KEEP carve-out.
     // A value-WORD (`user=alice`) is NOT masked (value not digit-leading → kept); that
-    // varying word is the unbuilt registry's job (SRC-D-TID-5/SRC-D-TID-14). The CI-revert re-measure
-    // (§8) did not surface this — CI tokens are space-separated, LogCraft wraps in `key=`.
+    // varying word is the unbuilt registry's job (SRC-D-TID-5/SRC-D-TID-14). The CI-revert
+    // re-measure (§8) did not surface this — CI tokens are space-separated, LogCraft wraps in
+    // `key=`.
     [[nodiscard]] inline bool normalize_kv_value(std::string_view tok, std::string& out)
     {
         const std::size_t eq_pos{tok.find('=')};
@@ -822,10 +826,10 @@ namespace
     // stated so future drift between them has a rule to violate loudly.
     constexpr std::array<CompositeRule, 9U> kCompositeRules{{
         {.name = "diagnostic_composite",
-         .normalize = normalize_diagnostic_composite},                           // SRC-D-MSK-1  (-4)
-        {.name = "ephemeral_root", .normalize = normalize_ephemeral_root},       // SRC-D-MSK-2  (-4)
-        {.name = "versioned_ref", .normalize = normalize_versioned_ref},         // D-TID-12 #2
-        {.name = "bracket_timestamp", .normalize = normalize_bracket_timestamp}, // SRC-D-MSK-5  (-8)
+         .normalize = normalize_diagnostic_composite},                     // SRC-D-MSK-1  (-4)
+        {.name = "ephemeral_root", .normalize = normalize_ephemeral_root}, // SRC-D-MSK-2  (-4)
+        {.name = "versioned_ref", .normalize = normalize_versioned_ref},   // D-TID-12 #2
+        {.name = "bracket_timestamp", .normalize = normalize_bracket_timestamp}, // SRC-D-MSK-5 (-8)
         {.name = "bracket_index", .normalize = normalize_bracket_index},         // SRC-D-TID-13(b)
         {.name = "hash_counter", .normalize = normalize_hash_counter},           // SRC-D-TID-13(a)
         {.name = "marker_number", .normalize = normalize_marker_number}, // SRC-D-TID-22 (-3)

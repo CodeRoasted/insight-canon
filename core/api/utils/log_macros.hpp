@@ -4,10 +4,10 @@
 // compile-time level elision these macros provide is load-bearing (true zero-cost in Release). So
 // the macros stay a TEXTUAL header, #included in the GMF of every logging TU. This header is
 // SEALED to pure preprocessor + a SINGLE third-party include — NO first-party declarations leak
-// (ADR-3.D4: GMF = third-party-textual). The function the macros expand to (detail::log_message) lives
-// in the insight.canon.api module; every logging TU (canon's own + downstream consumers like eidos)
-// also does `import insight.canon;`. (The compile-time DEBUG gate for `if constexpr` elision is a
-// build-only local in canon's tokenizer/parser impl units — never the api surface, so no level
+// (ADR-3.D4: GMF = third-party-textual). The function the macros expand to (detail::log_message)
+// lives in the insight.canon.api module; every logging TU (canon's own + downstream consumers like
+// eidos) also does `import insight.canon;`. (The compile-time DEBUG gate for `if constexpr` elision
+// is a build-only local in canon's tokenizer/parser impl units — never the api surface, so no level
 // macro leaks through the module.) This header stays PUBLIC/installed because downstream packages
 // use the INSIGHT_LOG_* macros.
 #pragma once

@@ -29,11 +29,12 @@
 //
 // HOMING (Kleio's). `core/tests/transport/`, 1:1 with
 // `core/src/transport/` under the per-domain mirror, beside the sibling G1 grain
-// `test_transport_declaration.cpp` (the third grain is `core/tests/compose/test_transport_identity.cpp`).
-// The SUT is `insight::transport::TransportStack::peel` — core's; the oracle is inline; the corpus
-// arrives by env var. The original home (`semantic/github/tests/`) rested on a premise T4 retired:
-// the gate once needed BOTH implementations in scope at once, and the dependency arrow runs
-// core → semantic/github and never back. With the oracle frozen inline this file imports only
+// `test_transport_declaration.cpp` (the third grain is
+// `core/tests/compose/test_transport_identity.cpp`). The SUT is
+// `insight::transport::TransportStack::peel` — core's; the oracle is inline; the corpus arrives by
+// env var. The original home (`semantic/github/tests/`) rested on a premise T4 retired: the gate
+// once needed BOTH implementations in scope at once, and the dependency arrow runs core →
+// semantic/github and never back. With the oracle frozen inline this file imports only
 // `insight.canon`, and leaving it in the package compiled the whole `insight.semantic.github`
 // module into a binary that never referenced it while making a core-owned characterization pin
 // look like a dialect-package obligation (the misreading the frozen-oracle discipline guards
@@ -58,8 +59,8 @@
 // bank sliced by `std::filesystem::directory_iterator` — UNSPECIFIED order — and capped
 // mid-iteration. That population was unnameable BY CONSTRUCTION and unreproducible even on the same
 // box once a file landed; its numbers are withdrawn, not reconciled. So this gate never walks a
-// directory: it reads `corpus.jsonl`, takes every non-null `log_annotated`, SORTS, and does not cap.
-// Same manifest ⇒ same population ⇒ same numbers, on any machine, forever.
+// directory: it reads `corpus.jsonl`, takes every non-null `log_annotated`, SORTS, and does not
+// cap. Same manifest ⇒ same population ⇒ same numbers, on any machine, forever.
 //
 // THE EQUIVALENCE DEFINITION IS THE WHOLE DESIGN, and the naive one is WRONG. Asserting
 // `oracle_claim() == peel().content` over ALL lines reports thousands of "disagreements"
@@ -79,12 +80,12 @@
 //
 // ⚠ AND THIS FILE'S FIRST ARM IS INSENSITIVE TO THE BOM FIX, BY CONSTRUCTION. It declares
 // `kDeclaredGha` — the ONE shipped GHA row — and that declaration is FROZEN, exactly as the oracle
-// is: the arm's subject is "the declared GHA peel vs. the shipped GHA detector", and adding a second
-// row to its stack would change the subject. So when `utf8-bom-line-prefix` lands, cell B stays at
-// 511 / 17 487 and this arm stays GREEN. (An earlier revision of this comment claimed the opposite —
-// that the fix would turn cell B red here. It would not, and believing it would have left the
-// un-drop measured by nothing.) The un-drop is measured by the SECOND arm below, which declares the
-// two-row stack over the SAME manifest population.
+// is: the arm's subject is "the declared GHA peel vs. the shipped GHA detector", and adding a
+// second row to its stack would change the subject. So when `utf8-bom-line-prefix` lands, cell B
+// stays at 511 / 17 487 and this arm stays GREEN. (An earlier revision of this comment claimed the
+// opposite — that the fix would turn cell B red here. It would not, and believing it would have
+// left the un-drop measured by nothing.) The un-drop is measured by the SECOND arm below, which
+// declares the two-row stack over the SAME manifest population.
 //
 // ── G-BOM-3, the second arm (DN-25.D5) — THE UN-DROP, COUNTED ──────────────────────────────────
 // `BomRowUndropsExactlyTheBomDeclinedLinesAndNothingElse` scores the same population under three
@@ -108,8 +109,8 @@
 //
 // ⚠ MEASURED BLINDNESS — the two slices are NOT interchangeable, and this is why the pins are
 // per-slice rather than the gate taking whatever it is pointed at. Mutation E is a REAL divergence
-// class (the GHA separator being a tab rather than a space) that `data/v1/sample` does not contain a
-// single instance of: the sample arm stayed fully GREEN under it while the full arm caught 23 157
+// class (the GHA separator being a tab rather than a space) that `data/v1/sample` does not contain
+// a single instance of: the sample arm stayed fully GREEN under it while the full arm caught 23 157
 // lines. So `sample` (0.4 s) is a SMOKE arm and `full` (23.5 s) is the claim. Wiring only the fast
 // one buys a green that is measurably weaker than it reads — green-BLIND.
 //
@@ -170,7 +171,8 @@ constexpr std::array<std::string_view, 2> kDeclaredGhaThenBom{{kGhaTransform, kB
 constexpr std::size_t kOracleGhaPrefixLen{28U}; // "YYYY-MM-DDTHH:MM:SS.fffffffZ"
 
 // "YYYY-MM-DD" at offset `pos`.
-[[nodiscard]] constexpr bool oracle_match_iso_date_at(std::string_view str, std::size_t pos) noexcept
+[[nodiscard]] constexpr bool oracle_match_iso_date_at(std::string_view str,
+                                                      std::size_t pos) noexcept
 {
     if (pos + 10U > str.size())
         return false;
@@ -309,8 +311,8 @@ constexpr std::array<SlicePins, 2> kSlices{{
 // A TARGETED extraction, not a JSON parser, and fail-closed on anything it does not understand: a
 // silently mis-parsed manifest would build a different population and report a confident wrong
 // number, which is the failure mode this whole file exists to avoid. Corpus filenames are
-// `log_annotated/<owner>__<repo>__pr<N>__run<N>.log` — no escapes — so an escape sequence here means
-// the manifest's shape changed and the extraction must be revisited rather than guessed at.
+// `log_annotated/<owner>__<repo>__pr<N>__run<N>.log` — no escapes — so an escape sequence here
+// means the manifest's shape changed and the extraction must be revisited rather than guessed at.
 struct ManifestField
 {
     bool found{false};
@@ -455,7 +457,8 @@ class TransportPeelEquivalenceGate : public ::testing::Test
             << "The slice is declared present, so this is a wiring error, not an absent corpus — "
                "unset the variable if this runner has no local copy of the private slice.";
         ASSERT_TRUE(std::filesystem::is_directory(slice_ / "log_annotated"))
-            << kSliceDirVar << " is set to '" << raw << "' but there is no log_annotated/ under it.";
+            << kSliceDirVar << " is set to '" << raw
+            << "' but there is no log_annotated/ under it.";
     }
 
     // The population: every non-null `log_annotated`, SORTED, UNCAPPED. Never a directory walk.
@@ -593,8 +596,8 @@ class TransportPeelEquivalenceGate : public ::testing::Test
             << kSlices[0].label << " = " << kSlices[0].logs << ", " << kSlices[1].label << " = "
             << kSlices[1].logs
             << ").\nThis gate pins per-slice numbers, so an unrecognized population is a FAILURE, "
-               "not a skip — either point " << kSliceDirVar
-            << " at a pinned slice, or add the new slice's pins deliberately.";
+               "not a skip — either point "
+            << kSliceDirVar << " at a pinned slice, or add the new slice's pins deliberately.";
         return out.str();
     }
 
@@ -616,37 +619,33 @@ TEST_F(TransportPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheShippedDete
 
     // ── The diagnostic block. Printed on ANY failure below, so a red is diagnosable without
     // re-running under a debugger. ──
-    const auto report{[&score, pins]
-                      {
-                          std::ostringstream out;
-                          out << "\n  slice            : " << pins->label
-                              << "\n  logs             : " << score.logs << " (pinned "
-                              << pins->logs << ")"
-                              << "\n  lines            : " << score.lines << " (pinned "
-                              << pins->lines << ")"
-                              << "\n  A  equal         : " << score.claimed_equal << " (pinned "
-                              << pins->claimed_equal << ")"
-                              << "\n  A  MISMATCH      : " << score.claimed_mismatch
-                              << " (pinned 0)   <<< THE CLAIM"
-                              << "\n  blank-decline    : " << score.blank_decline
-                              << "\n  empty-input      : " << score.empty_input
-                              << "\n  blank+empty      : "
-                              << (score.blank_decline + score.empty_input) << " (pinned "
-                              << pins->blank_and_empty << ")"
-                              << "\n  B  BOM decline   : " << score.bom_decline << " (pinned "
-                              << pins->bom_declines << ")"
-                              << "\n  C  unstamped     : " << score.unstamped << " (pinned "
-                              << pins->unstamped << ")"
-                              << "\n  decline VIOLATN  : " << score.violations << " (pinned 0)"
-                              << "\n  partition total  : " << score.partition_total() << " / "
-                              << score.lines;
-                          for (const std::string& line : score.reported)
-                              out << "\n  " << line;
-                          if (score.reported.size() == kMaxReportedLines)
-                              out << "\n  … reporting truncated at " << kMaxReportedLines
-                                  << " lines";
-                          return out.str();
-                      }};
+    const auto report{
+        [&score, pins]
+        {
+            std::ostringstream out;
+            out << "\n  slice            : " << pins->label
+                << "\n  logs             : " << score.logs << " (pinned " << pins->logs << ")"
+                << "\n  lines            : " << score.lines << " (pinned " << pins->lines << ")"
+                << "\n  A  equal         : " << score.claimed_equal << " (pinned "
+                << pins->claimed_equal << ")"
+                << "\n  A  MISMATCH      : " << score.claimed_mismatch
+                << " (pinned 0)   <<< THE CLAIM"
+                << "\n  blank-decline    : " << score.blank_decline
+                << "\n  empty-input      : " << score.empty_input
+                << "\n  blank+empty      : " << (score.blank_decline + score.empty_input)
+                << " (pinned " << pins->blank_and_empty << ")"
+                << "\n  B  BOM decline   : " << score.bom_decline << " (pinned "
+                << pins->bom_declines << ")"
+                << "\n  C  unstamped     : " << score.unstamped << " (pinned " << pins->unstamped
+                << ")"
+                << "\n  decline VIOLATN  : " << score.violations << " (pinned 0)"
+                << "\n  partition total  : " << score.partition_total() << " / " << score.lines;
+            for (const std::string& line : score.reported)
+                out << "\n  " << line;
+            if (score.reported.size() == kMaxReportedLines)
+                out << "\n  … reporting truncated at " << kMaxReportedLines << " lines";
+            return out.str();
+        }};
 
     // ── THE CLAIM ──
     EXPECT_EQ(score.claimed_mismatch, kExpectedMismatches)
@@ -664,7 +663,8 @@ TEST_F(TransportPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheShippedDete
     // into a bucket nobody counted — the classic way a corpus gate reports on a subset it does not
     // know it is reporting on. ──
     EXPECT_EQ(score.partition_total(), score.lines)
-        << "the cells do NOT sum to the line total — the partition is not closed, so some lines are "
+        << "the cells do NOT sum to the line total — the partition is not closed, so some lines "
+           "are "
            "unaccounted for and every cell number below is suspect."
         << report();
 
@@ -680,12 +680,12 @@ TEST_F(TransportPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheShippedDete
     EXPECT_EQ(score.unstamped, pins->unstamped) << report();
 
     // ── Cell B — the SHIPPED DEFECT, NAMED and counted ──
-    // This arm's declaration is FROZEN at the one shipped GHA row, so landing `utf8-bom-line-prefix`
-    // does NOT move this number: the subject here is the shipped detector's own behavior, warts
-    // included, and a stack that peeled the BOM would be measuring a different function. Cell B is
-    // therefore the pre-fix population, held steady, and the sibling arm below is what watches it
-    // get rescued. A move HERE means the corpus bytes changed or the stamp acceptor did — never
-    // that the BOM row landed.
+    // This arm's declaration is FROZEN at the one shipped GHA row, so landing
+    // `utf8-bom-line-prefix` does NOT move this number: the subject here is the shipped detector's
+    // own behavior, warts included, and a stack that peeled the BOM would be measuring a different
+    // function. Cell B is therefore the pre-fix population, held steady, and the sibling arm below
+    // is what watches it get rescued. A move HERE means the corpus bytes changed or the stamp
+    // acceptor did — never that the BOM row landed.
     EXPECT_EQ(score.bom_decline, pins->bom_declines)
         << "cell B moved. This arm cannot see the BOM row (it declares one transform, frozen), so "
            "this is a corpus or acceptor change, not the DN-25 fix landing."
@@ -745,15 +745,15 @@ TEST_F(TransportPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheShippedDete
 struct BomUndropScore
 {
     std::size_t lines{0};
-    std::size_t bom_at_head{0};         ///< the line's first bytes are EF BB BF
-    std::size_t bom_declined{0};        ///< ... and the shipped detector would have claimed the twin
-    std::size_t rescued{0};             ///< ... and the two-row peel == the twin's claim, byte-exact
-    std::size_t rescue_mismatch{0};     ///< ... and it does not. THE CLAIM: 0.
-    std::size_t rescue_blank{0};        ///< ... and the peel emptied the line (it would still drop)
-    std::size_t still_bom_prefixed{0};  ///< ... and the BOM survived the peel. 17 487 → 0.
-    std::size_t moved_by_bom_row{0};    ///< over ALL lines: two-row content != one-row content
-    std::size_t moved_without_bom{0};   ///< ... on a line carrying no leading BOM. OVER-STRIP: 0.
-    std::size_t reversed_rescued{0};    ///< the reversed stack rescued a line. THE RED ARM: 0.
+    std::size_t bom_at_head{0};        ///< the line's first bytes are EF BB BF
+    std::size_t bom_declined{0};       ///< ... and the shipped detector would have claimed the twin
+    std::size_t rescued{0};            ///< ... and the two-row peel == the twin's claim, byte-exact
+    std::size_t rescue_mismatch{0};    ///< ... and it does not. THE CLAIM: 0.
+    std::size_t rescue_blank{0};       ///< ... and the peel emptied the line (it would still drop)
+    std::size_t still_bom_prefixed{0}; ///< ... and the BOM survived the peel. 17 487 → 0.
+    std::size_t moved_by_bom_row{0};   ///< over ALL lines: two-row content != one-row content
+    std::size_t moved_without_bom{0};  ///< ... on a line carrying no leading BOM. OVER-STRIP: 0.
+    std::size_t reversed_rescued{0};   ///< the reversed stack rescued a line. THE RED ARM: 0.
     std::size_t reversed_kept_stamp{0}; ///< the reversed stack left a GHA stamp at line head
     std::vector<std::string> reported;
 };
@@ -781,8 +781,9 @@ TEST_F(TransportPeelEquivalenceGate, BomRowUndropsExactlyTheBomDeclinedLinesAndN
         IngestDeclaration{.stack = kDeclaredGhaThenBom, .dialect = {}, .channel = {}})};
     ASSERT_EQ(two_row.size(), 2U) << "the declared stack must resolve BOTH rows — a one-row stack "
                                      "would satisfy the counts below for the wrong reason";
-    ASSERT_EQ(reversed.size(), 2U) << "the reversed stack must resolve BOTH rows, or the red arm is "
-                                      "red for a reason that has nothing to do with ORDER";
+    ASSERT_EQ(reversed.size(), 2U)
+        << "the reversed stack must resolve BOTH rows, or the red arm is "
+           "red for a reason that has nothing to do with ORDER";
 
     BomUndropScore score;
     for (const std::filesystem::path& path : paths)
@@ -838,10 +839,9 @@ TEST_F(TransportPeelEquivalenceGate, BomRowUndropsExactlyTheBomDeclinedLinesAndN
             {
                 ++score.still_bom_prefixed;
                 if (score.reported.size() < kMaxReportedLines)
-                    score.reported.push_back(std::string{"BOM SURVIVED "} +
-                                             path.filename().string() + ":" +
-                                             std::to_string(line_no) + "\n    2-row : \"" +
-                                             escape(after) + "\"");
+                    score.reported.push_back(
+                        std::string{"BOM SURVIVED "} + path.filename().string() + ":" +
+                        std::to_string(line_no) + "\n    2-row : \"" + escape(after) + "\"");
             }
 
             const std::optional<std::string_view> claim{oracle_claim(twin)};
@@ -869,38 +869,35 @@ TEST_F(TransportPeelEquivalenceGate, BomRowUndropsExactlyTheBomDeclinedLinesAndN
         }
     }
 
-    const auto report{[&score, pins]
-                      {
-                          std::ostringstream out;
-                          out << "\n  slice              : " << pins->label
-                              << "\n  lines              : " << score.lines << " (pinned "
-                              << pins->lines << ")"
-                              << "\n  BOM at head        : " << score.bom_at_head << " (pinned "
-                              << pins->bom_at_head << ")"
-                              << "\n  BOM-declined       : " << score.bom_declined << " (pinned "
-                              << pins->bom_declines << ")"
-                              << "\n  RESCUED            : " << score.rescued << " (pinned "
-                              << pins->bom_declines << ")   <<< THE UN-DROP"
-                              << "\n  rescue MISMATCH    : " << score.rescue_mismatch
-                              << " (pinned 0)"
-                              << "\n  rescue blank       : " << score.rescue_blank << " (pinned 0)"
-                              << "\n  BOM survived peel  : " << score.still_bom_prefixed
-                              << " (pinned 0)"
-                              << "\n  moved by BOM row   : " << score.moved_by_bom_row
-                              << " (pinned " << pins->bom_at_head << ")"
-                              << "\n  moved WITHOUT BOM  : " << score.moved_without_bom
-                              << " (pinned 0)   <<< OVER-STRIP"
-                              << "\n  reversed RESCUED   : " << score.reversed_rescued
-                              << " (pinned 0)   <<< THE RED ARM"
-                              << "\n  reversed kept stamp: " << score.reversed_kept_stamp
-                              << " (pinned " << pins->bom_declines << ")";
-                          for (const std::string& line : score.reported)
-                              out << "\n  " << line;
-                          if (score.reported.size() == kMaxReportedLines)
-                              out << "\n  … reporting truncated at " << kMaxReportedLines
-                                  << " lines";
-                          return out.str();
-                      }};
+    const auto report{
+        [&score, pins]
+        {
+            std::ostringstream out;
+            out << "\n  slice              : " << pins->label
+                << "\n  lines              : " << score.lines << " (pinned " << pins->lines << ")"
+                << "\n  BOM at head        : " << score.bom_at_head << " (pinned "
+                << pins->bom_at_head << ")"
+                << "\n  BOM-declined       : " << score.bom_declined << " (pinned "
+                << pins->bom_declines << ")"
+                << "\n  RESCUED            : " << score.rescued << " (pinned " << pins->bom_declines
+                << ")   <<< THE UN-DROP"
+                << "\n  rescue MISMATCH    : " << score.rescue_mismatch << " (pinned 0)"
+                << "\n  rescue blank       : " << score.rescue_blank << " (pinned 0)"
+                << "\n  BOM survived peel  : " << score.still_bom_prefixed << " (pinned 0)"
+                << "\n  moved by BOM row   : " << score.moved_by_bom_row << " (pinned "
+                << pins->bom_at_head << ")"
+                << "\n  moved WITHOUT BOM  : " << score.moved_without_bom
+                << " (pinned 0)   <<< OVER-STRIP"
+                << "\n  reversed RESCUED   : " << score.reversed_rescued
+                << " (pinned 0)   <<< THE RED ARM"
+                << "\n  reversed kept stamp: " << score.reversed_kept_stamp << " (pinned "
+                << pins->bom_declines << ")";
+            for (const std::string& line : score.reported)
+                out << "\n  " << line;
+            if (score.reported.size() == kMaxReportedLines)
+                out << "\n  … reporting truncated at " << kMaxReportedLines << " lines";
+            return out.str();
+        }};
 
     // ── The population must be the SAME one the first arm scored. Without this the counts below
     // could all pass over a slice that quietly shrank. ──

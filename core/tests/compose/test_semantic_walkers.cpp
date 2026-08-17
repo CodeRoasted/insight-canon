@@ -46,12 +46,12 @@ using insight::tokenization::recognize;
 }
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════════
-// SRC-SP-5 heap-allocation guard — a global operator-new replacement counting allocations while ARMED.
-// The replacement is a plain passthrough (forwards to malloc) unless a RAII AllocGuard is live, so
-// it never perturbs the rest of the test binary; armed only around the recognizer probe path. This
-// lives in the TEST binary — a global new override must NEVER ship in the canon library (it would
-// intercept every product allocation), which is exactly why the "no allocation in recognizers" leg
-// is homed HERE, in core, not in the installed conformance module.
+// SRC-SP-5 heap-allocation guard — a global operator-new replacement counting allocations while
+// ARMED. The replacement is a plain passthrough (forwards to malloc) unless a RAII AllocGuard is
+// live, so it never perturbs the rest of the test binary; armed only around the recognizer probe
+// path. This lives in the TEST binary — a global new override must NEVER ship in the canon library
+// (it would intercept every product allocation), which is exactly why the "no allocation in
+// recognizers" leg is homed HERE, in core, not in the installed conformance module.
 // ════════════════════════════════════════════════════════════════════════════════════════════════════
 namespace
 {

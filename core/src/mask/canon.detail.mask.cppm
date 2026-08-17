@@ -22,9 +22,9 @@ export namespace insight::tokenization
 // template differently) cannot form. The per-token KEEP / MASK / composite-normalize
 // classification (status-value KEEP, UUID/long-hash + IPv4/hex + digit-leading MASK,
 // source-location / versioned-ref / bracket-index / #-counter / embedded-identity /
-// key=<numeric-value> normalization — §8 D-TID-12/SRC-D-TID-13) is DECIDED per token, never discovered from
-// cross-line data (SRC-D-TID-2: discover→decide). This is the sole identity source (the clustering tree
-// it replaced is RIPPED — SRC-D-TID-3).
+// key=<numeric-value> normalization — §8 D-TID-12/SRC-D-TID-13) is DECIDED per token, never
+// discovered from cross-line data (SRC-D-TID-2: discover→decide). This is the sole identity source
+// (the clustering tree it replaced is RIPPED — SRC-D-TID-3).
 //
 // ── The composite-normalizer contracts, DECLARED ────────────────────────────────────
 // These govern what `stateless_template()` OBSERVABLY returns, so they are interface

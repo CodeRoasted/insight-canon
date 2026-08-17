@@ -247,10 +247,11 @@ namespace
             std::cerr << "<none>";
         for (std::size_t i{0}; i < packages.size(); ++i)
             std::cerr << (i == 0 ? "" : ", ") << '"' << packages[i].name << '"';
-        std::cerr << ".\nA dialect is caller-declared provenance, never guessed: canon VERIFIES, it "
-                     "does not infer. An unknown dialect is a MISTAKE and fails closed here; an "
-                     "ABSENT dialect is a CHOICE and asserts nothing. Declare one of the names "
-                     "above, or none.\n";
+        std::cerr
+            << ".\nA dialect is caller-declared provenance, never guessed: canon VERIFIES, it "
+               "does not infer. An unknown dialect is a MISTAKE and fails closed here; an "
+               "ABSENT dialect is a CHOICE and asserts nothing. Declare one of the names "
+               "above, or none.\n";
         std::terminate();
     }
 
@@ -264,9 +265,9 @@ ResolvedStream resolve_stream(const ComposedSemantics& composed,
     // ONE evaluation point of the dialect gate in the whole engine — nothing below the view sees
     // the coordinate, which is what makes the per-line content dependence structurally impossible
     // rather than merely absent.
-    return ResolvedStream{
-        .semantics = composed.for_stream(declaration.dialect, declaration.channel),
-        .transport = insight::transport::resolve_transport_stack(declaration)};
+    return ResolvedStream{.semantics =
+                              composed.for_stream(declaration.dialect, declaration.channel),
+                          .transport = insight::transport::resolve_transport_stack(declaration)};
 }
 
 std::string ComposedSemantics::identity_hex() const
@@ -321,9 +322,9 @@ ComposedSemantics ComposedSemantics::for_stream(std::string_view declared_dialec
     out.report_ = report_;
     // The identity is carried VERBATIM: semantic_identity is the RULESET's identity (which rows
     // exist and how they gate), not a per-stream view of it. Two streams of one binary declaring
-    // different dialects or IntentChannels are analyzed by the SAME ruleset, so they must report the
-    // same identity — otherwise a cross-channel comparison (D5's legal case: BuildId N annotated ↔
-    // N+1 stripped) would look like a comparison across two different engines.
+    // different dialects or IntentChannels are analyzed by the SAME ruleset, so they must report
+    // the same identity — otherwise a cross-channel comparison (D5's legal case: BuildId N
+    // annotated ↔ N+1 stripped) would look like a comparison across two different engines.
     out.identity_ = identity_;
 
     // Every filter is re-derived from the UNFILTERED tables, never from this view's own: a view is
@@ -349,19 +350,18 @@ ComposedSemantics ComposedSemantics::for_stream(std::string_view declared_dialec
                          [&admits](const LevelLiftRow& row) { return admits(row.dialect_gate); });
     out.outcome_tokens_.reserve(all_outcome_tokens_.size());
     std::ranges::copy_if(all_outcome_tokens_, std::back_inserter(out.outcome_tokens_),
-                         [&admits](const OutcomeTokenRow& row) { return admits(row.dialect_gate); });
+                         [&admits](const OutcomeTokenRow& row)
+                         { return admits(row.dialect_gate); });
     out.outcome_markers_.reserve(all_outcome_markers_.size());
     std::ranges::copy_if(all_outcome_markers_, std::back_inserter(out.outcome_markers_),
                          [&admits](const OutcomeMarkerRow& row)
                          { return admits(row.dialect_gate); });
     // Markers carry BOTH gates — the Medium is `dialect × IntentChannel` — so both apply here.
     out.markers_.reserve(all_markers_.size());
-    std::ranges::copy_if(all_markers_, std::back_inserter(out.markers_),
-                         [&admits, declared_channel](const IntentMarkerRow& row)
-                         {
-                             return admits(row.dialect_gate) &&
-                                    channel_admits(row.channel_gate, declared_channel);
-                         });
+    std::ranges::copy_if(
+        all_markers_, std::back_inserter(out.markers_),
+        [&admits, declared_channel](const IntentMarkerRow& row)
+        { return admits(row.dialect_gate) && channel_admits(row.channel_gate, declared_channel); });
     return out;
 }
 

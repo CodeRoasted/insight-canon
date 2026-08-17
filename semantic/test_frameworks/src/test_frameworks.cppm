@@ -51,8 +51,8 @@ inline constexpr std::array<LocationRow, 3> kLocations{{
 
 // ── The manifest (§2.5) — the package's single composed contribution ──
 // Ships only location rows (no roles/markers/level-lifts/value-classes, no code tier). version
-// "1.0.0" (SRC-SP-7). name sorts after "github" → github rows precede test_frameworks rows in canonical
-// order.
+// "1.0.0" (SRC-SP-7). name sorts after "github" → github rows precede test_frameworks rows in
+// canonical order.
 export inline constexpr SemanticPackageManifest kManifest{
     .name = "test_frameworks",
     .version = "1.0.0",

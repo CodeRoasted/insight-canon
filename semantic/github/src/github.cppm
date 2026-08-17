@@ -43,16 +43,24 @@ export inline constexpr std::string_view kDialect{"github"};
 // the new vocabulary. Narrowing them to \"github\" would be a recognition change riding a
 // type change — a different decision, with its own gate, and not this cut's.
 inline constexpr std::array<StructuralRoleRow, 6> kRoles{{
-    {.prefix = "##[group]", .role = insight::StructuralRole::GroupBegin, .dialect_gate = kAnyDialect},
-    {.prefix = "::group::", .role = insight::StructuralRole::GroupBegin, .dialect_gate = kAnyDialect},
+    {.prefix = "##[group]",
+     .role = insight::StructuralRole::GroupBegin,
+     .dialect_gate = kAnyDialect},
+    {.prefix = "::group::",
+     .role = insight::StructuralRole::GroupBegin,
+     .dialect_gate = kAnyDialect},
     {.prefix = "##[endgroup]",
      .role = insight::StructuralRole::GroupEnd,
      .dialect_gate = kAnyDialect},
     {.prefix = "::endgroup::",
      .role = insight::StructuralRole::GroupEnd,
      .dialect_gate = kAnyDialect},
-    {.prefix = "##[error]", .role = insight::StructuralRole::Terminator, .dialect_gate = kAnyDialect},
-    {.prefix = "::error::", .role = insight::StructuralRole::Terminator, .dialect_gate = kAnyDialect},
+    {.prefix = "##[error]",
+     .role = insight::StructuralRole::Terminator,
+     .dialect_gate = kAnyDialect},
+    {.prefix = "::error::",
+     .role = insight::StructuralRole::Terminator,
+     .dialect_gate = kAnyDialect},
 }};
 
 // ── The declared INTENT CHANNEL vocabulary (ADR-22) ──
@@ -179,12 +187,13 @@ inline constexpr std::array<IntentMarkerRow, 3> kMarkers{{
 // ── Generation-template rows (studies/008, shared_intent_declaration §3.2) — the WRITER dual ──
 // One emit row per recognition row, paired by (prefix, kind, dialect_gate, channel_gate) — the
 // MEDIUM is `dialect × IntentChannel` (ADR-22 / ADR-22), so each projection names
-// the same dialect and channel as its dual. Both Step media are present: `##[group]Run <cmd>` materializes into the ANNOTATED
-// channel (the real one, and the writer's default), `Run <cmd>` into our STRIPPED ablation — each
-// read back to the same identity under its own channel, so the round-trip closes per channel (G2).
-// The writer picks WHICH by the declared channel (the medium selector), never by array order. Each
-// emit is PayloadAfterPrefix, the exact inverse of the reader's RemainderAfterPrefix:
-// render_row(row, "yarn lint") reproduces the banner canon segments back to Step "yarn lint".
+// the same dialect and channel as its dual. Both Step media are present: `##[group]Run <cmd>`
+// materializes into the ANNOTATED channel (the real one, and the writer's default), `Run <cmd>`
+// into our STRIPPED ablation — each read back to the same identity under its own channel, so the
+// round-trip closes per channel (G2). The writer picks WHICH by the declared channel (the medium
+// selector), never by array order. Each emit is PayloadAfterPrefix, the exact inverse of the
+// reader's RemainderAfterPrefix: render_row(row, "yarn lint") reproduces the banner canon segments
+// back to Step "yarn lint".
 inline constexpr std::array<IntentEmitRow, 3> kEmitMarkers{{
     {.prefix = "Complete job name: ",
      .kind = insight::tokenization::IntentMarkerKind::Job,
@@ -239,30 +248,14 @@ static_assert(insight::semantic::all_channel_gates_declared(kMarkers, kEmitMarke
 // single package-local reader. First match in DECLARED order wins, so order is content here.
 // Also serialized into semantic_identity.
 inline constexpr std::array<LevelLiftRow, 8> kLevelLifts{{
-    {.prefix = "##[error]",
-     .level = insight::LogLevel::Error,
-     .dialect_gate = kDialect},
-    {.prefix = "::error::",
-     .level = insight::LogLevel::Error,
-     .dialect_gate = kDialect},
-    {.prefix = "##[warning]",
-     .level = insight::LogLevel::Warn,
-     .dialect_gate = kDialect},
-    {.prefix = "::warning::",
-     .level = insight::LogLevel::Warn,
-     .dialect_gate = kDialect},
-    {.prefix = "##[debug]",
-     .level = insight::LogLevel::Debug,
-     .dialect_gate = kDialect},
-    {.prefix = "::debug::",
-     .level = insight::LogLevel::Debug,
-     .dialect_gate = kDialect},
-    {.prefix = "##[notice]",
-     .level = insight::LogLevel::Info,
-     .dialect_gate = kDialect},
-    {.prefix = "::notice::",
-     .level = insight::LogLevel::Info,
-     .dialect_gate = kDialect},
+    {.prefix = "##[error]", .level = insight::LogLevel::Error, .dialect_gate = kDialect},
+    {.prefix = "::error::", .level = insight::LogLevel::Error, .dialect_gate = kDialect},
+    {.prefix = "##[warning]", .level = insight::LogLevel::Warn, .dialect_gate = kDialect},
+    {.prefix = "::warning::", .level = insight::LogLevel::Warn, .dialect_gate = kDialect},
+    {.prefix = "##[debug]", .level = insight::LogLevel::Debug, .dialect_gate = kDialect},
+    {.prefix = "::debug::", .level = insight::LogLevel::Debug, .dialect_gate = kDialect},
+    {.prefix = "##[notice]", .level = insight::LogLevel::Info, .dialect_gate = kDialect},
+    {.prefix = "::notice::", .level = insight::LogLevel::Info, .dialect_gate = kDialect},
 }};
 
 // ── Run-outcome token rows (grammar-2, ADR-17 — the GitHub reshape) ──
@@ -275,44 +268,30 @@ inline constexpr std::array<LevelLiftRow, 8> kLevelLifts{{
 // a guess). NO OutcomeMarkerRow: GHA emits no single run-verdict console line (`Process completed
 // with exit code N` is per-step) — the degenerate console path is correctly Unknown (§3.2).
 inline constexpr std::array<OutcomeTokenRow, 7> kOutcomeTokens{{
-    {.token = "success",
-     .outcome = insight::RunOutcome::Success,
-     .dialect_gate = kDialect},
-    {.token = "failure",
-     .outcome = insight::RunOutcome::Failure,
-     .dialect_gate = kDialect},
-    {.token = "cancelled",
-     .outcome = insight::RunOutcome::Aborted,
-     .dialect_gate = kDialect},
-    {.token = "timed_out",
-     .outcome = insight::RunOutcome::Aborted,
-     .dialect_gate = kDialect},
-    {.token = "skipped",
-     .outcome = insight::RunOutcome::Unknown,
-     .dialect_gate = kDialect},
-    {.token = "neutral",
-     .outcome = insight::RunOutcome::Unknown,
-     .dialect_gate = kDialect},
-    {.token = "action_required",
-     .outcome = insight::RunOutcome::Unknown,
-     .dialect_gate = kDialect},
+    {.token = "success", .outcome = insight::RunOutcome::Success, .dialect_gate = kDialect},
+    {.token = "failure", .outcome = insight::RunOutcome::Failure, .dialect_gate = kDialect},
+    {.token = "cancelled", .outcome = insight::RunOutcome::Aborted, .dialect_gate = kDialect},
+    {.token = "timed_out", .outcome = insight::RunOutcome::Aborted, .dialect_gate = kDialect},
+    {.token = "skipped", .outcome = insight::RunOutcome::Unknown, .dialect_gate = kDialect},
+    {.token = "neutral", .outcome = insight::RunOutcome::Unknown, .dialect_gate = kDialect},
+    {.token = "action_required", .outcome = insight::RunOutcome::Unknown, .dialect_gate = kDialect},
 }};
 
 // ── The manifest (§2.5) — the package's single composed contribution ──
 // name "github", version "1.4.0" — bumped from 1.3.0 for T4: the package's CODE TIER lost its
-// format strategy (`.strategy` is serialized as a presence byte, so the manifest's content genuinely
-// moved) and every gated row's coordinate became the package NAME. 1.3.0 was the IntentChannel
-// coordinate (the declared
-// channel vocabulary + the channel-gated Step rows). SRC-SP-7 immutable-release discipline: a released
-// version's rows are frozen, a content change is a new version; the bump also rides the SRC-II-7
-// semantic_identity hash, an honest comparability boundary — a diff across this boundary is
-// comparing two different recognition rulesets, and the digest says so.
+// format strategy (`.strategy` is serialized as a presence byte, so the manifest's content
+// genuinely moved) and every gated row's coordinate became the package NAME. 1.3.0 was the
+// IntentChannel coordinate (the declared channel vocabulary + the channel-gated Step rows).
+// SRC-SP-7 immutable-release discipline: a released version's rows are frozen, a content change is
+// a new version; the bump also rides the SRC-II-7 semantic_identity hash, an honest comparability
+// boundary — a diff across this boundary is comparing two different recognition rulesets, and the
+// digest says so.
 //
 // ADR-22's rename (Sink → IntentChannel) did NOT bump this, deliberately: it renamed C++
 // identifiers, and what enters the digest is the channel NAMES ("annotated"/"stripped" — ruled
-// unchanged) and the row content, neither of which moved. SRC-SP-7 keys on CONTENT, not on spelling;
-// bumping for a rename would declare a new ruleset that recognizes exactly what the old one did,
-// and make two identical rulesets look incomparable. Ships no locations (that is the
+// unchanged) and the row content, neither of which moved. SRC-SP-7 keys on CONTENT, not on
+// spelling; bumping for a rename would declare a new ruleset that recognizes exactly what the old
+// one did, and make two identical rulesets look incomparable. Ships no locations (that is the
 // test_frameworks package) and no value classes (none has a consumer yet). Code tier: the
 // echoed-source hook, and nothing else.
 export inline constexpr SemanticPackageManifest kManifest{
@@ -326,7 +305,7 @@ export inline constexpr SemanticPackageManifest kManifest{
     .value_classes = {},
     .outcome_tokens = kOutcomeTokens,
     .outcome_markers = {},
-    .channels = kChannels, // ADR-22 — the two GHA materializations
+    .channels = kChannels,              // ADR-22 — the two GHA materializations
     .echoed_source = &is_echoed_source, // the only code tier left: a byte predicate, not a grammar
 };
 

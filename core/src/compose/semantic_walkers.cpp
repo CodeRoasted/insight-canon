@@ -227,8 +227,7 @@ namespace tokenization
                 terminator != std::string_view::npos)
                 remainder = std::string_view{remainder.data(), terminator};
             if (!remainder.empty() && remainder.back() == ']')
-                if (const std::size_t group{remainder.rfind('[')};
-                    group != std::string_view::npos)
+                if (const std::size_t group{remainder.rfind('[')}; group != std::string_view::npos)
                     remainder = std::string_view{remainder.data(), group};
             if (remainder.empty())
                 return std::nullopt;

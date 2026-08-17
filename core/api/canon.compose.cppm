@@ -86,8 +86,8 @@ find_conflict(std::span<const SemanticPackageManifest> packages) noexcept;
 // The composed rule set: the canonically-ordered, conflict-free tables the core mechanisms walk,
 // the code-tier seams (strategy factories + provenance hooks), the package list, and the content
 // hash. Owns its row storage (small POD copied from the manifest spans in canonical order; the
-// pointed-at bytes stay alive in package static storage — SRC-SP-7). Built once per binary; passed by
-// const-ref to every Tokenizer. Move-only.
+// pointed-at bytes stay alive in package static storage — SRC-SP-7). Built once per binary; passed
+// by const-ref to every Tokenizer. Move-only.
 class ComposedSemantics
 {
   public:
@@ -153,7 +153,8 @@ class ComposedSemantics
     // gated to a different channel. Consequences, all structural rather than asserted:
     //
     //   * the HOT PATH never sees either coordinate — classify / recognize / lift_level /
-    //     map_outcome_token walk a plain row span with no gate parameter at all, zero per-line cost;
+    //     map_outcome_token walk a plain row span with no gate parameter at all, zero per-line
+    //     cost;
     //   * one dialect and one IntentChannel per TREE (D5) are UNREPRESENTABLE otherwise — a sibling
     //     dialect's or channel's rows are not in the table, so the bad state cannot be built;
     //   * `kAnyDialect` / `kAnyChannel` rows survive every filter, so a universal role row and a
@@ -184,8 +185,8 @@ class ComposedSemantics
     // have had — is what makes a second call silently wrong, so there is exactly one door.
     //
     // Cold path by construction: called once per stream, copies ~30 POD rows. The pointed-at bytes
-    // stay in package-static storage (SRC-SP-7), so the copy is trivial and the identity is preserved
-    // verbatim — semantic_identity is the RULESET's identity, not a stream's view of it.
+    // stay in package-static storage (SRC-SP-7), so the copy is trivial and the identity is
+    // preserved verbatim — semantic_identity is the RULESET's identity, not a stream's view of it.
     [[nodiscard]] ComposedSemantics for_stream(std::string_view declared_dialect,
                                                std::string_view declared_channel) const;
 
@@ -340,7 +341,8 @@ namespace detail
     // plain row span with no gate left to test. The `gate_matches` that used to live here — the
     // per-line `row_gate == kAnyFormat || row_gate == line_format` every walker shared — is gone
     // with the coordinate it tested.
-    [[nodiscard]] constexpr bool gates_intersect(std::string_view lhs, std::string_view rhs) noexcept
+    [[nodiscard]] constexpr bool gates_intersect(std::string_view lhs,
+                                                 std::string_view rhs) noexcept
     {
         return lhs == rhs || lhs == kAnyDialect || rhs == kAnyDialect;
     }
@@ -368,8 +370,7 @@ namespace detail
                     for (std::size_t idx_j{(pkg_b == pkg_a) ? idx_i + 1 : 0}; idx_j < rows_b.size();
                          ++idx_j)
                         if (rows_a[idx_i].prefix == rows_b[idx_j].prefix &&
-                            gates_intersect(rows_a[idx_i].dialect_gate,
-                                            rows_b[idx_j].dialect_gate))
+                            gates_intersect(rows_a[idx_i].dialect_gate, rows_b[idx_j].dialect_gate))
                             return rows_a[idx_i].prefix;
                 }
         }
@@ -395,8 +396,7 @@ namespace detail
                     for (std::size_t idx_j{(pkg_b == pkg_a) ? idx_i + 1 : 0}; idx_j < rows_b.size();
                          ++idx_j)
                         if (rows_a[idx_i].token == rows_b[idx_j].token &&
-                            gates_intersect(rows_a[idx_i].dialect_gate,
-                                            rows_b[idx_j].dialect_gate))
+                            gates_intersect(rows_a[idx_i].dialect_gate, rows_b[idx_j].dialect_gate))
                             return rows_a[idx_i].token;
                 }
         }

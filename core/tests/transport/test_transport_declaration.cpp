@@ -7,9 +7,10 @@
 //   • THIS FILE — the degenerate declaration's shape: empty stack, `peel` is byte-identity, the
 //     catalogue's contract, and fail-closed resolution. Every one of these is a property of ONE
 //     component (`insight.canon.transport`) over bytes this file authors. It needs no seam and no
-//     corpus, so it is a UNIT test and belongs in `core/tests/transport/`, 1:1 with `src/transport/`
-//     (the per-domain test mirror). Homing it as a corpus gate would have been the mis-homing this
-//     role exists to stop: real bytes cannot prove a property that is about the empty stack.
+//     corpus, so it is a UNIT test and belongs in `core/tests/transport/`, 1:1 with
+//     `src/transport/` (the per-domain test mirror). Homing it as a corpus gate would have been the
+//     mis-homing this role exists to stop: real bytes cannot prove a property that is about the
+//     empty stack.
 //   • `tests/compose/test_transport_identity.cpp` — that declaring transport does not move
 //     `semantic_identity`. Also unit, but its seam is compose's, not transport's.
 //   • The CORPUS arm (byte-identical behavior over the D11 slice) + G1-PEEL — the sibling
@@ -88,7 +89,9 @@ const std::array<LineCase, 14> kLines{{
     {.label = "empty", .bytes = {}, .carries_stamp = false},
     {.label = "single space", .bytes = " ", .carries_stamp = false},
     {.label = "plain content", .bytes = "hello world", .carries_stamp = false},
-    {.label = "stamped + content", .bytes = "2026-04-15T22:20:38.2879579Z ok", .carries_stamp = true},
+    {.label = "stamped + content",
+     .bytes = "2026-04-15T22:20:38.2879579Z ok",
+     .carries_stamp = true},
     {.label = "stamped, no trailing space",
      .bytes = "2026-04-15T22:20:38.2879579Z",
      .carries_stamp = true},
@@ -200,7 +203,8 @@ TEST(TransportDeclaration, DegenerateStackPeelIsByteIdentity)
             << "': the degenerate stack declares no extract, so it must set no observation time.";
 
         EXPECT_EQ(peeled.is_blank(), line.bytes.empty())
-            << "case [" << idx << "] '" << line.label << "': is_blank() must mean 'peeled to empty' "
+            << "case [" << idx << "] '" << line.label
+            << "': is_blank() must mean 'peeled to empty' "
             << "and nothing else — content was \"" << escape(peeled.content) << "\"";
     }
 }
@@ -234,7 +238,8 @@ TEST(TransportDeclaration, DeclaredStackActuallyPeels)
             ++shortened;
             EXPECT_LT(peeled.content.size(), line.bytes.size())
                 << "case [" << idx << "] '" << line.label
-                << "': a declared api-rfc3339-line-prefix stack must SHORTEN a stamped line. If this "
+                << "': a declared api-rfc3339-line-prefix stack must SHORTEN a stamped line. If "
+                   "this "
                    "is green while DegenerateStackPeelIsByteIdentity is also green, `peel` is a "
                    "no-op for every stack and the transport vocabulary does nothing.\n"
                 << "  in : \"" << escape(line.bytes) << "\"\n"
@@ -372,8 +377,7 @@ TEST(TransportDeclarationDeathTest, UnknownTransformFailsClosedNamingTheCatalog)
     const IngestDeclaration declaration{.stack = kTypo, .dialect = {}, .channel = {}};
 
     EXPECT_DEATH(
-        { (void)resolve_transport_stack(declaration); },
-        "unknown transport transform")
+        { (void)resolve_transport_stack(declaration); }, "unknown transport transform")
         << "a typo'd transform name must fatal, not degrade to no peel";
 
     // The message must NAME the vocabulary — a fail-closed error the operator cannot act on is
@@ -405,8 +409,7 @@ TEST(TransportRenderer, BracketPrefixRendersOneFixedFormAndRoundTrips)
     // of the rendered interior (parse_iso8601 skips the fraction BY DESIGN — the law holds at
     // the parser's grain; the millisecond digits are covered by the byte-exact form pin above).
     const std::array<std::string_view, 1> declared_names{"bracket-rfc3339-line-prefix"};
-    const TransportStack stack{resolve_transport_stack(
-        IngestDeclaration{.stack = declared_names})};
+    const TransportStack stack{resolve_transport_stack(IngestDeclaration{.stack = declared_names})};
     const std::string line{rendered + "hello world"};
     const auto peeled{stack.peel_raw(line)};
     EXPECT_EQ(peeled.content, "hello world");
@@ -472,7 +475,7 @@ constexpr std::chrono::sys_days kCalendarCeiling{std::chrono::year::max() / std:
 constexpr std::chrono::sys_days kFirstProbeDay{kClockFloor > kCalendarFloor ? kClockFloor
                                                                             : kCalendarFloor};
 constexpr std::chrono::sys_days kLastProbeDay{kClockCeiling < kCalendarCeiling ? kClockCeiling
-                                                                              : kCalendarCeiling};
+                                                                               : kCalendarCeiling};
 
 // The oracle for "which year is this day in" is the standard calendar, deliberately NOT the
 // renderer's own `civil_from_days`: an expectation computed by the code under test is the
@@ -492,25 +495,27 @@ TEST(TransportRenderer, AcceptsExactlyTheStampsInsideTheFourDigitYearWindow)
     const auto* bracket_row{find_transform("bracket-rfc3339-line-prefix")};
     ASSERT_NE(bracket_row, nullptr);
 
-    const auto probe{[bracket_row](std::chrono::sys_days day, bool expect_rendered,
-                                   std::string_view why) {
-        std::string out;
-        const bool rendered{
-            insight::transport::render_transport_prefix(*bracket_row, insight::Timestamp{day}, out)};
-        EXPECT_EQ(rendered, expect_rendered)
-            << why << " — day " << day.time_since_epoch().count() << " since epoch (civil year "
-            << civil_year_of(day) << "): render_transport_prefix returned " << rendered
-            << ", expected " << expect_rendered << "; buffer holds \"" << out << '"';
-        if (expect_rendered)
-            EXPECT_EQ(out.size(), kRenderedPrefixBytes)
-                << why << " — an accepted stamp must produce the ONE fixed form; got " << out.size()
-                << " bytes: \"" << out << '"';
-        else
-            EXPECT_TRUE(out.empty())
-                << why << " — a refusal must leave the caller's buffer untouched, never a partial "
-                          "or wrong prefix; got \""
-                << out << '"';
-    }};
+    const auto probe{
+        [bracket_row](std::chrono::sys_days day, bool expect_rendered, std::string_view why)
+        {
+            std::string out;
+            const bool rendered{insight::transport::render_transport_prefix(
+                *bracket_row, insight::Timestamp{day}, out)};
+            EXPECT_EQ(rendered, expect_rendered)
+                << why << " — day " << day.time_since_epoch().count() << " since epoch (civil year "
+                << civil_year_of(day) << "): render_transport_prefix returned " << rendered
+                << ", expected " << expect_rendered << "; buffer holds \"" << out << '"';
+            if (expect_rendered)
+                EXPECT_EQ(out.size(), kRenderedPrefixBytes)
+                    << why << " — an accepted stamp must produce the ONE fixed form; got "
+                    << out.size() << " bytes: \"" << out << '"';
+            else
+                EXPECT_TRUE(out.empty())
+                    << why
+                    << " — a refusal must leave the caller's buffer untouched, never a partial "
+                       "or wrong prefix; got \""
+                    << out << '"';
+        }};
 
     // ── Leg 1: the extremes this build can carry and name. Present whatever the tick period, so
     // this leg runs on every stdlib; its expectation is DERIVED from the calendar, so on a wide
@@ -553,8 +558,9 @@ TEST(TransportRenderer, AcceptsExactlyTheStampsInsideTheFourDigitYearWindow)
             // inside the window, hence no stamp above the window can be constructed at all. That is
             // a claim about THIS build, and it fails the day the clock widens.
             EXPECT_LE(civil_year_of(kLastProbeDay), kLastRenderableYear)
-                << edge.why << " — no such Timestamp exists in this build, which is only sound "
-                               "while the highest carryable stamp (civil year "
+                << edge.why
+                << " — no such Timestamp exists in this build, which is only sound "
+                   "while the highest carryable stamp (civil year "
                 << civil_year_of(kLastProbeDay)
                 << ") stays inside the window; it no longer does, so this edge is now reachable "
                    "and must be probed rather than explained away";
@@ -563,8 +569,9 @@ TEST(TransportRenderer, AcceptsExactlyTheStampsInsideTheFourDigitYearWindow)
         if (day < kFirstProbeDay)
         {
             EXPECT_GE(civil_year_of(kFirstProbeDay), kFirstRenderableYear)
-                << edge.why << " — no such Timestamp exists in this build, which is only sound "
-                               "while the lowest carryable stamp (civil year "
+                << edge.why
+                << " — no such Timestamp exists in this build, which is only sound "
+                   "while the lowest carryable stamp (civil year "
                 << civil_year_of(kFirstProbeDay)
                 << ") stays inside the window; it no longer does, so this edge is now reachable "
                    "and must be probed rather than explained away";

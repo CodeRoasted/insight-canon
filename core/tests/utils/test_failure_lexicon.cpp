@@ -454,8 +454,8 @@ TEST(FailureLexicon, NoteRegisterDoesNotReachAVerdictAnchoredEarlierOnTheLine)
     EXPECT_TRUE(contains_failure_cue(
         "##[error]/src/foo.cpp:12:3: note: template argument deduction/substitution failed:"))
         << "the runner's own ##[error] wrapper precedes the note marker and keeps its verdict";
-    EXPECT_TRUE(contains_failure_cue(
-        "build failed -- /src/foo.cpp:12:3: note: candidate template ignored"))
+    EXPECT_TRUE(
+        contains_failure_cue("build failed -- /src/foo.cpp:12:3: note: candidate template ignored"))
         << "a verdict word before the diagnostic-kind position is not the note's word";
 }
 
@@ -470,7 +470,8 @@ TEST(FailureLexicon, ScanLimitBoundsTheHead)
     EXPECT_FALSE(contains_failure_cue(line, 20))
         << "the late 'ERROR' STARTS past a 20-char head — out of head, not unanchored";
     // A token that STARTS within the head but extends past it is fully captured. Uses a
-    // verdict-register cue (colon) — SRC-D-MSK-4: a bare `OperationalError` echo is no longer a cue.
+    // verdict-register cue (colon) — SRC-D-MSK-4: a bare `OperationalError` echo is no longer a
+    // cue.
     EXPECT_TRUE(contains_failure_cue("OperationalError: happened later", 5))
         << "the cue token starts at offset 0, within the head";
 }

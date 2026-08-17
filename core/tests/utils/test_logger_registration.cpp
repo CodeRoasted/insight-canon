@@ -40,9 +40,12 @@ using namespace insight::logging;
 [[nodiscard]] auto bound_loggers()
 {
     return std::vector{
-        std::pair{kArenaLogger, arena_logger()},         std::pair{kMaskLogger, mask_logger()},
-        std::pair{kPipelineLogger, pipeline_logger()},   std::pair{kDetectorLogger, detector_logger()},
-        std::pair{kParserLogger, parser_logger()},       std::pair{kStrategyLogger, strategy_logger()},
+        std::pair{kArenaLogger, arena_logger()},
+        std::pair{kMaskLogger, mask_logger()},
+        std::pair{kPipelineLogger, pipeline_logger()},
+        std::pair{kDetectorLogger, detector_logger()},
+        std::pair{kParserLogger, parser_logger()},
+        std::pair{kStrategyLogger, strategy_logger()},
         std::pair{kTokenizerLogger, tokenizer_logger()},
     };
 }

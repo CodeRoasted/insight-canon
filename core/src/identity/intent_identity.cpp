@@ -4,8 +4,9 @@ import insight.canon.internal;
 // intent_identity.cpp — the canon-owned INTENT identity (bibles/intent_identity.md §2-§4).
 //
 // `canonicalize_intent` is the templating discipline of the stateless value masker
-// (canon.detail.mask, SRC-D-TID-1/SRC-D-TID-2) REAPPLIED to identifiers — the closure-as-identity-constructor
-// make-or-break (§5.1 detail 1). It is a DISTINCT rule set from the value masker, by design:
+// (canon.detail.mask, SRC-D-TID-1/SRC-D-TID-2) REAPPLIED to identifiers — the
+// closure-as-identity-constructor make-or-break (§5.1 detail 1). It is a DISTINCT rule set from the
+// value masker, by design:
 //   - the value masker keeps structure to DISTINGUISH   ( `yarn (1/10)` → `yarn (1/<*>` )
 //   - identity canonicalization COLLAPSES to ALIGN      ( `yarn (1/10)` → `yarn (M)`     )
 // so that matrix legs / shards / version-parameterized jobs of ONE intent map to ONE class. The
@@ -30,8 +31,8 @@ import insight.canon.internal;
 // name's bytes.
 //
 // `intent_id_of` = template_id_of(canonicalize_intent(name)): the 16-byte SHA-256 structural key
-// (SRC-II-1). Identity IS "the hash under the registry version", so it is co-located here, exactly as
-// template identity is co-located with kCanonicalizationVersion (template_id.cpp).
+// (SRC-II-1). Identity IS "the hash under the registry version", so it is co-located here, exactly
+// as template identity is co-located with kCanonicalizationVersion (template_id.cpp).
 
 namespace insight
 {

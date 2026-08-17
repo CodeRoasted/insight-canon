@@ -36,7 +36,8 @@ TEST(GitLabRoundTrip, TheRenderedMarkerCarriesAPlaceholderStampNotAWallClock)
 {
     // The declared limitation, asserted rather than left to prose: a generated GitLab marker has no
     // wall-clock and therefore no section duration. If a writer ever emits a VARYING stamp here,
-    // that is a step_duration capability landing, and this expectation is where it announces itself.
+    // that is a step_duration capability landing, and this expectation is where it announces
+    // itself.
     const std::string line{insight::semantic::render_row(
         insight::semantic::gitlab::Dialect::emit_markers.front(), "build")};
     EXPECT_EQ(line, "section_start:0:build");

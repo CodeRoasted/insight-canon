@@ -41,11 +41,11 @@ namespace insight::semantic::jenkins
 // THE 19-LOG PAYLOAD-STAMPED RE-BASELINE, recorded here because this is the strategy's successor
 // surface (ADR-23 Part 2 clause 1; T5 §4 item 5): that class is NOT declarable (the stamp is a
 // payload-determined subset, ADR-23), so post-purification its stamps stay CONTENT and those
-// lines template with the stamp under SRC-D-MSK-5's `[<*>]` normal form. Template IDs move; the count
-// is stable — measured ±strip 3 337 vs 3 339, the +2 fully attributed (one dual-occurrence twin +
-// the bare-`[<*>]` cell from 134 timestamp-only lines; the §6.5 prefix-image triangle returned
-// REPAIRED 2026-07-30, per stamped line template(unstripped) == "[<*>]" ⧺ M(rest), zero exceptions
-// on 6 416 stamped lines). A re-baseline, not a regression.
+// lines template with the stamp under SRC-D-MSK-5's `[<*>]` normal form. Template IDs move; the
+// count is stable — measured ±strip 3 337 vs 3 339, the +2 fully attributed (one dual-occurrence
+// twin + the bare-`[<*>]` cell from 134 timestamp-only lines; the §6.5 prefix-image triangle
+// returned REPAIRED 2026-07-30, per stamped line template(unstripped) == "[<*>]" ⧺ M(rest), zero
+// exceptions on 6 416 stamped lines). A re-baseline, not a regression.
 
 // The dialect NAME every gated row below carries, and the name a caller declares
 // (`IngestDeclaration::dialect` / `--dialect`). ADR-22: the gate is a composed package
@@ -117,21 +117,11 @@ static_assert(
 // `Finished: <RESULT>` epilogue — the DEGENERATE fallback source only (truncation-fragile, and it
 // can be present-but-divergent: Accumulo #498 — the authoritative side-input always wins).
 inline constexpr std::array<OutcomeTokenRow, 5> kOutcomeTokens{{
-    {.token = "SUCCESS",
-     .outcome = insight::RunOutcome::Success,
-     .dialect_gate = kDialect},
-    {.token = "FAILURE",
-     .outcome = insight::RunOutcome::Failure,
-     .dialect_gate = kDialect},
-    {.token = "UNSTABLE",
-     .outcome = insight::RunOutcome::Unstable,
-     .dialect_gate = kDialect},
-    {.token = "ABORTED",
-     .outcome = insight::RunOutcome::Aborted,
-     .dialect_gate = kDialect},
-    {.token = "NOT_BUILT",
-     .outcome = insight::RunOutcome::Unknown,
-     .dialect_gate = kDialect},
+    {.token = "SUCCESS", .outcome = insight::RunOutcome::Success, .dialect_gate = kDialect},
+    {.token = "FAILURE", .outcome = insight::RunOutcome::Failure, .dialect_gate = kDialect},
+    {.token = "UNSTABLE", .outcome = insight::RunOutcome::Unstable, .dialect_gate = kDialect},
+    {.token = "ABORTED", .outcome = insight::RunOutcome::Aborted, .dialect_gate = kDialect},
+    {.token = "NOT_BUILT", .outcome = insight::RunOutcome::Unknown, .dialect_gate = kDialect},
 }};
 
 inline constexpr std::array<OutcomeMarkerRow, 1> kOutcomeMarkers{{
@@ -167,8 +157,9 @@ export inline constexpr SemanticPackageManifest kManifest{
 static_assert(insight::semantic::all_dialect_gates_owned(kManifest),
               "jenkins: a row's dialect_gate is neither kAnyDialect nor this package's own name (a "
               "typo in .dialect_gate, or a row reaching for another package's vocabulary?)");
-static_assert(kManifest.name == kDialect,
-              "jenkins: kDialect and the manifest name must be the same string — kDialect is what a "
-              "caller declares and what every gated row carries");
+static_assert(
+    kManifest.name == kDialect,
+    "jenkins: kDialect and the manifest name must be the same string — kDialect is what a "
+    "caller declares and what every gated row carries");
 
 } // namespace insight::semantic::jenkins

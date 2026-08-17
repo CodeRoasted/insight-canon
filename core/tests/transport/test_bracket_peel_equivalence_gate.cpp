@@ -111,8 +111,8 @@ struct OracleOutcome
 {
     const std::size_t prefix_end{oracle_timestamper_prefix_end(line)};
     if (prefix_end == 0U)
-        return {.claimed = false, .blank_declined = false, .content = line,
-                .timestamp = std::nullopt};
+        return {
+            .claimed = false, .blank_declined = false, .content = line, .timestamp = std::nullopt};
     OracleOutcome outcome;
     outcome.claimed = true;
     outcome.timestamp = insight::utils::parse_iso8601(line.substr(1U, prefix_end - 2U));
@@ -172,7 +172,8 @@ constexpr std::array<std::uint32_t, 64> kSha256RoundConstants{
                 (static_cast<std::uint32_t>(
                      static_cast<unsigned char>(padded[block + 4U * word + 2U]))
                  << 8U) |
-                static_cast<std::uint32_t>(static_cast<unsigned char>(padded[block + 4U * word + 3U]));
+                static_cast<std::uint32_t>(
+                    static_cast<unsigned char>(padded[block + 4U * word + 3U]));
         for (std::size_t word{16}; word < 64U; ++word)
         {
             const std::uint32_t sigma0{rotate_right(schedule[word - 15U], 7U) ^
@@ -263,17 +264,18 @@ TEST_F(BracketPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheFrozenStrateg
 {
     // Population: the sidecar's whole-stream rows (frozen labels, clause 1), bytes verified.
     bool read_ok{true};
-    const auto read_file{[&read_ok](const std::filesystem::path& path) {
-        std::ifstream input{path, std::ios::binary};
-        if (!input)
-        {
-            read_ok = false;
-            return std::string{};
-        }
-        std::ostringstream buffer;
-        buffer << input.rdbuf();
-        return std::move(buffer).str();
-    }};
+    const auto read_file{[&read_ok](const std::filesystem::path& path)
+                         {
+                             std::ifstream input{path, std::ios::binary};
+                             if (!input)
+                             {
+                                 read_ok = false;
+                                 return std::string{};
+                             }
+                             std::ostringstream buffer;
+                             buffer << input.rdbuf();
+                             return std::move(buffer).str();
+                         }};
 
     struct WholeStreamTrace
     {
@@ -306,8 +308,8 @@ TEST_F(BracketPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheFrozenStrateg
             const auto [ptr, err]{
                 std::from_chars(fields[2].data(), fields[2].data() + fields[2].size(), size)};
             ASSERT_TRUE(err == std::errc{} && ptr == fields[2].data() + fields[2].size());
-            traces.push_back({.path = std::string{fields[0]}, .sha256 = std::string{fields[1]},
-                              .size = size});
+            traces.push_back(
+                {.path = std::string{fields[0]}, .sha256 = std::string{fields[1]}, .size = size});
         }
     }
     // Clause 3 — the population SIZE selects the pins; an unrecognized population FAILS.

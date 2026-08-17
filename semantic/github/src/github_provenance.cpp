@@ -10,9 +10,9 @@ import insight.canon.spi;
 // + spi + std — never a sealed detail shard.
 //
 // ⚠ THE FORMAT STRATEGY IS GONE (T4 — ADR-23, ADR-22). `GitHubActionsStrategy`
-// DETECTED a per-line RFC 3339 stamp and peeled it. That stamp is a property of GitHub's *delivery*,
-// not of the GHA *dialect* (ADR-23): the format of a GHA job log is `RawText` and always was,
-// and the dialect is the workflow-command VOCABULARY over it (ADR-22). The peel is now
+// DETECTED a per-line RFC 3339 stamp and peeled it. That stamp is a property of GitHub's
+// *delivery*, not of the GHA *dialect* (ADR-23): the format of a GHA job log is `RawText` and
+// always was, and the dialect is the workflow-command VOCABULARY over it (ADR-22). The peel is now
 // DECLARED — `IngestDeclaration{.stack = {"api-rfc3339-line-prefix"}}`, unwound by
 // `TransportStack::peel` before canon sees the line — so nothing here detects anything.
 //
@@ -24,8 +24,8 @@ import insight.canon.spi;
 //
 // CONSEQUENCE, stated because it is a real cost and not a tidiness: `kManifest.strategy` is now
 // nullptr, so `ComposedPackage::has_strategy` is FALSE for github while `has_echoed_source` stays
-// true. This package's code tier is one provenance hook — a byte predicate, not a grammar — which is
-// what makes the dialect DATA-ONLY (ADR-22: a generator can only generate from data).
+// true. This package's code tier is one provenance hook — a byte predicate, not a grammar — which
+// is what makes the dialect DATA-ONLY (ADR-22: a generator can only generate from data).
 
 namespace insight::semantic::github
 {
@@ -81,11 +81,12 @@ namespace
 // behaviors and it was a DETECTION: a per-line content test deciding where the visible content
 // starts. Under a declared stack the caller peels BEFORE canon sees the line, so by the time this
 // runs there is no stamp left to skip; keeping the skip would have preserved a second, undeclared,
-// content-inferred transport strip inside a provenance hook — exactly the shape T4 exists to delete.
+// content-inferred transport strip inside a provenance hook — exactly the shape T4 exists to
+// delete.
 //
 // What that costs, stated rather than hidden: a caller that hands canon RAW GHA API bytes WITHOUT
-// declaring the transform loses echoed-source provenance on those lines (the wrapper is no longer at
-// the head of the line this predicate sees). That is fail-closed on DEPTH and it is the same
+// declaring the transform loses echoed-source provenance on those lines (the wrapper is no longer
+// at the head of the line this predicate sees). That is fail-closed on DEPTH and it is the same
 // contract as every other declared coordinate — declaring is the path to depth.
 bool is_echoed_source(std::string_view line) noexcept
 {

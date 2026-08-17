@@ -34,7 +34,8 @@
 //     argument nobody reads is worthless.
 //
 // Determinism: byte-only. Synthetic manifests authored here, no packages linked (a core test never
-// links the semantic packages — that would invert the dependency arrow), no RNG, no clock, no float.
+// links the semantic packages — that would invert the dependency arrow), no RNG, no clock, no
+// float.
 
 #include <gtest/gtest.h>
 
@@ -160,9 +161,9 @@ TEST(TransportIdentityDeathTest, DeclarationCoordinatesAreActuallyRead)
 
     EXPECT_DEATH(
         {
-            (void)resolve_stream(composed, IngestDeclaration{.stack = {},
-                                                             .dialect = "no-such-dialect",
-                                                             .channel = {}});
+            (void)resolve_stream(
+                composed,
+                IngestDeclaration{.stack = {}, .dialect = "no-such-dialect", .channel = {}});
         },
         "unknown dialect")
         << "an unknown declared dialect must fatal — this is also what proves resolve_stream reads "
@@ -171,9 +172,9 @@ TEST(TransportIdentityDeathTest, DeclarationCoordinatesAreActuallyRead)
     // The message must name the composed vocabulary, or the fail-closed posture is unactionable.
     EXPECT_DEATH(
         {
-            (void)resolve_stream(composed, IngestDeclaration{.stack = {},
-                                                             .dialect = "no-such-dialect",
-                                                             .channel = {}});
+            (void)resolve_stream(
+                composed,
+                IngestDeclaration{.stack = {}, .dialect = "no-such-dialect", .channel = {}});
         },
         "transport_identity_fixture");
 
@@ -181,8 +182,8 @@ TEST(TransportIdentityDeathTest, DeclarationCoordinatesAreActuallyRead)
     // a correct one is neither. Without this leg the death arm above would also pass against an
     // implementation that fataled on every dialect.
     const ResolvedStream resolved{resolve_stream(
-        composed, IngestDeclaration{.stack = {}, .dialect = "transport_identity_fixture",
-                                    .channel = {}})};
+        composed,
+        IngestDeclaration{.stack = {}, .dialect = "transport_identity_fixture", .channel = {}})};
     EXPECT_EQ(resolved.semantics.identity(), composed.identity())
         << "declaring a KNOWN dialect must also leave semantic_identity untouched";
 }

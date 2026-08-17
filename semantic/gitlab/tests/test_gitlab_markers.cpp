@@ -41,7 +41,8 @@ namespace
 [[nodiscard]] ComposedSemantics gitlab_only()
 {
     const std::array manifests{insight::semantic::gitlab::kManifest};
-    return insight::semantic::compose(manifests).for_stream(insight::semantic::gitlab::kDialect, {});
+    return insight::semantic::compose(manifests).for_stream(insight::semantic::gitlab::kDialect,
+                                                            {});
 }
 
 // The same composition on a stream that declared NO dialect — the fail-closed arm.
@@ -125,9 +126,10 @@ TEST(GitLabMarkers, TheEchoedMarkerIsRejectedByPositionNotByTheStamp)
 {
     const ComposedSemantics composed{gitlab_only()};
     // bash `set -x` xtrace echoes the script's own marker with a FULLY EXPANDED, strictly-VALID
-    // stamp — so a stamp-shape guard does not reject it and only anchoring does. `recognize` matches
-    // with starts_with, so the guard is free. (The `\e` here is a literal two-character sequence in
-    // the echoed text, not an escape byte — canon's ingest strip has nothing to remove.)
+    // stamp — so a stamp-shape guard does not reject it and only anchoring does. `recognize`
+    // matches with starts_with, so the guard is free. (The `\e` here is a literal two-character
+    // sequence in the echoed text, not an escape byte — canon's ingest strip has nothing to
+    // remove.)
     EXPECT_EQ(recognize(norm_probe("++ echo -e '\\e[0Ksection_start:1784657178:build\\r\\e[0K'"),
                         composed)
                   .kind,
@@ -143,8 +145,8 @@ TEST(GitLabMarkers, SectionEndIsNotARow)
 {
     const ComposedSemantics composed{gitlab_only()};
     // There is no close kind in IntentMarkerKind and the fold is open-marker driven: a section's
-    // quantum runs until the next section opens. Recognizing a close is only useful to BOUND a span,
-    // which is step_duration territory.
+    // quantum runs until the next section opens. Recognizing a close is only useful to BOUND a
+    // span, which is step_duration territory.
     EXPECT_EQ(recognize(norm_probe("section_end:1784657178:prepare_executor\r"), composed).kind,
               IntentMarkerKind::None);
 }

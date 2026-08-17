@@ -175,7 +175,8 @@ namespace
     // Defined below the register kernels it consults (is_verdict_anchored / is_count_preceded);
     // declared here so contains_failure_cue's lambda can name it.
     [[nodiscard]] LexiconHit lexicon_hit(std::string_view text, std::string_view token,
-                                         std::string_view prev, std::string_view prev_prev) noexcept;
+                                         std::string_view prev,
+                                         std::string_view prev_prev) noexcept;
 
     // Caps register (SRC-D-OUT-4 anchor #1): the token's raw bytes are ALL-UPPERCASE ASCII
     // letters, ≥2 of them — the decoration CI/test tooling uses to mark an outcome
@@ -404,17 +405,17 @@ namespace
         return false; // no leading fail glyph within the head
     }
 
-    // SRC-D-OUT-4b (SRC-D-MSK-4 cut, 2026-07-21 ruling): a CamelCase error-TYPE token anchors a failure
-    // cue ONLY when it is verdict-anchored — the register/position discriminator, stated literally.
-    // A thrown verdict (`TypeError:`, `[Error]`, CAPS) fires; a type NAMED but not thrown does not.
-    // The prior `|| !leads_with_descriptive_glyph(line)` fallback was a one-entry denylist built
-    // for a single node:test `▶`-suite FP — it fired on every producer shape it never saw (ctest's
-    // `Start NN: FooErrorTest.Bar` here, gtest/pytest next). This IS the check's own partition
-    // criterion (benign-collision-proneness): a CamelCase type ending in `Error` is maximally
-    // collision-prone in a test suite, so it belongs in RegisterAnchored ("fires only in verdict
-    // register"). Recall is protected by POSITION not luck: the caller runs this only on lines with
-    // NO failure word at all (`!matched && …`), and a genuinely thrown error brings register or a
-    // fail glyph that fires via a separate, stronger cue. See bugs.md 2026-07-09 row.
+    // SRC-D-OUT-4b (SRC-D-MSK-4 cut, 2026-07-21 ruling): a CamelCase error-TYPE token anchors a
+    // failure cue ONLY when it is verdict-anchored — the register/position discriminator, stated
+    // literally. A thrown verdict (`TypeError:`, `[Error]`, CAPS) fires; a type NAMED but not
+    // thrown does not. The prior `|| !leads_with_descriptive_glyph(line)` fallback was a one-entry
+    // denylist built for a single node:test `▶`-suite FP — it fired on every producer shape it
+    // never saw (ctest's `Start NN: FooErrorTest.Bar` here, gtest/pytest next). This IS the check's
+    // own partition criterion (benign-collision-proneness): a CamelCase type ending in `Error` is
+    // maximally collision-prone in a test suite, so it belongs in RegisterAnchored ("fires only in
+    // verdict register"). Recall is protected by POSITION not luck: the caller runs this only on
+    // lines with NO failure word at all (`!matched && …`), and a genuinely thrown error brings
+    // register or a fail glyph that fires via a separate, stronger cue. See bugs.md 2026-07-09 row.
     [[nodiscard]] bool error_type_anchors(std::string_view line, std::string_view token) noexcept
     {
         return detail::is_verdict_anchored(line, token);
@@ -553,13 +554,14 @@ namespace detail
         // Walk left over the column digits, then its ':', then the line digits, then the path's
         // ':'. Every step is required — a missing one means this is not the diagnostic-kind slot.
         std::size_t pos{marker};
-        const auto take_digits{[line, &pos]() noexcept
-                               {
-                                   const std::size_t end{pos};
-                                   while (pos > 0U && line[pos - 1U] >= '0' && line[pos - 1U] <= '9')
-                                       --pos;
-                                   return end != pos; // at least one digit consumed
-                               }};
+        const auto take_digits{
+            [line, &pos]() noexcept
+            {
+                const std::size_t end{pos};
+                while (pos > 0U && line[pos - 1U] >= '0' && line[pos - 1U] <= '9')
+                    --pos;
+                return end != pos; // at least one digit consumed
+            }};
         const auto take_colon{[line, &pos]() noexcept
                               {
                                   if (pos == 0U || line[pos - 1U] != ':')
@@ -673,7 +675,8 @@ bool contains_failure_cue(std::string_view text, std::size_t scan_limit) noexcep
         {
             if (detail::token_in_note_message(text, token, note_message_at))
             {
-                prev_prev = prev; // the window still shifts: the token exists, it just does not fire
+                prev_prev =
+                    prev; // the window still shifts: the token exists, it just does not fire
                 prev = token;
                 return false;
             }

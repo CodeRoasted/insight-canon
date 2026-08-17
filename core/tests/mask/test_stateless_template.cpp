@@ -246,7 +246,8 @@ TEST(StatelessTemplate, NonEphemeralPathsAndSourcePathsUntouched)
            "masks";
 }
 
-// ── F13 strengthening (SRC-D-TID-11/SRC-D-TID-12/SRC-D-TID-13) — the re-measure rule set ───────────────────
+// ── F13 strengthening (SRC-D-TID-11/SRC-D-TID-12/SRC-D-TID-13) — the re-measure rule set
+// ───────────────────
 
 TEST(StatelessTemplate, DigitLeadingTokensMask)
 {
@@ -513,9 +514,9 @@ TEST(EphemeralRootMask, G2_TailSurvives)
 TEST(EphemeralRootMask, G3_ContentClassStaysLiteral)
 {
     ArenaAllocator arena{256U * 1024U};
-    // None of these sits under a catalogued root, so SRC-D-MSK-4 must not touch them (over-mask check).
-    // A pinned action SHA path (its change is drift we WANT surfaced) keeps its class anchors and
-    // gains NO ephemeral artifact.
+    // None of these sits under a catalogued root, so SRC-D-MSK-4 must not touch them (over-mask
+    // check). A pinned action SHA path (its change is drift we WANT surfaced) keeps its class
+    // anchors and gains NO ephemeral artifact.
     const std::string sha{masked("_actions/actions/create-github-app-token/"
                                  "bcd2ba49abf26b56dd0dd2eb1c9dd5c77b096d4c/dist/main.cjs",
                                  arena)};

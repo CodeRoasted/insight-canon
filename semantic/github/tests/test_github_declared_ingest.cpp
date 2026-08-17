@@ -71,7 +71,8 @@ constexpr std::string_view kGHABlankWithSpace{"2026-05-27T15:26:41.7842152Z "};
 constexpr std::string_view kGHABlankNoSpace{"2026-05-27T15:26:41.7842152Z"};
 } // namespace
 
-// ── The declared peel: the stamp AND the GHA indentation leave, an observation time is extracted ──
+// ── The declared peel: the stamp AND the GHA indentation leave, an observation time is extracted
+// ──
 TEST(GithubDeclaredIngest, DeclaredPeelStripsStampAndIndentation)
 {
     const ComposedSemantics composed{github_composition()};
@@ -107,8 +108,8 @@ TEST(GithubDeclaredIngest, StampOnlyLinePeelsToBlank)
 // ⚠ CORPUS COVERAGE IS NOT SYMMETRIC ACROSS THESE EIGHT, and the difference matters when reading a
 // green run elsewhere. Across the D11 full slice (4 082 logs / 22 490 937 lines) the `::…::` forms
 // plus `##[notice]` lead a line 41 times in total, and `::notice::` occurs NOWHERE AT ALL. Half
-// this vocabulary is corpus-unfalsifiable and is exercised HERE and only here; no corpus-scale green
-// may be cited as coverage for it.
+// this vocabulary is corpus-unfalsifiable and is exercised HERE and only here; no corpus-scale
+// green may be cited as coverage for it.
 TEST(GithubDeclaredIngest, LiftsDeclaredLevelsFromWorkflowCommands)
 {
     struct LiftCase
@@ -164,9 +165,9 @@ TEST(GithubDeclaredIngest, AnUndeclaredStreamGetsNoDeclaredLift)
     const ComposedSemantics composed{github_composition()};
     // Transport still declared (so the bytes are the same), dialect deliberately NOT.
     const ResolvedStream stream{insight::semantic::resolve_stream(
-        composed,
-        IngestDeclaration{.stack = kGhaStack, .dialect = insight::semantic::kAnyDialect,
-                          .channel = insight::semantic::github::kChannelAnnotated})};
+        composed, IngestDeclaration{.stack = kGhaStack,
+                                    .dialect = insight::semantic::kAnyDialect,
+                                    .channel = insight::semantic::github::kChannelAnnotated})};
     ArenaAllocator arena{64U * 1024U};
     Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
     const auto event{tokenizer.process_line(

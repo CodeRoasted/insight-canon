@@ -1,8 +1,8 @@
 // f13_cardinality_measure — the standing F13 masker-cardinality RE-MEASURE instrument.
 //
 // WHY THIS IS A CLI TOOL AND NOT A TEST (DN-18.D1 § 3.3, Eqya ruling 2026-07-29).
-// This measurement lived as `StatelessTemplate.CardinalityOnCorpus` inside the unit suite, env-gated
-// on CORPUS_DIR. Its population is whatever directory the operator mounts — unnameable by
+// This measurement lived as `StatelessTemplate.CardinalityOnCorpus` inside the unit suite,
+// env-gated on CORPUS_DIR. Its population is whatever directory the operator mounts — unnameable by
 // construction, so the same invocation on two machines is not the same measurement, and clause 1 of
 // the corpus-gate contract forbids gating on it. A test whose only assertion is `lines > 0` and
 // whose meaning is a printed report is a measurement instrument wearing a test's clothes; homed
@@ -12,9 +12,10 @@
 //
 // WHAT THE NUMBER IS FOR. Distinct-template count + singleton fraction size the F13 masking rules
 // (ADR-16.D5): re-run after any F13 rule change. The one-time over-split ratio
-// vs the now-ripped Drain was 4.12x → 1.79x at the § 8 gate; that comparison cannot re-run post-rip,
-// and the standing production guard is the K_dim cardinality monitor (D-TID-7), not this tool.
-// A number printed here is citable ONLY next to its population block — that is the whole contract.
+// vs the now-ripped Drain was 4.12x → 1.79x at the § 8 gate; that comparison cannot re-run
+// post-rip, and the standing production guard is the K_dim cardinality monitor (D-TID-7), not this
+// tool. A number printed here is citable ONLY next to its population block — that is the whole
+// contract.
 //
 // The pipeline is the production one: Tokenizer::process_line (parse → mask) over a degenerate,
 // zero-package composition — generic corpus masking is semantic-unaware, and the tool must never
@@ -55,7 +56,8 @@ struct FileConsumption
 void print_usage(std::string_view program_name)
 {
     std::println(stderr, "usage: {} <corpus-dir> [max-lines]", program_name);
-    std::println(stderr, "  <corpus-dir>  directory of *.log files (the population; walked sorted)");
+    std::println(stderr,
+                 "  <corpus-dir>  directory of *.log files (the population; walked sorted)");
     std::println(stderr, "  [max-lines]   line budget (default {})", kDefaultMaxLines);
 }
 } // namespace
@@ -75,8 +77,8 @@ int main(int argc, char** argv)
     if (arguments.size() == 3)
     {
         const std::string_view budget_arg{arguments[2]};
-        const auto [parse_end, parse_err]{std::from_chars(
-            budget_arg.data(), budget_arg.data() + budget_arg.size(), max_lines)};
+        const auto [parse_end, parse_err]{
+            std::from_chars(budget_arg.data(), budget_arg.data() + budget_arg.size(), max_lines)};
         if (parse_err != std::errc{} || parse_end != budget_arg.data() + budget_arg.size() ||
             max_lines == 0)
         {
@@ -170,9 +172,9 @@ int main(int argc, char** argv)
 
     std::vector<std::pair<std::string, std::uint64_t>> by_count{template_counts.begin(),
                                                                 template_counts.end()};
-    std::ranges::sort(by_count, [](const auto& lhs, const auto& rhs) {
-        return lhs.second != rhs.second ? lhs.second > rhs.second : lhs.first < rhs.first;
-    });
+    std::ranges::sort(
+        by_count, [](const auto& lhs, const auto& rhs)
+        { return lhs.second != rhs.second ? lhs.second > rhs.second : lhs.first < rhs.first; });
     std::println("--- top {} by count ---", kTopTemplatesShown);
     for (std::size_t index{0}; index < std::min(kTopTemplatesShown, by_count.size()); ++index)
         std::println("{}  {}", by_count[index].second,

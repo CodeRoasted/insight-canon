@@ -334,8 +334,7 @@ namespace
             if (row.dialect_gate == kAnyDialect)
                 continue;
             const std::string probe{marker_probe_for(row, manifest.emits)};
-            const ComposedSemantics medium{
-                composed.for_stream(manifest.name, row.channel_gate)};
+            const ComposedSemantics medium{composed.for_stream(manifest.name, row.channel_gate)};
             if (insight::tokenization::recognize(normalized_probe(probe, scratch), medium).kind !=
                 insight::tokenization::IntentMarkerKind::None)
             {
@@ -343,15 +342,16 @@ namespace
                         .kind != insight::tokenization::IntentMarkerKind::None)
                     return {.name = "dialect_gate.marker_leak",
                             .passed = false,
-                            .detail = "marker key \"" + std::string{row.prefix} + "\" (gated to \"" +
-                                      std::string{row.dialect_gate} +
+                            .detail = "marker key \"" + std::string{row.prefix} +
+                                      "\" (gated to \"" + std::string{row.dialect_gate} +
                                       "\") FIRED on a stream declaring \"" +
                                       std::string{kForeignDialect} + "\" — SRC-II-6 gate leak."};
                 continue;
             }
             return {.name = "dialect_gate.marker_own",
                     .passed = false,
-                    .detail = "marker key \"" + std::string{row.prefix} + "\" did NOT fire on its "
+                    .detail = "marker key \"" + std::string{row.prefix} +
+                              "\" did NOT fire on its "
                               "OWN medium (dialect \"" +
                               std::string{manifest.name} + "\", channel \"" +
                               std::string{row.channel_gate} + "\") for the probe \"" + probe +
@@ -665,8 +665,8 @@ namespace
                                       line +
                                       "\" did not map back to the token's own verdict "
                                       "(marker_present=" +
-                                      (scan.marker_present ? "true" : "false") + ", scanned token \"" +
-                                      scan.token + "\")."};
+                                      (scan.marker_present ? "true" : "false") +
+                                      ", scanned token \"" + scan.token + "\")."};
             }
         }
         return {.name = "outcome_round_trip", .passed = true, .detail = {}};

@@ -147,8 +147,8 @@ TEST(NormalizedContentDoors, NormalizedContentHasExactlyTheTwoAuditedFriends)
     // The passkey friend is QUALIFIED in source: a qualified friend is a pure reference to the
     // exported global-module forward declaration, which is what keeps gcc-15 and clang-21 binding
     // it to the ONE sealed entity (see the note at the declaration).
-    const std::vector<std::string> expected{
-        "friend class NormalizedLine", "friend class insight::tokenization::LogParserPasskey"};
+    const std::vector<std::string> expected{"friend class NormalizedLine",
+                                            "friend class insight::tokenization::LogParserPasskey"};
     EXPECT_EQ(found, expected)
         << "NormalizedContent's friend list moved — that list is the DOOR CENSUS: every entry is "
            "a producer of the walkers' currency, so growth is a ruling, not an edit. Found:\n"

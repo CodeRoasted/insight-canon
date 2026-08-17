@@ -187,8 +187,9 @@ struct LineOutcome
 [[nodiscard]] const insight::transport::TransportStack& bracket_stack()
 {
     static const std::array<std::string_view, 1> names{"bracket-rfc3339-line-prefix"};
-    static const insight::transport::TransportStack stack{insight::transport::
-        resolve_transport_stack(insight::transport::IngestDeclaration{.stack = names})};
+    static const insight::transport::TransportStack stack{
+        insight::transport::resolve_transport_stack(
+            insight::transport::IngestDeclaration{.stack = names})};
     return stack;
 }
 
@@ -236,13 +237,11 @@ run_declared_peel_arm(const std::vector<std::string>& lines,
                 if (const auto event{tokenizer.process_line(carried)}; event.has_value())
                 {
                     const std::string_view templ{event->template_str};
-                    if (templ.starts_with(kPeelCarrier) &&
-                        templ.size() > kPeelCarrier.size() &&
+                    if (templ.starts_with(kPeelCarrier) && templ.size() > kPeelCarrier.size() &&
                         templ[kPeelCarrier.size()] == ' ')
                     {
                         outcome.produced = true;
-                        outcome.template_str =
-                            std::string{templ.substr(kPeelCarrier.size() + 1U)};
+                        outcome.template_str = std::string{templ.substr(kPeelCarrier.size() + 1U)};
                         outcome.format = event->format;
                     }
                     // A fused carrier is an instrument failure; left as DECLINED here, and the
@@ -666,8 +665,8 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
         struct StampFacts
         {
             std::size_t line_index;
-            std::size_t m_rest_index{SIZE_MAX};       // into carrier_outcomes
-            std::size_t m_stripped_index{SIZE_MAX};   // into carrier_outcomes
+            std::size_t m_rest_index{SIZE_MAX};     // into carrier_outcomes
+            std::size_t m_stripped_index{SIZE_MAX}; // into carrier_outcomes
             bool a_declined_cell{false};
         };
         std::vector<StampFacts> stamps;
@@ -741,18 +740,20 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
         ASSERT_EQ(carrier_outcomes.size(), carrier_lines.size());
 
         // Extract M(x) from a carrier outcome; nullopt = carrier failure (INSTRUMENT arm).
-        const auto extract_m{[&](std::size_t carrier_index) -> std::optional<std::string> {
-            const LineOutcome& outcome{carrier_outcomes[carrier_index]};
-            if (!outcome.produced || !outcome.template_str.starts_with(kCarrier))
-                return std::nullopt;
-            const std::string_view tail{
-                std::string_view{outcome.template_str}.substr(kCarrier.size())};
-            if (tail.empty())
-                return std::string{}; // M(x) is empty (x was empty/space-only)
-            if (!tail.starts_with(' '))
-                return std::nullopt; // carrier token fused — carrier failure
-            return std::string{tail.substr(1U)};
-        }};
+        const auto extract_m{
+            [&](std::size_t carrier_index) -> std::optional<std::string>
+            {
+                const LineOutcome& outcome{carrier_outcomes[carrier_index]};
+                if (!outcome.produced || !outcome.template_str.starts_with(kCarrier))
+                    return std::nullopt;
+                const std::string_view tail{
+                    std::string_view{outcome.template_str}.substr(kCarrier.size())};
+                if (tail.empty())
+                    return std::string{}; // M(x) is empty (x was empty/space-only)
+                if (!tail.starts_with(' '))
+                    return std::nullopt; // carrier token fused — carrier failure
+                return std::string{tail.substr(1U)};
+            }};
 
         for (const StampFacts& facts : stamps)
         {
@@ -764,9 +765,8 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
                     carrier_samples.push_back(log_path + ":" + std::to_string(facts.line_index));
                 continue;
             }
-            const std::string expected_b{m_rest->empty()
-                                             ? std::string{kBareNormalForm}
-                                             : std::string{kImagePrefix} + *m_rest};
+            const std::string expected_b{m_rest->empty() ? std::string{kBareNormalForm}
+                                                         : std::string{kImagePrefix} + *m_rest};
 
             // (P2a) — per line, the masker composes over the claimed prefix.
             const LineOutcome& b_outcome{arm_b[facts.line_index]};
@@ -789,8 +789,7 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
                 {
                     ++p2b_violations;
                     if (p2b_samples.size() < kSampleTemplatesPrinted)
-                        p2b_samples.push_back(log_path + ":" +
-                                              std::to_string(facts.line_index) +
+                        p2b_samples.push_back(log_path + ":" + std::to_string(facts.line_index) +
                                               " A produced on an A-declined-cell line: \"" +
                                               arm_a[facts.line_index].template_str + "\"");
                 }

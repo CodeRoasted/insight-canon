@@ -124,7 +124,8 @@ constexpr std::array<std::uint32_t, 64> kSha256RoundConstants{
                 (static_cast<std::uint32_t>(
                      static_cast<unsigned char>(padded[block + 4U * word + 2U]))
                  << 8U) |
-                static_cast<std::uint32_t>(static_cast<unsigned char>(padded[block + 4U * word + 3U]));
+                static_cast<std::uint32_t>(
+                    static_cast<unsigned char>(padded[block + 4U * word + 3U]));
         for (std::size_t word{16}; word < 64U; ++word)
         {
             const std::uint32_t sigma0{rotate_right(schedule[word - 15U], 7U) ^
@@ -326,27 +327,29 @@ std::filesystem::path JenkinsBareNullGate::root_{};
 TEST_F(JenkinsBareNullGate, ThePurifiedChainMovesNothingOnTheBareClass)
 {
     bool read_ok{true};
-    const auto read_file{[&read_ok](const std::filesystem::path& path) {
-        std::ifstream input{path, std::ios::binary};
-        if (!input)
-        {
-            read_ok = false;
-            return std::string{};
-        }
-        std::ostringstream buffer;
-        buffer << input.rdbuf();
-        return std::move(buffer).str();
-    }};
+    const auto read_file{[&read_ok](const std::filesystem::path& path)
+                         {
+                             std::ifstream input{path, std::ios::binary};
+                             if (!input)
+                             {
+                                 read_ok = false;
+                                 return std::string{};
+                             }
+                             std::ostringstream buffer;
+                             buffer << input.rdbuf();
+                             return std::move(buffer).str();
+                         }};
 
     // The committed oracle, found beside this TU (__FILE__-relative — no second env var).
-    const std::filesystem::path oracle_path{
-        std::filesystem::path{__FILE__}.parent_path() / kOracleFile};
+    const std::filesystem::path oracle_path{std::filesystem::path{__FILE__}.parent_path() /
+                                            kOracleFile};
     const std::string oracle_text{read_file(oracle_path)};
     // `.string()` is load-bearing, not noise: libstdc++ spells `operator<<(ostream&, const path&)`
     // in terms of `std::quoted`, whose declaration this TU never sees — it takes std through
     // `import std;` while gtest arrives as a header, so the header template instantiates against a
     // std that is not in its scope. Streaming the string sidesteps the module/header seam entirely.
-    ASSERT_TRUE(read_ok) << oracle_path.string() << " — the committed pre-cut oracle is part of this "
+    ASSERT_TRUE(read_ok) << oracle_path.string()
+                         << " — the committed pre-cut oracle is part of this "
                          << "repo; a missing file is a checkout defect, never a skip.";
     std::map<std::string, OracleRow> oracle_rows;
     {
@@ -373,11 +376,13 @@ TEST_F(JenkinsBareNullGate, ThePurifiedChainMovesNothingOnTheBareClass)
             OracleRow row{.path = std::string{fields[0]},
                           .finished = std::string{fields[3]},
                           .surface_sha256 = std::string{fields[6]}};
-            const auto parse_count{[&](std::string_view text, std::uint64_t& out_value) {
-                const auto [ptr, err]{
-                    std::from_chars(text.data(), text.data() + text.size(), out_value)};
-                ASSERT_TRUE(err == std::errc{} && ptr == text.data() + text.size()) << text;
-            }};
+            const auto parse_count{
+                [&](std::string_view text, std::uint64_t& out_value)
+                {
+                    const auto [ptr, err]{
+                        std::from_chars(text.data(), text.data() + text.size(), out_value)};
+                    ASSERT_TRUE(err == std::errc{} && ptr == text.data() + text.size()) << text;
+                }};
             parse_count(fields[1], row.stages);
             parse_count(fields[2], row.steps);
             parse_count(fields[4], row.produced_lines);
@@ -418,8 +423,7 @@ TEST_F(JenkinsBareNullGate, ThePurifiedChainMovesNothingOnTheBareClass)
                 continue;
             BareTrace trace{.path = std::string{fields[0]}, .sha256 = std::string{fields[1]}};
             const auto [ptr, err]{
-                std::from_chars(fields[2].data(), fields[2].data() + fields[2].size(),
-                                trace.size)};
+                std::from_chars(fields[2].data(), fields[2].data() + fields[2].size(), trace.size)};
             ASSERT_TRUE(err == std::errc{} && ptr == fields[2].data() + fields[2].size());
             traces.push_back(std::move(trace));
         }
@@ -432,8 +436,8 @@ TEST_F(JenkinsBareNullGate, ThePurifiedChainMovesNothingOnTheBareClass)
 
     const std::array manifests{insight::semantic::jenkins::kManifest};
     const ComposedSemantics undeclared_view{insight::semantic::compose(manifests)};
-    const ComposedSemantics declared_view{insight::semantic::compose(manifests).for_stream(
-        insight::semantic::jenkins::kDialect, {})};
+    const ComposedSemantics declared_view{
+        insight::semantic::compose(manifests).for_stream(insight::semantic::jenkins::kDialect, {})};
 
     std::size_t compared{0};
     std::size_t moved{0};
@@ -462,10 +466,9 @@ TEST_F(JenkinsBareNullGate, ThePurifiedChainMovesNothingOnTheBareClass)
                 moved_rows.push_back(
                     trace.path + " — stages " + std::to_string(actual.stages) + "/" +
                     std::to_string(expected.stages) + " steps " + std::to_string(actual.steps) +
-                    "/" + std::to_string(expected.steps) + " finished '" + actual.finished +
-                    "'/'" + expected.finished + "' produced " +
-                    std::to_string(actual.produced_lines) + "/" +
-                    std::to_string(expected.produced_lines) + " distinct " +
+                    "/" + std::to_string(expected.steps) + " finished '" + actual.finished + "'/'" +
+                    expected.finished + "' produced " + std::to_string(actual.produced_lines) +
+                    "/" + std::to_string(expected.produced_lines) + " distinct " +
                     std::to_string(actual.distinct_templates) + "/" +
                     std::to_string(expected.distinct_templates) +
                     (actual.surface_sha256 != expected.surface_sha256 ? " DIGEST MOVED" : ""));
@@ -473,8 +476,7 @@ TEST_F(JenkinsBareNullGate, ThePurifiedChainMovesNothingOnTheBareClass)
     }
 
     EXPECT_EQ(moved, 0U)
-        << "THE ABORT WIRE: the purified chain moved the bare class on " << moved << "/"
-        << compared
+        << "THE ABORT WIRE: the purified chain moved the bare class on " << moved << "/" << compared
         << " traces — the strategy's bare-line parse was NOT RawText-equivalent somewhere, or "
            "the tokenizer path drifted. The pass does not stand as landed; attribute or abort "
            "(actual/expected per axis below).";

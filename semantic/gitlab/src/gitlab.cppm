@@ -49,12 +49,12 @@ export inline constexpr std::string_view kDialect{"gitlab"};
 //
 // `Step`, not `Job`, and the FOLD is why: eidos treats a `Job` marker as opening a new job node and
 // immediately opens a synthetic setup quantum under it, while a `Step` marker opens a quantum under
-// whatever job is current. A GitLab trace IS one job and its job identity is exogenous — there is no
-// job banner anywhere in a trace (studies/012 G-GL-P6). Mapping sections to `Job` would mint one
+// whatever job is current. A GitLab trace IS one job and its job identity is exogenous — there is
+// no job banner anywhere in a trace (studies/012 G-GL-P6). Mapping sections to `Job` would mint one
 // "job" per runner phase (`prepare_executor` as a job) and leave every one of them step-less.
-// Mapping to `Step` yields one implicit job whose steps are its phases, which is what the bytes say;
-// the content before the first section falls into the existing preamble quantum, which is correct —
-// it is the runner banner block.
+// Mapping to `Step` yields one implicit job whose steps are its phases, which is what the bytes
+// say; the content before the first section falls into the existing preamble quantum, which is
+// correct — it is the runner banner block.
 //
 // `Ordered`, not `Unordered`: GitLab job phases are strictly sequential by construction of the
 // runner state machine — one runner, one job, one phase at a time. Unlike GHA matrix jobs and
@@ -74,11 +74,11 @@ export inline constexpr std::string_view kDialect{"gitlab"};
 //
 // The ANTI-PHANTOM GUARD IS POSITION, NOT THE STAMP. GitLab scripts echo their own markers — the
 // runner's command echo and bash `set -x` xtrace — and the xtrace form carries a fully-expanded,
-// strictly-VALID stamp, so a stamp-shape guard does not reject it. What rejects it is that a genuine
-// marker sits at offset 0 of the peeled, ANSI-stripped content while an echoed one is preceded by
-// literal ASCII `++ echo -e '\e[0K`. `recognize()` matches with `starts_with`, so the guard is free:
-// 8486 of 8545 corpus markers are segment-leading, and 23 of the 59 exceptions are exactly this echo
-// class, correctly excluded.
+// strictly-VALID stamp, so a stamp-shape guard does not reject it. What rejects it is that a
+// genuine marker sits at offset 0 of the peeled, ANSI-stripped content while an echoed one is
+// preceded by literal ASCII `++ echo -e '\e[0K`. `recognize()` matches with `starts_with`, so the
+// guard is free: 8486 of 8545 corpus markers are segment-leading, and 23 of the 59 exceptions are
+// exactly this echo class, correctly excluded.
 inline constexpr std::array<IntentMarkerRow, 1> kMarkers{{
     {.prefix = "section_start:",
      .kind = insight::tokenization::IntentMarkerKind::Step,
@@ -138,14 +138,14 @@ inline constexpr std::array<OutcomeTokenRow, 5> kOutcomeTokens{{
 //
 // THE THIRD ROW IS A MEASURED FINDING, not symmetry. GitLab announces a CANCELLATION with the
 // FAILURE prefix — `ERROR: Job failed: canceled`, 17 of the 25 cancelled jobs in marker_corpus_v1.
-// A Jenkins-shaped row set reads all 17 as Failure: a WRONG verdict, not a missing one. The row is a
-// strict extension of the failure row and is resolved by LONGEST PREFIX, never by array order — the
-// grammar-5 tie-break exists precisely so this verdict does not depend on where these three rows sit
-// in this array.
+// A Jenkins-shaped row set reads all 17 as Failure: a WRONG verdict, not a missing one. The row is
+// a strict extension of the failure row and is resolved by LONGEST PREFIX, never by array order —
+// the grammar-5 tie-break exists precisely so this verdict does not depend on where these three
+// rows sit in this array.
 //
 // The console tail stays the DEGENERATE fallback; the API result is authoritative (ADR-17,
-// SRC-D-OUT-RUN-1). Measured divergence exists and is exactly what that precedence is for: 2 cancelled
-// jobs end on `Job succeeded`.
+// SRC-D-OUT-RUN-1). Measured divergence exists and is exactly what that precedence is for: 2
+// cancelled jobs end on `Job succeeded`.
 inline constexpr std::array<OutcomeMarkerRow, 3> kOutcomeMarkers{{
     {.prefix = "Job succeeded",
      .dialect_gate = kDialect,

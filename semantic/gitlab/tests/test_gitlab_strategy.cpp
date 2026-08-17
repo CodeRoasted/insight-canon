@@ -1,10 +1,11 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_gitlab_strategy.cpp — the GitLab dialect CODE TIER: the line-selective
 // format strategy. What it guards: the strategy claims EXACTLY the dialect-marked shapes (a line
-// carrying the 32-byte runner transport prefix, a bare `section_start:` marker, the terminal verdict
-// line), PEELS the prefix and parses its timestamp as the event time, and stays silent on every
-// other line AND on the RFC3339-prefixed look-alikes (a GHA line, a Syslog line) — the anti-phantom
-// guard the strict fixed-width shape buys. Determinism: byte-only parse, no RNG/clock/float.
+// carrying the 32-byte runner transport prefix, a bare `section_start:` marker, the terminal
+// verdict line), PEELS the prefix and parses its timestamp as the event time, and stays silent on
+// every other line AND on the RFC3339-prefixed look-alikes (a GHA line, a Syslog line) — the
+// anti-phantom guard the strict fixed-width shape buys. Determinism: byte-only parse, no
+// RNG/clock/float.
 #include <gtest/gtest.h>
 
 import std;

@@ -108,7 +108,8 @@ constexpr std::array<std::string_view, 1> kGhaStack{{"api-rfc3339-line-prefix"}}
 {
     return insight::semantic::resolve_stream(
         composed, insight::transport::IngestDeclaration{
-                      .stack = kGhaStack, .dialect = insight::semantic::github::kDialect,
+                      .stack = kGhaStack,
+                      .dialect = insight::semantic::github::kDialect,
                       .channel = insight::semantic::github::kChannelAnnotated});
 }
 } // namespace
@@ -171,8 +172,8 @@ TEST(GithubRoles, TokenizerSeesTheStampWithoutADeclaration)
 {
     const ComposedSemantics composed{
         insight::semantic::compose(std::array{insight::semantic::github::kManifest})};
-    const insight::semantic::ResolvedStream stream{insight::semantic::resolve_stream(
-        composed, insight::transport::IngestDeclaration{})};
+    const insight::semantic::ResolvedStream stream{
+        insight::semantic::resolve_stream(composed, insight::transport::IngestDeclaration{})};
     ArenaAllocator arena{64U * 1024U};
     Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
     const auto event{tokenizer.process_line(
