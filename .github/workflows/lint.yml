@@ -10,15 +10,8 @@ jobs:
   lint:
     uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-lint.yml@main
     # PUBLIC repo: no runs-on passthrough — a self-hosted runner reachable from a fork PR is an RCE.
-    with:
-      # format-check OFF, and this line is the whole record of why. 3 files carry pre-existing
-      # clang-format violations (88 diagnostics; measured 2026-07-28 on a standalone checkout,
-      # which is what CI gets), all under tests/. Arming it today reds every PR here for debt no
-      # live lane introduced. The remedy is one command — `malf format` at the repo root — but it
-      # must land behind a build+test leg: a formatting-only commit moves lines, and
-      # line-layout-coupled assertions have broken on exactly that before. Heph's to clear;
-      # delete this line with it.
-      format-check: false
+    # No `with:` at all: every gate in the reusable workflow defaults TRUE, so a caller that says
+    # nothing is fully gated, and a hole would have to be a written line here.
 
   # SRC-SP-1 (ADR 0024 §9.1): canon core is semantic-unaware — no ecosystem literal fused into the
   # mechanism. Canon-repo-local (the deny-list is canon-specific, so it stays here, not in the shared
