@@ -113,6 +113,135 @@ TEST(IntentCanonicalize, FrozenRuleSet)
     expect_distinct_intent("Lint", "Build");   // distinct jobs never collapse
 }
 
+// ── A CLASS PREFIX SURVIVES A NON-WORD SEPARATOR — and the two shapes where it does not ──
+//
+// WHY THIS IS CANON'S PROPERTY AND NOT ITS CONSUMER'S. A downstream join (`DN-37.D32`, the
+// `needs:` fold's containment arm over the platform's own `"<anchor> / <remainder>"` rendering)
+// tests whether one canonicalized name CONTAINS another by matching a class PREFIX at a separator.
+// That arm is sound only if canonicalizing the WHOLE composed name leaves the anchor's own
+// canonical form intact at the front — which is a property of this algorithm, decided here.
+//
+// IT HOLDS BECAUSE THE PASS IS STATELESS AT A NON-WORD BYTE, and the argument is the code's: the
+// rewrite is one left-to-right pass whose only carried state is `prev_is_word`, and R1/R2/R3 fire
+// only at a LEADING word boundary and require a trailing one, so a separator made of non-word
+// bytes both terminates the anchor's last claim and resets the scan. The remainder is then
+// canonicalized exactly as it would be alone.
+//
+// IT IS NOT UNCONDITIONAL, and the two escapes are the whole content of the arm below:
+//   • R4 IS NOT BOUNDARY-ANCHORED — it scans forward for the first ')'. An unclosed '(' is literal
+//     in ISOLATION and claims a ')' the REMAINDER supplies, so the anchor's own bytes vanish into
+//     an (M) that did not exist when it stood alone.
+//   • THE TRIM IS A WHOLE-STRING OPERATION. A trim byte that is TRAILING in the anchor is INTERIOR
+//     in the composition, so it survives there and is absent from the anchor's own canonical form.
+//     (A LEADING one is trimmed in both and is harmless — asserted, because the asymmetry is the
+//     kind of thing a reader assumes away.)
+// Both shapes are producer-authorable — a job may legally be named `build (x` or `build ` — so a
+// consumer of the prefix arm must EXCLUDE them at the point it derives the anchor's coordinate,
+// never discover them as a silent mis-join.
+namespace
+{
+// The platform rendering's separator (`DN-37.D14` owns the grammar; it is cited, never restated —
+// canon knows only that these bytes are non-word). `kOtherSeparator` is here so the arm asserts the
+// BYTE-CLASS property rather than one consumer's literal.
+constexpr std::string_view kPlatformSeparator{" / "};
+constexpr std::string_view kOtherSeparator{" ▸ "};
+
+// Anchors drawn from this file's own frozen rule-set vocabulary — one per rule, plus the plain and
+// already-masked shapes. No corpus bytes: the breaker class is characterized by the RULES, so the
+// rules are the population (`MEM:synthetic-gate-vacuity-vs-judgment` — a scoped population with a
+// stated predicate, never one picked by eye).
+constexpr std::array<std::string_view, 9> kWellFormedAnchors{
+    {"Lint", "Build", "ESLint v6", "Node 18", "build 1.2.3", "Shard 1", "deploy (prod)",
+     "Test (ubuntu-latest, Node 24.x)", "yarn test-build (1/10)"}};
+// Remainders, including every shape that could reach BACK into an anchor: a bare ')', a paren
+// group, and the numeric anchors again.
+constexpr std::array<std::string_view, 8> kRemainders{
+    {"inner", "test (fast)", ")", "(x)", "v6", "1.2.3", "42", "build / deep"}};
+
+void expect_prefix_preserved(std::string_view anchor, std::string_view remainder,
+                             std::string_view separator)
+{
+    const std::string composed{std::string{anchor} + std::string{separator} +
+                               std::string{remainder}};
+    const std::string want{canonicalize_intent(anchor) + std::string{separator}};
+    const std::string got{canonicalize_intent(composed)};
+    EXPECT_TRUE(got.starts_with(want))
+        << "the anchor's class did not survive composition:\n"
+        << "  anchor    \"" << anchor << "\" -> \"" << canonicalize_intent(anchor) << "\"\n"
+        << "  remainder \"" << remainder << "\"\n"
+        << "  composed  \"" << composed << "\" -> \"" << got << "\"\n"
+        << "  expected it to start with \"" << want << '"';
+}
+} // namespace
+
+TEST(IntentCanonicalize, ClassPrefixSurvivesANonWordSeparator)
+{
+    for (const std::string_view separator : {kPlatformSeparator, kOtherSeparator})
+        for (const std::string_view anchor : kWellFormedAnchors)
+            for (const std::string_view remainder : kRemainders)
+                expect_prefix_preserved(anchor, remainder, separator);
+
+    // NON-VACUITY: the arm must be able to observe a rewrite, or it is a property about strings
+    // canon never touched. At least one anchor and one remainder MUST canonicalize to something
+    // other than themselves, or the loop above proves only that concatenation concatenates.
+    EXPECT_NE(canonicalize_intent("Test (ubuntu-latest, Node 24.x)"),
+              "Test (ubuntu-latest, Node 24.x)");
+    EXPECT_NE(canonicalize_intent("v6"), "v6");
+    // …and the rewrite genuinely happens on BOTH sides of the separator in one composition.
+    EXPECT_EQ(
+        canonicalize_intent(std::string{"ESLint v6"} + std::string{kPlatformSeparator} + "Node 18"),
+        "ESLint vX / Node N");
+}
+
+// ── The two escapes, asserted POSITIVELY: this is the precondition, not a defect ──
+// A consumer excluding these two shapes has a sound prefix arm; one that does not has a silent
+// mis-join. Stating the boundary is what makes the arm above safe to rely on.
+TEST(IntentCanonicalize, PrefixPreservationEscapesAreTheUnclosedParenAndTheTrailingTrimByte)
+{
+    // ① R4 reaches ACROSS the separator when the anchor leaves a '(' open.
+    EXPECT_EQ(canonicalize_intent("build (x"), "build (x"); // literal in isolation…
+    EXPECT_EQ(canonicalize_intent("build (x / test (fast)"),
+              "build (M)"); // …claimed the remainder's ')'
+    EXPECT_FALSE(
+        canonicalize_intent("build (x / test (fast)")
+            .starts_with(canonicalize_intent("build (x") + std::string{kPlatformSeparator}))
+        << "an unclosed '(' anchor no longer breaks the prefix — if R4 became boundary-anchored, "
+           "this boundary is stale and the consumer's exclusion can be dropped.";
+
+    // ② A TRAILING trim byte on the anchor is INTERIOR after composition and survives.
+    EXPECT_EQ(canonicalize_intent("build "), "build");
+    EXPECT_EQ(canonicalize_intent("build  / inner"), "build  / inner"); // the anchor's space stayed
+    EXPECT_FALSE(canonicalize_intent("build  / inner")
+                     .starts_with(canonicalize_intent("build ") + std::string{kPlatformSeparator}));
+    // The same byte class, on the shape that is NOT hypothetical: a Windows runner's CR.
+    EXPECT_EQ(canonicalize_intent("build\r"), "build");
+    EXPECT_FALSE(
+        canonicalize_intent("build\r / inner")
+            .starts_with(canonicalize_intent("build\r") + std::string{kPlatformSeparator}));
+
+    // ③ …and the asymmetry: a LEADING trim byte is trimmed in BOTH, so it is harmless.
+    expect_prefix_preserved(" build", "inner", kPlatformSeparator);
+}
+
+// ── A class prefix is a CLASS predicate — it separates no siblings, by construction ──
+// The mask exists to collapse matrix legs to one class (MatrixLegsCollapseToOneClass above), so a
+// prefix match at the separator cannot distinguish two legs of one job: it is an instance-BLIND
+// test and any consumer reading it as "this row is inside THAT leg" is over-reading it. The
+// separation lives in the discriminant (test_instance_discriminant.cpp), which this arm does not
+// have — the anchor of a containment match carries no instance to compare.
+TEST(IntentCanonicalize, AClassPrefixIsInstanceBlindAndSeparatesNoSiblings)
+{
+    constexpr std::string_view lhs{"Test (ubuntu-latest, Node 24.x)"};
+    constexpr std::string_view rhs{"Test (windows-latest, Node 24.x)"};
+    ASSERT_EQ(canonicalize_intent(lhs), canonicalize_intent(rhs)); // one class, two legs
+    EXPECT_TRUE(canonicalize_intent(std::string{rhs} + std::string{kPlatformSeparator} + "inner")
+                    .starts_with(canonicalize_intent(lhs) + std::string{kPlatformSeparator}))
+        << "the OTHER leg's rendered name no longer matches this leg's class prefix — if the mask "
+           "stopped collapsing legs, the consumer's instance-blindness caveat is stale.\n"
+        << "  \"" << lhs << "\" -> \"" << canonicalize_intent(lhs) << "\"\n"
+        << "  \"" << rhs << "\" -> \"" << canonicalize_intent(rhs) << '"';
+}
+
 // NOTE: the comparability-version assertion (formerly RegistryVersionIsFrozen, pinning
 // kIntentRegistryVersion == "intent-gha-2") RETIRED with the constant: the
 // composed-ruleset content hash `semantic_identity` supersedes it and is pinned in
