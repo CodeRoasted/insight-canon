@@ -26,6 +26,7 @@
 #include <map>
 #include <optional>
 #include <span>
+#include <spdlog/common.h> // spdlog::level — named for init_logging's sink/level choice below
 #include <string>
 #include <vector>
 #if defined(_WIN32)
@@ -110,6 +111,21 @@ int main(int argc, char** argv)
 #if defined(_WIN32)
     (void)_setmode(_fileno(stdout), _O_BINARY);
 #endif
+
+    // Same invariant, second threat: NOTHING but the digest may reach this stdout. Canon's engine
+    // loggers carry a wall-clock `[%Y-%m-%d %H:%M:%S.%e]` pattern, and with no init_logging call
+    // they resolve to spdlog's DEFAULT logger — whose sink is stdout. So an unelided build of this
+    // fixture interleaves timestamped lines into the hashed bytes, and the digest stops being a
+    // function of the corpus: two runs of ONE binary on ONE input differ. Measured 2026-08-18 on
+    // the `malf inventory` build: 18 such lines on stdout for a 6-line input.
+    // det_public_proof.sh's cells compile the macros out (`-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF`,
+    // scripts/det_public_proof.sh:138), which is why the release legs never saw this — but that
+    // makes the determinism of the artifact a property of the CALLER's flags rather than of the
+    // fixture, and every other caller (the inventory build, scripts/samples_showcase.sh, a desk
+    // run) gets the corrupting default. The sink choice belongs here, where the contract is.
+    // Level stays `info` rather than `off`: the diagnostics are not the defect, their DESTINATION
+    // was — silencing them would answer an artifact-purity problem by deleting observability.
+    insight::logging::init_logging(spdlog::level::info, /*diagnostics_to_stderr=*/true);
 
     namespace tk = insight::tokenization;
 

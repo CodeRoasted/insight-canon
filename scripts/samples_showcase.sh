@@ -27,6 +27,16 @@ OUT="${3:?usage: samples_showcase.sh <det_proof-binary> <samples-root> <out-dir>
 [ -d "$SAMPLES" ]  || { echo "error: samples-root '$SAMPLES' is not a directory" >&2; exit 2; }
 mkdir -p "$OUT"
 
+# THE REPLAY CHECK IS NOT CEREMONY. What this script publishes is a PUBLIC artifact whose whole
+# claim is "same input → same bytes", and a stale-but-reproducible page is strictly better than a
+# fresh one that moves under the reader. The failure this catches is silent by nature: anything
+# that leaks a wall clock, a pid, an address or a hash-order into det_proof's stdout still renders
+# a page that LOOKS right, and only a byte compare of two runs can see it. It is a fact-shaped
+# check (byte equality), not a heuristic, so it has no false-positive mode. Measured cost: one
+# extra pass per corpus over ~30 small logs.
+replay="$(mktemp)"
+trap 'rm -f "$replay"' EXIT
+
 # One det_proof run per corpus (all its logs in a single process, sorted for a stable order).
 corpora=()   # "corpus:count"
 for cdir in "$SAMPLES"/*/samples; do
@@ -36,6 +46,17 @@ for cdir in "$SAMPLES"/*/samples; do
   [ "${#logs[@]}" -gt 0 ] || { echo "skip $corpus (no *.log under $cdir)" >&2; continue; }
   echo "showcase: $corpus (${#logs[@]} logs)" >&2
   "$DET" "${logs[@]}" > "$OUT/$corpus.canon.txt"
+  "$DET" "${logs[@]}" > "$replay"
+  if ! cmp -s "$OUT/$corpus.canon.txt" "$replay"; then
+    {
+      echo "error: det_proof is NOT deterministic on corpus '$corpus' — refusing to publish."
+      echo "  two runs of the SAME binary on the SAME ${#logs[@]} logs disagree:"
+      cmp "$OUT/$corpus.canon.txt" "$replay" || true
+      echo "  first differing hunk (run 1 '<' vs run 2 '>'):"
+      diff "$OUT/$corpus.canon.txt" "$replay" | head -6 || true
+    } >&2
+    exit 3
+  fi
   corpora+=("$corpus:${#logs[@]}")
 done
 
