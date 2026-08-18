@@ -83,8 +83,16 @@ packages="$(grep -m1 '^# semantic_packages ' "$first_out" | sed 's/^# semantic_p
     echo "| \`$c\` | $n | [\`$c.canon.txt\`]($c.canon.txt) |"
   done
   echo
-  echo "> The sample logs are public-safe by construction — fully synthetic fixtures or"
-  echo "> CC-BY-licensed corpora. Our real third-party crawl corpora stay private."
+  # The publication claim states the GATE, never a safety verdict. `samples_safety_lint.py`
+  # judges two independent axes — the right to redistribute, and a scan for declared
+  # identifying-content classes — and its own bound is that a pass means "no declared class
+  # fired", never "these bytes are safe". Wording that outran that bound is what published a
+  # real third-party corpus behind the phrase "public-safe by construction".
+  echo "> Every sample tree published here clears two independent checks: the **right** to"
+  echo "> redistribute (a \`SLICE.json\` declaring it fully synthetic, or an \`ATTRIBUTION.md\`"
+  echo "> naming a redistribution licence) **and** a scan that refuses declared"
+  echo "> identifying-content classes. That scan matches byte shapes, so it is a floor and not"
+  echo "> a certificate. Our real third-party crawl corpora stay private."
 } > "$OUT/README.md"
 
 echo "showcase rendered → $OUT (${#corpora[@]} corpora)" >&2
