@@ -77,7 +77,27 @@ using EventID = uint64_t;
 // no document was ever produced under it, so the revert restores -9 rather than minting a false
 // incomparability. The number is BURNT: append-only means a generation is never re-bound to
 // different rules, so the next bump is -11.
-inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-9"};
+// -11 = SRC-D-MSK-6, the WRAPPER-SHELL repair. `kWrapperPairs` (canon.detail.scan) declares the six
+// byte pairs a producer wraps a whole token in — `[] () {} <> "" ''` — and closes a grammar defect,
+// not a missing rule: rule 4 already tolerated a shell (`\[?…\]?`) but only for the ONE pair the
+// first corpus showed, so `(163.27.187.39)` failed at byte 0, was not digit-leading, carried no
+// byte in the composite pre-gate's separator set, and fell to literal KEEP. SIX template rows of
+// the published render `coderoast-hub/showcase/canon/loghub.canon.txt` carry a real third-party
+// address for exactly that reason. Two touch points, both reading the one table: (1)
+// `is_ipv4_token` accepts any declared opener and up to two trailing shell/sentence bytes — a
+// STRICT SUPERSET of the retired grammar, so nothing that masked before stops masking; (2)
+// `TokenShape::has_separator` gains the wrapper bytes, so a hex run >= 16 wrapped in `( { < " '`
+// reaches `embedded_identity` and yields the
+// `(<*>)` normal form the bracketed and UUID forms ALREADY produced — this restores one normal form
+// per class rather than minting a second. `template_str`/`template_id` move ONLY for lines carrying
+// a shell-wrapped IPv4 or a shell-wrapped long hash; every other document is byte-identical except
+// this version string. MEASURED on 32 000 lines of real third-party logs across 16 producers
+// (`coderoast-hub/samples/loghub/samples`, the f13_cardinality_measure instrument): distinct
+// templates 6712 -> 6709, singletons 5238 -> 5233. Three templates move out of 6712 — the leaked
+// instances collapsing into their class, which is the shape a leak repair is supposed to have. The
+// bump is taken because the masker itself moved: this is the -4/-8 class (template identity), not
+// the -7/-9 class (serialized level/component with identity untouched).
+inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-11"};
 
 // ── Template identity (insight_perf_template_id.md SRC-D-TIR-1) ──
 // The structural identity of a canonicalised template: the first 16 bytes of

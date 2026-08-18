@@ -657,6 +657,194 @@ TEST(StatelessTemplate, Ipv4KnobGatesTheBracketedFormThatDigitLeadingCannotReach
            "the knob's domain just widened silently.";
 }
 
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+// The WRAPPER SHELL — rule 4's grammar admitted ONE delimiter pair out of six, and the omission
+// published a real third-party address
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// WHY THIS EXISTS. The test directly above pins the bracketed form and calls it "the ONLY case
+// that separates the two knobs". That is true of the KNOB and it was read as if it were true of
+// the GRAMMAR — it is not. `is_ipv4_token` admitted a leading `[` and nothing else, so
+// `(163.27.187.39)` failed at byte 0, was not digit-leading, carried no byte in the
+// `maybe_composite` pre-gate's separator set (`: / [ # - =` — every one of `( ) { } < > " '` is
+// absent from it), and fell to rule 6 literal KEEP.
+//
+// ⚠ THIS IS NOT A HYPOTHETICAL. The published render
+// `coderoast-hub/showcase/canon/loghub.canon.txt` carries SIX template rows whose masked text
+// contains a bare routable third-party IPv4 — from `Linux_2k.log`, `Mac_2k.log` and
+// `Thunderbird_2k.log` — and the ONLY reason is this one character. A `templates` section is
+// precisely where a reader has been told the addresses are gone. The tokens below are the literal
+// ones that leaked.
+//
+// ⚠ AND THE ASYMMETRY WAS NEVER DECLARED. The rule already decided that a punctuation shell does
+// not defeat the class — it spelled `\[?…\]?` plus a trailing `[,;:.\]]` set — and then
+// implemented that decision over a hand-picked subset of the punctuation that actually wraps a
+// token in a log line. Nothing chose `[` over `(`. The repair is the declared pair catalog
+// `kWrapperPairs` (mask.cpp), so the next delimiter is not a second incident.
+//
+// ═══ FALSIFIABILITY ═══════════════════════════════════════════════════════════════════════════
+// Every leg below was OBSERVED RED on the pre-fix grammar (the `(` / `{` / `<` / `"` / `'` rows
+// KEEP, the `[` row passes), which is what makes this a regression guard and not a restatement of
+// current behaviour. The knob-OFF leg is the non-vacuity arm: it proves rule 4 is what masks the
+// wrapped form. If a composite rule ever claims these tokens first, the OFF leg goes green-blind
+// and this whole block stops testing rule 4 — exactly the trap the block above documents.
+
+TEST(StatelessTemplate, Ipv4MasksInsideEveryDeclaredWrapperPair)
+{
+    ArenaAllocator arena{256U * 1024U};
+
+    // One address, every declared shell, both directions of each pair, plus the port form.
+    // `[…]` is today's only passing row and is kept here so the table shows the class, not the
+    // repair's delta.
+    for (const std::string_view tok : {
+             "(10.20.30.40)",
+             "[10.20.30.40]",
+             "{10.20.30.40}",
+             "<10.20.30.40>",
+             "\"10.20.30.40\"",
+             "'10.20.30.40'",
+             // An opener with no closer still leaks: the defect is the byte that PRECEDES the
+             // address, so the unbalanced-open fragment is the same failure, not a lesser one.
+             "(10.20.30.40",
+             "{10.20.30.40",
+             // The closer-only forms are a CONTROL, not a repair. They were never broken —
+             // byte 0 is a digit, so rule 5 (digit-leading) already masked them, which is exactly
+             // why the audit named the LEADING bracket. They are pinned so a future change to the
+             // shell cannot quietly take them away from digit-leading.
+             "10.20.30.40)",
+             "10.20.30.40}",
+             "10.20.30.40>",
+             // the shell around the `host:port` form, and the sentence byte after the shell.
+             "(10.20.30.40:8080)",
+             "(10.20.30.40),",
+             "\"10.20.30.40\".",
+         })
+    {
+        const std::string got{masked_with(tok, arena, MaskConfig{})};
+        EXPECT_EQ(got, "<*>")
+            << "a wrapped IPv4 must MASK — the shell is punctuation, not part of the address, and "
+               "the whole product claim about a `templates` section rests on this.\n  token:    "
+            << tok << "\n  expected: <*>\n  actual:   " << got;
+    }
+
+    // NON-VACUITY. With the knob OFF every one of these must come back LITERAL. If any masks
+    // anyway, something upstream of the rule-4 disjunction claimed the token and the table above
+    // is no longer testing the IPv4 grammar at all.
+    //
+    // ONLY opener-led tokens belong in this leg, and the reason is a measured one: `10.20.30.40)`
+    // masks with the knob OFF, because a trailing closer leaves byte 0 a digit and rule 5 owns it.
+    // Putting a closer-only form here asserts a falsehood about which rule is under test — this
+    // leg's whole job is to name the rule, so it must contain only shapes rule 5 cannot reach.
+    for (const std::string_view tok : {"(10.20.30.40)", "\"10.20.30.40\"", "{10.20.30.40"})
+    {
+        const std::string off{masked_with(tok, arena, cfg_without_ip_masking())};
+        EXPECT_EQ(off, tok)
+            << "with mask_ip_addresses OFF the wrapped IPv4 must stay literal — this leg is what "
+               "proves rule 4 (and not a composite rule reached through the maybe_composite "
+               "pre-gate) is what masks it.\n  token:    "
+            << tok << "\n  expected: " << tok << " (kept)\n  actual:   " << off;
+    }
+}
+
+// The six rows that actually shipped. Verbatim tokens from
+// `coderoast-hub/showcase/canon/loghub.canon.txt` (artifact lines 17169-17170, 19926-19927,
+// 31559-31560) — a published surface is the strongest oracle available for "did we really fix the
+// thing we published".
+TEST(StatelessTemplate, ThePublishedTemplateRowsThatLeakedARealAddressNowMask)
+{
+    ArenaAllocator arena{256U * 1024U};
+
+    for (const std::string_view line :
+         {"Authentication failed from <*> (163.27.187.39): Permission denied in replay cache code",
+          "Authentication failed from <*> (163.27.187.39): Software caused connection abort",
+          "mDNS_DeregisterInterface: Frequent transitions for interface en0 (10.105.162.32)",
+          "mDNS_DeregisterInterface: Frequent transitions for interface en0 (10.142.110.44)",
+          "DHCPREQUEST for <*> (10.100.0.250) from <*> via eth1",
+          "DHCPREQUEST for <*> (10.100.0.250) from <*> via eth1: unknown lease <*>"})
+    {
+        const std::string got{masked(line, arena)};
+        EXPECT_EQ(got.find('('), std::string::npos)
+            << "no parenthesised token may survive into a template here — every one of these rows "
+               "is an address.\n  line:   "
+            << line << "\n  masked: " << got;
+        for (const std::string_view leaked :
+             {"163.27.187.39", "10.105.162.32", "10.142.110.44", "10.100.0.250"})
+            EXPECT_EQ(got.find(leaked), std::string::npos)
+                << "a real third-party address survived masking — this is the exact byte sequence "
+                   "that reached the public hub.\n  leaked: "
+                << leaked << "\n  masked: " << got;
+    }
+}
+
+// The boundary, stated positively. The shell must not become a licence to mask whatever sits
+// inside a bracket — over-masking destroys distinguishing content permanently and invisibly
+// (ADR-16.D5's fail-safe direction), so the KEEP side is asserted as hard as the MASK side.
+// `(anonymous)`, `(reserved)`, `(usable)` are attested neighbours of the leaked rows in the same
+// published artifact: they sat one token away and must not move.
+TEST(StatelessTemplate, TheWrapperShellDoesNotReachBeyondTheAddressClass)
+{
+    ArenaAllocator arena{256U * 1024U};
+
+    for (const std::string_view tok : {
+             "(anonymous)",
+             "(reserved)",
+             "(usable)",    // attested neighbours — plain words
+             "(1.2.3)",     // three octets is not an address
+             "(1.2.3.4.5)", // five is not either
+             "(v1.2.3.4)",  // a version with a letter anchor
+             "(1.2.3.4x)",  // alphanumeric tail — not a shell byte
+         })
+    {
+        const std::string got{masked_with(tok, arena, MaskConfig{})};
+        EXPECT_EQ(got, tok) << "this token is not an address and must survive verbatim — the shell "
+                               "widens WHICH punctuation rule 4 tolerates, never WHAT it "
+                               "matches.\n  token:    "
+                            << tok << "\n  expected: " << tok << " (kept)\n  actual:   " << got;
+    }
+}
+
+// The sibling with the same shape, and the reason it takes a DIFFERENT repair. A UUID or a
+// hex run >= 16 wrapped in `[...]` already normalizes to `[<*>]` — not because rule 3 tolerates a
+// shell (it does not: it requires the WHOLE token) but because `[` sits in the maybe_composite
+// pre-gate's separator set, so `embedded_identity` gets a look. `(` did not sit in that set, so a
+// parenthesised hash was kept whole. The repair is therefore in the PRE-GATE, not in rule 3: it
+// restores the normal form the bracketed and the UUID forms already produce, instead of inventing
+// a second one. A wrapped UUID was always fine, for the accidental reason that a UUID contains
+// `-` — which is in the set. That accident is what hid the hex case.
+TEST(StatelessTemplate, AWrappedHashNormalizesLikeTheBracketedFormItAlreadyMatched)
+{
+    ArenaAllocator arena{256U * 1024U};
+    struct Row
+    {
+        std::string_view token;
+        std::string_view want;
+    };
+    // 32 hex, and an 8-4-4-4-12 UUID.
+    for (const Row& row : {
+             Row{.token = "[d41d8cd98f00b204e9800998ecf8427e]", .want = "[<*>]"},
+             Row{.token = "(d41d8cd98f00b204e9800998ecf8427e)", .want = "(<*>)"},
+             Row{.token = "{d41d8cd98f00b204e9800998ecf8427e}", .want = "{<*>}"},
+             Row{.token = "\"d41d8cd98f00b204e9800998ecf8427e\"", .want = "\"<*>\""},
+             // already green before the repair — the `-` accident, pinned so it stays green.
+             Row{.token = "(3f2504e0-4f89-11d3-9a0c-0305e82c3301)", .want = "(<*>)"},
+         })
+    {
+        const std::string_view tok{row.token};
+        const std::string_view want{row.want};
+        const std::string got{masked_with(tok, arena, MaskConfig{})};
+        EXPECT_EQ(got, want)
+            << "a wrapped high-cardinality identity must normalize to the SAME shape in every "
+               "shell — two normal forms for one class means two templates for one logical "
+               "line.\n  token:    "
+            << tok << "\n  expected: " << want << "\n  actual:   " << got;
+    }
+
+    // The floor holds: a short hex-looking word is still a word, shell or no shell.
+    for (const std::string_view tok : {"(deadbeef)", "(cafe)"})
+        EXPECT_EQ(masked_with(tok, arena, MaskConfig{}), tok)
+            << "the >=16 hash floor must not move — a wrapped short hex word is still content.";
+}
+
 // The boundary the hex rip must not cross. Written by Kleio BEFORE the rip, when it toggled
 // `mask_hex_addresses` to prove the tokens masked with the knob in either position; the rip
 // removed the knob, so the toggle is now unrepresentable and only the surviving half is kept.

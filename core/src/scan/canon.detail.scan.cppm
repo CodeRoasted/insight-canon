@@ -81,6 +81,53 @@ export namespace insight::tokenization
     return chr == ' ' || chr == '\t';
 }
 
+// ── The WRAPPER-SHELL catalog (SRC-D-MSK-6) ──────────────────────────────────────
+// FROZEN, DECLARED byte pairs: the punctuation a producer wraps a whole token in. A shell is NOT
+// part of the value it surrounds, and no mask rule may treat it as one.
+//
+// WHY THIS IS A CATALOG AND NOT AN `if`, AND WHY IT LIVES HERE. The IPv4 rule already decided that
+// a shell does not defeat the class — its grammar spelled `\[?…\]?` — and then implemented that
+// decision over a hand-picked subset of ONE pair. `(10.100.0.250)` therefore failed at byte 0, was
+// not digit-leading, and fell to literal KEEP; SIX rows of the published render
+// `coderoast-hub/showcase/canon/loghub.canon.txt` carry a real third-party address for exactly that
+// reason, inside their `templates` section — where the reader has been told the addresses are gone.
+// Nothing anywhere chose `[` over `(`: it was the pair the first corpus happened to show. A closed
+// table makes the next delimiter a lookup instead of a second incident (the kEphemeralRoots /
+// kCurrencyMarkers discipline), and it sits in scan because TWO call sites read it — rule 4's
+// grammar in mask.cpp and `has_separator` below. A second copy is how two maskers diverge and
+// template identity stops being a pure function of the line (SRC-D-MSK-4's stated reason).
+//
+// WHAT THE ASYMMETRY ACTUALLY WAS, measured rather than assumed: only the OPENING byte was ever the
+// defect. A trailing closer leaves byte 0 a digit, so `10.100.0.250)` was already masked by the
+// digit-leading rule and never leaked; an opener destroys digit-leading and leaves rule 4 the only
+// rule that can see the token. The closers matter as the shell's trailing half, never as a second
+// entry point.
+struct WrapperPair
+{
+    char open;
+    char close;
+};
+inline constexpr std::array<WrapperPair, 6> kWrapperPairs{{
+    {.open = '[', .close = ']'},
+    {.open = '(', .close = ')'},
+    {.open = '{', .close = '}'},
+    {.open = '<', .close = '>'},
+    {.open = '"', .close = '"'},
+    {.open = '\'', .close = '\''},
+}};
+
+[[nodiscard]] constexpr bool is_wrapper_open(char chr) noexcept
+{
+    return std::ranges::any_of(kWrapperPairs,
+                               [chr](const WrapperPair& pair) { return pair.open == chr; });
+}
+
+[[nodiscard]] constexpr bool is_wrapper_close(char chr) noexcept
+{
+    return std::ranges::any_of(kWrapperPairs,
+                               [chr](const WrapperPair& pair) { return pair.close == chr; });
+}
+
 // ── TokenShape — one-pass per-token byte profile (ADR-16.D5, the precedence) ──────
 // The masker classifies each whitespace token KEEP / MASK / NORMALIZE in a fixed precedence
 // (D-TID-12). Several steps of that dispatch each re-walked the token: is_all_digits (the
@@ -97,8 +144,18 @@ struct TokenShape
     bool all_digits{false}; // non-empty AND every byte is an ASCII digit (== is_all_digits)
     bool digit_leading{
         false}; // first byte after an optional +/- sign is a digit (== is_digit_leading)
-    bool has_separator{
-        false}; // contains a composite separator : / [ # - =  (the maybe_composite gate)
+    // contains a composite separator `: / # - =` OR any kWrapperPairs byte (the maybe_composite
+    // gate). The wrapper bytes joined this set with the SRC-D-MSK-6 repair, and the reason is the
+    // set's own history: `[` was in it and `( { < " '` were not, so a hex hash wrapped in brackets
+    // reached `embedded_identity` and normalized to `[<*>]` while the SAME hash in parentheses was
+    // never offered to the catalog and was KEPT WHOLE. A wrapped UUID escaped that only by
+    // accident — a UUID carries `-`, which was already in the set — and the accident is precisely
+    // what hid the hex case. Extending the gate (rather than teaching rule 3 a shell) is what
+    // reproduces the normal form the bracketed and UUID forms already produce, instead of minting
+    // a second one for the same class. `embedded_identity` is the ONLY rule the widened gate can
+    // newly reach: every other normalizer carries its own `: / # = $` trigger, all of which were
+    // already in the set.
+    bool has_separator{false};
 
     explicit constexpr TokenShape(std::string_view tok) noexcept : empty(tok.empty())
     {
@@ -112,8 +169,8 @@ struct TokenShape
         for (const char chr : tok)
         {
             all_digits = all_digits && is_digit(chr);
-            has_separator = has_separator || chr == ':' || chr == '/' || chr == '[' || chr == '#' ||
-                            chr == '-' || chr == '=';
+            has_separator = has_separator || chr == ':' || chr == '/' || chr == '#' || chr == '-' ||
+                            chr == '=' || is_wrapper_open(chr) || is_wrapper_close(chr);
         }
     }
 };

@@ -62,13 +62,31 @@ namespace
         return true;
     }
 
-    // IPv4: \[?\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?\]?[,;:\.\]]?
+    // Sentence punctuation that may trail a token in running log text. Disjoint from the
+    // kWrapperPairs closers (canon.detail.scan); the two sets together are what rule 4 tolerates
+    // after the address.
+    [[nodiscard]] constexpr bool is_trailing_punct(char chr) noexcept
+    {
+        return chr == ',' || chr == ';' || chr == ':' || chr == '.';
+    }
+
+    // The trailing budget the retired grammar already spent: an optional `]` followed by one of
+    // `[,;:.\]]`. Named rather than open-coded twice, and held at 2 so the repair widens WHICH
+    // bytes are tolerated without widening HOW MANY — a longer punctuation run is a different
+    // token, not a wrapped address.
+    constexpr std::size_t kMaxIpv4TrailBytes{2};
+
+    // IPv4: <open>? \d{1,3}(\.\d{1,3}){3}(:\d*)? <shell-or-sentence-punct>{0,2}
+    // where <open> is any kWrapperPairs opener. A STRICT SUPERSET of the retired
+    // `\[?…\]?[,;:\.\]]?`: every string that grammar accepted, this one accepts (`[` is an opener;
+    // `]` is a closer; `,;:.` are sentence punct; the budget is unchanged at 2), so no token that
+    // masked before can stop masking — a masking repair must never narrow the guarantee it repairs.
     [[nodiscard]] constexpr bool is_ipv4_token(std::string_view str) noexcept
     {
         if (str.empty())
             return false;
         std::size_t pos{0};
-        if (str[0] == '[')
+        if (is_wrapper_open(str[0]))
             ++pos;
         for (int oct{0}; oct < 4; ++oct)
         {
@@ -87,10 +105,9 @@ namespace
             while (pos < str.size() && static_cast<unsigned>(str[pos]) - '0' < kDecimalBase)
                 ++pos;
         }
-        if (pos < str.size() && str[pos] == ']')
-            ++pos;
-        if (pos < str.size() && (str[pos] == ',' || str[pos] == ';' || str[pos] == ':' ||
-                                 str[pos] == '.' || str[pos] == ']'))
+        for (std::size_t taken{0}; taken < kMaxIpv4TrailBytes && pos < str.size() &&
+                                   (is_wrapper_close(str[pos]) || is_trailing_punct(str[pos]));
+             ++taken)
             ++pos;
         return pos == str.size();
     }

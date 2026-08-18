@@ -39,15 +39,15 @@ Each whitespace token is classified by the **first** matching rule:
 | 1 | **Status-value KEEP** — an all-digit token, ≤ 3 digits, immediately after a **status keyword** | KEEP literal |
 | 2 | **Composite** — the token carries a structural delimiter; one of the normalizers (§4) matches | KEEP normalized (embeds `<*>`) |
 | 3 | **UUID / long hash** | MASK `<*>` |
-| 4 | **IPv4** (when `mask_ip_addresses`) | MASK `<*>` |
+| 4 | **IPv4** (when `mask_ip_addresses`), bare or inside a declared **wrapper shell** (§3.2) | MASK `<*>` |
 | 5 | **Digit-leading numeric** | MASK `<*>` — this also carries `0x`-hex: a `0x…` token starts with a digit |
 | 6 | **Literal** — none of the above | KEEP literal |
 
 Rule 1 wins first on purpose: it protects the **green→red distinction** that downstream diffing depends on —
 `exit code 0` and `exit code 1` must stay *different* templates, so a short status value after a status keyword
 is never masked (see §3). The composite layer (rule 2) is gated by a cheap pre-check: a token is only tried
-against the normalizers if it contains one of `: / [ # - =` or a declared marker prefix; everything else skips
-straight to the fixed masks.
+against the normalizers if it contains one of `: / # - =`, a **wrapper byte** (§3.2), or a declared marker
+prefix; everything else skips straight to the fixed masks.
 
 ---
 
@@ -63,11 +63,12 @@ data-learned. This is what keeps masking decidable and deterministic.
 | **Currency markers** | `$` (ASCII; structured to add `€`/`£`/`¥` as declared byte sequences if a corpus shows them) | §4 marker-number — a leading currency symbol glued to a number. |
 | **Ephemeral roots** | `/tmp`, `/var/tmp`, `/var/folders`, `.conan2/p/b`, `/nix/store` — each carrying a declared **anchor** + **scope** (§3.1) | §4 ephemeral-root — a path segment directly under a per-run build/temp root is an instance and masks; the root is kept. |
 | **Min hash length** | `16` | Rule 3 / §4 embedded-identity — a hex-only run this long is an instance hash, not a word. |
+| **Wrapper pairs** | `[]` `()` `{}` `<>` `""` `''` | §3.2 — the punctuation shell a producer wraps a whole token in. Read by rule 4's grammar and by the rule-2 pre-gate. |
 | **Wildcard** | `<*>` | The mask placeholder. |
 
 `mask_ip_addresses` is the one `MaskConfig` knob (default **on**) gating a rule — rule 4. It gates for a
-reason the retired hex knob never did: its grammar admits a leading `[`, and a bracketed token is not
-digit-leading, so `[10.20.30.40]` masks with the knob on and stays **literal** with it off.
+reason the retired hex knob never did: its grammar admits a **wrapper shell** (§3.2), and a shell-led token
+is not digit-leading, so `(10.20.30.40)` masks with the knob on and stays **literal** with it off.
 
 ### 3.1 The ephemeral-root catalog — the root is the decidable thing
 
@@ -98,6 +99,36 @@ normalizer (§4) **and**, as a per-segment predicate, from inside the source-loc
 surfaced — it holds no hash, so masking it would destroy signal to fix nothing. Adding a root is a **core**
 masking change (it is syntactic, not ecosystem vocabulary) and bumps `canonicalization_version`.
 
+### 3.2 The wrapper-shell catalog — a shell is punctuation, never part of the value
+
+A producer wraps a whole token in punctuation and means nothing by it: `(10.100.0.250)`, `[10.20.30.40]`
+and `"10.0.0.1"` are one address in three dresses. The six pairs are the declared, frozen set, read from
+**one table** (`kWrapperPairs`) by both surfaces that need them — rule 4's grammar and rule 2's pre-gate —
+because a second copy is how two maskers diverge.
+
+**This catalog exists because its absence shipped.** Rule 4 had *already* decided a shell does not defeat
+the class — it spelled `\[?…\]?` — and then implemented that decision over the single pair the first corpus
+happened to show. Nothing chose `[` over `(`. So a parenthesised address failed at byte 0, was not
+digit-leading, carried no byte in the pre-gate's separator set, and fell to rule 6 literal KEEP — and six
+template rows of a **published** render carry a real third-party IPv4 for that reason, inside the section
+where a reader has been told the addresses are gone.
+
+Two facts about its shape, both measured rather than assumed:
+
+- **Only the OPENING byte was ever the defect.** A trailing closer leaves byte 0 a digit, so `10.0.0.1)`
+  was always masked by the digit-leading rule. An opener destroys digit-leading and leaves rule 4 the only
+  rule that can see the token. The closers matter as the shell's trailing half, never as an entry point.
+- **The hash class needed the *pre-gate*, not a second shell.** A hex run ≥ 16 inside `[…]` already
+  normalized to `[<*>]` — not because rule 3 tolerates a shell (it requires the whole token) but because
+  `[` sat in the pre-gate's separator set, so `embedded-identity` got a look. `(` did not, so the same hash
+  in parentheses was kept whole. A wrapped *UUID* escaped only by accident (a UUID carries `-`, which was
+  in the set), and that accident is what hid the hex case. Widening the pre-gate reproduces the normal form
+  the bracketed and UUID forms already produced, instead of minting a second one for one class.
+
+The shell widens **which punctuation** a rule tolerates, never **what it matches**: `(anonymous)`,
+`(reserved)`, `(1.2.3)` and `(v1.2.3.4)` all stay literal. Measured on 32 000 lines of real third-party
+logs across 16 producers, the repair moves **3 templates out of 6712**.
+
 ---
 
 ## 4. The composite normalizers (keep-class, mask-instance)
@@ -113,7 +144,7 @@ instance. Tried in order; first match wins.
 | **bracket-index** | `<word>[<short-alpha?><digits>]` | keep the word + class marker, mask the index | `make[2]:` → `make[<*>]:` · `[gw0]` → `[gw<*>]` |
 | **hash-counter** | `#<digits>` (no alnum may trail) | keep `#`, mask the index | `step #26` → `step #<*>` |
 | **marker-number** | `<currency-marker><digit-core>[.<digits>]` | keep the marker, mask the number | `$463.50` → `$<*>` |
-| **embedded-identity** | a UUID (`8-4-4-4-12`) or a hex run ≥ 16, *inside* a larger token not under a declared ephemeral root | mask the id in place, keep surrounding structure | `~/.cache/gradle/f7f6…2680/lib.jar` → `~/.cache/gradle/<*>/lib.jar` |
+| **embedded-identity** | a UUID (`8-4-4-4-12`) or a hex run ≥ 16, *inside* a larger token not under a declared ephemeral root — including one whose only structure is a wrapper shell (§3.2) | mask the id in place, keep surrounding structure | `~/.cache/gradle/f7f6…2680/lib.jar` → `~/.cache/gradle/<*>/lib.jar` · `(d41d…427e)` → `(<*>)` |
 | **kv-value** | `<key>=<digit-leading-value>` (strips a leading currency marker first) | keep the key (+ marker), mask the value | `order=100000` → `order=<*>` · `total=$18` → `total=$<*>` |
 
 **The ephemeral-root catalog is also consulted from inside source-location.** A per-run instance directory in
