@@ -84,6 +84,20 @@ packages="$(grep -m1 '^# semantic_packages ' "$first_out" | sed 's/^# semantic_p
   [ -n "$identity" ] && echo "- \`$identity\`"
   [ -n "$packages" ] && echo "- \`$packages\`"
   echo
+  # THE PAGE MUST SAY WHICH RUN IT IS, and it cannot date itself: this script renders on demand,
+  # has no release version to stamp, and a wall clock in a published artifact is exactly what the
+  # replay check above exists to forbid. So it says what the two bullets ARE — one run's vocabulary
+  # — and points at the sibling folder that carries a release stamp. Measured cost of not having
+  # this: the committed render sat fifteen cuts old, publishing a three-package set at github@1.3.0
+  # while the shipped engine composed four at github@1.4.0, and no reader could have known.
+  # NOTE the pointer is deliberately NOT "determinism/ is newer" — it is not always: on 2026-08-18
+  # this page re-rendered at stateless-masks-11 while determinism/ still held the v1.9.5 snapshot.
+  # What is durably true is only that one of the two carries a version stamp and this one does not.
+  echo "The two lines above are the canon vocabulary of **this run** — not a standing version claim."
+  echo "This page is rendered on demand, not at every release cut, so read it as a snapshot of one"
+  echo "run. The release-stamped evidence lives beside it in [\`determinism/\`](../../determinism/),"
+  echo "which is regenerated at each cut and names the version it belongs to."
+  echo
   echo "## What each \`*.canon.txt\` shows"
   echo
   echo "Per source log, Canon emits three sections:"

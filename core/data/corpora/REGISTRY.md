@@ -6,10 +6,16 @@ governance — an INTERNAL CodeRoast decision record, not shipped with this repo
 **Rules (ADR-7):**
 - A committed test/gate references a corpus **by the `id` below**, resolving to a **repo-local
   fixture** (e.g. the determinism `proof/corpus/`) or a **pinned + checksummed** asset — **never** an
-  untracked `data/logs/` path. Public-safe **sample slices no longer live in canon git**: they live
-  in `coderoast-corpora/<platform>_corpora/<corpus>/samples/` (§2a gate `_shared/samples_safety_lint.py`)
-  and publish to the **public hub** via the corpora Sample Release workflow; the canon *showcase*
-  fetches them from the hub (a client-facing render, not a gate — ADR 0016 §5).
+  untracked `data/logs/` path. **Sample slices no longer live in canon git**: they live
+  in `coderoast-corpora/<platform>_corpora/<corpus>/samples/` and publish to the **public hub** via
+  the corpora Sample Release workflow; the canon *showcase* fetches them from the hub (a
+  client-facing render, not a gate — ADR 0016 §5). What decides that a slice may publish is the
+  fail-closed §2a gate `_shared/samples_safety_lint.py`, and it decides **two independent axes,
+  ANDed** — never either: the **right** to redistribute (an `ATTRIBUTION.md` naming a permissive
+  source, or a `SLICE.json` declaring the tree synthetic) **and** a **content** scan that refuses
+  declared identifying-content classes. A licence grants redistribution and says nothing about what
+  is in the bytes. The scan matches declared byte shapes one line at a time, so a pass means *no
+  declared class fired* — **never** *these bytes are safe*. It is a floor, not a certificate.
 - Big bytes are **not** in git (no LFS); they live in the private warehouse **`coderoast-corpora`**
   (tooling + materialized data + pinned Release assets) and materialize there via the acquisition
   recipe. Only this `data/corpora/` tree (registry + READMEs) is tracked, in canon.
@@ -43,9 +49,9 @@ Do not relocate them here.
 | **eidos-fuzz** | parse-path fuzz replay set (minimized) + curated seeds | `insight-eidos/fuzz/corpus/` | `parse_fuzzer` (libFuzzer/ASAN gate) |
 | **playground-red** | cube REDs + e2e scenario fixtures (1:1 scenario↔test) | `coderoast-server/insight-playground/` | the e2e regression suite |
 
-## Public-safe sample slices (ADR 0016 §5 — home moved to the warehouse + hub)
+## Published sample slices (ADR 0016 §5 — home moved to the warehouse + hub)
 
-Each big corpus's small, deterministic **public-safe slice** lives at
+Each big corpus's small, deterministic **published slice** lives at
 `coderoast-corpora/<platform>_corpora/<corpus>/samples/` — **not** in canon git. Its purpose is now a
 **client-facing showcase** (canon's `det_proof` run over it, published as evidence — the
 [Samples Showcase](../../../.github/workflows/samples-showcase.yaml) workflow fetches from the hub),
@@ -54,11 +60,18 @@ fixture, and the end-to-end coverage is owned by Eidos + the playground e2e. So 
 in-git slice, and the slices were removed from canon (the CC-BY LogHub `_2k` set + the ci-revert
 synthetic fixture).
 
-**A published slice MUST be public-safe by construction (§2a).** For a **first-party / redistributable**
+**A published slice MUST clear both §2a axes (§2a).** For a **first-party / redistributable**
 corpus (LogHub CC-BY-4.0) the slice is real bytes + an `ATTRIBUTION.md`; for a **third-party / private**
 corpus (`ci-revert`, `jenkins-markers`) it is a **synthetic shape-fixture** (`SLICE.json "synthetic":
 true`) — never real crawled logs; the real-data gates run private on a trusted runner. Two lints
 enforce it, fail-closed, before anything is published: the warehouse
-`coderoast-corpora/_shared/samples_safety_lint.py` (every `*/samples/` is synthetic-or-attributed) and
+`coderoast-corpora/_shared/samples_safety_lint.py` (RIGHT **and** CONTENT, per the Rules above) and
 the workspace [`corpus_registry_lint.py`](../../../scripts/corpus_registry_lint.py) Rule D (no
 third-party-class corpus has committed bytes in canon's public tree).
+
+> **The phrase "public-safe by construction" is retired and must not come back.** It stated a
+> verdict the instrument cannot reach, and it is what carried a real third-party operational corpus
+> onto the public hub and into 16 published release tarballs — a licence-only gate reading as a
+> content guarantee. The gate's own header now names its bound; this page must not restate it more
+> confidently than the gate does. Attribution + a declared class list is what a published
+> third-party slice is carried on: **declared, not asserted clean.**
