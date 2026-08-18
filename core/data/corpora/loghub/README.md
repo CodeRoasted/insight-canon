@@ -11,7 +11,7 @@ governance (an internal CodeRoast record, not shipped here).
   all-format structural sweep, the template-lattice / format-relative gate. *This arc is closed*
   (the disposable `insight_cube` pkg was deleted at the 1.6.0 verdict, adr/0018) — LogHub is
   retained for what follows.
-- **Cross-stdlib determinism measurement**: a large, messy, real input for the gcc-15/libstdc++ ≡
+- **Cross-stdlib determinism measurement**: a large, messy, real input for the gcc-16.2/libstdc++ ≡
   clang-21/libc++ diagonal.
 - **Rich-format AMI re-measure**: base-vs-lattice AMI on a genuinely rich format. The cube itself
   is no longer conditioned on it — it ships always-on since 1.7.2 (no opt-in flag).

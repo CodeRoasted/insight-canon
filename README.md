@@ -169,9 +169,9 @@ insight-canon/
 │   ├── data/corpora/       Tracked corpus registry + smoke slices (ADR 0016)
 │   └── test_package/       Conan consumer smoke test (zero-init, import insight.canon only)
 ├── semantic/               The vocabulary packages (statically composed, Apache-2.0)
-│   ├── github/             insight_semantic_github — GitHub Actions / Azure dialect (rows + strategy)
+│   ├── github/             insight_semantic_github — GitHub Actions / Azure dialect (rows)
 │   ├── gitlab/             insight_semantic_gitlab — GitLab CI dialect (rows + strategy)
-│   ├── jenkins/            insight_semantic_jenkins — Jenkins dialect (rows + strategy)
+│   ├── jenkins/            insight_semantic_jenkins — Jenkins dialect (rows)
 │   └── test_frameworks/    insight_semantic_test_frameworks — test-file location families
 ├── bench/                  insight_canon_bench — the composed perf harness (SRC-SP-5 gate)
 ├── proof/                  Public determinism proof gate (composes core + every package)
