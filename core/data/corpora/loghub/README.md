@@ -51,7 +51,7 @@ BGL / Thunderbird carry an **alert-label column 1** (`-` = normal; `KERNDTLB`/`A
 class). The loader strips col-1 **only** where the sentinel-rate detector confirms it exists (the 14
 message-leading formats keep col-1 as real message).
 
-## Public-safe sample slice (ADR 0016 §5)
+## Published sample slice (ADR 0016 §5)
 
 The LogHub per-format **`*_2k.log`** set (16 files, 2000 lines each) — the canonical small,
 deterministic, all-format input — plus `ATTRIBUTION.md` (CC-BY-4.0 credit + the "no changes / full

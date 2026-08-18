@@ -119,7 +119,7 @@ reference, and **zero rows reference a file that is not on disk** in either corp
 posture). Materializes under the warehouse's gitignored `coderoast-corpora/github_corpora/revert_corpus/data/v1/full/`
 (`corpus.jsonl`, `log_annotated/`, `log_stripped/`, `manifest/`).
 
-## Public-safe sample slice — SYNTHETIC (public-safe by construction, ADR 0016 §2a + §5)
+## Published sample slice — SYNTHETIC (ADR 0016 §2a + §5)
 
 Because ci-revert is third-party/private, its public slice is a **fully synthetic, clearly-labelled
 *shape* fixture** — fabricated repos/content, **zero third-party bytes** — living at
