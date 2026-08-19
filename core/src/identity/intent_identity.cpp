@@ -3,6 +3,18 @@ import insight.canon.internal;
 
 // intent_identity.cpp — the canon-owned INTENT identity (bibles/intent_identity.md §2-§4).
 //
+// CLOSURE MODEL — geometry TREE, axis species POPULATION (ADR-25.D6 routes it). What this file
+// constructs are identities INCOMPARABLE WITHIN ONE EXECUTION: matrix legs, shards and
+// version-parameterized jobs of one intent are exchangeable siblings, not one identity shifted
+// along an axis. So the relation is Intent, and the algebra is ALIGNMENT (ADR-18) — never
+// compose/baseline. The complementary ORDINAL axis (BuildId) is applied by the aligner above,
+// which is what makes a Continuation reading an Intent reading via an axis; nothing here knows
+// it, and a compose/pyramid reading of this class is the category error ADR-25.D6 names.
+//
+// VOCABULARY TRAP, written out because the word is overloaded on the opposite subject: the
+// "ordinal" refused below (`discriminant_of`, "never a masked ordinal") is an APPEARANCE
+// ordinal — a forbidden identity key. It is not the ordinal AXIS SPECIES of the line above.
+//
 // `canonicalize_intent` is the templating discipline of the stateless value masker
 // (canon.detail.mask, SRC-D-TID-1/SRC-D-TID-2) REAPPLIED to identifiers — the
 // closure-as-identity-constructor make-or-break (§5.1 detail 1). It is a DISTINCT rule set from the
