@@ -719,6 +719,31 @@ inline void sv_skip_ws(std::string_view& str) noexcept
     return result;
 }
 
+// The PROJECTION-TOTALITY-safe form of sv_take_until, for the case where the delimiter is what
+// TERMINATES a named field rather than merely what separates two of them (DN-43.D6).
+//
+// sv_take_until's no-delimiter branch hands back the WHOLE remainder and leaves `str` empty. A
+// caller that names the result — `component = sv_take_until(rest, ':'); content = rest;` —
+// therefore moves the entire message body onto a cube dimension and empties `content` on any line
+// the delimiter is missing from. That line then templates to the SHA-256 prefix of the empty
+// string, a universal collision bucket published on the wire as an ordinary identity, and the
+// component it invented is high-card free text on the cube's WHERE axis. It is the exact defect
+// DN-43 was opened for, and bounding one caller (SyslogStrategy) did not reach the branch's SHAPE
+// at the others.
+//
+// Here the field is simply NOT NAMED when its terminator is absent: `str` is left untouched, so
+// every byte survives into the caller's `content`, and an empty component is a positive statement
+// that this line declares no functional source — the direction ADR-16.D5's fail-safe KEEP demands,
+// and strictly cheaper than dropping the line (which would cost the timestamp and the declared
+// level the header already yielded).
+[[nodiscard]] constexpr std::string_view sv_take_until_or_none(std::string_view& str,
+                                                               char delim) noexcept
+{
+    if (str.find(delim) == std::string_view::npos)
+        return {};
+    return sv_take_until(str, delim);
+}
+
 // Take exactly n chars; advance str by n (capped at str.size()).
 // substr(0,actual) has pos arg 0; substr(actual) has actual = min(n,size) <= size — cannot throw.
 // NOLINTNEXTLINE(bugprone-exception-escape)

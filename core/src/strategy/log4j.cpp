@@ -141,9 +141,12 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
     (void)sv_take_bracketed(rest); // skip [thread]
     sv_skip_ws(rest);
 
-    // Component is until ':' or " -"
-    const std::string_view component{sv_take_until(rest, ':')};
-    // sv_take_until already consumed ':', rest is now " msg" or "- msg"
+    // Component is until ':' or " -". The colon TERMINATES it, so its absence means this line names
+    // no component — not that the component is the rest of the line (DN-43.D6,
+    // sv_take_until_or_none): the unbounded form emptied `content` and put the whole message on the
+    // cube's WHERE axis.
+    const std::string_view component{sv_take_until_or_none(rest, ':')};
+    // the delimiter (when present) is already consumed, rest is now " msg" or "- msg"
     sv_skip_ws(rest);
     if (!rest.empty() && rest[0] == '-')
         (void)sv_take_token(rest);

@@ -37,7 +37,10 @@ std::expected<ParsedLine, std::string> SparkHDFSStrategy::parse(std::string_view
         sv_skip_ws(rest);
 
         const std::string_view level_sv{sv_take_token(rest)};
-        const std::string_view component{sv_take_until(rest, ':')};
+        // The colon TERMINATES the component; absent it this line names none (DN-43.D6). The
+        // unbounded sv_take_until emptied `content` and moved the message onto the cube's WHERE
+        // axis — the defect shape DN-43 repaired at SyslogStrategy and left live here.
+        const std::string_view component{sv_take_until_or_none(rest, ':')};
         sv_skip_ws(rest);
 
         ParsedLine parsed_line;
@@ -69,7 +72,7 @@ std::expected<ParsedLine, std::string> SparkHDFSStrategy::parse(std::string_view
 
         (void)sv_take_token(rest); // skip record count / thread id
         const std::string_view level_sv{sv_take_token(rest)};
-        const std::string_view component{sv_take_until(rest, ':')};
+        const std::string_view component{sv_take_until_or_none(rest, ':')}; // see the Spark arm
         sv_skip_ws(rest);
 
         ParsedLine parsed_line;

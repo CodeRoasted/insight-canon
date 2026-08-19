@@ -985,6 +985,31 @@ TEST_F(Log4jStrategyTest, ParsesOpenStackLine)
     EXPECT_NE(pl.component.find("nova"), std::string::npos);
 }
 
+// PROJECTION TOTALITY on the branch the ProjectionIsTotal family structurally cannot see: that
+// family feeds each strategy its CANONICAL line, and a canonical line always carries the delimiter.
+// The defect is found by DEGRADING the input, never by mutating the code — a colon-less line drove
+// sv_take_until's no-delimiter branch, which returns the WHOLE remainder, so `component` became the
+// message body (high-card free text on the cube's WHERE axis, published unmasked) and `content`
+// became EMPTY (the SHA-256 prefix of the empty string, the universal collision bucket). DN-43
+// repaired this shape at SyslogStrategy by bounding its tag search and called the no-delimiter
+// branch "unreachable"; it was unreachable only from that caller.
+TEST_F(Log4jStrategyTest, ColonlessStandardLineNamesNoComponentAndKeepsEveryByte)
+{
+    static constexpr std::string_view kNoColon{
+        "2015-10-18 18:01:47,978 INFO [main] startup complete after 12 s"};
+    auto result{strategy.parse(kNoColon, arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const auto& pl{result.value()};
+    EXPECT_EQ(pl.content, "startup complete after 12 s")
+        << "content = \"" << pl.content << "\" component = \"" << pl.component << "\"";
+    EXPECT_TRUE(pl.component.empty()) << "the colon TERMINATES the component; absent it the line "
+                                         "names none, it does not name the "
+                                         "whole message; component = \""
+                                      << pl.component << "\"";
+    EXPECT_EQ(pl.level, LogLevel::Info) << "the header's declared level is still recovered";
+    EXPECT_TRUE(pl.timestamp.has_value()) << "and so is the event time";
+}
+
 TEST_F(Log4jStrategyTest, RejectsNonLog4jLine)
 {
     EXPECT_FALSE(strategy.parse(kBSDLine, arena).has_value());
@@ -1042,6 +1067,33 @@ TEST_F(SparkHDFSStrategyTest, ParsesHDFSLine)
     EXPECT_EQ(pl.level, LogLevel::Info);
     EXPECT_EQ(pl.component, "dfs.DataNode$PacketResponder");
     EXPECT_NE(pl.content.find("PacketResponder"), std::string::npos);
+}
+
+// Both arms, same degraded input, same defect as the Log4j case above — SparkHDFS is the only
+// strategy carrying the shape twice, so both are driven rather than one and an inference.
+TEST_F(SparkHDFSStrategyTest, ColonlessLinesNameNoComponentAndKeepEveryByte)
+{
+    static constexpr std::string_view kSparkNoColon{"17/06/09 20:10:40 INFO shutting down cleanly"};
+    static constexpr std::string_view kHdfsNoColon{
+        "081109 203615 148 INFO waiting for block report"};
+
+    auto spark{strategy.parse(kSparkNoColon, arena)};
+    ASSERT_TRUE(spark.has_value()) << spark.error();
+    EXPECT_EQ(spark.value().content, "shutting down cleanly")
+        << "content = \"" << spark.value().content << "\" component = \"" << spark.value().component
+        << "\"";
+    EXPECT_TRUE(spark.value().component.empty())
+        << "component = \"" << spark.value().component << "\"";
+    EXPECT_EQ(spark.value().level, LogLevel::Info);
+
+    auto hdfs{strategy.parse(kHdfsNoColon, arena)};
+    ASSERT_TRUE(hdfs.has_value()) << hdfs.error();
+    EXPECT_EQ(hdfs.value().content, "waiting for block report")
+        << "content = \"" << hdfs.value().content << "\" component = \"" << hdfs.value().component
+        << "\"";
+    EXPECT_TRUE(hdfs.value().component.empty())
+        << "component = \"" << hdfs.value().component << "\"";
+    EXPECT_EQ(hdfs.value().level, LogLevel::Info);
 }
 
 TEST_F(SparkHDFSStrategyTest, RejectsNonMatchingLines)
