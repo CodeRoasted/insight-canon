@@ -166,8 +166,19 @@ TEST(GithubRoles, DeclaredPeelThenTokenizerPlainGhaLineHasNoRole)
 }
 
 // The COST of not declaring, pinned so nobody rediscovers it as a bug. An empty stack's peel is the
-// identity, so the stamp survives into `content` and the line-anchored role rows do not match. This
-// is fail-closed on DEPTH, not on the run — the line still tokenizes.
+// identity, so the stamp survives into `content` and the line-anchored role rows — which match
+// strictly at offset 0 — cannot fire. This is fail-closed on DEPTH, not on the run: the line still
+// tokenizes, keeps every byte, and masks the stamp instance away.
+//
+// The MECHANISM is asserted, not narrated, and that is the whole point of this arm. It was green
+// for nine canonicalization generations for a reason that was false the day it was written: the
+// stamp did NOT survive into `content` — SyslogStrategy claimed the line, ate the level word as a
+// hostname, moved the message body onto `component` and left `content` EMPTY, and classify("") is
+// None. A role assertion alone cannot tell "the stamp blocks the row" from "the projection was
+// destroyed", so it must be paired with evidence that the bytes are still there. `CanonicalEvent`
+// carries no content, so the seam that proves it is the masker's output: the stamp is one
+// digit-leading whole token, so it reaches the template as a single leading `<*>` and its raw bytes
+// reach `params[0]`. Both would be absent had anything peeled it content-side (DN-43.D12).
 TEST(GithubRoles, TokenizerSeesTheStampWithoutADeclaration)
 {
     const ComposedSemantics composed{
@@ -184,5 +195,13 @@ TEST(GithubRoles, TokenizerSeesTheStampWithoutADeclaration)
     EXPECT_EQ(event->structural_role, StructuralRole::None)
         << "an undeclared transport leaves the delivery stamp at the head of the content, so a "
            "line-anchored role row cannot match — declaring is the path to depth";
+    EXPECT_TRUE(event->template_str.starts_with("<*> ##[error]"))
+        << "the stamp must still be in `content` when the masker runs, as its own leading token; "
+           "template_str = \""
+        << event->template_str << "\"";
+    ASSERT_FALSE(event->params.empty()) << "template_str = \"" << event->template_str << "\"";
+    EXPECT_EQ(event->params.front(), "2026-05-27T15:42:03.4000004Z")
+        << "the masked leading position must carry the stamp's own bytes; params[0] = \""
+        << event->params.front() << "\"";
 }
 // NOLINTEND

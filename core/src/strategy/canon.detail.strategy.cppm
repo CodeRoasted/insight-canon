@@ -311,6 +311,16 @@ export namespace insight::tokenization
 // line capture the strategy for the rest of the file — the starvation RawTextStrategy's constant
 // 0.0 exists to prevent.
 //
+// It READS the stamp and KEEPS its bytes (DN-43.D12, the SPI's naming-totality rule). `content` is
+// the WHOLE line: the stamp is exactly what the declared transport row `api-rfc3339-line-prefix`
+// peels, so its layer is undecidable content-side and only a declaration may remove it — the remedy
+// for a validated field of undecidable LAYER is *read, never remove*. That makes projection
+// totality trivial here rather than argued (`content.empty()` iff the line is empty), and it costs
+// nothing at the template grain: a bare digit-leading stamp is one whitespace-delimited token and
+// masks to a single leading `<*>`, which is why `normalize_bracket_timestamp` had to exist for the
+// BRACKETED sibling and nothing had to exist for this one. The strategy is not deleted, because the
+// event time is recovered by the READING, and that is the half we keep.
+//
 // `component` is left EMPTY: the layout names no functional source, and saying so is a fact where
 // inventing one would be a fabrication on the cube's WHERE axis. The BSD prefix gets no sibling —
 // `Mon DD HH:MM:SS` carries no year and collides with prose, so consuming it would fabricate an

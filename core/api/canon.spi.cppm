@@ -205,6 +205,34 @@ class IFormatStrategy
     // bucket shared by every content-less line of every stream — and it is published on the wire as
     // an identity like any other, indistinguishable from a rare but honest empty body. An empty
     // template is legitimate; an empty PROJECTION is not.
+    //
+    // ⚠ NAMING TOTALITY, the third rule and the gap the other two leave (DN-43.D11):
+    //
+    //     A strategy's removal of bytes from `content` is admissible only if BOTH hold:
+    //     (1) ENTITLEMENT BY GRAMMAR — the claim predicate structurally validated that byte range;
+    //     (2) ENTITLEMENT BY LAYER — that the range belongs to the RECORD rather than to a DELIVERY
+    //         ENVELOPE is decidable from the line's own bytes.
+    //     A leading field followed by an unconstrained remainder is not a header — it is a STAMP,
+    //     and a stamp leaves `content` only by a declared transport peel. A strategy that
+    //     recognizes one MAY read it into a typed ParsedLine field and MUST leave its bytes in
+    //     `content`.
+    //
+    // The other two rules quantify over what the strategy NAMED, so both are satisfiable by naming
+    // MORE: a `<stamp><free text>` grammar satisfies the claim rule vacuously (the grammar is fully
+    // determined by the prefix precisely because the grammar IS the prefix) and projection totality
+    // trivially. Condition (2) is decidable rather than a judgment call, and the test is one
+    // lookup: does a row of the DECLARED transport catalogue (a closed, versioned artifact —
+    // ADR-23.D3) produce exactly the shape the strategy claims? If so the shape is
+    // transport-ambiguous and unremovable content-side, because provenance is DECLARED, never
+    // detected (ADR-23.D5 — never a content-side workaround for an absent declaration). If not, the
+    // removal is entitled: no catalogue row emits syslog's `TIMESTAMP HOST TAG:`, which is why that
+    // three-field header removal stands. A NEW catalogue row therefore re-opens the question for
+    // every strategy whose shape it begins to produce.
+    //
+    // The two failure modes carry DIFFERENT remedies and conflating them produces a wrong fix:
+    // failing (1) — an unvalidated field — means VALIDATE OR DECLINE; failing (2) — a validated
+    // field of undecidable layer — means READ, NEVER REMOVE, because the ambiguity is not in the
+    // bytes' shape but in their provenance and no tightening of the grammar can reach it.
     [[nodiscard]] virtual std::expected<ParsedLine, std::string>
     parse(std::string_view line, ArenaAllocator& arena) const = 0;
 

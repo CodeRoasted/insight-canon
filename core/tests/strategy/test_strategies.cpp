@@ -678,9 +678,12 @@ class Rfc3339TextStrategyTest : public ::testing::Test
     ArenaAllocator arena{4096};
 };
 
-// The whole slot in one arm: the timestamp SURVIVES (that is what killed bare rejection to raw
-// text), the projection is total, the level is read from the content, and `component` is empty
-// rather than invented.
+// The whole slot in one arm, and the name is exact only after DN-43.D12: the stamp is READ (the
+// event time survives — that is what killed bare rejection to raw text) and its BYTES ARE KEPT, so
+// `content` is the whole line. Removing them would be the content-side workaround for an absent
+// declaration ADR-23.D5 forbids. The level is still inferred from the POST-STAMP remainder, which
+// is the assertion that separates this disposition from the one that scans `content` from byte 0
+// and loses the level word to the stamp's share of the leading head.
 TEST_F(Rfc3339TextStrategyTest, KeepsTheStampAndProjectsTheWholeRemainder)
 {
     const std::string_view line{kRfc3339AppLine};
@@ -689,10 +692,41 @@ TEST_F(Rfc3339TextStrategyTest, KeepsTheStampAndProjectsTheWholeRemainder)
     ASSERT_TRUE(result.has_value());
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value()) << "the event time is what MetaLog windows on";
-    EXPECT_EQ(pl.content, "INFO request method=GET path=/api/users/1000 status=200");
-    EXPECT_EQ(pl.level, LogLevel::Info);
+    EXPECT_EQ(pl.content, line) << "the stamp's bytes must stay: content = \"" << pl.content
+                                << "\"";
+    EXPECT_TRUE(pl.content.starts_with("2026-05-31T08:00:01Z"))
+        << "content = \"" << pl.content << "\"";
+    EXPECT_EQ(pl.level, LogLevel::Info)
+        << "inferred from the post-stamp remainder, not from byte 0";
     EXPECT_FALSE(pl.level.is_declared());
     EXPECT_TRUE(pl.component.empty()) << "component = \"" << pl.component << "\"";
+}
+
+// The level assertion above is satisfiable by a strategy that scans `content` from byte 0, because
+// `INFO` still lands inside the leading head on THAT line — so on its own it is a can't-FAIL arm
+// for the mechanism DN-43.D12 calls load-bearing. This line is the discriminating one, and it took
+// a mutation run to make it so: the stamp plus a bracketed worker tag put the level word at byte
+// 45, past infer_leading_log_level's 40-byte LEADING head, so a byte-0 scan cannot reach it in
+// stage 1. The level must be NON-ALERTING for the arm to discriminate at all — stage 2's cue scan
+// carries a 128-byte head and the words ERROR/FATAL are themselves failure cues, so an alerting
+// level is recovered from byte 0 anyway and the arm goes green under the very mutation it exists to
+// catch (measured: the first draft of this test passed under it). Bound the scan, never the claim
+// (ADR-20). Both mutations red here: removing the stamp's bytes reds the content assert, scanning
+// `content` instead of the post-stamp remainder reds the level assert.
+TEST_F(Rfc3339TextStrategyTest, InfersTheLevelPastAStampThatSpendsTheLeadingHead)
+{
+    static constexpr std::string_view kHeadSpendingLine{
+        "2026-05-31T08:00:01.123456Z [worker-7-of-16] INFO batch 4 of 9 dispatched"};
+    EXPECT_GT(strategy.confidence(kHeadSpendingLine), 0.0);
+    auto result{strategy.parse(kHeadSpendingLine, arena)};
+    ASSERT_TRUE(result.has_value());
+    const auto& pl{result.value()};
+    EXPECT_EQ(pl.content, kHeadSpendingLine) << "content = \"" << pl.content << "\"";
+    EXPECT_EQ(pl.level, LogLevel::Info)
+        << "the level word starts at byte 45 of the WHOLE line, past the leading head, so a byte-0 "
+           "scan reads inferred(Unknown); level = "
+        << to_string(pl.level.value());
+    EXPECT_FALSE(pl.level.is_declared());
 }
 
 // DISJOINTNESS, from this side. Without it the sticky latch starves one of the two strategies for

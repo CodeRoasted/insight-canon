@@ -10,7 +10,8 @@ import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitive
 // The contract, the disjointness argument and the empty-component ruling live on the class
 // declaration in canon.detail.strategy.cppm.
 //
-// Zero-copy: `line` is arena-stable when parse() is invoked, so `content` is a tail subview of it.
+// Zero-copy: `line` is arena-stable when parse() is invoked, so `content` IS it — nothing is
+// removed, and the post-stamp remainder the level is inferred from is a tail subview.
 
 namespace insight::tokenization
 {
@@ -31,10 +32,19 @@ std::expected<ParsedLine, std::string> Rfc3339TextStrategy::parse(std::string_vi
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
     parsed_line.timestamp = EventTime::parsed(utils::parse_iso8601(raw_ts));
-    // TOTAL by construction: every byte past the stamp is content. Nothing is named, so nothing may
-    // be dropped (DN-43.D6).
-    parsed_line.content = rest;
-    parsed_line.level = utils::infer_leading_log_level(parsed_line.content);
+    // NAMING TOTALITY (DN-43.D12): the stamp is READ, never REMOVED. `<stamp><unconstrained
+    // remainder>` is not a header — the declared transport row `api-rfc3339-line-prefix` peels
+    // exactly this shape, so the stamp's LAYER (record or delivery envelope) is undecidable from
+    // the line's own bytes and only a declaration settles it. Removing it here would assert "these
+    // bytes are not this record's" on no authority — an over-claim at the projection grain, and the
+    // content-side workaround for an absent declaration ADR-23.D5 forbids in terms.
+    parsed_line.content = line;
+    // Scanned from the POST-STAMP remainder, never from `content`: infer_leading_log_level's
+    // leading head is a RAW-BYTE budget and an RFC-3339 stamp spends most of it, so scanning from
+    // byte 0 would push the level word out of the head — the exact proxy-over-presentation-bytes
+    // defect ADR-20's "bound the scan, never the claim" was learned on. The strategy knows where
+    // the field ends, so it scans from there while the bytes stay in `content`.
+    parsed_line.level = utils::infer_leading_log_level(rest);
     // `component` is deliberately left empty — see the class declaration: the layout names no
     // functional source. `host` likewise: this layout carries no node identity.
     INSIGHT_LOG_DEBUG(logging::strategy_logger(), "strategy=Rfc3339Text parsed level={} has_ts={}",
