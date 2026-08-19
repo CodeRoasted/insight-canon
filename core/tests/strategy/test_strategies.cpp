@@ -476,7 +476,11 @@ TEST_F(CLFStrategyTest, ParsesCommonLogFormat)
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.level, LogLevel::Info);
-    EXPECT_EQ(pl.component, "127.0.0.1");
+    // DN-43.D8: the client IP is a NODE IDENTITY, so it lands in `host`, and `component` states —
+    // positively — that this layout declares no functional source. Both halves are asserted: an
+    // arm that only checked `component` would pass on a strategy that simply dropped the address.
+    EXPECT_EQ(pl.host, "127.0.0.1");
+    EXPECT_TRUE(pl.component.empty()) << "component = \"" << pl.component << "\"";
     EXPECT_NE(pl.content.find("GET"), std::string::npos);
     EXPECT_NE(pl.content.find("200"), std::string::npos);
 }
@@ -588,6 +592,123 @@ TEST_F(SyslogStrategyTest, TruncatedSyslogReturnsError)
 TEST_F(SyslogStrategyTest, ConfidenceZeroForKVLine)
 {
     EXPECT_EQ(strategy.confidence(kKVLine), 0.0);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SyslogStrategy — the CLAIM is the header, not the prefix (DN-43.D1/D3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Clause 1. A level word standing where a hostname belongs is the mechanism that produced the
+// published all-INFO window: `(void)sv_take_token` ate `INFO` as a host and the level was never
+// read. The assertion is on `confidence()`, not on `parse()` — the gate is what routes, and a
+// parse-only guard would drop the line instead of re-routing it.
+TEST_F(SyslogStrategyTest, ClaimsNothingWhenTheHostSlotHoldsALevelWord)
+{
+    for (const std::string_view line :
+         {"2026-05-31T08:00:01Z INFO request method=GET path=/api/users/1000 status=200",
+          "2026-05-31T09:00:01Z ERROR upstream timeout service=payments after_ms=80",
+          "2026-05-31T08:02:03Z DEBUG db query=select_orders duration_ms=15 rows=2",
+          "2026-05-31T09:01:02Z WARN slow request path=/api/report latency_ms=103"})
+    {
+        EXPECT_EQ(strategy.confidence(line), 0.0) << "claimed: " << line;
+        EXPECT_FALSE(strategy.parse(line, arena).has_value()) << "parsed: " << line;
+    }
+}
+
+// The opposite direction, and it is what keeps the arm above from being satisfiable by a bare
+// rejection of the whole RFC-3339 shape: a genuine RFC-3339 SYSLOG line still scores.
+TEST_F(SyslogStrategyTest, StillClaimsARealRfc3339SyslogLine)
+{
+    constexpr std::string_view line{"2026-05-31T08:00:01Z web01 nginx[2451]: GET /api/users 200"};
+    EXPECT_GT(strategy.confidence(line), 0.5);
+    auto result{strategy.parse(line, arena)};
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result.value().component, "nginx");
+    EXPECT_EQ(result.value().content, "GET /api/users 200");
+}
+
+// Clause 2. The tag search is bounded to ONE token, so a stray colon deeper in the message can no
+// longer terminate it — the defect that made `cache key=session:1021 hit=true` yield the component
+// `cache key=session` and the content `1021 hit=true`.
+TEST_F(SyslogStrategyTest, TagSearchIsBoundedToOneTokenSoAStrayColonCannotSplitTheMessage)
+{
+    constexpr std::string_view line{
+        "Jan 15 08:03:22 web01 app[1893]: cache key=session:1021 hit=true"};
+    auto result{strategy.parse(line, arena)};
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result.value().component, "app");
+    EXPECT_EQ(result.value().content, "cache key=session:1021 hit=true");
+}
+
+// A colon INSIDE the `[…]` pair is not a tag colon: `sshd[12:34]` alone does not qualify.
+TEST_F(SyslogStrategyTest, ClaimsNothingWhenTheOnlyColonIsInsideTheBracketPair)
+{
+    constexpr std::string_view line{"Jan 15 08:03:22 web01 sshd[12:34] connection closed"};
+    EXPECT_EQ(strategy.confidence(line), 0.0);
+}
+
+// DN-43.D5: both branches infer the level FROM THE MESSAGE BODY, in the `inferred` species. The BSD
+// arm is asserted here because it is the one the old suite could not see — its only level assertion
+// used a body with no level and no cue, so it held before and after.
+TEST_F(SyslogStrategyTest, InfersTheLevelFromTheBodyOnBothBranches)
+{
+    auto bsd{
+        strategy.parse("Jan 15 08:03:22 web01 sshd[1]: error: PAM authentication failure", arena)};
+    ASSERT_TRUE(bsd.has_value());
+    EXPECT_EQ(bsd.value().level, LogLevel::Error);
+    EXPECT_FALSE(bsd.value().level.is_declared()) << "a body reading is INFERRED, never declared";
+
+    auto rfc{strategy.parse("2026-05-31T08:00:01Z web01 app[9]: WARN disk almost full", arena)};
+    ASSERT_TRUE(rfc.has_value());
+    EXPECT_EQ(rfc.value().level, LogLevel::Warn);
+    EXPECT_FALSE(rfc.value().level.is_declared());
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rfc3339TextStrategy — the LAYOUT split (DN-43.D4)
+// ─────────────────────────────────────────────────────────────────────────────
+
+static constexpr std::string_view kRfc3339AppLine{
+    "2026-05-31T08:00:01Z INFO request method=GET path=/api/users/1000 status=200"};
+
+class Rfc3339TextStrategyTest : public ::testing::Test
+{
+  protected:
+    Rfc3339TextStrategy strategy;
+    ArenaAllocator arena{4096};
+};
+
+// The whole slot in one arm: the timestamp SURVIVES (that is what killed bare rejection to raw
+// text), the projection is total, the level is read from the content, and `component` is empty
+// rather than invented.
+TEST_F(Rfc3339TextStrategyTest, KeepsTheStampAndProjectsTheWholeRemainder)
+{
+    const std::string_view line{kRfc3339AppLine};
+    EXPECT_GT(strategy.confidence(line), 0.0);
+    auto result{strategy.parse(line, arena)};
+    ASSERT_TRUE(result.has_value());
+    const auto& pl{result.value()};
+    EXPECT_TRUE(pl.timestamp.has_value()) << "the event time is what MetaLog windows on";
+    EXPECT_EQ(pl.content, "INFO request method=GET path=/api/users/1000 status=200");
+    EXPECT_EQ(pl.level, LogLevel::Info);
+    EXPECT_FALSE(pl.level.is_declared());
+    EXPECT_TRUE(pl.component.empty()) << "component = \"" << pl.component << "\"";
+}
+
+// DISJOINTNESS, from this side. Without it the sticky latch starves one of the two strategies for
+// the rest of the file.
+TEST_F(Rfc3339TextStrategyTest, ClaimsNothingWhenTheSyslogHeaderIsPresent)
+{
+    constexpr std::string_view line{"2026-05-31T08:00:01Z web01 nginx[2451]: GET /api/users 200"};
+    EXPECT_EQ(strategy.confidence(line), 0.0);
+    EXPECT_FALSE(strategy.parse(line, arena).has_value());
+}
+
+TEST_F(Rfc3339TextStrategyTest, ClaimsNothingWithoutAnRfc3339Prefix)
+{
+    EXPECT_EQ(strategy.confidence(kBSDLine), 0.0);
+    EXPECT_EQ(strategy.confidence(kJSONLine), 0.0);
+    EXPECT_EQ(strategy.confidence("plain build output, no stamp"), 0.0);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1660,9 +1781,17 @@ TEST_F(RawTextStrategyTest, LeadingWhitespaceTrimmedForContinuationGrouping)
 //
 //   FormatReturns           — format() reports the row's LogFormat tag (all rows)
 //   RawLinePreserved        — parse(canonical line) echoes raw_line verbatim
+//   ProjectionIsTotal       — parse(canonical line) keeps message bytes in `content` (all rows)
 //   RejectsCLFAndKV         — parse() fails on both the CLF and the KV sample
 //   ConfidenceZeroForSyslog — confidence(BSD syslog sample) == 0.0 (RFC5424's
 //                             identical assert was formerly ConfidenceZeroForBSD)
+//
+// `canonical_line` is now populated on EVERY row, which deliberately extends RawLinePreserved to
+// the six strategies that had no row in it. The rule above bars an ACCIDENTAL blanket-extension
+// during a mechanical fold; this one is chosen, and it is what makes ProjectionIsTotal — the
+// DN-43.D6 design-time half of the invariant — total over every registered strategy rather than
+// over the two branches DN-43 repairs. Each added line is one an existing per-strategy TEST_F
+// already proves that strategy parses.
 // ─────────────────────────────────────────────────────────────────────────────
 
 struct StrategyCase
@@ -1671,8 +1800,8 @@ struct StrategyCase
     const char* name;
     std::unique_ptr<IFormatStrategy> (*make_strategy)();
     LogFormat format;
-    // RawLinePreserved input: the canonical happy-path line whose raw_line echo is
-    // asserted. Empty ⇒ the strategy has no row in that family.
+    // The canonical happy-path line this strategy CLAIMS — the input for RawLinePreserved and for
+    // ProjectionIsTotal. Populated on every row.
     std::string_view canonical_line{};
     bool rejects_clf_and_kv{false};
     bool confidence_zero_for_syslog{false};
@@ -1768,27 +1897,39 @@ static constexpr std::array kStrategyTable{
     StrategyCase{.name = "NginxError",
                  .make_strategy = make_strategy_instance<NginxErrorStrategy>,
                  .format = LogFormat::NginxError,
+                 .canonical_line = kNginxErrorLine,
                  .rejects_clf_and_kv = true},
     StrategyCase{.name = "RFC5424",
                  .make_strategy = make_strategy_instance<RFC5424Strategy>,
                  .format = LogFormat::RFC5424,
+                 .canonical_line = kRFC5424Line,
                  .rejects_clf_and_kv = true,
                  .confidence_zero_for_syslog = true},
     StrategyCase{.name = "IISW3C",
                  .make_strategy = make_strategy_instance<IISW3CStrategy>,
                  .format = LogFormat::IISW3C,
+                 .canonical_line = kIISW3CLine,
                  .rejects_clf_and_kv = true},
     StrategyCase{.name = "CloudWatch",
                  .make_strategy = make_strategy_instance<CloudWatchStrategy>,
                  .format = LogFormat::CloudWatch,
+                 .canonical_line = kCloudWatchLine,
                  .rejects_clf_and_kv = true},
     StrategyCase{.name = "SystemdJournal",
                  .make_strategy = make_strategy_instance<SystemdJournalStrategy>,
                  .format = LogFormat::SystemdJournal,
+                 .canonical_line = kSystemdJournalLine,
                  .rejects_clf_and_kv = true},
+    StrategyCase{.name = "Rfc3339Text",
+                 .make_strategy = make_strategy_instance<Rfc3339TextStrategy>,
+                 .format = LogFormat::Rfc3339Text,
+                 .canonical_line = kRfc3339AppLine,
+                 .rejects_clf_and_kv = true,
+                 .confidence_zero_for_syslog = true},
     StrategyCase{.name = "RawText",
                  .make_strategy = make_strategy_instance<RawTextStrategy>,
-                 .format = LogFormat::RawText},
+                 .format = LogFormat::RawText,
+                 .canonical_line = "ERROR build failed after 3 retries"},
 };
 
 // The adaptors are spelled as function calls, not `operator|`. Reaching the pipe operator through
@@ -1838,6 +1979,9 @@ class FormatReturns : public StrategyTableTest
 class RawLinePreserved : public StrategyTableTest
 {
 };
+class ProjectionIsTotal : public StrategyTableTest
+{
+};
 class RejectsCLFAndKV : public StrategyTableTest
 {
 };
@@ -1861,6 +2005,25 @@ TEST_P(RawLinePreserved, CanonicalLineEchoedVerbatim)
     EXPECT_EQ(result.value().raw_line, canonical_line) << "strategy=" << GetParam().name;
 }
 
+// DN-43.D6, the design-time half. `ParsedLine::content` is a TOTAL projection: `content.empty()`
+// implies the line has no message bytes beyond the header the strategy parsed. Checked here for
+// EVERY registered strategy — the invariant is the SPI's, not Syslog's, and the failure it guards
+// against is invisible downstream (an emptied content templates to the SHA-256 prefix of the empty
+// string, a universal collision bucket published as an ordinary identity).
+TEST_P(ProjectionIsTotal, ClaimedLineKeepsItsMessageBytes)
+{
+    ArenaAllocator arena{4096};
+    const std::string_view canonical_line{GetParam().canonical_line};
+    auto result{strategy->parse(canonical_line, arena)};
+    ASSERT_TRUE(result.has_value()) << "strategy=" << GetParam().name
+                                    << " failed to parse its own canonical line: " << canonical_line
+                                    << " error: " << result.error();
+    EXPECT_FALSE(result.value().content.empty())
+        << "strategy=" << GetParam().name
+        << " emptied content on a line that has message bytes; input: " << canonical_line
+        << " component=\"" << result.value().component << "\"";
+}
+
 TEST_P(RejectsCLFAndKV, ParseFailsOnBothForeignSamples)
 {
     ArenaAllocator arena{4096};
@@ -1880,6 +2043,8 @@ INSTANTIATE_TEST_SUITE_P(Strategies, FormatReturns, ::testing::ValuesIn(kStrateg
                          strategy_case_name);
 INSTANTIATE_TEST_SUITE_P(Strategies, RawLinePreserved,
                          ::testing::ValuesIn(rows_with_canonical_line()), strategy_case_name);
+INSTANTIATE_TEST_SUITE_P(Strategies, ProjectionIsTotal, ::testing::ValuesIn(kStrategyTable),
+                         strategy_case_name);
 INSTANTIATE_TEST_SUITE_P(Strategies, RejectsCLFAndKV,
                          ::testing::ValuesIn(rows_rejecting_clf_and_kv()), strategy_case_name);
 INSTANTIATE_TEST_SUITE_P(Strategies, ConfidenceZeroForSyslog,

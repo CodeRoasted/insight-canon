@@ -6,7 +6,7 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.spi;             // StrategyFactory
 import insight.canon.compose;         // ComposedSemantics
-import insight.canon.detail.strategy; // the 19 core representation strategies registered here
+import insight.canon.detail.strategy; // the 20 core representation strategies registered here
 
 // FormatDetector: registers all built-in format strategies and selects the
 // best match for a given line or sample batch.
@@ -184,13 +184,12 @@ namespace
         {
             if (line.size() > kTimestampSeparatorIndex && line[kTimestampSeparatorIndex] == 'T')
             {
-                // Syslog is the core representation-format candidate for an RFC3339+T line. A
-                // composed GitHub-Actions dialect strategy (if present) is probed via
-                // custom_strategies_ on every line and outranks Syslog by confidence (0.92 vs 0.80)
-                // on its precise 7-digit-fractional/'Z' shape — so canon names no dialect here (ADR
-                // 0024 §1.3), and a real RFC3339 syslog line (GHA confidence 0.0) still routes to
-                // Syslog. Byte-identical.
+                // BOTH core representation candidates for an RFC3339+T line, and they are
+                // DISJOINT: Syslog claims it only if the syslog header holds, Rfc3339Text only if
+                // it does not (DN-43.D4). Listing both is what makes the split reachable — the
+                // detector scores candidates, and a builtin absent from this list is never probed.
                 candidates.add(LogFormat::Syslog);
+                candidates.add(LogFormat::Rfc3339Text);
             }
             else
             {
@@ -233,6 +232,7 @@ FormatDetector::FormatDetector(const insight::semantic::ComposedSemantics& compo
     // arrives via the composition below (ADR-17).
     add_builtin(std::make_unique<JsonStrategy>());
     add_builtin(std::make_unique<SyslogStrategy>());
+    add_builtin(std::make_unique<Rfc3339TextStrategy>());
     add_builtin(std::make_unique<CLFStrategy>());
     add_builtin(std::make_unique<KVStrategy>());
     add_builtin(std::make_unique<HealthAppStrategy>());

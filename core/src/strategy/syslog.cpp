@@ -14,12 +14,104 @@ import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitive
 // Hand-written scanner: zero RE2, zero string copies. `line` is already
 // arena-stable (copied by LogParser before parse() is called), so every
 // substring is a valid zero-copy string_view.
+//
+// The HEADER — not the timestamp — is what this strategy claims; `scan_syslog_header` below is that
+// claim, and both `confidence()` and `parse()` read it (DN-43.D2). Level is INFERRED from the
+// message body on both branches: a PRI-less syslog line declares no severity, so content inference
+// is not a fallback for it but the correct layer (ADR-22.D3), and `apply_level_lift` still runs
+// afterwards and still outranks it, so a dialect's declared marker keeps precedence.
 
 namespace insight::tokenization
 {
 
-// extract_syslog_tag now lives in insight.canon.detail.scan (shared with the BGL/Thunderbird
-// branch, F3b) — the `[pid]` is stripped (identity), leaving the daemon name.
+// extract_syslog_tag lives in insight.canon.detail.scan (shared with the BGL/Thunderbird
+// branch, F3b). SyslogStrategy no longer calls it: its delimiter search runs over the WHOLE
+// remainder, which is how `cache key=session:1021 hit=true` produced the component
+// `cache key=session` and the content `1021 hit=true` — a message body moved onto a cube axis.
+// A syslog tag is ONE token, and bounding the search to one token makes that extractor's
+// no-delimiter branch — the branch that eats the message — unreachable from here, which is a
+// stronger guarantee than deleting it (DN-43.D3).
+
+std::optional<SyslogHeader> scan_syslog_header(std::string_view line) noexcept
+{
+    static constexpr std::size_t kBsdTimeLen{8U};        // "HH:MM:SS"
+    static constexpr std::string_view kHostReject{"[:"}; // a tag delimiter inside a host token
+    static constexpr std::string_view kTagStop{"[: \t"}; // first delimiter OR the token's end
+    static constexpr std::string_view kPidStop{"] \t"};  // the `[pid]` must close inside the token
+
+    std::string_view stamp{line};
+    std::string_view rest{line};
+    bool bsd{false};
+
+    if (is_bsd_syslog_prefix(line))
+    {
+        // Walk to the end of "HH:MM:SS": "Mon DD HH:MM:SS" is three space-separated fields the
+        // stamp parser reads as one. is_bsd_syslog_prefix already proved the same walk lands a
+        // full time field inside the line, so the two trims below are in range by construction.
+        std::size_t ts_end{3};
+        while (ts_end < line.size() && is_space(line[ts_end]))
+            ++ts_end;
+        while (ts_end < line.size() && is_digit(line[ts_end]))
+            ++ts_end;
+        while (ts_end < line.size() && is_space(line[ts_end]))
+            ++ts_end;
+        ts_end += kBsdTimeLen;
+        stamp.remove_suffix(line.size() - ts_end);
+        rest.remove_prefix(ts_end);
+        sv_skip_ws(rest);
+        bsd = true;
+    }
+    else if (is_rfc3339_prefix(line))
+    {
+        stamp = sv_take_token(rest);
+    }
+    else
+    {
+        return std::nullopt;
+    }
+
+    // ── Clause 1: HOST ───────────────────────────────────────────────────────
+    // The next token is a hostname only if it is non-empty, carries no tag delimiter, and does NOT
+    // parse as a log level. That last test is the whole first defect: `(void)sv_take_token` used to
+    // swallow `INFO`/`ERROR` as a hostname, which is how a window of application lines published as
+    // uniformly INFO with the level never read at all. Its cost is a host literally named `ERROR`,
+    // which the raw fallback still templates honestly (DN-43.D3 clause 1).
+    const std::string_view host{sv_take_token(rest)};
+    if (host.empty() || host.find_first_of(kHostReject) != std::string_view::npos)
+        return std::nullopt;
+    if (utils::parse_log_level(host) != LogLevel::Unknown)
+        return std::nullopt;
+
+    // ── Clause 2: TAG, bounded to ONE token ──────────────────────────────────
+    // One find over the tag token: whitespace or end-of-line before any delimiter means the token
+    // carries no ':' and the line is not syslog.
+    const auto stop{rest.find_first_of(kTagStop)};
+    if (stop == std::string_view::npos || is_space(rest[stop]))
+        return std::nullopt;
+
+    std::string_view tag{rest};
+    tag.remove_suffix(rest.size() - stop); // keep bytes [0, stop) — noexcept, unlike substr
+    if (tag.empty())
+        return std::nullopt;
+
+    std::size_t body_at{stop + 1U};
+    if (rest[stop] == '[')
+    {
+        // The `[pid]` must CLOSE inside the token and be followed immediately by the tag's ':' —
+        // so `sshd[12:34]`, whose colon is inside the brackets, is not a tag and `nginx[2451]:` is.
+        const auto close{rest.find_first_of(kPidStop, stop + 1U)};
+        if (close == std::string_view::npos || rest[close] != ']' || close + 1U >= rest.size() ||
+            rest[close + 1U] != ':')
+            return std::nullopt;
+        body_at = close + 2U;
+    }
+
+    std::string_view body{rest};
+    body.remove_prefix(body_at); // in range: the colon branch proved stop < size, the bracket
+                                 // branch proved close + 1 < size
+    sv_skip_ws(body);
+    return SyslogHeader{.stamp = stamp, .tag = tag, .body = body, .bsd = bsd};
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // IFormatStrategy interface
@@ -28,70 +120,30 @@ namespace insight::tokenization
 std::expected<ParsedLine, std::string> SyslogStrategy::parse(std::string_view line,
                                                              ArenaAllocator& /*arena*/) const
 {
-    static constexpr std::size_t kBsdTimeLen{8U}; // "HH:MM:SS"
-
-    if (line.size() < kBsdMinLen)
+    const std::optional<SyslogHeader> header{scan_syslog_header(line)};
+    if (!header)
     {
-        INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=Syslog parse miss (too short)");
-        return std::unexpected(std::string("SyslogStrategy: line too short"));
+        // Reachable only under set_format(): auto-detection routes on the same predicate, so a line
+        // that reaches parse() by scoring has already passed it. A wrong declaration stays wrong,
+        // loudly, and the declarer owns it (ADR-23.D2).
+        INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=Syslog parse miss");
+        return std::unexpected(
+            std::string("SyslogStrategy: line does not match BSD or RFC3339 syslog format"));
     }
 
-    // ── BSD syslog: "Mon DD HH:MM:SS hostname process[pid]: message" ──────
-    if (is_bsd_syslog_prefix(line))
-    {
-        // Walk to the end of "HH:MM:SS".
-        std::size_t ts_end{3};
-        while (ts_end < line.size() && is_space(line[ts_end]))
-            ++ts_end;
-        while (ts_end < line.size() && is_digit(line[ts_end]))
-            ++ts_end;
-        while (ts_end < line.size() && is_space(line[ts_end]))
-            ++ts_end;
-        ts_end += kBsdTimeLen; // "HH:MM:SS"
-
-        const std::string_view raw_ts{line.substr(0, ts_end)};
-        std::string_view rest{line.substr(ts_end)};
-        sv_skip_ws(rest);
-        (void)sv_take_token(rest); // skip hostname
-        const std::string_view tag{extract_syslog_tag(rest)};
-
-        ParsedLine parsed_line;
-        parsed_line.raw_line = line;
-        parsed_line.timestamp = EventTime::parsed(utils::parse_bsd_syslog_ts(raw_ts));
-        parsed_line.level = EventLevel{};
-        parsed_line.component = tag;
-        parsed_line.content = rest;
-        INSIGHT_LOG_DEBUG(logging::strategy_logger(),
-                          "strategy=Syslog parsed component={} level={} has_timestamp={}",
-                          parsed_line.component, to_string(parsed_line.level.value()),
-                          parsed_line.timestamp.has_value());
-        return std::expected<ParsedLine, std::string>{parsed_line};
-    }
-
-    // ── RFC 3339: "YYYY-MM-DDTHH:MM:SS[Z|±HH:MM] hostname process[pid]: msg"
-    if (is_rfc3339_prefix(line))
-    {
-        std::string_view rest{line};
-        const std::string_view raw_ts{sv_take_token(rest)};
-        (void)sv_take_token(rest); // skip hostname
-        const std::string_view tag{extract_syslog_tag(rest)};
-
-        ParsedLine parsed_line;
-        parsed_line.raw_line = line;
-        parsed_line.timestamp = EventTime::parsed(utils::parse_iso8601(raw_ts));
-        parsed_line.level = EventLevel{};
-        parsed_line.component = tag;
-        parsed_line.content = rest;
-        INSIGHT_LOG_DEBUG(logging::strategy_logger(),
-                          "strategy=Syslog parsed component={} level={} has_timestamp={}",
-                          parsed_line.component, to_string(parsed_line.level.value()),
-                          parsed_line.timestamp.has_value());
-        return std::expected<ParsedLine, std::string>{parsed_line};
-    }
-
-    INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=Syslog parse miss");
-    return std::unexpected(
-        std::string("SyslogStrategy: line does not match BSD or RFC3339 syslog format"));
+    ParsedLine parsed_line;
+    parsed_line.raw_line = line;
+    parsed_line.timestamp =
+        EventTime::parsed(header->bsd ? utils::parse_bsd_syslog_ts(header->stamp)
+                                      : utils::parse_iso8601(header->stamp));
+    parsed_line.level = utils::infer_leading_log_level(header->body);
+    parsed_line.component = header->tag;
+    parsed_line.content = header->body;
+    INSIGHT_LOG_DEBUG(logging::strategy_logger(),
+                      "strategy=Syslog parsed component={} level={} has_timestamp={}",
+                      parsed_line.component, to_string(parsed_line.level.value()),
+                      parsed_line.timestamp.has_value());
+    return std::expected<ParsedLine, std::string>{parsed_line};
 }
 
 LogFormat SyslogStrategy::format() const noexcept
@@ -105,27 +157,10 @@ double SyslogStrategy::confidence(std::string_view line) const noexcept
     static constexpr double kRfc3339SyslogConfidence{0.80};
     static constexpr double kNoConfidence{0.0};
 
-    if (line.size() < kBsdMinLen)
+    const std::optional<SyslogHeader> header{scan_syslog_header(line)};
+    if (!header)
         return kNoConfidence;
-    if (is_bsd_syslog_prefix(line))
-        return kBsdSyslogConfidence;
-    if (is_rfc3339_prefix(line))
-        return kRfc3339SyslogConfidence;
-    return kNoConfidence;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Private helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-std::optional<Timestamp> SyslogStrategy::parse_bsd_timestamp(std::string_view timestamp_str)
-{
-    return utils::parse_bsd_syslog_ts(timestamp_str);
-}
-
-std::optional<Timestamp> SyslogStrategy::parse_iso_timestamp(std::string_view timestamp_str)
-{
-    return utils::parse_iso8601(timestamp_str);
+    return header->bsd ? kBsdSyslogConfidence : kRfc3339SyslogConfidence;
 }
 
 } // namespace insight::tokenization

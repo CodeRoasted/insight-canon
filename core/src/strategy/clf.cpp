@@ -96,12 +96,19 @@ std::expected<ParsedLine, std::string> CLFStrategy::parse(std::string_view line,
     parsed_line.raw_line = line;
     parsed_line.timestamp = EventTime::parsed(parse_clf_timestamp(raw_ts));
     parsed_line.level = EventLevel::declared(status_code_to_level(status_code));
-    parsed_line.component = host;
+    // Group 1 is a NODE IDENTITY — high-card, and the requester rather than the producer of the
+    // line — so it belongs in `host`, the field written for exactly that, and NOT on the cube's
+    // WHERE axis. It sat in `component` until DN-43.D8: `component` is copied to CanonicalEvent
+    // unmasked, so the same octets were masked in `content` and published raw as a dimension.
+    // `component` stays EMPTY and that is a POSITIVE statement: this layout declares no functional
+    // source. A constant (`apache_error.cpp`'s "httpd") would be sound only for a grammar that is
+    // one server's; CLF is emitted by Apache, nginx, HAProxy, Caddy, Envoy and every load balancer,
+    // so a constant here would be a fabricated fact.
+    parsed_line.host = host;
     parsed_line.content = {buf.data(), clen};
 
-    INSIGHT_LOG_DEBUG(logging::strategy_logger(),
-                      "strategy=CLF parsed component={} level={} has_timestamp={}",
-                      parsed_line.component, to_string(parsed_line.level.value()),
+    INSIGHT_LOG_DEBUG(logging::strategy_logger(), "strategy=CLF parsed host={} level={} has_ts={}",
+                      parsed_line.host, to_string(parsed_line.level.value()),
                       parsed_line.timestamp.has_value());
     return std::expected<ParsedLine, std::string>{parsed_line};
 }

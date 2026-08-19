@@ -36,15 +36,33 @@ class TokenizerTest : public ::testing::Test
 // Basic pipeline correctness per format
 // ─────────────────────────────────────────────────────────────────────────────
 
+// The level assertion here used to read `Unknown` under the comment "BSD syslog has no inline
+// level", on a body carrying neither a level word nor a lexicon cue — so it held BOTH before and
+// after the branch started reading levels at all: a can't-FAIL arm, and nine generations of green
+// said nothing about this path. The comment was also false as a general claim, which is why the
+// repair is a line whose body DOES carry a level rather than a re-assertion of the old one
+// (DN-43.D5).
 TEST_F(TokenizerTest, ProcessesBSDSyslogLine)
 {
-    constexpr std::string_view line{"Jan 15 08:03:22 myhost sshd[1]: Accepted password for alice"};
+    constexpr std::string_view line{
+        "Jan 15 08:03:22 myhost sshd[1]: error: PAM authentication failure for alice"};
     auto result{tokenizer.process_line(line)};
     ASSERT_TRUE(result.has_value());
     const auto& ev{result.value()};
     EXPECT_EQ(ev.component, "sshd");
-    EXPECT_EQ(ev.level, LogLevel::Unknown); // BSD syslog has no inline level
+    EXPECT_EQ(ev.level, LogLevel::Error) << "level = " << to_string(ev.level);
+    EXPECT_FALSE(ev.declared_level) << "a level read out of the body is INFERRED, never declared";
     EXPECT_FALSE(ev.template_str.empty());
+}
+
+// A BSD body with no level and no cue still yields no level — the boundary the arm above needs to
+// stay honest. Split out so each arm can fail for exactly one reason.
+TEST_F(TokenizerTest, ProcessesBSDSyslogLineWithNoLevelInItsBody)
+{
+    constexpr std::string_view line{"Jan 15 08:03:22 myhost sshd[1]: Accepted password for alice"};
+    auto result{tokenizer.process_line(line)};
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result.value().level, LogLevel::Unknown);
 }
 
 TEST_F(TokenizerTest, ProcessesJSONLine)
@@ -126,8 +144,63 @@ TEST_F(TokenizerTest, ProcessesCLFLine)
     ASSERT_TRUE(result.has_value());
     const auto& ev{result.value()};
     EXPECT_EQ(ev.level, LogLevel::Info);
-    EXPECT_EQ(ev.component, "192.168.1.5");
+    // DN-43.D8 — and this is the seam that matters: `component` reaches the cube's WHERE axis
+    // UNMASKED, so a client IP left there was published raw while the same octets in `content`
+    // were masked. It is a host, it goes in `host`, and it stays off the axis.
+    EXPECT_EQ(ev.host, "192.168.1.5");
+    EXPECT_TRUE(ev.component.empty()) << "component = \"" << ev.component << "\"";
     EXPECT_NE(ev.template_str.find("GET"), std::string::npos);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The leading-RFC-3339 application stream, end to end (DN-43.D4/D6)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// The through-pipeline property, and it is homed HERE rather than on the strategy because the
+// defect it guards is a JOINT one: the routing, the projection and the level inference have to hold
+// together for the identity that reaches the wire to be right. Three assertions, and the timestamp
+// one is not decoration — without it this passes on the rejected alternative (a bare rejection to
+// RawTextStrategy, which sets no event time and would lose the clock MetaLog windows on).
+TEST_F(TokenizerTest, Rfc3339ApplicationLinesTemplateDistinctlyAndKeepTheirStamp)
+{
+    static constexpr std::array kLines{
+        std::string_view{
+            "2026-05-31T08:00:01Z INFO request method=GET path=/api/users/1000 status=200"},
+        std::string_view{"2026-05-31T08:02:03Z DEBUG db query=select_orders duration_ms=15 rows=2"},
+        std::string_view{"2026-05-31T08:03:04Z INFO cache key=session:1021 hit=true"},
+        std::string_view{
+            "2026-05-31T09:00:01Z ERROR upstream timeout service=payments after_ms=80"},
+        std::string_view{"2026-05-31T09:01:02Z WARN slow request path=/api/report latency_ms=103"},
+    };
+    static constexpr std::array kExpected{LogLevel::Info, LogLevel::Debug, LogLevel::Info,
+                                          LogLevel::Error, LogLevel::Warn};
+
+    std::set<std::string> templates;
+    for (std::size_t i = 0; i < kLines.size(); ++i)
+    {
+        auto result{tokenizer.process_line(kLines[i])};
+        ASSERT_TRUE(result.has_value()) << "line " << i << ": " << kLines[i];
+        const auto& ev{result.value()};
+
+        // 1. The projection is total: the whole remainder is content, so each line templates to its
+        //    own structure. The defect published ONE template for the whole file — the SHA-256
+        //    prefix of the empty string.
+        EXPECT_FALSE(ev.template_str.empty()) << "line " << i << ": " << kLines[i];
+        templates.insert(std::string{ev.template_str});
+
+        // 2. The level is read, and it is what the body says — not a uniform default.
+        EXPECT_EQ(ev.level, kExpected[i]) << "line " << i << " level=" << to_string(ev.level)
+                                          << " expected=" << to_string(kExpected[i]);
+
+        // 3. The event time SURVIVES the split. A missing timestamp lands as the epoch.
+        EXPECT_NE(ev.timestamp, Timestamp{}) << "line " << i << " lost its event time";
+
+        // The layout names no functional source; inventing one would be a fabricated cube axis.
+        EXPECT_TRUE(ev.component.empty())
+            << "line " << i << " component=\"" << ev.component << "\"";
+    }
+    EXPECT_EQ(templates.size(), kLines.size())
+        << "distinct templates=" << templates.size() << " lines=" << kLines.size();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

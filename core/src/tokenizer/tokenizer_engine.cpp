@@ -34,6 +34,11 @@ namespace
 
     constexpr std::size_t kProgressLogInterval{1000};
 
+    // Rate limit for the projection-totality warn (see make_event): first breach + every Nth after.
+    // Same shape as LogParser's failure warns — a broken strategy must not turn a 31 M-line stream
+    // into 31 M log records.
+    constexpr std::size_t kEmptyProjectionWarnEvery{100};
+
     // canon-internal DEBUG gate for `if constexpr` elision of the progress-log block (computation +
     // log). SPDLOG_ACTIVE_LEVEL is canon's PRIVATE build-type compile def, reaching this build-only
     // impl unit via the textual log_macros.hpp include. Kept OFF the public insight.canon.api
@@ -55,6 +60,8 @@ struct Tokenizer::Impl
     MaskConfig config; // token-mask configuration for the stateless masker (mask IPv4/hex)
     EventID next_id{0};
     std::size_t produced{0};
+    // Projection-totality breaches seen on this stream — see the check in make_event.
+    std::size_t empty_projections{0};
 
     Impl(ArenaAllocator& arena_ref, MaskConfig mask_config,
          const insight::semantic::ComposedSemantics& composed_ref)
@@ -72,6 +79,33 @@ struct Tokenizer::Impl
             return std::unexpected(parsed.error());
         }
         const ParsedLine& parsed_line = parsed.value();
+
+        // ── The PROJECTION-TOTALITY instrument (DN-43.D6) ────────────────────────────────────
+        // A strategy that emptied `content` on a line that HAS bytes broke the SPI contract, and
+        // the breach is invisible downstream: the line templates to the SHA-256 prefix of the empty
+        // string, a universal collision bucket that reaches the wire as an ordinary identity. A
+        // rare honest occurrence (a syslog line whose body really is empty) and a catastrophic
+        // silent projection bug are indistinguishable in the bytes, so the condition earns an
+        // instrument rather than a rule. Nothing in canon reported this for the life of the defect;
+        // that silence WAS the logging gap. Rate-limited (first + every 100th) and cold by
+        // construction — two empty() tests on a path that already hashes the line.
+        if (parsed_line.content.empty() && !parsed_line.raw_line.empty()) [[unlikely]]
+        {
+            ++empty_projections;
+            if (empty_projections == 1 || empty_projections % kEmptyProjectionWarnEvery == 0)
+            {
+                // `component` is printed because it is what separates the two readings a bare
+                // count cannot: EMPTY means the line's body genuinely ended at the header (a
+                // legitimate `cron[1]:` with nothing after it), NON-EMPTY means the message body
+                // was moved onto a cube dimension — the defect shape itself.
+                INSIGHT_LOG_WARN(
+                    logging::tokenizer_logger(),
+                    "empty projection: format={} kept 0 content bytes of {} component=\"{}\" "
+                    "(total={})",
+                    to_string(parser.routed_format()), parsed_line.raw_line.size(),
+                    parsed_line.component, empty_projections);
+            }
+        }
 
         const StatelessTemplate match{stateless_template(parsed_line.content, arena, config)};
 

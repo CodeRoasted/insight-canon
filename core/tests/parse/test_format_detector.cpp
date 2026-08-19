@@ -30,11 +30,11 @@ class FormatDetectorTest : public ::testing::Test
 // Strategy registration
 // ─────────────────────────────────────────────────────────────────────────────
 
-TEST_F(FormatDetectorTest, HasEighteenBuiltInRepresentationStrategies)
+TEST_F(FormatDetectorTest, HasNineteenBuiltInRepresentationStrategies)
 {
-    // 18 core representation strategies (dialect strategies register into custom_strategies_, not
-    // here).
-    EXPECT_EQ(detector.strategies().size(), 18u);
+    // 19 core representation strategies (dialect strategies register into custom_strategies_, not
+    // here). 18 until DN-43.D4 split the leading-RFC-3339 LAYOUT out of Syslog.
+    EXPECT_EQ(detector.strategies().size(), 19u);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,11 +62,26 @@ TEST_F(FormatDetectorTest, DetectsRFC3339Syslog)
     EXPECT_EQ(s->format(), LogFormat::Syslog);
 }
 
-// NOTE: GHA format DETECTION (DetectsGitHubActions) and the "GHA does not steal whole-second
-// RFC3339 syslog" guard migrated with the dialect strategy to the github package suite
-// (test_github_strategy: DetectionRoutesGhaLineToGitHubActions +
-// DetectionLeavesWholeSecondRfc3339AsSyslog). With a degenerate composition core has no GHA
-// strategy, so those properties are only meaningful once github is composed.
+// DN-43.D3 clause 1: the routing, not just the parse. A level word where a hostname belongs is what
+// made SyslogStrategy claim application lines, and a test that only checked the parse could not
+// tell the gate from the grammar.
+TEST_F(FormatDetectorTest, RoutesRfc3339AppLineToRfc3339TextNotSyslog)
+{
+    auto* s{detector.detect("2026-05-31T08:00:01Z INFO request method=GET path=/api/users/1000")};
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->format(), LogFormat::Rfc3339Text)
+        << "routed to " << to_string(s->format())
+        << "; a level word must never be consumed as a syslog hostname";
+}
+
+// The mirror arm: the predicates are DISJOINT, so the same prefix still reaches Syslog when the
+// header is genuinely there. A test that only had the arm above would pass on a bare rejection.
+TEST_F(FormatDetectorTest, RoutesRfc3339SyslogLineToSyslogNotRfc3339Text)
+{
+    auto* s{detector.detect("2026-05-31T08:00:01Z web01 nginx[2451]: GET /api/users 200")};
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->format(), LogFormat::Syslog) << "routed to " << to_string(s->format());
+}
 
 TEST_F(FormatDetectorTest, DetectsCLF)
 {

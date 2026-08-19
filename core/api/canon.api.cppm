@@ -97,7 +97,30 @@ using EventID = uint64_t;
 // instances collapsing into their class, which is the shape a leak repair is supposed to have. The
 // bump is taken because the masker itself moved: this is the -4/-8 class (template identity), not
 // the -7/-9 class (serialized level/component with identity untouched).
-inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-11"};
+// -12 = DN-43, the CLAIM-and-PROJECTION batch, and it is the -4/-8 class (template identity moves)
+// on the nose. Four changes, one generation, because the token is spent ONCE at a cut head
+// (ADR-16.D2) and every one of them is output-affecting:
+//   (1) `SyslogStrategy` claims a line only on the syslog HEADER (`TIMESTAMP HOST TAG:`), never on
+//       a timestamp prefix, and its tag search is bounded to ONE token — so a line whose remainder
+//       carried no `[`/`:` no longer moves its whole message body into `component` and leaves
+//       `content` empty. That empty content is what produced a `template_id` equal to the SHA-256
+//       prefix of the EMPTY STRING, published as an ordinary identity;
+//   (2) the leading-RFC-3339 LAYOUT gets its own core strategy (`LogFormat::Rfc3339Text`): the
+//       stamp is the timestamp, the whole remainder is content, and `component` is empty;
+//   (3) BOTH syslog branches now INFER the level from the message body (`infer_leading_log_level`,
+//       `EventLevel::inferred`) instead of assigning `EventLevel{}` unconditionally — the level was
+//       never read at all on either arm. A strict refinement: `EventLevel{}` and
+//       `inferred(Unknown)` compare equal, so a line can only move from NO level to SOME level, and
+//       `apply_level_lift` still outranks the inference, so a declared marker keeps precedence;
+//   (4) CLF's client IP moves from `component` to `host`, and `component` becomes EMPTY — the field
+//       contract already ruled it (`component` = the low-card FUNCTIONAL SOURCE, NOT the node
+//       identity), and the same octets were being masked in `content` and left unmasked on the
+//       cube's WHERE axis.
+// `template_str`/`template_id`, `dominant_level` and `component` all move, so this is
+// output-affecting three times over. It is a CONTENT re-base under ADR-31, never a determinism
+// regression: two runs of THIS generation over the same bytes stay bit-identical, and old/new
+// documents are incomparable at the §2.4 gate by construction (re-derive, never migrate).
+inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-12"};
 
 // ── Template identity (insight_perf_template_id.md SRC-D-TIR-1) ──
 // The structural identity of a canonicalised template: the first 16 bytes of
@@ -748,6 +771,13 @@ enum class LogFormat : uint8_t
     // prefix (stamped traces), `section_start:` section markers, and the terminal
     // `Job succeeded` / `ERROR: Job failed…` verdict line; other trace output falls through.
     GitLab,
+    // The leading-RFC-3339 LAYOUT: a stamp token then free text, no vocabulary. A core
+    // REPRESENTATION format, not a dialect — it names no ecosystem. It exists because an RFC-3339
+    // prefix is evidence of a TIMESTAMP and not of syslog: Syslog used to claim this shape at 0.80,
+    // eat the level word as a hostname and move the whole message into `component`. Splitting it
+    // out keeps the event time (which MetaLog windows on) while the template, the level and the
+    // component become what the bytes actually say (DN-43.D4).
+    Rfc3339Text,
     // Catch-all for unstructured text (CI / pytest / build logs). Selected only
     // when no structured strategy matches a non-empty line, so the tokenizer
     // never silently drops a line. Keep immediately before Unknown.
@@ -801,6 +831,8 @@ enum class LogFormat : uint8_t
         return "GitHubActions"sv;
     case LogFormat::GitLab:
         return "GitLab"sv;
+    case LogFormat::Rfc3339Text:
+        return "Rfc3339Text"sv;
     case LogFormat::RawText:
         return "RawText"sv;
     default:

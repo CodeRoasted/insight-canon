@@ -1,5 +1,5 @@
 // insight.canon.detail.strategy — SEALED format-strategy domain (
-// ADR-3.D4). ParsedLine, the IFormatStrategy contract, and the 20 concrete format strategies.
+// ADR-3.D4). ParsedLine, the IFormatStrategy contract, and the 21 concrete format strategies.
 // Imports api (Timestamp/LogLevel/LogFormat/ArenaAllocator) — never the facade. The strategy impl
 // units additionally import detail.scan (fast_gates predicates) and keep simdjson textual in their
 // GMFs (simdjson_scratch.hpp). Never re-exported by the facade and never installed (PRIVATE file
@@ -9,7 +9,7 @@ import insight.canon.internal; // std + global C types
 import insight.canon.api;      // Timestamp, LogLevel, LogFormat, ArenaAllocator
 // ParsedLine + IFormatStrategy — the provider CODE-TIER contract (ADR-17) — moved to
 // the INSTALLED insight.canon.spi module so an external semantic package can implement a dialect
-// strategy without importing this SEALED shard. Re-exported here so the 19 core representation
+// strategy without importing this SEALED shard. Re-exported here so the 20 core representation
 // strategies below (module members of this shard) are byte-unchanged.
 export import insight.canon.spi;
 
@@ -107,7 +107,7 @@ class CloudWatchStrategy final : public IFormatStrategy
 // GitHubActionsStrategy — the GHA/Azure DIALECT strategy — relocated to insight_semantic_github
 // (ADR-17: a dialect strategy is code-tier package knowledge, not a core
 // representation format). It reaches the FormatDetector as a composed StrategyFactory
-// (register_strategy seam), so canon core registers no dialect. The 19 strategies below are
+// (register_strategy seam), so canon core registers no dialect. The 20 strategies below are
 // universal representation formats.
 
 // ──────── from src/insight/tokenization/strategies/health_app.hpp ────────
@@ -290,6 +290,42 @@ class RawTextStrategy final : public IFormatStrategy
 
 } // namespace insight::tokenization
 
+// ──────── from src/strategy/rfc3339_text.cpp ────────
+export namespace insight::tokenization
+{
+
+// The leading-RFC-3339 LAYOUT: a stamp token followed by free text.
+//   "2026-05-31T08:00:01Z INFO request method=GET path=/api/users/1000 status=200"
+//
+// A representation format with a timestamp field and no vocabulary (ADR-17.D1: core owns the
+// LANGUAGE, packages own the VOCABULARY). It exists because rejecting the shape from Syslog is not
+// enough: the one thing Syslog's RFC-3339 branch got RIGHT was the event time, and MetaLog windows
+// on event time, so a bare rejection to RawTextStrategy — which sets no timestamp — would fix the
+// level, the component and the template and lose the clock (DN-43.D4).
+//
+// It claims `is_rfc3339_prefix(line) && !scan_syslog_header(line)`, and the negation lives in the
+// PREDICATE rather than in a confidence ordering. That makes the two predicates DISJOINT, which is
+// what makes LogParser's sticky latch self-correcting on a mixed stream: a genuine syslog line
+// scores 0 here and re-detects to Syslog, a timestamped application line scores 0 on Syslog and
+// re-detects here. A lower confidence over the bare prefix would instead let the first matching
+// line capture the strategy for the rest of the file — the starvation RawTextStrategy's constant
+// 0.0 exists to prevent.
+//
+// `component` is left EMPTY: the layout names no functional source, and saying so is a fact where
+// inventing one would be a fabrication on the cube's WHERE axis. The BSD prefix gets no sibling —
+// `Mon DD HH:MM:SS` carries no year and collides with prose, so consuming it would fabricate an
+// event time from an inference.
+class Rfc3339TextStrategy final : public IFormatStrategy
+{
+  public:
+    [[nodiscard]] std::expected<ParsedLine, std::string>
+    parse(std::string_view line, ArenaAllocator& arena) const override;
+    [[nodiscard]] LogFormat format() const noexcept override;
+    [[nodiscard]] double confidence(std::string_view line) const noexcept override;
+};
+
+} // namespace insight::tokenization
+
 // ──────── from src/insight/tokenization/strategies/rfc5424.hpp ────────
 export namespace insight::tokenization
 {
@@ -326,6 +362,37 @@ class SparkHDFSStrategy final : public IFormatStrategy
 
 } // namespace insight::tokenization
 
+// ──────── the SYSLOG HEADER predicate — ONE scan, three readers (DN-43.D2) ────────
+// Deliberately NOT exported: module-internal, defined in syslog.cpp (whose grammar it is) and
+// consumed by rfc3339_text.cpp, which claims exactly its negation.
+namespace insight::tokenization
+{
+
+// The syslog grammar's structural commitment is its HEADER — `TIMESTAMP HOST TAG:` — never its
+// timestamp. A leading RFC-3339 stamp is evidence of a TIMESTAMP; reading it as evidence of syslog
+// is what let the strategy claim application lines it could not parse, at 0.80, and shred them into
+// one empty template (DN-43.D1).
+//
+// This function IS SyslogStrategy's claim. `confidence()` scores non-zero iff it yields a value and
+// `parse()` consumes the split it already computed instead of re-deriving it by hand — the only
+// construction under which the gate and the grammar cannot drift apart (DN-43.D2). The same value
+// serves the parse gate, the detector's routing, and LogParser's sticky stream latch: one
+// predicate, three readers, and making it mean "this parse will succeed" makes it correct for all
+// three.
+struct SyslogHeader
+{
+    std::string_view stamp; // the raw timestamp field — the branch's own timestamp parser reads it
+    std::string_view tag;   // the daemon/program name, `[pid]` stripped — the F3b functional source
+    std::string_view body;  // EVERY byte after the tag's ':' — the total projection (DN-43.D6)
+    bool bsd{false};        // which stamp grammar matched; selects the timestamp parser
+};
+
+// nullopt = the line is not syslog. Bounded by the HEADER: both token scans stop at the first
+// whitespace, and the message body is handed over as a tail view that is never scanned.
+[[nodiscard]] std::optional<SyslogHeader> scan_syslog_header(std::string_view line) noexcept;
+
+} // namespace insight::tokenization
+
 // ──────── from src/insight/tokenization/strategies/syslog.hpp ────────
 export namespace insight::tokenization
 {
@@ -337,12 +404,6 @@ class SyslogStrategy final : public IFormatStrategy
     parse(std::string_view line, ArenaAllocator& arena) const override;
     [[nodiscard]] LogFormat format() const noexcept override;
     [[nodiscard]] double confidence(std::string_view line) const noexcept override;
-
-  private:
-    [[nodiscard]] static std::optional<Timestamp>
-    parse_bsd_timestamp(std::string_view timestamp_str);
-    [[nodiscard]] static std::optional<Timestamp>
-    parse_iso_timestamp(std::string_view timestamp_str);
 };
 
 } // namespace insight::tokenization

@@ -9,7 +9,7 @@
 // Homed in api/ (public, installed) alongside the facade. Imports api (the enums/types the grammar
 // rows reference) + internal (std). Provider types (IFormatStrategy, ParsedLine) live HERE — they
 // were formerly in the sealed detail.strategy shard, which an external package cannot import; the
-// shard now re-exports them so the 19 core strategies are unchanged.
+// shard now re-exports them so the 20 core strategies are unchanged.
 module;
 
 export module insight.canon.spi;
@@ -192,13 +192,45 @@ class IFormatStrategy
     // borrows from it). Owned scalar fields (component, content) are copied into the supplied arena
     // via ArenaAllocator::store_string(); their string_views remain valid until the arena is reset
     // or destroyed.
+    //
+    // ⚠ PROJECTION TOTALITY, and it is an obligation on every implementer (DN-43.D6):
+    //
+    //     `ParsedLine::content` is a TOTAL projection. `content.empty()` implies the line has no
+    //     message bytes beyond the header this strategy parsed. A strategy that cannot satisfy
+    //     that on a line MUST NOT claim the line.
+    //
+    // The claim rule below asks "may I parse this?"; this asks "did I keep everything I did not
+    // name?", and the pair is the contract. Breaking it is INVISIBLE IN THE BYTES: an emptied
+    // `content` templates to the SHA-256 prefix of the empty string, which is a universal collision
+    // bucket shared by every content-less line of every stream — and it is published on the wire as
+    // an identity like any other, indistinguishable from a rare but honest empty body. An empty
+    // template is legitimate; an empty PROJECTION is not.
     [[nodiscard]] virtual std::expected<ParsedLine, std::string>
     parse(std::string_view line, ArenaAllocator& arena) const = 0;
 
     [[nodiscard]] virtual LogFormat format() const noexcept = 0;
 
     // Returns a [0,1] confidence score that this strategy matches the line. Used by FormatDetector
-    // for majority-vote detection. Must be O(1).
+    // for majority-vote detection.
+    //
+    // ⚠ THE CLAIM RULE (DN-43.D1), and it is what this value MEANS:
+    //
+    //     A representation-format strategy may return a non-zero confidence for a line only if its
+    //     `parse()` is structurally committed to succeeding on that line. Prefix-shaped confidence
+    //     is admissible only where the format's grammar is FULLY DETERMINED by that prefix.
+    //
+    // Three readers, three meanings — *route this line* (FormatDetector::detect), *latch this
+    // stream* (LogParser::select_strategy's sticky fast path, which re-uses any strategy scoring
+    // above zero without re-detecting), and *this parse will succeed*. Making it mean the third
+    // makes it correct for all three, because the third implies the other two. An over-broad value
+    // does not merely mis-route one line: it captures the rest of the file.
+    //
+    // Under-claiming is the SAFE direction and the fail-safe is real: a line no strategy claims
+    // falls to RawTextStrategy, which templates the whole line and recovers a level. Under-claiming
+    // costs structure; over-claiming costs the truth.
+    //
+    // Bounded by the line's HEADER, never by the line: this runs on every line of every stream, so
+    // a whole-line scan here is a per-stream cost, not a per-match one.
     [[nodiscard]] virtual double confidence(std::string_view line) const noexcept = 0;
 };
 
