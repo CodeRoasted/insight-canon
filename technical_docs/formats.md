@@ -52,23 +52,23 @@ fall through to the level-inference path in [classification.md](classification.m
 |---|---|---|---|---|---|
 | **JSON** | `kTimestampKeys` | `kLevelKeys` (or OTEL `severityNumber`, which **overrides**) | `kComponentKeys` | — | OTEL- and ordinal-aware (§4). Fast path for escape-free input, simdjson slow path otherwise. |
 | **KeyValue** | per-key `timestamp` value | per-key `level` value | first matched key value | — | `key=value` / logfmt. |
-| **Syslog** | BSD or RFC3339 prefix | — | daemon/tag (`tag[pid]:`) | — | Two prefix shapes. |
+| **Syslog** | BSD or RFC3339 prefix | inferred from the message body | daemon/tag (`tag[pid]:`) | — | Two prefix shapes. Claims a line only on the full syslog HEADER (`TIMESTAMP HOST TAG:`), never on the timestamp alone; the tag search is bounded to ONE token. |
 | **RFC5424** | RFC3339 | PRI value → level | APP-NAME | HOSTNAME | Structured syslog. |
 | **Log4j** | `YYYY-MM-DD HH:MM:SS,mmm` | explicit level word | thread/component (variant) | — | Hadoop/Zookeeper/OpenStack variants. |
 | **SparkHDFS** | `YY/MM/DD` or `YYMMDD HHMMSS` | explicit level word | component | — | Spark + HDFS. |
 | **BGL** | decimal epoch | explicit level (else inferred) | subsystem (low-card) | node (high-card) | Splits low-card `component` from high-card `host`. |
-| **CLF** | `10/Oct/2000:13:55:36 -0700` | HTTP status → level | host field | — | Common/Combined access logs. |
+| **CLF** | `10/Oct/2000:13:55:36 -0700` | HTTP status → level | (empty) | client IP / hostname | Common/Combined access logs. The client IP is a NODE identity, so it is `host`, never a cube dimension; the layout declares no functional source and says so. |
 | **IIS W3C** | `YYYY-MM-DD HH:MM:SS` | HTTP status → level | — | — | IIS extended format. |
 | **NginxError** | `YYYY/MM/DD HH:MM:SS` | `[level]` bracket | — | — | nginx error log. |
 | **ApacheError** | `[Wkd Mon DD HH:MM:SS YYYY]` | `[level]` bracket | `"httpd"` (constant) | — | apache error log. |
 | **AndroidLogcat** | `MM-DD HH:MM:SS.mmm` | priority letter → level | tag | — | Zero-copy fast scan. |
-| **GitHubActions** | RFC3339 (100-ns / `Z`) | inferred from content (the `##[error]` / `::error::` LIFT is applied above the strategy — see below) | — | — | Strips the leading timestamp; the workflow-command marker is KEPT in the content. (Note: ANSI colour already removed at ingest, §1.) |
 | **WindowsCBS** | `YYYY-MM-DD HH:MM:SS` | explicit level word | component | — | Windows Component-Based Servicing. |
 | **SystemdJournal** | `__REALTIME_TIMESTAMP` (µs) | `PRIORITY` | `_COMM` | — | journal export (JSON-shaped). |
 | **CloudWatch** | millis field | (JSON path) | (JSON path) | — | AWS CloudWatch JSON. |
 | **HealthApp** | `YYYYMMDD-HH:MM:SS:mmm` | — | pipe-delimited field | — | |
 | **HPC** | decimal epoch | — | space-delimited field | — | |
 | **Proxifier** | (coarse → none) | — | process name | — | Timestamp too coarse → `Unknown`. |
+| **Rfc3339Text** | RFC3339 prefix token | inferred from the message body | (empty) | — | The leading-RFC-3339 LAYOUT: a stamp then free text, no vocabulary. Claims exactly the lines Syslog's header predicate rejects, so the two are disjoint. Keeps the event time; names no functional source. |
 | **RawText** | — | inferred from content | (empty) | — | Fallback; confidence always `0.0`. |
 
 `component` is the **low-cardinality functional source** (a subsystem/daemon, a small stable set — the useful
