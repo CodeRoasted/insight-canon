@@ -386,8 +386,10 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
     // ADR-23 — the TRANSPORT CATALOGUE is identity, and the per-run DECLARATION is not. This
     // is 0031's hash split and it is the whole quotient: the transform GRAMMAR (which transforms
     // exist and what bytes they own) is a property of the analyzing binary and belongs in the
-    // comparability key; which transforms a given STREAM declared is provenance and rides to
-    // MetaLog instead. Two runs ±a declared transform MUST therefore carry the same
+    // comparability key; which transforms a given STREAM declared rides the MetaLog document's
+    // `extensions` container as `fr.coderoast.transport` — NOT the standard `provenance[]` lineage
+    // array and not the `source` block, which are closed standard objects a non-standard member
+    // may not enter. Two runs ±a declared transform MUST therefore carry the same
     // `semantic_identity` — otherwise transport-invariance is not being built, it is only being
     // asserted. Canon-shipped and closed, so it enters here as a fixed component rather than as a
     // compose() parameter: it is core vocabulary like the ordinal/OTEL catalogs, not package data.
