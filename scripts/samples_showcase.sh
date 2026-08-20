@@ -37,14 +37,59 @@ mkdir -p "$OUT"
 replay="$(mktemp)"
 trap 'rm -f "$replay"' EXIT
 
+# THE RIGHT-AXIS VERDICT IS COMPUTED HERE, IN THE RUN THAT PRODUCES THE BYTES, and the render
+# cannot be emitted without it. That ordering is the whole repair: `rendered but undeclared` is not
+# a reachable state of this script, in the same way `rendered but unguarded` is not a reachable
+# state of publish_hub_evidence.py (its scrub_guard lives INSIDE the render functions). A check the
+# renderer performs is a property of the artifact; a check a workflow performs beside it is a
+# property of nobody.
+#
+# WHAT IT READS. Exactly the two declarations the warehouse gate reads on its RIGHT axis: a
+# `SLICE.json` with `"synthetic": true`, or an `ATTRIBUTION.md` naming a redistribution licence.
+# It does NOT re-implement the CONTENT axis — that predicate lives in the private warehouse and
+# this repo is public and anonymous, so it cannot run here. The README says so in as many words
+# rather than implying a scan nobody performed.
+#
+# A DERIVATIVE OWES ATTRIBUTION. CC-BY 4.0 §3(a) conditions redistribution on naming the source,
+# the licence and — for a modified work — the fact of modification. A render is a modified work:
+# it is a new arrangement we authored, and the declaration cannot simply travel with it, because
+# the source's own claim ("Changes: none — verbatim 2k samples") is FALSE of the render. So the
+# attribution is REBUILT here, per act, with the derivation stated. Until 2026-08-20 the render
+# carried none of it — measured: zero occurrences of `loghub`, `zenodo`, `CC-BY`, `attribution` or
+# `licence` in the 14 MB artifact, published at three public locations.
+right_of() {   # $1 = a <corpus>/samples dir -> prints "SYNTHETIC" | "REDISTRIBUTABLE|<attrib>"
+  local cdir="$1" slice="$1/SLICE.json" attrib
+  if [ -f "$slice" ] && grep -q '"synthetic"[[:space:]]*:[[:space:]]*true' "$slice"; then
+    echo "SYNTHETIC"; return 0
+  fi
+  attrib="$(find "$cdir" -type f -name 'ATTRIBUTION.md' | LC_ALL=C sort | head -1)"
+  # The same licence vocabulary the warehouse gate accepts. Kept in step deliberately: a render
+  # that claimed a right its source's gate would refuse is the failure one level down.
+  if [ -n "$attrib" ] && grep -qiE 'CC-?BY|CC0|public[ -]?domain|MIT|Apache|BSD|permissive' "$attrib"; then
+    echo "REDISTRIBUTABLE|$attrib"; return 0
+  fi
+  return 1
+}
+
 # One det_proof run per corpus (all its logs in a single process, sorted for a stable order).
 corpora=()   # "corpus:count"
+rights=()    # "corpus:SYNTHETIC" | "corpus:REDISTRIBUTABLE|<path to the source ATTRIBUTION.md>"
 for cdir in "$SAMPLES"/*/samples; do
   [ -d "$cdir" ] || continue
   corpus="$(basename "$(dirname "$cdir")")"
   mapfile -t logs < <(find "$cdir" -type f -name '*.log' | LC_ALL=C sort)
   [ "${#logs[@]}" -gt 0 ] || { echo "skip $corpus (no *.log under $cdir)" >&2; continue; }
-  echo "showcase: $corpus (${#logs[@]} logs)" >&2
+  if ! right="$(right_of "$cdir")"; then
+    {
+      echo "error: corpus '$corpus' declares no right to redistribute — refusing to publish."
+      echo "  $cdir carries neither a SLICE.json with \"synthetic\": true nor an ATTRIBUTION.md"
+      echo "  naming a redistribution licence. A render of undeclared bytes is a publication we"
+      echo "  cannot stand behind, and this script will not emit one."
+    } >&2
+    exit 4
+  fi
+  rights+=("$corpus:$right")
+  echo "showcase: $corpus (${#logs[@]} logs, RIGHT=${right%%|*})" >&2
   "$DET" "${logs[@]}" > "$OUT/$corpus.canon.txt"
   "$DET" "${logs[@]}" > "$replay"
   if ! cmp -s "$OUT/$corpus.canon.txt" "$replay"; then
@@ -61,6 +106,57 @@ for cdir in "$SAMPLES"/*/samples; do
 done
 
 [ "${#corpora[@]}" -gt 0 ] || { echo "error: no corpora with *.log under $SAMPLES" >&2; exit 1; }
+
+# ── The derived work's OWN attribution file ──────────────────────────────────────────────────
+# One section per corpus whose right is a LICENCE (a synthetic corpus owes nobody a notice). The
+# source declaration is quoted verbatim so the reader can check it against the upstream record,
+# and the derivation is stated separately, because the source's "Changes: none" is a claim about
+# the SOURCE and is false of what sits beside this file.
+attributed=0
+{
+  echo "# Attribution for the rendered artifacts in this folder"
+  echo
+  echo "Each \`*.canon.txt\` here is a **derived work**: the open (Apache-2.0) canon core run over a"
+  echo "sample corpus published at [coderoast-hub](https://github.com/CodeRoasted/coderoast-hub)"
+  echo "under \`samples/\`. Where the source corpus is third-party material under a redistribution"
+  echo "licence, that licence conditions this derivative too, and its notice is below."
+  echo
+  echo "The renders are **not** verbatim copies. Canon collapses each line to a template, emits one"
+  echo "event row per line, and computes an integer entropy term; the output is a new arrangement of"
+  echo "the source data, authored by CodeRoast. Line counts, ordering and content all differ from the"
+  echo "source logs. Treat every section below as *\"Changes: yes — rendered through canon\"*, whatever"
+  echo "the upstream declaration says about its own copy."
+  for entry in "${rights[@]}"; do
+    c="${entry%%:*}"; r="${entry#*:}"
+    case "$r" in
+      REDISTRIBUTABLE\|*)
+        src="${r#REDISTRIBUTABLE|}"
+        attributed=$((attributed + 1))
+        echo
+        echo "## \`$c.canon.txt\` — derived from the \`$c\` corpus"
+        echo
+        echo "Source declaration, quoted verbatim from \`${src#"$SAMPLES/"}\` in the corpus this render"
+        echo "was produced from:"
+        echo
+        # Quote it as a blockquote so it cannot be mistaken for this file's own prose.
+        sed 's/^/> /' "$src"
+        echo
+        echo "**Derivation:** rendered by \`insight-canon/scripts/samples_showcase.sh\` using canon's"
+        echo "\`det_proof\`. Deterministic and reproducible from the published inputs above with the"
+        echo "published Apache-2.0 canon core; this script byte-compares two runs and refuses to"
+        echo "publish if they differ."
+        ;;
+      SYNTHETIC)
+        echo
+        echo "## \`$c.canon.txt\` — derived from the \`$c\` corpus"
+        echo
+        echo "The source corpus is a **fabricated fixture** (\`SLICE.json \"synthetic\": true\`) with no"
+        echo "third-party bytes, so no third-party notice is owed. Read as of this run, not asserted."
+        ;;
+    esac
+  done
+} > "$OUT/ATTRIBUTION.md"
+echo "attribution: $attributed licensed corpus/corpora declared → $OUT/ATTRIBUTION.md" >&2
 
 # canon's composed-ruleset identity hash + package list are the first lines of any det_proof
 # output — lift them from the first corpus so the index states which canon vocabulary produced this.
@@ -111,23 +207,47 @@ packages="$(grep -m1 '^# semantic_packages ' "$first_out" | sed 's/^# semantic_p
   echo
   echo "## Corpora in this showcase"
   echo
-  echo "| corpus | source logs | canon output |"
-  echo "| --- | --- | --- |"
+  echo "| corpus | source logs | right to redistribute | canon output |"
+  echo "| --- | --- | --- | --- |"
   for entry in "${corpora[@]}"; do
     c="${entry%%:*}"; n="${entry##*:}"
-    echo "| \`$c\` | $n | [\`$c.canon.txt\`]($c.canon.txt) |"
+    r=""
+    for re in "${rights[@]}"; do [ "${re%%:*}" = "$c" ] && r="${re#*:}"; done
+    case "$r" in
+      SYNTHETIC)          rcell="synthetic fixture (\`SLICE.json\`)" ;;
+      REDISTRIBUTABLE\|*) rcell="licensed — see [\`ATTRIBUTION.md\`](ATTRIBUTION.md)" ;;
+      *)                  rcell="—" ;;
+    esac
+    echo "| \`$c\` | $n | $rcell | [\`$c.canon.txt\`]($c.canon.txt) |"
   done
   echo
-  # The publication claim states the GATE, never a safety verdict. `samples_safety_lint.py`
-  # judges two independent axes — the right to redistribute, and a scan for declared
-  # identifying-content classes — and its own bound is that a pass means "no declared class
-  # fired", never "these bytes are safe". Wording that outran that bound is what published a
-  # real third-party corpus behind the phrase "public-safe by construction".
-  echo "> Every sample tree published here clears two independent checks: the **right** to"
-  echo "> redistribute (a \`SLICE.json\` declaring it fully synthetic, or an \`ATTRIBUTION.md\`"
-  echo "> naming a redistribution licence) **and** a scan that refuses declared"
-  echo "> identifying-content classes. That scan matches byte shapes, so it is a floor and not"
-  echo "> a certificate. Our real third-party crawl corpora stay private."
+  # A PUBLISHED VERDICT MUST BE AN OUTPUT OF THE RUN THAT PRODUCED THE ARTIFACT.
+  #
+  # This block used to be a constant. It asserted, unconditionally, that "every sample tree
+  # published here clears two independent checks", naming the right-to-redistribute axis AND a
+  # scan for identifying-content classes. Measured 2026-08-20 with the shipped predicate: the
+  # `loghub` tree it named does NOT clear that scan (4 279 line-hits over 6 classes), and the
+  # artifact the sentence physically sat beside — `loghub.canon.txt` — had never been scanned by
+  # anything (5 916 line-hits over 4 classes). The sentence had no failing mode.
+  #
+  # The repair that PRODUCED it was already reasoning correctly and simply did not reach far
+  # enough: it retired an unearned SAFETY claim ("public-safe by construction") and replaced it
+  # with an unearned GATE claim — which is worse in one specific way, because naming a mechanism
+  # makes it more credible to the reader it misleads.
+  #
+  # So: the RIGHT axis is stated because this run computed it, per corpus, above — and refuses to
+  # render at all when it cannot. The CONTENT axis is stated as NOT COMPUTED, because it is not:
+  # that predicate lives in the private warehouse and this workflow is public and anonymous. An
+  # instrument that cannot reach a surface must say so where the human reads, not only where the
+  # machine prints.
+  echo "> **What this run checked, and what it did not.** The *right to redistribute* in the table"
+  echo "> above was read from each source corpus during this run — a \`SLICE.json\` declaring it"
+  echo "> fabricated, or an \`ATTRIBUTION.md\` naming a licence — and this page is not rendered at"
+  echo "> all when a corpus declares neither. **No identifying-content scan was computed for these"
+  echo "> rendered artifacts.** That scan is a separate axis, it runs outside this repository, and"
+  echo "> a redistribution licence says nothing about what is *in* the bytes. Read the table as a"
+  echo "> statement about our right to publish these renders, never as a statement about their"
+  echo "> contents. Our real third-party crawl corpora stay private."
 } > "$OUT/README.md"
 
 echo "showcase rendered → $OUT (${#corpora[@]} corpora)" >&2
