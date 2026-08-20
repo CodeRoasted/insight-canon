@@ -70,8 +70,8 @@ the workspace [`corpus_registry_lint.py`](../../../scripts/corpus_registry_lint.
 third-party-class corpus has committed bytes in canon's public tree).
 
 > **The phrase "public-safe by construction" is retired and must not come back.** It stated a
-> verdict the instrument cannot reach, and it is what carried a real third-party operational corpus
-> onto the public hub and into 16 published release tarballs — a licence-only gate reading as a
-> content guarantee. The gate's own header now names its bound; this page must not restate it more
+> verdict the instrument cannot reach — a licence-only gate reading as a content guarantee — and
+> real third-party operational bytes reached public surfaces behind it before anyone had measured
+> what was in them. The gate's own header now names its bound; this page must not restate it more
 > confidently than the gate does. Attribution + a declared class list is what a published
 > third-party slice is carried on: **declared, not asserted clean.**
