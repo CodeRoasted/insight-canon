@@ -57,16 +57,19 @@ jobs:
       benchmark-subdir: bench
     secrets: inherit
 
-  # Client-facing transparency: build canon over our PUBLIC hub samples and attach the human-legible
-  # "Canon over our samples" bundle to the Release. NOT a gate (needs: release, runs after the cut is
-  # published); a showcase. Passing the tag makes the reusable workflow attach the bundle.
-  samples-showcase:
-    needs: release
-    uses: ./.github/workflows/samples-showcase.yaml
-    with:
-      tag: ${{ github.event.inputs.tag || github.ref_name }}
-      samples_ref: main
-    secrets: inherit   # HUB_PUBLISH_TOKEN for the optional hub-mirror job (skips until configured)
+  # THE SHOWCASE ACT MOVED OUT OF THIS REPO, 2026-08-21 (DN-48.D13 discharge 1, on the Founder's
+  # ratification of DN-48.D8). It now runs in the PRIVATE superproject as `canon-showcase.yml`.
+  #
+  # Not a tidy-up: a publication act may occur only where the verdict for the artifact it emits is
+  # computable, and it was not computable here. This repo is PUBLIC and the showcase ran
+  # anonymously, while the content predicate is 591 lines in the PRIVATE warehouse — so the act
+  # publishing the workspace's highest-exposure artifact was structurally the one that could not
+  # judge it. Publishing the predicate instead was refused twice (DN-48.D11/D12): it repairs
+  # executability alone, leaving the verdict REFUSED, and it would publish the enumeration of what
+  # that predicate cannot see. Capability is a property of the SITE, so the act moved to the judge.
+  #
+  # `scripts/samples_showcase.sh` STAYS HERE and is still the renderer — the superproject checks
+  # this repo out and calls it. What left is the publishing, not the rendering.
 
   # Attach the validated golden (produced by the golden gate) to the Release — per-release, not committed.
   attach-golden:

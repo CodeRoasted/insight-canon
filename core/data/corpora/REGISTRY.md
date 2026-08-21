@@ -53,8 +53,11 @@ Do not relocate them here.
 
 Each big corpus's small, deterministic **published slice** lives at
 `coderoast-corpora/<platform>_corpora/<corpus>/samples/` — **not** in canon git. Its purpose is now a
-**client-facing showcase** (canon's `det_proof` run over it, published as evidence — the
-[Samples Showcase](../../../.github/workflows/samples-showcase.yaml) workflow fetches from the hub),
+**client-facing showcase** (canon's `det_proof` run over it, published as evidence — the renderer is
+`scripts/samples_showcase.sh` in this repo, driven from the private orchestration repo, which fetches
+the samples from the hub; the publishing act itself deliberately does not run here, because a
+publication may only occur where the verdict for what it emits can be computed, and the content
+predicate is not reachable from a public repo),
 **not** a zero-fetch canon test gate: the determinism gate uses its own repo-local `proof/corpus/`
 fixture, and the end-to-end coverage is owned by Eidos + the playground e2e. So no canon test needs an
 in-git slice, and the slices were removed from canon (the CC-BY LogHub `_2k` set + the ci-revert

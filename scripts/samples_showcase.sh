@@ -107,6 +107,77 @@ done
 
 [ "${#corpora[@]}" -gt 0 ] || { echo "error: no corpora with *.log under $SAMPLES" >&2; exit 1; }
 
+# canon's composed-ruleset identity hash + package list are the first lines of any det_proof
+# output — lift them from the first corpus so the index states which canon vocabulary produced this.
+first_out="$OUT/${corpora[0]%%:*}.canon.txt"
+identity="$(grep -m1 '^# semantic_identity ' "$first_out"  | sed 's/^# semantic_identity /semantic_identity /' || true)"
+packages="$(grep -m1 '^# semantic_packages ' "$first_out" | sed 's/^# semantic_packages /packages: /' || true)"
+
+# ── The PINS: what a re-runner needs to land on THESE bytes ─────────────────────────────────────
+# OWED BY THE FOUNDER'S SIGNATURE, not by taste. DN-48.D8 clause 2 grounds the derived-artifact
+# entry on "the reader re-runs the tool". The replay check above proves det_proof deterministic
+# FOR FIXED INPUTS AND A FIXED BINARY — it says nothing across builds, and the measurement that
+# proves it matters is on the record: two acts of this same producer published `loghub.canon.txt`
+# at 14 053 806 B / 155 212 lines and 13 997 882 B / 155 184 lines — identical class profile,
+# different bytes — while `marker_corpus.canon.txt` differed at the SAME size. Name, size and
+# provenance are not identity.
+#
+# THE FAILURE THIS PREVENTS is specific and it is self-inflicted: a reader who re-runs the tool
+# against different inputs or a different build measures a different class set, and under
+# DN-39.D4's exact-set rule (declared must equal fired, in BOTH directions) that reader REFUSES
+# OUR DISCLOSURE WITH OUR OWN INSTRUMENT. The pins are what make the re-run land where the
+# disclosure says it will.
+#
+# Every value below is a digest or a count — no wall clock, nothing that moves between two runs
+# over the same inputs, because this file rides into an artifact whose whole claim is byte
+# reproducibility and the replay check would be a lie if its own manifest churned.
+det_sha="$(sha256sum "$DET" | cut -d' ' -f1)"
+{
+  echo "# Pins — what a re-run needs to reproduce these bytes"
+  echo
+  echo "These renders are deterministic **for a fixed tool and fixed inputs**. That is narrower than"
+  echo "\"deterministic\", and the difference is the reason this file exists: the same tool over the"
+  echo "same-named inputs has already produced different bytes at two different acts. If you re-run"
+  echo "and your class set differs from the one declared beside these artifacts, check these pins"
+  echo "first — you are almost certainly not holding the same inputs or the same build."
+  echo
+  echo "## Tool"
+  echo
+  echo "- \`det_proof\` sha256: \`$det_sha\`"
+  [ -n "$identity" ] && echo "- canon ruleset: \`$identity\`"
+  [ -n "$packages" ] && echo "- canon $packages"
+  echo
+  echo "## Inputs"
+  echo
+  # The samples root's commit, when it is a checkout. ABSENT IS STATED, never omitted: a missing
+  # pin that simply is not printed reads exactly like a pin that was never needed.
+  if samples_ref="$(git -C "$SAMPLES" rev-parse HEAD 2>/dev/null)"; then
+    echo "- source repository commit: \`$samples_ref\`"
+  else
+    echo "- source repository commit: **unavailable** — this render was produced from a"
+    echo "  non-checkout input tree, so the inputs cannot be pinned by ref. The per-file digests"
+    echo "  below still identify them exactly."
+  fi
+  echo
+  echo "Per corpus, the SHA-256 of every input log actually read by this run, in the order it was"
+  echo "read. A corpus anchor is the SHA-256 of that list, so one line identifies the whole input set."
+  for entry in "${corpora[@]}"; do
+    c="${entry%%:*}"; n="${entry##*:}"
+    cdir="$SAMPLES/$c/samples"
+    echo
+    echo "### \`$c\` — $n log(s)"
+    echo
+    echo '```'
+    ( cd "$cdir" && find . -type f -name '*.log' | LC_ALL=C sort | xargs sha256sum )
+    echo '```'
+    anchor="$( ( cd "$cdir" && find . -type f -name '*.log' | LC_ALL=C sort | xargs sha256sum ) \
+               | sha256sum | cut -d' ' -f1 )"
+    echo
+    echo "corpus anchor: \`$anchor\`"
+  done
+} > "$OUT/PINS.md"
+echo "pins: det_proof $det_sha, ${#corpora[@]} corpus anchor(s) → $OUT/PINS.md" >&2
+
 # ── The derived work's OWN attribution file ──────────────────────────────────────────────────
 # One section per corpus whose right is a LICENCE (a synthetic corpus owes nobody a notice). The
 # source declaration is quoted verbatim so the reader can check it against the upstream record,
@@ -157,12 +228,6 @@ attributed=0
   done
 } > "$OUT/ATTRIBUTION.md"
 echo "attribution: $attributed licensed corpus/corpora declared → $OUT/ATTRIBUTION.md" >&2
-
-# canon's composed-ruleset identity hash + package list are the first lines of any det_proof
-# output — lift them from the first corpus so the index states which canon vocabulary produced this.
-first_out="$OUT/${corpora[0]%%:*}.canon.txt"
-identity="$(grep -m1 '^# semantic_identity ' "$first_out"  | sed 's/^# semantic_identity /semantic_identity /' || true)"
-packages="$(grep -m1 '^# semantic_packages ' "$first_out" | sed 's/^# semantic_packages /packages: /' || true)"
 
 # The client-facing framing. No engine internals, no moat — this is the give-away language layer.
 {
