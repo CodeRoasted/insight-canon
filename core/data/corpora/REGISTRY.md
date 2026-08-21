@@ -69,7 +69,7 @@ corpus (`ci-revert`, `jenkins-markers`) it is a **synthetic shape-fixture** (`SL
 true`) — never real crawled logs; the real-data gates run private on a trusted runner. Two lints
 enforce it, fail-closed, before anything is published: the warehouse
 `coderoast-corpora/_shared/samples_safety_lint.py` (RIGHT **and** CONTENT, per the Rules above) and
-the workspace [`corpus_registry_lint.py`](../../../scripts/corpus_registry_lint.py) Rule D (no
+the workspace `scripts/corpus_registry_lint.py` Rule D (no
 third-party-class corpus has committed bytes in canon's public tree).
 
 > **The phrase "public-safe by construction" is retired and must not come back.** It stated a
