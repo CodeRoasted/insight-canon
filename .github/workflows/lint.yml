@@ -35,3 +35,26 @@ jobs:
         run: bash scripts/provenance_one_write_site_lint.sh declared_timestamp
       - name: DN-32.D3 — declared_level has exactly one write site
         run: bash scripts/provenance_one_write_site_lint.sh declared_level
+
+  # OPS-7.O9: DISCLOSURE.md accepts a CLOSED set of historic refs carrying the LogHub slice; the
+  # disclosure bar is "signed record in-tree + exact-set gate in CI on every publication run".
+  # This is the gate half. It sits HERE because release.yaml's `lint` job calls this workflow at
+  # every tag and manual publication run (release needs golden needs ci needs lint — the whole
+  # chain reds if this job reds), and PR runs give the early signal for free. Exact-set, both
+  # directions: a ref outside the set carrying the slice (the exposure grew) AND a declared ref
+  # gone clean (record no longer matches reality) both fail, naming the ref. The script selftests
+  # its red arms on every run. Plain `run:` — never `if { … } | tee`, which disarms set -e.
+  disclosure-set:
+    # PUBLIC repo: pinned to hosted — a self-hosted runner reachable from a fork PR is an RCE. Never vars.CI_RUNS_ON here.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The predicate ranges over every ref: the gate itself fails closed on a partial
+          # fetch (a declared tag absent, or no tag newer than the boundary, is an error).
+          fetch-depth: 0
+          fetch-tags: true
+      - name: OPS-7.O9 — the disclosed historic-exposure ref set is exact and closed
+        run: bash scripts/disclosure_set_lint.sh
