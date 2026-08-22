@@ -57,14 +57,14 @@ jobs:
       benchmark-subdir: bench
     secrets: inherit
 
-  # THE SHOWCASE ACT MOVED OUT OF THIS REPO, 2026-08-21 (DN-48.D13 discharge 1, on the Founder's
-  # ratification of DN-48.D8). It now runs in the PRIVATE superproject as `canon-showcase.yml`.
+  # THE SHOWCASE ACT MOVED OUT OF THIS REPO, 2026-08-21 (ADR-33.D8 discharge 1, on the Founder's
+  # ratification of ADR-33.D5). It now runs in the PRIVATE superproject as `canon-showcase.yml`.
   #
   # Not a tidy-up: a publication act may occur only where the verdict for the artifact it emits is
   # computable, and it was not computable here. This repo is PUBLIC and the showcase ran
   # anonymously, while the content predicate is 591 lines in the PRIVATE warehouse — so the act
   # publishing the workspace's highest-exposure artifact was structurally the one that could not
-  # judge it. Publishing the predicate instead was refused twice (DN-48.D11/D12): it repairs
+  # judge it. Publishing the predicate instead was refused twice (ADR-33.D6/D7): it repairs
   # executability alone, leaving the verdict REFUSED, and it would publish the enumeration of what
   # that predicate cannot see. Capability is a property of the SITE, so the act moved to the judge.
   #

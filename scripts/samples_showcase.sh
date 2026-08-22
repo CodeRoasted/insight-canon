@@ -114,7 +114,7 @@ identity="$(grep -m1 '^# semantic_identity ' "$first_out"  | sed 's/^# semantic_
 packages="$(grep -m1 '^# semantic_packages ' "$first_out" | sed 's/^# semantic_packages /packages: /' || true)"
 
 # ── The PINS: what a re-runner needs to land on THESE bytes ─────────────────────────────────────
-# OWED BY THE FOUNDER'S SIGNATURE, not by taste. DN-48.D8 clause 2 grounds the derived-artifact
+# OWED BY THE FOUNDER'S SIGNATURE, not by taste. ADR-33.D5 clause 2 grounds the derived-artifact
 # entry on "the reader re-runs the tool". The replay check above proves det_proof deterministic
 # FOR FIXED INPUTS AND A FIXED BINARY — it says nothing across builds, and the measurement that
 # proves it matters is on the record: two acts of this same producer published `loghub.canon.txt`
