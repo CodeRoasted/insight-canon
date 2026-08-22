@@ -88,8 +88,9 @@ namespace
         return spdlog::default_logger();    // state (A) — silent, and correct
     }
 
-    // Shared colour sink — all module loggers write to the same stdout sink so
-    // output is interleaved coherently.  The sink itself is thread-safe (mt).
+    // Shared colour sink — all module loggers write to the SAME sink so output is interleaved
+    // coherently. Which stream that sink points at is `init_logging`'s `diagnostics_to_stderr`
+    // (stdout or stderr), decided once by the first caller. The sink itself is thread-safe (mt).
     auto& shared_sink()
     {
         static std::shared_ptr<spdlog::sinks::sink> sink;

@@ -1756,14 +1756,22 @@ inline constexpr std::array kAllLoggers{kArenaLogger,    kMaskLogger,   kPipelin
                                         kDetectorLogger, kParserLogger, kStrategyLogger,
                                         kTokenizerLogger};
 
-// Creates all named loggers with a shared stdout colour sink. Call once before any logging
+// Creates all named loggers with one shared colour sink. Call once before any logging
 // (thread-safe; first call wins). Defined in the logger.cpp impl unit.
-// `diagnostics_to_stderr` picks the SINK. Default false (stdout) — unchanged for every existing
-// caller. A tool whose STDOUT is a machine-readable stream (sift-crawl's JSONL work-list) must pass
-// true: otherwise opting into diagnostics corrupts the artifact, and the corruption scales with the
-// log level rather than announcing itself. Measured on a real crawl with CODEROAST_LOG_LEVEL=debug
-// set by the project's own .env.local: 9874 log lines interleaved with 34 records, the file
-// unparseable as JSONL while every record in it was correct.
+//
+// `diagnostics_to_stderr` picks the SINK, and the rule is a PREDICATE ON THE CALLER, not a list of
+// tools: if anything downstream PARSES or HASHES this process's stdout — JSON, JSONL, TSV, a
+// golden artifact, a framed protocol — pass true. Otherwise opting into diagnostics corrupts the
+// artifact, and the corruption scales with the log level rather than announcing itself: the
+// artifact's validity becomes a property of the operator's environment instead of the binary.
+// Measured twice, on two entry points that each read as a special case until the second one:
+// sift-crawl at CODEROAST_LOG_LEVEL=debug, 9874 log lines interleaved with 34 records, the file
+// unparseable as JSONL while every record in it was correct; and `sift --format json`, 30 lines
+// interleaved into a 62 kB report, unparsable at column 6, every byte of the report correct.
+// The false default is the historical one and it is the WRONG WAY ROUND for a new caller —
+// stdout is the artifact stream, stderr is the diagnostic stream. It survives only because
+// flipping it is a cascade across every caller and every test that captures a stream; a caller
+// that takes the default is asserting its stdout is human-facing, and should say so out loud.
 void init_logging(spdlog::level::level_enum default_level = spdlog::level::info,
                   bool diagnostics_to_stderr = false);
 
