@@ -1776,6 +1776,20 @@ inline constexpr std::array kAllLoggers{kArenaLogger,    kMaskLogger,   kPipelin
 // whose stdout really is a human stream is served by a DIFFERENT facility that hardcodes its own
 // posture (coderoast-server's `init_server_logging`, whose Drogon daemon writes to a container log
 // stream); it is not served by widening this one.
+//
+// `default_level` IS THE SILENCING AXIS, and it is the only door. A benchmark or a fuzz harness
+// passes `spdlog::level::off` to declare *"I measure nanoseconds / throughput; I want no records
+// at all"* — one call, all seven names registered at `off`, nothing emitted. There is deliberately
+// no `quiet()` entry and no `quiet` flag: the level argument already is that axis, and a second
+// spelling would reopen the shape the sink parameter's removal just closed.
+//
+// Nothing OUTSIDE this API can quiet canon, and that is by construction rather than by oversight.
+// `spdlog::set_level` walks the registry, and before this call canon has nothing in it: the
+// accessors' fallback logger is registered under no name (DN-53.D3), precisely so no third party
+// can mutate it by name. Silencing the host's default logger does not reach canon either — it used
+// to, only because the accessors borrowed that logger, which is the coupling D3 severed. Ask the
+// component through its own API; reaching across into another component's logger was an accident
+// that happened to work (DN-53.D7).
 void init_logging(spdlog::level::level_enum default_level = spdlog::level::info);
 
 // Per-module logger accessors. A registered name yields its own logger; before init_logging has
