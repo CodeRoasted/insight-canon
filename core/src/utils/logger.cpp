@@ -3,6 +3,9 @@ module;
 #include <spdlog/common.h>
 #include <spdlog/logger.h>
 #include <spdlog/sinks/sink.h>
+// spdlog 1.13 declares BOTH colour sinks here; there is no `stderr_color_sinks.h` sibling to
+// narrow this to (measured: the header does not exist in the pinned tree). So this include is
+// not evidence that anything writes to stdout — this unit constructs `stderr_color_sink_mt` only.
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
@@ -29,10 +32,11 @@ namespace
     // fallback conflated, which is the whole reason a missing registration could hide for
     // weeks:
     //
-    //   (A) init_logging() never ran   — nothing is registered, the default logger is the
-    //       only thing that works, and falling back is CORRECT. This is the unit-test path
-    //       and it must stay silent: a naive fail-fast here turns every test that logs
-    //       before init into a crash.
+    //   (A) init_logging() never ran   — nothing is registered, and the accessors resolve to a
+    //       canon-owned quiet logger (see `quiet_logger` below). The FACADE must stay silent
+    //       about itself here: a naive fail-fast turns every test that logs before init into a
+    //       crash. Silence about itself is not silence about the module's records — those still
+    //       go out, on canon's own stderr sink.
     //   (B) init_logging() ran, but this NAME is not registered — a programming error. The
     //       old code degraded to the default logger identically to (A), so nothing
     //       distinguished "not initialised" from "not registered" at runtime.
@@ -77,6 +81,48 @@ namespace
                          name, name);
     }
 
+    // The name state-(A) records carry. It is not in `kAllLoggers` and is never registered, so it
+    // cannot collide with a module name — and it tells an operator reading a stray warning the one
+    // fact that explains it: this process never called init_logging().
+    constexpr std::string_view kUninitialisedLogger{"insight.uninitialised"};
+
+    // WHERE STATE (A)'s RECORDS GO. Before this existed the accessors handed back
+    // `spdlog::default_logger()`, whose sink is STDOUT at info — so every entry point that linked
+    // canon and called nothing put canon's diagnostics into its own standard output. Four of the
+    // six entry points measured for DN-53 were that shape, insight-metalog's determinism fixture
+    // among them: it returned two sha256 for two runs of one binary on one input, the differing
+    // bytes a wall clock inside a log line. The artifact was a function of the operator's log
+    // level rather than of the input.
+    //
+    // Three properties, each load-bearing and each with a way to get it wrong:
+    //  * STDERR, never stdout. canon's callers are CLI tools and sidecars whose stdout is a
+    //    machine artifact. This is logcraft's `install_library_default` posture — never stdout,
+    //    never touch the host's default logger — applied to the sibling facade that lacked it.
+    //  * IT OWNS A SINK, and its level ADMITS a warn. A sinkless logger, or one filtered to `err`,
+    //    would keep stdout clean by making canon mute in every un-initialised process. That buys
+    //    the stream property by deleting the diagnostics, and it is not the fix.
+    //  * SINK ONLY, NOT A REGISTRATION. It registers no name, does not set `initialised()`, and
+    //    does not consume `init_flag()`. logcraft shares one flag between `install_library_default`
+    //    and `configure_loggers` ("first call wins") and documents the cost: a static initializer
+    //    that logs before `main` silently discards the level `main` later chooses. canon does not
+    //    inherit that hazard for a state whose entire purpose is to be quiet until someone decides
+    //    — so init_logging() still wins whenever it runs, no matter what logged first.
+    std::shared_ptr<spdlog::logger> quiet_logger()
+    {
+        static const std::shared_ptr<spdlog::logger> logger{
+            []
+            {
+                auto made{std::make_shared<spdlog::logger>(
+                    std::string{kUninitialisedLogger},
+                    std::static_pointer_cast<spdlog::sinks::sink>(
+                        std::make_shared<spdlog::sinks::stderr_color_sink_mt>()))};
+                made->set_level(spdlog::level::warn);
+                made->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%n] [%^%l%$] %v");
+                return made;
+            }()};
+        return logger;
+    }
+
     // The one accessor the per-module getters share. They differed by nothing but a name,
     // and seven copies of a fallback is how one of them quietly stopped matching the others.
     std::shared_ptr<spdlog::logger> logger_for(std::string_view name)
@@ -84,13 +130,16 @@ namespace
         if (auto logger{spdlog::get(std::string{name})})
             return logger;
         if (initialised())
+        {
             report_unregistered_once(name); // state (B) — loud, because logging works here
-        return spdlog::default_logger();    // state (A) — silent, and correct
+            return spdlog::default_logger();
+        }
+        return quiet_logger(); // state (A) — canon's own stream, never the host's
     }
 
     // Shared colour sink — all module loggers write to the SAME sink so output is interleaved
-    // coherently. Which stream that sink points at is `init_logging`'s `diagnostics_to_stderr`
-    // (stdout or stderr), decided once by the first caller. The sink itself is thread-safe (mt).
+    // coherently. STDERR, unconditionally: see the declaration in canon.api.cppm for why this is
+    // a constant and not a caller's choice. The sink itself is thread-safe (mt).
     auto& shared_sink()
     {
         static std::shared_ptr<spdlog::sinks::sink> sink;
@@ -110,20 +159,13 @@ namespace
 
 } // namespace
 
-void init_logging(spdlog::level::level_enum default_level, bool diagnostics_to_stderr)
+void init_logging(spdlog::level::level_enum default_level)
 {
     std::call_once(init_flag(),
-                   [default_level, diagnostics_to_stderr]()
+                   [default_level]()
                    {
-                       // The sink is chosen ONCE, by the first caller, like every other decision
-                       // under this call_once. A tool that owns a machine-readable stdout says so
-                       // here rather than hoping the level stays low — see the declaration.
-                       shared_sink() =
-                           diagnostics_to_stderr
-                               ? std::static_pointer_cast<spdlog::sinks::sink>(
-                                     std::make_shared<spdlog::sinks::stderr_color_sink_mt>())
-                               : std::static_pointer_cast<spdlog::sinks::sink>(
-                                     std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
+                       shared_sink() = std::static_pointer_cast<spdlog::sinks::sink>(
+                           std::make_shared<spdlog::sinks::stderr_color_sink_mt>());
 
                        // Module loggers — order does not matter. The SET is `kAllLoggers`
                        // in canon.api.cppm, beside the name constants; this unit no longer
@@ -148,10 +190,10 @@ void init_logging(spdlog::level::level_enum default_level, bool diagnostics_to_s
 // spdlog::get() acquires a mutex; acceptable because:
 //   - TRACE/DEBUG macros are compiled out in Release (getter never runs on hot paths)
 //   - INFO/WARN call sites are infrequent (constructors, thresholds, resets)
-// Falls back to spdlog::default_logger() when init_logging() hasn't been called
-// (e.g. in unit tests) — avoids null-pointer dereference in SPDLOG_LOGGER_CALL. That
-// fallback is SILENT only in that state; once init_logging has run, an unresolved name is
-// a defect and logger_for() reports it. See logger_for/initialised above.
+// An unresolved name never yields null (SPDLOG_LOGGER_CALL would dereference it), and which
+// logger it yields instead is the state split: before init_logging, canon's own quiet stderr
+// logger, silently; after it, spdlog's default logger plus a one-per-name WARN, because at that
+// point the name is a defect. See quiet_logger/logger_for/initialised above.
 
 std::shared_ptr<spdlog::logger> arena_logger()
 {

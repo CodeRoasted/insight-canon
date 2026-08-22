@@ -1759,23 +1759,28 @@ inline constexpr std::array kAllLoggers{kArenaLogger,    kMaskLogger,   kPipelin
 // Creates all named loggers with one shared colour sink. Call once before any logging
 // (thread-safe; first call wins). Defined in the logger.cpp impl unit.
 //
-// `diagnostics_to_stderr` picks the SINK, and the rule is a PREDICATE ON THE CALLER, not a list of
-// tools: if anything downstream PARSES or HASHES this process's stdout — JSON, JSONL, TSV, a
-// golden artifact, a framed protocol — pass true. Otherwise opting into diagnostics corrupts the
-// artifact, and the corruption scales with the log level rather than announcing itself: the
-// artifact's validity becomes a property of the operator's environment instead of the binary.
-// Measured twice, on two entry points that each read as a special case until the second one:
-// sift-crawl at CODEROAST_LOG_LEVEL=debug, 9874 log lines interleaved with 34 records, the file
-// unparseable as JSONL while every record in it was correct; and `sift --format json`, 30 lines
-// interleaved into a 62 kB report, unparsable at column 6, every byte of the report correct.
-// The false default is the historical one and it is the WRONG WAY ROUND for a new caller —
-// stdout is the artifact stream, stderr is the diagnostic stream. It survives only because
-// flipping it is a cascade across every caller and every test that captures a stream; a caller
-// that takes the default is asserting its stdout is human-facing, and should say so out loud.
-void init_logging(spdlog::level::level_enum default_level = spdlog::level::info,
-                  bool diagnostics_to_stderr = false);
+// THE SINK IS STDERR AND IS NOT A PARAMETER. This facility serves CLI tools and sidecars — a
+// process class whose stdout is an artifact stream: something downstream parses, hashes or frames
+// (JSON, JSONL, TSV, a golden, an MCP protocol channel). Diagnostics on that stream corrupt it,
+// and the corruption scales with the log level rather than announcing itself, so the artifact's
+// validity becomes a property of the operator's environment instead of of the binary. Measured on
+// two entry points that each read as a special case until the second one: sift-crawl at
+// CODEROAST_LOG_LEVEL=debug, 9874 log lines interleaved with 34 records, the file unparseable as
+// JSONL while every record in it was correct; and `sift --format json`, 30 lines interleaved into
+// a 62 kB report, unparsable at column 6, every byte of the report correct.
+//
+// This was a `diagnostics_to_stderr` flag, defaulting to stdout. Eleven call sites existed; eight
+// passed `true`, three were canon's own logger tests taking the default and asserting nothing
+// about the sink, and ZERO passed `false`. A rule with one legal answer is not a parameter, it is
+// a constant — and a parameter teaches a new author that the wrong value is available. A process
+// whose stdout really is a human stream is served by a DIFFERENT facility that hardcodes its own
+// posture (coderoast-server's `init_server_logging`, whose Drogon daemon writes to a container log
+// stream); it is not served by widening this one.
+void init_logging(spdlog::level::level_enum default_level = spdlog::level::info);
 
-// Per-module logger accessors (named logger when registered, else the spdlog default).
+// Per-module logger accessors. A registered name yields its own logger; before init_logging has
+// run they yield a canon-owned quiet logger on canon's own stderr sink, never the host's default
+// logger (logger.cpp states why, and what it costs to get wrong).
 std::shared_ptr<spdlog::logger> arena_logger();
 std::shared_ptr<spdlog::logger> mask_logger();
 std::shared_ptr<spdlog::logger> pipeline_logger();

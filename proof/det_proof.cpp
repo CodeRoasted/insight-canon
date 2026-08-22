@@ -113,19 +113,22 @@ int main(int argc, char** argv)
 #endif
 
     // Same invariant, second threat: NOTHING but the digest may reach this stdout. Canon's engine
-    // loggers carry a wall-clock `[%Y-%m-%d %H:%M:%S.%e]` pattern, and with no init_logging call
-    // they resolve to spdlog's DEFAULT logger — whose sink is stdout. So an unelided build of this
-    // fixture interleaves timestamped lines into the hashed bytes, and the digest stops being a
-    // function of the corpus: two runs of ONE binary on ONE input differ. Measured 2026-08-18 on
-    // the `malf inventory` build: 18 such lines on stdout for a 6-line input.
-    // det_public_proof.sh's cells compile the macros out (`-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF`,
-    // scripts/det_public_proof.sh:138), which is why the release legs never saw this — but that
-    // makes the determinism of the artifact a property of the CALLER's flags rather than of the
-    // fixture, and every other caller (the inventory build, scripts/samples_showcase.sh, a desk
-    // run) gets the corrupting default. The sink choice belongs here, where the contract is.
-    // Level stays `info` rather than `off`: the diagnostics are not the defect, their DESTINATION
-    // was — silencing them would answer an artifact-purity problem by deleting observability.
-    insight::logging::init_logging(spdlog::level::info, /*diagnostics_to_stderr=*/true);
+    // loggers carry a wall-clock `[%Y-%m-%d %H:%M:%S.%e]` pattern, so a record interleaved into
+    // the hashed bytes makes the digest a function of the operator instead of of the corpus: two
+    // runs of ONE binary on ONE input differ. Measured 2026-08-18 on the `malf inventory` build,
+    // back when an un-initialised canon resolved to spdlog's default STDOUT logger: 18 such lines
+    // on stdout for a 6-line input. det_public_proof.sh's cells compiled the macros out
+    // (`-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF`, scripts/det_public_proof.sh:138), which is why
+    // the release legs never saw it, while the inventory build, scripts/samples_showcase.sh and a
+    // desk run all got the corrupting default.
+    //
+    // canon's un-initialised state is stderr-only now (DN-53.D3), so this call is no longer what
+    // stands between the digest and a log line. It stays because it buys the other two things
+    // this fixture wants and the quiet fallback deliberately does not give: the module records
+    // carry their `[insight.*]` tag, and the level is `info` rather than the fallback's `warn`.
+    // Level stays `info` rather than `off`: the diagnostics were never the defect, their
+    // DESTINATION was — silencing them would answer artifact purity by deleting observability.
+    insight::logging::init_logging(spdlog::level::info);
 
     namespace tk = insight::tokenization;
 
