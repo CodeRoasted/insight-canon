@@ -64,9 +64,11 @@ constexpr std::string_view kGhaTransform{"api-rfc3339-line-prefix"};
 
 // ── The line table ────────────────────────────────────────────────────────────────────────────
 // Authored to be ADVERSARIAL to "the empty stack is the identity", not merely representative. Each
-// row names why it is here; the awkward ones (NUL-bearing, lone-CR, sub-width, near-miss stamp) are
-// the cases where a peel that trusted its declared width rather than shape-checking would corrupt
-// bytes, and where a `std::string_view` mishandled as a C string would truncate.
+// row names why it is here; the awkward ones (NUL-bearing, lone-CR, sub-width, near-miss stamp,
+// whole-second syslog) are the cases where a peel that trusted its declared width rather than
+// requiring the grammar to FILL it would corrupt bytes, and where a `std::string_view` mishandled
+// as a C string would truncate. The last two are the arms of one root: a line whose first 19 bytes
+// are a valid RFC 3339 head but whose complete datetime is not `width` bytes long.
 struct LineCase
 {
     std::string_view label;
@@ -85,7 +87,7 @@ constexpr std::string_view kStamp{"2026-04-15T22:20:38.2879579Z"};
 // point of this row is that the view must NOT stop at the NUL.
 constexpr std::string_view kNulBearing{"2026-04-15T22:20:38.2879579Z ok\0after-nul", 41U};
 
-const std::array<LineCase, 14> kLines{{
+const std::array<LineCase, 15> kLines{{
     {.label = "empty", .bytes = {}, .carries_stamp = false},
     {.label = "single space", .bytes = " ", .carries_stamp = false},
     {.label = "plain content", .bytes = "hello world", .carries_stamp = false},
@@ -114,14 +116,27 @@ const std::array<LineCase, 14> kLines{{
     // Shorter than the declared 28-byte width: a width-trusting peel would read past the end or
     // return garbage. Shape-checking returns the line untouched (transport.cpp has_stamp_at_head).
     {.label = "sub-width digits", .bytes = "2026-04-15T22", .carries_stamp = false},
-    // Correct shape in the invariant head, WRONG in the declared tail (6 fractional digits, no Z).
-    // The core-side `has_stamp_at_head` validates only the 19-byte invariant head and trusts the
-    // declared width for the rest, so it DOES claim this line. Asserted as it behaves, not as it
-    // might be wished to behave — this row is why the flag below is `carries_stamp`, a measured
-    // property of the shipped algorithm, and not "looks like a stamp to a human".
+    // Correct shape in the invariant head, WRONG in the declared tail (6 fractional digits, no Z):
+    // the complete full-datetime here is 26 bytes, not the declared 28. The acceptor requires the
+    // grammar to fill the width EXACTLY, so the row's effect on these bytes is nothing.
+    //
+    // This row is the ONE fixture the acceptor tightening was pre-registered to move. It asserted
+    // `true` for as long as the width was trusted rather than checked, under a comment that said
+    // in as many words "asserted as it behaves, not as it might be wished to behave". It now
+    // behaves as it was wished to, and the flag stays a MEASURED property of the shipped
+    // algorithm — never "looks like a stamp to a human".
     {.label = "near-miss stamp (short fraction)",
      .bytes = "2026-04-15T22:20:38.287957 ok",
-     .carries_stamp = true},
+     .carries_stamp = false},
+    // The third arm of the same root, and the oldest: a whole-second RFC 3339 stamp — 20 bytes,
+    // no fraction — followed by real content. The first 19 bytes are a valid invariant head and
+    // the line is longer than 28, so a width-trusting acceptor removed 28 bytes and ate the `m`
+    // of `myapp`. It was found on a real fixture, written down in a downstream comment, and
+    // compensated for there instead of being closed here; the complete datetime is 20 ≠ 28, so
+    // the row now declines. Nobody was hunting this case, which is exactly why it is pinned.
+    {.label = "whole-second stamp, syslog payload",
+     .bytes = "2024-01-15T10:30:00Z host1 myapp[123]: connection refused",
+     .carries_stamp = false},
     {.label = "high-bit / non-UTF8 bytes", .bytes = "\xFF\xFE raw bytes", .carries_stamp = false},
     {.label = "whitespace only", .bytes = "   \t  ", .carries_stamp = false},
 }};
@@ -260,6 +275,19 @@ TEST(TransportDeclaration, DeclaredStackActuallyPeels)
                    "decline.\n"
                 << "  in : \"" << escape(line.bytes) << "\"\n"
                 << "  out: \"" << escape(peeled.content) << "\"";
+
+            // The EXTRACT is the other half of "the rule's effect is nothing", and it is the half
+            // a downstream probe was built to lean on: acquisition's `deduce_transport` counts a
+            // row as evidence only when the peel shortened the line AND the extract parsed,
+            // precisely because the acceptor used to trust its width. Asserting it here is what
+            // makes that bar's discriminating power a property of THIS component rather than a
+            // claim in a comment one repo away.
+            EXPECT_FALSE(peeled.observation_time.has_value())
+                << "case [" << idx << "] '" << line.label
+                << "': the row declined these bytes, so it must publish no observation time; a "
+                   "time extracted from a span the rule did not claim is a datum invented out of "
+                   "content.\n"
+                << "  in : \"" << escape(line.bytes) << "\"";
         }
 
         // The peel SHORTENS — it never rewrites. Whatever it returns must be a suffix of the input,
@@ -276,7 +304,7 @@ TEST(TransportDeclaration, DeclaredStackActuallyPeels)
 
     // A table that stopped exercising the shortening path would make this whole arm vacuous while
     // every EXPECT above stayed green — the can't-FAIL mode. Pin the count.
-    constexpr std::size_t kStampedCases{6};
+    constexpr std::size_t kStampedCases{5};
     EXPECT_EQ(shortened, kStampedCases)
         << "the line table must keep exercising the shortening path; if a case was edited out, "
            "this arm stops falsifying anything and the degenerate green becomes meaningless";

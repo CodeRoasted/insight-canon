@@ -14,17 +14,13 @@ namespace insight::transport
 namespace
 {
 
-    [[nodiscard]] constexpr bool is_digit(char chr) noexcept
-    {
-        return static_cast<unsigned>(chr) - '0' < 10U;
-    }
     [[nodiscard]] constexpr bool is_space(char chr) noexcept
     {
         return chr == ' ' || chr == '\t';
     }
 
-    // The `LinePrefixTimestamp` declared byte grammar: an RFC 3339 stamp `YYYY-MM-DDTHH:MM:SS…`
-    // occupying exactly `width` bytes at line head.
+    // The `LinePrefixTimestamp` declared byte grammar: a COMPLETE RFC 3339 full-datetime occupying
+    // EXACTLY `width` bytes at line head.
     //
     // Shape-checked rather than width-trusted, and that is the DECLARED RULE, not a detection:
     // "remove these bytes IF they are a stamp of this shape" is one total rule whose effect is
@@ -32,19 +28,36 @@ namespace
     // corrupt every non-conforming line instead of leaving it alone, which is a worse reading of
     // the same declaration — and it would make a single unstamped line silently shift the whole
     // template.
+    //
+    // ⚠ THE WIDTH IS A CLAIM ABOUT THE BYTES, NEVER A PROMISE ABOUT THEM. This predicate once
+    // validated the invariant 19-byte head and let the declared width cover the remaining 9 —
+    // 19 checked, 9 trusted — and a stamp of a DIFFERENT width whose first 19 bytes are a valid
+    // RFC 3339 head then satisfied it by arithmetic coincidence, so the row peeled `width` bytes
+    // off a line it did not describe. Three arms of that one root were measured, on three
+    // different streams: a serving API whose 27-byte stamp plus its separator is exactly 28
+    // (a false declaration deleted 20 real error-class gaps while IMPROVING the benign share);
+    // our own writer at a 6-digit fraction, the same arithmetic; and a whole-second syslog line
+    // `2024-01-15T10:30:00Z host1 myapp[123]: …`, which lost 28 bytes and with them the `m` of
+    // `myapp`. Each was compensated for one tier out and closed in none.
+    //
+    // The asymmetry that let it stand is worth naming, because it is the general shape: the
+    // VARIABLE-width sibling below already delegates to this same public grammar — it MUST, it
+    // needs the grammar to find the end — while the FIXED-width kind does not have to, so it did
+    // not. A fixed parameter made validation optional, and optional validation is what turned a
+    // width into a coincidence. `rfc3339_datetime_length` is the one owner of the full-datetime
+    // byte grammar (canon.api.cppm); requiring `== width` completes an already-declared grammar
+    // and teaches canon to infer nothing (ADR-22): the row still declines, it never deduces.
     [[nodiscard]] constexpr bool has_stamp_at_head(std::string_view line,
                                                    std::size_t width) noexcept
     {
-        // "YYYY-MM-DDTHH:MM:SS" — the invariant head of every RFC 3339 form; the sub-second tail
-        // and the zone designator are inside the declared width and are not re-validated here.
-        constexpr std::size_t kMinShapeLen{19U};
-        if (line.size() < width || width < kMinShapeLen)
-            return false;
-        return is_digit(line[0]) && is_digit(line[1]) && is_digit(line[2]) && is_digit(line[3]) &&
-               line[4] == '-' && is_digit(line[5]) && is_digit(line[6]) && line[7] == '-' &&
-               is_digit(line[8]) && is_digit(line[9]) && line[10] == 'T' && is_digit(line[11]) &&
-               is_digit(line[12]) && line[13] == ':' && is_digit(line[14]) && is_digit(line[15]) &&
-               line[16] == ':' && is_digit(line[17]) && is_digit(line[18]);
+        // The shortest complete full-datetime the shared grammar can return, `YYYY-MM-DDTHH:MM:SS`.
+        // The guard's one live case is `width == 0`: the equality below would otherwise be
+        // satisfied by every line carrying no datetime at all, which is a malformed row reading as
+        // a universal match. `line.size() < width` needs no guard — the grammar never returns more
+        // bytes than the line holds, so a width past the end cannot compare equal.
+        constexpr std::size_t kMinDatetimeLen{19U};
+        return width >= kMinDatetimeLen &&
+               insight::utils::rfc3339_datetime_length(line, 0U) == width;
     }
 
     // Apply ONE row over a plain view. Returns the shortened view; sets `observation_time` when

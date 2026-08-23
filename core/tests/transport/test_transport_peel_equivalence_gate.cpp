@@ -26,6 +26,18 @@
 //     third-party logs; that event happened, and it is a fact of git history, not of this file's
 //     location. Copying bytes cannot manufacture provenance. What relocation preserves is the
 //     ability to RE-RUN the same comparison — nothing more, and no document may read it as more.
+//   * ⚠ THE ORACLE AND THE SUT ARE NO LONGER THE SAME DECISION FUNCTION, AND THE GREEN BELOW MUST
+//     NOT BE READ AS IDENTITY. The oracle keeps the 19-byte-head-plus-trusted-width grammar; the
+//     SUT's acceptor now requires a COMPLETE RFC 3339 full-datetime of EXACTLY the declared width,
+//     because the trusted 9 bytes were a measured defect (three arms, one root: a 27-byte serving
+//     API stamp, our own writer at a 6-digit fraction, and a whole-second syslog line that lost
+//     the `m` of `myapp`). The two grammars can disagree only on a line whose complete datetime is
+//     not 28 bytes, and this corpus contains NONE — censused before the change, 22 369 563 claimed
+//     lines, every one of them exactly 28. So the zero below is an AGREEMENT ON THIS POPULATION,
+//     which is what a characterization pin measures; it is no longer refactor-equivalence, and it
+//     never again certifies that the two grammars coincide. The oracle is NOT updated to match:
+//     an "improvement" to a frozen oracle is a defect, and a frozen oracle that tracks the SUT
+//     stops being able to catch it.
 //
 // HOMING (Kleio's). `core/tests/transport/`, 1:1 with
 // `core/src/transport/` under the per-domain mirror, beside the sibling G1 grain
