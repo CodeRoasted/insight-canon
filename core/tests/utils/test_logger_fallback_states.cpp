@@ -641,12 +641,12 @@ void observe_state_a_stdout()
     const std::string tail{control_complete ? captured.substr(control_eol + 1) : std::string{}};
 
     const std::string summary{
-        "\n  stdout capture: " + std::to_string(captured.size()) + " byte(s) total; control write " +
-        (control_landed ? "LANDED" : "MISSING") + "; " + std::to_string(prefix.size()) +
-        " byte(s) preceded its LINE; " + std::to_string(tail.size()) +
-        " byte(s) followed it — THE MEASURAND.\n  accessors: " + std::to_string(kAccessors.size()) +
-        ", sinkless " + indices(sinkless) + ", inaudible " + indices(inaudible) +
-        "\n  captured bytes: \"" + escape_bytes(captured) + "\""};
+        "\n  stdout capture: " + std::to_string(captured.size()) +
+        " byte(s) total; control write " + (control_landed ? "LANDED" : "MISSING") + "; " +
+        std::to_string(prefix.size()) + " byte(s) preceded its LINE; " +
+        std::to_string(tail.size()) + " byte(s) followed it — THE MEASURAND.\n  accessors: " +
+        std::to_string(kAccessors.size()) + ", sinkless " + indices(sinkless) + ", inaudible " +
+        indices(inaudible) + "\n  captured bytes: \"" + escape_bytes(captured) + "\""};
 
     if (!registered_already.empty())
         abandon_child(kChildPreconditionViolated,
@@ -658,14 +658,15 @@ void observe_state_a_stdout()
                           summary);
 
     if (!control_complete)
-        abandon_child(kChildStdoutProbeDeaf,
-                      "stdout-stream arm — the control write never arrived intact, so the emptiness "
-                      "below proves nothing. One of: the capture never attached to fd 1; "
-                      "INSIGHT_LOG_WARN is elided at compile time in this build; "
-                      "spdlog::default_logger() is not bound to stdout on this platform; or the "
-                      "sink cached a handle the capture then closed (the Windows binding — see the "
-                      "⚠ ordering block, and fix the INSTRUMENT, not the product)." +
-                          summary);
+        abandon_child(
+            kChildStdoutProbeDeaf,
+            "stdout-stream arm — the control write never arrived intact, so the emptiness "
+            "below proves nothing. One of: the capture never attached to fd 1; "
+            "INSIGHT_LOG_WARN is elided at compile time in this build; "
+            "spdlog::default_logger() is not bound to stdout on this platform; or the "
+            "sink cached a handle the capture then closed (the Windows binding — see the "
+            "⚠ ordering block, and fix the INSTRUMENT, not the product)." +
+                summary);
 
     if (!tail.empty())
         abandon_child(
@@ -864,11 +865,12 @@ TEST(LoggerFallbackStateADeathTest, NoModuleRecordReachesStdoutWhenInitLoggingNe
            "links canon and calls nothing corrupts its own machine artifact. Exit "
         << kChildStdoutProbeDeaf
         << " = the control write never reached the capture, so the silence measured nothing: that "
-           "is a defect in this INSTRUMENT, not in the product. Exit " << kChildLoggerSinkless
-        << " / " << kChildRecordInaudible
+           "is a defect in this INSTRUMENT, not in the product. Exit "
+        << kChildLoggerSinkless << " / " << kChildRecordInaudible
         << " = the property was bought with silence — the accessor's logger owns no sink of its "
            "own, or filters a WARN out, which would make canon mute in every un-initialised "
-           "process instead of moving it off stdout. Exit " << kChildPreconditionViolated
+           "process instead of moving it off stdout. Exit "
+        << kChildPreconditionViolated
         << " = the child was not in state (A) at all. The child's own diagnostic, with the "
            "captured bytes, is printed above under \"Actual msg\".";
 }
