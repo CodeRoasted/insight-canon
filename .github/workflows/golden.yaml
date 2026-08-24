@@ -231,8 +231,11 @@ jobs:
           # service.log / service_a.log / service-b.log come back in a different order than
           # `LC_ALL=C sort` gives on the Linux legs (scripts/det_public_proof.sh pins that). Today's
           # seven filenames agree under either; this keeps the agreement from being luck.
+          # -Path wildcard, never -Filter: `-Filter` goes to FindFirstFile, which matches a file's
+          # 8.3 SHORT name too, so `*.log` there also takes `<name>.logfile`, while the Linux leg
+          # globs `*.log`. Two legs enumerating different file sets, on a byte compare.
           $byName = @{}
-          Get-ChildItem -Path proof/corpus -Filter *.log -File | ForEach-Object { $byName[$_.Name] = $_.FullName }
+          Get-ChildItem -Path proof/corpus/*.log -File | ForEach-Object { $byName[$_.Name] = $_.FullName }
           $names = [string[]]$byName.Keys
           [Array]::Sort($names, [StringComparer]::Ordinal)
           $corpus = @($names | ForEach-Object { $byName[$_] })
