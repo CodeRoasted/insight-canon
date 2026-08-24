@@ -225,7 +225,18 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $det = (Get-Content det_proof_path.txt).Trim()
-          $corpus = Get-ChildItem -Path proof/corpus -Filter *.log | Sort-Object Name | ForEach-Object { $_.FullName }
+          # ORDINAL, not Sort-Object: det_proof prints one section per argument, so this order IS
+          # digest order on one side of a five-leg byte compare. `Sort-Object Name` collates
+          # culture-aware, where punctuation is ignorable — measured on pwsh 7.4.6,
+          # service.log / service_a.log / service-b.log come back in a different order than
+          # `LC_ALL=C sort` gives on the Linux legs (scripts/det_public_proof.sh pins that). Today's
+          # seven filenames agree under either; this keeps the agreement from being luck.
+          $byName = @{}
+          Get-ChildItem -Path proof/corpus -Filter *.log -File | ForEach-Object { $byName[$_.Name] = $_.FullName }
+          $names = [string[]]$byName.Keys
+          [Array]::Sort($names, [StringComparer]::Ordinal)
+          $corpus = @($names | ForEach-Object { $byName[$_] })
+          if ($corpus.Count -eq 0) { Write-Error "no *.log under proof/corpus"; exit 1 }
           $p = Start-Process -FilePath $det -ArgumentList $corpus -NoNewWindow -Wait -PassThru `
                  -RedirectStandardOutput "$($PWD.Path)/digest-msvc.txt"
           if ($p.ExitCode -ne 0) { Write-Error "det_proof exited $($p.ExitCode)"; exit 1 }

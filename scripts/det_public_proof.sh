@@ -57,7 +57,13 @@ PROOF="$CANON/proof"
 
 [ -f "$PROOF/det_proof.cpp" ]   || { echo "error: $PROOF/det_proof.cpp missing." >&2; exit 2; }
 [ -f "$PROOF/CMakeLists.txt" ]  || { echo "error: $PROOF/CMakeLists.txt missing (the Approach-B per-cell harness)." >&2; exit 2; }
-CORPUS="$(ls "$PROOF"/corpus/*.log 2>/dev/null | sort)"
+# LC_ALL=C: this order is the ARGUMENT order handed to det_proof, and det_proof prints one section
+# per argument — so corpus order IS digest order, and golden.yaml's MSVC leg sorts the same names
+# on the other side of a byte compare. A locale-aware collation treats punctuation as ignorable
+# (measured on pwsh 7.4.6: service.log / service_a.log / service-b.log come back in a different
+# order than byte order gives), so both sides pin byte order. Today's seven filenames agree under
+# either; this keeps that from being luck the first time a name mixes `_`, `.` or case.
+CORPUS="$(ls "$PROOF"/corpus/*.log 2>/dev/null | LC_ALL=C sort)"
 [ -n "$CORPUS" ] || { echo "error: no corpus under $PROOF/corpus" >&2; exit 2; }
 
 command -v conan >/dev/null || { echo "error: conan not found — the module build needs it for the toolchain + deps." >&2; exit 2; }
