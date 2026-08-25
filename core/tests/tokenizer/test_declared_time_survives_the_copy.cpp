@@ -24,8 +24,9 @@ using namespace insight::tokenization;
 //
 // THE PAIR IS THE PROPERTY, NEVER THE FLAG. Asserting `declared_timestamp == true` alone passes
 // with a wrong timestamp sitting beside it — the two fields are exactly what can drift apart, so
-// an arm reading only one of them is blind to the drift it exists to catch (MEMN-21: ask what ELSE
-// would make this pass). Every case below asserts the flag AND the value together.
+// an arm reading only one of them is blind to the drift it exists to catch
+// (MEM:synthetic-gate-vacuity-vs-judgment: ask what ELSE would make this pass). Every case below
+// asserts the flag AND the value together.
 //
 // Determinism: literal lines, one arena per case, no wall clock, no RNG.
 namespace
