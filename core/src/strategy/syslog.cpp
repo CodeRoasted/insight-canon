@@ -124,8 +124,8 @@ std::expected<ParsedLine, std::string> SyslogStrategy::parse(std::string_view li
     if (!header)
     {
         // Reachable only under set_format(): auto-detection routes on the same predicate, so a line
-        // that reaches parse() by scoring has already passed it. A wrong declaration stays wrong,
-        // loudly, and the declarer owns it (ADR-23.D2).
+        // that reaches parse() by scoring has already passed it. A wrong declaration stays wrong
+        // and the declarer owns it — nothing announces it (ADR-23.D2).
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=Syslog parse miss");
         return std::unexpected(
             std::string("SyslogStrategy: line does not match BSD or RFC3339 syslog format"));
