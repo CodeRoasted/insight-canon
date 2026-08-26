@@ -112,6 +112,44 @@ struct Report
 [[nodiscard]] Report round_trip_report(const SemanticPackageManifest& manifest,
                                        const ComposedSemantics& composed);
 
+// The MANIFEST EQUIVALENCE comparator (DN-17.D21 §5) — "do these two semantic packages agree,
+// FIELD FOR FIELD?". A THIRD question, so a third entry point rather than a mode on an existing
+// one: run() asks whether ONE package satisfies the contract, round_trip_report() asks whether one
+// package's two projections close on each other, and this asks whether TWO packages are the same
+// ruleset. The kit is canon's package-introspection surface, which is why an equivalence report
+// lives in a module named for conformance; the tension is named rather than smoothed, and if the
+// kit grows a fourth question the module earns a rename, not a split.
+//
+// WHY IT EXISTS WHEN A DIGEST ALREADY ANSWERS THE QUESTION. `compose({m}).identity()` decides
+// equality better than any comparator can — it covers every data-tier field the serializer writes
+// and is wrong only on a 2^-128 collision — but it is a 16-byte hash, so it can only ever say
+// THAT two rulesets differ. This says WHERE: which member, which index, which field, and both
+// values. That locator is the entire deliverable, which is why the report is a per-member Report
+// and never a bool.
+//
+// SCOPE, AND IT IS NARROWER THAN "the packages behave identically". The two CODE-TIER members are
+// compared by PRESENCE ONLY — their checks are named `strategy_presence_only` and
+// `echoed_source_presence_only` so the report itself says so, in the report, to a reader who never
+// opened this file. Two different packages hold two different function symbols, so comparing
+// pointer values is a guaranteed can't-PASS, and `compose.cpp`'s serializer makes the same call for
+// the same reason ("code tier, nominal"). Whether the two code tiers COMPUTE the same answers is a
+// separate obligation with a separate leg (DN-17.D21 §2, leg 2b: run both hooks over a fixture set
+// and require verdict-for-verdict agreement) and nothing here may be read as covering it.
+//
+// It is an EQUIVALENCE report, not a NON-VACUITY report: two empty manifests are genuinely
+// equivalent and this returns 14 green checks for them. A caller who needs the comparison to mean
+// something must feed it a package with rows — the subject is the caller's to choose, and
+// pretending otherwise would make an empty package permanently non-conformant.
+//
+// Rows pair BY INDEX, matching the identity serializer, which walks each span in declared order:
+// two manifests whose rows are the same SET in a different ORDER hash differently and are reported
+// differently here too, because declared order is ruleset content.
+//
+// Pure and deterministic: reads the two manifests and allocates only the report strings. Always
+// returns exactly one check per manifest member.
+[[nodiscard]] Report manifest_equivalence_report(const SemanticPackageManifest& lhs,
+                                                 const SemanticPackageManifest& rhs);
+
 // The kit's own marker probe, EXPORTED for regression tripwires (bibles/jenkins_dialect.md §3,
 // leg L-C). The repaired construction is `render_row(paired_writer_row(row), "probe")` — the
 // writer dual materialized, self-adapting over every extractor. The OLD form (`prefix + " probe"`)
@@ -775,6 +813,564 @@ Report round_trip_report(const SemanticPackageManifest& manifest, const Composed
                        ", child_order=" + std::string{order_name(got.child_order)} +
                        ", payload=\"" + std::string{got.name} + "\"}."});
     }
+    return report;
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════════
+// The MANIFEST EQUIVALENCE comparator (DN-17.D21 §5) — implementation.
+// ════════════════════════════════════════════════════════════════════════════════════════════════════
+
+namespace
+{
+
+    // How many differing rows one member's diagnostic enumerates before it summarizes, and how many
+    // unpaired rows a length mismatch names. Bounded on purpose: a report is read by a human, and
+    // an 800-row diff is a wall, not a locator. The COUNTS are always exact — only the enumeration
+    // is capped, so the cap can never make a difference look smaller than it is.
+    constexpr std::size_t kMaxReportedRowDiffs{8};
+    constexpr std::size_t kMaxReportedUnpairedRows{4};
+
+    // ── Value renderers ─────────────────────────────────────────────────────────────────────────
+    // Verbose-on-failure IS the deliverable here: leg 3 (semantic_identity equal) already decides
+    // the boolean, so this report earns its keep only by locating. Every enum therefore prints as
+    // its NAME — "extract: lhs=RemainderAfterPrefix rhs=None" locates a defect, "extract: lhs=1
+    // rhs=0" sends the reader back to the header to decode a byte. Produced strings are ASCII only:
+    // the report crosses into an external author's test framework and the surrounding kit asserts
+    // ASCII of every row key, so the diagnostic must not be the one place a multi-byte glyph
+    // enters.
+    //
+    // The four *_name switches below carry no `default:` label, deliberately: -Werror=switch over
+    // an unhandled enumerator is what makes a new grammar shape a compile error HERE instead of a
+    // "?" in a diagnostic nobody reads twice. `dual()` in canon.spi.cppm states the same reasoning
+    // for the same reason. The trailing return exists only because the function is non-void.
+
+    [[nodiscard]] std::string_view extract_name(PayloadExtract extract) noexcept
+    {
+        switch (extract)
+        {
+        case PayloadExtract::None:
+            return "None";
+        case PayloadExtract::RemainderAfterPrefix:
+            return "RemainderAfterPrefix";
+        case PayloadExtract::RemainderToClosingParen:
+            return "RemainderToClosingParen";
+        case PayloadExtract::NumericFieldThenRemainder:
+            return "NumericFieldThenRemainder";
+        }
+        return "?";
+    }
+
+    [[nodiscard]] std::string_view emit_name(PayloadEmit emit) noexcept
+    {
+        switch (emit)
+        {
+        case PayloadEmit::None:
+            return "None";
+        case PayloadEmit::PayloadAfterPrefix:
+            return "PayloadAfterPrefix";
+        case PayloadEmit::PayloadThenClosingParen:
+            return "PayloadThenClosingParen";
+        case PayloadEmit::PlaceholderNumericFieldThenPayload:
+            return "PlaceholderNumericFieldThenPayload";
+        }
+        return "?";
+    }
+
+    [[nodiscard]] std::string_view location_kind_name(LocationMatchKind kind) noexcept
+    {
+        switch (kind)
+        {
+        case LocationMatchKind::TestSpecExtension:
+            return "TestSpecExtension";
+        case LocationMatchKind::PrefixAndExtension:
+            return "PrefixAndExtension";
+        case LocationMatchKind::SuffixSet:
+            return "SuffixSet";
+        }
+        return "?";
+    }
+
+    [[nodiscard]] std::string_view outcome_shape_name(OutcomeMarkerShape shape) noexcept
+    {
+        switch (shape)
+        {
+        case OutcomeMarkerShape::RemainderToken:
+            return "RemainderToken";
+        case OutcomeMarkerShape::PrefixIsVerdict:
+            return "PrefixIsVerdict";
+        }
+        return "?";
+    }
+
+    [[nodiscard]] std::string_view value_class_name(ValueClass cls) noexcept
+    {
+        switch (cls)
+        {
+        case ValueClass::None:
+            return "None";
+        }
+        return "?";
+    }
+
+    [[nodiscard]] std::string quoted(std::string_view value)
+    {
+        return '"' + std::string{value} + '"';
+    }
+
+    [[nodiscard]] std::string render_value(std::string_view value)
+    {
+        return quoted(value);
+    }
+
+    [[nodiscard]] std::string render_value(std::span<const std::string_view> values)
+    {
+        std::string out{"["};
+        for (std::size_t idx{0}; idx < values.size(); ++idx)
+        {
+            if (idx != 0)
+                out += ", ";
+            out += quoted(values[idx]);
+        }
+        out += ']';
+        return out;
+    }
+
+    [[nodiscard]] std::string render_value(std::int64_t value)
+    {
+        return std::to_string(value);
+    }
+
+    [[nodiscard]] std::string render_value(insight::StructuralRole role)
+    {
+        return std::string{insight::to_string(role)};
+    }
+
+    [[nodiscard]] std::string render_value(insight::LogLevel level)
+    {
+        return std::string{insight::to_string(level)};
+    }
+
+    [[nodiscard]] std::string render_value(insight::RunOutcome outcome)
+    {
+        return std::string{insight::to_string(outcome)};
+    }
+
+    [[nodiscard]] std::string render_value(insight::tokenization::IntentMarkerKind kind)
+    {
+        return std::string{kind_name(kind)};
+    }
+
+    [[nodiscard]] std::string render_value(insight::tokenization::ChildOrder order)
+    {
+        return std::string{order_name(order)};
+    }
+
+    [[nodiscard]] std::string render_value(PayloadExtract extract)
+    {
+        return std::string{extract_name(extract)};
+    }
+
+    [[nodiscard]] std::string render_value(PayloadEmit emit)
+    {
+        return std::string{emit_name(emit)};
+    }
+
+    [[nodiscard]] std::string render_value(LocationMatchKind kind)
+    {
+        return std::string{location_kind_name(kind)};
+    }
+
+    [[nodiscard]] std::string render_value(OutcomeMarkerShape shape)
+    {
+        return std::string{outcome_shape_name(shape)};
+    }
+
+    [[nodiscard]] std::string render_value(ValueClass cls)
+    {
+        return std::string{value_class_name(cls)};
+    }
+
+    // ── Field equality ──────────────────────────────────────────────────────────────────────────
+    // `std::span` has NO operator== (deliberately, upstream: it is a view, and the committee
+    // refused to pick between identity and element-wise), which is exactly why this comparator has
+    // to exist at all — the manifest is nine spans and no compiler-generated equality can be
+    // defaulted onto it. The constrained template therefore does not apply to a span at all and the
+    // span overload takes it, element-wise, which is the semantics the identity serializer encodes.
+    template <typename Value>
+        requires requires(const Value& lhs, const Value& rhs) {
+            { lhs == rhs } -> std::convertible_to<bool>;
+        }
+    [[nodiscard]] bool equal_values(const Value& lhs, const Value& rhs) noexcept
+    {
+        return lhs == rhs;
+    }
+
+    [[nodiscard]] bool equal_values(std::span<const std::string_view> lhs,
+                                    std::span<const std::string_view> rhs) noexcept
+    {
+        return std::ranges::equal(lhs, rhs);
+    }
+
+    // Accumulates the FIELDS of one row pair that differ, as "field: lhs=<v> rhs=<v>",
+    // comma-joined. Empty text is the equality verdict: a row pair is equal exactly when no field
+    // was recorded.
+    class FieldDiff
+    {
+      public:
+        template <typename Value>
+        void field(std::string_view label, const Value& lhs, const Value& rhs)
+        {
+            if (equal_values(lhs, rhs))
+                return;
+            if (!text_.empty())
+                text_ += ", ";
+            text_ += label;
+            text_ += ": lhs=";
+            text_ += render_value(lhs);
+            text_ += " rhs=";
+            text_ += render_value(rhs);
+        }
+
+        [[nodiscard]] const std::string& text() const noexcept
+        {
+            return text_;
+        }
+
+      private:
+        std::string text_;
+    };
+
+    // ── Row comparison ──────────────────────────────────────────────────────────────────────────
+    // ⚠ THE STRUCTURED BINDING IS THE COVERAGE INSTRUMENT, NOT A STYLE CHOICE — do not "simplify"
+    // these to member access. A comparator whose apparent subject is "the row" and whose real
+    // subject is "the fields someone remembered" is a silent, green, wrong answer, and the failure
+    // is invisible precisely because a partial comparator still reports. A structured binding must
+    // name EXACTLY as many members as the type has, so adding a field to any row struct — or to the
+    // manifest itself, bound the same way in manifest_equivalence_report below — is a COMPILE ERROR
+    // at that line, in this file, on the next build. The instrument costs one line per row kind and
+    // it is the only thing standing between this function and the defect class it lives inside.
+
+    [[nodiscard]] std::string row_differences(const StructuralRoleRow& lhs,
+                                              const StructuralRoleRow& rhs)
+    {
+        const auto& [lhs_prefix, lhs_role, lhs_dialect] = lhs;
+        const auto& [rhs_prefix, rhs_role, rhs_dialect] = rhs;
+        FieldDiff diff;
+        diff.field("prefix", lhs_prefix, rhs_prefix);
+        diff.field("role", lhs_role, rhs_role);
+        diff.field("dialect_gate", lhs_dialect, rhs_dialect);
+        return diff.text();
+    }
+
+    [[nodiscard]] std::string row_differences(const IntentMarkerRow& lhs,
+                                              const IntentMarkerRow& rhs)
+    {
+        const auto& [lhs_prefix, lhs_kind, lhs_order, lhs_dialect, lhs_extract, lhs_excludes,
+                     lhs_channel] = lhs;
+        const auto& [rhs_prefix, rhs_kind, rhs_order, rhs_dialect, rhs_extract, rhs_excludes,
+                     rhs_channel] = rhs;
+        FieldDiff diff;
+        diff.field("prefix", lhs_prefix, rhs_prefix);
+        diff.field("kind", lhs_kind, rhs_kind);
+        diff.field("child_order", lhs_order, rhs_order);
+        diff.field("dialect_gate", lhs_dialect, rhs_dialect);
+        diff.field("extract", lhs_extract, rhs_extract);
+        diff.field("payload_excludes", lhs_excludes, rhs_excludes);
+        diff.field("channel_gate", lhs_channel, rhs_channel);
+        return diff.text();
+    }
+
+    [[nodiscard]] std::string row_differences(const IntentEmitRow& lhs, const IntentEmitRow& rhs)
+    {
+        const auto& [lhs_prefix, lhs_kind, lhs_order, lhs_dialect, lhs_emit, lhs_channel] = lhs;
+        const auto& [rhs_prefix, rhs_kind, rhs_order, rhs_dialect, rhs_emit, rhs_channel] = rhs;
+        FieldDiff diff;
+        diff.field("prefix", lhs_prefix, rhs_prefix);
+        diff.field("kind", lhs_kind, rhs_kind);
+        diff.field("child_order", lhs_order, rhs_order);
+        diff.field("dialect_gate", lhs_dialect, rhs_dialect);
+        diff.field("emit", lhs_emit, rhs_emit);
+        diff.field("channel_gate", lhs_channel, rhs_channel);
+        return diff.text();
+    }
+
+    [[nodiscard]] std::string row_differences(const LevelLiftRow& lhs, const LevelLiftRow& rhs)
+    {
+        const auto& [lhs_prefix, lhs_level, lhs_dialect] = lhs;
+        const auto& [rhs_prefix, rhs_level, rhs_dialect] = rhs;
+        FieldDiff diff;
+        diff.field("prefix", lhs_prefix, rhs_prefix);
+        diff.field("level", lhs_level, rhs_level);
+        diff.field("dialect_gate", lhs_dialect, rhs_dialect);
+        return diff.text();
+    }
+
+    [[nodiscard]] std::string row_differences(const LocationRow& lhs, const LocationRow& rhs)
+    {
+        const auto& [lhs_kind, lhs_infixes, lhs_extensions, lhs_prefixes, lhs_suffixes] = lhs;
+        const auto& [rhs_kind, rhs_infixes, rhs_extensions, rhs_prefixes, rhs_suffixes] = rhs;
+        FieldDiff diff;
+        diff.field("kind", lhs_kind, rhs_kind);
+        diff.field("infixes", lhs_infixes, rhs_infixes);
+        diff.field("extensions", lhs_extensions, rhs_extensions);
+        diff.field("prefixes", lhs_prefixes, rhs_prefixes);
+        diff.field("suffixes", lhs_suffixes, rhs_suffixes);
+        return diff.text();
+    }
+
+    [[nodiscard]] std::string row_differences(const ValueClassRow& lhs, const ValueClassRow& rhs)
+    {
+        const auto& [lhs_key, lhs_cls, lhs_schedule, lhs_scale] = lhs;
+        const auto& [rhs_key, rhs_cls, rhs_schedule, rhs_scale] = rhs;
+        FieldDiff diff;
+        diff.field("key", lhs_key, rhs_key);
+        diff.field("cls", lhs_cls, rhs_cls);
+        diff.field("schedule_id", lhs_schedule, rhs_schedule);
+        diff.field("scale", lhs_scale, rhs_scale);
+        return diff.text();
+    }
+
+    [[nodiscard]] std::string row_differences(const OutcomeTokenRow& lhs,
+                                              const OutcomeTokenRow& rhs)
+    {
+        const auto& [lhs_token, lhs_outcome, lhs_dialect] = lhs;
+        const auto& [rhs_token, rhs_outcome, rhs_dialect] = rhs;
+        FieldDiff diff;
+        diff.field("token", lhs_token, rhs_token);
+        diff.field("outcome", lhs_outcome, rhs_outcome);
+        diff.field("dialect_gate", lhs_dialect, rhs_dialect);
+        return diff.text();
+    }
+
+    [[nodiscard]] std::string row_differences(const OutcomeMarkerRow& lhs,
+                                              const OutcomeMarkerRow& rhs)
+    {
+        const auto& [lhs_prefix, lhs_dialect, lhs_shape, lhs_outcome] = lhs;
+        const auto& [rhs_prefix, rhs_dialect, rhs_shape, rhs_outcome] = rhs;
+        FieldDiff diff;
+        diff.field("prefix", lhs_prefix, rhs_prefix);
+        diff.field("dialect_gate", lhs_dialect, rhs_dialect);
+        diff.field("shape", lhs_shape, rhs_shape);
+        // `outcome` is INERT on a RemainderToken row (its verdict rides its remainder), and it is
+        // compared anyway — for the same reason the identity serializer writes it for every row:
+        // the manifest's content is a fixed field layout, not a per-shape union, so a row that
+        // changed shape must report the field that moved rather than have the comparison shift
+        // underneath.
+        diff.field("outcome", lhs_outcome, rhs_outcome);
+        return diff.text();
+    }
+
+    // The short human handle a row is named by when a LENGTH mismatch leaves it unpaired. A
+    // LocationRow has no key of its own — it is an ALGORITHM plus its vocabulary — so it names its
+    // algorithm, which is the only field a reader can act on without the full row.
+    [[nodiscard]] std::string_view row_key(const StructuralRoleRow& row) noexcept
+    {
+        return row.prefix;
+    }
+    [[nodiscard]] std::string_view row_key(const IntentMarkerRow& row) noexcept
+    {
+        return row.prefix;
+    }
+    [[nodiscard]] std::string_view row_key(const IntentEmitRow& row) noexcept
+    {
+        return row.prefix;
+    }
+    [[nodiscard]] std::string_view row_key(const LevelLiftRow& row) noexcept
+    {
+        return row.prefix;
+    }
+    [[nodiscard]] std::string_view row_key(const LocationRow& row) noexcept
+    {
+        return location_kind_name(row.kind);
+    }
+    [[nodiscard]] std::string_view row_key(const ValueClassRow& row) noexcept
+    {
+        return row.key;
+    }
+    [[nodiscard]] std::string_view row_key(const OutcomeTokenRow& row) noexcept
+    {
+        return row.token;
+    }
+    [[nodiscard]] std::string_view row_key(const OutcomeMarkerRow& row) noexcept
+    {
+        return row.prefix;
+    }
+
+    // Name the rows one side declares past the paired prefix — the "what was added / removed"
+    // half of a length mismatch, which the paired-row diff structurally cannot show.
+    template <typename Row>
+    [[nodiscard]] std::string unpaired_note(std::string_view side, std::span<const Row> longer,
+                                            std::size_t paired)
+    {
+        const std::size_t surplus{longer.size() - paired};
+        const std::size_t shown{std::min(surplus, kMaxReportedUnpairedRows)};
+        std::string out{" Unpaired "};
+        out += side;
+        out += " rows:";
+        for (std::size_t idx{paired}; idx < paired + shown; ++idx)
+        {
+            out += idx == paired ? " [" : ", [";
+            out += std::to_string(idx);
+            out += "] ";
+            out += quoted(row_key(longer[idx]));
+        }
+        if (surplus > shown)
+        {
+            out += ", and ";
+            out += std::to_string(surplus - shown);
+            out += " more";
+        }
+        out += '.';
+        return out;
+    }
+
+    // One manifest row-span member, compared row by row and field by field. Rows pair BY INDEX
+    // (the identity serializer's own semantics — declared order is ruleset content), so a length
+    // mismatch is reported as counts plus the unpaired keys, and the paired prefix is still
+    // compared: an appended row and a mutated row are different findings and a reader needs both.
+    template <typename Row>
+    [[nodiscard]] CheckResult compare_rows(std::string_view check_name, std::string_view member,
+                                           std::span<const Row> lhs, std::span<const Row> rhs)
+    {
+        const std::size_t paired{std::min(lhs.size(), rhs.size())};
+        std::size_t differing{0};
+        std::string rows_detail;
+        for (std::size_t idx{0}; idx < paired; ++idx)
+        {
+            const std::string fields{row_differences(lhs[idx], rhs[idx])};
+            if (fields.empty())
+                continue;
+            ++differing;
+            if (differing > kMaxReportedRowDiffs)
+                continue;
+            rows_detail += ' ';
+            rows_detail += member;
+            rows_detail += '[';
+            rows_detail += std::to_string(idx);
+            rows_detail += "]: ";
+            rows_detail += fields;
+        }
+
+        if (lhs.size() == rhs.size() && differing == 0)
+            return {.name = check_name, .passed = true, .detail = {}};
+
+        std::string detail{member};
+        detail += ": ";
+        if (lhs.size() != rhs.size())
+        {
+            detail += "LHS declares ";
+            detail += std::to_string(lhs.size());
+            detail += " rows, RHS declares ";
+            detail += std::to_string(rhs.size());
+            detail += " (rows pair BY INDEX; the first ";
+            detail += std::to_string(paired);
+            detail += " are compared, the surplus is unpaired).";
+            detail += lhs.size() > rhs.size() ? unpaired_note("LHS", lhs, paired)
+                                              : unpaired_note("RHS", rhs, paired);
+            detail += ' ';
+        }
+        detail += std::to_string(differing);
+        detail += " of the ";
+        detail += std::to_string(paired);
+        detail += " paired rows differ field-for-field.";
+        if (differing > kMaxReportedRowDiffs)
+        {
+            detail += " First ";
+            detail += std::to_string(kMaxReportedRowDiffs);
+            detail += " shown.";
+        }
+        detail += rows_detail;
+        return {.name = check_name, .passed = false, .detail = std::move(detail)};
+    }
+
+    [[nodiscard]] CheckResult compare_scalar(std::string_view check_name, std::string_view member,
+                                             std::string_view lhs, std::string_view rhs)
+    {
+        if (lhs == rhs)
+            return {.name = check_name, .passed = true, .detail = {}};
+        return {.name = check_name,
+                .passed = false,
+                .detail = std::string{member} + ": lhs=" + quoted(lhs) + " rhs=" + quoted(rhs)};
+    }
+
+    // A declared VOCABULARY member (channels, dialect_revisions): a short closed set, so both sides
+    // print in full rather than by index — the whole value IS the locator at this size.
+    [[nodiscard]] CheckResult compare_vocabulary(std::string_view check_name,
+                                                 std::string_view member,
+                                                 std::span<const std::string_view> lhs,
+                                                 std::span<const std::string_view> rhs)
+    {
+        if (std::ranges::equal(lhs, rhs))
+            return {.name = check_name, .passed = true, .detail = {}};
+        return {.name = check_name,
+                .passed = false,
+                .detail = std::string{member} + ": lhs=" + render_value(lhs) +
+                          " rhs=" + render_value(rhs)};
+    }
+
+    // The code tier, PRESENCE ONLY — see the entry point's contract above. The two packages hold
+    // two different symbols, so a pointer compare is a can't-PASS, and the behavioural comparison
+    // is a separate leg. The check NAME carries the word `presence_only` so the scope travels with
+    // the report into a framework that shows nothing but names.
+    [[nodiscard]] CheckResult compare_presence(std::string_view check_name, std::string_view member,
+                                               bool lhs, bool rhs)
+    {
+        if (lhs == rhs)
+            return {.name = check_name, .passed = true, .detail = {}};
+        return {.name = check_name,
+                .passed = false,
+                .detail = std::string{member} + ": one side declares the hook and the other does " +
+                          "not (lhs=" + (lhs ? "present" : "absent") +
+                          ", rhs=" + (rhs ? "present" : "absent") +
+                          "). This check compares PRESENCE only; whether two present hooks agree " +
+                          "on their verdicts is a separate obligation this kit does not cover."};
+    }
+
+} // namespace
+
+Report manifest_equivalence_report(const SemanticPackageManifest& lhs,
+                                   const SemanticPackageManifest& rhs)
+{
+    // ⚠ THE STRUCTURED BINDING IS THE COVERAGE INSTRUMENT (see the row_differences block above).
+    // SemanticPackageManifest has fourteen members and this names fourteen; adding a fifteenth is a
+    // COMPILE ERROR here rather than a member this report silently never looks at. That failure —
+    // a comparator whose apparent subject is "the manifest" and whose real subject is "the members
+    // someone remembered" — is the one this function is most likely to have, because it reports
+    // either way and the missing member's check simply never appears in a list nobody counts.
+    const auto& [lhs_name, lhs_version, lhs_roles, lhs_markers, lhs_emits, lhs_level_lifts,
+                 lhs_locations, lhs_value_classes, lhs_outcome_tokens, lhs_outcome_markers,
+                 lhs_channels, lhs_dialect_revisions, lhs_strategy, lhs_echoed_source] = lhs;
+    const auto& [rhs_name, rhs_version, rhs_roles, rhs_markers, rhs_emits, rhs_level_lifts,
+                 rhs_locations, rhs_value_classes, rhs_outcome_tokens, rhs_outcome_markers,
+                 rhs_channels, rhs_dialect_revisions, rhs_strategy, rhs_echoed_source] = rhs;
+
+    Report report;
+    report.checks.push_back(compare_scalar("equivalence.name", "name", lhs_name, rhs_name));
+    report.checks.push_back(
+        compare_scalar("equivalence.version", "version", lhs_version, rhs_version));
+    report.checks.push_back(compare_rows("equivalence.roles", "roles", lhs_roles, rhs_roles));
+    report.checks.push_back(
+        compare_rows("equivalence.markers", "markers", lhs_markers, rhs_markers));
+    report.checks.push_back(compare_rows("equivalence.emits", "emits", lhs_emits, rhs_emits));
+    report.checks.push_back(
+        compare_rows("equivalence.level_lifts", "level_lifts", lhs_level_lifts, rhs_level_lifts));
+    report.checks.push_back(
+        compare_rows("equivalence.locations", "locations", lhs_locations, rhs_locations));
+    report.checks.push_back(compare_rows("equivalence.value_classes", "value_classes",
+                                         lhs_value_classes, rhs_value_classes));
+    report.checks.push_back(compare_rows("equivalence.outcome_tokens", "outcome_tokens",
+                                         lhs_outcome_tokens, rhs_outcome_tokens));
+    report.checks.push_back(compare_rows("equivalence.outcome_markers", "outcome_markers",
+                                         lhs_outcome_markers, rhs_outcome_markers));
+    report.checks.push_back(
+        compare_vocabulary("equivalence.channels", "channels", lhs_channels, rhs_channels));
+    report.checks.push_back(compare_vocabulary("equivalence.dialect_revisions", "dialect_revisions",
+                                               lhs_dialect_revisions, rhs_dialect_revisions));
+    report.checks.push_back(compare_presence("equivalence.strategy_presence_only", "strategy",
+                                             lhs_strategy != nullptr, rhs_strategy != nullptr));
+    report.checks.push_back(compare_presence("equivalence.echoed_source_presence_only",
+                                             "echoed_source", lhs_echoed_source != nullptr,
+                                             rhs_echoed_source != nullptr));
     return report;
 }
 

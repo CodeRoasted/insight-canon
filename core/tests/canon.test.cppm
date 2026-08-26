@@ -15,6 +15,10 @@ export import insight.canon.detail.parse;
 // facade does not surface spi; a white-box core test legitimately does). Package suites import spi
 // via their own package module instead.
 export import insight.canon.spi;
+// The package-agnostic conformance kit. It is a PUBLIC module unit (canon ships it installed), not
+// a sealed shard, but a core test that exercises the kit's own algorithms belongs to the same
+// "import this and nothing else" contract as the rest of the surface above.
+export import insight.canon.conformance;
 
 // Shared core-test composition helper. A core test whose property is SEMANTIC-UNAWARE
 // (the universal formats tokenize; no dialect rows fire) feeds the Tokenizer a degenerate,
