@@ -526,11 +526,14 @@ enum class PayloadEmit : std::uint8_t
 // a fifth extractor here without touching the generator produces a compile error at the generated
 // row (a switch this function cannot answer) instead of a silently mis-derived writer.
 //
-// `-Werror=switch` over an unhandled enumerator is what makes that promise real: a new extractor
-// breaks THIS function on the next build, in the file that added it. There is deliberately no
-// `default:` LABEL — a default is what would silence that warning and turn the break into a wrong
-// answer. The trailing return exists only because the function is non-void and is unreachable while
-// the switch stays total.
+// What makes that promise real is a BUILD OPTION, not this prose: `core/CMakeLists.txt` sets
+// `-Werror=switch` (GCC/Clang) and `/we4062` (MSVC) PRIVATE on the `insight_canon` and
+// `insight_canon_tests` targets, so an unhandled enumerator is a compile ERROR in this file, on the
+// build that added the enumerator. Measured 2026-08-26: a fifth `PayloadExtract` enumerator fails
+// both targets' compile of this TU at the switch below. There is deliberately no `default:` LABEL —
+// a default is what would silence that diagnostic and turn the break into a wrong answer. The
+// trailing return exists only because the function is non-void and is unreachable while the switch
+// stays total.
 [[nodiscard]] constexpr PayloadEmit dual(PayloadExtract extract) noexcept
 {
     switch (extract)

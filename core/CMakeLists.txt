@@ -174,6 +174,24 @@ target_compile_options(insight_canon PUBLIC
 )
 
 ###########################################################
+#  Enumerator totality — the mechanism `dual()` (api/canon.spi.cppm) and the conformance
+#  diagnostic renderers (src/conformance/canon.conformance.cppm) both DECLARE they stand on.
+#  Those switches carry no `default:` label on purpose: a default is what silences the diagnostic
+#  and turns a forgotten enumerator into a wrong ANSWER — a writer derived as PayloadEmit::None,
+#  a manifest-diff printing "?" where a grammar shape should be named. Until this line existed the
+#  promise was prose only: -Wswitch rides -Wall, canon sets neither, so nothing enforced it.
+#  PRIVATE, not PUBLIC: it governs canon's own translation units. Pushing it onto consumers is a
+#  workspace-wide posture decision and is not this target's to make.
+#  MSVC: C4062 is the same diagnostic (unhandled enumerator, no default label). It is off at every
+#  warning level, so it has to be named to exist at all. C4061 is the wrong number — it also fires
+#  when a default label IS present, which is every deliberate partial switch in the tree.
+###########################################################
+set(INSIGHT_CANON_SWITCH_TOTALITY
+    $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-Werror=switch>
+    $<$<CXX_COMPILER_ID:MSVC>:/we4062>)
+target_compile_options(insight_canon PRIVATE ${INSIGHT_CANON_SWITCH_TOTALITY})
+
+###########################################################
 #  Optional NUMA support (arena allocator)
 ###########################################################
 # libnuma is vendored via conan (libnuma/2.0.19 on Linux, mirrors logcraft) — hermetic, so
@@ -296,8 +314,12 @@ if(INSIGHT_CANON_BUILD_TESTS)
         if(INSIGHT_CANON_ARENA_POISON)
             target_compile_definitions(insight_canon_tests PRIVATE INSIGHT_CANON_ARENA_POISON)
         endif()
+        # The test target COMPILES api/canon.spi.cppm and the conformance module in its own right
+        # (white-box, like arena_allocator.cpp above), so the totality option has to be repeated
+        # here — a PRIVATE option on insight_canon does not reach this target's copy of those TUs.
         target_compile_options(insight_canon_tests PRIVATE
-            $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-ffp-contract=off>)
+            $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-ffp-contract=off>
+            ${INSIGHT_CANON_SWITCH_TOTALITY})
         include(GoogleTest)
         gtest_discover_tests(insight_canon_tests)
     endif()

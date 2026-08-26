@@ -731,7 +731,10 @@ namespace
 {
 
     // Verbose-on-failure enum names (no canon to_string exists for these two — G2's diagnostic
-    // needs them).
+    // needs them). Both are switches with no `default:` label so the `-Werror=switch` / `/we4062`
+    // option set in core/CMakeLists.txt covers them; `order_name` is a switch over a two-valued
+    // enum for exactly that reason — as the equivalent ternary it was outside the option's reach
+    // and a third ChildOrder would have printed "Ordered" for the new value, silently.
     [[nodiscard]] std::string_view kind_name(insight::tokenization::IntentMarkerKind kind) noexcept
     {
         using insight::tokenization::IntentMarkerKind;
@@ -750,7 +753,14 @@ namespace
     [[nodiscard]] std::string_view order_name(insight::tokenization::ChildOrder order) noexcept
     {
         using insight::tokenization::ChildOrder;
-        return order == ChildOrder::Unordered ? "Unordered" : "Ordered";
+        switch (order)
+        {
+        case ChildOrder::Unordered:
+            return "Unordered";
+        case ChildOrder::Ordered:
+            return "Ordered";
+        }
+        return "?";
     }
 
 } // namespace
@@ -839,10 +849,12 @@ namespace
     // ASCII of every row key, so the diagnostic must not be the one place a multi-byte glyph
     // enters.
     //
-    // The four *_name switches below carry no `default:` label, deliberately: -Werror=switch over
-    // an unhandled enumerator is what makes a new grammar shape a compile error HERE instead of a
-    // "?" in a diagnostic nobody reads twice. `dual()` in canon.spi.cppm states the same reasoning
-    // for the same reason. The trailing return exists only because the function is non-void.
+    // The five *_name switches below carry no `default:` label, deliberately, and what enforces
+    // that is a build option rather than this comment: `core/CMakeLists.txt` sets `-Werror=switch`
+    // (GCC/Clang) and `/we4062` (MSVC) PRIVATE on `insight_canon` and `insight_canon_tests`, so an
+    // unhandled enumerator is a compile error HERE instead of a "?" in a diagnostic nobody reads
+    // twice. Measured 2026-08-26 on `extract_name`. `dual()` in canon.spi.cppm stands on the same
+    // option for the same reason. The trailing return exists only because the function is non-void.
 
     [[nodiscard]] std::string_view extract_name(PayloadExtract extract) noexcept
     {
