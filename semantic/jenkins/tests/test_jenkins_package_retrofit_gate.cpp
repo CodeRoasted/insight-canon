@@ -1124,7 +1124,7 @@ TEST_F(JenkinsRecognizerRetrofitGate, LOTheRunOutcomeRecoversThePlatformVerdict)
 
 // The pre-cut bare-null oracle EMITTER lived here between the FIRST ACT and the identity cut
 // that landed it: it froze the shipped chain's per-trace scores over the 82 bare traces
-// into the committed BARE-v2.precut-oracle.tsv (emitted at e6f5494, provenance in the file's
+// into the committed BARE-v2.baseline.tsv (emitted at e6f5494, provenance in the file's
 // own header) and was DELETED with the cut, exactly as announced — regenerating the oracle now
 // requires re-adding code, which is the loud act the freeze demands. The comparing gate is
 // test_jenkins_bare_null_gate.cpp (G-T5-BARE).

@@ -4,7 +4,7 @@
 //
 // ═══ THE CLAIM THIS GATE MAKES — NARROWED BY RULING ON 2026-08-26; READ BEFORE THE REST ═══
 // This gate was born as the T5 purification's ABORT WIRE. Its baseline file,
-// `BARE-v2.precut-oracle.tsv`, was emitted from the SHIPPED PRE-CUT chain (JenkinsStrategy live)
+// `BARE-v2.baseline.tsv`, was emitted from the SHIPPED PRE-CUT chain (JenkinsStrategy live)
 // at insight-canon e6f5494 on 2026-07-30, so a green then meant a genuine before/after null:
 //     "the T5 purification moved NOTHING on the 82 bare traces."
 //
@@ -77,7 +77,7 @@
 // (`JenkinsBareNullGate`) is unchanged — it is what `scripts/run_corpus_gates.sh` matches.
 //
 // ═══ THE BASELINE IS THE COMMITTED FILE ═══
-// `BARE-v2.precut-oracle.tsv`, beside this TU. 75 of its 82 rows are still the pre-cut emission of
+// `BARE-v2.baseline.tsv`, beside this TU. 75 of its 82 rows are still the pre-cut emission of
 // 2026-07-30 (by the since-deleted JenkinsBareNullPrecutOracleEmitter, 2-run byte-identical at
 // emit time); 7 are the 2026-08-26 re-emission. The file's own header carries both provenances,
 // and the filename keeps its `precut` token because most of the file still IS that emission —
@@ -187,7 +187,7 @@ using insight::tokenization::Tokenizer;
 constexpr const char* kCorpusVar{"CORPUS_JENKINS_MARKERS_DIR"};
 constexpr std::string_view kTraceSidecar{"RETRO-v2.trace-sidecar.tsv"};
 constexpr std::string_view kBytesRoot{"data/v2"};
-constexpr std::string_view kOracleFile{"BARE-v2.precut-oracle.tsv"};
+constexpr std::string_view kOracleFile{"BARE-v2.baseline.tsv"};
 constexpr std::size_t kBare{82};
 constexpr std::size_t kMaxReportedRows{10};
 constexpr std::size_t kArenaBlockBytes{4U * 1024U * 1024U};

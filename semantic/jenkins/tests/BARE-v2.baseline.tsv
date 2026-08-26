@@ -1,4 +1,4 @@
-# BARE-v2.precut-oracle.tsv — the G-T5-BARE baseline for the 82 bare traces of the
+# BARE-v2.baseline.tsv — the G-T5-BARE baseline for the 82 bare traces of the
 # jenkins-markers/v2 corpus (bare = the sidecar's frozen `stamp_class` cell, studies/010 triage).
 # Read by insight-canon/semantic/jenkins/tests/test_jenkins_bare_null_gate.cpp, which owns the
 # claim this file supports and the RULED procedure by which any row here may move.
