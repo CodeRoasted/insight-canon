@@ -1,9 +1,8 @@
 ###########################################################
 #  insight_semantic_github — the GitHub Actions / Azure Pipelines dialect semantic package
-#  (ADR 0024). TWO module interface units, each with one impl unit — the hand-written package
-#  (insight.semantic.github) and the projection of github.dialect.yaml
-#  (insight.semantic.github_gen) — and NO partitions in either (the cross-package BMI closure must
-#  not deepen — ADR 0024 §7 / the named-modules hazard family).
+#  (ADR 0024). ONE module interface unit (insight.semantic.github, a thin wrapper around the
+#  projection of github.dialect.yaml) plus one impl unit (its code tier), and NO partitions (the
+#  cross-package BMI closure must not deepen — ADR 0024 §7 / the named-modules hazard family).
 ###########################################################
 cmake_minimum_required(VERSION 3.28)
 
@@ -16,6 +15,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(INSIGHT_SEMANTIC_GITHUB_BUILD_TESTS "Build unit tests" ${PROJECT_IS_TOP_LEVEL})
+
+# Pulled in here rather than beside the install rules: CMAKE_INSTALL_INCLUDEDIR is read by the
+# module target's install interface (target_include_directories below), which is declared with the
+# target and not with the install block.
+include(GNUInstallDirs)
 
 # Cross-package dep: guarded so an umbrella build's single resolution stays authoritative.
 if(NOT TARGET insight::canon)
@@ -92,11 +96,10 @@ set(GITHUB_GENERATED_STAMP "${GITHUB_GENERATED_DIR}/github.dialect.stamp")
 # Stamp pattern (mirrors logcraft/core): the tool write-if-changes the .inc, so unchanged
 # content never recompiles a dependent TU, while the always-touched stamp stops ninja
 # re-running the command on every build.
-# `--module-suffix _gen` is a GENERATION parameter and reaches the C++ namespace and nothing
-# else: the projection lands in `insight::semantic::github_gen`, disjoint from the hand-written
-# package's `insight::semantic::github`. The dialect NAME stays "github" verbatim in the
-# declaration, because every row's `dialect_gate` carries it into `semantic_identity` — a rename
-# at the declared level would move the digest.
+# No `--module-suffix`: the projection lands in `insight::semantic::github`, the canonical
+# namespace, because it IS this package now. The suffix was the coexistence parameter that kept a
+# second, projected package disjoint from a hand-written one while the two were compared; there is
+# one package again and the suffix would only re-introduce a name nothing consumes.
 add_custom_command(
     OUTPUT "${GITHUB_GENERATED_STAMP}"
     BYPRODUCTS "${GITHUB_GENERATED_INC}"
@@ -104,39 +107,26 @@ add_custom_command(
     COMMAND Python3::Interpreter "${DIALECT_CODEGEN_TOOL}"
             --declaration "${GITHUB_DIALECT_DECLARATION}"
             --out "${GITHUB_GENERATED_INC}"
-            --module-suffix _gen
     COMMAND ${CMAKE_COMMAND} -E touch "${GITHUB_GENERATED_STAMP}"
     DEPENDS "${DIALECT_CODEGEN_TOOL}" "${GITHUB_DIALECT_DECLARATION}"
     COMMENT "dialect_package_codegen: --selftest, then project github.dialect.yaml"
     VERBATIM)
 add_custom_target(insight_semantic_github_dialect_gen DEPENDS "${GITHUB_GENERATED_STAMP}")
 
-# Two module interface units, one target, and they are in DIFFERENT file sets on purpose — see
-# the target_sources call below. `github_gen.cppm` is the thin wrapper that textually includes the
-# projection generated above; it declares the dialect NAME "github" verbatim, exactly as the
-# hand-written unit does, and only the module/namespace/target spelling carries `_gen` (DN-17.D9).
-# The two are never composed together — that is a property of the composing call sites, not of this
-# file, which merely compiles both.
-set(GITHUB_MODULE_UNITS      ${CMAKE_CURRENT_SOURCE_DIR}/src/github.cppm)
-set(GITHUB_GEN_MODULE_UNITS  ${CMAKE_CURRENT_SOURCE_DIR}/src/github_gen.cppm)
+# One module interface unit: `github.cppm`, the thin wrapper that textually includes the projection
+# generated above. It is PUBLIC and it is EXPORTED — cross-package module shipping installs the
+# interface unit itself and the CONSUMER recompiles it from the conan package (§10.7/§10.9) — which
+# is why the projection travels with it (the install(FILES) below) and why the include directory is
+# declared with both interfaces (target_include_directories below).
+set(GITHUB_MODULE_UNITS ${CMAKE_CURRENT_SOURCE_DIR}/src/github.cppm)
 file(GLOB_RECURSE GITHUB_IMPL_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
 add_library(insight_semantic_github STATIC ${GITHUB_IMPL_SOURCES})
-# The generated wrapper is a PRIVATE file set: built here, never installed and never exported.
-# That is a correctness requirement, not tidiness. Cross-package module shipping in this workspace
-# installs the module interface unit itself and the CONSUMER recompiles it from the conan package
-# (§10.7/§10.9) — but `github_gen.cppm` textually includes a projection that exists only inside a
-# build tree, so an installed copy could not be scanned, let alone compiled, anywhere else. The
-# same shape as logcraft_core's `cxx_modules_detail` set, for a different reason.
 target_sources(insight_semantic_github
     PUBLIC
         FILE_SET cxx_modules TYPE CXX_MODULES
         BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src
         FILES    ${GITHUB_MODULE_UNITS}
-    PRIVATE
-        FILE_SET cxx_modules_generated TYPE CXX_MODULES
-        BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src
-        FILES    ${GITHUB_GEN_MODULE_UNITS}
 )
 set_target_properties(insight_semantic_github PROPERTIES EXPORT_NAME semantic_github
     CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
@@ -145,16 +135,24 @@ add_library(insight::semantic_github ALIAS insight_semantic_github)
 
 target_link_libraries(insight_semantic_github PUBLIC insight::canon)
 
-# PRIVATE, and it must stay private: the directory only exists inside a build tree, so exporting it
-# would ship a path that resolves on the machine that built the package and nowhere else. The only
-# TU that reaches it is github_gen.cppm, which is compiled here and, separately, in the test
-# executable below — hence the same two lines there.
-target_include_directories(insight_semantic_github PRIVATE ${GITHUB_GENERATED_DIR})
+# THE PROJECTION'S TWO ADDRESSES, and they are different questions rather than one path written
+# twice. In the BUILD TREE the projection sits in `<build>/generated/`, an absolute path that
+# resolves only on the machine that built it — correct there, and CMake carries it to a consumer
+# that recompiles this interface unit through `IMPORTED_CXX_MODULES_INCLUDE_DIRECTORIES`, which is
+# what makes the editable workspace work. In the INSTALLED package that path does not exist, so the
+# projection is installed NEXT TO `github.cppm` in the module directory (install(FILES) below) and
+# the include directory is declared against the install prefix as well. Belt and braces on purpose:
+# the quoted `#include "github.generated.inc"` resolves by the includer's own directory before any
+# search path is consulted, so the installed layout works even where CMake declines to carry a
+# module include directory across the export.
+target_include_directories(insight_semantic_github PUBLIC
+    $<BUILD_INTERFACE:${GITHUB_GENERATED_DIR}>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/insight_semantic_github_modules>)
 
 # The declaration is projected as part of BUILDING this package, not as an opt-in target:
 # a generation step someone must remember to invoke is a step that does not run. Ordering is also
 # a correctness requirement rather than a convenience: the module SCAN preprocesses
-# github_gen.cppm, so the projection must exist before the target's first build step, not merely
+# github.cppm, so the projection must exist before the target's first build step, not merely
 # before its compile step.
 add_dependencies(insight_semantic_github insight_semantic_github_dialect_gen)
 
@@ -166,7 +164,6 @@ target_compile_options(insight_semantic_github PUBLIC
 ###########################################################
 #  Install + cross-package module shipping (mirrors insight_canon §10.7/§10.9)
 ###########################################################
-include(GNUInstallDirs)
 install(TARGETS insight_semantic_github
     EXPORT insight_semantic_githubTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -175,6 +172,15 @@ install(TARGETS insight_semantic_github
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILE_SET cxx_modules DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/insight_semantic_github_modules
 )
+# The projection travels WITH the interface unit that includes it, into the same directory. This is
+# not a convenience copy: the consumer recompiles `github.cppm` from the package, and the file it
+# textually includes has to be reachable from wherever the consumer unpacked us. Installed as a
+# sibling, `#include "github.generated.inc"` resolves by the includer's own directory. The file is a
+# BYPRODUCT of the generation step above, so a missing one is an install-time error naming it —
+# fail-closed, in the direction that matters: a package that shipped the interface unit without its
+# content would fail at every consumer's scan step instead of here.
+install(FILES ${GITHUB_GENERATED_INC}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/insight_semantic_github_modules)
 install(EXPORT insight_semantic_githubTargets
     NAMESPACE insight::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/insight_semantic_github
@@ -206,10 +212,10 @@ if(INSIGHT_SEMANTIC_GITHUB_BUILD_TESTS)
             PRIVATE
                 FILE_SET cxx_modules TYPE CXX_MODULES
                 BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src
-                FILES    ${GITHUB_MODULE_UNITS} ${GITHUB_GEN_MODULE_UNITS})
+                FILES    ${GITHUB_MODULE_UNITS})
         target_link_libraries(insight_semantic_github_tests PRIVATE
             insight::canon GTest::gtest GTest::gtest_main)
-        # This executable recompiles the module units rather than linking the library, so it needs
+        # This executable recompiles the module unit rather than linking the library, so it needs
         # the projection on its own include path and before its own scan (see the library above).
         target_include_directories(insight_semantic_github_tests PRIVATE ${GITHUB_GENERATED_DIR})
         add_dependencies(insight_semantic_github_tests insight_semantic_github_dialect_gen)

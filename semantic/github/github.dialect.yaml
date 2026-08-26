@@ -118,7 +118,7 @@ dialect:
         - ""
         - "There is NO format strategy any more, and that is the rejected alternative worth"
         - "recording: the dialect strategy used to detect and peel GitHub's per-line delivery"
-        - "stamp, and that peel became DECLARED transport instead — ADR-23. What is left of this"
+        - "stamp, and that peel became DECLARED transport instead — ADR-23.D3. What is left of this"
         - "package's code tier is one byte predicate — so the dialect is DATA: these rows plus"
         - "canon's walkers ARE the GHA parser."
 
