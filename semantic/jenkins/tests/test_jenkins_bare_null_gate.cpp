@@ -70,6 +70,12 @@
 //      in the falsifiability block below — a baseline that can only agree with itself is not a
 //      gate.
 //
+// THE TEST WAS RENAMED WITH THE CLAIM, 2026-08-26: `ThePurifiedChainMovesNothingOnTheBareClass`
+// -> `TheBareSurfaceIsByteIdenticalToTheCommittedBaseline`. The old name asserted the discharged
+// before/after null in the one string a CI log shows a reader who opens nothing else, which is
+// precisely where a narrowed claim must not survive under its old wording. The SUITE name
+// (`JenkinsBareNullGate`) is unchanged — it is what `scripts/run_corpus_gates.sh` matches.
+//
 // ═══ THE BASELINE IS THE COMMITTED FILE ═══
 // `BARE-v2.precut-oracle.tsv`, beside this TU. 75 of its 82 rows are still the pre-cut emission of
 // 2026-07-30 (by the since-deleted JenkinsBareNullPrecutOracleEmitter, 2-run byte-identical at
@@ -430,7 +436,7 @@ class JenkinsBareNullGate : public ::testing::Test
 };
 std::filesystem::path JenkinsBareNullGate::root_{};
 
-TEST_F(JenkinsBareNullGate, ThePurifiedChainMovesNothingOnTheBareClass)
+TEST_F(JenkinsBareNullGate, TheBareSurfaceIsByteIdenticalToTheCommittedBaseline)
 {
     bool read_ok{true};
     const auto read_file{[&read_ok](const std::filesystem::path& path)
