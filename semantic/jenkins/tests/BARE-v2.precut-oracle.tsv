@@ -1,8 +1,49 @@
-# BARE-v2.precut-oracle.tsv — the G-T5-BARE frozen oracle (adr/0062).
-# Emitted from the SHIPPED pre-cut chain (JenkinsStrategy live) by
-# JenkinsBareNullPrecutOracleEmitter.EmitOnceByHand over the 82 bare
-# traces of jenkins-markers/v2 (stamp_class column, studies/010 triage).
-# provenance: insight-canon e6f5494 (pre-cut, JenkinsStrategy live), corpus jenkins-markers/v2 (REGISTRY pin ae5f19f1), emitted 2026-07-30
+# BARE-v2.precut-oracle.tsv — the G-T5-BARE baseline for the 82 bare traces of the
+# jenkins-markers/v2 corpus (bare = the sidecar's frozen `stamp_class` cell, studies/010 triage).
+# Read by insight-canon/semantic/jenkins/tests/test_jenkins_bare_null_gate.cpp, which owns the
+# claim this file supports and the RULED procedure by which any row here may move.
+#
+# ── WHAT THIS FILE CLAIMS, AND WHAT IT NO LONGER CLAIMS ───────────────────────────────────────
+# 75 of the 82 rows are still the ORIGINAL PRE-CUT emission and carry the T5 purification's
+# before/after null for those traces. 7 rows were RE-EMITTED on 2026-08-26 from the CURRENT
+# purified chain, on the Founder's explicit ruling. Their "pre" side is GONE and NOT RECOMPUTABLE:
+# the JenkinsStrategy that produced it is deleted, so the re-emission could not restore the
+# comparison — it re-froze the current surface as a new baseline. For those 7 traces this file
+# therefore proves "nothing has moved since 2026-08-26" and NOTHING about the purification itself.
+# A whole-file green means: the bare surface is byte-identical to this file. It does NOT mean
+# "the T5 purification moved nothing on the bare class" any more. Do not read the old promise off
+# this file.
+#
+# ── PROVENANCE, oldest first — a row here moved by RULING, never by drift ─────────────────────
+# emitted 2026-07-30: all 82 rows. Source: the SHIPPED PRE-CUT chain (JenkinsStrategy live) at
+#   insight-canon e6f5494, by JenkinsBareNullPrecutOracleEmitter.EmitOnceByHand (since deleted),
+#   2-run byte-identical at emit time. Corpus jenkins-markers/v2, REGISTRY pin ae5f19f1.
+# re-emitted 2026-08-26: 7 rows, from the CURRENT purified chain at insight-canon 3858821 on
+#   linux-gcc16-release, via the gate's own REBASELINE-ROW patch output. Same corpus, same
+#   REGISTRY pin ae5f19f1, byte-attestation re-verified on all 82 traces in the same run.
+#   AUTHORITY: the Founder's ruling of 2026-08-26. CONDITION MET: the movement (7 of 82) was
+#   attributed CLOSED by causal experiment to two insight-canon commits — f6169f0 (2026-08-19,
+#   6 traces: sv_take_until -> sv_take_until_or_none, which stopped a colon-less remainder
+#   collapsing the message body onto `component` and leaving `content` empty) and fb2bfd5
+#   (2026-08-18, 2 traces, 1 shared: TokenShape::has_separator gained the wrapper bytes, so a
+#   hex run >= 16 wrapped in ( { < " ' now reaches embedded_identity) — and BOTH movements were
+#   judged CORRECT defect repairs, so neither could be reverted to satisfy this file. The rows
+#   re-emitted are exactly:
+#     builds_apache_org/job_Brooklyn_job_brooklyn_client_job_PR_102__4.log        (both commits)
+#     builds_apache_org/job_Brooklyn_job_brooklyn_dist_job_PR_145__56.log         (f6169f0)
+#     builds_apache_org/job_Camel_job_Camel_20Core_20_20JDK26_job_main__12.log    (f6169f0)
+#     builds_apache_org/job_Camel_job_Camel_20Core_20_20JDK26_job_main__13.log    (f6169f0)
+#     builds_apache_org/job_Camel_..._Build_20and_20test_job_camel_4_14_x__218.log (f6169f0)
+#     builds_apache_org/job_Camel_..._Build_20and_20test_job_camel_4_14_x__219.log (f6169f0)
+#     ibmz_ci_osuosl_org/job_TensorFlow_IBMZ_CI_test__13.log                      (fb2bfd5)
+#
+# ── HOW A ROW MAY MOVE AGAIN ──────────────────────────────────────────────────────────────────
+# Only through the 5-step procedure written at the head of test_jenkins_bare_null_gate.cpp:
+# attribute the movement CLOSED by causal experiment, have each attributed movement judged a
+# correct repair, apply the gate's own REBASELINE-ROW patch lines verbatim, append a dated
+# `# re-emitted:` line here, then re-run to 0 of 82 and re-prove red-capability. An UNATTRIBUTED
+# movement is the abort wire, never a re-pin. This file is never rewritten wholesale and no code
+# may write it in place.
 path	stages	steps	finished	produced_lines	distinct_templates	surface_sha256
 builds_apache_org/job_Accumulo_job_2_1__496.log	0	0	SUCCESS	4114	2630	e8090df5f5fcac249516f8dc47f7fe9eea90a2920948dd6ab3c3293b408028fd
 builds_apache_org/job_Accumulo_job_2_1__497.log	0	0	ABORTED	3342	2125	63c3f80ec3ca4fce46d5483224b6aed5b92cd8d49b1102c7cfcecd6bcc8ccdb8
@@ -12,13 +53,13 @@ builds_apache_org/job_Accumulo_job_4_0__474.log	0	0	SUCCESS	3270	1892	ffa5d6c4a4
 builds_apache_org/job_Accumulo_job_4_0__475.log	0	0	SUCCESS	3269	1890	ecb3c00a402ef76207f8ebf6c8477d13b69ca37a46c89df610dd82edb6516ce6
 builds_apache_org/job_Aries_job_website_build__29.log	2	13	SUCCESS	912	892	1b1cf34bf287f595d1a613bc5226163671af8e8f5018498cf3f864f506d28e37
 builds_apache_org/job_BigTop_job_pipeline_site__87.log	4	30	SUCCESS	706	270	1863bee732ea6fd0467cf757720b29098820b5a8e54a6ae4e0dbd3cc2d643c99
-builds_apache_org/job_Brooklyn_job_brooklyn_client_job_PR_102__4.log	4	20	SUCCESS	18374	9038	4c52764d78fbad2ac8925f714ef634400e65d2d7e3913dcabbe76b96089dd7ce
-builds_apache_org/job_Brooklyn_job_brooklyn_dist_job_PR_145__56.log	4	20	SUCCESS	52570	22209	95775c4dcdf69172019b45cefa7f1c56e6d013e901f24583589eb41c61c58f49
+builds_apache_org/job_Brooklyn_job_brooklyn_client_job_PR_102__4.log	4	20	SUCCESS	18374	9045	0b072ae85813c3835830fab2e4a4012746f732f487d9fdfaacf9a090a454a94b
+builds_apache_org/job_Brooklyn_job_brooklyn_dist_job_PR_145__56.log	4	20	SUCCESS	52570	22209	aac231d657413230f7592af53e62f73cd0769d55ce14ca1f9242edbf703d25c4
 builds_apache_org/job_Brooklyn_job_brooklyn_server_job_PR_1003__361.log	2	7	FAILURE	184	93	da3813793b8eb2941def0d12fa379daa0d2365902edb12f4bb4c16f8ab5173a8
-builds_apache_org/job_Camel_job_Camel_20Core_20_20JDK26_job_main__12.log	9	26	UNSTABLE	32462	9558	e36484bea364ab4c89d277c691fa71ecf1267577df62047865da12c7e37e4218
-builds_apache_org/job_Camel_job_Camel_20Core_20_20JDK26_job_main__13.log	10	28	FAILURE	31206	9307	16361913f9acf0fba83026bf70cff3c1c7e6534092572e9aff371b18335d516a
-builds_apache_org/job_Camel_job_Camel_20Core_20_Build_20and_20test_job_camel_4_14_x__218.log	11	26	FAILURE	21709	7234	f7d9b7b0fb0bf67a115911d130e90c3d7c9d154b1bcf88f5b5f068ec719fd791
-builds_apache_org/job_Camel_job_Camel_20Core_20_Build_20and_20test_job_camel_4_14_x__219.log	11	26	UNSTABLE	22077	7392	dc0be21bc4c0342eac4ad43053b9fb6aaf84eed869cded30ebcce4f611ecf374
+builds_apache_org/job_Camel_job_Camel_20Core_20_20JDK26_job_main__12.log	9	26	UNSTABLE	32462	9560	b9b819869f07f8671d57fb23e81a959334c46e61d2d760744e1591a758114b46
+builds_apache_org/job_Camel_job_Camel_20Core_20_20JDK26_job_main__13.log	10	28	FAILURE	31206	9309	09980b1ad12d5d49300deba3bfdd9da533abf4ca3ba1e0bb54da5b20337b9a9b
+builds_apache_org/job_Camel_job_Camel_20Core_20_Build_20and_20test_job_camel_4_14_x__218.log	11	26	FAILURE	21709	7236	822337b3f0d26af04dea704069874bd2938016e0144d1fe5a90758516566b713
+builds_apache_org/job_Camel_job_Camel_20Core_20_Build_20and_20test_job_camel_4_14_x__219.log	11	26	UNSTABLE	22077	7394	1c2b768ddb3edc69a6c1f402bc4c594ea963c2d9b7f3edfc132c87fee1cbd2ee
 ci_codemc_io/job_4drian3d_job_AuthMeVelocity__96.log	0	0	SUCCESS	153	153	1aa88f980792a85a140279c4d590e99533c1d892556788daa24f91b5c3573cd8
 ci_codemc_io/job_4drian3d_job_AuthMeVelocity__97.log	0	0	SUCCESS	152	152	348844a4d891714f3a83c10de7d22a66e35b68025474dabed9fa459173a39002
 ci_codemc_io/job_4drian3d_job_AuthMeVelocity__98.log	0	0	SUCCESS	152	152	e45545083373577c2e5e1b1d55ecb0a190e2f875db882a6091c8c3e84dd03c24
@@ -59,7 +100,7 @@ ibmz_ci_osuosl_org/job_Envoy_IBMZ_CI_test__1.log	4	11	FAILURE	81	61	ec708e583039
 ibmz_ci_osuosl_org/job_Strimzi_Kafka_Operator_IBMZ_CI_test__442.log	4	25	FAILURE	125	83	e7a6ca47939e66fac41f35b1b8ac40bdbabdda4250f9b7eab9c6b9f7d66ae127
 ibmz_ci_osuosl_org/job_Strimzi_Kafka_Operator_IBMZ_CI_test__443.log	4	25	FAILURE	123	81	1069a6ab388c8066d1843c1400234806acfa9912717953d778b30eadd6b4696e
 ibmz_ci_osuosl_org/job_TensorFlow_IBMZ_CI_test__12.log	4	14	SUCCESS	142	88	6f37b990c28dfcbfd7e19fa16825299c168dffab22d12caa913e3495e71f6580
-ibmz_ci_osuosl_org/job_TensorFlow_IBMZ_CI_test__13.log	4	11	ABORTED	148	95	a779b09a0c15b20266ed315b22238c13208d7d02e8478c32f1cd3eb292174f08
+ibmz_ci_osuosl_org/job_TensorFlow_IBMZ_CI_test__13.log	4	11	ABORTED	148	95	d83730708a85accfa90989b803ce4d6ca7977c9a2b0ce1429363e5e09ef547f5
 ibmz_ci_osuosl_org/job_TensorFlow_IBMZ_CI_test__26.log	1	2	ABORTED	29	28	da50502709ba69cea437c84d3fdc4b261026b4e4d0e2c7e9dfaba0658effa57e
 ibmz_ci_osuosl_org/job_TensorFlow_IBMZ_CI_test__27.log	4	14	FAILURE	37286	22153	a844259aec6fa0b3c7472c54e82e21b0067f8fbb3f7e76a76fa1b039a1e8bae5
 ibmz_ci_osuosl_org/job_che_machine_exec_IBMZ_CI__7.log	0	0	FAILURE	874	697	5cc5407d8b55d1200329b7bd0e4dcfe7efa6a92e3eaf1162b24df07bb4b87517
