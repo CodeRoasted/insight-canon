@@ -58,8 +58,8 @@ TEST(GithubManifestShape, ShipsTheDeclaredRulesetShapeAndNothingElse)
            "this must equal markers.size() = "
         << markers.size() << "; actual: " << emits.size();
     EXPECT_EQ(level_lifts.size(), 8U) << "level-lift rows, actual: " << level_lifts.size();
-    EXPECT_EQ(outcome_tokens.size(), 7U) << "run-outcome token rows, actual: "
-                                         << outcome_tokens.size();
+    EXPECT_EQ(outcome_tokens.size(), 7U)
+        << "run-outcome token rows, actual: " << outcome_tokens.size();
     EXPECT_EQ(channels.size(), 2U)
         << "declared intent-channel vocabulary (annotated + stripped), actual: " << channels.size();
     EXPECT_EQ(dialect_revisions.size(), 1U)
@@ -84,9 +84,9 @@ TEST(GithubManifestShape, ShipsTheDeclaredRulesetShapeAndNothingElse)
     // The code tier, by presence — the only thing a manifest-level check can say about it. Whether
     // two code tiers COMPUTE the same verdicts is a separate obligation with a separate leg, and
     // nothing here may be read as covering it.
-    EXPECT_EQ(strategy, nullptr)
-        << "this package ships no format strategy: the per-line delivery-stamp peel became declared "
-           "transport, leaving one byte predicate as the whole code tier";
+    EXPECT_EQ(strategy, nullptr) << "this package ships no format strategy: the per-line "
+                                    "delivery-stamp peel became declared "
+                                    "transport, leaving one byte predicate as the whole code tier";
     EXPECT_NE(echoed_source, nullptr)
         << "the echoed-source raw-line provenance hook is this package's entire code tier and must "
            "be present";
