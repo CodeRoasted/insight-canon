@@ -1,6 +1,6 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_composition.cpp — the composition CONTRACT, canon's semantic-unaware
-// machinery, over SYNTHETIC manifests. Four permanent properties:
+// machinery, over SYNTHETIC manifests. Five permanent properties:
 //   • G-SP-5 fail-closed — an exact-duplicate key across packages is a BUILD error (constexpr
 //     find_conflict, static_assert'd here) AND a startup FATAL (the runtime compose,
 //     EXPECT_DEATH'd).
@@ -10,6 +10,11 @@
 //   • The degenerate core-only composition (compose({})) is a defined, runnable state: universal
 //     formats tokenize, no dialect row fires, the identity is the stable hash of just the version
 //     components.
+//   • The DECLARATION fences, exercised in BOTH directions — all_packages_named and
+//     all_revisions_named. They are consteval predicates, so a `return true;` body would satisfy
+//     every positive arm ever written and red nothing; only the negative arms measure them. Plus
+//     the empty-name fence's RUNTIME half (EXPECT_DEATH), the grain a consteval predicate cannot
+//     reach: a package set assembled at runtime never meets a compile-time check.
 //   • semantic_identity is a reproducible, order-independent, CONTENT hash — the comparability key
 //     that REPLACES the retired kIntentRegistryVersion literal, making the composed ruleset part
 //     of the comparison's identity. This is the unit-level G-SP-4 guard; the cross-build /
@@ -170,6 +175,16 @@ constexpr SemanticPackageManifest kUnnamedPkg{.name = "",
                                               .echoed_source = nullptr};
 constexpr std::array<SemanticPackageManifest, 2> kNamedSet{kPkgA, kPkgB};
 constexpr std::array<SemanticPackageManifest, 2> kUnnamedSet{kPkgA, kUnnamedPkg};
+
+// ── The dialect-REVISION vocabulary fence's fixtures (grammar-6, DN-17.D14). Three ways to fail,
+// and each needs its own set because the predicate returns on the first one it meets: an EMPTY
+// vocabulary (a package that declares no vendor generation at all — the undeclared state the
+// coordinate exists to remove), an empty NAME inside it, and a REPEATED name (a copy-paste whose
+// only symptom would be duplicate bytes in the identity preimage). ──
+constexpr std::array<std::string_view, 1> kRevisionsOne{{"v1"}};
+constexpr std::array<std::string_view, 2> kRevisionsTwo{{"v1", "v2"}};
+constexpr std::array<std::string_view, 1> kRevisionUnnamed{{""}};
+constexpr std::array<std::string_view, 2> kRevisionsRepeated{{"v1", "v1"}};
 } // namespace
 
 // ── G-SP-5, build-time half: find_conflict is constexpr, so a duplicate is caught in a
@@ -224,6 +239,32 @@ static_assert(!insight::semantic::all_packages_named(kUnnamedSet),
               "an empty manifest name must FAIL the fence — the empty string IS kAnyDialect, so "
               "such a package's rows would read as universally gated to every downstream reader");
 
+// ── The dialect-REVISION vocabulary fence, all four arms. The positive arm alone is worthless
+// here: `all_revisions_named` is consteval and returns bool, so a body of `return true;` passes
+// every positive arm that will ever be written and reds nothing. The three negative arms are what
+// measure the predicate, one per rejection reason. ──
+static_assert(insight::semantic::all_revisions_named(kRevisionsOne),
+              "a single non-empty revision name must satisfy the fence");
+static_assert(insight::semantic::all_revisions_named(kRevisionsTwo),
+              "two distinct non-empty revision names must satisfy the fence — the cardinality-one "
+              "bound is a SCHEMA rule enforced by the declaration tool, never by core");
+static_assert(!insight::semantic::all_revisions_named(std::span<const std::string_view>{}),
+              "an EMPTY revision vocabulary must FAIL — a package that names no vendor generation "
+              "is the undeclared state this coordinate exists to remove, not a degenerate case");
+static_assert(!insight::semantic::all_revisions_named(kRevisionUnnamed),
+              "an empty revision NAME must FAIL — it names no vendor generation while occupying a "
+              "slot, and it enters the identity preimage as zero bytes");
+static_assert(!insight::semantic::all_revisions_named(kRevisionsRepeated),
+              "a REPEATED revision name must FAIL — a copy-paste whose only other symptom would be "
+              "duplicate bytes in the identity preimage");
+
+// The runtime empty-name death test's NON-VACUITY, proved at compile time: kUnnamedSet carries no
+// duplicate of any kind, so nothing but the empty-name fence can make compose() fatal on it. Delete
+// that fence and the EXPECT_DEATH below goes red rather than being caught by a neighbour.
+static_assert(!find_conflict(kUnnamedSet).has_conflict,
+              "kUnnamedSet must be conflict-free — otherwise the empty-name death test would be "
+              "measuring find_conflict, not the name fence");
+
 // ── G-SP-5, runtime half: compose() on the duplicate set FAILS CLOSED (fatal) — never a silent
 // merge ──
 TEST(CompositionDeathTest, DuplicateKeyFailsClosedAtRuntime)
@@ -245,6 +286,21 @@ TEST(CompositionDeathTest, DuplicatePackageNameFailsClosedAtRuntime)
         << "compose() must fatal on two packages sharing a manifest name even when they share no "
            "row of any kind — the silent alternative is one flattened view serving both packages' "
            "rows under one name";
+}
+
+// ── The empty-name fence's RUNTIME half, and it is the half that was missing. `all_packages_named`
+// is consteval: it reaches a package set written down in a translation unit and nothing else, while
+// compose() accepts a span assembled at runtime — the hand-written / externally supplied package
+// path this kit supports. Before this branch existed a runtime set carrying a package named ""
+// composed successfully, and every ungated row of that package then read as universally gated
+// (kAnyDialect IS the empty string), which is the exact reading the fence exists to prevent.
+// The regex pins the failure CLASS and the offending position, not the surrounding advice. ──
+TEST(CompositionDeathTest, UnnamedPackageFailsClosedAtRuntime)
+{
+    EXPECT_DEATH((void)compose(kUnnamedSet),
+                 "package at position 1 of 2 declares an EMPTY manifest name")
+        << "compose() must fatal on a runtime-assembled set carrying a package named \"\" — the "
+           "silent alternative is that package's rows reading as universally gated downstream";
 }
 
 // ── The degenerate core-only composition is a defined, RUNNABLE state (SRC-II-4 at the composition

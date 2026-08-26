@@ -236,6 +236,25 @@ namespace
         std::terminate();
     }
 
+    // DN-17.D17 — an EMPTY manifest NAME. It gets its own message rather than riding fail_closed:
+    // that headline names a duplicated match KEY and there is none here, and its remedy (edit a
+    // row, narrow a gate) is the wrong procedure for a package that simply has no name — the same
+    // "advice that cannot terminate" trap the branch above exists to avoid. The package's position
+    // in the caller's span is the only identity there is to print, precisely because it has no
+    // name.
+    [[noreturn]] void fail_unnamed_package(std::size_t index, std::size_t total)
+    {
+        std::cerr << "FATAL: insight::semantic::compose — the package at position " << index
+                  << " of " << total
+                  << " declares an EMPTY manifest name. Composition fails closed: kAnyDialect IS "
+                     "the empty string, so an unnamed package satisfies the dialect-gate ownership "
+                     "check VACUOUSLY and its every ungated row then reads as universally gated to "
+                     "downstream readers — the package would claim a gate it never asked for. Name "
+                     "the package. A set declared in a translation unit should static_assert "
+                     "all_packages_named() instead: the same fence, one build earlier.\n";
+        std::terminate();
+    }
+
     // ADR-22 — an UNKNOWN IntentChannel is a hard error, distinct from an absent one. Same
     // fail-closed posture as a duplicate row: a clear message naming the declared vocabulary, then
     // terminate. Degrading a typo to the fallback would hand back a silently structure-less
@@ -389,6 +408,23 @@ ComposedSemantics ComposedSemantics::for_stream(std::string_view declared_dialec
 
 ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
 {
+    // The EMPTY manifest name, answered before every other fence. `all_packages_named` (DN-17.D17)
+    // is consteval, so it reaches only a package set written down in a translation unit; a set
+    // ASSEMBLED AT RUNTIME — the hand-written / externally supplied package path this kit
+    // supports — never met it, and composed silently.
+    //
+    // It cannot ride find_conflict: an unnamed package is not a COLLISION. ONE such package is
+    // enough and the damage needs no second package, while find_conflict is pairwise by
+    // construction and has nothing to compare it against.
+    //
+    // Answered FIRST, and that order is content, not sequencing: every other diagnostic here
+    // identifies the offending package BY ITS NAME, so an unnamed package leaves them unable to
+    // say who. It is the same argument that puts the package-name duplicate ahead of the row
+    // checks inside find_conflict.
+    for (std::size_t index{0}; index < packages.size(); ++index)
+        if (packages[index].name.empty())
+            fail_unnamed_package(index, packages.size());
+
     // Fail-closed: an exact-duplicate key aborts before any table is built (the runtime half of
     // G-SP-5; the constexpr find_conflict is the build-time half a composition TU static_asserts).
     if (const ConflictInfo conflict{find_conflict(packages)}; conflict.has_conflict)
