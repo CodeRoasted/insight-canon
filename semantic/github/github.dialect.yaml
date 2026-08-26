@@ -209,7 +209,8 @@ dialect:
           - "`##[` never occurs in a stripped log — but gated anyway, so the declared channel"
           - "selects EXACTLY ONE Step row: a multi-channel tree becomes unrepresentable rather than"
           - "merely unattested, fail-closed is symmetric across both forms, and the writer's medium"
-          - "selector has a gate to select ON."
+          - "selector has a gate to select ON. The selection-order hazard that makes the gate"
+          - "load-bearing rather than decorative is DN-17.D15's."
           - ""
           - "The two Step prefixes never shadow: neither is a proper prefix of the other, so the"
           - "composed longest-match note stays empty."
@@ -249,6 +250,25 @@ dialect:
       - prefix: "::notice::"
         level: Info
         dialect_gate: self
+
+  # ── a DECLARED ABSENCE: the WHERE coordinate belongs to another package ──
+  locations:
+    why:
+      - "This dialect declares NO test-file location rows, and the absence is an ATTRIBUTION rather"
+      - "than a gap: a WHERE coordinate is a property of the TEST FRAMEWORK that named the file, not"
+      - "of the CI runner that printed the line, and the test_frameworks package is the one that"
+      - "owns that vocabulary. Empty on purpose and pointed somewhere, so a reader expecting a"
+      - "location row here is told where to look instead of meeting silence."
+    rows: []
+
+  # ── a DECLARED ABSENCE: no consumer exists, so no row is declared ──
+  value_classes:
+    why:
+      - "This dialect declares NO value classes, because not one of its candidates has a consumer"
+      - "yet. A class nothing reads can only rot, and declaring one to reserve the slot is exactly"
+      - "the dormant plumbing this project rips rather than extends. Empty by DECISION: it is"
+      - "revisited when a reader exists, and not before."
+    rows: []
 
   # ── run-outcome token rows ──
   outcome_tokens:
