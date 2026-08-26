@@ -1,7 +1,9 @@
 ###########################################################
 #  insight_semantic_github — the GitHub Actions / Azure Pipelines dialect semantic package
-#  (ADR 0024). One module interface unit (insight.semantic.github) + one impl unit — NO partitions
-#  (the cross-package BMI closure must not deepen — ADR 0024 §7 / the gcc-15 hazard).
+#  (ADR 0024). TWO module interface units, each with one impl unit — the hand-written package
+#  (insight.semantic.github) and the projection of github.dialect.yaml
+#  (insight.semantic.github_gen) — and NO partitions in either (the cross-package BMI closure must
+#  not deepen — ADR 0024 §7 / the named-modules hazard family).
 ###########################################################
 cmake_minimum_required(VERSION 3.28)
 
@@ -109,15 +111,32 @@ add_custom_command(
     VERBATIM)
 add_custom_target(insight_semantic_github_dialect_gen DEPENDS "${GITHUB_GENERATED_STAMP}")
 
-set(GITHUB_MODULE_UNITS  ${CMAKE_CURRENT_SOURCE_DIR}/src/github.cppm)
+# Two module interface units, one target, and they are in DIFFERENT file sets on purpose — see
+# the target_sources call below. `github_gen.cppm` is the thin wrapper that textually includes the
+# projection generated above; it declares the dialect NAME "github" verbatim, exactly as the
+# hand-written unit does, and only the module/namespace/target spelling carries `_gen` (DN-17.D9).
+# The two are never composed together — that is a property of the composing call sites, not of this
+# file, which merely compiles both.
+set(GITHUB_MODULE_UNITS      ${CMAKE_CURRENT_SOURCE_DIR}/src/github.cppm)
+set(GITHUB_GEN_MODULE_UNITS  ${CMAKE_CURRENT_SOURCE_DIR}/src/github_gen.cppm)
 file(GLOB_RECURSE GITHUB_IMPL_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
 add_library(insight_semantic_github STATIC ${GITHUB_IMPL_SOURCES})
+# The generated wrapper is a PRIVATE file set: built here, never installed and never exported.
+# That is a correctness requirement, not tidiness. Cross-package module shipping in this workspace
+# installs the module interface unit itself and the CONSUMER recompiles it from the conan package
+# (§10.7/§10.9) — but `github_gen.cppm` textually includes a projection that exists only inside a
+# build tree, so an installed copy could not be scanned, let alone compiled, anywhere else. The
+# same shape as logcraft_core's `cxx_modules_detail` set, for a different reason.
 target_sources(insight_semantic_github
     PUBLIC
         FILE_SET cxx_modules TYPE CXX_MODULES
         BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src
         FILES    ${GITHUB_MODULE_UNITS}
+    PRIVATE
+        FILE_SET cxx_modules_generated TYPE CXX_MODULES
+        BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src
+        FILES    ${GITHUB_GEN_MODULE_UNITS}
 )
 set_target_properties(insight_semantic_github PROPERTIES EXPORT_NAME semantic_github
     CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
@@ -126,8 +145,17 @@ add_library(insight::semantic_github ALIAS insight_semantic_github)
 
 target_link_libraries(insight_semantic_github PUBLIC insight::canon)
 
+# PRIVATE, and it must stay private: the directory only exists inside a build tree, so exporting it
+# would ship a path that resolves on the machine that built the package and nowhere else. The only
+# TU that reaches it is github_gen.cppm, which is compiled here and, separately, in the test
+# executable below — hence the same two lines there.
+target_include_directories(insight_semantic_github PRIVATE ${GITHUB_GENERATED_DIR})
+
 # The declaration is projected as part of BUILDING this package, not as an opt-in target:
-# a generation step someone must remember to invoke is a step that does not run.
+# a generation step someone must remember to invoke is a step that does not run. Ordering is also
+# a correctness requirement rather than a convenience: the module SCAN preprocesses
+# github_gen.cppm, so the projection must exist before the target's first build step, not merely
+# before its compile step.
 add_dependencies(insight_semantic_github insight_semantic_github_dialect_gen)
 
 # Determinism: the dialect recognizers feed deterministic content → no FMA contraction (mirrors canon).
@@ -178,9 +206,13 @@ if(INSIGHT_SEMANTIC_GITHUB_BUILD_TESTS)
             PRIVATE
                 FILE_SET cxx_modules TYPE CXX_MODULES
                 BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src
-                FILES    ${GITHUB_MODULE_UNITS})
+                FILES    ${GITHUB_MODULE_UNITS} ${GITHUB_GEN_MODULE_UNITS})
         target_link_libraries(insight_semantic_github_tests PRIVATE
             insight::canon GTest::gtest GTest::gtest_main)
+        # This executable recompiles the module units rather than linking the library, so it needs
+        # the projection on its own include path and before its own scan (see the library above).
+        target_include_directories(insight_semantic_github_tests PRIVATE ${GITHUB_GENERATED_DIR})
+        add_dependencies(insight_semantic_github_tests insight_semantic_github_dialect_gen)
         target_compile_features(insight_semantic_github_tests PRIVATE cxx_std_23)
         set_target_properties(insight_semantic_github_tests PROPERTIES
             CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
