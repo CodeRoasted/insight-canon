@@ -483,8 +483,25 @@ TEST_F(JenkinsBareNullGate, ThePurifiedChainMovesNothingOnTheBareClass)
     for (const std::string& row : moved_rows)
         ADD_FAILURE() << "  " << row;
     EXPECT_EQ(compared, kBare);
-    GTEST_LOG_(INFO) << "G-T5-BARE green: " << compared << "/" << kBare
-                     << " bare traces byte-identical pre/post purification.";
+    // THE BANNER STATES THE VERDICT IT MEASURED, and this line is the reason the rule is written
+    // here rather than assumed. It was emitted unconditionally, after the abort wire's own
+    // EXPECT_EQ, off a quantity that counts traces REACHED and never traces EQUAL — so on
+    // 2026-08-26 a run that moved 7 of 82 traces printed "G-T5-BARE green: 82/82 ...
+    // byte-identical" four lines above `[  FAILED  ]`, wrong on both halves. This banner is a
+    // CI-log grep surface: `G-T5-BARE green` must be findable on a green run and absent from a red
+    // one.
+    if (moved == 0U && compared == kBare)
+        GTEST_LOG_(INFO) << "G-T5-BARE green: " << compared << "/" << kBare
+                         << " bare traces compared, 0 moved — every one byte-identical against "
+                            "the frozen pre-cut oracle.";
+    else
+        GTEST_LOG_(INFO) << "G-T5-BARE RED: " << moved << " of " << compared << " bare traces "
+                         << "compared (" << kBare
+                         << " expected) MOVED against the frozen pre-cut "
+                            "oracle; "
+                         << (compared - moved)
+                         << " byte-identical. Attribute the movement or abort the T5 purification "
+                            "pass — never re-pin.";
 }
 } // namespace
 // NOLINTEND
