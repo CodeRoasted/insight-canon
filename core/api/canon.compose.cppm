@@ -74,7 +74,7 @@ struct CompositionReport
 struct ConflictInfo
 {
     bool has_conflict{false};
-    std::string_view kind; // "role" | "marker" | "level_lift" | "value_class"
+    std::string_view kind; // "package_name" | "role" | "marker" | "level_lift" | "value_class"
     std::string_view key;  // the duplicated prefix / value-class key
 };
 
@@ -380,6 +380,35 @@ namespace detail
 
 namespace detail
 {
+    // Two composed packages sharing a manifest `name` (DN-17.D17). Keyed on `name` ALONE, never on
+    // `(name, version)`: two packages at different versions under one name are still ambiguous,
+    // because `dialect_gate` carries the NAME, so `--dialect github` admits both and no rule would
+    // pick one.
+    //
+    // WHY THIS BELONGS HERE AND NOWHERE ELSE. A name collision is a property of the manifest SET,
+    // so no package-local check can see it — `all_dialect_gates_owned` takes ONE manifest and is
+    // blind by construction. And the generator cannot be the fence either: a customer may
+    // hand-write a package, or compose one generated package with three hand-written ones, so a
+    // fence living in the tool is absent from exactly the composition that needs it.
+    //
+    // What it prevents, derived from the shipped code rather than imagined: two packages both named
+    // "github" with DISJOINT row prefixes trip no other check — `gates_intersect("github",
+    // "github")` is true, but disjoint prefixes never collide. `for_stream("github")` then admits
+    // BOTH packages' gated rows flattened into one view, `packages()` lists "github" twice, and the
+    // unknown-dialect message prints the name twice. A silent shadow, reachable today.
+    [[nodiscard]] constexpr std::optional<std::string_view>
+    first_package_name_dup(std::span<const SemanticPackageManifest> packages) noexcept
+    {
+        for (std::size_t pkg_a{0}; pkg_a < packages.size(); ++pkg_a)
+            for (std::size_t pkg_b{pkg_a + 1}; pkg_b < packages.size(); ++pkg_b)
+                if (packages[pkg_a].name == packages[pkg_b].name)
+                    return packages[pkg_a].name;
+        return std::nullopt;
+    }
+} // namespace detail
+
+namespace detail
+{
     // The outcome-token variant of first_prefix_dup: keyed on .token + intersecting gate (ADR-17
     // §3.3 — two packages mapping the SAME token under intersecting gates is a conflict, whatever
     // the mapped outcome; a duplicate row has no deterministic resolution either way).
@@ -406,6 +435,11 @@ namespace detail
 
 constexpr ConflictInfo find_conflict(std::span<const SemanticPackageManifest> packages) noexcept
 {
+    // The package NAME first: it is the only key whose collision makes every OTHER answer here
+    // ambiguous — two packages under one name mean the reported duplicate could not name which
+    // package it came from.
+    if (const auto key{detail::first_package_name_dup(packages)})
+        return {.has_conflict = true, .kind = "package_name", .key = *key};
     // An exact duplicate is same key + (for prefix rows) intersecting dialect gate. Each unordered
     // (package,row) pair is checked once; O(rows²) over a handful of rows at compile time.
     if (const auto key{

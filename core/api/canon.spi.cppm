@@ -971,6 +971,23 @@ all_dialect_gates_owned(const SemanticPackageManifest& manifest) noexcept
                                { return owned(row.dialect_gate); });
 }
 
+// all_packages_named — the composed SET's name fence (DN-17.D17). A manifest `name` MUST be
+// non-empty, and the need is concrete rather than hygienic: `kAnyDialect` IS the empty string, so a
+// manifest named "" makes `all_dialect_gates_owned`'s `gate == manifest.name` succeed VACUOUSLY for
+// every ungated row, and the package's rows then read as ungated to every downstream reader — a
+// package silently claiming the universal gate it never asked for.
+//
+// Set-valued because it is asserted at the COMPOSITION site, beside `find_conflict`: one place
+// where a binary declares its package list is one place to fence that list, and the customer kit's
+// compose recipe ships the pair as its contract. Same shape and same posture as
+// `all_channels_named` — consteval, so the failure is a build error rather than a startup fatal.
+[[nodiscard]] consteval bool
+all_packages_named(std::span<const SemanticPackageManifest> packages) noexcept
+{
+    return std::ranges::all_of(packages, [](const SemanticPackageManifest& package) noexcept
+                               { return !package.name.empty(); });
+}
+
 // all_intents_paired — the bidirectionality predicate (SID: no reader without a writer). consteval
 // so a package static_asserts it over its constexpr rows: every recognition marker has a paired
 // generation row. The value half of the C2 type obligation (§3.2).
