@@ -128,6 +128,13 @@ inline constexpr std::array<OutcomeMarkerRow, 1> kOutcomeMarkers{{
     {.prefix = "Finished: ", .dialect_gate = kDialect},
 }};
 
+// ── The declared DIALECT REVISION vocabulary (grammar-6, DN-17.D14) ──
+// The VENDOR generation these rows recognize: the Jenkins Declarative Pipeline console syntax —
+// the `[Pipeline]` step echo and the `Finished: <RESULT>` epilogue. Jenkins has shipped one such
+// generation. It is NOT `.version` above: that one moves when WE edit the ruleset, this one moves
+// when JENKINS ships a new console syntax generation.
+export inline constexpr std::array<std::string_view, 1> kDialectRevisions{{"v1"}};
+
 // ── The manifest (§2.5) — the package's single composed contribution ──
 // name "jenkins", version "1.1.0" (SRC-SP-7 immutable-release discipline; bumped from 1.0.0 for T5
 // 5.2: the package's CODE TIER lost its format strategy — `.strategy` is serialized as a presence
@@ -148,6 +155,7 @@ export inline constexpr SemanticPackageManifest kManifest{
     .value_classes = {},
     .outcome_tokens = kOutcomeTokens,
     .outcome_markers = kOutcomeMarkers,
+    .dialect_revisions = kDialectRevisions, // grammar-6 — the vendor syntax generation
     .echoed_source = nullptr,
 };
 
@@ -161,5 +169,12 @@ static_assert(
     kManifest.name == kDialect,
     "jenkins: kDialect and the manifest name must be the same string — kDialect is what a "
     "caller declares and what every gated row carries");
+
+// grammar-6 (DN-17.D14) — the declared vendor-revision vocabulary, checked in the package
+// that declares it, at the same seat and for the same reason as the gate checks above.
+static_assert(insight::semantic::all_revisions_named(kDialectRevisions),
+              "jenkins: the declared dialect-revision vocabulary must be non-empty, with unique, "
+              "non-empty names (grammar-6 — the coordinate is what a reader compares generations "
+              "on, so an unnamed or repeated one is not a declaration)");
 
 } // namespace insight::semantic::jenkins

@@ -321,7 +321,16 @@ export namespace insight::semantic
 // carries the verdict and whose remainder is free-form). Two new closed-enum members, one new enum,
 // and two new serialized row fields — every one of them a serialization shape change, so the token
 // moves for the reason the paragraph above states.
-inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-5"};
+//
+// grammar-6 (DN-17.D14, the dialect REVISION coordinate): `SemanticPackageManifest` gains
+// `dialect_revisions`, a declared vocabulary span naming the VENDOR generations this package's
+// rows recognize — orthogonal to `.version`, which keeps its SRC-SP-7 meaning (the identity of OUR
+// ruleset edits). One new serialized section, appended at the END of the manifest preimage, so it
+// is a serialization SHAPE change and takes the token for the reason the paragraph above states.
+// The span is the shape rather than a scalar because the v2 subject may compose one dialect over
+// the UNION of generations; a scalar would have to become a span then, which is the reshape the
+// coordinate exists to avoid.
+inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-6"};
 
 // ── The DIALECT coordinate (ADR-22 / ADR-22) ─────────────────────────────────────────────────────
 // A DIALECT is a VOCABULARY over a HOST FORMAT (0064 clause 1): the format owns the LAYOUT rule
@@ -740,6 +749,27 @@ struct SemanticPackageManifest
     // ⇒ HARD ERROR listing these names. The span points at package-static constexpr storage
     // (SRC-SP-7 lifetime); serialized into semantic_identity alongside the rows it gates.
     std::span<const std::string_view> channels;
+    // grammar-6 (DN-17.D14) — the package's declared DIALECT REVISION vocabulary: which VENDOR
+    // generation(s) of the dialect these rows recognize. The vendor owns the referent, we own the
+    // declaration; `.version` above is OUR ruleset identity and answers a different question, so a
+    // reader must never substitute one for the other. NON-EMPTY, names unique and non-empty
+    // (`all_revisions_named`) — a package that recognizes nothing in particular is not a state the
+    // grammar admits. Cardinality ONE is a SCHEMA bound, enforced by the declaration tool, not
+    // here: core stays general so the v2 subject re-opens it by bumping the declaration schema
+    // rather than reshaping this member.
+    //
+    // NOT a gate in v1. Nothing filters on it, no row carries it, and the identity serializer is
+    // its only reader — a thin but LIVE consumer with a live contract. Its keep is that the day a
+    // vendor ships a second generation is a DATA change instead of a redesign; if the arc reaches
+    // every planned dialect without a v2 subject ever arming it, it is a legitimate rip candidate.
+    //
+    // Deliberately NOT propagated into `ComposedPackage` / `metalog::RulesetIdentity.packages[]`:
+    // that is a public metalog-spec wire surface with a different owner and external implementers,
+    // and a cardinality-one coordinate does not earn a wire widening. It becomes visible there
+    // when a revision becomes an OBSERVED output, and that is a metalog-spec subject at that time.
+    // The span points at package-static constexpr storage (SRC-SP-7 lifetime); serialized into
+    // semantic_identity at the END of the manifest preimage.
+    std::span<const std::string_view> dialect_revisions;
     StrategyFactory strategy{nullptr};     // nullable — the dialect format-strategy code tier
     ProvenanceHook echoed_source{nullptr}; // nullable — the raw-line echoed-source code tier
 };
@@ -863,6 +893,30 @@ paired_writer_row(const IntentMarkerRow& reader, std::span<const IntentEmitRow> 
 {
     return std::ranges::all_of(channels,
                                [](std::string_view channel) noexcept { return !channel.empty(); });
+}
+
+// ── The DIALECT REVISION static check (grammar-6, DN-17.D14 — fail-closed at COMPILE time) ──
+// The package's declared revision vocabulary is non-empty, every name is non-empty, and no name
+// repeats. Same seat and same posture as `all_channels_named`: the package's own TU, at compile
+// time. Non-emptiness is load-bearing in a way the channel vocabulary's is not — an EMPTY channel
+// span is the honest degenerate case (a dialect with one materialization), while an empty revision
+// span would mean a package that declares no vendor generation at all, which is exactly the
+// undeclared state the coordinate exists to remove. Uniqueness is checked because a repeated name
+// is a copy-paste error whose only symptom would be duplicate bytes in the identity preimage.
+[[nodiscard]] consteval bool
+all_revisions_named(std::span<const std::string_view> revisions) noexcept
+{
+    if (revisions.empty())
+        return false;
+    for (std::size_t i{0}; i < revisions.size(); ++i)
+    {
+        if (revisions[i].empty())
+            return false;
+        for (std::size_t j{i + 1}; j < revisions.size(); ++j)
+            if (revisions[i] == revisions[j])
+                return false;
+    }
+    return true;
 }
 
 // Every row's channel_gate is kAnyChannel or one of the package's DECLARED channels. Catches the

@@ -123,6 +123,15 @@ export inline constexpr std::string_view kChannelStripped{"stripped"};
 export inline constexpr std::array<std::string_view, 2> kChannels{
     {kChannelAnnotated, kChannelStripped}};
 
+// ── The declared DIALECT REVISION vocabulary (grammar-6, DN-17.D14) ──
+// The VENDOR generation these rows recognize: GitHub's workflow-command syntax v1 — the
+// `::name key=value::payload` family and the `##[group]` / `##[endgroup]` pair. GitHub has
+// deprecated `set-env`/`add-path` within v1 and shipped no v2 syntax, so this is cardinality one
+// and stays so until a second generation exists. It is NOT `.version` above: that one moves when
+// WE edit the ruleset, this one moves when GITHUB ships a new syntax generation, and the two
+// answer different questions for a reader of a MetaLog ruleset block.
+export inline constexpr std::array<std::string_view, 1> kDialectRevisions{{"v1"}};
+
 // ── Intent-marker rows (§1.2/§2.2) ──
 // DIALECT-GATED to this package (SRC-II-6 — `Run ` is GHA-runner-specific and would misfire
 // elsewhere). The hierarchy rides the rows: Job = Unordered (jobs parallel-by-construction), Step =
@@ -305,7 +314,8 @@ export inline constexpr SemanticPackageManifest kManifest{
     .value_classes = {},
     .outcome_tokens = kOutcomeTokens,
     .outcome_markers = {},
-    .channels = kChannels,              // ADR-22 — the two GHA materializations
+    .channels = kChannels,                  // ADR-22 — the two GHA materializations
+    .dialect_revisions = kDialectRevisions, // grammar-6 — the vendor syntax generation
     .echoed_source = &is_echoed_source, // the only code tier left: a byte predicate, not a grammar
 };
 
@@ -319,5 +329,12 @@ static_assert(insight::semantic::all_dialect_gates_owned(kManifest),
 static_assert(kManifest.name == kDialect,
               "github: kDialect and the manifest name must be the same string — kDialect is what a "
               "caller declares and what every gated row carries");
+
+// grammar-6 (DN-17.D14) — the declared vendor-revision vocabulary, checked in the package
+// that declares it, at the same seat and for the same reason as the gate checks above.
+static_assert(insight::semantic::all_revisions_named(kDialectRevisions),
+              "github: the declared dialect-revision vocabulary must be non-empty, with unique, "
+              "non-empty names (grammar-6 — the coordinate is what a reader compares generations "
+              "on, so an unnamed or repeated one is not a declaration)");
 
 } // namespace insight::semantic::github

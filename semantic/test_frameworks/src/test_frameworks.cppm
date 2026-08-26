@@ -49,6 +49,15 @@ inline constexpr std::array<LocationRow, 3> kLocations{{
      .suffixes = kGoRubySuffixes}, // full-file suffix set
 }};
 
+// ── The declared REVISION vocabulary (grammar-6, DN-17.D14) ──
+// This package has no VENDOR: the test-file naming families are a convention shared across jest /
+// vitest / playwright / pytest / go / ruby, not one supplier's syntax. The coordinate is still
+// declared and still non-empty, because the grammar admits no package that declares no generation
+// at all, and because a reader comparing two digests must be able to see the same field in every
+// manifest. `v1` names OUR first generation of these families; it moves when the FAMILY SET
+// changes shape, which is the only referent this package has for the coordinate.
+export inline constexpr std::array<std::string_view, 1> kDialectRevisions{{"v1"}};
+
 // ── The manifest (§2.5) — the package's single composed contribution ──
 // Ships only location rows (no roles/markers/level-lifts/value-classes, no code tier). version
 // "1.0.0" (SRC-SP-7). name sorts after "github" → github rows precede test_frameworks rows in
@@ -62,8 +71,17 @@ export inline constexpr SemanticPackageManifest kManifest{
     .level_lifts = {},
     .locations = kLocations,
     .value_classes = {},
+    .dialect_revisions = kDialectRevisions, // grammar-6 — the naming-family generation
     .strategy = nullptr,
     .echoed_source = nullptr,
 };
+
+// grammar-6 (DN-17.D14) — the declared revision vocabulary, checked in the package that declares
+// it. This package ships no dialect gates, so this is its ONLY compile-time declaration check.
+static_assert(
+    insight::semantic::all_revisions_named(kDialectRevisions),
+    "test_frameworks: the declared dialect-revision vocabulary must be non-empty, with unique, "
+    "non-empty names (grammar-6 — the coordinate is what a reader compares generations "
+    "on, so an unnamed or repeated one is not a declaration)");
 
 } // namespace insight::semantic::test_frameworks

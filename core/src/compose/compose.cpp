@@ -180,6 +180,15 @@ namespace
             append_u8(out, static_cast<std::uint8_t>(row.emit));
             append_str(out, row.channel_gate);
         }
+        // grammar-6 (DN-17.D14): the package's declared DIALECT REVISION vocabulary — which vendor
+        // generation(s) of the dialect these rows recognize. It is identity because two packages
+        // whose rows are byte-identical but whose declared generations differ are making DIFFERENT
+        // claims about what they recognize, and a digest that could not tell them apart would let
+        // the two compare as one ruleset. Appended after the grammar-3 section, the same discipline
+        // grammar-2 and grammar-3 used (fixed field order per generation; the version string above
+        // segregates the generations), so the preimage stays a fixed layout rather than a section
+        // inserted mid-stream that would shift the bytes of rows nobody touched.
+        append_str_span(out, pkg.dialect_revisions);
     }
 
     // Record longest-match shadow notes among a set of prefix rows: when one prefix is a PROPER
