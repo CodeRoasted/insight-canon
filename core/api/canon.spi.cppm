@@ -515,6 +515,38 @@ enum class PayloadEmit : std::uint8_t
     PlaceholderNumericFieldThenPayload,
 };
 
+// dual — the extractor→emitter map, TOTAL over the four declared pairs, and the ONE site the
+// pairing is written down (DN-17.D15).
+//
+// It exists because the pairing was about to be minted twice. A dialect declaration declares the
+// READER rows only and its writer projection is DERIVED, so the generator has to turn each row's
+// `extract` into its `emit` — and a mapping table inside the generator would be this same closed
+// correspondence, expressed a second time, in another language, with no compiler between them. The
+// generator therefore emits a CALL to this function rather than a `PayloadEmit` enumerator: adding
+// a fifth extractor here without touching the generator produces a compile error at the generated
+// row (a switch this function cannot answer) instead of a silently mis-derived writer.
+//
+// `-Werror=switch` over an unhandled enumerator is what makes that promise real: a new extractor
+// breaks THIS function on the next build, in the file that added it. There is deliberately no
+// `default:` LABEL — a default is what would silence that warning and turn the break into a wrong
+// answer. The trailing return exists only because the function is non-void and is unreachable while
+// the switch stays total.
+[[nodiscard]] constexpr PayloadEmit dual(PayloadExtract extract) noexcept
+{
+    switch (extract)
+    {
+    case PayloadExtract::None:
+        return PayloadEmit::None;
+    case PayloadExtract::RemainderAfterPrefix:
+        return PayloadEmit::PayloadAfterPrefix;
+    case PayloadExtract::RemainderToClosingParen:
+        return PayloadEmit::PayloadThenClosingParen;
+    case PayloadExtract::NumericFieldThenRemainder:
+        return PayloadEmit::PlaceholderNumericFieldThenPayload;
+    }
+    return PayloadEmit::None;
+}
+
 // Which core location-matching ALGORITHM a LocationRow selects + parameterizes (§2.2 — a CLOSED
 // enum; the three families location_recognizer implements today). A new dialect needing a new
 // family is a grammar-version bump, part of the identity.
