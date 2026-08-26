@@ -58,6 +58,28 @@ jobs:
       # det_public_proof.sh picks the profile matching DETERMINISM_LEG; x86↔arm64 differ only by arch.
       DETERMINISM_GCC_PROFILE: ${{ matrix.gcc_profile }}
       DETERMINISM_CLANG_PROFILE: ${{ matrix.clang_profile }}
+      # MALF_TOOLCHAIN_DIR is the generator's RESOLUTION MECHANISM, not a convenience
+      # (DN-17.D31/D32). A package that cannot find its build-time generator FATALs: it never
+      # degrades and never probes a second candidate, because a two-candidate
+      # `if(EXISTS a) else(b)` succeeds in BOTH environments while being right in one, and
+      # nothing downstream can tell which it picked. A package's relative fallback anchors on the
+      # DESK layout alone; CI is the environment that can declare, so it declares. The same
+      # conclusion was already reached from the other end at conan_module.sh:45-51, with the
+      # reason written at that site: the sibling fallback is unreachable under `conan create`.
+      #
+      # TRUE BY CONSTRUCTION here — this job checks malf-toolchain out at `path: malf`, which is
+      # `github.workspace`/malf by definition of actions/checkout.
+      #
+      # DELIBERATELY a duplicate of what conan_module.sh exports, and this is the one place where
+      # two sites encoding one fact is CORRECT rather than the enumeration class we normally kill:
+      # these legs are deliberately RAW. Routing them through the shared composite to inherit the
+      # variable would make the determinism proof inherit that wiring's assumptions, after which it
+      # could no longer distinguish "the build is deterministic" from "the wiring made it look
+      # deterministic". Their rawness IS their subject, so the second site is a proof harness whose
+      # whole value is not depending on the first.
+      #
+      # Inert until a package in this closure actually generates.
+      MALF_TOOLCHAIN_DIR: ${{ github.workspace }}/malf
     steps:
       - uses: actions/checkout@v5
 
@@ -145,6 +167,28 @@ jobs:
     runs-on: windows-2025
     env:
       CONAN_HOME: ${{ github.workspace }}/.conan2
+      # MALF_TOOLCHAIN_DIR is the generator's RESOLUTION MECHANISM, not a convenience
+      # (DN-17.D31/D32). A package that cannot find its build-time generator FATALs: it never
+      # degrades and never probes a second candidate, because a two-candidate
+      # `if(EXISTS a) else(b)` succeeds in BOTH environments while being right in one, and
+      # nothing downstream can tell which it picked. A package's relative fallback anchors on the
+      # DESK layout alone; CI is the environment that can declare, so it declares. The same
+      # conclusion was already reached from the other end at conan_module.sh:45-51, with the
+      # reason written at that site: the sibling fallback is unreachable under `conan create`.
+      #
+      # TRUE BY CONSTRUCTION here — this job checks malf-toolchain out at `path: malf`, which is
+      # `github.workspace`/malf by definition of actions/checkout.
+      #
+      # DELIBERATELY a duplicate of what conan_module.sh exports, and this is the one place where
+      # two sites encoding one fact is CORRECT rather than the enumeration class we normally kill:
+      # these legs are deliberately RAW. Routing them through the shared composite to inherit the
+      # variable would make the determinism proof inherit that wiring's assumptions, after which it
+      # could no longer distinguish "the build is deterministic" from "the wiring made it look
+      # deterministic". Their rawness IS their subject, so the second site is a proof harness whose
+      # whole value is not depending on the first.
+      #
+      # Inert until a package in this closure actually generates.
+      MALF_TOOLCHAIN_DIR: ${{ github.workspace }}/malf
     steps:
       - uses: actions/checkout@v5
 
