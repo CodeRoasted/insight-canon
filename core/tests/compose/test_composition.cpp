@@ -183,10 +183,22 @@ static_assert(find_conflict(kDupSet).key == "##DUP##", "the conflict must name t
 static_assert(!find_conflict(std::array<SemanticPackageManifest, 2>{kPkgA, kPkgB}).has_conflict,
               "distinct-key packages must NOT conflict");
 
-// ── The composed-set NAME fence, build-time half. `.kind` is the load-bearing assertion: it is
-// what proves NOTHING ROW-KEYED FIRED, and therefore that the name check — not some incidental row
-// collision — is what answered. An arm asserting only `has_conflict` would pass on a fixture the
-// row checks caught, and would keep passing if the name check were deleted tomorrow. ──
+// ── The composed-set NAME fence, build-time half. What isolates the name check here is the
+// FIXTURE, not the reported kind. `find_conflict` answers the package name FIRST (its definition
+// in canon.compose.cppm), so `.kind == "package_name"` is what ANY name-colliding set reports, one
+// carrying a live row duplicate included — the kNameAndRowDupSet arm below is that set and reports
+// "package_name" over a real role duplicate. Reading `.kind` as proof that nothing row-keyed fired
+// is therefore reading the check ORDER and calling it a fixture property.
+//
+// The isolation comes from kShadowOfA carrying no row of any kind — no row-keyed check has anything
+// to compare — together with kNamedShadowSet, the negative control that puts that same row-less
+// manifest under a name of its own and does NOT conflict. Between those two sets only the name
+// differs, so only the name can explain the difference; and on this fixture `has_conflict` alone
+// already proves the name check answered, because nothing else could have.
+//
+// `.kind` is still asserted, for a different reason: it is the operator-facing vocabulary the
+// runtime fail_closed branches its REMEDY on (kConflictKindPackageName), so its spelling is
+// contract rather than diagnostics. ──
 static_assert(find_conflict(kShadowSet).has_conflict,
               "two packages under one manifest name must be detectable at compile time, with no "
               "row of any kind in common");
