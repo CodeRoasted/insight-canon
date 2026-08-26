@@ -23,7 +23,13 @@ class InsightSemanticGithubConan(ConanFile):
     options = {"shared": [True, False], "fPIC": [True, False]}
     default_options = {"shared": False, "fPIC": True}
 
-    exports_sources = "CMakeLists.txt", "src/*"
+    # NAMED, never globbed (DN-17.D31 fence 2). github.dialect.yaml IS the ruleset: under
+    # `conan create` the cache source folder is what the build sees, so a declaration that
+    # does not travel with the package is a package whose content cannot be produced. It is
+    # spelled out rather than swept by a glob because zero rows is not a degenerate dialect,
+    # it is a broken one — a row-less manifest still compiles, still composes and still
+    # publishes a `semantic_identity`.
+    exports_sources = "CMakeLists.txt", "src/*", "github.dialect.yaml"
 
     def config_options(self):
         if self.settings.os == "Windows":
