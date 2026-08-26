@@ -1,9 +1,12 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_composition.cpp — the composition CONTRACT, canon's semantic-unaware
-// machinery, over SYNTHETIC manifests. Three permanent properties:
+// machinery, over SYNTHETIC manifests. Four permanent properties:
 //   • G-SP-5 fail-closed — an exact-duplicate key across packages is a BUILD error (constexpr
 //     find_conflict, static_assert'd here) AND a startup FATAL (the runtime compose,
 //     EXPECT_DEATH'd).
+//   • The composed-set NAME fence — two packages under one manifest name conflict on the name
+//     ALONE, with no row of any kind in common. Same two halves as G-SP-5, and the isolating
+//     fixture is what makes the property provable at all (see the kShadow* block).
 //   • The degenerate core-only composition (compose({})) is a defined, runnable state: universal
 //     formats tokenize, no dialect row fires, the identity is the stable hash of just the version
 //     components.
@@ -109,6 +112,64 @@ constexpr SemanticPackageManifest kDupB{.name = "dup_b",
                                         .strategy = nullptr,
                                         .echoed_source = nullptr};
 constexpr std::array<SemanticPackageManifest, 2> kDupSet{kDupA, kDupB};
+
+// ── The composed-set NAME fence, and the fixture is the whole point ──
+// The obvious mutation proves NOTHING here: composing a package with itself duplicates its ROWS
+// too, and the row-keyed checks above already catch that — a green would not say which check
+// fired. The isolating probe is a SHADOW manifest that carries not one row of any kind: no roles,
+// no markers, no level lifts, no outcome tokens, no value classes. Its rows are disjoint from
+// every other package's by construction (the empty set intersects nothing), so every row-keyed
+// check is silent and only the name check can speak.
+//
+// That is not a hypothetical: before the name check existed, this exact set composed SILENTLY —
+// `for_stream("alpha")` served BOTH packages' gated rows flattened into one view, `packages()`
+// listed "alpha" twice, and no diagnostic anywhere named the collision. It is reachable the moment
+// a package is hand-written, which is the supported extension path.
+constexpr SemanticPackageManifest kShadowOfA{.name = "alpha", // the SAME name as kPkgA
+                                             .version = "9.9.9",
+                                             .roles = {},
+                                             .markers = {},
+                                             .level_lifts = {},
+                                             .locations = {},
+                                             .value_classes = {},
+                                             .strategy = nullptr,
+                                             .echoed_source = nullptr};
+constexpr std::array<SemanticPackageManifest, 2> kShadowSet{kPkgA, kShadowOfA};
+
+// The negative control, and it is what makes the arm above a statement about the NAME. Byte-for
+// byte the same empty manifest under a name of its own: if THIS conflicted, the arm above would be
+// measuring "a second package" or "an empty package", not a name collision.
+constexpr SemanticPackageManifest kNamedShadow{.name = "shadow",
+                                               .version = "9.9.9",
+                                               .roles = {},
+                                               .markers = {},
+                                               .level_lifts = {},
+                                               .locations = {},
+                                               .value_classes = {},
+                                               .strategy = nullptr,
+                                               .echoed_source = nullptr};
+constexpr std::array<SemanticPackageManifest, 2> kNamedShadowSet{kPkgA, kNamedShadow};
+
+// A set carrying BOTH failures at once: kDupA against itself is a name collision AND an exact
+// role-key duplicate. The reported kind pins the check ORDER, which is content and not an
+// implementation detail — with two packages under one name, a reported ROW duplicate cannot say
+// which package it came from, so the name must be answered first or the answer is ambiguous.
+constexpr std::array<SemanticPackageManifest, 2> kNameAndRowDupSet{kDupA, kDupA};
+
+// The empty-name fence's two arms. `kAnyDialect` IS the empty string, so a manifest named "" makes
+// `all_dialect_gates_owned`'s `gate == manifest.name` succeed VACUOUSLY for every ungated row, and
+// the package's rows then read as universally gated to every downstream reader.
+constexpr SemanticPackageManifest kUnnamedPkg{.name = "",
+                                              .version = "1.0.0",
+                                              .roles = kRolesB,
+                                              .markers = {},
+                                              .level_lifts = {},
+                                              .locations = {},
+                                              .value_classes = {},
+                                              .strategy = nullptr,
+                                              .echoed_source = nullptr};
+constexpr std::array<SemanticPackageManifest, 2> kNamedSet{kPkgA, kPkgB};
+constexpr std::array<SemanticPackageManifest, 2> kUnnamedSet{kPkgA, kUnnamedPkg};
 } // namespace
 
 // ── G-SP-5, build-time half: find_conflict is constexpr, so a duplicate is caught in a
@@ -122,12 +183,56 @@ static_assert(find_conflict(kDupSet).key == "##DUP##", "the conflict must name t
 static_assert(!find_conflict(std::array<SemanticPackageManifest, 2>{kPkgA, kPkgB}).has_conflict,
               "distinct-key packages must NOT conflict");
 
+// ── The composed-set NAME fence, build-time half. `.kind` is the load-bearing assertion: it is
+// what proves NOTHING ROW-KEYED FIRED, and therefore that the name check — not some incidental row
+// collision — is what answered. An arm asserting only `has_conflict` would pass on a fixture the
+// row checks caught, and would keep passing if the name check were deleted tomorrow. ──
+static_assert(find_conflict(kShadowSet).has_conflict,
+              "two packages under one manifest name must be detectable at compile time, with no "
+              "row of any kind in common");
+static_assert(find_conflict(kShadowSet).kind == "package_name",
+              "the conflict must be reported as a PACKAGE-NAME duplicate — a row-keyed kind here "
+              "would mean the shadow was caught incidentally and an all-empty shadow would still "
+              "compose silently");
+static_assert(find_conflict(kShadowSet).key == "alpha",
+              "the conflict must name the duplicated package name");
+static_assert(!find_conflict(kNamedShadowSet).has_conflict,
+              "the negative control: the SAME row-less manifest under a name of its own must NOT "
+              "conflict — otherwise the arm above measures 'a second package', not a name clash");
+static_assert(find_conflict(kNameAndRowDupSet).kind == "package_name",
+              "the package name must be answered FIRST: with two packages under one name, a "
+              "reported row duplicate cannot say which package it came from");
+
+// ── The empty-name fence, both arms. consteval, so the red arm is expressed as a NEGATION here
+// rather than as an observed build failure — a build failure cannot be asserted by a TU that must
+// itself build. ──
+static_assert(insight::semantic::all_packages_named(kNamedSet),
+              "two distinctly named packages must satisfy the manifest-name fence");
+static_assert(!insight::semantic::all_packages_named(kUnnamedSet),
+              "an empty manifest name must FAIL the fence — the empty string IS kAnyDialect, so "
+              "such a package's rows would read as universally gated to every downstream reader");
+
 // ── G-SP-5, runtime half: compose() on the duplicate set FAILS CLOSED (fatal) — never a silent
 // merge ──
 TEST(CompositionDeathTest, DuplicateKeyFailsClosedAtRuntime)
 {
     EXPECT_DEATH((void)compose(kDupSet), "exact-duplicate role")
         << "compose() must fatal (fail-closed) on a cross-package duplicate, not silently merge";
+}
+
+// ── The name fence's RUNTIME half — the grain the row duplicate already had and the name did not.
+// The build-time half above proves the constant evaluator answers; it says nothing about a set
+// assembled at runtime, which is the shape a hand-written or externally supplied package arrives
+// in. The regex pins the CONFLICT KIND and the key, deliberately not the surrounding prose: the
+// operator message's closing advice ("fix the package rows or gate them") cannot be followed for a
+// name collision — there are no rows to fix and no gate that resolves it — so pinning it would
+// make wrong advice a contract. ──
+TEST(CompositionDeathTest, DuplicatePackageNameFailsClosedAtRuntime)
+{
+    EXPECT_DEATH((void)compose(kShadowSet), R"(exact-duplicate package_name match key "alpha")")
+        << "compose() must fatal on two packages sharing a manifest name even when they share no "
+           "row of any kind — the silent alternative is one flattened view serving both packages' "
+           "rows under one name";
 }
 
 // ── The degenerate core-only composition is a defined, RUNNABLE state (SRC-II-4 at the composition
