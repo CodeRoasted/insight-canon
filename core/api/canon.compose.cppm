@@ -74,9 +74,16 @@ struct CompositionReport
 struct ConflictInfo
 {
     bool has_conflict{false};
-    std::string_view kind; // "package_name" | "role" | "marker" | "level_lift" | "value_class"
-    std::string_view key;  // the duplicated prefix / value-class key
+    std::string_view kind; // the rule class that collided — `find_conflict` owns the vocabulary
+    std::string_view key;  // the duplicated prefix / value-class key / package name
 };
+
+// The one `kind` value that is COMPARED rather than only printed: the runtime fail-closed message
+// selects its remedy on it (a name collision has no row to edit and no gate to narrow, so the row
+// advice cannot be given there). Named because the producer and the comparison site sit in
+// different translation units — a literal repeated at the comparison would degrade silently to the
+// wrong remedy if the spelling here ever moved.
+inline constexpr std::string_view kConflictKindPackageName{"package_name"};
 
 // Scan the manifest set for an exact-duplicate match key. Pure over the manifest DATA (constexpr:
 // string_view compare + span iteration), so usable in a static_assert AND by the runtime compose.
@@ -439,7 +446,7 @@ constexpr ConflictInfo find_conflict(std::span<const SemanticPackageManifest> pa
     // ambiguous — two packages under one name mean the reported duplicate could not name which
     // package it came from.
     if (const auto key{detail::first_package_name_dup(packages)})
-        return {.has_conflict = true, .kind = "package_name", .key = *key};
+        return {.has_conflict = true, .kind = kConflictKindPackageName, .key = *key};
     // An exact duplicate is same key + (for prefix rows) intersecting dialect gate. Each unordered
     // (package,row) pair is checked once; O(rows²) over a handful of rows at compile time.
     if (const auto key{

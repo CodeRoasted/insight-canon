@@ -214,12 +214,25 @@ namespace
     // closed rather than picking a winner by package order. The operator-facing text below states
     // that rule and its remedy without naming this record: canon ships public, and a reader of the
     // message cannot open the shelf it lives on.
+    //
+    // The REMEDY differs by kind, so the message branches on it. A duplicated ROW key is repaired
+    // in the rows — edit one, or narrow its dialect gate so the two stop intersecting. A duplicated
+    // package NAME has neither lever: there is no row to edit (the collision holds with both row
+    // sets empty) and no gate that separates two packages answering to one name. Printing the row
+    // advice there hands the operator a procedure that cannot terminate.
     [[noreturn]] void fail_closed(const ConflictInfo& conflict)
     {
         std::cerr << "FATAL: insight::semantic::compose — exact-duplicate " << conflict.kind
                   << " match key \"" << conflict.key
-                  << "\" across the composed packages. Composition fails closed: a duplicate rule "
-                     "has no deterministic resolution. Fix the package rows or gate them.\n";
+                  << "\" across the composed packages. Composition fails closed: ";
+        if (conflict.kind == kConflictKindPackageName)
+            std::cerr << "two packages in this set declare that manifest name. No row edit or "
+                         "dialect gate resolves it — the name is what selects a package "
+                         "downstream, so a single view would serve both packages' rows. Rename "
+                         "one of the two packages, or compose only one of them.\n";
+        else
+            std::cerr << "a duplicate rule has no deterministic resolution. Fix the package rows "
+                         "or gate them.\n";
         std::terminate();
     }
 
