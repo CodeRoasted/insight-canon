@@ -21,14 +21,12 @@ dialect:
   why:
     - "SRC-SP-7 keys identity on CONTENT, not on spelling: `version:` moves when what this package"
     - "RECOGNIZES or EMITS moves — its rows, their gates, or its code tier — and never for a"
-    - "grammar-shape change or a rename. Bumping for a rename would declare a new ruleset that"
-    - "recognizes exactly what the old one did and make two identical rulesets look incomparable."
-    - "The discipline and its rejected alternative are ADR-17.D3's."
+    - "grammar-shape change or a rename. The discipline and the alternative it rejects are"
+    - "ADR-17.D3's; DN-17.D22 is the slot that applied it to the grammar-6 widening and ruled that"
+    - "this `version:` does not bump."
     - ""
-    - "Every gated row below names THIS package or fires on any dialect, and that is required"
-    - "because composition FLATTENS: the composed tables carry no edge back to the contributing"
-    - "package, so a gate reaching for another package's vocabulary would be invisible downstream."
-    - "ADR-22.D6 states the reason in decision form."
+    - "Every gated row below names THIS package or fires on any dialect. That the row-level dialect"
+    - "gate is required, and why, is ADR-22.D6's."
     - ""
     - "The exported dialect-name constant, and the schema's `self` / `any` gate spelling that makes"
     - "an illegal third gate value unrepresentable rather than merely asserted, are the generator's"
@@ -120,9 +118,9 @@ dialect:
         - ""
         - "There is NO format strategy any more, and that is the rejected alternative worth"
         - "recording: the dialect strategy used to detect and peel GitHub's per-line delivery"
-        - "stamp, and that peel became DECLARED transport instead. What is left of this package's"
-        - "code tier is one byte predicate — so the dialect is DATA: these rows plus canon's"
-        - "walkers ARE the GHA parser."
+        - "stamp, and that peel became DECLARED transport instead — ADR-23. What is left of this"
+        - "package's code tier is one byte predicate — so the dialect is DATA: these rows plus"
+        - "canon's walkers ARE the GHA parser."
 
   # ── structural-role rows ──
   roles:
