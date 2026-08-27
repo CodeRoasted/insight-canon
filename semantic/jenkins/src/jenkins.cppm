@@ -128,7 +128,7 @@ inline constexpr std::array<OutcomeMarkerRow, 1> kOutcomeMarkers{{
     {.prefix = "Finished: ", .dialect_gate = kDialect},
 }};
 
-// ── The declared DIALECT REVISION vocabulary (grammar-6, DN-17.D14) ──
+// ── The declared DIALECT REVISION vocabulary (grammar-6, ADR-17.D9) ──
 // The VENDOR generation these rows recognize: the Jenkins Declarative Pipeline console syntax —
 // the `[Pipeline]` step echo and the `Finished: <RESULT>` epilogue. Jenkins has shipped one such
 // generation. It is NOT `.version` above: that one moves when WE edit the ruleset, this one moves
@@ -170,7 +170,7 @@ static_assert(
     "jenkins: kDialect and the manifest name must be the same string — kDialect is what a "
     "caller declares and what every gated row carries");
 
-// grammar-6 (DN-17.D14) — the declared vendor-revision vocabulary, checked in the package
+// grammar-6 (ADR-17.D9) — the declared vendor-revision vocabulary, checked in the package
 // that declares it, at the same seat and for the same reason as the gate checks above.
 static_assert(insight::semantic::all_revisions_named(kDialectRevisions),
               "jenkins: the declared dialect-revision vocabulary must be non-empty, with unique, "

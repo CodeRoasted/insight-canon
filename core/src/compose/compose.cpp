@@ -180,7 +180,7 @@ namespace
             append_u8(out, static_cast<std::uint8_t>(row.emit));
             append_str(out, row.channel_gate);
         }
-        // grammar-6 (DN-17.D14): the package's declared DIALECT REVISION vocabulary — which vendor
+        // grammar-6 (ADR-17.D9): the package's declared DIALECT REVISION vocabulary — which vendor
         // generation(s) of the dialect these rows recognize. It is identity because two packages
         // whose rows are byte-identical but whose declared generations differ are making DIFFERENT
         // claims about what they recognize, and a digest that could not tell them apart would let

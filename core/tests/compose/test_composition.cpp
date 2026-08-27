@@ -176,7 +176,7 @@ constexpr SemanticPackageManifest kUnnamedPkg{.name = "",
 constexpr std::array<SemanticPackageManifest, 2> kNamedSet{kPkgA, kPkgB};
 constexpr std::array<SemanticPackageManifest, 2> kUnnamedSet{kPkgA, kUnnamedPkg};
 
-// ── The dialect-REVISION vocabulary fence's fixtures (grammar-6, DN-17.D14). Three ways to fail,
+// ── The dialect-REVISION vocabulary fence's fixtures (grammar-6, ADR-17.D9). Three ways to fail,
 // and each needs its own set because the predicate returns on the first one it meets: an EMPTY
 // vocabulary (a package that declares no vendor generation at all — the undeclared state the
 // coordinate exists to remove), an empty NAME inside it, and a REPEATED name (a copy-paste whose

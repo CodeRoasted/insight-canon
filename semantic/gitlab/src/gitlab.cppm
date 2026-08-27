@@ -161,7 +161,7 @@ inline constexpr std::array<OutcomeMarkerRow, 3> kOutcomeMarkers{{
      .outcome = insight::RunOutcome::Aborted},
 }};
 
-// ── The declared DIALECT REVISION vocabulary (grammar-6, DN-17.D14) ──
+// ── The declared DIALECT REVISION vocabulary (grammar-6, ADR-17.D9) ──
 // The VENDOR generation these rows recognize: the GitLab CI job-log syntax whose section markers
 // carry the `section_start:<unix-ts>:<name>` shape and whose runner emits the `ERROR: Job failed`
 // console tail. The depth claim is already scoped to the MODERN runner leg (>= 18.9); this names
@@ -198,7 +198,7 @@ static_assert(kManifest.name == kDialect,
               "gitlab: kDialect and the manifest name must be the same string — kDialect is what a "
               "caller declares and what every gated row carries");
 
-// grammar-6 (DN-17.D14) — the declared vendor-revision vocabulary, checked in the package
+// grammar-6 (ADR-17.D9) — the declared vendor-revision vocabulary, checked in the package
 // that declares it, at the same seat and for the same reason as the gate checks above.
 static_assert(insight::semantic::all_revisions_named(kDialectRevisions),
               "gitlab: the declared dialect-revision vocabulary must be non-empty, with unique, "

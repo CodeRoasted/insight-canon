@@ -49,7 +49,7 @@ inline constexpr std::array<LocationRow, 3> kLocations{{
      .suffixes = kGoRubySuffixes}, // full-file suffix set
 }};
 
-// ── The declared REVISION vocabulary (grammar-6, DN-17.D14) ──
+// ── The declared REVISION vocabulary (grammar-6, ADR-17.D9) ──
 // This package has no VENDOR: the test-file naming families are a convention shared across jest /
 // vitest / playwright / pytest / go / ruby, not one supplier's syntax. The coordinate is still
 // declared and still non-empty, because the grammar admits no package that declares no generation
@@ -76,7 +76,7 @@ export inline constexpr SemanticPackageManifest kManifest{
     .echoed_source = nullptr,
 };
 
-// grammar-6 (DN-17.D14) — the declared revision vocabulary, checked in the package that declares
+// grammar-6 (ADR-17.D9) — the declared revision vocabulary, checked in the package that declares
 // it. This package ships no dialect gates, so this is its ONLY compile-time declaration check.
 static_assert(
     insight::semantic::all_revisions_named(kDialectRevisions),

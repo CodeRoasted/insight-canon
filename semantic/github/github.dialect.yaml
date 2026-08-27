@@ -58,7 +58,7 @@ dialect:
       - ""
       - "The cardinality-one FENCE is the schema's, not this dialect's, and so is the fact that"
       - "core carries a general span so the day a second generation lands is a data change rather"
-      - "than a redesign: DN-17.D14."
+      - "than a redesign: ADR-17.D9."
     names: [v1]
 
   # ── the declared INTENT CHANNEL vocabulary ──

@@ -322,7 +322,7 @@ export namespace insight::semantic
 // and two new serialized row fields — every one of them a serialization shape change, so the token
 // moves for the reason the paragraph above states.
 //
-// grammar-6 (DN-17.D14, the dialect REVISION coordinate): `SemanticPackageManifest` gains
+// grammar-6 (ADR-17.D9, the dialect REVISION coordinate): `SemanticPackageManifest` gains
 // `dialect_revisions`, a declared vocabulary span naming the VENDOR generations this package's
 // rows recognize — orthogonal to `.version`, which keeps its SRC-SP-7 meaning (the identity of OUR
 // ruleset edits). One new serialized section, appended at the END of the manifest preimage, so it
@@ -784,10 +784,11 @@ struct SemanticPackageManifest
     // ⇒ HARD ERROR listing these names. The span points at package-static constexpr storage
     // (SRC-SP-7 lifetime); serialized into semantic_identity alongside the rows it gates.
     std::span<const std::string_view> channels;
-    // grammar-6 (DN-17.D14) — the package's declared DIALECT REVISION vocabulary: which VENDOR
+    // grammar-6 (ADR-17.D9) — the package's declared DIALECT REVISION vocabulary: which VENDOR
     // generation(s) of the dialect these rows recognize. The vendor owns the referent, we own the
     // declaration; `.version` above is OUR ruleset identity and answers a different question, so a
-    // reader must never substitute one for the other. NON-EMPTY, names unique and non-empty
+    // reader must never substitute one for the other (ADR-22.D8, which also owns the deferred v2
+    // fork this shape refuses to pre-decide). NON-EMPTY, names unique and non-empty
     // (`all_revisions_named`) — a package that recognizes nothing in particular is not a state the
     // grammar admits. Cardinality ONE is a SCHEMA bound, enforced by the declaration tool, not
     // here: core stays general so the v2 subject re-opens it by bumping the declaration schema
@@ -930,7 +931,7 @@ paired_writer_row(const IntentMarkerRow& reader, std::span<const IntentEmitRow> 
                                [](std::string_view channel) noexcept { return !channel.empty(); });
 }
 
-// ── The DIALECT REVISION static check (grammar-6, DN-17.D14 — fail-closed at COMPILE time) ──
+// ── The DIALECT REVISION static check (grammar-6, ADR-17.D9 — fail-closed at COMPILE time) ──
 // The package's declared revision vocabulary is non-empty, every name is non-empty, and no name
 // repeats. Same seat and same posture as `all_channels_named`: the package's own TU, at compile
 // time. Non-emptiness is load-bearing in a way the channel vocabulary's is not — an EMPTY channel
