@@ -8,7 +8,7 @@ required_conan_version = ">=2.28"
 
 class InsightSemanticTestFrameworksConan(ConanFile):
     name = "insight_semantic_test_frameworks"
-    version = "1.10.1"
+    version = "1.10.2"
     package_type = "library"
     license = "Apache-2.0"
     url = "https://github.com/CodeRoasted/insight-canon"
@@ -40,7 +40,7 @@ class InsightSemanticTestFrameworksConan(ConanFile):
         self.cpp.build.builddirs = [build_dir]
 
     def requirements(self):
-        self.requires("insight_canon/1.10.1", transitive_headers=True, transitive_libs=True)
+        self.requires("insight_canon/1.10.2", transitive_headers=True, transitive_libs=True)
 
     def build_requirements(self):
         self.test_requires("gtest/1.17.0")

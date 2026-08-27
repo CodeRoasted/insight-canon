@@ -8,7 +8,7 @@ required_conan_version = ">=2.28"
 
 class InsightSemanticGithubConan(ConanFile):
     name = "insight_semantic_github"
-    version = "1.10.1"
+    version = "1.10.2"
     package_type = "library"
     license = "Apache-2.0"
     url = "https://github.com/CodeRoasted/insight-canon"
@@ -51,7 +51,7 @@ class InsightSemanticGithubConan(ConanFile):
         # The provider contract (insight.canon.spi) + api types live in insight_canon; the package
         # imports its modules. transitive_headers/libs so a downstream composing this package resolves
         # canon's public module surface (fmt/spdlog GMF) through the same graph.
-        self.requires("insight_canon/1.10.1", transitive_headers=True, transitive_libs=True)
+        self.requires("insight_canon/1.10.2", transitive_headers=True, transitive_libs=True)
 
     def build_requirements(self):
         self.test_requires("gtest/1.17.0")
