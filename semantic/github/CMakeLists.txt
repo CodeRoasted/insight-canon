@@ -74,6 +74,34 @@ if(NOT EXISTS "${DIALECT_CODEGEN_TOOL}")
         "not a mechanism. It cannot work under `conan create`, which builds from sources "
         "exported into the conan cache.")
 endif()
+# The tool is an ENTRY POINT, not the whole program. It imports `codegen_common` — the
+# strict-YAML subset parser, the canonical declaration hash and the C++ escaping — and all three
+# are IDENTITY-BEARING for what this package publishes. Ninja tracks exactly what DEPENDS names,
+# so omitting the shared module does not make the build slow, it makes the DESK AND THE TAG
+# DISAGREE: CI configures a clean tree and gets the new projection, while a desk that just edited
+# the hash or the escaping recompiles the OLD projection and reads green before pushing on it.
+# Naming the module is deliberate over globbing `${MALF_TOOLCHAIN_DIR}/*.py`: the toolchain
+# directory also holds tools this projection never imports (sbom_gen.py, dead_symbol_lint.py, …)
+# and a glob would regenerate the dialect whenever one of those changed. A false edge is not a
+# safer edge — it is an unattributable slow desk. The list has exactly one member because
+# `codegen_common` is the only import of dialect_package_codegen.py outside the Python standard
+# library; that is a checkable fact about the tool, not an assumption about it. DERIVING the list —
+# the tool printing its own first-party imports — closes the class instead of this instance and is
+# the better shape, but it needs either a configure-time run of the tool or a ninja depfile, and
+# both are mechanisms whose own empty result reads as "no dependencies" rather than failing. Adding
+# a second shared module therefore means adding a line here, in both projections.
+set(DIALECT_CODEGEN_SHARED "${MALF_TOOLCHAIN_DIR}/codegen_common.py")
+if(NOT EXISTS "${DIALECT_CODEGEN_SHARED}")
+    message(FATAL_ERROR
+        "insight_semantic_github: codegen_common.py NOT FOUND.\n"
+        "  looked for: ${DIALECT_CODEGEN_SHARED}\n"
+        "  MALF_TOOLCHAIN_DIR resolved to: '${MALF_TOOLCHAIN_DIR}'\n"
+        "dialect_package_codegen.py imports it, so the tool cannot run without it. This is a "
+        "configure-time FATAL rather than the ninja 'missing and no known rule to make it' error "
+        "the DEPENDS below would otherwise raise, because the cause — a malf-toolchain checkout "
+        "at a revision where the shared module moved or was renamed — is not readable from that "
+        "message.")
+endif()
 # Fence: the declaration is NAMED, never globbed. An empty glob yielding an empty Intent
 # library is a legitimate degenerate state in logcraft/core; here it is not — ZERO ROWS IS NOT
 # A DEGENERATE DIALECT, IT IS A BROKEN ONE. A row-less manifest still compiles, still composes
@@ -108,7 +136,8 @@ add_custom_command(
             --declaration "${GITHUB_DIALECT_DECLARATION}"
             --out "${GITHUB_GENERATED_INC}"
     COMMAND ${CMAKE_COMMAND} -E touch "${GITHUB_GENERATED_STAMP}"
-    DEPENDS "${DIALECT_CODEGEN_TOOL}" "${GITHUB_DIALECT_DECLARATION}"
+    DEPENDS "${DIALECT_CODEGEN_TOOL}" "${DIALECT_CODEGEN_SHARED}"
+            "${GITHUB_DIALECT_DECLARATION}"
     COMMENT "dialect_package_codegen: --selftest, then project github.dialect.yaml"
     VERBATIM)
 add_custom_target(insight_semantic_github_dialect_gen DEPENDS "${GITHUB_GENERATED_STAMP}")
