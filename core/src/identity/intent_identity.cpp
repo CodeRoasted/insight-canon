@@ -143,13 +143,19 @@ namespace
     }
 } // namespace
 
-std::string canonicalize_intent(std::string_view name)
+std::string_view trimmed_intent_name(std::string_view name) noexcept
 {
-    // Trim (the marker payload is extracted verbatim after the banner prefix; G1 strips).
+    // The marker payload is extracted verbatim after the banner prefix; G1 strips.
     while (!name.empty() && is_intent_trim_byte(name.front()))
         name.remove_prefix(1);
     while (!name.empty() && is_intent_trim_byte(name.back()))
         name.remove_suffix(1);
+    return name;
+}
+
+std::string canonicalize_intent(std::string_view name)
+{
+    name = trimmed_intent_name(name);
 
     std::string out;
     out.reserve(name.size());
@@ -223,10 +229,7 @@ std::string_view discriminant_of(std::string_view name) noexcept
     // site that stores the result — is `noexcept` and runs per banner; a JOINED string needs a
     // separator, and a separator is an injectivity hazard of its own (`["1", "2:3"]` and
     // `["1:2", "3"]` join alike under `:`). The envelope joins nothing, so it needs no separator.
-    while (!name.empty() && is_intent_trim_byte(name.front()))
-        name.remove_prefix(1);
-    while (!name.empty() && is_intent_trim_byte(name.back()))
-        name.remove_suffix(1);
+    name = trimmed_intent_name(name);
 
     std::size_t first{std::string_view::npos}; // offset of the first masked span's start
     std::size_t last{0};                       // offset one past the last masked span's end

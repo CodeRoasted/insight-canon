@@ -189,6 +189,18 @@ struct NgramId
 // markers per log) — returns an owned string.
 [[nodiscard]] std::string canonicalize_intent(std::string_view name);
 
+// The producer's name as the identity spine reads it: the marker payload with canon's intent trim
+// bytes removed from BOTH ends and kept verbatim otherwise. A view into `name` (no allocation, no
+// masking, no normalization).
+//
+// It exists because THREE consumers need that one byte set and the set may have exactly ONE
+// definition. Two are below — the class MASKS, the instance KEEPS — and the third is the RENDERED
+// name a report shows (`DN-38.D1`): a report whose render trimmed a different set from the class
+// would show one intent two ways on two runners. `\r` is in the set for that reason and not for
+// tidiness — a Windows runner emits CRLF, so 10.2% of real banners carry a trailing CR (measured;
+// the set's own definition in intent_identity.cpp carries the numbers).
+[[nodiscard]] std::string_view trimmed_intent_name(std::string_view name) noexcept;
+
 // The raw INSTANCE DISCRIMINANT (ADR-18, SRC-II-9 — the third role on the identity spine): the
 // matrix tuple rendered into a job/step display name (`Test (ubuntu-latest, Node 24.x)` →
 // `(ubuntu-latest, Node 24.x)`), returned VERBATIM (a view into `name`). This is the STABLE
