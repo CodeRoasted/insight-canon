@@ -1,29 +1,59 @@
 // NOLINTBEGIN — unit test: short identifiers and string literals are fine.
-// test_masked_span_census.cpp — `G-D` LEG 1: how many real GitHub-Actions intent-marker payloads
-// carry TWO OR MORE masked spans?
+// test_masked_span_census.cpp — `DN-38`'s measure-first GATE 2, half one: is the PRODUCER'S name
+// safe to render, and on how much of the real stream does the rendered headline move?
 //
-// WHY THAT NUMBER AND NOT ANOTHER. `DN-38.D3` rules the instance coordinate to become the ENVELOPE
-// of the masked spans (first span start → last span end) instead of the FIRST span, and proves the
-// blast radius as a theorem rather than a measurement: zero spans → the envelope is empty, exactly
-// as today; one span → that span, exactly as today; two or more → strictly wider. **So behaviour
-// moves for names carrying ≥2 masked spans and for no other name, at every consumer at once.** The
-// count of such names is therefore an EXACT UPPER BOUND on the population any later leg can move,
-// and without it a re-run's surprise is unattributable.
+// WHY THAT QUESTION AND NOT ANOTHER. `DN-38.D1` clause 1 rules that `RankedChange::phase` carries
+// the PRODUCER'S trimmed name — both halves, job and step — instead of the masked class it carries
+// today, and the note gates that ruling behind a measurement that must precede a line of
+// implementation: *"on the same pairs, print every row's `phase` under both rules. It settles at
+// once whether any producer name is unreasonable as display (length, non-ASCII, CR) and whether
+// any pair's row COUNT changes."* The two halves of that sentence have DIFFERENT GRAINS and this
+// file answers exactly one of them:
 //
-// ⚠ THIS IS A CENSUS, NOT A PROPERTY GATE — the same distinction `d38_unit_identity_gate_test`
-// draws for `DN-38`'s gate 1, and for the same reason. Pinning a prevalence would encode today's
-// corpus as intended behaviour. Every assertion below is an INSTRUMENT-VALIDITY one: that the
-// subject loaded whole, that line classification is total, that the span decomposition is sound
-// against an independent oracle, and that the instrument can report a non-zero at all.
+//   * **HALF ONE — the rendered BYTES, and it is a property of the NAMES alone.** No aligner, no
+//     report, no diff engine: whether `canonicalize_intent(name)` differs from the trimmed name is
+//     a pure function of one payload, and so is every display-safety question about it. That is a
+//     single-component property and it homes in the component — here.
+//   * **HALF TWO — the row COUNT, and it needs the ENGINE.** A row count changes only where the
+//     over-merge un-merges, which lives in `insight-eidos`'s failing-unit map and roll-up. Nothing
+//     in this package can see it, and a census that pretended to would be answering a narrower
+//     question under a wider name. It is measured over the same 1 000 pairs by the harness in
+//     `coderoast-corpora/sift_assessment/1.10.2/gd_gate1_over_merge/`, which drives the shipped
+//     `sift` CLI.
+//
+// ── WHAT "THE RENDER MOVES" IS, MEASURED DIRECTLY RATHER THAN INFERRED ────────────────────────
+//
+// A row's headline moves under `DN-38.D1` clause 1 exactly when `canonicalize_intent(name)` and
+// the trimmed name are DIFFERENT BYTES. That is the whole predicate, it is one comparison, and it
+// is deliberately NOT "the name carries at least one masked span".
+//
+// ⚠ THE TWO ARE NOT THE SAME SET, and the difference is not academic: a producer who names a job
+// with the mask alphabet itself — `Test (M)` — carries one masked span whose mask is byte-identical
+// to the bytes it replaced, so its class equals its name and its headline does NOT move.
+// `DN-38.D3` clause 4 declares that residual ambiguity as a property of the CLASS. Counting spans
+// would over-count the render delta by exactly that population; comparing the rendered bytes
+// cannot.
+//
+// ⚠ AND IT IS WHY THIS FILE NO LONGER DECOMPOSES A NAME INTO SPANS. It used to, for `G-D` leg 1's
+// ≥2-masked-span population, by walking a name with repeated `discriminant_of` on the tail — which
+// was sound only while that function returned the FIRST span. `DN-38.D3` widened it to the
+// ENVELOPE of the spans (`insight-canon` `ec832ff`), so the walk stops after one step and every
+// name reads as one span. The instrument's premise was the very thing under test. Its number is
+// banked (`gd_leg1_span_census/RESULTS.md`: 24 distinct payloads with ≥2 spans, 21 of 1 000 pairs
+// reachable) and its purpose — bounding the widening's blast radius BEFORE the widening — is
+// discharged by `gd_leg2_pinned_rerun/RESULTS.md` (990 of 1 000 reports byte-identical, every
+// mover inside the enumerated 21). A derived instrument whose derivation is ruled away is DELETED,
+// never forked: rebuilding the decomposition would mean spelling canon's mask literals here, and a
+// second implementation of a shipped scan is the one thing this file has always refused.
 //
 // ── WHY IT HOMES HERE, AND NOT IN `insight-eidos` ─────────────────────────────────────────────
 //
-// The measured quantity is a function of canon's `discriminant_of` over a population of NAMES. No
-// aligner, no report, no diff engine is involved, so homing it in a sift gate would put a package
-// in every failure's suspect list that the measurement never touches. What the population DOES
-// need is the GitHub-Actions marker vocabulary — which line is a marker and what its payload is —
-// and that vocabulary is this package's `github.dialect.yaml` rows. Population defined here,
-// function owned by canon core, both in canon: one repo, one build, no seam.
+// The measured quantity is a function of canon's own `canonicalize_intent` over a population of
+// NAMES. Homing it in a sift gate would put a package in every failure's suspect list that the
+// measurement never touches. What the population DOES need is the GitHub-Actions marker
+// vocabulary — which line is a marker and what its payload is — and that vocabulary is this
+// package's `github.dialect.yaml` rows. Population defined here, function owned by canon core,
+// both in canon: one repo, one build, no seam.
 //
 // ── WHY IT DRIVES `recognize()` AND DOES NOT GREP FOR THE BANNER ──────────────────────────────
 //
@@ -40,7 +70,7 @@
 // ── WHAT IT DOES NOT MEASURE, STATED SO THE NUMBER IS NOT OVER-READ ───────────────────────────
 //
 // ⚠ THE ACQUIRER'S DECLARED DISPLAYS ARE A SECOND SURFACE AND THEY ARE NOT IN THIS CENSUS.
-// `insight-eidos`'s declaration fold runs `discriminant_of` on a COMPOSED declared name
+// `insight-eidos`'s declaration fold runs the identity functions on a COMPOSED declared name
 // (`diff_engine.cpp` — `coordinate_of()` over `DiffConfig::DeclaredJob::display`, which for a
 // reusable-workflow fan-out is `<caller> / <callee>`). That name comes from the run's jobs listing
 // joined to the workflow file, and NEITHER is banked for this corpus: the longitudinal collector
@@ -53,6 +83,12 @@
 // therefore `nullopt`, and the fold — hence `coordinate_of` — never runs. So the marker-payload
 // count below is the WHOLE bound for a re-run of that subject, and the declared surface's own
 // number is owed to production rather than to this leg.
+//
+// ⚠ A `phase` IS TWO HALVES JOINED, AND THIS FILE CENSUSES THE HALVES. `quantum_path` composes
+// `job + " ▸ " + step`, so the rendered headline's length is the sum of two payloads plus the
+// separator and its safety is the conjunction of theirs. Which job pairs with which step is the
+// engine's join, not canon's — so the joined string is reported as a BOUND (the widest job beside
+// the widest step), never as an observed row.
 //
 // Determinism: no RNG, no threads, no wall clock, no float. The subject is a committed, sorted TSV
 // of file names; the file set, the walk order and every printed set are sorted, so the output is a
@@ -84,29 +120,13 @@ using insight::transport::PeeledLine;
 namespace
 {
 
-// ── THE MASKED-SPAN DECOMPOSITION, BUILT OUT OF THE SHIPPED FUNCTION ──────────────────────────
-//
-// `discriminant_of` returns the FIRST masked span as a view INTO the name, so its offset is
-// recoverable and the scan can be resumed on the tail. Resuming is EXACT rather than approximate,
-// and the reason is a property of the scan: a numeric claim ends only where `boundary_after` holds
-// (the next byte is non-word or the string ends) and a paren claim ends on `)`, so the byte
-// following any span is non-word in both cases — which is precisely the state a fresh scan starts
-// in (`prev_is_word = false`, start-of-string is a boundary). No copy of R1–R4 is made here, and
-// none may be: a second implementation of the scan is what makes a reproduction disagree with the
-// thing it reproduces.
-//
-// The soundness of that argument is not left as prose — `TheSpanDecompositionReconstructsTheClass`
-// below falsifies it against an INDEPENDENT oracle on every name the census sees.
-struct Span
-{
-    std::size_t offset; // into the name handed in
-    std::size_t size;
-};
+// ── THE RENDERED BYTES, AND THE RISKS A HEADLINE CARRIES ──────────────────────────────────────
 
-// canon's `is_intent_trim_byte`, restated so offsets are taken against a name whose ends both
-// functions already ignore. It is a RESTATEMENT, never a fork: `TrimIsCanonInvariant` requires
-// both canon functions to answer identically on the name and on its trimmed form, so a divergence
-// in the trim set fails loudly instead of shifting every offset by one.
+// canon's `is_intent_trim_byte`, restated so this file compares the bytes `DN-38.D1` clause 1
+// actually renders — the payload with space, tab and CR trimmed off both ends. It is a
+// RESTATEMENT, never a fork: `TrimIsCanonInvariant` requires both canon identity functions to
+// answer identically on the name and on its trimmed form, so a divergence in the trim set fails
+// loudly instead of quietly renaming what "the producer's name" means.
 [[nodiscard]] std::string_view trimmed(std::string_view name)
 {
     const auto is_trim{[](char byte) { return byte == ' ' || byte == '\t' || byte == '\r'; }};
@@ -117,59 +137,177 @@ struct Span
     return name;
 }
 
-[[nodiscard]] std::vector<Span> masked_spans(std::string_view name)
-{
-    const std::string_view body{trimmed(name)};
-    std::vector<Span> spans;
-    std::size_t consumed{0};
-    while (consumed < body.size())
-    {
-        const std::string_view tail{body.substr(consumed)};
-        const std::string_view span{discriminant_of(tail)};
-        if (span.empty())
-            break;
-        const std::size_t at{static_cast<std::size_t>(span.data() - tail.data())};
-        spans.push_back(Span{.offset = consumed + at, .size = span.size()});
-        consumed += at + span.size();
-    }
-    return spans;
-}
+// The phase separator `quantum_path` joins the two halves with (`insight-eidos`,
+// `diff_engine.cpp`). It is named here for ONE diagnostic — how many producer names already
+// contain it — and that count is a READABILITY observation, never a correctness one:
+// `DN-38.D1` clause 5 and `DN-38.D3` clause 5 both forbid any consumer from splitting `phase`, so
+// a name containing the separator makes a headline harder to read and makes nothing wrong.
+constexpr std::string_view kPhaseSeparator{" ▸ "};
 
-// The independent oracle for the decomposition: rebuild the class from the pieces. Literal
-// material is emitted verbatim (which is what `canonicalize_intent` does to it) and each span is
-// replaced by `canonicalize_intent(span)` — the span alone, standing at a start-of-string
-// boundary, re-fires exactly the rule that claimed it. If the two disagree, the decomposition is
-// not a decomposition and every count below it is void. No mask literal (`vX`, `N`, `(M)`) is
-// spelled here: they are canon's internals and a copy of them would be a third rig.
-[[nodiscard]] std::string rebuilt_class(std::string_view name)
+// A reporting cut, not a limit anything enforces: it exists so the long tail is ENUMERATED rather
+// than summarized into a maximum. `DN-38` asks whether any producer name is "unreasonable as
+// display"; a maximum alone cannot answer that, because one 300-byte outlier and two hundred of
+// them are the same maximum and a different decision.
+constexpr std::size_t kLongName{100};
+
+// What could make the producer's trimmed name unreasonable in a report headline. Each flag is a
+// property of the RENDERED bytes, so the class carrying the same byte is reported beside it: a
+// hazard the class already had is not created by `DN-38.D1` clause 1 and must not be charged to it.
+struct DisplayRisk
 {
-    const std::string_view body{trimmed(name)};
-    std::string out;
-    std::size_t cursor{0};
-    for (const Span& span : masked_spans(name))
+    bool non_ascii{false};         // a byte >= 0x80 — the headline is not pure ASCII
+    bool interior_control{false};  // a byte < 0x20 or 0x7F AFTER the trim — a CR or NUL mid-name
+    bool carries_separator{false}; // see `kPhaseSeparator` — readability only
+    bool carries_quote{false};     // `summary` renders the name inside double quotes
+
+    [[nodiscard]] bool any() const noexcept
     {
-        out.append(body.substr(cursor, span.offset - cursor));
-        out.append(canonicalize_intent(body.substr(span.offset, span.size)));
-        cursor = span.offset + span.size;
+        return non_ascii || interior_control || carries_separator || carries_quote;
     }
-    out.append(body.substr(cursor));
+};
+
+[[nodiscard]] DisplayRisk risk_of(std::string_view rendered)
+{
+    DisplayRisk out;
+    for (const char byte : rendered)
+    {
+        const auto raw{static_cast<unsigned char>(byte)};
+        if (raw >= 0x80U)
+            out.non_ascii = true;
+        if (raw < 0x20U || raw == 0x7FU)
+            out.interior_control = true;
+        if (raw == static_cast<unsigned char>('"'))
+            out.carries_quote = true;
+    }
+    out.carries_separator = rendered.find(kPhaseSeparator) != std::string_view::npos;
     return out;
 }
 
-// `DN-38.D3` clause 1: the subview from the START of the FIRST masked span to the END of the LAST.
-// Derived from the shipped function's own answers, never from a copy of the ruled implementation —
-// it is printed as a diagnostic beside each ≥2-span example so the implementer can read what the
-// coordinate becomes, and it is asserted NOWHERE. Pinning it here would make this census the
-// oracle for the fix that has not been written.
-[[nodiscard]] std::string_view envelope(std::string_view name)
+[[nodiscard]] std::string show_risk(const DisplayRisk& risk)
 {
-    const std::string_view body{trimmed(name)};
-    const std::vector<Span> spans{masked_spans(name)};
-    if (spans.empty())
-        return {};
-    const std::size_t from{spans.front().offset};
-    const std::size_t to{spans.back().offset + spans.back().size};
-    return body.substr(from, to - from);
+    std::string out;
+    const auto add{[&out](bool flag, std::string_view label)
+                   {
+                       if (flag)
+                           out += (out.empty() ? "" : "+") + std::string{label};
+                   }};
+    add(risk.non_ascii, "non-ascii");
+    add(risk.interior_control, "interior-control");
+    add(risk.carries_separator, "separator");
+    add(risk.carries_quote, "quote");
+    return out.empty() ? "clean" : out;
+}
+
+// Every byte outside printable ASCII escaped, so a control byte in a payload cannot corrupt the
+// census output it is being reported in — and so the reader can SEE which byte it was.
+[[nodiscard]] std::string escaped(std::string_view text)
+{
+    static constexpr std::string_view kHex{"0123456789abcdef"};
+    std::string out;
+    for (const char byte : text)
+    {
+        const auto raw{static_cast<unsigned char>(byte)};
+        if (raw >= 0x20U && raw < 0x7FU)
+        {
+            out.push_back(byte);
+            continue;
+        }
+        out += "\\x";
+        out.push_back(kHex[raw >> 4U]);
+        out.push_back(kHex[raw & 0x0FU]);
+    }
+    return out;
+}
+
+// ── THE TALLY ──────────────────────────────────────────────────────────────────────────────────
+
+// One (side × marker kind) cell. Names are counted BOTH ways on purpose: a DISTINCT-name count is
+// the population a rule applies to, an OCCURRENCE count is how often a reader meets it, and a
+// count reported without saying which one it is cannot be spent.
+struct Tally
+{
+    std::map<std::string, std::size_t> occurrences_by_name; // payload → times recognized
+    std::set<std::string> names;                            // every distinct payload
+    std::size_t recognized{0};
+
+    void add(const std::string& name)
+    {
+        ++occurrences_by_name[name];
+        names.insert(name);
+        ++recognized;
+    }
+};
+
+// The census's arithmetic over one cell. `moved` is `DN-38.D1` clause 1's population on this
+// surface: the names whose rendered headline is different bytes after the ruling.
+struct Bucketed
+{
+    std::size_t names_moved{0};
+    std::size_t names_unmoved{0};
+    std::size_t occ_moved{0};
+    std::size_t occ_unmoved{0};
+    std::size_t longest_name{0};  // bytes, the TRIMMED producer name (what clause 1 renders)
+    std::size_t longest_class{0}; // bytes, what is rendered TODAY
+    std::size_t widest_growth{0}; // max(name − class) over the cell, 0 when no name grows
+    std::size_t names_over_cut{0};
+    std::size_t names_at_risk{0};
+    // ⚠ THE NUMBER A RULING IS TAKEN ON, and it is NOT `names_at_risk`. A hazard the CLASS already
+    // carries is on the wire today; `DN-38.D1` clause 1 neither creates it nor removes it, and
+    // charging it to the ruling would make the count say the opposite of what it means
+    // (`MEM:prescriptive-instrument-false-positive-costs-truth` — a firing count never bounds
+    // correctness). Only a name whose rendered bytes are at risk while its class is NOT is a
+    // hazard the ruling introduces.
+    std::size_t names_risk_introduced{0};
+};
+
+// Does the ruling INTRODUCE a display hazard on this name, or was it already on the wire?
+[[nodiscard]] bool risk_introduced(std::string_view name)
+{
+    return risk_of(trimmed(name)).any() && !risk_of(canonicalize_intent(name)).any();
+}
+
+[[nodiscard]] Bucketed bucket(const Tally& tally)
+{
+    Bucketed out;
+    for (const std::string& name : tally.names)
+    {
+        const std::size_t occ{tally.occurrences_by_name.at(name)};
+        const std::string_view rendered{trimmed(name)};
+        const std::string clazz{canonicalize_intent(name)};
+        if (rendered != clazz)
+        {
+            ++out.names_moved;
+            out.occ_moved += occ;
+        }
+        else
+        {
+            ++out.names_unmoved;
+            out.occ_unmoved += occ;
+        }
+        out.longest_name = std::max(out.longest_name, rendered.size());
+        out.longest_class = std::max(out.longest_class, clazz.size());
+        if (rendered.size() > clazz.size())
+            out.widest_growth = std::max(out.widest_growth, rendered.size() - clazz.size());
+        out.names_over_cut += static_cast<std::size_t>(rendered.size() > kLongName);
+        out.names_at_risk += static_cast<std::size_t>(risk_of(rendered).any());
+        out.names_risk_introduced += static_cast<std::size_t>(risk_introduced(name));
+    }
+    return out;
+}
+
+[[nodiscard]] std::string show(const Bucketed& b, const Tally& t)
+{
+    std::ostringstream out;
+    out << "recognized=" << t.recognized << " distinct=" << t.names.size()
+        << " | headline MOVES: " << b.names_moved << " names / " << b.occ_moved << " occ"
+        << " | unchanged: " << b.names_unmoved << " / " << b.occ_unmoved
+        << " | longest rendered name " << b.longest_name << "B (class today " << b.longest_class
+        << "B, widest growth +" << b.widest_growth << "B)"
+        << " | over the " << kLongName << "B cut: " << b.names_over_cut
+        << " | at display risk: " << b.names_at_risk
+        << " (of which INTRODUCED by clause 1: " << b.names_risk_introduced
+        << "; the rest are hazards the class already carries and the wire already ships)";
+    return out.str();
 }
 
 // ── THE SUBJECT ────────────────────────────────────────────────────────────────────────────────
@@ -244,85 +382,6 @@ struct SubjectRow
     return rows;
 }
 
-// ── THE TALLY ──────────────────────────────────────────────────────────────────────────────────
-
-// One (side × marker kind) cell. Names are counted BOTH ways on purpose: a DISTINCT-name count is
-// the population a rule applies to, an OCCURRENCE count is how often a reader meets it, and a
-// count reported without saying which one it is cannot be spent.
-struct Tally
-{
-    std::map<std::string, std::size_t> occurrences_by_name; // payload → times recognized
-    std::map<std::string, std::size_t> spans_by_name;       // payload → masked-span count
-    std::size_t recognized{0};
-
-    void add(const std::string& name, std::size_t spans)
-    {
-        ++occurrences_by_name[name];
-        spans_by_name[name] = spans;
-        ++recognized;
-    }
-};
-
-struct Bucketed
-{
-    std::size_t names_zero{0};
-    std::size_t names_one{0};
-    std::size_t names_two_plus{0};
-    std::size_t occ_zero{0};
-    std::size_t occ_one{0};
-    std::size_t occ_two_plus{0};
-    // Among the ≥2-span names: how many distinct CLASSES they fall into, and how many of those
-    // classes carry more than one distinct name. The second number is the collision opportunity —
-    // a class with one member cannot mis-pair with itself, so it bounds nothing on its own.
-    std::size_t classes_two_plus{0};
-    std::size_t colliding_classes_two_plus{0};
-    std::size_t max_spans{0};
-};
-
-[[nodiscard]] Bucketed bucket(const Tally& tally)
-{
-    Bucketed out;
-    std::map<std::string, std::set<std::string>> classes;
-    for (const auto& [name, spans] : tally.spans_by_name)
-    {
-        const std::size_t occ{tally.occurrences_by_name.at(name)};
-        out.max_spans = std::max(out.max_spans, spans);
-        if (spans == 0)
-        {
-            ++out.names_zero;
-            out.occ_zero += occ;
-        }
-        else if (spans == 1)
-        {
-            ++out.names_one;
-            out.occ_one += occ;
-        }
-        else
-        {
-            ++out.names_two_plus;
-            out.occ_two_plus += occ;
-            classes[canonicalize_intent(name)].insert(name);
-        }
-    }
-    out.classes_two_plus = classes.size();
-    for (const auto& [clazz, members] : classes)
-        if (members.size() > 1)
-            ++out.colliding_classes_two_plus;
-    return out;
-}
-
-[[nodiscard]] std::string show(const Bucketed& b, const Tally& t)
-{
-    std::ostringstream out;
-    out << "recognized=" << t.recognized << " distinct=" << t.spans_by_name.size()
-        << " | spans 0: " << b.names_zero << " names / " << b.occ_zero << " occ"
-        << " | 1: " << b.names_one << " / " << b.occ_one << " | >=2: " << b.names_two_plus << " / "
-        << b.occ_two_plus << " | >=2 classes " << b.classes_two_plus << " (of which "
-        << b.colliding_classes_two_plus << " carry >1 name)"
-        << " | max spans " << b.max_spans;
-    return out.str();
-}
-
 [[nodiscard]] std::string kind_name(IntentMarkerKind kind)
 {
     switch (kind)
@@ -339,105 +398,79 @@ struct Bucketed
 
 } // namespace
 
-// ── THE DECOMPOSITION'S OWN PROOF — runs with no mount, on every clone ─────────────────────────
+// ── THE INSTRUMENT'S OWN PROOF — runs with no mount, on every clone ────────────────────────────
 //
-// The census's whole arithmetic rests on `masked_spans`. This arm falsifies it against
-// `canonicalize_intent`, which is a genuinely different function: the SUT walks the name by
-// repeated `discriminant_of` on the tail, the ORACLE masks it in one pass. They can only agree if
-// the decomposition found exactly the spans the mask claimed, in order, at the right offsets.
-TEST(MaskedSpanCensus, TheSpanDecompositionReconstructsTheClass)
+// Two detectors decide everything this file prints, and a census whose detectors cannot fire
+// reports zeros that mean nothing (`MEM:synthetic-gate-vacuity-vs-judgment`, the green-BLIND row).
+// Both are exercised in BOTH directions here: a case that must fire and a case that must not.
+TEST(MaskedSpanCensus, TheRenderDeltaPredicateAndTheRiskDetectorBothFireAndBothStaySilent)
 {
-    // The names carry the shapes the census must get right, and the last four are adversarial:
-    // a span at offset 0, two spans with class material between them, a name that is ALL span, and
-    // the `DN-38.D3` clause-4 pair whose residual ambiguity lives in the CLASS.
-    static constexpr std::array<std::pair<std::string_view, std::size_t>, 19> kNames{{
-        {"Lint", 0},
-        {"Build", 0},
-        {"Test (ubuntu-latest, Node 24.x)", 1},
-        {"Test (windows-latest, Node 24.x)", 1},
-        {"ESLint v6", 1},
-        {"ESLint v7", 1},
-        {"Test (my-gpu-box)", 1},
-        {"bench (arm64-metal, cuda-12)", 1},
-        {"build (ubuntu-latest)", 1},
-        {"test (ubuntu-latest)", 1},
-        {"macos-14 (15.3)", 2},
-        {"macos-15 (26.0.1)", 2},
-        {"Test v2 on ubuntu-20", 2},
-        // A COMPOSED declared name — the reusable-workflow rendering the fold's `coordinate_of`
-        // would see. ONE span, not two: R4 is non-greedy to the first `)`, so `macos-14`'s digits
-        // are INSIDE the paren group and are consumed by it. The composed surface is a different
-        // domain from a marker payload, and this is one of the ways it differs.
-        {"rust-ci / build (macos-14, 15.3)", 1},
-        {"rust-ci / test v2 (macos-14)", 2},
-        {"14 leading", 1},
-        {"1.2.3", 1},
-        {"N 42", 1},
-        {"42 N", 1},
+    // ── THE RENDER-DELTA PREDICATE: does `DN-38.D1` clause 1 move this headline? ──
+    struct DeltaCase
+    {
+        std::string_view name;
+        bool moves;
+        std::string_view why;
+    };
+    static constexpr std::array<DeltaCase, 6> kDeltaCases{{
+        {"macos-14 (15.3)", true, "a runner-matrix cell: two masked spans, both rewritten"},
+        {"ESLint v6", true, "one masked span, rewritten"},
+        {"Lint", false, "no masked span at all — nothing to rewrite"},
+        {"Build", false, "no masked span at all — nothing to rewrite"},
+        // ⚠ THE CASE THAT SEPARATES THIS PREDICATE FROM A SPAN COUNT, and the reason the census
+        // compares rendered BYTES. `DN-38.D3` clause 4's residual ambiguity: a producer who names
+        // a job in canon's own mask alphabet carries a masked span whose mask is byte-identical to
+        // the bytes it replaced, so the class equals the name and the HEADLINE DOES NOT MOVE. A
+        // span-counting instrument would charge this name to clause 1's population; this one
+        // cannot.
+        {"Test (M)", false, "carries a masked span whose mask reproduces its own bytes"},
+        {"  Lint\t", false, "differs from its class only by the trim, which clause 1 also applies"},
     }};
+    for (const auto& [name, moves, why] : kDeltaCases)
+    {
+        const bool observed{trimmed(name) != canonicalize_intent(name)};
+        EXPECT_EQ(observed, moves)
+            << "the render-delta predicate answered " << (observed ? "MOVES" : "unchanged")
+            << " for \"" << name << "\" and the case says " << (moves ? "MOVES" : "unchanged")
+            << " — " << why << ".\n  trimmed name : \"" << escaped(trimmed(name))
+            << "\"\n  class today  : \"" << escaped(canonicalize_intent(name)) << "\"";
+    }
+    // The separating case is only separating if it really does carry a span — otherwise it proves
+    // nothing about the difference between the two instruments.
+    EXPECT_FALSE(discriminant_of("Test (M)").empty())
+        << "\"Test (M)\" no longer carries a masked span, so it is no longer the case that "
+           "separates the render-delta predicate from a span count, and the comment above it is "
+           "false.";
 
-    for (const auto& [name, want_spans] : kNames)
-    {
-        EXPECT_EQ(masked_spans(name).size(), want_spans)
-            << "masked_spans(\"" << name << "\") found " << masked_spans(name).size()
-            << " span(s), expected " << want_spans;
-        EXPECT_EQ(rebuilt_class(name), canonicalize_intent(name))
-            << "THE DECOMPOSITION IS UNSOUND on \"" << name
-            << "\": rebuilding the class from the spans it found gives \"" << rebuilt_class(name)
-            << "\" but canonicalize_intent says \"" << canonicalize_intent(name)
-            << "\". Every count in this file is derived from this decomposition and is void until "
-               "they agree.";
-    }
-}
+    // ── THE DISPLAY-RISK DETECTOR: each flag fires on its own witness and on nothing else ──
+    EXPECT_FALSE(risk_of("Build and test (ubuntu-latest)").any())
+        << "the risk detector fires on an ordinary ASCII job name, so every at-risk count below "
+           "is noise.";
+    EXPECT_TRUE(risk_of("Tests \xE2\x9C\x93").non_ascii) << "the non-ASCII flag does not fire";
+    EXPECT_TRUE(risk_of("build\rtest").interior_control)
+        << "the interior-control flag does not fire on a CR between two words — and an end-trimmed "
+           "CR is NOT this case: canon's trim set removes those, this flag is for the ones it "
+           "cannot reach.";
+    EXPECT_FALSE(risk_of(trimmed("build \r")).interior_control)
+        << "the interior-control flag fires on a CR the trim already removed, so it would charge "
+           "`DN-38.D1` clause 1 for a byte clause 1 never renders.";
+    EXPECT_TRUE(
+        risk_of(std::string{"build"} + std::string{kPhaseSeparator} + "test").carries_separator)
+        << "the separator flag does not fire";
+    EXPECT_TRUE(risk_of("run \"the suite\"").carries_quote) << "the quote flag does not fire";
 
-// ── The blast-radius theorem, asserted on the two boundary cases (`DN-38.D3`) ─────────────────
-//
-// Zero spans → today's answer is empty. One span → today's answer IS that span. This is what makes
-// "behaviour moves for ≥2-span names and no other" a theorem rather than a hope, and it is the
-// half a reader must be able to check without reading the design note.
-//
-// ⚠ IT IS ALSO THE PRE-FLIGHT FOR THE FIX, AND THE LIST BELOW IS LONGER THAN THE ONE THE DESIGN
-// NOTE ENUMERATES. `DN-38.D3` names two files whose currently-green literals must survive the
-// widening byte-identical. A workspace sweep for arms that pin a discriminant VALUE finds FOUR,
-// and the two the note does not name are in other packages:
-//   * `insight-canon/core/tests/identity/test_instance_discriminant.cpp` — named
-//   * `insight-twin/core/tests/test_twin_gates.cpp:806-812` — named; the payloads come from
-//     `kTwoJobSourceYaml`'s `build (ubuntu-latest)` / `test (ubuntu-latest)`
-//   * `insight-canon/semantic/github/tests/test_github_markers.cpp:221` — NOT named:
-//     `EXPECT_EQ(job.discriminant, "(ubuntu-latest)")` over the payload `Test (ubuntu-latest)`
-//   * `insight-canon/semantic/jenkins/tests/test_jenkins_markers.cpp:71` — NOT named, and it is a
-//     DIFFERENT DIALECT: `EXPECT_EQ(branch.discriminant, "(lts)")` over `Branch: maven (lts)`.
-//     The identity functions are canon's and dialect-blind, which is exactly why a Jenkins arm can
-//     pin their output.
-// Every one of the four carries at most ONE masked span, so all four stay byte-identical — but
-// that is a MEASURED result rather than an assumed one, and it is measured here.
-//
-// ⚠ THE WINDOW THIS PRE-FLIGHT IS VALID IN: it restates literals that live in three other files,
-// so it goes stale silently if one of them changes its payload to a ≥2-span name. It is a
-// pre-flight for the `DN-38.D3` widening, not a standing guard; after the widening lands, the
-// authoritative check is those four suites going green.
-TEST(MaskedSpanCensus, TodaysDiscriminantIsAlreadyTheEnvelopeBelowTwoSpans)
-{
-    static constexpr std::array<std::string_view, 10> kBelowTwo{
-        {"Lint", "Build", "Test (ubuntu-latest, Node 24.x)", "ESLint v6", "Test (my-gpu-box)",
-         "bench (arm64-metal, cuda-12)", "build (ubuntu-latest)", "test (ubuntu-latest)",
-         "Test (ubuntu-latest)", "Branch: maven (lts)"}};
-    for (const std::string_view name : kBelowTwo)
-    {
-        ASSERT_LE(masked_spans(name).size(), 1U) << "\"" << name << "\" carries more than one span";
-        EXPECT_EQ(discriminant_of(name), envelope(name))
-            << "\"" << name << "\": today's discriminant \"" << discriminant_of(name)
-            << "\" already differs from the masked-span envelope \"" << envelope(name)
-            << "\" below two spans — the blast radius is NOT confined to the >=2-span set";
-    }
-    // And the population the widening moves, on leg 0's own cells: two spans, and the envelope is
-    // strictly wider than today's answer.
-    for (const std::string_view name : {"macos-14 (15.3)", "macos-15 (26.0.1)"})
-    {
-        ASSERT_EQ(masked_spans(name).size(), 2U);
-        EXPECT_NE(discriminant_of(name), envelope(name))
-            << "\"" << name << "\" carries two spans and its envelope did not widen";
-    }
+    // ── THE INTRODUCED/PRE-EXISTING SPLIT: the number a ruling is taken on, both directions ──
+    //
+    // A hazard the class already carries is on the wire TODAY and clause 1 is not answerable for
+    // it. A census that reported the two together would say the opposite of what it means.
+    EXPECT_FALSE(risk_introduced("run \"the suite\""))
+        << "a double quote that survives masking is on the wire today — the class is \""
+        << canonicalize_intent("run \"the suite\"")
+        << "\" — so clause 1 introduces nothing and must not be charged for it.";
+    EXPECT_TRUE(risk_introduced("deploy (\"eu-west-1\")"))
+        << "a quote that the paren mask REMOVES from the class — class \""
+        << canonicalize_intent("deploy (\"eu-west-1\")")
+        << "\" — is a hazard clause 1 puts back in front of a reader, and the split must see it.";
 }
 
 // ── The trim restatement is CHECKED, never trusted ─────────────────────────────────────────────
@@ -449,14 +482,14 @@ TEST(MaskedSpanCensus, TrimIsCanonInvariant)
     {
         const std::string_view body{trimmed(padded)};
         EXPECT_EQ(canonicalize_intent(padded), canonicalize_intent(body))
-            << "canon's trim set and this file's disagree on \"" << padded << "\"";
+            << "canon's trim set and this file's disagree on \"" << escaped(padded) << "\"";
         EXPECT_EQ(discriminant_of(padded), discriminant_of(body))
-            << "canon's trim set and this file's disagree on \"" << padded << "\"";
+            << "canon's trim set and this file's disagree on \"" << escaped(padded) << "\"";
     }
 }
 
-// ── `G-D` LEG 1 — THE CENSUS ───────────────────────────────────────────────────────────────────
-TEST(MaskedSpanCensus, TheTwoOrMoreSpanPopulationOnTheG1Bank)
+// ── `DN-38` GATE 2, HALF ONE — THE RENDER DELTA ON THE `G1` BANK ───────────────────────────────
+TEST(MaskedSpanCensus, TheProducerNameRenderDeltaOnTheG1Bank)
 {
     const std::optional<std::string> logs{env("CODEROAST_G1_LOGS")};
     const std::optional<std::string> subject_path{env("CODEROAST_G1_SUBJECT")};
@@ -527,11 +560,9 @@ TEST(MaskedSpanCensus, TheTwoOrMoreSpanPopulationOnTheG1Bank)
             }
             ++lines_recognized;
             const std::string payload{marker.name};
-            tallies[row.side][kind_name(marker.kind)].add(payload, masked_spans(payload).size());
-            // The PER-PAIR view. A corpus-wide class collision is not a collision: the aligner
-            // works inside ONE pair, so two names of one class living in two different repos
-            // separate nothing and pair nothing. Every set below is therefore keyed by
-            // (pair, side, kind) and the corpus-wide bucket above is only the theorem's ceiling.
+            tallies[row.side][kind_name(marker.kind)].add(payload);
+            // The PER-PAIR view. A corpus-wide count is the ceiling; a report is one pair, so the
+            // question "how many REPORTS does clause 1 move" is answered only per pair.
             payloads[row.pair][row.side][kind_name(marker.kind)].insert(payload);
         }
     }
@@ -547,107 +578,91 @@ TEST(MaskedSpanCensus, TheTwoOrMoreSpanPopulationOnTheG1Bank)
     ASSERT_EQ(lines_blank_after_peel + lines_recognized + lines_other, lines_total)
         << "line classification is not total: " << lines_blank_after_peel << " + "
         << lines_recognized << " + " << lines_other << " != " << lines_total;
+    ASSERT_FALSE(tallies.empty()) << "no marker was recognized in " << files_read
+                                  << " file(s) — the census walked the corpus and saw no name, so "
+                                     "every zero below is about the reader, not about the bytes.";
 
-    // ARMING: the instrument can report a non-zero at all. `macos-14 (15.3)` is leg 0's own cell
-    // and it must decompose into two spans — if it does not, every zero below is unfalsifiable.
-    ASSERT_EQ(masked_spans("macos-14 (15.3)").size(), 2U)
-        << "THE INSTRUMENT IS BLIND: the >=2-span shape this census counts does not decompose "
-           "into two spans, so a zero from it would mean nothing.";
+    std::cout << "\n[DN-38 gate 2 / half one] subject " << subject.size() << " side-records, "
+              << files_read << " read | lines " << lines_total << " (peeled-blank "
+              << lines_blank_after_peel << ", marker " << lines_recognized << ", other "
+              << lines_other << ")" << std::endl;
 
-    std::cout << "\n[G-D leg 1] subject " << subject.size() << " side-records, " << files_read
-              << " read | lines " << lines_total << " (peeled-blank " << lines_blank_after_peel
-              << ", marker " << lines_recognized << ", other " << lines_other << ")" << std::endl;
-
-    std::set<std::string> two_plus_union;
+    // side → kind → the widest rendered name, for the joined-headline BOUND below.
+    std::map<std::string, std::map<std::string, std::string>> widest;
     for (const auto& [side, by_kind] : tallies)
         for (const auto& [kind, tally] : by_kind)
         {
             const Bucketed b{bucket(tally)};
-            std::cout << "[G-D leg 1] side=" << side << " surface=marker/" << kind << "  "
+            std::cout << "[DN-38 gate 2] side=" << side << " surface=marker/" << kind << "  "
                       << show(b, tally) << std::endl;
             // EVERY member, never a head: an enumeration truncated for readability is how a
-            // complete enumeration gets read as a complete disposition.
-            for (const auto& [name, spans] : tally.spans_by_name)
+            // complete enumeration gets read as a complete disposition. These two sets are the
+            // ones a ruling is taken on, so both are printed whole.
+            for (const std::string& name : tally.names)
             {
-                if (spans < 2)
-                    continue;
-                two_plus_union.insert(name);
-                std::cout << "        >=2  \"" << name << "\"  spans=" << spans << "  today=\""
-                          << discriminant_of(name) << "\"  envelope=\"" << envelope(name)
-                          << "\"  class=\"" << canonicalize_intent(name) << "\"  x"
-                          << tally.occurrences_by_name.at(name) << std::endl;
+                const std::string_view rendered{trimmed(name)};
+                if (rendered.size() > widest[side][kind].size())
+                    widest[side][kind] = std::string{rendered};
+                const DisplayRisk risk{risk_of(rendered)};
+                if (risk.any())
+                    std::cout << "        RISK  "
+                              << (risk_introduced(name) ? "INTRODUCED " : "pre-existing ")
+                              << show_risk(risk) << "  \"" << escaped(rendered) << "\"  class=\""
+                              << escaped(canonicalize_intent(name)) << "\"  x"
+                              << tally.occurrences_by_name.at(name) << std::endl;
+                if (rendered.size() > kLongName)
+                    std::cout << "        LONG  " << rendered.size() << "B  \"" << escaped(rendered)
+                              << "\"  (class " << canonicalize_intent(name).size() << "B)  x"
+                              << tally.occurrences_by_name.at(name) << std::endl;
             }
         }
 
-    // ── THE PER-REPORT PARTITION — what the next leg's prediction is actually about ───────────
+    // ── THE JOINED HEADLINE, AS A BOUND ──────────────────────────────────────────────────────
     //
-    // Three nested sets, each strictly inside the last, and they answer three different questions.
-    // TOUCHED: the pair carries at least one >=2-span payload somewhere. Outside this set nothing
-    //   can move, so "every other report is byte-identical" is a claim about its complement.
-    // REGROUPED: inside ONE run, one class holds two or more DISTINCT >=2-span payloads. Only here
-    //   does the widening change what the aligner's multiset key groups — a class with a single
-    //   member cannot mis-pair with itself, so a coordinate that merely changes VALUE moves no row
-    //   (the coordinate is transient and, after `DN-38.D4`, rendered nowhere).
-    // ASYMMETRIC: a class whose >=2-span member SET DIFFERS between baseline and changed. This is
-    //   the population that can mint a `ReplacedIntent` row that does not exist today: under the
-    //   colliding key the two cells match on the shared first span and mint nothing; under the
-    //   widened key they no longer match, and `emit_level` pairs the unmatched vanished with the
-    //   unmatched inserted node inside the class.
-    std::map<std::string, std::set<std::string>> touched;    // pair → kinds
-    std::map<std::string, std::set<std::string>> regrouped;  // pair → "side/kind/class"
-    std::map<std::string, std::set<std::string>> asymmetric; // pair → "kind/class"
-    // A FOURTH set, and it belongs here because the two rulings are scheduled to ship as ONE
-    // comparability event. `DN-38.D1` clause 1 replaces `RankedChange::phase`'s halves with the
-    // PRODUCER'S name in place of the class, so a row's headline moves wherever the class differs
-    // from the name — that is every name carrying at least ONE masked span, not two. The >=2-span
-    // bound below says nothing about that population, and a prediction of the form "every report
-    // outside the >=2-span set is byte-identical" is FALSE for a binary carrying both slices.
-    std::map<std::string, std::set<std::string>> renamed; // pair → kinds (>=1 masked span)
-    for (const auto& [pair, by_side] : payloads)
+    // `phase` is `job ▸ step` and which job pairs with which step is the ENGINE's join, not
+    // canon's. So the widest headline this corpus can produce is the widest job beside the widest
+    // step — an upper bound that no observed row need reach, and it is labelled as one.
+    for (const auto& [side, by_kind] : widest)
     {
-        // kind → class → side → EVERY member declared on that side, plus the classes that hold at
-        // least one >=2-span member. The full member set is what the two questions below need: a
-        // class where one side declares `macos-14 (15.3)` and the other declares a name with no
-        // second span is still a class whose pairing moves, and restricting the sets to >=2-span
-        // members alone would answer a narrower question than the one asked.
-        std::map<std::string, std::map<std::string, std::map<std::string, std::set<std::string>>>>
-            by_class;
-        std::map<std::string, std::set<std::string>> widened_classes; // kind → class
+        const auto job{by_kind.find("Job")};
+        const auto step{by_kind.find("Step")};
+        const std::size_t job_len{job == by_kind.end() ? 0 : job->second.size()};
+        const std::size_t step_len{step == by_kind.end() ? 0 : step->second.size()};
+        std::cout << "[DN-38 gate 2] side=" << side << " widest JOINED headline BOUND = " << job_len
+                  << " + " << kPhaseSeparator.size() << " + " << step_len << " = "
+                  << job_len + kPhaseSeparator.size() + step_len << "B"
+                  << "\n        widest Job  \"" << escaped(job == by_kind.end() ? "" : job->second)
+                  << "\"\n        widest Step \""
+                  << escaped(step == by_kind.end() ? "" : step->second)
+                  << "\"\n        ⚠ a BOUND: this job and this step need not sit in one row."
+                  << std::endl;
+    }
+
+    // ── THE PER-REPORT PARTITION — how many of the 1 000 reports clause 1 moves ───────────────
+    //
+    // MOVED: the pair carries at least one payload whose rendered headline differs from its class.
+    // Outside this set no row's `phase` can change a byte, so "every other report is
+    // byte-identical under clause 1" is a claim about its complement — and that complement is what
+    // a pinned re-run of clause 1's slice must predict.
+    std::map<std::string, std::set<std::string>> moved;   // pair → kinds
+    std::map<std::string, std::set<std::string>> at_risk; // pair → "kind: name"
+    for (const auto& [pair, by_side] : payloads)
         for (const auto& [side, by_kind] : by_side)
             for (const auto& [kind, names] : by_kind)
                 for (const std::string& name : names)
                 {
-                    const std::string clazz{canonicalize_intent(name)};
-                    by_class[kind][clazz][side].insert(name);
-                    const std::size_t spans{masked_spans(name).size()};
-                    if (spans >= 1)
-                        renamed[pair].insert(kind);
-                    if (spans >= 2)
-                    {
-                        touched[pair].insert(kind);
-                        widened_classes[kind].insert(clazz);
-                    }
+                    const std::string_view rendered{trimmed(name)};
+                    if (rendered != canonicalize_intent(name))
+                        moved[pair].insert(kind);
+                    if (risk_introduced(name))
+                        at_risk[pair].insert(kind + ": \"" + escaped(rendered) + "\"");
                 }
-        for (const auto& [kind, classes] : widened_classes)
-            for (const std::string& clazz : classes)
-            {
-                const auto& sides{by_class.at(kind).at(clazz)};
-                for (const auto& [side, members] : sides)
-                    if (members.size() > 1)
-                        regrouped[pair].insert(side + "/" + kind + "/" + clazz);
-                const auto base{sides.find("baseline")};
-                const auto chg{sides.find("changed")};
-                const bool differs{base == sides.end() || chg == sides.end() ||
-                                   base->second != chg->second};
-                if (differs)
-                    asymmetric[pair].insert(kind + "/" + clazz);
-            }
-    }
 
     const auto enumerate{
         [](std::string_view label, const std::map<std::string, std::set<std::string>>& set)
         {
-            std::cout << "[G-D leg 1] " << label << ": " << set.size() << " pair(s)" << std::endl;
+            std::cout << "[DN-38 gate 2] " << label << ": " << set.size() << " pair(s)"
+                      << std::endl;
             for (const auto& [pair, what] : set)
             {
                 std::cout << "        pair " << pair << " —";
@@ -656,40 +671,15 @@ TEST(MaskedSpanCensus, TheTwoOrMoreSpanPopulationOnTheG1Bank)
                 std::cout << std::endl;
             }
         }};
-    enumerate("TOUCHED (carry >=1 payload with >=2 masked spans; every OTHER report is "
-              "byte-identical under the widening)",
-              touched);
-    enumerate("REGROUPED (one class, >=2 distinct >=2-span payloads INSIDE one run — where the "
-              "aligner's pairing can change)",
-              regrouped);
-    enumerate("ASYMMETRIC (a >=2-span class whose member set differs across the two sides — where "
-              "a ReplacedIntent row can be MINTED that does not exist today)",
-              asymmetric);
-
-    // ⚠ THE STEP ROWS OF THE THREE SETS ABOVE ARE AN UPPER BOUND, AND THE JOB ROWS ARE NOT.
-    // `emit_level` runs at BOTH tiers, so a step class can mint a REPLACED row exactly as a job
-    // class can — but the step tier is scoped to the unmatched steps INSIDE one MATCHED job and
-    // aligns them order-respecting, while this census pools every step of a run together and
-    // compares sets. So a step class listed here is a candidate; a step class absent from here
-    // cannot move. The job tier's multiset match over (class, instance) is what this arithmetic
-    // models directly.
-    std::cout << "[G-D leg 1] RENAMED (carry >=1 payload with >=1 masked span — the population "
-                 "`DN-38.D1` clause 1 moves, NOT this leg's bound): "
-              << renamed.size() << " pair(s)" << std::endl;
-
-    std::cout << "[G-D leg 1] ⚠ the Step rows above are an UPPER bound (this census pools a run's "
-                 "steps; the engine scopes them per matched job and aligns them order-respecting). "
-                 "The Job rows model the aligner's multiset key directly."
-              << std::endl;
-
-    std::cout << "[G-D leg 1] UNION of >=2-span distinct payloads across every side and surface: "
-              << two_plus_union.size()
-              << "\n            this is the EXACT UPPER BOUND on the names whose coordinate the "
-                 "`DN-38.D3` widening can move on this corpus; every other name keeps today's "
-                 "answer byte-for-byte."
-              << "\n            ⚠ the acquirer's DECLARED-DISPLAY surface is NOT in this number: "
-                 "no jobs listing is banked for this corpus, and the replay that defines the next "
-                 "leg's subject passes no --changed-job-graph, so that surface is empty there."
-              << std::endl;
+    std::cout << "[DN-38 gate 2] MOVED (the pair carries >=1 payload whose rendered headline "
+                 "changes under `DN-38.D1` clause 1; every OTHER report keeps every `phase` byte): "
+              << moved.size()
+              << " pair(s) — not enumerated, it is the majority set; its "
+                 "COMPLEMENT is the prediction and it is "
+              << (payloads.size() - moved.size()) << " pair(s)." << std::endl;
+    enumerate("DISPLAY HAZARD INTRODUCED BY CLAUSE 1 (the rendered name carries a non-ASCII byte, "
+              "an interior control byte, the phase separator or a double quote AND its class does "
+              "not — the set the ruling is answerable for)",
+              at_risk);
 }
 // NOLINTEND
