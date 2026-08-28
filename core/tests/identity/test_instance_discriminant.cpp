@@ -69,8 +69,15 @@ TEST(InstanceDiscriminant, RunnerAgnosticNoHardcodedNames)
 // names its own assumption (true retries of an identical key), and matrix legs complete in a
 // DIFFERENT order on every run. So cell `(15.3)`'s baseline is diffed against cell `(15.1)`'s
 // changed. Measured on 1 000 adjudicated green→green GitHub Actions situations: 4 pairs affected,
-// 8–9 of 11 cells mis-paired per pair, 70 of the 76 HIGH rows that report one template as BOTH
-// appeared and vanished in a single report. Every such row is TRUE of its pair; the pair is wrong.
+// 8–9 of 11 cells mis-paired per pair, and 70 rows that report one template as BOTH appeared and
+// vanished in a single report. Every such row is TRUE of its pair; the pair is wrong.
+//
+// ⚠ THE SEVERITY OF THOSE 70 WAS WRONG HERE UNTIL 2026-08-28, and the count was not. An earlier
+// wording — "70 of the 76 HIGH rows" — is corrected by the pinned re-run that removed them
+// (`coderoast-corpora/sift_assessment/1.10.2/gd_leg2_pinned_rerun/RESULTS.md`): the population is
+// 35 `new_template` at HIGH plus 35 `vanished_template` at MEDIUM, one appeared/vanished pair per
+// mis-paired cell, and only the APPEARED half is HIGH. All 70 go to zero on the widened
+// coordinate, and each of the four reports goes to zero ranked rows.
 //
 // The rule this arm holds the code to: THE DISCRIMINANT IS THE FULL COMPLEMENT OF THE CLASS —
 // every masked span, in declaration order, verbatim, never the first alone. The two functions stay
