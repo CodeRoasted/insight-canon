@@ -199,16 +199,37 @@ TemplateId intent_id_of(std::string_view name)
 std::string_view discriminant_of(std::string_view name) noexcept
 {
     // The instance discriminant is the COMPLEMENT of canonicalize_intent: the class MASKS the drift
-    // tokens (R1–R4), the discriminant KEEPS the first one VERBATIM. Same scan, same rules — so
-    // `Test (ubuntu-latest, Node 24.x)` → `(ubuntu-latest, Node 24.x)` (R4 tuple) and `ESLint v6` →
-    // `v6` (R2 version): the raw declared coordinate that separates co-occurring /
-    // cross-run-drifted legs. The FIRST masked span (contiguous → a view); a name with no drift
-    // token → empty.
+    // tokens (R1–R4), the discriminant KEEPS them VERBATIM. Same scan, same rules, same trim set —
+    // this loop is `canonicalize_intent`'s, with the emission replaced by the recording of where
+    // the masked spans START and END.
+    //
+    // The answer is the ENVELOPE of those spans: the subview from the START of the FIRST to the
+    // END of the LAST, the class material BETWEEN them included, verbatim. `ESLint v6` → `v6`,
+    // `Test (ubuntu-latest, Node 24.x)` → `(ubuntu-latest, Node 24.x)`, `macos-14 (15.3)` →
+    // `14 (15.3)`. Zero spans → empty. One span → that span. Two or more → strictly wider than
+    // the span alone, which is the only case where this differs from keeping the first.
+    //
+    // WHY THE ENVELOPE SEPARATES, and it is not injectivity. For two payloads that share a class,
+    // the bytes outside the envelope and the bytes between the spans are class material, so the
+    // envelope determines every masked span: `(class, envelope)` separates any two names whose
+    // spans occupy the same class positions — every runner matrix, shard set and
+    // version-parameterized job. It is NOT injective over arbitrary strings (`N 42` and `42 N`
+    // share the class `N N` and the envelope `42`), and no spelling of the complement removes
+    // that: which of a class's `N` tokens was a mask is not recoverable from the class. Declared,
+    // not defended — it takes a producer naming a job in the mask alphabet itself.
+    //
+    // WHY ONE CONTIGUOUS VIEW AND NOT THE SPAN LIST. An owning `std::string` or a
+    // `std::vector<string_view>` would make this allocate, and `recognize()` — the one production
+    // site that stores the result — is `noexcept` and runs per banner; a JOINED string needs a
+    // separator, and a separator is an injectivity hazard of its own (`["1", "2:3"]` and
+    // `["1:2", "3"]` join alike under `:`). The envelope joins nothing, so it needs no separator.
     while (!name.empty() && is_intent_trim_byte(name.front()))
         name.remove_prefix(1);
     while (!name.empty() && is_intent_trim_byte(name.back()))
         name.remove_suffix(1);
 
+    std::size_t first{std::string_view::npos}; // offset of the first masked span's start
+    std::size_t last{0};                       // offset one past the last masked span's end
     std::size_t idx{0};
     bool prev_is_word{false};
     while (idx < name.size())
@@ -216,18 +237,35 @@ std::string_view discriminant_of(std::string_view name) noexcept
         const char chr{name[idx]};
         if (chr == '(') // R4 paren group → the raw tuple
         {
-            const std::size_t close{name.find(')', idx + 1)};
-            if (close != std::string_view::npos)
-                return std::string_view{name.data() + idx, close - idx + 1};
+            if (const std::size_t close{name.find(')', idx + 1)}; close != std::string_view::npos)
+            {
+                if (first == std::string_view::npos)
+                    first = idx;
+                last = close + 1;
+                idx = close + 1;
+                prev_is_word = false; // ')' is non-word
+                continue;
+            }
         }
         if (!prev_is_word &&
             (chr == 'v' || is_digit(chr))) // R1/R2/R3 → the raw version/digit token
+        {
             if (const std::optional<NumericClaim> claim{claim_numeric(name, idx)}; claim)
-                return std::string_view{name.data() + idx, claim->end - idx};
+            {
+                if (first == std::string_view::npos)
+                    first = idx;
+                last = claim->end;
+                idx = claim->end;
+                prev_is_word = true; // last claimed char ('X'/'N' in the class) is a word char
+                continue;
+            }
+        }
         prev_is_word = is_word(chr);
         ++idx;
     }
-    return {};
+    if (first == std::string_view::npos)
+        return {};
+    return std::string_view{name.data() + first, last - first};
 }
 
 } // namespace insight
