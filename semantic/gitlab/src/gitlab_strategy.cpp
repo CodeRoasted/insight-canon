@@ -16,16 +16,22 @@ import insight.canon.spi;
 //   3. the terminal verdict line, recognized by walking THIS package's kOutcomeMarkers data so the
 //      knowledge lives in one place (the row) — the Jenkins-strategy discipline.
 //
-// THE 32-BYTE PREFIX IS PEELED HERE, NOT DECLARED. It is textbook admissible transport under
-// ADR-23 — a TOTAL-scope, whole-stream, fixed-width transform, the same class as GHA's 28-byte
-// api-rfc3339-line-prefix — and the catalogue already ships the right KIND
-// (TransportTransformKind::LinePrefixTimestamp with an EventObservationTime extract). What it does
-// NOT ship is a faithful declaration of a timestamp FOLLOWED BY a stream tag, which needs a
-// two-element ordered stack and therefore a new kind, a transport-catalog token, and the
-// acquisition-side plumbing that decides who declares it. ADR-23 has already sequenced that work
-// as T2, whose ± arms are the two legs this dialect's corpus contains. Peeling in the strategy is
-// exactly where Jenkins's timestamper peel lives; this package makes T2's vehicle concrete and does
-// not schedule it.
+// THE 32-BYTE PREFIX IS PEELED HERE, NOT DECLARED, AND THAT IS ADR-23.D1's RULING RATHER THAN A
+// SHORTCUT. Scope is total, so the prefix IS transport — but it is a COMPOSITE (stamp, stream
+// ordinal, stream tag, continuation flag), and ADR-23.D1 HOLDS such a row instead of refusing it:
+// a composite is declarable only when EVERY field is EXTRACTABLE or INERT, and the '+'
+// continuation flag diagrammed below is neither — it encodes line DELIMITATION. Peeling it
+// discards that; honouring it rejoins lines, which ADR-23.D3's line-preserving contract refuses
+// by name. The catalogue therefore ships the right KIND for a BARE stamp
+// (TransportTransformKind::LinePrefixTimestamp with an EventObservationTime extract) and still
+// cannot express a stamp FOLLOWED BY a tag; carriage needs a new kind, which is catalogue growth
+// under ADR-23.D3, never a dialect strategy.
+//
+// The lifting condition is a MEASUREMENT, never a design pass (ADR-23.D1): reproduce the
+// platform's own bare rendering across the continuation rejoin, over a committed corpus pin —
+// only then does the kind land and this strategy retire. Until then this peel is the one
+// surviving dialect strategy ADR-23.D1 prices as the cost of not lying about the line set, and it
+// sits exactly where Jenkins's timestamper peel does.
 //
 // Determinism: pure byte walks, no locale, no float (F5). The peel is a fixed offset, so it cannot
 // depend on content.
@@ -57,7 +63,8 @@ namespace
     // also opens with an RFC3339 token, and only the fixed fraction width plus the stream tag tell
     // them apart. A producer emitting some other fraction width is DECLINED — the line falls
     // through to RawText and yields no marker, which is a fail-closed miss rather than a wrong
-    // answer, and it is the same fixed-width property T2's declaration will assert.
+    // answer, and it is the same fixed-width property the HELD catalogue row will assert once
+    // ADR-23.D1's lifting measurement lands.
     constexpr std::size_t kTimestampWidth{27U}; // YYYY-MM-DDTHH:MM:SS.ffffffZ
     constexpr std::size_t kFractionDigits{6U};
     constexpr std::size_t kSeparatorWidth{1U}; // the space between timestamp and stream tag

@@ -195,8 +195,9 @@ int main(int argc, char** argv)
             .dialect = insight::semantic::github::kDialect,
             .stack = kRfc3339Stack},
         // GitLab declares NO transport stack: its 32-byte runner prefix is peeled by the dialect
-        // strategy, not declared, because a faithful declaration is a two-element ordered stack
-        // (timestamp then stream tag) and that is T2's work (ADR-23), not a package landing's.
+        // strategy, not declared, because the composite carries a line-DELIMITATION field, so
+        // ADR-23.D1 HOLDS the catalogue row until its lifting measurement lands. Not a package
+        // landing's call, and not this proof's.
         Arm{.label = "gitlab", .dialect = insight::semantic::gitlab::kDialect, .stack = {}},
         Arm{.label = "jenkins", .dialect = insight::semantic::jenkins::kDialect, .stack = {}},
     };
