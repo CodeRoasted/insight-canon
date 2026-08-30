@@ -39,12 +39,14 @@ namespace insight::semantic::jenkins
 // (that is the GHA SGR command-echo), so the whole code tier is empty.
 //
 // THE 19-LOG PAYLOAD-STAMPED RE-BASELINE, recorded here because this is the strategy's successor
-// surface (ADR-23 Part 2 clause 1; T5 §4 item 5): that class is NOT declarable (the stamp is a
-// payload-determined subset, ADR-23), so post-purification its stamps stay CONTENT and those
-// lines template with the stamp under SRC-D-MSK-5's `[<*>]` normal form. Template IDs move; the
+// surface: that class is NOT declarable (the stamp is a payload-determined subset, ADR-23.D1), so
+// its stamps stay CONTENT and those lines template with the stamp under SRC-D-MSK-5's `[<*>]`
+// normal form. ADR-23.D6 rules that template consequence REAL and CORRECT, never "honesty-only" —
+// which is why the number is recorded here rather than explained away. Template IDs move; the
 // count is stable — measured ±strip 3 337 vs 3 339, the +2 fully attributed (one dual-occurrence
-// twin + the bare-`[<*>]` cell from 134 timestamp-only lines; the §6.5 prefix-image triangle
-// returned REPAIRED 2026-07-30, per stamped line template(unstripped) == "[<*>]" ⧺ M(rest), zero
+// twin + the bare-`[<*>]` cell from 134 timestamp-only lines; the prefix-image triangle —
+// `PrefixImageExitGate` in tests/t5_payload_stamp_template_measurement_test.cpp — returned
+// REPAIRED 2026-07-30, per stamped line template(unstripped) == "[<*>]" ⧺ M(rest), zero
 // exceptions on 6 416 stamped lines). A re-baseline, not a regression.
 
 // The dialect NAME every gated row below carries, and the name a caller declares
