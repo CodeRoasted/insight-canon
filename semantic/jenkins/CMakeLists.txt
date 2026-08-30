@@ -1,7 +1,7 @@
 ###########################################################
-#  insight_semantic_jenkins — the Jenkins Pipeline dialect semantic package (ADR 0024/0025).
+#  insight_semantic_jenkins — the Jenkins Pipeline dialect semantic package (ADR-17).
 #  One module interface unit (insight.semantic.jenkins) + one impl unit — NO partitions
-#  (the cross-package BMI closure must not deepen — ADR 0024 §7 / the gcc-15 hazard).
+#  (the cross-package BMI closure must not deepen — ADR-17.D8 / the gcc-15 hazard).
 ###########################################################
 cmake_minimum_required(VERSION 3.28)
 

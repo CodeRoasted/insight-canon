@@ -1,5 +1,5 @@
 ###########################################################
-#  insight_semantic_test_frameworks — test-framework file-location semantic package (ADR 0024).
+#  insight_semantic_test_frameworks — test-framework file-location semantic package (ADR-17).
 #  DATA only: one module interface unit (insight.semantic.test_frameworks) carrying location rule
 #  rows. No code tier (the matching algorithm lives in canon core). No partitions.
 ###########################################################

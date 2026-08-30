@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###############################################################################
-# SRC-SP-1 semantic-unawareness lint (ADR 0024 §9.1; insight_canon_semantic_packages.md §9)
+# SRC-SP-1 semantic-unawareness lint (ADR-17.D1; insight_canon_semantic_packages.md §9)
 #
 #   "Core is semantic-unaware. No ecosystem literal (marker, dialect prefix,
 #    framework suffix) exists in canon core sources. Enforced by a lint (the
@@ -98,7 +98,7 @@ strip_comments() {
     }gesx' "$1"
 }
 
-# Exempt the LogFormat identifier registry (ADR 0024 §1.3). The closed enum, its
+# Exempt the LogFormat identifier registry (ADR-17.D7). The closed enum, its
 # `to_string` render, and any qualified `LogFormat::<Ident>` reference are the sanctioned
 # home of dialect *identifiers* in core — an identifier registry, never a behavioral literal
 # fused into the mechanism. Blank them (newline-preserving) BEFORE the deny scan so a

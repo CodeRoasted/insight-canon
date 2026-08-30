@@ -76,7 +76,7 @@ find_package(picosha2 REQUIRED CONFIG)
 set(CANON_PUBLIC_MODULE_UNITS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/canon.internal.cppm
     ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.api.cppm
-    # insight.canon.spi — the provider contract (ADR 0024 §2.4): installed + public, but NOT
+    # insight.canon.spi — the provider contract (ADR-17.D8): installed + public, but NOT
     # re-exported by the facade (canon.cppm). A semantic package imports spi + api; consumers of
     # insight.canon never see it.
     ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.spi.cppm
@@ -86,12 +86,12 @@ set(CANON_PUBLIC_MODULE_UNITS
     # nothing in it may reach the tokenizer's identity path (§4). Listed before compose, which
     # imports it to fold the catalogue version + rows into semantic_identity.
     ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.transport.cppm
-    # insight.canon.compose — static composition (ADR 0024 §3/§4): compose()/ComposedSemantics.
+    # insight.canon.compose — static composition (ADR-17.D2 / ADR-17.D3): compose()/ComposedSemantics.
     # Installed + public; re-exported by the facade so `import insight.canon;` yields it alongside
     # Tokenizer. Imports spi (plain — the provider surface stays off the consumer default path).
     ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.compose.cppm
     ${CMAKE_CURRENT_SOURCE_DIR}/api/canon.cppm
-    # insight.canon.conformance — the package-agnostic CONFORMANCE KIT (ADR 0024 §2.3, SRC-SP-2): the
+    # insight.canon.conformance — the package-agnostic CONFORMANCE KIT (ADR-17.D8, SRC-SP-2): the
     # canon-shipped harness every semantic package must pass. Installed + public (an external package
     # author runs the identical gate), NOT re-exported by the facade — a package's test target imports it
     # explicitly. Imports the facade + spi; pure (no gtest, no global operator new in the library).
@@ -325,7 +325,7 @@ if(INSIGHT_CANON_BUILD_TESTS)
     endif()
 endif()
 
-# Benchmarks moved to the sibling `bench/` leaf package (insight_canon_bench, ADR 0024 / SRC-SP-5):
+# Benchmarks moved to the sibling `bench/` leaf package (insight_canon_bench, ADR-17.D8 · SRC-SP-5):
 # the composed perf gate links the semantic packages, which the core build must
 # never do (SRC-SP-1 / R1
 # dependency arrow). The bench consumes canon externally (the det_proof shape), so the white-box

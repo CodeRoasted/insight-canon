@@ -22,7 +22,7 @@ jobs:
       # the bench falls through to remotes and the release build reds — keep this list 1:1 with
       # packages.yml). test+create both default true; kept explicit so the ordering intent is legible.
       # Building the packages here is what exercises the deepened cross-package C++-module closure
-      # (ADR 0024 §7) on every PR, not just at the tag.
+      # (ADR-17.D8) on every PR, not just at the tag.
       modules: |
         core true true
         semantic/github true true

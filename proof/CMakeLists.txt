@@ -36,7 +36,7 @@ endif()
 
 # Build canon as a module static-lib (tests default OFF — not top-level here).
 add_subdirectory(${CANON_ROOT}/core canon_build)
-# The semantic packages (ADR 0024) — added AFTER canon so their `if(NOT TARGET insight::canon)`
+# The semantic packages (ADR-17.D8) — added AFTER canon so their `if(NOT TARGET insight::canon)`
 # guards see the in-tree target (no find_package). det_proof composes the product's exact manifest
 # set {github, gitlab, jenkins, test_frameworks}, so the proof exercises the composed pipeline (the
 # byte-identity G-SP-1 gate; the grammar-2 composed identity = G-OUT-6).

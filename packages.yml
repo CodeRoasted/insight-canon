@@ -9,7 +9,7 @@ packages:
     public: true
     release: true
     depends: []
-  # Semantic packages (ADR 0024): per-dialect VOCABULARY (rule rows + code tier), Apache-2.0, statically
+  # Semantic packages (ADR-17.D1): per-dialect VOCABULARY (rule rows + code tier), Apache-2.0, statically
   # composed via insight::semantic::compose(). One module interface unit each — no partitions (the
   # cross-package BMI closure must not deepen). gcc/cloud are PO-scheduled successors riding the
   # same contract, never pre-built.
@@ -41,7 +41,7 @@ packages:
     public: true
     release: true
     depends: [insight_canon]
-  # The composed benchmark harness (ADR 0024 / SRC-SP-5): a leaf APPLICATION package — the perf gate
+  # The composed benchmark harness (ADR-17.D8 · SRC-SP-5): a leaf APPLICATION package — the perf gate
   # must link the vocabulary packages, which core never may (SRC-SP-1 / R1).
   # Built + run by `malf bench`
   # and the on-tag measure-benchmark gate; never published as a release artifact.

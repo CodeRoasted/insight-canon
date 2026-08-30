@@ -1,8 +1,8 @@
 ###########################################################
 #  insight_semantic_github — the GitHub Actions / Azure Pipelines dialect semantic package
-#  (ADR 0024). ONE module interface unit (insight.semantic.github, a thin wrapper around the
+#  (ADR-17.D8). ONE module interface unit (insight.semantic.github, a thin wrapper around the
 #  projection of github.dialect.yaml) plus one impl unit (its code tier), and NO partitions (the
-#  cross-package BMI closure must not deepen — ADR 0024 §7 / the named-modules hazard family).
+#  cross-package BMI closure must not deepen — ADR-17.D8 / the named-modules hazard family).
 ###########################################################
 cmake_minimum_required(VERSION 3.28)
 

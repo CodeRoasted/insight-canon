@@ -144,7 +144,7 @@ insight-canon is the upstream tokenization layer of the [MetaLog](https://github
 
 ## Project layout
 
-Multi-package Conan repo (ADR 0024): the root is the shelf; the tree reads like the
+Multi-package Conan repo (ADR-17.D8): the root is the shelf; the tree reads like the
 architecture — `core/` is the **language**, `semantic/*` are the **vocabularies**.
 
 ```

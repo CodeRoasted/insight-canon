@@ -13,7 +13,7 @@ class InsightSemanticTestFrameworksConan(ConanFile):
     license = "Apache-2.0"
     url = "https://github.com/CodeRoasted/insight-canon"
     description = (
-        "InSight Canon semantic package: test-framework file-location vocabulary (ADR 0024). "
+        "InSight Canon semantic package: test-framework file-location vocabulary (ADR-17.D1). "
         "Location rule rows (jest/vitest/playwright/pytest/go/ruby test-file families) in the closed "
         "canon rule grammar — DATA only, no code tier. The core recognizer walks these composed rows; "
         "framework file-naming is CI-dialect-independent. Statically composed via compose()."

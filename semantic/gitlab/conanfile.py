@@ -13,7 +13,7 @@ class InsightSemanticGitLabConan(ConanFile):
     license = "Apache-2.0"
     url = "https://github.com/CodeRoasted/insight-canon"
     description = (
-        "InSight Canon semantic package: the GitLab CI dialect (ADR 0024/0025/0069). "
+        "InSight Canon semantic package: the GitLab CI dialect (ADR-17). "
         "Intent-marker (section skeleton) + run-outcome rule rows in the closed canon "
         "rule grammar, plus the dialect format strategy (the fixed-width runner transport "
         "peel, section_start markers, the terminal verdict line — the code tier). "
