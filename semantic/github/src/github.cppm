@@ -28,8 +28,8 @@
 module;
 
 export module insight.semantic.github;
-import insight.canon.internal; // std + global C fixed-width types
-import insight.canon.api;      // StructuralRole, LogLevel, LogFormat, IntentMarkerKind, ChildOrder
+import insight.canon.internal;
+import insight.canon.api;
 export import insight.canon.spi;
 
 namespace insight::semantic::github
@@ -43,10 +43,9 @@ namespace insight::semantic::github
 // WHERE IT IS DEFINED: `src/github_provenance.cpp`, this module's implementation unit — the name
 // the declaration's `unit:` carries, and the projection reproduces it verbatim.
 //
-// There is NO strategy factory (T4): `GitHubActionsStrategy` detected and peeled GitHub's per-line
-// delivery stamp, and that peel is now DECLARED transport (ADR-23.D3 — `api-rfc3339-line-prefix`).
-// This package's code tier is one byte predicate, so the dialect is DATA: rows plus canon's
-// walkers ARE the GHA parser (ADR-22).
+// WHY THE CODE TIER IS ONLY THIS HOOK is argued at `dialect.code_tier.echoed_source.why` in
+// `github.dialect.yaml` and emitted by the projection above the signature pin. It is not restated
+// here: both texts land in this one translation unit, so a second copy is a second home.
 export bool is_echoed_source(std::string_view raw_line) noexcept;
 
 } // namespace insight::semantic::github
