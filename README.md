@@ -166,7 +166,7 @@ insight-canon/
 │   │   ├── conformance/    insight.canon.conformance — the package conformance kit
 │   │   └── ...             tokenizer/ arena/ identity/ utils/ impl units
 │   ├── tests/              Per-domain mirror of src/ + the insight.canon.test aggregate module
-│   ├── data/corpora/       Tracked corpus registry + smoke slices (ADR 0016)
+│   ├── data/corpora/       Registry of record ONLY — REGISTRY.md + a README per corpus (ADR-7.D4)
 │   └── test_package/       Conan consumer smoke test (zero-init, import insight.canon only)
 ├── semantic/               The vocabulary packages (statically composed, Apache-2.0)
 │   ├── github/             insight_semantic_github — GitHub Actions / Azure dialect (rows)

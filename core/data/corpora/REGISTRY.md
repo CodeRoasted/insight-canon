@@ -9,7 +9,7 @@ governance — an INTERNAL CodeRoast decision record, not shipped with this repo
   untracked `data/logs/` path. **Sample slices no longer live in canon git**: they live
   in `coderoast-corpora/<platform>_corpora/<corpus>/samples/` and publish to the **public hub** via
   the corpora Sample Release workflow; the canon *showcase* fetches them from the hub (a
-  client-facing render, not a gate — ADR 0016 §5). What decides that a slice may publish is the
+  client-facing render, not a gate — `ADR-7.D7`). What decides that a slice may publish is the
   fail-closed §2a gate `_shared/samples_safety_lint.py`, and it decides **two independent axes,
   ANDed** — never either: the **right** to redistribute (an `ATTRIBUTION.md` naming a permissive
   source, or a `SLICE.json` declaring the tree synthetic) **and** a **content** scan that refuses
@@ -40,7 +40,7 @@ it exercises); its **`class`** carries the Rule-D storage class (public / re-acq
 
 ## Repo-local fixtures (defined where their tests own them — listed for completeness)
 
-These are **small permanent fixtures**, committed in git lock-step with their tests (ADR 0016 §2).
+These are **small permanent fixtures**, committed in git lock-step with their tests (`ADR-7.D2`).
 Do not relocate them here.
 
 | id | what | home | consumed by |
@@ -49,7 +49,7 @@ Do not relocate them here.
 | **eidos-fuzz** | parse-path fuzz replay set (minimized) + curated seeds | `insight-eidos/fuzz/corpus/` | `parse_fuzzer` (libFuzzer/ASAN gate) |
 | **playground-red** | cube REDs + e2e scenario fixtures (1:1 scenario↔test) | `coderoast-server/insight-playground/` | the e2e regression suite |
 
-## Published sample slices (ADR 0016 §5 — home moved to the warehouse + hub)
+## Published sample slices (`ADR-7.D7` — home moved to the warehouse + hub)
 
 Each big corpus's small, deterministic **published slice** lives at
 `coderoast-corpora/<platform>_corpora/<corpus>/samples/` — **not** in canon git. Its purpose is now a

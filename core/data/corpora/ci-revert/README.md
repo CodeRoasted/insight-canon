@@ -24,7 +24,7 @@ and are not shipped with this repo.
   **pinned 25-repo set**, `pinned_repos.txt`; v2: ~60 repos, **revert-density-gated** selection).
   **Positive-Unlabeled** posture (positives reliable, negatives weak); revert ≠ defect (re-applied
   *and* relanded reverts excluded).
-- **Distribution class: third-party / PRIVATE (ADR 0016 §2a).** These are **third-party CI logs**
+- **Distribution class: third-party / PRIVATE (`ADR-7.D3`).** These are **third-party CI logs**
   with **no redistribution licence**, and the scrub is **heuristic** with **IPv4 redaction
   deliberately dropped** (`ips: 0` in `summary.json` means *not redacted*, **not** *none present*).
   So the real bytes are **private-only**: never a public Release, **never committed to this public
@@ -33,14 +33,14 @@ and are not shipped with this repo.
 - **Storage class:** big · **NON-re-acquirable** — GHA logs **expire at 90 days**, so a retrospective
   crawl cannot rebuild a past snapshot. **The pinned `vN` private asset is the source of truth.**
 
-## Version lineage (ADR 0016 §3)
+## Version lineage (`ADR-7.D5`)
 
 - **`v1`** *(FROZEN 2026-06-17 — the interim R1/R2 baseline)*: 4132 samples (4082 logged) · 403 R1
   failures · ~10 R2 revert-positives · 19 repos contributed · measured merge-green-rate 0.807 ·
   `intended_canon_version` 1.5.2 · schema v1. Validity finding baked in: survivorship is
   repo-dependent — **R2 filters to `merge_run_conclusion == "success"`**; R1 uses each run's own
   `ci_outcome` (weak-repo list in `manifest/summary.json`).
-  - **Content anchor (the registry pin, ADR 0016 §3):** sha256
+  - **Content anchor (the registry pin, `ADR-7.D5`):** sha256
     `3054b158382c333301d986ad0472e2208078ee87a92edf42b33dd32a4660b059` — a per-file manifest over the
     8171-file tree (compression-independent; verify the *extracted* corpus against it).
   - **Frozen asset:** `ci-revert-v1.tar.zst` · 274,069,224 B (262 MB, 5.8 % of the 4.5 GB tree) ·
@@ -61,7 +61,7 @@ and are not shipped with this repo.
 
 ## Fetch / verify / freeze (reproducibility — private, trusted-runner only)
 
-All corpus tooling lives in the private warehouse **`coderoast-corpora`** (ADR 0016 §2a). The frozen
+All corpus tooling lives in the private warehouse **`coderoast-corpora`** (`ADR-7.D4`). The frozen
 artifact is produced by `coderoast-corpora/_shared/freeze_corpus.sh` (deterministic tar → `zstd -19`;
 emits the content manifest, the asset, its sha256, and a `.pin.txt`). To re-freeze a future version:
 `bash scripts/freeze_corpus.sh data/ci-revert/v1/full ci-revert vN`. `v1` was frozen and
@@ -119,7 +119,7 @@ reference, and **zero rows reference a file that is not on disk** in either corp
 posture). Materializes under the warehouse's gitignored `coderoast-corpora/github_corpora/revert_corpus/data/v1/full/`
 (`corpus.jsonl`, `log_annotated/`, `log_stripped/`, `manifest/`).
 
-## Published sample slice — SYNTHETIC (ADR 0016 §2a + §5)
+## Published sample slice — SYNTHETIC (`ADR-7.D3` · `ADR-7.D7`)
 
 Because ci-revert is third-party/private, its public slice is a **fully synthetic, clearly-labelled
 *shape* fixture** — fabricated repos/content, **zero third-party bytes** — living at

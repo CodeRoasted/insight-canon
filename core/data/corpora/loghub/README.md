@@ -32,7 +32,7 @@ governance (an internal CodeRoast record, not shipped here).
 
 ## Acquisition
 
-All tooling lives in the private warehouse **`coderoast-corpora`** (ADR 0016 §2a).
+All tooling lives in the private warehouse **`coderoast-corpora`** (`ADR-7.D4`).
 
 - **`_2k` samples + structured-JSON mix:** `coderoast-corpora/zenodo_corpora/loghub/scripts/download_logs.sh` fetches the 16
   `_2k` samples (logpai/loghub GitHub) under the warehouse's `data/logs/loghub/` and a structured-JSON
@@ -51,7 +51,7 @@ BGL / Thunderbird carry an **alert-label column 1** (`-` = normal; `KERNDTLB`/`A
 class). The loader strips col-1 **only** where the sentinel-rate detector confirms it exists (the 14
 message-leading formats keep col-1 as real message).
 
-## Published sample slice (ADR 0016 §5)
+## Published sample slice (`ADR-7.D7`)
 
 The LogHub per-format **`*_2k.log`** set (16 files, 2000 lines each) — the canonical small,
 deterministic, all-format input — plus `ATTRIBUTION.md` (CC-BY-4.0 credit + the "no changes / full
@@ -62,4 +62,4 @@ distribution verbatim (or `head -n 2000` of each full format file, label column 
 **Consumed by:** the **canon Samples Showcase** — `insight-canon/proof/det_proof` run over the hub
 samples for a client-facing "what Canon extracts" render (a showcase, **not** a gate: the determinism
 gate uses `proof/corpus/`, and the end-to-end is owned by Eidos + the playground e2e). No canon test
-resolves an in-git slice, so the LogHub `_2k` bytes were removed from canon git (ADR 0016 §5, 2026-07-09).
+resolves an in-git slice, so the LogHub `_2k` bytes were removed from canon git (`ADR-7.D7`, 2026-07-09).
