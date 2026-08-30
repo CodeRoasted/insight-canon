@@ -283,7 +283,10 @@ bool is_otel_span_document(std::string_view line) noexcept
     const std::size_t key{line.find_first_not_of(kWhitespace, open + 1)};
     if (key == std::string_view::npos)
         return false;
-    const std::string_view first_key{line.substr(key)};
+    // Built from the pointer for the reason json.cpp's `first_top_level_key` states: `substr`
+    // can throw and this body is `noexcept`. `key` came back from a non-npos find, so
+    // `key < line.size()` and the tail is well-formed.
+    const std::string_view first_key{line.data() + key, line.size() - key};
     for (const std::string_view accepted : kExportFirstKeys)
         if (first_key.starts_with(accepted))
             return true;

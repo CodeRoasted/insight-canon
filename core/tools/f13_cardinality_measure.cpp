@@ -37,7 +37,10 @@ using insight::tokenization::Tokenizer;
 // Default line budget — the same sizing the test-era instrument used, kept so historical readings
 // stay comparable order-of-magnitude. Overridable via argv[2]; the report states where it cut.
 constexpr std::size_t kDefaultMaxLines{300000};
-constexpr std::size_t kArenaBytes{8U * 1024U * 1024U};
+// The product is formed AT `std::size_t`, never widened after the fact: `8U * 1024U * 1024U`
+// multiplies in `unsigned int` and only then converts, so the day this constant is raised past
+// 4 GiB it would wrap silently at a number nobody would suspect.
+constexpr std::size_t kArenaBytes{std::size_t{8} * 1024 * 1024};
 constexpr std::size_t kTopTemplatesShown{15};
 constexpr std::size_t kSingletonSamplesShown{40};
 constexpr std::size_t kTemplatePreviewChars{140};
@@ -45,6 +48,9 @@ constexpr std::size_t kTemplatePreviewChars{140};
 constexpr int kExitOk{0};
 constexpr int kExitEmptyPopulation{1};
 constexpr int kExitUsage{2};
+// The run died on a thrown exception — distinct from every code above because it is the only one
+// that can fire after report rows have already been printed: it says the report is partial.
+constexpr int kExitFatal{4};
 
 struct FileConsumption
 {
@@ -62,7 +68,13 @@ void print_usage(std::string_view program_name)
 }
 } // namespace
 
+// A FUNCTION-TRY-BLOCK, and the shape is the point: the body below is a measurement that prints
+// as it goes, so the handler's job is to make a partial report SAY it is partial rather than to
+// let `terminate` end the process with no line at all. The corpus walk, every file read and
+// `std::println` itself can throw. The handlers use `std::fputs` and not `std::println` because a
+// diagnostic that can itself throw would leave this function throwing after all.
 int main(int argc, char** argv)
+try
 {
     const std::span<char*> arguments{argv, static_cast<std::size_t>(argc)};
     if (arguments.size() < 2 || arguments.size() > 3)
@@ -190,4 +202,17 @@ int main(int argc, char** argv)
         }
 
     return kExitOk;
+}
+catch (const std::exception& error)
+{
+    std::fputs("fatal: ", stderr);
+    std::fputs(error.what(), stderr);
+    std::fputs("\nfatal: the report above is PARTIAL and may not be cited\n", stderr);
+    return kExitFatal;
+}
+catch (...)
+{
+    std::fputs("fatal: unknown exception\n", stderr);
+    std::fputs("fatal: the report above is PARTIAL and may not be cited\n", stderr);
+    return kExitFatal;
 }

@@ -84,13 +84,19 @@ class EventTime
     // Deref forwards too, so `timestamp->time_since_epoch()` reads exactly as it did against the
     // bare optional. The point of this type is to constrain WRITERS; making readers rewrite would
     // have been churn with no guarantee attached to it. Precondition is the optional's own.
+    // The two NOLINTs below are the FORWARDING contract, not a missing check.
+    // `bugprone-unchecked-optional-access` reads every `*opt` as a caller who forgot to test, and
+    // here the unchecked deref IS the accessor being defined: these reproduce
+    // `std::optional::operator*`/`operator->` verbatim, precondition included (stated above).
+    // Adding a test would change this type's published contract from "same as std::optional" to
+    // "checked", on a per-event accessor — a contract decision, not a lint fix.
     [[nodiscard]] const Timestamp& operator*() const noexcept
     {
-        return *value_;
+        return *value_; // NOLINT(bugprone-unchecked-optional-access)
     }
     [[nodiscard]] const Timestamp* operator->() const noexcept
     {
-        return &*value_;
+        return &*value_; // NOLINT(bugprone-unchecked-optional-access)
     }
 
     // True only for rung 1. A time that is absent is never declared, so this cannot disagree with

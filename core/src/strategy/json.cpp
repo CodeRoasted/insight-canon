@@ -301,7 +301,12 @@ namespace
         const std::size_t end{line.find('"', quote + 1)};
         if (end == std::string_view::npos || end == quote + 1)
             return kUnreadable;
-        return line.substr(quote + 1, end - quote - 1);
+        // Built from the pointer, not `substr`: `substr` throws when its offset exceeds the
+        // size, and a potentially-throwing call inside a `noexcept` body is a `std::terminate`
+        // that only a proof rules out. The proof holds here — `end` came back from a find that
+        // STARTED at `quote + 1` and is not npos, so `quote + 1 <= end < line.size()` — and this
+        // form states it instead of leaving every later reader to re-derive it.
+        return std::string_view{line.data() + quote + 1, end - quote - 1};
     }
 
     // Name the object's top-level keys for L2's diagnostic. COLD PATH ONLY — called after the line
