@@ -194,10 +194,8 @@ int main(int argc, char** argv)
         Arm{.label = "github+api-rfc3339-line-prefix",
             .dialect = insight::semantic::github::kDialect,
             .stack = kRfc3339Stack},
-        // GitLab declares NO transport stack: its 32-byte runner prefix is peeled by the dialect
-        // strategy, not declared, because the composite carries a line-DELIMITATION field, so
-        // ADR-23.D1 HOLDS the catalogue row until its lifting measurement lands. Not a package
-        // landing's call, and not this proof's.
+        // GitLab declares NO transport stack: its 32-byte runner prefix carries a line-DELIMITATION
+        // field, so ADR-23.D1 HOLDS the catalogue row and the dialect strategy peels it instead.
         Arm{.label = "gitlab", .dialect = insight::semantic::gitlab::kDialect, .stack = {}},
         Arm{.label = "jenkins", .dialect = insight::semantic::jenkins::kDialect, .stack = {}},
     };
