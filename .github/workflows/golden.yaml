@@ -14,7 +14,7 @@ name: Determinism Golden Proof
 #   package set (github + jenkins + test_frameworks, grammar-2) and emits `# semantic_identity <hash>`
 #   + the package list as the digest's first lines. So the composed-ruleset content hash is under the
 #   SAME 5-leg byte-identity assertion — a cross-OS/ISA divergence in the hash serialization fails the
-#   gate. No separate job. G-OUT-6 (ADR 0025) rides the same way: the grammar-2 identity plus the
+#   gate. No separate job. G-OUT-6 (ADR-17.D5) rides the same way: the grammar-2 identity plus the
 #   per-file `### run_outcome` console-tail scan surface are in the compared bytes.
 #
 # PUBLIC + anonymous (no secrets): anyone can fork canon and reproduce it. arm64 + msvc run on HOSTED

@@ -9,7 +9,7 @@ governance (an internal CodeRoast record, not shipped here).
 
 - **Cube measurement** (concluded): the `b_native` oracle (BGL/Thunderbird alert classes), the
   all-format structural sweep, the template-lattice / format-relative gate. *This arc is closed*
-  (the disposable `insight_cube` pkg was deleted at the 1.6.0 verdict, adr/0018) — LogHub is
+  (the disposable `insight_cube` pkg was deleted at the 1.6.0 verdict; `ADR-19` owns the cube today) — LogHub is
   retained for what follows.
 - **Cross-stdlib determinism measurement**: a large, messy, real input for the gcc-16.2/libstdc++ ≡
   clang-21/libc++ diagonal.
