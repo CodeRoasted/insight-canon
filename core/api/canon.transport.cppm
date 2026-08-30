@@ -30,7 +30,7 @@ export namespace insight::transport
 // version is. A stream analyzed under two different transport vocabularies is not comparable, and
 // the digest must say so.
 //
-// THE BUMP RULE (ADR-2.3, which SHARPENED the over-broad rule this comment first
+// THE BUMP RULE (`ADR-2.D5`, which SHARPENED the over-broad rule this comment first
 // carried):
 //
 //     Bump on a change to what the catalogue SERIALIZES — plus any change to its serialization
@@ -69,12 +69,12 @@ inline constexpr std::string_view kTransportCatalogVersion{"transport-catalog-3"
 
 // Which transform ALGORITHM a row selects and parameterizes.
 //
-// TWO members today, each grown in WITH ITS ALGORITHM, ITS ROW AND ITS GATE (ADR-2.1),
+// TWO members today, each grown in WITH ITS ALGORITHM, ITS ROW AND ITS GATE (`ADR-2.D7`),
 // as `PayloadExtract` and `LocationMatchKind` grew. ADR-23 listed a wider anticipated
-// vocabulary — FramingLine, AnsiEchoWrap, StreamTag, Truncation, Chunking, Encoding — and **§3's
-// enum bodies are to be read as a SKETCH, never as a normative closed set**; §3's normative
-// content is the row shape, the rows-as-data rule and the ternary extract routing, all of which
-// shipped intact.
+// vocabulary — FramingLine, AnsiEchoWrap, StreamTag, Truncation, Chunking, Encoding — and **those
+// enum bodies are to be read as a SKETCH, never as a normative closed set**; `ADR-23.D3`'s
+// normative content is the row shape, the rows-as-data rule and the ternary extract routing, all
+// of which shipped intact.
 //
 // The decisive argument is not anti-dormant, it is arithmetic: an enum member with no row
 // serializes zero bytes, so declaring the full set up front either moves no digest (and buys
@@ -117,7 +117,7 @@ enum class TransportTransformKind : std::uint8_t
 // dropped.
 //
 // `StreamLabel` from ADR-23's sketch is not shipped: no transform produces one today (same
-// rule as the kinds above, ratified by ADR-2.1). It APPENDS if it ever lands.
+// rule as the kinds above, ratified by `ADR-2.D7`). It APPENDS if it ever lands.
 enum class TransportExtract : std::uint8_t
 {
     None = 0, ///< the peel yields nothing but the shortened line
@@ -210,6 +210,16 @@ inline constexpr std::array<TransportTransformRow, 3> kTransportCatalogRows{{
      .strip_leading_space = false},
 }};
 
+// The bytes ONE `LinePrefixBracketedTimestamp` row renders: the fixed lexical form
+// `[YYYY-MM-DDTHH:MM:SS.mmmZ]` plus its single separator space. Published beside the catalogue
+// because a WRITER cannot promise not to allocate without first SIZING its buffer, and the size
+// is `rows × this`. LogCraft's console/file sinks size their end-of-stream trailer buffer at
+// CONSTRUCTION from this constant so `signal_end_of_stream()` is honestly `noexcept`; a caller
+// spelling a round number instead is sufficient by configuration accident — one declared row fits
+// in 32 bytes, two do not — and would reallocate inside a `noexcept` frame the day a second row
+// is declared. A value one surface owns is never re-spelled in another.
+inline constexpr std::size_t kBracketedTimestampPrefixBytes{27U};
+
 // Look a declared name up in the catalogue. Returns nullptr when unknown — the caller decides
 // whether that is a hard error (canon, at declaration resolution) or a query.
 [[nodiscard]] constexpr const TransportTransformRow* find_transform(std::string_view name) noexcept
@@ -231,10 +241,10 @@ inline constexpr std::array<TransportTransformRow, 3> kTransportCatalogRows{{
 //
 // * `LinePrefixBracketedTimestamp` renders ONE fixed lexical form — the corpus-attested
 //   millisecond-`Z` spelling `[YYYY-MM-DDTHH:MM:SS.mmmZ]` + one space. Integer/manual formatting
-//   only (no iostream, no locale, no strftime — determinism MUST M8), and ALLOCATION-FREE beyond
-//   the caller's buffer: the trailer of a declared wrap is stamped inside the writer's `noexcept`
-//   end-of-stream path (§3.1's high-water-mark rule), so this function may not allocate on its
-//   own account — a stack scratch is filled and appended in one call. NORMATIVE, not an accident.
+//   only (no iostream, no locale, no strftime — determinism MUST M8), and ALLOCATION-FREE: the
+//   trailer of a declared wrap is stamped inside the writer's `noexcept` end-of-stream path
+//   (§3.1's high-water-mark rule). NORMATIVE, not an accident — and DISCHARGED, by the
+//   caller-buffer signature below, rather than asked of a caller who has no way to meet it.
 // * `LinePrefixTimestamp` has NO writer dual, deliberately (returns false): the GHA API stamp is
 //   the PLATFORM's, baked into the GHA IntentFormat's own writer (T5 §3.3 — a writer-side ± knob
 //   there would generate only our own ablation and move shipped SRC-SID-3 bytes for nothing). A
@@ -249,13 +259,33 @@ inline constexpr std::array<TransportTransformRow, 3> kTransportCatalogRows{{
 //     `floor<seconds>(stamp)` — the peel is the renderer's inverse at the declared strip's
 //     boundary (T5 §2.3's round-trip law, stated at the honest `strip_ws` boundary).
 //
-// Returns false also for a stamp outside the four-digit-year window the fixed form can spell
-// (0000-01-01 … 9999-12-31) — a caller-contract violation surfaced as "not renderable", never a
-// silently wrong prefix. Deliberately NOT noexcept: `out.append` may grow the caller's buffer,
-// and an allocating function must not wear the keyword (the escape-NOLINT that would preserve it
-// defeats the very tripwire it decorates) — "allocation-free" is the function's own account: a
-// caller that reserves once appends forever without a further allocation. Defined in
-// transport.cpp.
+// Both forms return the no-render answer for a stamp outside the four-digit-year window the fixed
+// form can spell (0000-01-01 … 9999-12-31) — a caller-contract violation surfaced as "not
+// renderable", never a silently wrong prefix.
+//
+// TWO SIGNATURES, ONE ALGORITHM. The span form below IS the algorithm; the `std::string&` form is
+// a wrapper that appends its result. The pair exists because the normative sentence above places a
+// no-allocation obligation on this function's callers, and a `std::string&` signature makes that
+// obligation UNDISCHARGEABLE: the capacity is invisible to the callee and — the half that decides
+// it — invisible to a static analyzer, which sees `basic_string::append`, reaches
+// `__throw_length_error`, and charges the caller's `noexcept` frame. Pre-reserving would make such
+// a caller semantically honest and leave the check red, which is the branch where a suppression
+// becomes tempting; the second signature removes the temptation rather than resisting it.
+//
+// The span form writes into memory the caller already owns and touches no `std::string`, so it is
+// genuinely `noexcept` and a `noexcept` caller can be believed. Returns the bytes written, or
+// 0 for all three refusals — a row with no writer dual, an unrenderable stamp, or a buffer smaller
+// than the row's `kBracketedTimestampPrefixBytes`. On 0 the buffer is UNTOUCHED (the bytes are
+// composed in a stack scratch and copied once), so a partial prefix can never reach a document.
+[[nodiscard]] std::size_t render_transport_prefix(const TransportTransformRow& row,
+                                                  insight::Timestamp stamp,
+                                                  std::span<char> out) noexcept;
+
+// The appending form: convenience over the span form, for callers with no `noexcept` obligation
+// (canon's own probes, LogCraft's per-record path). NOT noexcept, and the reason is now local to
+// this wrapper rather than delegated to the contract above — `out.append` may grow the caller's
+// buffer, and an allocating function must not wear the keyword (the escape-NOLINT that would
+// preserve it defeats the very tripwire it decorates). Both defined in transport.cpp.
 [[nodiscard]] bool render_transport_prefix(const TransportTransformRow& row,
                                            insight::Timestamp stamp, std::string& out);
 

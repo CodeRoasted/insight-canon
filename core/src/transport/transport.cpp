@@ -233,31 +233,35 @@ PeeledLine TransportStack::peel(const insight::tokenization::NormalizedLine& lin
                       .observation_time = raw.observation_time};
 }
 
-bool render_transport_prefix(const TransportTransformRow& row, insight::Timestamp stamp,
-                             std::string& out)
+std::size_t render_transport_prefix(const TransportTransformRow& row, insight::Timestamp stamp,
+                                    std::span<char> out) noexcept
 {
     switch (row.kind)
     {
     case TransportTransformKind::LinePrefixTimestamp:
         // NO writer dual, deliberately (T5 §3.3): the GHA API stamp is the platform's, baked into
         // the GHA IntentFormat's own writer — see the interface contract.
-        return false;
+        return 0U;
     case TransportTransformKind::LinePrefixBracketedTimestamp:
         break;
     case TransportTransformKind::LinePrefixByteOrderMark:
         // NO writer dual, and unlike the GHA row's absence this one is structural rather than a
         // homing choice: a BOM is not a rendering of any datum, so there is nothing to render.
-        return false;
+        return 0U;
     }
 
-    // The ONE fixed lexical form: `[YYYY-MM-DDTHH:MM:SS.mmmZ]` + one separator space — 27 bytes,
-    // filled into a stack scratch and appended in one call (allocation-free on this function's
-    // own account; the caller's buffer amortizes to steady-state capacity).
+    if (out.size() < kBracketedTimestampPrefixBytes)
+        return 0U;
+
+    // The ONE fixed lexical form: `[YYYY-MM-DDTHH:MM:SS.mmmZ]` + one separator space —
+    // `kBracketedTimestampPrefixBytes`, composed in a stack scratch and copied once at the end.
+    // The scratch is what makes the 0-return honest: an unrenderable year is discovered after the
+    // civil conversion, and writing straight into `out` would leave a caller who checked the
+    // return a buffer holding a half-formed prefix.
     static constexpr std::int64_t kMillisPerSecond{1000};
     static constexpr std::int64_t kMillisPerDay{86'400'000};
     static constexpr std::int64_t kSecondsPerMinute{60};
     static constexpr std::int64_t kMinutesPerHour{60};
-    static constexpr std::size_t kPrefixBytes{27U};
     static constexpr std::int64_t kMaxRenderableYear{9999};
 
     const std::int64_t total_millis{
@@ -273,8 +277,8 @@ bool render_transport_prefix(const TransportTransformRow& row, insight::Timestam
     }
     const CivilDate date{civil_from_days(days)};
     if (date.year < 0 || date.year > kMaxRenderableYear)
-        return false; // outside the four-digit window the fixed form can spell — never a wrong
-                      // prefix
+        return 0U; // outside the four-digit window the fixed form can spell — never a wrong
+                   // prefix
 
     const std::int64_t millis{millis_in_day % kMillisPerSecond};
     const std::int64_t seconds_in_day{millis_in_day / kMillisPerSecond};
@@ -282,7 +286,7 @@ bool render_transport_prefix(const TransportTransformRow& row, insight::Timestam
     const std::int64_t minute{(seconds_in_day / kSecondsPerMinute) % kMinutesPerHour};
     const std::int64_t hour{seconds_in_day / (kSecondsPerMinute * kMinutesPerHour)};
 
-    std::array<char, kPrefixBytes> scratch{};
+    std::array<char, kBracketedTimestampPrefixBytes> scratch{};
     std::size_t pos{0};
     scratch[pos++] = '[';
     put_two_digits(scratch, pos, static_cast<unsigned>(date.year / 100));
@@ -303,7 +307,18 @@ bool render_transport_prefix(const TransportTransformRow& row, insight::Timestam
     scratch[pos++] = 'Z';
     scratch[pos++] = ']';
     scratch[pos++] = ' ';
-    out.append(scratch.data(), scratch.size());
+    std::ranges::copy(scratch, out.begin());
+    return scratch.size();
+}
+
+bool render_transport_prefix(const TransportTransformRow& row, insight::Timestamp stamp,
+                             std::string& out)
+{
+    std::array<char, kBracketedTimestampPrefixBytes> rendered{};
+    const std::size_t written{render_transport_prefix(row, stamp, std::span<char>{rendered})};
+    if (written == 0U)
+        return false;
+    out.append(rendered.data(), written);
     return true;
 }
 
