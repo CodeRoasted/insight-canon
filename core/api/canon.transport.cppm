@@ -53,8 +53,8 @@ export namespace insight::transport
 // ship makes the fourth shape.
 inline constexpr std::string_view kTransportCatalogVersion{"transport-catalog-3"};
 
-// ⚠ NORMATIVE — CATALOGUE ENUM VALUES ARE IDENTITY-BEARING: NEW MEMBERS APPEND (ADR-2
-// clause 2.2). A value is never renumbered and never inserted mid-enum. Both enums below serialize
+// ⚠ NORMATIVE — CATALOGUE ENUM VALUES ARE IDENTITY-BEARING: NEW MEMBERS APPEND
+// (`ADR-2.D7`). A value is never renumbered and never inserted mid-enum. Both enums below serialize
 // as their `uint8_t` VALUE on every row (`compose.cpp`), so inserting a member in the middle shifts
 // the serialized byte of EVERY EXISTING ROW — the digest moves for rows nobody touched, and it
 // moves SILENTLY: the diff is one line, the compiler says nothing, and no reviewer would attribute
@@ -94,7 +94,8 @@ enum class TransportTransformKind : std::uint8_t
     // width: `[` + the shared full-datetime grammar (`insight::utils::rfc3339_datetime_length` —
     // the one owner, bibles/jenkins_dialect.md §4 item 3) + `]`, then the declared separator/
     // indentation strip. The Jenkins Timestamper plugin's whole-stream scoping is the attested
-    // population (12/113 in jenkins-markers/v2, ADR-23 Part 2), and the row landed exactly where
+    // population (12 of the 113 `jenkins-markers/v2` logs; the scoping split is provenance, and
+    // `ADR-23.O2` is where it is routed), and the row landed exactly where
     // the earlier refusal said it could not YET land: WITH its algorithm, its row and its gate
     // (G-T5-PEEL — a real population and a real frozen oracle, the shipped strategy strip frozen
     // per ADR-8 since this cut deletes it). Admissibility argument:
@@ -159,8 +160,8 @@ struct TransportTransformRow
 // That oracle was `GitHubActionsStrategy`'s peel; T4 deleted the detection, and the oracle is now
 // FROZEN inside G1-PEEL itself (ADR-8), where it still scores this row over 22 490 937 lines.
 //
-// THE NAME IS DELIVERY-SHAPED, NOT ECOSYSTEM-SHAPED, and that is load-bearing twice over. ADR-23
-// §3 is the reason the row lives here at all: the catalogue is orthogonal to the dialect packages
+// THE NAME IS DELIVERY-SHAPED, NOT ECOSYSTEM-SHAPED, and that is load-bearing twice over.
+// `ADR-23.D3` is the reason the row lives here at all: the catalogue is orthogonal to the packages
 // because this prefix is a property of the *delivery*, not of the GHA *dialect* — so naming the row
 // after an ecosystem would contradict the argument that placed it in core. ADR-17 (SRC-SP-1)
 // independently forbids an ecosystem literal in the core mechanism, and the two together leave
@@ -178,7 +179,9 @@ inline constexpr std::array<TransportTransformRow, 3> kTransportCatalogRows{{
     // The bracketed variable-width form (T5 §2.1). Delivery-shaped name, same argument as the row
     // above; Jenkins-Timestamper provenance lives HERE in prose, never in the identifier. The
     // greedy `[ \t]+` strip reproduces the shipped strategy's bundled behavior #3 byte-exactly
-    // because ADR-23 verdict (a) requires items 2–4 reproduced — NOT because the strip's merit
+    // because `ADR-23.D6` makes peel-equivalence the obligation this row owes, and the bundled
+    // behaviours 2–4 are the enumeration it is measured against (executed record, routed by
+    // `ADR-23.O2`) — NOT because the strip's merit
     // is settled: that question stays PARKED, measurement-gated (flaws.md Eqya·9), and this row
     // does not move shipped canonicalization as a second change in its pass. `prefix_width` unread
     // (variable width — the acceptor computes it from the shared grammar). The shipped strictness

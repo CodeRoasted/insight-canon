@@ -416,9 +416,10 @@ namespace detail
 
 namespace detail
 {
-    // The outcome-token variant of first_prefix_dup: keyed on .token + intersecting gate (ADR-17
-    // §3.3 — two packages mapping the SAME token under intersecting gates is a conflict, whatever
-    // the mapped outcome; a duplicate row has no deterministic resolution either way).
+    // The outcome-token variant of first_prefix_dup: keyed on .token + intersecting gate.
+    // `ADR-17.D2` — exact-duplicate keys fail the build or startup, UNCONDITIONALLY: two packages
+    // mapping the SAME token under intersecting gates is a conflict whatever the mapped outcome,
+    // because a duplicate row has no deterministic resolution either way.
     [[nodiscard]] constexpr std::optional<std::string_view>
     first_outcome_token_dup(std::span<const SemanticPackageManifest> packages) noexcept
     {

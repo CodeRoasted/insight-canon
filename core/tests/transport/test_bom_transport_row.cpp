@@ -320,7 +320,7 @@ TEST(BomTransportRow, RowAppendsAtTheEndOfTheCatalogAndTheEnumIsNotRenumbered)
            "semantic_identity, so inserting one shifts the serialized bytes of rows nobody touched "
            "— and it does so SILENTLY: the diff is one line and the compiler says nothing.";
 
-    // ⚠ THE ENUM'S NUMERIC VALUES ARE THE SERIALIZED BYTES (ADR-2 clause 2.2 —
+    // ⚠ THE ENUM'S NUMERIC VALUES ARE THE SERIALIZED BYTES (`ADR-2.D7` —
     // identity-bearing, new members APPEND, never renumber, never insert mid-enum). The sibling
     // suite pins each row's kind SYMBOLICALLY, which cannot see a renumbering at all: renaming
     // nothing and renumbering everything leaves every symbolic assert green while every golden in

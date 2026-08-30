@@ -6,8 +6,8 @@ import insight.canon.api;
 import insight.canon.spi; // the composed row types (StructuralRoleRow / IntentMarkerRow / LocationRow)
 import insight.canon.compose; // ComposedSemantics
 
-// semantic_walkers.cpp — the dialect-recognition ALGORITHMS over the composed vocabulary (ADR-17
-// §3). Canon owns these algorithms; the composed rows (from the semantic packages) are the DATA.
+// semantic_walkers.cpp — the dialect-recognition ALGORITHMS over the composed vocabulary
+// (`ADR-17.D1`). Canon owns these algorithms; the composed rows (from the packages) are the DATA.
 // Homed as a facade impl unit (module insight.canon) because they consume ComposedSemantics, which
 // imports api — so they cannot live in api. Ported byte-for-byte from the pre-split hardcoded
 // StructuralRoleRegistry::classify / IntentMarkerRegistry::recognize / recognize_location so the

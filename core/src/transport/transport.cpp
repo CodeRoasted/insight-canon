@@ -4,9 +4,10 @@ module insight.canon.transport;
 import insight.canon.internal;
 import insight.canon.api;
 
-// transport.cpp — the transform ALGORITHMS and the fail-closed declaration resolution (ADR-23
-// §4/§6). Canon owns every algorithm; the catalogue owns only rows. A new transform kind is a
-// catalogue-version bump with its algorithm landing here, never a package-local peel.
+// transport.cpp — the transform ALGORITHMS (`ADR-23.D3`) and the fail-closed declaration
+// resolution (`ADR-23.D4`). Canon owns every algorithm; the catalogue owns only rows. A new
+// transform kind is a catalogue-version bump with its algorithm landing here, never a
+// package-local peel.
 
 namespace insight::transport
 {
@@ -67,7 +68,9 @@ namespace
     // two-implementations defect this whole contract is about).
     // Shared by both prefix kinds: the post-stamp separator/indentation strip (greedy `[ \t]+`,
     // leading only). For the bracketed kind this reproduces the deleted JenkinsStrategy's bundled
-    // behavior #3 BYTE-EXACTLY (ADR-23 verdict (a); the merit question stays parked in flaws.md).
+    // behavior #3 BYTE-EXACTLY (`ADR-23.D6` — peel-equivalence is the obligation; the bundled
+    // enumeration it is measured against is executed record, routed by `ADR-23.O2`. The merit
+    // question stays parked in flaws.md).
     void strip_separator(const TransportTransformRow& row, RawPeeledLine& peeled) noexcept
     {
         if (!row.strip_leading_space)
