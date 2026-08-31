@@ -118,7 +118,7 @@ int main(int argc, char** argv)
     // runs of ONE binary on ONE input differ. Measured 2026-08-18 on the `malf inventory` build,
     // back when an un-initialised canon resolved to spdlog's default STDOUT logger: 18 such lines
     // on stdout for a 6-line input. det_public_proof.sh's cells compiled the macros out
-    // (`-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF`, scripts/det_public_proof.sh:138), which is why
+    // (`-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF` in `scripts/det_public_proof.sh`), which is why
     // the release legs never saw it, while the inventory build, scripts/samples_showcase.sh and a
     // desk run all got the corrupting default.
     //

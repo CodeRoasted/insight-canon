@@ -17,7 +17,7 @@
 //
 // HOMING (Kleio). UNIT, in `tests/compose/` — not `tests/transport/` and not a corpus gate.
 //   • Not transport's suite: the property is about what `resolve_stream` does to a COMPOSITION, and
-//     `resolve_stream` is compose's (compose.cpp:250). Transport's suite owns the peel's shape.
+//     `resolve_stream` is compose's (`compose.cpp`). Transport's suite owns the peel's shape.
 //   • Not a corpus gate: real bytes cannot make this property more true. `semantic_identity` is a
 //     hash of the RULESET, computed before the first line is read — it is not a function of any
 //     input bytes at all, so scoring it over 22 000 logs would measure nothing the empty

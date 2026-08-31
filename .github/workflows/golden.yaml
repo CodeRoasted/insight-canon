@@ -64,8 +64,9 @@ jobs:
       # `if(EXISTS a) else(b)` succeeds in BOTH environments while being right in one, and
       # nothing downstream can tell which it picked. A package's relative fallback anchors on the
       # DESK layout alone; CI is the environment that can declare, so it declares. The same
-      # conclusion was already reached from the other end at conan_module.sh:45-51, with the
-      # reason written at that site: the sibling fallback is unreachable under `conan create`.
+      # conclusion was already reached from the other end at `F-SRC-malf:conan_module.sh`,
+      # with the reason written at that site: the sibling fallback is unreachable under
+      # `conan create`.
       #
       # TRUE BY CONSTRUCTION here — this job checks malf-toolchain out at `path: malf`, which is
       # `github.workspace`/malf by definition of actions/checkout.
@@ -173,8 +174,9 @@ jobs:
       # `if(EXISTS a) else(b)` succeeds in BOTH environments while being right in one, and
       # nothing downstream can tell which it picked. A package's relative fallback anchors on the
       # DESK layout alone; CI is the environment that can declare, so it declares. The same
-      # conclusion was already reached from the other end at conan_module.sh:45-51, with the
-      # reason written at that site: the sibling fallback is unreachable under `conan create`.
+      # conclusion was already reached from the other end at `F-SRC-malf:conan_module.sh`,
+      # with the reason written at that site: the sibling fallback is unreachable under
+      # `conan create`.
       #
       # TRUE BY CONSTRUCTION here — this job checks malf-toolchain out at `path: malf`, which is
       # `github.workspace`/malf by definition of actions/checkout.
