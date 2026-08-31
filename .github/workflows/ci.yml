@@ -16,7 +16,7 @@ jobs:
       # canon is a tower root (no first-party deps to vendor). Post-ADR-17 it is a MULTI-package
       # repo: the core under core/ (the logcraft/server layout — the repo root is the shelf), the three
       # semantic vocabulary packages under semantic/ (github, gitlab, jenkins, test_frameworks), and the composed
-      # bench harness under bench/. Dependency-ordered — each row's `create` publishes into the local
+      # bench harness under benchmarks/. Dependency-ordered — each row's `create` publishes into the local
       # cache so the next row's `conan install` resolves it; the semantic packages `require insight_canon`
       # and the bench requires ALL THREE, so the order below is load-bearing (a missing semantic row =
       # the bench falls through to remotes and the release build reds — keep this list 1:1 with

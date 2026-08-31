@@ -325,7 +325,7 @@ if(INSIGHT_CANON_BUILD_TESTS)
     endif()
 endif()
 
-# Benchmarks moved to the sibling `bench/` leaf package (insight_canon_bench, ADR-17.D8 · SRC-SP-5):
+# Benchmarks moved to the sibling `benchmarks/` leaf package (insight_canon_bench, ADR-17.D8 · SRC-SP-5):
 # the composed perf gate links the semantic packages, which the core build must
 # never do (SRC-SP-1 / R1
 # dependency arrow). The bench consumes canon externally (the det_proof shape), so the white-box

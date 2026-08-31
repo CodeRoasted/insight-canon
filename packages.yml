@@ -1,7 +1,7 @@
 packages:
   # Core in core/ (the logcraft/server layout): the repo root is the SHELF (README/LICENSE/
   # workflows/packages.yml/scripts/proof), the tree reads like the architecture —
-  # core/ = the language, semantic/* = the vocabularies, bench/ = the composed perf harness.
+  # core/ = the language, semantic/* = the vocabularies, benchmarks/ = the composed perf harness.
   insight_canon:
     path: core
     version: 1.10.3
@@ -46,7 +46,7 @@ packages:
   # Built + run by `malf bench`
   # and the on-tag measure-benchmark gate; never published as a release artifact.
   insight_canon_bench:
-    path: bench
+    path: benchmarks
     version: 1.10.3
     license: Apache-2.0
     public: true

@@ -15,7 +15,7 @@
 # ── Scope ──────────────────────────────────────────────────────────────────────
 # Core only: core/src + core/api (the mechanism + its public/provider surface). Excluded:
 #   * semantic/          — the packages; they OWN the vocabulary (that is the point)
-#   * bench/ proof/      — composition consumers BY DESIGN (they name package manifests)
+#   * benchmarks/ proof/ — composition consumers BY DESIGN (they name package manifests)
 #   * core/tests/        — test bodies exercise universal mechanisms with ecosystem-shaped
 #                          inputs (incl. absence assertions) — not the mechanism
 #   * build*/            — generated
@@ -43,7 +43,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CANON="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$CANON"
 
-# Core scan roots (the mechanism + its contract surface). semantic/, bench/, proof/ deliberately absent.
+# Core scan roots (the mechanism + its contract surface). semantic/, benchmarks/, proof/ deliberately absent.
 SCAN_ROOTS=(core/src core/api)
 
 # The deny-list: BEHAVIORAL ecosystem literals as they appear in CODE. Deliberately NOT the

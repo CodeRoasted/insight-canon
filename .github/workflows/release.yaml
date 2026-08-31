@@ -50,11 +50,11 @@ jobs:
         insight_semantic_gitlab:semantic/gitlab
         insight_semantic_jenkins:semantic/jenkins
         insight_semantic_test_frameworks:semantic/test_frameworks
-      # The composed bench harness (bench/ — insight_canon_bench, release:false) is BUILT + RUN by
+      # The composed bench harness (benchmarks/ — insight_canon_bench, release:false) is BUILT + RUN by
       # measure-benchmark but never published; its first-party deps resolve as workspace editables
-      # from this same tag checkout (measure-benchmark runs `malf bench bench`).
+      # from this same tag checkout (measure-benchmark runs `malf bench benchmarks`).
       benchmark: 'insight_canon_bench=insight-canon'
-      benchmark-subdir: bench
+      benchmark-subdir: benchmarks
     secrets: inherit
 
   # THE SHOWCASE ACT MOVED OUT OF THIS REPO, 2026-08-21 (ADR-33.D8 discharge 1, on the Founder's

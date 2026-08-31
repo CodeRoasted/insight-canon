@@ -8,10 +8,10 @@ design — this repo is the verifiable half of the determinism claim.
 ## Arrival
 
 - Build/test: `malf build` / `malf test` from the repo root (dependency-ordered:
-  core → semantic/* → bench), or per package dir.
+  core → semantic/* → benchmarks), or per package dir.
 - Layout: `core/` = the `insight_canon` package (the language);
   `semantic/<dialect>/` = per-dialect vocabulary packages (rule rows + code
-  tier); `bench/` = the composed perf harness (application package, never
+  tier); `benchmarks/` = the composed perf harness (application package, never
   released); `proof/` = the determinism-proof harness. Packages and deps:
   `packages.yml`.
 - Docs: `technical_docs/README.md` — masking, classification, formats,
@@ -26,7 +26,7 @@ design — this repo is the verifiable half of the determinism claim.
 - Semantic packages are one module interface unit each, NO partitions — the
   cross-package BMI closure must not deepen (`packages.yml` states the rule).
 - `core` never links a vocabulary package; anything needing composed semantics
-  (the perf gate included) lives in `bench/` or downstream.
+  (the perf gate included) lives in `benchmarks/` or downstream.
 - Onboarding a new dialect touches ~30 points across 6 repos — follow the
   superproject's `OPS-2` (present only in a full workspace checkout), never
   memory.
