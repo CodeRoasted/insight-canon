@@ -216,8 +216,8 @@ namespace
 // the accepted form's.
 //
 // THE BASELINE ALL THREE FIGURES ARE A FRACTION OF: `Tokenizer::process_line` over the non-OTEL
-// nested-JSON workload (`BM_TokenizationThroughputNestedJson`, insight-canon/benchmarks), 1000 lines per
-// iteration, 2 independent builds x 7 repetitions, clang-21/libc++ release, one box. That
+// nested-JSON workload (`BM_TokenizationThroughputNestedJson`, insight-canon/benchmarks), 1000
+// lines per iteration, 2 independent builds x 7 repetitions, clang-21/libc++ release, one box. That
 // population — structured JSON that reaches the simdjson slow path and carries no OTEL field — is
 // the one charged for this probe, and the percentages below are of ITS per-line tokenize cost,
 // not of a window, a pipeline stage, or the product path.
