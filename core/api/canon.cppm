@@ -80,10 +80,43 @@ class Tokenizer
     [[nodiscard]] std::expected<CanonicalEvent, std::string>
     process_line(std::string_view raw_line);
 
-    // Like process_line() but skips the arena copy of the raw line.
-    // The caller guarantees that stable_line (and all string_views sliced from
-    // it by the format strategy) remain valid for the arena's lifetime, e.g.
-    // lines from a mmap'd file or a pre-stored arena buffer.
+    // THE STABLE DOOR. Two things separate it from process_line, and only one of them is the arena
+    // copy — reading it as "process_line minus a memcpy" is the misreading this declaration exists
+    // to close.
+    //
+    // WHAT IT DOES NOT DO: stage 1. This door performs NO normalization at all, deliberately, and
+    // its answers — the strategy's projection, the level lift, the structural role, the intent
+    // marker — are therefore functions of the caller's PRESENTATION bytes. It exists so the
+    // echoed-source demotion can read the SGR command-echo wrapper that stage 1 destroys, on a
+    // path that holds ONE view and hands it to both the strategy and the detector. The two
+    // preconditions do not compose on that single view: normalize() rewrites an ESC-bearing line
+    // into a scratch buffer the next line reuses, so a normalized view is not stable, and making
+    // it stable costs exactly the copy this door avoids. The plausible wrong fix is named so
+    // nobody rediscovers it: routing this path through process_line restores stage 1 and silently
+    // deletes the echoed-source register. A caller handing presentation-bearing bytes to this door
+    // gets a silently coarser answer, and that is the door's price, not a defect.
+    //
+    // ITS REAL PRECONDITION IS BYTE LIFETIME, NOT NORMALIZATION, and stated as the actual
+    // condition rather than the proxy: every read of the returned CanonicalEvent
+    // happens-before the caller's bytes die or the arena resets, whichever comes first. The event
+    // and every string_view the format strategy sliced from `stable_line` view those bytes; canon
+    // copies none of them. "Valid for the arena's lifetime" is a PROXY for that, and it is only
+    // ever true because today's callers reset the arena in the same call that reads the event —
+    // it is not the condition itself, and a caller that held an event past its line would satisfy
+    // the proxy's words while breaking the door.
+    //
+    // WHY THIS IS PROSE AND NOT A TYPE, which is the question NormalizedContent's existence
+    // invites. Canon PERFORMS stage 1, so canon can attest it, and the mint's friend list is a
+    // real audit surface. Canon cannot know a caller-side lifetime. A token carrying this
+    // precondition would be an attestation the CALLER mints — it would compile whether or not it
+    // were true, and would prove strictly less than NormalizedContent while wearing its shape.
+    // The measurement, not an assumption: the violation class is empty today. All three call sites
+    // are in insight-eidos's pipeline (ingest_stable_line, ingest_stable_line_and_analyze_due_
+    // windows, ingest_peeled_stable_line_and_analyze_due_windows) and all three reset the arena in
+    // the same call, after the last read. Downstream of them every retention is a copy, verified
+    // four frames deep to insight-metalog's TemplateRegistry::intern, whose table_ maps to
+    // std::string. Empty by measurement is not empty by construction, and nothing but this text
+    // holds the difference.
     [[nodiscard]] std::expected<CanonicalEvent, std::string>
     process_stable_line(std::string_view stable_line);
 
