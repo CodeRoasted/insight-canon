@@ -633,9 +633,9 @@ namespace
     // words ("deadbeef", "cafe") literal — only genuinely high-card hashes mask.
     [[nodiscard]] inline bool is_uuid_or_long_hash(std::string_view tok) noexcept
     {
-        static constexpr std::size_t kUuidLen{36};
+        constexpr std::size_t kUuidLen{36};
         static constexpr std::size_t kUuidDash1{8}, kUuidDash2{13}, kUuidDash3{18}, kUuidDash4{23};
-        static constexpr std::size_t kMinHashLen{16};
+        constexpr std::size_t kMinHashLen{16};
         if (tok.size() == kUuidLen && tok[kUuidDash1] == '-' && tok[kUuidDash2] == '-' &&
             tok[kUuidDash3] == '-' && tok[kUuidDash4] == '-')
         {
@@ -724,41 +724,131 @@ namespace
         return true;
     }
 
-    // D-TID-12 #3, reached INSIDE a token: mask a UUID (8-4-4-4-12) or a long hex-run
-    // (≥ 16, delimiter-bounded) that is EMBEDDED in a larger token — temp-dir paths
-    // (`/…/_temp/<uuid>/cache.tzst`), `git-credentials-<uuid>.config`, `{worker-uuid}`,
+    // ── The two FIXED-LENGTH embedded-identity grammars ──────────────────────────────
+    // Both are file-local and PRIVATE, both are pure byte scans at a token offset, and both
+    // are free functions rather than lambdas inside their one caller: nested in
+    // `normalize_embedded_identity` they carried its cognitive complexity past the 25 the
+    // doctrine enforces, and hoisting is the root fix where a NOLINT would have been the
+    // paper-over.
+    constexpr std::size_t kUuidLen{36};
+    constexpr std::array<std::size_t, 4> kUuidDashes{8, 13, 18, 23};
+    constexpr std::size_t kMinHashLen{16};
+
+    // A UUID (8-4-4-4-12 hex-with-dashes) starting exactly at `pos`.
+    [[nodiscard]] inline bool uuid_at(std::string_view tok, std::size_t pos) noexcept
+    {
+        if (pos + kUuidLen > tok.size())
+            return false;
+        for (std::size_t off{0}; off < kUuidLen; ++off)
+        {
+            const bool is_dash{off == kUuidDashes[0] || off == kUuidDashes[1] ||
+                               off == kUuidDashes[2] || off == kUuidDashes[3]};
+            if (is_dash ? (tok[pos + off] != '-') : !is_hex_char(tok[pos + off]))
+                return false;
+        }
+        return true;
+    }
+
+    // THE COMPACT UTC INSTANT GRAMMAR — file-local and PRIVATE on purpose, and deliberately
+    // NOT delegated to `insight::utils::rfc3339_datetime_length` (canon.api.cppm), the shared
+    // public RFC3339 grammar. That grammar requires COLONS in the time, so admitting this
+    // colon-free profile would mean WIDENING it — and a shared grammar's blast radius is its
+    // CONSUMER SET, which here is four live consumers on three axes: the transport
+    // bracket-peel row and `has_stamp_at_head` (transport.cpp), both of which decide CONTENT
+    // vs TRANSPORT; the `bracket_timestamp` composite above; and two frozen measurement
+    // oracles (test_bracket_peel_equivalence_gate.cpp,
+    // t5_payload_stamp_template_measurement_test.cpp) that re-implement the position logic
+    // AROUND it. Widening moves a Jenkins/GitHub content boundary and quietly falsifies
+    // `has_stamp_at_head`'s stated `kMinDatetimeLen{19}` invariant (18 < 19) — none of it
+    // visible to a masking-focused review. This grammar has ONE caller, in this translation
+    // unit, so it earns no public seat: it moves to canon.api.cppm the day a second consumer
+    // OUTSIDE this file needs it, which is the same criterion, byte for byte, that put
+    // `rfc3339_datetime_length` there.
+    //
+    // 18 bytes, no options and no variable-length part:
+    //   DIGIT{4} '-' DIGIT{2} '-' DIGIT{2} 'T' DIGIT{6} 'Z'
+    // ISO-8601 EXTENDED date + BASIC (colon-free) time + MANDATORY `Z`. Each anchor is
+    // load-bearing. `Z` is the RIGHT-HAND anchor: dropping it admits the 17-byte zoneless form
+    // and leaves the token with no literal terminator. No fraction, so the length stays fixed
+    // and the hot path needs no run scan, for zero measured instances. The colon-bearing
+    // extended form is a different owner's grammar and stays out of this one.
+    constexpr std::size_t kInstantLen{18};
+    constexpr std::size_t kInstantDash1{4};
+    constexpr std::size_t kInstantDash2{7};
+    constexpr std::size_t kInstantTimeMark{10};
+    constexpr std::size_t kInstantZulu{17};
+
+    // DELIMITER-GATED ON BOTH SIDES, symmetrically. The byte before the match (when one
+    // exists) and the byte after it (when one exists) must both be non-alphanumeric, so
+    // `12026-06-09T185733Z` does not match from offset 1 and `2026-06-09T185733Zebra` is
+    // declined at the right edge. Both bounds are what make the 18 bytes a whole token rather
+    // than a window slid over a longer name.
+    [[nodiscard]] inline bool compact_instant_at(std::string_view tok, std::size_t pos) noexcept
+    {
+        if (pos + kInstantLen > tok.size())
+            return false;
+        if (pos > 0 && (is_digit(tok[pos - 1U]) || is_alpha(tok[pos - 1U])))
+            return false;
+        const std::size_t after{pos + kInstantLen};
+        if (after < tok.size() && (is_digit(tok[after]) || is_alpha(tok[after])))
+            return false;
+        if (tok[pos + kInstantDash1] != '-' || tok[pos + kInstantDash2] != '-' ||
+            tok[pos + kInstantTimeMark] != 'T' || tok[pos + kInstantZulu] != 'Z')
+            return false;
+        for (std::size_t off{0}; off < kInstantLen; ++off)
+        {
+            const bool literal{off == kInstantDash1 || off == kInstantDash2 ||
+                               off == kInstantTimeMark || off == kInstantZulu};
+            if (!literal && !is_digit(tok[pos + off]))
+                return false;
+        }
+        return true;
+    }
+
+    // D-TID-12 #3, reached INSIDE a token: mask a UUID (8-4-4-4-12), a long hex-run
+    // (≥ 16, delimiter-bounded) or a COMPACT UTC INSTANT (`2026-06-09T185733Z`) that is
+    // EMBEDDED in a larger token — temp-dir paths (`/…/_temp/<uuid>/cache.tzst`,
+    // `/…/_temp/<instant>.json`), `git-credentials-<uuid>.config`, `{worker-uuid}`,
     // `builder-<uuid>` — keeping the surrounding path/structure, masking the identity
     // instance (the same keep-class/mask-instance pattern as source-location). A UUID is
     // a UUID whether standalone or in a path; this is the largest re-measured residual
     // chunk and is squarely a SYNTACTIC class (SRC-D-TID-14), not a varying word.
+    //
+    // The instant arm (-13) is admissible where `is_opaque_identity` (-10, reverted) was not,
+    // and the difference is structural rather than one of degree: this is a CLOSED grammar
+    // pinned by literal bytes at fixed offsets, and every member of its acceptance set is,
+    // by ISO-8601's own semantics, an INSTANCE value — no stable name can inhabit it. A
+    // producer writing `2026-06-09T185733Z` CHOSE an encoding to say "this is an instant";
+    // reading that back is recognition, not inference from shape. The sibling nobody may add
+    // on the same reasoning is an embedded long-DIGIT-run arm: `qtp615117857` (a Jetty thread
+    // name, ephemeral) and `playwright-frontend-coverage-17364829102` (a GitHub run id in an
+    // artifact name, ephemeral) and `QUICKCONTROLS2` (stable, must NOT mask) are the same
+    // shape, and no parameter separates them.
     [[nodiscard]] inline bool normalize_embedded_identity(std::string_view tok, std::string& out)
     {
-        static constexpr std::size_t kUuidLen{36};
-        static constexpr std::array<std::size_t, 4> kUuidDashes{8, 13, 18, 23};
-        static constexpr std::size_t kMinHashLen{16};
-        const auto uuid_at{
-            [&](std::size_t pos) -> bool
-            {
-                if (pos + kUuidLen > tok.size())
-                    return false;
-                for (std::size_t off{0}; off < kUuidLen; ++off)
-                {
-                    const bool is_dash{off == kUuidDashes[0] || off == kUuidDashes[1] ||
-                                       off == kUuidDashes[2] || off == kUuidDashes[3]};
-                    if (is_dash ? (tok[pos + off] != '-') : !is_hex_char(tok[pos + off]))
-                        return false;
-                }
-                return true;
-            }};
         out.clear();
         bool masked{false};
         std::size_t pos{0};
+        // The three arms below are DISJOINT BY CONSTRUCTION, and their order is a COST choice,
+        // never a precedence claim — stating it as precedence would be a false comment. A UUID
+        // requires `-` at offset 8 where an instant requires a DIGIT there and `T` at offset 10;
+        // a hex run requires ≥ 16 CONSECUTIVE hex bytes where an instant requires `-` at
+        // offset 4. Both fixed-length probes therefore run before the variable-length run scan
+        // purely because they are cheaper. The DETECTOR for that disjointness is
+        // `StatelessTemplate.EmbeddedIdentityArmsAreDisjoint`, not this paragraph.
         while (pos < tok.size())
         {
-            if (uuid_at(pos))
+            if (uuid_at(tok, pos))
             {
                 out.append(kWildcard);
                 pos += kUuidLen;
+                masked = true;
+                continue;
+            }
+            if (compact_instant_at(tok, pos))
+            {
+                out.append(kWildcard);
+                pos += kInstantLen;
                 masked = true;
                 continue;
             }
@@ -833,6 +923,12 @@ namespace
     // the single enumerable place that rule can be stated (closing the SRC-D-TID-16 "rules changed,
     // version didn't" gap for the rule set itself). Each entry names its governing ruling + the
     // generation that introduced it.
+    // THE CATALOG'S SHAPE IS ONE LIMB OF THE OBLIGATION, NOT ALL OF IT. Widening an existing
+    // rule's ACCEPTANCE SET in place — a new arm inside a normalizer, a moved threshold — leaves
+    // this array byte-identical and is output-affecting just the same, so it owes the same bump.
+    // Read only for add/reorder/remove, this comment would license a silent identity change:
+    // `stateless-masks-13` (the compact-UTC arm inside `normalize_embedded_identity`) is exactly
+    // that case, and it never touched a row below.
     struct CompositeRule
     {
         std::string_view name; // stable rule id (diagnostics / the canon bible)

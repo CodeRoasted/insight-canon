@@ -342,10 +342,11 @@ TEST(StatelessTemplate, CurrencyMarkerNumberMasked)
 // cafe literal", mask.cpp) was asserted nowhere. Pinning a threshold requires EXACT
 // template strings on BOTH sides of the boundary — literal at floor-1, `<*>` at floor.
 //
-// kMinHashLen is declared TWICE (two independent function-local copies): in
-// `is_uuid_or_long_hash` (the standalone whole-token path, dispatch step 3) and in
-// `normalize_embedded_identity` (composite rule #7, a delimiter-bounded run inside a
-// larger token). A guard on one leaves the other free to drift, so both are pinned.
+// kMinHashLen is declared TWICE, as two independent copies: a function-local one in
+// `is_uuid_or_long_hash` (the standalone whole-token path, dispatch step 3), and a
+// file-scope one shared by `normalize_embedded_identity` (composite rule #7, a
+// delimiter-bounded run inside a larger token). A guard on one leaves the other free to
+// drift, so both are pinned.
 //
 // These assert CURRENT SHIPPED BEHAVIOUR; they do not argue the floor is correct.
 // The value is not tunable by a threshold study — a red here means
@@ -865,6 +866,164 @@ TEST(StatelessTemplate, HexTokensStillMaskViaDigitLeadingAfterTheRuleFiveRip)
                "ONLY thing that can catch it. If this KEEPS, the rip was not behaviour-preserving "
                "and digit-leading is not the cover it was measured to be.\n  actual: "
             << masked;
+    }
+}
+
+// ── The COMPACT UTC INSTANT arm (kCanonicalizationVersion stateless-masks-13) ────────
+// The third alphabet arm of `normalize_embedded_identity`: an ISO-8601 EXTENDED date +
+// BASIC (colon-free) time + mandatory `Z`, exactly 18 bytes, delimiter-bounded on both
+// sides. It closed 16 of 17 hand-read false alerts on the v1.10.2 GitHub Actions bench,
+// where `/home/runner/work/_temp/<instant>.json` entered template identity verbatim and
+// made every run its own template. The three arms of that function are DISJOINT by
+// construction, which the last test here is the detector for.
+
+namespace
+{
+// The witness, byte-exact. `/home/runner/work/_temp` is deliberately NOT a declared
+// ephemeral root: its direct children are a MIX of per-run instances and stable names
+// (`codeql_databases`, `setup-uv-cache`), so declaring it would over-mask. The fix rides
+// on the CHILD's own grammar instead, which is why this is an alphabet arm and not a
+// kEphemeralRoots entry.
+constexpr std::string_view kInstantWitness{"/home/runner/work/_temp/2026-06-09T185733Z.json"};
+constexpr std::string_view kInstantWitnessMasked{"/home/runner/work/_temp/<*>.json"};
+constexpr std::size_t kInstantLen{18}; // the grammar's whole, fixed length
+} // namespace
+
+// GATE 1 — the RED that existed before the arm. At stateless-masks-12 this token came back
+// byte-identical, carrying `2026-06-09T185733Z` into `template_str` and into the
+// template_id hashed from it.
+TEST(StatelessTemplate, CompactUtcInstantMasksInsideAPath)
+{
+    ArenaAllocator arena{256U * 1024U};
+    ASSERT_EQ(std::string_view{"2026-06-09T185733Z"}.size(), kInstantLen)
+        << "fixture drift: the grammar is a FIXED 18 bytes and the witness must carry exactly "
+           "that many, else this test pins a different shape than the arm implements";
+
+    const std::string got{masked(kInstantWitness, arena)};
+    EXPECT_EQ(got, kInstantWitnessMasked)
+        << "a compact UTC instant embedded in a path must mask while the surrounding path is "
+           "KEPT — if it comes back verbatim the arm is gone and every run is its own "
+           "template again\n  input    : "
+        << kInstantWitness << "\n  expected : " << kInstantWitnessMasked
+        << "\n  actual   : " << got;
+}
+
+// GATE 2 — THE CAN'T-PASS CONTROL. A masking rule that cannot fail to mask is worthless,
+// so each row below is a NEAR MISS that must survive verbatim. Every one of them is a live
+// boundary of the grammar, and each is here because dropping it would enlarge the
+// acceptance set silently.
+//
+// READ THIS BEFORE "SIMPLIFYING" THE COLON ROW. `_2026-06-09T18:57:33Z.json` looks
+// gratuitously odd and it is not: the colon-bearing form written into a realistic path
+// (`/home/runner/work/_temp/2026-06-09T18:57:33Z.json`) is claimed UPSTREAM by
+// `diagnostic_composite` — its `:digit` trigger fires and the path supplies letter-leading
+// anchors — so such a token never reaches `embedded_identity` and asserting on it would
+// prove nothing about this arm. The leading `_` and the absence of any letter-leading
+// path segment are what make `diagnostic_composite` decline, so the compact-instant arm is
+// the only rule left that could claim it. That is the whole point of the row: it is the
+// binary proof that the arm refuses the colon-bearing profile, which is what keeps the
+// refusal to widen `insight::utils::rfc3339_datetime_length` true in the code and not
+// merely in prose.
+TEST(StatelessTemplate, CompactUtcInstantGrammarDeclinesEveryNearMiss)
+{
+    ArenaAllocator arena{256U * 1024U};
+    struct Row
+    {
+        std::string_view token;
+        std::string_view why;
+    };
+    for (const Row& row : {
+             Row{.token = "_2026-06-09T18:57:33Z.json",
+                 .why = "the COLON-BEARING extended form is a different owner's grammar "
+                        "(rfc3339_datetime_length) and this arm must never admit it"},
+             Row{.token = "/home/runner/work/_temp/2026-06-09T185733.json",
+                 .why = "no `Z` — the 17-byte zoneless form is a materially larger acceptance "
+                        "set and has no right-hand literal anchor"},
+             Row{.token = "/home/runner/work/_temp/2026-06-09T185733Zebra.json",
+                 .why = "RIGHT delimiter gate: the byte after the 18 is alphanumeric, so these "
+                        "are 18 bytes of a longer name, not a token"},
+             Row{.token = "/home/runner/work/_temp/12026-06-09T185733Z.json",
+                 .why = "LEFT delimiter gate: a valid instant sits at offset 1, and matching "
+                        "there would slide the window over a longer name"},
+         })
+    {
+        const std::string_view tok{row.token};
+        const std::string got{masked(tok, arena)};
+        EXPECT_EQ(got, tok) << "this token is a NEAR MISS and must survive VERBATIM — a grammar "
+                               "that accepts it is not the ruled grammar.\n  reason   : "
+                            << row.why << "\n  token    : " << tok << "\n  expected : " << tok
+                            << " (kept)\n  actual   : " << got;
+    }
+
+    // And the coordinate that keeps the row above from teaching a falsehood: in a REALISTIC
+    // path the colon-bearing form is not kept — it is masked by `diagnostic_composite`, one
+    // wildcard per `:`-separated segment. Pinned so a reader of this test does not conclude
+    // "the colon form is never masked", which is false, and so a claim about the masking
+    // boundary is written against what the binary does.
+    constexpr std::string_view kColonInPath{"/home/runner/work/_temp/2026-06-09T18:57:33Z.json"};
+    constexpr std::string_view kColonInPathMasked{"/home/runner/work/_temp/<*>:<*>:<*>"};
+    const std::string colon_got{masked(kColonInPath, arena)};
+    EXPECT_EQ(colon_got, kColonInPathMasked)
+        << "the colon-bearing form in a real path is claimed by diagnostic_composite, NOT by "
+           "the compact-instant arm — if this moved, the two rules now overlap and the "
+           "boundary the LIM row states is no longer the boundary the code draws\n  input    : "
+        << kColonInPath << "\n  expected : " << kColonInPathMasked
+        << "\n  actual   : " << colon_got;
+}
+
+// GATE 3 — DISJOINTNESS AS AN INSTRUMENT, not as a comment. `normalize_embedded_identity`
+// runs three arms in one left-to-right scan, and their ORDER is a cost choice rather than a
+// precedence: no token can be claimed by two, because three literal bytes forbid every
+// pair. A UUID requires `-` at offset 8 where an instant requires a DIGIT there and `T` at
+// offset 10; the hex arm requires >= 16 CONSECUTIVE hex bytes where an instant requires `-`
+// at offset 4. A declared limitation with no detector is a comment; with an arm it is an
+// instrument — so the three shapes are put in ONE token and the exact output is pinned. If
+// a future arm overlaps any of them, the byte output moves and this fails loudly.
+TEST(StatelessTemplate, EmbeddedIdentityArmsAreDisjoint)
+{
+    ArenaAllocator arena{256U * 1024U};
+    // A UUID, a 20-char hex run and a compact instant, in that order, inside one path token.
+    // `/var/cache` is deliberately not a declared ephemeral root and the token carries no
+    // `:digit`, so rules 1-6 all decline and embedded_identity is genuinely the rule under
+    // test (otherwise this pin would be vacuous).
+    constexpr std::string_view kAllThree{"/var/cache/f7f63412-b7a7-468d-bd31-1a6ae1ca2680/"
+                                         "deadbeefcafe0badf00d/2026-06-09T185733Z/x"};
+    constexpr std::string_view kAllThreeMasked{"/var/cache/<*>/<*>/<*>/x"};
+    const std::string got{masked(kAllThree, arena)};
+    EXPECT_EQ(got, kAllThreeMasked)
+        << "each of the three embedded-identity shapes must be claimed by EXACTLY ONE arm, "
+           "leaving exactly three wildcards and the surrounding path intact. A different "
+           "string here means two arms overlap, or one arm now eats a neighbour's bytes.\n"
+           "  input    : "
+        << kAllThree << "\n  expected : " << kAllThreeMasked << "\n  actual   : " << got;
+
+    // The negative half, one per pair, asserted where an overlap would first show: the
+    // instant must be claimed WHOLE (not partially eaten by the hex run scan, which would
+    // leave residue), and neither the UUID nor the hex run may be touched by the instant
+    // grammar (their outputs are unchanged from stateless-masks-12).
+    struct Row
+    {
+        std::string_view token;
+        std::string_view want;
+        std::string_view why;
+    };
+    for (const Row& row : {
+             Row{.token = "/var/cache/2026-06-09T185733Z/x",
+                 .want = "/var/cache/<*>/x",
+                 .why = "the instant is claimed WHOLE — a partial claim leaves digits behind"},
+             Row{.token = "/var/cache/f7f63412-b7a7-468d-bd31-1a6ae1ca2680/x",
+                 .want = "/var/cache/<*>/x",
+                 .why = "a UUID is still the UUID arm's; the instant grammar must not see it"},
+             Row{.token = "/var/cache/deadbeefcafe0badf00d/x",
+                 .want = "/var/cache/<*>/x",
+                 .why = "a >=16 hex run is still the hex arm's; the instant grammar must not "
+                        "see it"},
+         })
+    {
+        const std::string one{masked(row.token, arena)};
+        EXPECT_EQ(one, row.want) << "one shape, one arm, one wildcard.\n  reason   : " << row.why
+                                 << "\n  input    : " << row.token << "\n  expected : " << row.want
+                                 << "\n  actual   : " << one;
     }
 }
 

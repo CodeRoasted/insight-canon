@@ -120,7 +120,26 @@ using EventID = uint64_t;
 // output-affecting three times over. It is a CONTENT re-base under ADR-31, never a determinism
 // regression: two runs of THIS generation over the same bytes stay bit-identical, and old/new
 // documents are incomparable at the §2.4 gate by construction (re-derive, never migrate).
-inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-12"};
+// -13 = the COMPACT UTC INSTANT masking arm. `normalize_embedded_identity` gains a third
+// alphabet arm recognising an ISO-8601 EXTENDED date + BASIC (colon-free) time + mandatory `Z`
+// — exactly 18 bytes, delimiter-bounded on both sides — so an embedded instant masks to `<*>`
+// instead of entering template identity verbatim. The bump is owed because the RULE'S OWN
+// ACCEPTANCE SET widens; it is not a kCompositeRules add/reorder/remove, which is the same
+// clause reached by a different limb. Measured at the v1.10.2 cut over a 1 000-pair GitHub
+// Actions bench: 17 hand-read false alerts -> 1, 6/6 true incidents kept, 0 rows added
+// anywhere, HIGH+CRITICAL 104 -> 88. The arm is admissible where the reverted `is_opaque_identity`
+// (-10, burnt) was not, and the difference is structural: a CLOSED grammar pinned by literal
+// bytes at fixed offsets, every member of whose acceptance set is an INSTANCE value by
+// ISO-8601's own semantics — no stable name can inhabit it. `template_str`/`template_id` move
+// for lines carrying an embedded compact instant, and `params` moves for a line whose WHOLE
+// token is one (the token becomes a normalized literal rather than a masked parameter, so it
+// stops feeding metalog's param histograms while `template_str` stays `<*>`). Output-affecting,
+// and a CONTENT re-base under ADR-31 rather than a determinism regression: two runs of THIS
+// generation over the same bytes stay bit-identical, and old/new documents are incomparable at
+// the §2.4 gate by construction (re-derive, never migrate). The residue is declared, not
+// pending: a GitHub run id tailing an artifact name (`playwright-frontend-coverage-<run id>`)
+// is byte-isomorphic to stable names and gets NO masking fix.
+inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-13"};
 
 // ── Template identity (insight_perf_template_id.md SRC-D-TIR-1) ──
 // The structural identity of a canonicalised template: the first 16 bytes of
