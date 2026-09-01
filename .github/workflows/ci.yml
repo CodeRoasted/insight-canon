@@ -29,7 +29,7 @@ jobs:
         semantic/gitlab true true
         semantic/jenkins true true
         semantic/test_frameworks true true
-        bench true true
+        benchmarks true true
       # PUBLIC repo: sift-mode: public renders the Sift comment fork-safe (read-only token; a fork PR
       # can build here but post nothing) — the sift-post job below posts it.
       sift-mode: public
