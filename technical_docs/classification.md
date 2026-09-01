@@ -18,8 +18,15 @@ level from structured input ([formats.md](formats.md)); when it does not, canon 
 
 ### 1.1 Two-stage inference
 
-`infer_leading_log_level` scans the line **head** (≈ first 40 chars for the explicit token, ≈ 64 for the cue
-path) in two stages:
+`infer_leading_log_level` scans the line **head** — **40 bytes** for the explicit token
+(`kLeadingScanHead`), **128** for the cue path (`kKeywordHead`) — in two stages:
+
+> **Why the cue head is 128 and not 64.** A **verdict anchor can sit at the END of a long line**: a
+> deeply-namespaced CI test name pushes its `(FAILED)` anchor past column 64, so the strongest
+> available failure signal fell outside the old bound. The widening is measure-first — it is the fix
+> for a recall miss on `testTimeout (FAILED)`, which was this head bound and not the cue vocabulary.
+> The two heads are deliberately different sizes: an explicit level token is a **prefix**
+> convention, a cue is not.
 
 - **Stage 1 — explicit level token.** `parse_log_level` matches a level word:
 
