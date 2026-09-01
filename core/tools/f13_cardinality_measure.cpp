@@ -62,8 +62,9 @@ struct FileConsumption
 void print_usage(std::string_view program_name)
 {
     std::println(stderr, "usage: {} <corpus-dir> [max-lines]", program_name);
-    std::println(stderr,
-                 "  <corpus-dir>  directory of *.log files (the population; walked sorted)");
+    std::println(
+        stderr,
+        "  <corpus-dir>  root of a *.log tree (the population; walked RECURSIVELY, sorted)");
     std::println(stderr, "  [max-lines]   line budget (default {})", kDefaultMaxLines);
 }
 } // namespace
@@ -106,14 +107,22 @@ try
         return kExitUsage;
     }
 
+    // RECURSIVE, and the depth is not a convenience. A `directory_iterator` walks ONE level, so a
+    // corpus that nests its logs — `<corpus>/samples/logs/*.log`,
+    // `v2/pairs/<pair>/<arm>/console.log` — yielded zero matches and exited kExitEmptyPopulation,
+    // which reads as "nothing to report" rather than "never looked". Measured 2026-09-01:
+    // gcc-buildlog and gitlab-markers both returned an empty population at depth 1 while holding 36
+    // and 895 `*.log` files below it, and a masking measurement over them was silently narrowed to
+    // nothing. A gate with nothing to judge is green for the one reason that disqualifies it.
     std::vector<fs::path> files;
-    for (const auto& entry : fs::directory_iterator{corpus_dir})
+    for (const auto& entry : fs::recursive_directory_iterator{corpus_dir})
         if (entry.is_regular_file() && entry.path().extension() == ".log")
             files.push_back(entry.path());
     std::ranges::sort(files); // deterministic order for a fixed tree
     if (files.empty())
     {
-        std::println(stderr, "no *.log files under {}", corpus_dir.string());
+        std::println(stderr, "no *.log files anywhere under {} (walked recursively)",
+                     corpus_dir.string());
         return kExitEmptyPopulation;
     }
 
@@ -158,14 +167,20 @@ try
 
     // ── The population block: what was measured, declared, so the number is citable ──
     std::println("=== Stateless template_id cardinality (F13 re-measure) ===");
-    std::println("population       : {} of {} *.log files under {} (sorted walk)", consumed.size(),
-                 files.size(), corpus_dir.string());
+    std::println("population       : {} of {} *.log files under {} (recursive, sorted walk)",
+                 consumed.size(), files.size(), corpus_dir.string());
     std::println("line budget      : {}{}", max_lines,
                  total_lines >= max_lines ? " (EXHAUSTED — the population below is cap-shaped, "
                                             "not the whole tree)"
                                           : "");
+    // The path RELATIVE TO THE CORPUS ROOT, never the bare filename. Once the walk recurses, a
+    // filename stops identifying a file: a `pairs/<pair>/{baseline,changed}/console.log` layout
+    // prints the same nine characters for dozens of distinct populations, and a population block
+    // that cannot distinguish its own members is not a declaration. Relative rather than absolute
+    // so the block stays readable and does not leak the operator's tree into a citable report.
     for (const auto& record : consumed)
-        std::println("  {:>9} lines  {}{}", record.lines_consumed, record.path.filename().string(),
+        std::println("  {:>9} lines  {}{}", record.lines_consumed,
+                     record.path.lexically_relative(corpus_dir).generic_string(),
                      record.truncated_by_cap ? "  [TRUNCATED by the line budget]" : "");
     if (consumed.size() < files.size())
         std::println("  {} file(s) NOT REACHED (budget exhausted before them)",
