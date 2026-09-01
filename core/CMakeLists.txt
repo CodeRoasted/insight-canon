@@ -37,22 +37,33 @@ option(INSIGHT_CANON_ENABLE_NUMA  "Enable NUMA-aware arena allocation (libnuma, 
 # benchmark run against that tree. A perf instrument that turns itself on in release is worse than
 # no instrument.
 #
-# AUTO (the default) is recomputed from CMAKE_BUILD_TYPE at each configure, so an in-place build
-# type flip flips the instrument with it. An explicit ON/OFF still wins, so a release build can be
-# poisoned deliberately to reproduce a report, and a debug build can be un-poisoned to isolate a
-# perf question — both visible in the cache rather than inferred from flags.
+# AUTO (the default) is resolved by the CONFIGURATION being generated, never by a variable read at
+# configure time, so an in-place build-type flip flips the instrument with it AND a multi-config
+# generator gets it right per configuration (see the condition below). An explicit ON/OFF still
+# wins, so a release build can be poisoned deliberately to reproduce a report, and a debug build
+# can be un-poisoned to isolate a perf question — both visible in the cache rather than inferred
+# from flags.
 unset(INSIGHT_CANON_ARENA_POISON CACHE) # purge the sticky BOOL this replaces (see above)
 set(INSIGHT_CANON_ARENA_POISON_MODE AUTO CACHE STRING
-    "Arena reset-poison instrument: ON | OFF | AUTO (AUTO = ON for Debug builds only)")
+    "Arena reset-poison instrument: ON | OFF | AUTO (AUTO = ON for the Debug configuration only)")
 set_property(CACHE INSIGHT_CANON_ARENA_POISON_MODE PROPERTY STRINGS AUTO ON OFF)
+#
+# AUTO RESOLVES PER CONFIGURATION, NOT PER `CMAKE_BUILD_TYPE`, and that is the whole reason this is
+# a generator expression. `CMAKE_BUILD_TYPE` is EMPTY under a multi-config generator (an IDE:
+# Ninja Multi-Config, Visual Studio, Xcode), so a plain `if()` comparing that variable against
+# "Debug" takes its else() branch there ALWAYS — and this switch is not a log level: a Debug canon
+# would silently lose arena poisoning, the diagnostic that catches use-after-free on the arena,
+# absent in exactly the build where a developer expects it most. `$<CONFIG:Debug>` is evaluated per
+# configuration at GENERATE time and is correct under both generator kinds.
+#
+# The variable holds a CONDITION (`0`, `1`, or `$<CONFIG:Debug>`), never a boolean — hence the
+# name. `if(INSIGHT_CANON_ARENA_POISON_CONDITION)` would be a defect and reads like one.
 if(INSIGHT_CANON_ARENA_POISON_MODE STREQUAL "AUTO")
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        set(INSIGHT_CANON_ARENA_POISON ON)
-    else()
-        set(INSIGHT_CANON_ARENA_POISON OFF)
-    endif()
+    set(INSIGHT_CANON_ARENA_POISON_CONDITION "$<CONFIG:Debug>")
+elseif(INSIGHT_CANON_ARENA_POISON_MODE) # explicit ON (or any truthy spelling), as before
+    set(INSIGHT_CANON_ARENA_POISON_CONDITION "1")
 else()
-    set(INSIGHT_CANON_ARENA_POISON ${INSIGHT_CANON_ARENA_POISON_MODE})
+    set(INSIGHT_CANON_ARENA_POISON_CONDITION "0")
 endif()
 
 ###########################################################
@@ -149,20 +160,20 @@ target_link_libraries(insight_canon
 # logcraft's own SPDLOG_ACTIVE_LEVEL, and exposing a config macro through an api is wrong). The only
 # api-level consumer of it (the kDebugLogsEnabled constexpr) was moved into the build-only tokenizer/
 # parser impl units, so nothing on the public insight.canon.api surface references it anymore.
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    target_compile_definitions(insight_canon PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
-else()
-    target_compile_definitions(insight_canon PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO)
-endif()
+target_compile_definitions(insight_canon PRIVATE
+    $<IF:$<CONFIG:Debug>,SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE,SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO>)
 
 # PRIVATE like the level above, and for a stronger reason: this switch changes canon's BEHAVIOUR,
 # so it must be decided once, where reset() is compiled. Riding it onto consumers would let a
 # consumer's own compile of the api module disagree with the linked implementation. The runtime
 # `arena_poisons_on_reset()` exists so downstream can still read the answer truthfully.
-if(INSIGHT_CANON_ARENA_POISON)
-    target_compile_definitions(insight_canon PRIVATE INSIGHT_CANON_ARENA_POISON)
-    message(STATUS "insight_canon: arena reset-poison instrument ENABLED (debug instrument; release builds rewind)")
-endif()
+target_compile_definitions(insight_canon PRIVATE
+    $<${INSIGHT_CANON_ARENA_POISON_CONDITION}:INSIGHT_CANON_ARENA_POISON>)
+# Printed UNCONDITIONALLY and naming the MODE, because under AUTO there is no single answer to
+# print: on a multi-config generator the instrument is on for the Debug configuration and off for
+# the others, decided after this file has been read.
+message(STATUS "insight_canon: arena reset-poison instrument mode=${INSIGHT_CANON_ARENA_POISON_MODE} "
+               "(AUTO = the Debug configuration only; a release build rewinds)")
 
 ###########################################################
 #  Float determinism — det_math (header-only inline in the api module) requires cross-machine
@@ -311,9 +322,12 @@ if(INSIGHT_CANON_BUILD_TESTS)
         # in its own right — inheriting the library's PRIVATE define is not a thing. Without this
         # the arena's own instrument test would read `arena_poisons_on_reset() == false` inside a
         # poisoning build and skip itself: the instrument would ship untested.
-        if(INSIGHT_CANON_ARENA_POISON)
-            target_compile_definitions(insight_canon_tests PRIVATE INSIGHT_CANON_ARENA_POISON)
-        endif()
+        # The SAME condition as the library's, and it has to be the same EXPRESSION rather than
+        # the same intent: under a multi-config generator a `if(CMAKE_BUILD_TYPE …)` here and a
+        # `$<CONFIG:Debug>` there would disagree per configuration, and the test TU would then
+        # assert `arena_poisons_on_reset() == false` against a library that poisons.
+        target_compile_definitions(insight_canon_tests PRIVATE
+            $<${INSIGHT_CANON_ARENA_POISON_CONDITION}:INSIGHT_CANON_ARENA_POISON>)
         # The test target COMPILES api/canon.spi.cppm and the conformance module in its own right
         # (white-box, like arena_allocator.cpp above), so the totality option has to be repeated
         # here — a PRIVATE option on insight_canon does not reach this target's copy of those TUs.
