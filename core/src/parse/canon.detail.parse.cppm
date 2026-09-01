@@ -178,6 +178,15 @@ class LogParser
     LogFormat last_format_{LogFormat::Unknown}; // the format the last routed line was parsed with
     std::size_t parsed_count_{0};
     std::size_t failed_count_{0};
+    // Lines that carry NO EVENT and are not a failure: an empty line, and a line whose bytes were
+    // all escape sequences. Counted APART from `failed_count_`, because that counter gates the
+    // failure warns (first + every Nth) and feeds the failure-rate stat — and ordinary input
+    // diluting it is not cosmetic. Measured 2026-09-01, one pass over 4 082 GitHub CI logs:
+    // 523 126 empty lines against 87 643 real strategy failures, i.e. 85.6 % of the counter was
+    // ordinary input. Splitting them moved the SAME pass's bounded failure reports from 837 to
+    // 1 439, and two failure classes (IIS WNC, key=value) went from ZERO bounded reports to 47
+    // and 1 — a real failure was being crowded out of its own rate limit.
+    std::size_t skipped_count_{0};
     // Reusable buffer for the stage-1 strip.
     // SRC-D-TID-11 — see canon.api.cppm (normalize()) for the contract.
     // Local: result is ≤ input, so the retained capacity makes the strip

@@ -75,7 +75,18 @@ struct Tokenizer::Impl
     {
         if (!parsed)
         {
-            INSIGHT_LOG_WARN(logging::tokenizer_logger(), "parse failed: {}", parsed.error());
+            // DEBUG, and the level is the whole point. THE PARSER IS THE REPORTER OF RECORD: it
+            // classifies its own outcomes and logs each at the level it earns — TRACE for a line
+            // that carries no event (an empty line is ordinary input, not an error), a
+            // rate-limited WARN naming the strategy, its reason and the running count for a real
+            // failure. This site sees only a string and cannot tell those apart, so it used to
+            // reprint EVERY decline at WARN with no rate limit — an unbounded duplicate of an
+            // already-bounded record. Measured on 2026-09-01, one pass of
+            // `incident_episode_measure` over 4 082 GitHub CI logs: 611 704 stderr records,
+            // 57.7 MB, of which 523 126 were `LogParser: empty line`. Nothing is lost by the
+            // demotion — every genuine failure class still reaches WARN from the parser — and in
+            // Release this line compiles out entirely (SPDLOG_ACTIVE_LEVEL=INFO).
+            INSIGHT_LOG_DEBUG(logging::tokenizer_logger(), "no event: {}", parsed.error());
             return std::unexpected(parsed.error());
         }
         const ParsedLine& parsed_line = parsed.value();

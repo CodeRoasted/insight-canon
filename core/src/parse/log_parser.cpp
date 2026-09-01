@@ -135,9 +135,15 @@ void LogParser::set_auto_detect(bool enabled)
 // Rejected lines skip the arena copy.
 std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view raw_line)
 {
+    // AN EMPTY LINE IS ORDINARY INPUT, NOT A FAILURE — it is counted as skipped (see
+    // `skipped_count_`'s declaration for the measurement). It still returns `unexpected`, because
+    // the caller must learn that this line produced no event, and this is the one place that
+    // decision belongs: hoisting it to the callers duplicates a canon-internal rule in every
+    // consumer, and two first-party callers already disagree about it
+    // (`f13_cardinality_measure` pre-skips empty lines, `incident_episode_measure` does not).
     if (raw_line.empty())
     {
-        ++failed_count_;
+        ++skipped_count_;
         INSIGHT_LOG_TRACE(logging::parser_logger(), "parse: empty line skipped");
         return std::unexpected(std::string("LogParser: empty line"));
     }
@@ -151,7 +157,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
     const NormalizedLine normalized{normalize(raw_line, escape_scratch_)};
     if (normalized.bytes().empty()) // the (non-empty) line was all escape bytes
     {
-        ++failed_count_;
+        ++skipped_count_; // same class as the empty line above: no event, no failure
         INSIGHT_LOG_TRACE(logging::parser_logger(), "parse: line was all escape bytes, skipped");
         return std::unexpected(std::string("LogParser: empty line"));
     }
@@ -202,12 +208,15 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
     else
     {
         ++failed_count_;
-        // Rate-limited warning: first failure + every 100th thereafter.
+        // Rate-limited warning: first failure + every 100th thereafter. It carries the strategy's
+        // own REASON because this is the only bounded record of it: the tokenizer facade used to
+        // reprint every failure's text at WARN with no rate limit at all, and that unbounded
+        // duplicate is what turned one corpus pass into 57.7 MB of stderr.
         if (failed_count_ == 1 || failed_count_ % kWarnEveryNFailures == 0)
         {
             INSIGHT_LOG_WARN(logging::parser_logger(),
-                             "parse failed: strategy={} total_failures={}",
-                             to_string(strategy->format()), failed_count_);
+                             "parse failed: strategy={} reason=\"{}\" total_failures={}",
+                             to_string(strategy->format()), result.error(), failed_count_);
         }
     }
 
@@ -218,14 +227,18 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
     if constexpr (kDebugLogsEnabled)
     {
         static constexpr std::size_t kStatsEveryNLines{1000};
-        // Periodic stats every 1000 lines.
-        const auto total{parsed_count_ + failed_count_};
-        if (total > 0 && total % kStatsEveryNLines == 0)
+        // Periodic stats every 1000 lines SEEN. `skipped` (no-event input) is printed and is out
+        // of the rate's denominator: a stream that is half blank lines has no higher failure rate
+        // than the same stream without them.
+        const auto seen{parsed_count_ + failed_count_ + skipped_count_};
+        const auto attempted{parsed_count_ + failed_count_};
+        if (seen > 0 && seen % kStatsEveryNLines == 0 && attempted > 0)
         {
             INSIGHT_LOG_DEBUG(
-                logging::parser_logger(), "stats: parsed={} failed={} failure_rate={:.1f}%",
-                parsed_count_, failed_count_,
-                (static_cast<double>(failed_count_) / static_cast<double>(total)) * 100.0);
+                logging::parser_logger(),
+                "stats: parsed={} failed={} skipped={} failure_rate={:.1f}%", parsed_count_,
+                failed_count_, skipped_count_,
+                (static_cast<double>(failed_count_) / static_cast<double>(attempted)) * 100.0);
         }
     }
     return result;
@@ -236,9 +249,9 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
 // alias stable_line's storage directly (no extra copy).
 std::expected<ParsedLine, std::string> LogParser::parse_stable(std::string_view stable_line)
 {
-    if (stable_line.empty())
+    if (stable_line.empty()) // ordinary input, not a failure — see parse_line's empty-line branch
     {
-        ++failed_count_;
+        ++skipped_count_;
         INSIGHT_LOG_TRACE(logging::parser_logger(), "parse_stable: empty line skipped");
         return std::unexpected(std::string("LogParser: empty line"));
     }
@@ -280,11 +293,13 @@ std::expected<ParsedLine, std::string> LogParser::parse_stable(std::string_view 
     else
     {
         ++failed_count_;
+        // Rate-limited, and it carries the strategy's REASON for the same reason parse_line's
+        // twin does: this is the only bounded record of it.
         if (failed_count_ == 1 || failed_count_ % kWarnEveryNFailures == 0)
         {
             INSIGHT_LOG_WARN(logging::parser_logger(),
-                             "parse_stable failed: strategy={} total_failures={}",
-                             to_string(strategy->format()), failed_count_);
+                             "parse_stable failed: strategy={} reason=\"{}\" total_failures={}",
+                             to_string(strategy->format()), result.error(), failed_count_);
         }
     }
     return result;
