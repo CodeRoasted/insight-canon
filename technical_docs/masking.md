@@ -144,7 +144,7 @@ instance. Tried in order; first match wins.
 | **bracket-index** | `<word>[<short-alpha?><digits>]` | keep the word + class marker, mask the index | `make[2]:` → `make[<*>]:` · `[gw0]` → `[gw<*>]` |
 | **hash-counter** | `#<digits>` (no alnum may trail) | keep `#`, mask the index | `step #26` → `step #<*>` |
 | **marker-number** | `<currency-marker><digit-core>[.<digits>]` | keep the marker, mask the number | `$463.50` → `$<*>` |
-| **embedded-identity** | a UUID (`8-4-4-4-12`) or a hex run ≥ 16, *inside* a larger token not under a declared ephemeral root — including one whose only structure is a wrapper shell (§3.2) | mask the id in place, keep surrounding structure | `~/.cache/gradle/f7f6…2680/lib.jar` → `~/.cache/gradle/<*>/lib.jar` · `(d41d…427e)` → `(<*>)` |
+| **embedded-identity** | a UUID (`8-4-4-4-12`), a hex run ≥ 16, or a **compact UTC instant** (`YYYY-MM-DDTHHMMSSZ` — exactly 18 bytes, colon-free time, mandatory `Z`, non-alphanumeric on both sides), *inside* a larger token not under a declared ephemeral root — including one whose only structure is a wrapper shell (§3.2) | mask the id in place, keep surrounding structure | `~/.cache/gradle/f7f6…2680/lib.jar` → `~/.cache/gradle/<*>/lib.jar` · `(d41d…427e)` → `(<*>)` · `/home/runner/work/_temp/2026-06-09T185733Z.json` → `/home/runner/work/_temp/<*>.json` |
 | **kv-value** | `<key>=<digit-leading-value>` (strips a leading currency marker first) | keep the key (+ marker), mask the value | `order=100000` → `order=<*>` · `total=$18` → `total=$<*>` |
 
 **The ephemeral-root catalog is also consulted from inside source-location.** A per-run instance directory in
