@@ -93,12 +93,27 @@
 //         RED 2 of 4: ARM 2 and ARM 4 — and ARM 1 and ARM 3 stay GREEN. That is the whole reason
 //         ARM 4 exists: a stable door broken for a non-stage-1 reason passes the escape test and
 //         is caught only by the control.
-//   2026-09-02 — ARM 3's price input changed with ADR-16.D7 (above); REASONED for the new input,
-//         not re-measured, and the 2026-09-01 measurement above is of the previous input. SD-A
-//         normalizes the stable side, so both doors read the cue (Error/Error) and the arm's
-//         inequality reds; SD-B hands raw bytes to process_line, so neither door reads the cue
-//         (Unknown/Unknown) and it reds again; SD-C drops one trailing byte and is level-blind on
-//         this input, leaving ARM 3 green as before. The partition claim stands.
+//
+// ── FALSIFIABILITY, RE-MEASURED 2026-09-02 on the new ARM 3 input (Kleio) ────────────────────
+// clang-21 (`linux-clang21-libcxx-release`), insight-canon 3f9b17c plus this header; the same
+// three mutations, each applied, built, run over the WHOLE core binary (702 tests: 699 green and
+// 3 corpus-gated skips at HEAD), reverted, `sha256sum -c` OK on every touched source. The
+// partition is unchanged, and it is the whole suite's rather than this file's: under each
+// mutation the only reds among the 702 are the arms named below — no other test guards these
+// properties.
+//
+//   SD-A  RED 2 of 4: ARM 1 (`carries_escape(stable->template_str)` false) and ARM 3 Part 2 —
+//         the stable door reads Error, its cue head now reaching the stripped `failed` at byte
+//         118, so `is_failing(stable)` reds and then Error == Error reds the inequality. ARM 3
+//         Part 1 stays GREEN (Warn/Warn either way), as do ARM 2 and ARM 4.
+//   SD-B  RED 3 of 4: ARM 1's second half (an escape byte in `process_line`'s template), ARM 2
+//         (the templates diverge) and ARM 3 Part 2 — `process_line` reads Unknown, the raw
+//         `failed` at byte 129 being outside its head, and then Unknown == Unknown reds the
+//         inequality. ARM 3 Part 1 stays GREEN: with the token budget, `process_line` on raw bytes
+//         still reads WARNING at token 3, so Part 1 cannot see this mutation and Part 2 is what
+//         does. ARM 4 GREEN.
+//   SD-C  RED 2 of 4: ARM 2 and ARM 4. ARM 1 and ARM 3 GREEN, both parts — the dropped byte is
+//         the trailing `m` of the reset run on either input, and no level or cue moves.
 //
 // The line grain versus the classifier grain: `test_ingest_normalization_level_flip.cpp` pins that
 // `infer_leading_log_level` reads the `after_script` corpus line as Warn on BOTH byte strings since
@@ -153,10 +168,10 @@ constexpr std::string_view kEscapeFree{
 
 // The price input since ADR-16.D7: the same GitLab runner envelope (36 bytes stripped, 47 raw — the
 // `\r` stays, the two escape runs go) in front of a body with NO level word among its first eight
-// tokens and one failure cue, placed so the cue starts at stripped byte 118 and raw byte 129 — inside
-// Stage 2's 128-byte cue head on the normalized door, outside it on the stable one. A fixture, not a
-// corpus line: no producer emits this exact body, and the arm asserts both offsets before reading a
-// level, so a wrong count here reds as a fixture error rather than as a door.
+// tokens and one failure cue, placed so the cue starts at stripped byte 118 and raw byte 129 —
+// inside Stage 2's 128-byte cue head on the normalized door, outside it on the stable one. A
+// fixture, not a corpus line: no producer emits this exact body, and the arm asserts both offsets
+// before reading a level, so a wrong count here reds as a fixture error rather than as a door.
 constexpr std::string_view kCueAtTheHeadEdge{
     "section_end:1737226867:after_script\r\x1b[0K\x1b[0;33muploading artifacts for job 2092177 to "
     "the coordinator after three retry attempts failed: coordinator returned 502\x1b[0;m"};

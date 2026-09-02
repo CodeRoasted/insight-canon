@@ -15,6 +15,36 @@
 // delta at count grain (the G-L2 leg DN-54.D10 owes), which the index histogram — budget-blind by
 // construction — cannot show.
 //
+// THE NESTED-RECORD LEG (ROADMAP N112). Eqya's ruling of 2026-09-02 declares the residual's
+// verdict-shaped part — a CI line wrapping an application/syslog record, the level word at token
+// 8-15 — a residual of Stage 1: that word is the INNER record's level, and reading it as the line's
+// verdict would attribute the inner severity to the outer line. Stage 2 is not bound by that
+// budget: its cue scan (kKeywordHead{128}, a byte budget) promotes a caps or colon-anchored
+// error-class word wherever Stage 1 stopped, so an error-class inner word within 128 bytes is
+// promoted to Error TODAY, through canon's own cue path, unchanged by the token budget. This leg
+// counts that population and joins it to the run's DECLARED outcome — the one verdict this codebase
+// never infers — per root: how many nested residual lines carry an error-class inner word, how many
+// of those start inside the cue head, how many the pipeline promotes, how many of the promotions
+// are ATTRIBUTABLE to the inner word (blank the word's bytes and the verdict drops below Error — a
+// counterfactual through the shipped predicate, never a re-implementation), and, of those, how
+// many sit in a run that passed versus one that failed. The outcome comes from a TSV transcribed
+// VERBATIM from the corpus manifest and given per root as `<label>.outcomes=<path.tsv>`, one
+// `<file path relative to the root>\t<outcome word>` row per file; the bucket rule (passed /
+// failed / unstable / other) lives HERE, in one self-tested function, and a malformed row is an
+// error rather than a skipped row (alert_grain_measure's rule: a reader that drops what it cannot
+// parse reports a partition over the rows it happened to understand). A file with no row is
+// UNDECLARED, never defaulted into a bucket. The transcriptions, for the corpora this leg was first
+// run on (each manifest's own field, no renaming):
+//   GitHub Actions  jq -r 'select(.log_annotated != null)
+//                          | [(.log_annotated | sub("^log_annotated/"; "")), .ci_outcome] | @tsv'
+//                          corpus.jsonl            (root = .../full/log_annotated, ci_outcome = the
+//                                                   workflow run's conclusion)
+//   Jenkins         jq -r '[.log, .result] | @tsv' corpus.jsonl   (root = .../marker/v2, result =
+//                                                   the build's result)
+//   GitLab          jq -r '.artifacts[] | select(.kind == "trace") | [.path, .job_status] | @tsv'
+//                          PROBE-v1.manifest.json  (root = .../marker_corpus/v1, job_status = the
+//                                                   job's status)
+//
 // WHY A CLI TOOL AND NOT A TEST: the f13_cardinality_measure ruling (DN-18.D1 § 3.3). The
 // population is whatever the operator mounts, so the report DECLARES it (files, lines, doors, the
 // model's own control) rather than asserting on it, and no gate may depend on it.
@@ -82,6 +112,21 @@ constexpr std::size_t kLevelCount{static_cast<std::size_t>(LogLevel::Unknown) + 
 constexpr std::array<std::size_t, 10> kCandidateBudgets{2, 3, 4, 5, 6, 7, 8, 10, 12, 16};
 constexpr std::array<std::size_t, 4> kDetailedBudgets{7, 8, 12, 16};
 constexpr std::size_t kPreRegisteredBudget{7};
+// The two constants the nested-record leg reads against, QUOTED from time_utils.cpp — both are
+// function-local to infer_leading_log_level and cannot be linked. Re-derive them before citing the
+// leg: the landed Stage 1 budget (kLeadingScanTokens — the first index this leg's class starts at)
+// and Stage 2's cue head (kKeywordHead — the byte a token must START before to be read by the cue
+// scan, for_each_token's limit semantics).
+constexpr std::size_t kLandedBudget{8};
+constexpr std::size_t kQuotedCueHead{128};
+// The summary table's "N=8" columns are derived as kPreRegisteredBudget + 1; they are the landed
+// value's columns only while this holds.
+static_assert(kLandedBudget == kPreRegisteredBudget + 1);
+// The ruling names the class at token 8-15; the tail (16+) is reported beside it, never pooled.
+constexpr std::size_t kNestedBandEnd{16};
+constexpr std::size_t kNestedBandCount{2};
+constexpr std::array<std::string_view, kNestedBandCount> kNestedBandNames{"index 8-15",
+                                                                          "index 16+"};
 constexpr double kPercent{100.0};
 constexpr double kCoverage99{0.99};
 constexpr double kCoverage999{0.999};
@@ -108,6 +153,75 @@ enum class RegisterProxy : std::uint8_t
 constexpr std::size_t kProxyCount{4};
 constexpr std::array<std::string_view, kProxyCount> kProxyNames{"bracketed", "colon", "caps",
                                                                 "bare"};
+
+// ── The run's DECLARED outcome — the bucket rule, the one place three producers' vocabularies meet
+// GitHub Actions `ci_outcome` (success · failure · cancelled · skipped), Jenkins `result` (SUCCESS
+// · UNSTABLE · FAILURE · ABORTED), GitLab `job_status` (success · failed · canceled). UNSTABLE is
+// Jenkins' "built, tests failed" and is kept apart from `failed` rather than folded either way;
+// a cancelled, skipped or aborted run is `other` — it ended without a verdict on the work. A word
+// outside this table is `unrecognised` and printed with its spelling, so a producer's new
+// vocabulary shows up as a word rather than as a silent bucket.
+enum class Outcome : std::uint8_t
+{
+    Passed,
+    Failed,
+    Unstable,
+    Other,
+    Unrecognised,
+    Undeclared, // no row for the file — never defaulted into a bucket
+};
+constexpr std::size_t kOutcomeCount{6};
+constexpr std::array<std::string_view, kOutcomeCount> kOutcomeNames{
+    "passed", "failed", "unstable", "other", "unrecognised", "undeclared"};
+
+[[nodiscard]] Outcome outcome_of(std::string_view word) noexcept
+{
+    if (word == "success" || word == "SUCCESS")
+        return Outcome::Passed;
+    if (word == "failure" || word == "FAILURE" || word == "failed")
+        return Outcome::Failed;
+    if (word == "UNSTABLE")
+        return Outcome::Unstable;
+    if (word == "cancelled" || word == "canceled" || word == "skipped" || word == "ABORTED")
+        return Outcome::Other;
+    return Outcome::Unrecognised;
+}
+
+struct OutcomeTable
+{
+    std::map<std::string, std::string> word_by_path; // path relative to the root, '/'-separated
+    std::size_t duplicate_rows{0};
+};
+
+// `<path>\t<word>` per row, transcribed verbatim from the corpus manifest (the header's
+// one-liners). A malformed row is an ERROR, never a skipped row.
+[[nodiscard]] std::expected<OutcomeTable, std::string>
+read_outcome_table(const std::filesystem::path& tsv)
+{
+    std::ifstream input{tsv};
+    if (!input)
+        return std::unexpected(std::format("cannot open outcomes file {}", tsv.string()));
+    OutcomeTable table;
+    std::string row;
+    std::size_t row_number{0};
+    while (std::getline(input, row))
+    {
+        ++row_number;
+        if (!row.empty() && row.back() == '\r')
+            row.pop_back();
+        const std::size_t tab{row.find('\t')};
+        if (tab == std::string::npos || tab == 0 || tab + 1 == row.size() ||
+            row.find('\t', tab + 1) != std::string::npos)
+            return std::unexpected(std::format(
+                "{}:{}: expected exactly one `<path>\\t<word>` row with both fields non-empty",
+                tsv.string(), row_number));
+        const auto [position,
+                    inserted]{table.word_by_path.emplace(row.substr(0, tab), row.substr(tab + 1))};
+        if (!inserted)
+            ++table.duplicate_rows;
+    }
+    return table;
+}
 
 // Which remainder rule the routed door hands the scanner — the two modelled doors, or none.
 enum class DoorModel : std::uint8_t
@@ -433,10 +547,147 @@ struct IndexStats
     }
 };
 
+// ── The nested-record leg (N112) ──────────────────────────────────────────────────────────────
+[[nodiscard]] constexpr bool is_error_class(LogLevel level) noexcept
+{
+    return level == LogLevel::Error || level == LogLevel::Fatal;
+}
+
+// The counterfactual: the same remainder with the inner level word's bytes blanked to spaces (a
+// delimiter run, so every other token keeps its index and its neighbours), through the SHIPPED
+// predicate. A verdict that drops below Error without the word was the word's; one that stays is
+// another cue's — a `failed` in the body, a second anchored word — and the inner word discriminates
+// nothing on that line.
+[[nodiscard]] LogLevel level_with_word_blanked(std::string_view scanned, const LevelHit& hit)
+{
+    std::string blanked{scanned};
+    std::fill_n(blanked.begin() + static_cast<std::ptrdiff_t>(hit.byte_start), hit.token_size, ' ');
+    return insight::utils::infer_leading_log_level(blanked).value();
+}
+
+// One line of the nested-record residual, read at three coordinates: the inner word itself, what
+// the pipeline emitted for the line (the parse_line door), and what the same remainder reads on
+// the raw bytes (the parse_stable door, modelled on the same routing — the byte a cue starts at is
+// the one thing the strip moves, ADR-16.D7).
+struct NestedLine
+{
+    LogLevel word{LogLevel::Unknown};         // the inner level word's own class
+    RegisterProxy proxy{RegisterProxy::Bare}; // its register proxy — caps is Stage 2's anchor #1
+    bool in_cue_head{false};                  // the word STARTS inside kQuotedCueHead, stripped
+    bool in_cue_head_raw{false};              // ... on the raw remainder
+    LogLevel pipeline{LogLevel::Unknown};
+    LogLevel stable{LogLevel::Unknown};
+    bool promoted{false};         // the pipeline emitted Error/Fatal for the line
+    bool promoted_by_word{false}; // ... and blanking the inner word drops it below Error
+};
+
+[[nodiscard]] NestedLine classify_nested(std::string_view stripped_scan, std::string_view raw_scan,
+                                         const LevelHit& hit,
+                                         const std::optional<LevelHit>& raw_hit, LogLevel pipeline)
+{
+    NestedLine line{.word = hit.level,
+                    .proxy = hit.proxy,
+                    .in_cue_head = hit.byte_start < kQuotedCueHead,
+                    .in_cue_head_raw = raw_hit.has_value() && raw_hit->byte_start < kQuotedCueHead,
+                    .pipeline = pipeline,
+                    .stable = insight::utils::infer_leading_log_level(raw_scan).value(),
+                    .promoted = is_error_class(pipeline),
+                    .promoted_by_word = false};
+    if (line.promoted)
+        line.promoted_by_word = !is_error_class(level_with_word_blanked(stripped_scan, hit));
+    return line;
+}
+
+// What one band of the class IS, and what Stage 2 does with it — every count keyed to the run's
+// declared outcome where the precision reading needs it.
+struct NestedResidual
+{
+    std::uint64_t lines{0};
+    std::array<std::uint64_t, kLevelCount> by_word{};
+    std::array<std::uint64_t, kOutcomeCount> lines_by_outcome{};
+    std::uint64_t error_class{0};
+    std::uint64_t error_in_head{0};     // error-class AND starts inside the cue head (stripped)
+    std::uint64_t error_in_head_raw{0}; // error-class AND starts inside the cue head (raw)
+    std::array<std::uint64_t, kLevelCount> pipeline_of_error_in_head{};
+    // The error-in-head population by the inner word's register proxy, promoted and not: caps is
+    // Stage 2's anchor #1 and fires on its own; a colon-anchored word needs the kind slot, which a
+    // nested record's bare outer tokens break (SRC-D-OUT-4c), so `error:` at index >= 8 is the
+    // shape the cue path declines.
+    std::array<std::uint64_t, kProxyCount> promoted_by_proxy{};
+    std::array<std::uint64_t, kProxyCount> unpromoted_by_proxy{};
+    std::uint64_t promoted{0};         // error-class, in head, pipeline Error/Fatal
+    std::uint64_t promoted_by_word{0}; // ... attributable to the inner word
+    std::uint64_t stable_promoted{0};  // ... and the raw remainder reads Error/Fatal as well
+    std::uint64_t promoted_beyond_head{
+        0}; // error-class, NOT in head, still Error/Fatal: another cue
+    std::uint64_t promoted_other_word{0}; // a non-error-class inner word, line still Error/Fatal
+    std::array<std::uint64_t, kOutcomeCount> promoted_by_outcome{};
+    std::array<std::uint64_t, kOutcomeCount> promoted_by_word_by_outcome{};
+    // The recall side of the same class: an error-class inner word the pipeline did NOT promote —
+    // outside the head, or inside it and declined — by the run's outcome.
+    std::array<std::uint64_t, kOutcomeCount> error_unpromoted_by_outcome{};
+    std::array<std::uint64_t, kOutcomeCount> files_with_promotion_by_outcome{};
+    std::array<std::uint64_t, kOutcomeCount> files_with_word_promotion_by_outcome{};
+
+    void add(const NestedLine& line, Outcome outcome)
+    {
+        const std::size_t bucket{static_cast<std::size_t>(outcome)};
+        ++lines;
+        ++by_word[static_cast<std::size_t>(line.word)];
+        ++lines_by_outcome[bucket];
+        if (!is_error_class(line.word))
+        {
+            if (line.promoted)
+                ++promoted_other_word;
+            return;
+        }
+        ++error_class;
+        if (!line.promoted)
+            ++error_unpromoted_by_outcome[bucket];
+        if (line.in_cue_head_raw)
+            ++error_in_head_raw;
+        if (!line.in_cue_head)
+        {
+            if (line.promoted)
+                ++promoted_beyond_head;
+            return;
+        }
+        ++error_in_head;
+        ++pipeline_of_error_in_head[static_cast<std::size_t>(line.pipeline)];
+        ++(line.promoted ? promoted_by_proxy
+                         : unpromoted_by_proxy)[static_cast<std::size_t>(line.proxy)];
+        if (!line.promoted)
+            return;
+        ++promoted;
+        ++promoted_by_outcome[bucket];
+        if (is_error_class(line.stable))
+            ++stable_promoted;
+        if (line.promoted_by_word)
+        {
+            ++promoted_by_word;
+            ++promoted_by_word_by_outcome[bucket];
+        }
+    }
+};
+
+// What one FILE contributed to a band, at the file grain the outcome is declared at.
+struct NestedFileFlags
+{
+    bool promoted{false};
+    bool promoted_by_word{false};
+};
+
 struct RootReport
 {
     std::string label;
     std::filesystem::path dir;
+    // N112 — the declared outcome of the run each file belongs to, joined from the root's TSV.
+    std::optional<std::filesystem::path> outcomes_path;
+    OutcomeTable outcomes;
+    std::uint64_t files_joined{0};
+    std::map<std::string, std::uint64_t> outcome_words; // the raw words, as joined, per file
+    std::array<std::uint64_t, kOutcomeCount> files_by_outcome{};
+    std::array<NestedResidual, kNestedBandCount> nested{};
     std::size_t files{0};
     std::uint64_t lines{0};
     std::uint64_t nonempty{0};
@@ -481,7 +732,134 @@ struct SelfTestRow
     bool terminal;
 };
 
-[[nodiscard]] bool run_self_test()
+// The nested-record leg's own rows: the class predicate, the cue-head edge, the counterfactual's
+// two faces, and the register the cue path declines — each row read through the shipped predicate,
+// as the walk reads a corpus line. Row 3's prefix puts the word at index 8 and byte 162: inside the
+// token residual, outside the byte head. Row 6 is the shape GitLab's whole class takes: a
+// lowercase colon-anchored `error:` at index 9 is error-class for Stage 1's vocabulary and NOT a
+// cue for Stage 2, because the kind slot it needs is broken by the bare outer tokens before it.
+struct NestedSelfTestRow
+{
+    std::string_view name;
+    std::string_view scanned;
+    bool class_member;
+    bool error_class;
+    bool in_cue_head;
+    LogLevel inferred;
+    bool promoted_by_word;
+};
+
+[[nodiscard]] bool run_nested_self_test()
+{
+    static const std::string kFarNested{"[" + std::string(100, 'a') +
+                                        "] [runner-7] [job-42] [step-3] [attempt-1] May api-1 "
+                                        "kernel: ERROR: worker died"};
+    const std::array<NestedSelfTestRow, 6> rows{{
+        {.name = "error-class nested word at index 9, inside the cue head: promoted BY the word",
+         .scanned = "[2026-05-29 10:00:00] [runner-7] [job-42] May api-1 kernel: ERROR: worker "
+                    "died",
+         .class_member = true,
+         .error_class = true,
+         .in_cue_head = true,
+         .inferred = LogLevel::Error,
+         .promoted_by_word = true},
+        {.name = "info-class nested word at index 9: the residual, not promoted",
+         .scanned = "[2026-05-29 10:00:00] [runner-7] [job-42] May api-1 kernel: INFO: worker "
+                    "restarted",
+         .class_member = true,
+         .error_class = false,
+         .in_cue_head = true,
+         .inferred = LogLevel::Unknown,
+         .promoted_by_word = false},
+        {.name = "error-class nested word at index 8 starting past byte 128: outside the cue "
+                 "head, not promoted",
+         .scanned = kFarNested,
+         .class_member = true,
+         .error_class = true,
+         .in_cue_head = false,
+         .inferred = LogLevel::Unknown,
+         .promoted_by_word = false},
+        {.name = "error-class nested word beside a `failed` cue: promoted, NOT by the word",
+         .scanned = "[2026-05-29 10:00:00] [runner-7] [job-42] May api-1 kernel: ERROR: build "
+                    "failed",
+         .class_member = true,
+         .error_class = true,
+         .in_cue_head = true,
+         .inferred = LogLevel::Error,
+         .promoted_by_word = false},
+        {.name = "bare nested word at index 10: prose-shaped, outside the class",
+         .scanned = "the job on the runner in the pool hit an error while syncing",
+         .class_member = false,
+         .error_class = true,
+         .in_cue_head = true,
+         .inferred = LogLevel::Unknown,
+         .promoted_by_word = false},
+        {.name = "lowercase colon-anchored `error:` at index 9: in the class, in the head, and "
+                 "DECLINED by the cue path (the kind slot is broken by the bare outer tokens)",
+         .scanned = "[2026-05-29 10:00:00] [runner-7] [job-42] May api-1 kernel: error: worker "
+                    "died",
+         .class_member = true,
+         .error_class = true,
+         .in_cue_head = true,
+         .inferred = LogLevel::Unknown,
+         .promoted_by_word = false},
+    }};
+    bool all_ok{true};
+    for (const NestedSelfTestRow& row : rows)
+    {
+        const std::optional<LevelHit> hit{first_level_token(row.scanned)};
+        if (!hit)
+        {
+            all_ok = false;
+            std::println("  [FAIL] {}: got NO level token", row.name);
+            continue;
+        }
+        const bool member{hit->token_index >= kLandedBudget && hit->proxy != RegisterProxy::Bare};
+        const NestedLine line{
+            classify_nested(row.scanned, row.scanned, *hit, hit,
+                            insight::utils::infer_leading_log_level(row.scanned).value())};
+        const bool row_ok{member == row.class_member &&
+                          is_error_class(line.word) == row.error_class &&
+                          line.in_cue_head == row.in_cue_head && line.pipeline == row.inferred &&
+                          line.promoted_by_word == row.promoted_by_word};
+        all_ok = all_ok && row_ok;
+        std::println("  [{}] {}: expected member={} error-class={} in-head={} level={} by-word={}  "
+                     "got member={} error-class={} in-head={} level={} by-word={} (idx={} byte={})",
+                     row_ok ? "ok" : "FAIL", row.name, row.class_member, row.error_class,
+                     row.in_cue_head, insight::to_string(row.inferred), row.promoted_by_word,
+                     member, is_error_class(line.word), line.in_cue_head,
+                     insight::to_string(line.pipeline), line.promoted_by_word, hit->token_index,
+                     hit->byte_start);
+    }
+    return all_ok;
+}
+
+// The bucket rule, row by row: every word the three manifests carry, and one they do not.
+[[nodiscard]] bool run_outcome_rule_self_test()
+{
+    constexpr std::array<std::pair<std::string_view, Outcome>, 11> kOutcomeRows{{
+        {"success", Outcome::Passed},
+        {"SUCCESS", Outcome::Passed},
+        {"failure", Outcome::Failed},
+        {"FAILURE", Outcome::Failed},
+        {"failed", Outcome::Failed},
+        {"UNSTABLE", Outcome::Unstable},
+        {"cancelled", Outcome::Other},
+        {"canceled", Outcome::Other},
+        {"skipped", Outcome::Other},
+        {"ABORTED", Outcome::Other},
+        {"neutral", Outcome::Unrecognised},
+    }};
+    bool all_ok{true};
+    for (const auto& [word, bucket] : kOutcomeRows)
+        all_ok = all_ok && outcome_of(word) == bucket;
+    std::println("  [{}] outcome rule: the three producers' verdict words map to their buckets, an "
+                 "unknown word to `unrecognised`",
+                 all_ok ? "ok" : "FAIL");
+    return all_ok;
+}
+
+[[nodiscard]] bool run_predicate_self_test()
 {
     static const std::string kPadded{"[" + std::string(41, 'a') +
                                      "] Failed to resolve action download info. Error: boom"};
@@ -605,14 +983,46 @@ struct SelfTestRow
     all_ok = all_ok && tag_ok;
     std::println("  [{}] GitLab stream tag: `NNO ` new-line, `NNE+` continuation, else none",
                  tag_ok ? "ok" : "FAIL");
+    return all_ok;
+}
+
+// Every leg runs unconditionally, so every row prints before the one verdict.
+[[nodiscard]] bool run_self_test()
+{
+    const bool predicate_ok{run_predicate_self_test()};
+    const bool nested_ok{run_nested_self_test()};
+    const bool outcome_rule_ok{run_outcome_rule_self_test()};
+    const bool all_ok{predicate_ok && nested_ok && outcome_rule_ok};
     std::println("self-test: {}", all_ok ? "PASS" : "FAIL — the run is refused");
     return all_ok;
 }
 
 // ── The walk ──────────────────────────────────────────────────────────────────────────────────
-void measure_file(const std::filesystem::path& file, RootReport& report, ArenaAllocator& arena,
-                  const insight::semantic::ComposedSemantics& composed)
+// The nested-record class, as isolated for the ruling: a verdict-shaped (non-bare) level word at
+// token index >= kLandedBudget on a modelled door. Records the line in its band and raises the
+// file's flags for the file-grain count.
+void record_nested_line(RootReport& report, Outcome file_outcome, std::string_view stripped_scan,
+                        std::string_view raw_scan, const LevelHit& hit,
+                        const std::optional<LevelHit>& raw_hit, LogLevel pipeline_level,
+                        std::array<NestedFileFlags, kNestedBandCount>& flags)
 {
+    if (hit.token_index < kLandedBudget || hit.proxy == RegisterProxy::Bare)
+        return;
+    const std::size_t band{hit.token_index < kNestedBandEnd ? 0U : 1U};
+    const NestedLine nested{classify_nested(stripped_scan, raw_scan, hit, raw_hit, pipeline_level)};
+    report.nested[band].add(nested, file_outcome);
+    flags[band].promoted = flags[band].promoted || nested.promoted;
+    flags[band].promoted_by_word = flags[band].promoted_by_word || nested.promoted_by_word;
+}
+
+// Returns, per nested band, whether this file carried at least one promoted line, and one the
+// inner word promoted — the file grain of the N112 reading, counted by the caller against the
+// file's outcome.
+[[nodiscard]] std::array<NestedFileFlags, kNestedBandCount>
+measure_file(const std::filesystem::path& file, Outcome file_outcome, RootReport& report,
+             ArenaAllocator& arena, const insight::semantic::ComposedSemantics& composed)
+{
+    std::array<NestedFileFlags, kNestedBandCount> flags{};
     // A fresh Tokenizer per file: the format detector's latch is per STREAM in production, and a
     // corpus file is one stream.
     Tokenizer tokenizer{arena, MaskConfig{}, composed};
@@ -681,11 +1091,51 @@ void measure_file(const std::filesystem::path& file, RootReport& report, ArenaAl
             continue;
         const std::optional<LevelHit> raw_hit{first_level_token(raw_scan)};
         const bool in_byte_head{hit->byte_start < kReplacedByteHead};
-        const bool in_byte_head_raw{raw_hit.has_value() &&
-                                    raw_hit->byte_start < kReplacedByteHead};
+        const bool in_byte_head_raw{raw_hit.has_value() && raw_hit->byte_start < kReplacedByteHead};
         IndexStats& stats{door == DoorModel::Unmodelled ? report.unmodelled_stats
                                                         : report.modelled_stats};
         stats.record(*hit, in_byte_head, in_byte_head_raw);
+        if (door != DoorModel::Unmodelled)
+            record_nested_line(report, file_outcome, stripped_scan, raw_scan, *hit, raw_hit,
+                               pipeline_level, flags);
+    }
+    return flags;
+}
+
+// One root: the sorted recursive walk, the outcome join per file, the file-grain counts.
+void walk_root(RootReport& report, ArenaAllocator& arena,
+               const insight::semantic::ComposedSemantics& composed)
+{
+    namespace fs = std::filesystem;
+    std::vector<fs::path> files;
+    for (const auto& entry : fs::recursive_directory_iterator{report.dir})
+        if (entry.is_regular_file() && entry.path().extension() == ".log")
+            files.push_back(entry.path());
+    std::ranges::sort(files); // deterministic order for a fixed tree (order-independent anyway)
+    report.files = files.size();
+    for (const fs::path& file : files)
+    {
+        // The join: the file's path relative to its root, '/'-separated, against the TSV.
+        Outcome file_outcome{Outcome::Undeclared};
+        if (const auto row{
+                report.outcomes.word_by_path.find(fs::relative(file, report.dir).generic_string())};
+            row != report.outcomes.word_by_path.end())
+        {
+            ++report.files_joined;
+            ++report.outcome_words[row->second];
+            file_outcome = outcome_of(row->second);
+        }
+        const std::size_t bucket{static_cast<std::size_t>(file_outcome)};
+        ++report.files_by_outcome[bucket];
+        const std::array<NestedFileFlags, kNestedBandCount> flags{
+            measure_file(file, file_outcome, report, arena, composed)};
+        for (std::size_t band{0}; band < kNestedBandCount; ++band)
+        {
+            report.nested[band].files_with_promotion_by_outcome[bucket] +=
+                flags[band].promoted ? 1U : 0U;
+            report.nested[band].files_with_word_promotion_by_outcome[bucket] +=
+                flags[band].promoted_by_word ? 1U : 0U;
+        }
     }
 }
 
@@ -763,8 +1213,7 @@ void print_budget_table(const IndexStats& stats)
 {
     const std::uint64_t byte_head{stats.byte_head_total()};
     std::println("  40-byte head, REPLACED (stripped bytes): reached {} of {} ({:.4f}%), missed {}",
-                 byte_head, stats.lines, percent(byte_head, stats.lines),
-                 stats.lines - byte_head);
+                 byte_head, stats.lines, percent(byte_head, stats.lines), stats.lines - byte_head);
     std::println("  40-byte head on the raw bytes          : reached {} of {} ({:.4f}%)",
                  stats.head_raw_total(), stats.lines, percent(stats.head_raw_total(), stats.lines));
     std::println("  {:>4} {:>11} {:>9} {:>11} {:>14} {:>13}", "N", "covered", "cum%", "missed",
@@ -780,6 +1229,97 @@ void print_budget_table(const IndexStats& stats)
     std::println("  coverage cuts: N(99%)={}  N(99.9%)={}  N(100%)={}",
                  stats.budget_covering(kCoverage99), stats.budget_covering(kCoverage999),
                  stats.max_index() + 1);
+}
+
+[[nodiscard]] std::string outcome_cells(const std::array<std::uint64_t, kOutcomeCount>& counts)
+{
+    std::string cells;
+    for (std::size_t bucket{0}; bucket < kOutcomeCount; ++bucket)
+        cells += std::format(" {}={}", kOutcomeNames[bucket], counts[bucket]);
+    return cells;
+}
+
+void print_nested(const RootReport& report)
+{
+    std::println(
+        "--- N112: the NESTED-RECORD residual — a verdict-shaped level word at token index "
+        ">= {} on a modelled door — against the run's DECLARED outcome ---",
+        kLandedBudget);
+    if (report.outcomes_path)
+    {
+        std::string words;
+        for (const auto& [word, count] : report.outcome_words)
+            words += std::format(" {}={}", word, count);
+        std::println("  outcomes      : {} — {} rows ({} duplicate), joined to {} of {} files; "
+                     "files by bucket:{}; raw words as joined:{}",
+                     report.outcomes_path->string(), report.outcomes.word_by_path.size(),
+                     report.outcomes.duplicate_rows, report.files_joined, report.files,
+                     outcome_cells(report.files_by_outcome), words);
+    }
+    else
+        std::println("  outcomes      : none given (add <label>.outcomes=<path.tsv>) — every file "
+                     "is undeclared; files by bucket:{}",
+                     outcome_cells(report.files_by_outcome));
+    for (std::size_t band{0}; band < kNestedBandCount; ++band)
+    {
+        const NestedResidual& nested{report.nested[band]};
+        std::string words;
+        for (std::size_t level{0}; level < kLevelCount; ++level)
+            if (nested.by_word[level] != 0)
+                words += std::format(" {}={}", insight::to_string(static_cast<LogLevel>(level)),
+                                     nested.by_word[level]);
+        std::println("  band {:<10}: {} lines ({:.4f}% of level-bearing) — inner word:{}; by "
+                     "outcome:{}",
+                     kNestedBandNames[band], nested.lines,
+                     percent(nested.lines, report.modelled_stats.lines), words,
+                     outcome_cells(nested.lines_by_outcome));
+        if (nested.lines == 0)
+            continue;
+        std::string pipeline;
+        for (std::size_t level{0}; level < kLevelCount; ++level)
+            if (nested.pipeline_of_error_in_head[level] != 0)
+                pipeline += std::format(" {}={}", insight::to_string(static_cast<LogLevel>(level)),
+                                        nested.pipeline_of_error_in_head[level]);
+        std::println("    error-class inner word          : {} ({:.4f}% of the band)",
+                     nested.error_class, percent(nested.error_class, nested.lines));
+        std::println("      starting inside the {}-byte cue head: {} on the stripped remainder "
+                     "(parse_line), {} on the raw remainder (parse_stable)",
+                     kQuotedCueHead, nested.error_in_head, nested.error_in_head_raw);
+        std::println("      of the {} inside (stripped) — pipeline level:{}", nested.error_in_head,
+                     pipeline);
+        std::println("      PROMOTED (pipeline Error/Fatal)  : {} ({:.4f}% of those inside); "
+                     "attributable to the inner word (blanking it drops the verdict): {}; the raw "
+                     "remainder reads Error/Fatal on {} of the {}",
+                     nested.promoted, percent(nested.promoted, nested.error_in_head),
+                     nested.promoted_by_word, nested.stable_promoted, nested.promoted);
+        std::println("      error-class OUTSIDE the head yet Error/Fatal (another cue): {}; "
+                     "non-error-class inner word yet Error/Fatal: {}",
+                     nested.promoted_beyond_head, nested.promoted_other_word);
+        std::string promoted_proxies;
+        std::string unpromoted_proxies;
+        for (std::size_t proxy{0}; proxy < kProxyCount; ++proxy)
+        {
+            promoted_proxies +=
+                std::format(" {}={}", kProxyNames[proxy], nested.promoted_by_proxy[proxy]);
+            unpromoted_proxies +=
+                std::format(" {}={}", kProxyNames[proxy], nested.unpromoted_by_proxy[proxy]);
+        }
+        std::println("      by the inner word's register — promoted:{}; declined:{}",
+                     promoted_proxies, unpromoted_proxies);
+        std::println("    promoted lines, by outcome        :{}",
+                     outcome_cells(nested.promoted_by_outcome));
+        std::println("    promoted BY THE WORD, by outcome  :{}",
+                     outcome_cells(nested.promoted_by_word_by_outcome));
+        std::println("    error-class NOT promoted, by outcome:{}  (the recall side: outside the "
+                     "head, or inside it and declined)",
+                     outcome_cells(nested.error_unpromoted_by_outcome));
+        std::println("    files with >= 1 promoted line, by outcome:{}",
+                     outcome_cells(nested.files_with_promotion_by_outcome));
+        std::println("    files with >= 1 line promoted BY THE WORD, by outcome:{}  (of the "
+                     "root's files by bucket:{})",
+                     outcome_cells(nested.files_with_word_promotion_by_outcome),
+                     outcome_cells(report.files_by_outcome));
+    }
 }
 
 void print_root(const RootReport& report)
@@ -822,9 +1362,10 @@ void print_root(const RootReport& report)
     for (std::size_t level{0}; level < kLevelCount; ++level)
         levels += std::format(" {}={}", insight::to_string(static_cast<LogLevel>(level)),
                               report.pipeline_levels[level]);
-    std::println("pipeline level:{}  (every routed event, declared or inferred, all doors — the "
-                 "line that moves with Stage 1's budget: diff it between two builds over this root)",
-                 levels);
+    std::println(
+        "pipeline level:{}  (every routed event, declared or inferred, all doors — the "
+        "line that moves with Stage 1's budget: diff it between two builds over this root)",
+        levels);
 
     std::println("--- token index of the leading level word — MODELLED doors ({} lines) ---",
                  report.modelled_stats.lines);
@@ -838,6 +1379,7 @@ void print_root(const RootReport& report)
                     report.modelled_stats.budget_covering(kCoverage99)),
         report.modelled_stats.residual_beyond(report.modelled_stats.budget_covering(kCoverage99)),
         report.modelled_stats.lines);
+    print_nested(report);
 
     if (report.unmodelled_stats.lines != 0)
     {
@@ -853,27 +1395,33 @@ void print_root(const RootReport& report)
 
 void print_usage(std::string_view program_name)
 {
-    std::println(stderr, "usage: {} <label>=<corpus-dir> [<label>=<corpus-dir> ...]", program_name);
+    std::println(
+        stderr,
+        "usage: {} <label>=<corpus-dir> [<label>.outcomes=<path.tsv>] [<label>=<corpus-dir> "
+        "...]",
+        program_name);
     std::println(stderr,
                  "  each <corpus-dir> is walked RECURSIVELY (sorted) for *.log files; the report "
                  "prints counts and prefix shapes only, never a line");
+    std::println(stderr,
+                 "  <label>.outcomes=<path.tsv>: one `<file path relative to the corpus-dir>\\t"
+                 "<outcome word>` row per file, transcribed verbatim from the corpus manifest "
+                 "(the header names the transcription per corpus); the label must already have "
+                 "its <corpus-dir>. Files with no row count as undeclared; a malformed row is an "
+                 "error.");
 }
 } // namespace
 
 // A FUNCTION-TRY-BLOCK, as in f13_cardinality_measure: the body prints as it goes, so the
 // handler's job is to make a partial report SAY it is partial. The handlers use std::fputs, not
 // std::println — a diagnostic that can itself throw would leave this function throwing after all.
-int main(int argc, char** argv)
-try
+// `<label>=<corpus-dir>` roots in order, each optionally followed by its `<label>.outcomes=<tsv>`.
+// The error is the exit code to return, after the reason has been printed.
+[[nodiscard]] std::expected<std::vector<RootReport>, int>
+parse_arguments(std::span<char*> arguments)
 {
-    const std::span<char*> arguments{argv, static_cast<std::size_t>(argc)};
-    if (arguments.size() < 2)
-    {
-        print_usage(arguments.empty() ? "leading_level_token_index_measure" : arguments[0]);
-        return kExitUsage;
-    }
-
     namespace fs = std::filesystem;
+    constexpr std::string_view kOutcomesSuffix{".outcomes"};
     std::vector<RootReport> reports;
     for (std::size_t index{1}; index < arguments.size(); ++index)
     {
@@ -881,53 +1429,49 @@ try
         const std::size_t equals{argument.find('=')};
         if (equals == std::string_view::npos || equals == 0 || equals + 1 == argument.size())
         {
-            std::println(stderr, "argument must be <label>=<corpus-dir>, got '{}'", argument);
-            return kExitUsage;
+            std::println(stderr,
+                         "argument must be <label>=<corpus-dir> or <label>.outcomes=<path.tsv>, "
+                         "got '{}'",
+                         argument);
+            return std::unexpected(kExitUsage);
         }
-        RootReport report{.label = std::string{argument.substr(0, equals)},
-                          .dir = fs::path{std::string{argument.substr(equals + 1)}}};
+        const std::string_view key{argument.substr(0, equals)};
+        const std::string_view value{argument.substr(equals + 1)};
+        if (key.ends_with(kOutcomesSuffix) && key.size() > kOutcomesSuffix.size())
+        {
+            const std::string_view label{key.substr(0, key.size() - kOutcomesSuffix.size())};
+            const auto owner{std::ranges::find(reports, label, &RootReport::label)};
+            if (owner == reports.end())
+            {
+                std::println(stderr,
+                             "'{}' names no root given before it (give <label>=<dir> first)",
+                             argument);
+                return std::unexpected(kExitUsage);
+            }
+            owner->outcomes_path = fs::path{std::string{value}};
+            auto table{read_outcome_table(*owner->outcomes_path)};
+            if (!table)
+            {
+                std::println(stderr, "{}", table.error());
+                return std::unexpected(kExitUsage);
+            }
+            owner->outcomes = std::move(*table);
+            continue;
+        }
+        RootReport report{.label = std::string{key}, .dir = fs::path{std::string{value}}};
         std::error_code dir_error;
         if (!fs::is_directory(report.dir, dir_error))
         {
             std::println(stderr, "not a directory: {}", report.dir.string());
-            return kExitUsage;
+            return std::unexpected(kExitUsage);
         }
         reports.push_back(std::move(report));
     }
+    return reports;
+}
 
-    if (!run_self_test())
-        return kExitSelfTestFailed;
-    std::println("baseline head: the REPLACED kLeadingScanHead = {} raw bytes (N98 landed "
-                 "kLeadingScanTokens{{8}} in time_utils.cpp; the byte figure is quoted, the "
-                 "constant no longer exists)",
-                 kReplacedByteHead);
-
-    // Generic corpus routing is semantic-unaware — a degenerate (zero-package) composition.
-    // `composed` precedes every Tokenizer so it outlives the const-ref each one holds.
-    const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};
-    ArenaAllocator arena{kArenaBytes};
-
-    std::uint64_t population{0};
-    for (RootReport& report : reports)
-    {
-        std::vector<fs::path> files;
-        for (const auto& entry : fs::recursive_directory_iterator{report.dir})
-            if (entry.is_regular_file() && entry.path().extension() == ".log")
-                files.push_back(entry.path());
-        std::ranges::sort(files); // deterministic order for a fixed tree (order-independent anyway)
-        report.files = files.size();
-        for (const fs::path& file : files)
-            measure_file(file, report, arena, composed);
-        population += report.nonempty;
-        print_root(report);
-    }
-
-    if (population == 0)
-    {
-        std::println(stderr, "no non-empty line in any *.log file under the given roots");
-        return kExitEmptyPopulation;
-    }
-
+void print_summary(const std::vector<RootReport>& reports)
+{
     std::println("");
     std::println("=== summary (MODELLED doors) ===");
     std::println("  {:<18} {:>11} {:>9} {:>8} {:>5} {:>6} {:>6} {:>9} {:>8} {:>9} {:>8}", "root",
@@ -945,6 +1489,78 @@ try
                      stats.gained_vs_byte_head(kPreRegisteredBudget + 1).lines,
                      stats.lost_vs_byte_head(kPreRegisteredBudget + 1).lines);
     }
+}
+
+void print_nested_summary(const std::vector<RootReport>& reports)
+{
+    std::println("");
+    std::println(
+        "=== N112 summary — the nested-record residual at {} (MODELLED doors): error-class "
+        "inner words, the cue head's promotions, and the run's declared outcome ===",
+        kNestedBandNames[0]);
+    std::println("  {:<18} {:>7} {:>7} {:>7} {:>8} {:>7} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8}",
+                 "root", "band", "err-cls", "in-head", "promoted", "by-word", "pr:pass", "pr:fail",
+                 "pr:unst", "pr:other", "bw:pass", "bw:fail", "np:fail");
+    for (const RootReport& report : reports)
+    {
+        const NestedResidual& nested{report.nested[0]};
+        const auto& promoted{nested.promoted_by_outcome};
+        const auto& by_word{nested.promoted_by_word_by_outcome};
+        std::println(
+            "  {:<18} {:>7} {:>7} {:>7} {:>8} {:>7} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8} {:>8}",
+            report.label, nested.lines, nested.error_class, nested.error_in_head, nested.promoted,
+            nested.promoted_by_word, promoted[static_cast<std::size_t>(Outcome::Passed)],
+            promoted[static_cast<std::size_t>(Outcome::Failed)],
+            promoted[static_cast<std::size_t>(Outcome::Unstable)],
+            promoted[static_cast<std::size_t>(Outcome::Other)],
+            by_word[static_cast<std::size_t>(Outcome::Passed)],
+            by_word[static_cast<std::size_t>(Outcome::Failed)],
+            nested.error_unpromoted_by_outcome[static_cast<std::size_t>(Outcome::Failed)]);
+    }
+}
+
+int main(int argc, char** argv)
+try
+{
+    const std::span<char*> arguments{argv, static_cast<std::size_t>(argc)};
+    if (arguments.size() < 2)
+    {
+        print_usage(arguments.empty() ? "leading_level_token_index_measure" : arguments[0]);
+        return kExitUsage;
+    }
+    auto parsed{parse_arguments(arguments)};
+    if (!parsed)
+        return parsed.error();
+    std::vector<RootReport>& reports{*parsed};
+
+    if (!run_self_test())
+        return kExitSelfTestFailed;
+    std::println("baseline head: the REPLACED kLeadingScanHead = {} raw bytes (N98 landed "
+                 "kLeadingScanTokens{{8}} in time_utils.cpp; the byte figure is quoted, the "
+                 "constant no longer exists)",
+                 kReplacedByteHead);
+
+    // Generic corpus routing is semantic-unaware — a degenerate (zero-package) composition.
+    // `composed` precedes every Tokenizer so it outlives the const-ref each one holds.
+    const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};
+    ArenaAllocator arena{kArenaBytes};
+
+    std::uint64_t population{0};
+    for (RootReport& report : reports)
+    {
+        walk_root(report, arena, composed);
+        population += report.nonempty;
+        print_root(report);
+    }
+
+    if (population == 0)
+    {
+        std::println(stderr, "no non-empty line in any *.log file under the given roots");
+        return kExitEmptyPopulation;
+    }
+
+    print_summary(reports);
+    print_nested_summary(reports);
     return kExitOk;
 }
 catch (const std::exception& error)
