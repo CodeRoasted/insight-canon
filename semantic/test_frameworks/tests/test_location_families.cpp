@@ -69,6 +69,34 @@ TEST(LocationFamilies, StripsTrailingCoordinatesAndLeadingGlyphs)
                "src/util/date.test.js"); // glyph + trailer
 }
 
+// ── A producer's annotation glued to the path is NOT part of the location ──
+// The witness is the measured one: on the 4 082-run GitHub-Actions corpus, one published alert
+// carried the WHERE `##[error]fs/rc/rcserver/rcserver_test.go` — GitHub's annotation marker inside
+// the file path, because the recogniser sliced the whitespace token from offset 0. The marker is
+// transport annotation; the WHERE is a location (bibles/intent_identity.md §8 — "un chemin entier
+// comme une étiquette opaque"). Canon establishes the START by byte class, not by a marker list,
+// which is why `##[debug]File:` below matters: a marker-literal strip would leave `File:` welded to
+// the path on all 24 lines carrying that shape.
+TEST(LocationFamilies, GluedProducerAnnotationIsNotPartOfTheLocation)
+{
+    const ComposedSemantics tf{test_frameworks_only()};
+    expect_loc(tf,
+               "##[error]fs/rc/rcserver/rcserver_test.go:104:", "fs/rc/rcserver/rcserver_test.go");
+    expect_loc(tf, "##[group]src/options.spec.ts", "src/options.spec.ts");
+    expect_loc(tf, "##[debug]File:/home/runner/work/echarts/echarts/test/ut/spec/util/time.test.ts",
+               "/home/runner/work/echarts/echarts/test/ut/spec/util/time.test.ts");
+    expect_loc(tf, "\"src/auth/login.test.ts\"", "src/auth/login.test.ts");
+    expect_loc(tf, "(tests/test_login.py)", "tests/test_login.py");
+
+    // The costly direction: a byte that IS part of a real path must not truncate the label.
+    expect_loc(tf, "node_modules/@scope/pkg/src/index.spec.js",
+               "node_modules/@scope/pkg/src/index.spec.js");
+    expect_loc(tf, "external/devinfra+/pkg/net/handler_test.go",
+               "external/devinfra+/pkg/net/handler_test.go");
+    expect_loc(tf, "packages/app-desktop\\integration-tests\\main.spec.ts",
+               "packages/app-desktop\\integration-tests\\main.spec.ts");
+}
+
 // ── No false positives — the vocabulary boundary ──
 TEST(LocationFamilies, NoFalsePositives)
 {

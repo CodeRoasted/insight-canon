@@ -305,6 +305,62 @@ TEST(SemanticWalkers, LocationFamiliesAndTokenBoundaries)
     EXPECT_EQ(recognize_location(norm_probe("nothing here.txt"), sc), "");
 }
 
+// ── The location's START is established by the same byte class as its END ──
+// A family fixes the END of a match; whitespace fixes only where the TOKEN began. When a producer
+// glues its own annotation onto the path with no separator, those two are different positions, and
+// slicing from token offset 0 published the annotation INSIDE the label
+// (`##[error]fs/rc/rcserver/rcserver_test.go` — one measured GitHub-Actions alert). The property is
+// asserted over the SYNTHETIC rows on purpose: the repair is a byte class, not a marker table, so
+// it must hold with no dialect vocabulary linked at all.
+TEST(SemanticWalkers, LocationStartExcludesGluedNonPathPrefix)
+{
+    const ComposedSemantics sc{synth()};
+    // The glued-annotation family — one witness per real shape, all three LocationMatchKinds.
+    EXPECT_EQ(recognize_location(norm_probe("##[error]a/b/module_end.qq"), sc),
+              "a/b/module_end.qq");
+    EXPECT_EQ(recognize_location(norm_probe("##[group]dir/thing.chk.aa"), sc), "dir/thing.chk.aa");
+    // `##[debug]File:` is why the repair is a byte class rather than a marker strip: removing the
+    // marker alone would leave `File:` welded to the path on every one of these lines.
+    EXPECT_EQ(recognize_location(norm_probe("##[debug]File:/x/src/pre_widget.zz"), sc),
+              "/x/src/pre_widget.zz");
+    // Wrapping punctuation — the majority shape by count, and not a marker at all.
+    EXPECT_EQ(recognize_location(norm_probe("(a/b/module_end.qq)"), sc), "a/b/module_end.qq");
+    EXPECT_EQ(recognize_location(norm_probe("\"dir/thing.chk.aa\""), sc), "dir/thing.chk.aa");
+    EXPECT_EQ(recognize_location(norm_probe("'dir/thing.chk.aa'"), sc), "dir/thing.chk.aa");
+    // A JavaScript stack frame: `<fn>@<url>`. The `:` before the PORT is the cut, so the function
+    // name, the scheme and the host go and the port digits ride along — the declared residue of
+    // excluding ':', asserted rather than hidden. 17 such lines were measured.
+    EXPECT_EQ(
+        recognize_location(norm_probe("run@http://localhost:5173/a/b/module_end.qq:12:3"), sc),
+        "5173/a/b/module_end.qq");
+
+    // The other direction, and the one that costs more if it is wrong: a byte that IS part of a
+    // real path must NOT cut the label short. Each of these was observed inside a genuine path.
+    EXPECT_EQ(recognize_location(norm_probe("node_modules/@scope/pkg/dir/thing.chk.aa"), sc),
+              "node_modules/@scope/pkg/dir/thing.chk.aa")
+        << "an npm scoped-package '@' must stay inside the location — the largest population by "
+           "far (33 445 lines measured), and truncating it would trade one defect for a worse one";
+    EXPECT_EQ(recognize_location(norm_probe("external/devinfra+/pkg/module_end.qq"), sc),
+              "external/devinfra+/pkg/module_end.qq")
+        << "a Bazel external-repo '+' must stay inside the location";
+    EXPECT_EQ(recognize_location(norm_probe("plugins/***Editor/***dir/thing.chk.aa"), sc),
+              "plugins/***Editor/***dir/thing.chk.aa")
+        << "GitHub's secret redaction rewrites a path SEGMENT in place; '***' is the most of that "
+           "directory chain that is knowable, so it stays";
+    EXPECT_EQ(recognize_location(norm_probe("a\\b\\RUNNER~1\\module_end.qq"), sc),
+              "a\\b\\RUNNER~1\\module_end.qq")
+        << "Windows separators and 8.3 short names must stay inside the location";
+    // The declared price of excluding ':' — stated here rather than discovered later: a Windows
+    // drive letter is cut off with it. Measured at 11 lines against the 24 `##[debug]File:` labels
+    // that excluding ':' repairs.
+    EXPECT_EQ(recognize_location(norm_probe("C:\\a\\module_end.qq"), sc), "\\a\\module_end.qq");
+
+    // And a token that is ONLY the location is returned unchanged — the repair must be inert on
+    // the overwhelming majority of lines.
+    EXPECT_EQ(recognize_location(norm_probe("a/b/module_end.qq"), sc), "a/b/module_end.qq");
+    EXPECT_EQ(recognize_location(norm_probe("PASS dir/thing.chk.aa"), sc), "dir/thing.chk.aa");
+}
+
 // ── lift_level(): FIRST match in declared order wins — NOT longest match ──
 // The level-lift walk was relocated from the GHA package into core with the rows, their order and
 // the first-match rule unchanged. This is the assertion that the first-match rule
@@ -382,6 +438,9 @@ TEST(SemanticWalkers, RecognizersDoNotHeapAllocate)
         (void)recognize_location(norm_probe("PASS dir/thing.chk.aa:42"), sc);
         (void)recognize_location(norm_probe("ok src/pre_widget.zz"), sc);
         (void)recognize_location(norm_probe("a/b/module_end.qq"), sc);
+        // The start-establishing walk is a backwards byte scan over the same view — it must stay
+        // heap-free too, so the probe set carries a glued-prefix line.
+        (void)recognize_location(norm_probe("##[error]a/b/module_end.qq"), sc);
         observed = guard.count();
     }
     EXPECT_EQ(observed, 0U)

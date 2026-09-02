@@ -325,8 +325,12 @@ resolve_run_outcome(SideInputVerdict side_input, const RunOutcomeScan& scan,
 // homed in the facade because it walks the composed location rows (ComposedSemantics is in
 // insight.canon.compose). Canon owns the three LocationMatchKind algorithms; the composed rows are
 // the dialect-independent file-naming vocabulary. Returns a view into the content's bytes, or
-// empty. Byte-for-byte equivalent to the pre-split hardcoded recognize_location. `content`
-// carries the same type-borne ingest precondition as `classify`/`recognize` above.
+// empty. The view is the LOCATION ALONE: a family fixes its end, and the same byte class walked
+// backwards fixes its start, so a producer annotation glued to the path with no separator
+// (`##[error]<path>`, `##[debug]File:<path>`, a wrapping quote or paren) stays OUT of the label —
+// the one deliberate departure from the pre-split hardcoded recognize_location, which sliced from
+// token offset 0. `content` carries the same type-borne ingest precondition as
+// `classify`/`recognize` above.
 [[nodiscard]] std::string_view
 recognize_location(insight::tokenization::NormalizedContent content,
                    const insight::semantic::ComposedSemantics& composed) noexcept;

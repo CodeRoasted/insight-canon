@@ -61,6 +61,11 @@ constexpr SemanticPackageManifest kManifest{.name = "synth_loc",
 // (RawText, not GitHubActions) — the SRC-SP-1 regression guard.
 constexpr std::string_view kTestLine{"PASS src/auth/login.chk.aa"};
 constexpr std::string_view kNonTestLine{"Syncing repository acme/widget"};
+// The same test-file token with a producer's annotation glued to it, no separator — the shape that
+// put `##[error]fs/rc/rcserver/rcserver_test.go` on a published alert's WHERE. The marker is
+// spelled here as DATA on a probe line, never as a rule: no package is linked, so nothing in this
+// binary knows what `##[error]` means.
+constexpr std::string_view kAnnotatedTestLine{"##[error]src/auth/login.chk.aa:104:"};
 } // namespace
 
 // ── Flag ON: the identity-derived test-file WHERE populates the empty component (ANY format) ──
@@ -89,6 +94,24 @@ TEST(WhereWiring, FlagOffLeavesComponentEmpty)
     EXPECT_TRUE(result.value().component.empty())
         << "default-off must leave component empty (byte-identical); got \""
         << result.value().component << '"';
+}
+
+// ── The axis carries the LOCATION alone: a glued producer annotation never enters `component` ──
+// The end-to-end leg of the same property `test_semantic_walkers.cpp` pins on the algorithm: what a
+// consumer reads off the WHERE axis is the path, not the path plus whatever the producer welded to
+// its front.
+TEST(WhereWiring, FlagOnWhereCarriesTheLocationWithoutTheGluedAnnotation)
+{
+    ArenaAllocator arena{kArenaSize};
+    const ComposedSemantics sc{composed()};
+    Tokenizer tokenizer{arena, MaskConfig{.recognize_test_where = true}, sc};
+    const auto result{tokenizer.process_line(kAnnotatedTestLine)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const auto& ev{result.value()};
+    EXPECT_EQ(ev.component, "src/auth/login.chk.aa")
+        << "the WHERE axis must carry the location alone; line \"" << kAnnotatedTestLine
+        << "\" yielded component=\"" << ev.component << "\" (routed format "
+        << insight::to_string(ev.format) << ')';
 }
 
 // ── No false WHERE: a non-test line stays empty even with the flag ON ──

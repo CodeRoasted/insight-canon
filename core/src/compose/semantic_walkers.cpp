@@ -11,7 +11,10 @@ import insight.canon.compose; // ComposedSemantics
 // Homed as a facade impl unit (module insight.canon) because they consume ComposedSemantics, which
 // imports api — so they cannot live in api. Ported byte-for-byte from the pre-split hardcoded
 // StructuralRoleRegistry::classify / IntentMarkerRegistry::recognize / recognize_location so the
-// composed pipeline is byte-identical (G-SP-1).
+// composed pipeline is byte-identical (G-SP-1). ONE deliberate departure since:
+// `recognize_location` now establishes the location's START as well as its end (`loc_is_path`,
+// below) instead of slicing the token from offset 0. It is confined to the flag-gated
+// `MaskConfig::recognize_test_where` path — default OFF — so no G-SP-1 default path moves.
 
 namespace insight
 {
@@ -37,6 +40,36 @@ namespace
     {
         return loc_is_lower(chr) || (chr >= 'A' && chr <= 'Z') || (chr >= '0' && chr <= '9') ||
                chr == '_';
+    }
+    // The byte class a LOCATION may be spelled in — the START predicate, the mirror of the
+    // word-boundary test each family already applies at its END. Whitespace tokenization alone
+    // cannot find a location's start: a producer glues its own annotation onto the path with no
+    // separator (`##[error]fs/rc/rcserver/rcserver_test.go`), and a slice taken from token offset 0
+    // published that annotation INSIDE the label.
+    //
+    // AN ALLOWLIST, and deliberately a wide one, because the two failure directions are not
+    // symmetric: a byte wrongly EXCLUDED silently TRUNCATES a real path, while a byte wrongly
+    // INCLUDED leaves a visible prefix. Every byte below was observed INSIDE a real path on the
+    // 4 082-run GitHub-Actions annotated corpus (2.34 GB, 694 484 lines resolving a location):
+    // `@` npm scoped packages (`node_modules/@scope/pkg/x.test.ts` — 33 445 lines, 45x the
+    // population the annotation defect touches), `\` Windows separators, `+` Bazel external repo
+    // names (`external/devinfra+/…`), `~` Windows 8.3 short names (`…\RUNNER~1\…`), `*` GitHub's
+    // secret redaction, which rewrites a path SEGMENT in place (`plugins/***Editor/***` — 129
+    // lines; `***` is the most of that directory chain that is knowable, so dropping it deletes
+    // truth rather than noise). `:` is NOT admitted: it is the `path:line:col` separator, and
+    // admitting it would carry `File:` back into 24 measured `##[debug]File:<path>` labels — at
+    // the price, stated rather than hidden, of a Windows drive letter (11 lines: `C:\a\x.spec.ts`
+    // resolves `\a\x.spec.ts`).
+    //
+    // Semantic-unaware (SRC-SP-1) — no dialect literal, no marker table — and that is a
+    // measurement, not tidiness. The annotation junk is `##[group]` (42 lines), `##[debug]File:`
+    // (24) and `##[error]` (1), so a marker-literal strip would still have left `File:` inside 36 %
+    // of the labels it aimed at, and would not have touched the 597-line punctuation majority
+    // (`(`, `"`, `'`, `[`, a backtick, a JS stack frame's `fn@http://host:port/`).
+    [[nodiscard]] constexpr bool loc_is_path(char chr) noexcept
+    {
+        return loc_is_word(chr) || chr == '/' || chr == '\\' || chr == '.' || chr == '-' ||
+               chr == '@' || chr == '+' || chr == '~' || chr == '*';
     }
     [[nodiscard]] constexpr std::string_view loc_slice(std::string_view str, std::size_t pos,
                                                        std::size_t count) noexcept
@@ -162,7 +195,16 @@ std::string_view recognize_location(insight::tokenization::NormalizedContent nor
             ++cursor;
         const std::string_view tok{loc_slice(content, start, cursor - start)};
         if (const std::size_t end{test_file_end(tok, rows)}; end != std::string_view::npos)
-            return loc_slice(tok, 0, end);
+        {
+            // The families establish the location's END; this walk establishes its START, over the
+            // same byte class (`loc_is_path`). Taking the token from offset 0 was the defect: the
+            // whitespace that opened the token is a producer's SPACING, not a claim that everything
+            // after it is a path.
+            std::size_t begin{end};
+            while (begin > 0 && loc_is_path(tok[begin - 1U]))
+                --begin;
+            return loc_slice(tok, begin, end - begin);
+        }
     }
     return {};
 }
