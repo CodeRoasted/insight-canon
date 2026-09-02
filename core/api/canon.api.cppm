@@ -1603,12 +1603,30 @@ inline constexpr int kDefaultReferenceYear{2024};
 //                 "2024-01-15T10:30:00+05:30", "2024-01-15 10:30:00"
 [[nodiscard]] std::optional<Timestamp> parse_iso8601(std::string_view timestamp_str) noexcept;
 
-// The RFC3339 full-datetime byte GRAMMAR — one owner, two consumers (ADR-23 erratum 2's "three
-// spellings of one shape", collapsed): the Jenkins strategy's `timestamper_prefix_end` delegates
-// its character grammar here, and the masker's `bracket_timestamp` composite rule (SRC-D-MSK-5)
-// tests a bracket interior with the same function. Homed PUBLIC (not in the mask detail) because
-// the Jenkins package imports only insight.canon.api/spi — canon's detail shards are sealed, so a
+// The RFC3339 full-datetime byte GRAMMAR — ONE owner (ADR-23 erratum 2's "three spellings of one
+// shape", collapsed). ITS CONSUMER SET IS THE BLAST RADIUS OF ANY CHANGE TO IT, and it is four
+// live consumers on three axes, enumerated at the callers:
+//   TRANSPORT (two — these decide CONTENT vs TRANSPORT, not masking): `has_stamp_at_head`, the
+//     FIXED-width LinePrefixTimestamp row, which requires `rfc3339_datetime_length(line, 0) ==
+//     width`; and the LinePrefixBracketedTimestamp peel row beside it — the deleted
+//     `JenkinsStrategy::timestamper_prefix_end` position logic, verbatim in effect. Both in
+//     core/src/transport/transport.cpp.
+//   MASKING (one): the masker's `bracket_timestamp` composite rule (SRC-D-MSK-5,
+//     core/src/mask/mask.cpp), which tests a bracket interior with this function.
+//   MEASUREMENT (one, in two spellings): the frozen G-T5-PEEL oracle
+//     (core/tests/transport/test_bracket_peel_equivalence_gate.cpp) and the Jenkins T5 stamp
+//     measurement (semantic/jenkins/tests/t5_payload_stamp_template_measurement_test.cpp), which
+//     re-implement the position logic AROUND this grammar, so the stamped/unstamped partition
+//     they measure moves under them.
+// So WIDENING THIS GRAMMAR IS NOT A MASKING CHANGE: it moves a content boundary on two formats
+// and quietly falsifies `has_stamp_at_head`'s stated `kMinDatetimeLen{19}` invariant — none of it
+// visible to a masking-focused review. mask.cpp's file-local compact-UTC grammar carries the
+// other half of that refusal and the same census.
+// Homed PUBLIC (not in the mask detail) because a SEPARATE package must reach it: the jenkins
+// package imports only insight.canon.api/spi and canon's detail shards are sealed, so a
 // detail-homed grammar could not be delegated to (bibles/jenkins_dialect.md §4, homing note).
+// The cross-package consumer that keeps that seat earned today is the T5 measurement above — the
+// strategy that first earned it no longer exists.
 // Returns the number of bytes consumed by a COMPLETE datetime starting at `pos`, or 0 when the
 // bytes at `pos` do not carry one. Accepted shape, byte-exact — `YYYY-MM-DDTHH:MM:SS`, optional
 // `.f…` fraction, optional `Z` / `±HH:MM` / `±HHMM` zone. A malformed OPTIONAL part is a hard 0,

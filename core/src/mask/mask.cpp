@@ -559,7 +559,8 @@ namespace
     // Date-only, time-only, bare-integer (`[42]` stays bracket_index's), word (`[INFO]`,
     // `[Pipeline]`), version (`[v1.2.3]`) interiors and any trailing punctuation are all
     // declined. The byte grammar is insight::utils::rfc3339_datetime_length — ONE owner, shared
-    // with the Jenkins strategy's timestamper_prefix_end, so the shape is never spelled twice.
+    // with the transport peel and stamp-at-head rows, so the shape is never spelled twice; that
+    // grammar's own header holds the full four-consumer census.
     // Normal form `[<*>]`: the KEEP-class bracket convention its neighbor set — the bracket (the
     // class) survives, the instance masks. The output-class collision with bracket_index's `[<*>]`
     // is NAMED AND ACCEPTED: both are masked-instance-inside-brackets, and inventing a second
