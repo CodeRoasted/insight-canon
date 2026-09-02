@@ -134,19 +134,22 @@ TEST(VerdictRegisterKindSlot, CapsRegisterStillFiresOnEveryDisplacedRow)
 
 // ── Property 4 — the property whose ABSENCE is the 436: byte-length invariance ─
 // METAMORPHIC OVER ONE INPUT, which is what makes it untunable: it sweeps a bracket-enclosed
-// padding run across the 40-byte kLeadingScanHead boundary and asserts the verdict never moves. No
-// choice of head constant satisfies it; only removing the head from the CLAIM does.
+// padding run from 1 to 60 bytes — across the 40-byte head Stage 1 scanned until ADR-16.D7 made
+// its budget a token count (kLeadingScanTokens) — and asserts the verdict never moves. No choice
+// of a byte constant satisfies it; only removing bytes from the CLAIM does. The padding is ONE
+// token whatever its length, so under the token budget the property holds by construction, and
+// the row stays as the falsifier that reds if a byte budget ever returns.
 //
 // The shape is a real corpus family (GHA `revert/v1/full`): `Failed to resolve action download
-// info. Error: …`. `info.` is an unanchored level word, and whether the `Error` after it is seen
-// depends on whether it STARTS within 40 bytes — so the line read as Info (a bare terminal status)
-// at one padding length and Error at another. Terminality is a property of the LINE; deriving it
-// inside a head made a cost bound decide a verdict.
+// info. Error: …`. `info.` is an unanchored level word, and whether the `Error` after it was seen
+// depended on whether it STARTED within 40 bytes — so the line read as Info (a bare terminal
+// status) at one padding length and Error at another. Terminality is a property of the LINE;
+// deriving it inside a head made a cost bound decide a verdict.
 TEST(VerdictRegisterKindSlot, VerdictIsInvariantUnderPrefixLengthAcrossTheScanHead)
 {
     constexpr std::string_view kBody{"Failed to resolve action download info. Error: boom"};
     constexpr std::size_t kMinPad{1};
-    constexpr std::size_t kMaxPad{60}; // comfortably past kLeadingScanHead{40}
+    constexpr std::size_t kMaxPad{60}; // comfortably past the 40-byte head the token budget replaced
 
     const auto padded{[&](std::size_t pad)
                       { return "[" + std::string(pad, 'a') + "] " + std::string{kBody}; }};
@@ -161,8 +164,7 @@ TEST(VerdictRegisterKindSlot, VerdictIsInvariantUnderPrefixLengthAcrossTheScanHe
         EXPECT_EQ(infer_leading_log_level(line), reference)
             << "the verdict moved at padding length " << pad << " (the level word starts at byte "
             << line.find("info")
-            << ", the head is 40) — a register decision must not depend on a "
-               "byte budget\n  line: "
+            << ") — a register decision must not depend on a byte budget\n  line: "
             << line;
     }
 }

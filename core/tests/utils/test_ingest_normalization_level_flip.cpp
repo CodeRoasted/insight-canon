@@ -24,6 +24,17 @@
 // real failure here; it removes a false positive, and the normalized verdict is the one that AGREES
 // with the producer's declared severity.
 //
+// SUPERSEDED ON THE LEVEL CHANNEL, 2026-09-02 (ADR-16.D7, ROADMAP N98). Stage 1's budget is now a
+// TOKEN count (kLeadingScanTokens{8}, time_utils.cpp) and for_each_token treats an escape run as a
+// delimiter, so `WARNING` is token 3 on the RAW bytes as well and the raw line reads Warn with no
+// normalization at all — it read Error only while a 40-byte head let the escape run push the word
+// out of Stage 1's reach. The to-passing flip this file was written to defend therefore has no line
+// left to flip on: stage 1 no longer changes THIS verdict. What stage 1 still changes is the
+// TEMPLATE (tests/tokenizer/test_stable_door_does_not_normalize.cpp, ARM 1) and the byte position
+// of a Stage-2 cue against kKeywordHead{128} (ARM 3 there). The producer-agreement pin below
+// stands — Warn is still the right answer and still the producer's — and the raw side is now pinned
+// at the SAME verdict, the boundary assertion that reds if a byte budget ever returns to Stage 1.
+//
 // ⚠ THE BARE `\r` IS LOAD-BEARING — *a `\r` is CONTENT in CI logs, not a delimiter* — and this row
 // is the cheapest live proof of that rule in the tree. Stage 1
 // removes the escape run and CORRECTLY leaves the `\r`, which keeps `WARNING` a separate token and
@@ -81,12 +92,15 @@ TEST(IngestNormalizationLevelFlip, TheAfterScriptWarningReadsWarnOnceNormalized)
     const std::string_view normalized{
         insight::tokenization::normalize(kRawAfterScriptWarning, scratch).bytes()};
 
-    // The RAW line reads as failing — recorded, because it is the state the flip moved AWAY from
-    // and a test that only pinned the destination could not tell a fix from a classifier that had
-    // stopped working.
-    EXPECT_TRUE(is_failing(infer_leading_log_level(kRawAfterScriptWarning).value()))
+    // The RAW line reads Warn too, since the token budget (header): pinned at the SAME verdict and
+    // not merely "not failing", so a classifier that stopped reading levels (Unknown on both byte
+    // strings) still reds here, and so does a byte budget back in Stage 1 (Error: the escape run
+    // pushing WARNING out of a head, the state the flip moved AWAY from).
+    EXPECT_EQ(infer_leading_log_level(kRawAfterScriptWarning), LogLevel::Warn)
         << "raw reads " << to_string(infer_leading_log_level(kRawAfterScriptWarning).value())
-        << " — the escape run makes the line's head parse as a failure";
+        << " — with a token budget the escape runs are delimiters and WARNING is token 3, so the "
+           "raw line reads the producer's own severity: Error here is a byte budget back in Stage "
+           "1, Unknown a dead classifier";
 
     // And the NORMALIZED line does not. This is the pin: it agrees with the producer, which marked
     // the line WARNING in its text and yellow in its colour.

@@ -18,9 +18,23 @@ level from structured input ([formats.md](formats.md)); when it does not, canon 
 
 ### 1.1 Two-stage inference
 
-`infer_leading_log_level` scans the line **head** — **40 bytes** for the explicit token
-(`kLeadingScanHead`), **128** for the cue path (`kKeywordHead`) — in two stages:
+`infer_leading_log_level` scans the line **head** — the first **8 significant tokens** for the
+explicit level token (`kLeadingScanTokens`, whatever byte the word starts at), **128 bytes** for the
+cue path (`kKeywordHead`) — in two stages:
 
+> **Why the level budget is a token count and the cue head a byte count.** A budget that decides
+> whether the *producer's own* kind word is read at all is part of the claim, and a byte head made
+> that verdict a function of the prefix's length: `<path>:<line>:<col>: warning:` with a 34-byte
+> build path put `warning` at byte 43, past the old 40-byte head, so one diagnostic classified Warn
+> or Error by how long its path was (an ANSI run spends the same budget). The cue head hunts for
+> canon's *own* lexicon — a cost bound, which may stay in bytes with its residual declared
+> (`ADR-16.D7`). The value 8 is measured, not judged: `core/tools/leading_level_token_index_measure`
+> over 12 corpora, 62 187 513 lines. It reads every word the byte head turned into a verdict, reads
+> the path-prefixed diagnostic class the head dropped (31 % of GitHub Actions' level words, 91 % of
+> gcc's), and leaves a declared residual of level words at index ≥ 8 — GitHub Actions 5.85 %,
+> Jenkins 2.06 %, GitLab 1.38 %, gcc 0.29 % of level-bearing lines — mostly nested records, a CI
+> line wrapping an application or syslog record whose level word is the *inner* record's.
+>
 > **Why the cue head is 128 and not 64.** A **verdict anchor can sit at the END of a long line**: a
 > deeply-namespaced CI test name pushes its `(FAILED)` anchor past column 64, so the strongest
 > available failure signal fell outside the old bound. The widening is measure-first — it is the fix
@@ -40,7 +54,7 @@ level from structured input ([formats.md](formats.md)); when it does not, canon 
   | `fatal`, `failure`, `critical`, `crit` | Fatal |
 
   A leading level word is **authoritative only when it is anchored** — in verdict register (caps / `:` /
-  bracket, see §2.2) **or** it is the terminal/sole significant token in the head. An unanchored level word
+  bracket, see §2.2) **or** it is the terminal/sole significant token on the line. An unanchored level word
   buried mid-sentence (`failure modes documented`) does **not** set the level by itself; it falls through to
   Stage 2. This stops a descriptive sentence that merely contains a level word from being classified as that
   level.

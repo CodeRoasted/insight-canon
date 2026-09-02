@@ -46,10 +46,18 @@
 //   ARM 3  THE PRICE, at the door grain. ADR-21.D4 records that a caller handing
 //          presentation-bearing bytes to the stable door gets "precisely the silently-coarser
 //          answer ADR-21.D1 names", and calls that the door's price rather than a defect. This arm
-//          makes the price a measured fact on a real corpus line instead of a sentence: the same
-//          GitLab `after_script` warning reads a FAILING level through the stable door and Warn
-//          through the normalized one. It asserts the routed format is IDENTICAL first — otherwise
-//          a level split would be attributable to strategy routing rather than to stage 1.
+//          makes the price a measured fact on the level channel instead of a sentence — and the
+//          price MOVED on 2026-09-02 (ADR-16.D7, ROADMAP N98). It used to show on the GitLab
+//          `after_script` warning, whose escape run pushed `WARNING` past Stage 1's 40-byte head so
+//          the stable door read a FAILING level and the normalized door Warn; with Stage 1's
+//          budget a TOKEN count the escape runs are delimiters, `WARNING` is token 3 on both byte
+//          strings, and the two doors AGREE on that line — which the arm now pins as a boundary.
+//          Where the price still shows is Stage 2: its cue head kKeywordHead{128} is a raw-byte
+//          budget (a declared COST bound under ADR-16.D7's criterion), so on a line whose failure
+//          cue starts inside 128 stripped bytes and outside 128 raw bytes the stable door reads
+//          no failure and the normalized door reads Error. It asserts the routed format is
+//          IDENTICAL first — otherwise a level split would be attributable to strategy routing
+//          rather than to stage 1.
 //   ARM 4  THE ANTI-VACUITY CONTROL, and without it the three arms above prove less than they
 //          look. On an ESC-FREE line the two doors must agree byte-for-byte on every
 //          content-derived field. That is what makes ARM 1 a statement about STAGE 1 and not about
@@ -85,13 +93,20 @@
 //         RED 2 of 4: ARM 2 and ARM 4 — and ARM 1 and ARM 3 stay GREEN. That is the whole reason
 //         ARM 4 exists: a stable door broken for a non-stage-1 reason passes the escape test and
 //         is caught only by the control.
+//   2026-09-02 — ARM 3's price input changed with ADR-16.D7 (above); REASONED for the new input,
+//         not re-measured, and the 2026-09-01 measurement above is of the previous input. SD-A
+//         normalizes the stable side, so both doors read the cue (Error/Error) and the arm's
+//         inequality reds; SD-B hands raw bytes to process_line, so neither door reads the cue
+//         (Unknown/Unknown) and it reds again; SD-C drops one trailing byte and is level-blind on
+//         this input, leaving ARM 3 green as before. The partition claim stands.
 //
 // The line grain versus the classifier grain: `test_ingest_normalization_level_flip.cpp` pins that
-// `infer_leading_log_level` reads this same corpus line differently before and after
-// `normalize()`. That is a claim about the CLASSIFIER. ARM 3 is a claim about which bytes the DOOR
-// puts in front of it, and neither file can see the other's property — the classifier arm stays
-// green if both doors start normalizing, and this one stays green if the classifier's verdict on
-// either byte string changes, as long as the two verdicts still differ.
+// `infer_leading_log_level` reads the `after_script` corpus line as Warn on BOTH byte strings since
+// the token budget (it read Error raw before). That is a claim about the CLASSIFIER. ARM 3 is a
+// claim about which bytes the DOOR puts in front of it, taken on the input where the classifier
+// still answers differently, and neither file can see the other's property — the classifier arm
+// stays green if both doors start normalizing, and this one stays green if the classifier's verdict
+// on either byte string changes, as long as the two verdicts still differ.
 //
 // Determinism: string literals only, one arena and one Tokenizer per door invocation (a shared
 // LogParser latches a sticky strategy, so sharing one would make arm k's routing depend on arm
@@ -135,6 +150,19 @@ constexpr std::string_view kAnsiWrapped{
 constexpr std::string_view kEscapeFree{
     "section_end:1737226867:after_script WARNING: after_script failed, but job will continue "
     "unaffected: exit code 1"};
+
+// The price input since ADR-16.D7: the same GitLab runner envelope (36 bytes stripped, 47 raw — the
+// `\r` stays, the two escape runs go) in front of a body with NO level word among its first eight
+// tokens and one failure cue, placed so the cue starts at stripped byte 118 and raw byte 129 — inside
+// Stage 2's 128-byte cue head on the normalized door, outside it on the stable one. A fixture, not a
+// corpus line: no producer emits this exact body, and the arm asserts both offsets before reading a
+// level, so a wrong count here reds as a fixture error rather than as a door.
+constexpr std::string_view kCueAtTheHeadEdge{
+    "section_end:1737226867:after_script\r\x1b[0K\x1b[0;33muploading artifacts for job 2092177 to "
+    "the coordinator after three retry attempts failed: coordinator returned 502\x1b[0;m"};
+// Stage 2's cue head, QUOTED from time_utils.cpp (kKeywordHead is function-local there and cannot
+// be linked): the premise assertions in ARM 3 red if it moves, which is the coupling wanted.
+constexpr std::size_t kCueHeadBytes{128};
 
 // ── The fixture ───────────────────────────────────────────────────────────────────────────────
 
@@ -289,51 +317,102 @@ TEST(StableDoorDoesNotNormalize, ProcessLineIsTheStableDoorWithStageOneInFrontOf
 }
 
 // ── ARM 3 — THE PRICE, AT THE DOOR GRAIN ──────────────────────────────────────────────────────
-// ADR-21.D4 records the exemption's cost so it is "never quoted as costless". This measures it.
+// ADR-21.D4 records the exemption's cost so it is "never quoted as costless". This measures it —
+// where it still is — and pins the line it left.
 
 TEST(StableDoorDoesNotNormalize, ThePresentationBytesReachTheLevelVerdictThroughTheStableDoor)
 {
-    Door stable_door;
-    Door normalizing_door;
+    // Part 1 — THE BOUNDARY: the corpus line the price USED to show on. Since Stage 1's budget
+    // counts tokens (ADR-16.D7) the escape runs are delimiters, `WARNING` is token 3 on both byte
+    // strings, and the two doors agree on the producer's own severity. A split here is a byte
+    // budget back in Stage 1, not the exemption doing its work.
+    {
+        Door stable_door;
+        Door normalizing_door;
 
-    const auto stable{stable_door.tokenizer.process_stable_line(kAnsiWrapped)};
-    const auto normalized{normalizing_door.tokenizer.process_line(kAnsiWrapped)};
+        const auto stable{stable_door.tokenizer.process_stable_line(kAnsiWrapped)};
+        const auto normalized{normalizing_door.tokenizer.process_line(kAnsiWrapped)};
 
-    ASSERT_TRUE(stable.has_value()) << "process_stable_line declined: " << stable.error();
-    ASSERT_TRUE(normalized.has_value()) << "process_line declined: " << normalized.error();
+        ASSERT_TRUE(stable.has_value()) << "process_stable_line declined: " << stable.error();
+        ASSERT_TRUE(normalized.has_value()) << "process_line declined: " << normalized.error();
+        ASSERT_EQ(stable->format, normalized->format)
+            << "the two doors routed the after_script line to different strategies.\n  "
+            << describe("stable      ", *stable) << "\n  " << describe("process_line", *normalized);
 
-    // ASSERTED FIRST, because it is what makes the level split attributable. Two doors that routed
-    // to DIFFERENT strategies would disagree about the level for a reason that has nothing to do
-    // with stage 1, and the arm below would then be reading a routing difference while claiming a
-    // normalization one.
-    ASSERT_EQ(stable->format, normalized->format)
-        << "the two doors routed this line to different strategies, so nothing below is a "
-           "statement about stage 1.\n  "
-        << describe("stable      ", *stable) << "\n  " << describe("process_line", *normalized);
+        EXPECT_EQ(stable->level, LogLevel::Warn)
+            << "the stable door read the after_script warning as " << to_string(stable->level)
+            << " — Stage 1's token budget reads the producer's WARNING at token 3 THROUGH the "
+               "escape runs; a failing level here is a raw-byte budget back in Stage 1 (the "
+               "escape run pushing the word out of a head), the defect ADR-16.D7 removed.\n  "
+            << describe("stable", *stable);
+        EXPECT_EQ(normalized->level, LogLevel::Warn)
+            << "the normalized door no longer reads this line as the producer marked it. GitLab "
+               "wrote WARNING: in the text and coloured it 0;33.\n  "
+            << describe("process_line", *normalized);
+    }
 
-    EXPECT_TRUE(is_failing(stable->level))
-        << "the stable door no longer reads this line as failing. Its answers are specified as "
-           "functions of the caller's PRESENTATION bytes (ADR-21.D4), and on those bytes the "
-           "escape run makes the line's head parse as a failure.\n  "
-        << describe("stable", *stable);
+    // Part 2 — THE PRICE, where it still shows. Stage 2's cue head is a raw-byte budget
+    // (kKeywordHead{128}, a declared cost bound), so an escape run in front of a cue spends it:
+    // `failed` is inside the head once stripped and outside it raw. Premises asserted first, so a
+    // miscounted fixture reds as a fixture and not as a door.
+    {
+        std::string scratch;
+        const std::string_view stripped{normalize(kCueAtTheHeadEdge, scratch).bytes()};
+        const std::size_t cue_raw{kCueAtTheHeadEdge.find("failed")};
+        const std::size_t cue_stripped{stripped.find("failed")};
+        ASSERT_NE(cue_raw, std::string_view::npos);
+        ASSERT_NE(cue_stripped, std::string_view::npos);
+        ASSERT_LT(cue_stripped, kCueHeadBytes)
+            << "fixture premise: the cue must START inside the " << kCueHeadBytes
+            << "-byte cue head on the STRIPPED bytes; it starts at byte " << cue_stripped;
+        ASSERT_GE(cue_raw, kCueHeadBytes)
+            << "fixture premise: the cue must START outside the " << kCueHeadBytes
+            << "-byte cue head on the RAW bytes; it starts at byte " << cue_raw;
 
-    EXPECT_EQ(normalized->level, LogLevel::Warn)
-        << "the normalized door no longer reads this line as the producer marked it. GitLab wrote "
-           "WARNING: in the text and coloured it 0;33; with the escape run stripped, that is the "
-           "verdict stage 1 exists to surface.\n  "
-        << describe("process_line", *normalized);
+        Door stable_door;
+        Door normalizing_door;
 
-    // The pair, as one statement: this is the door's PRICE. A caller that hands
-    // presentation-bearing bytes to the stable door gets the silently-coarser answer, and the
-    // difference is a whole alerting level on a line whose own text says the failure was
-    // inconsequential.
-    EXPECT_NE(stable->level, normalized->level)
-        << "both doors read this line as " << to_string(stable->level)
-        << ". They agree, so the exemption now costs nothing on the "
-           "one input chosen because it costs something. Either stage 1 stopped mattering to the "
-           "leading-level inference — in which case ADR-21.D4's recorded price needs re-deriving, "
-           "not updating — or one of the doors changed.\n  "
-        << describe("stable      ", *stable) << "\n  " << describe("process_line", *normalized);
+        const auto stable{stable_door.tokenizer.process_stable_line(kCueAtTheHeadEdge)};
+        const auto normalized{normalizing_door.tokenizer.process_line(kCueAtTheHeadEdge)};
+
+        ASSERT_TRUE(stable.has_value()) << "process_stable_line declined: " << stable.error();
+        ASSERT_TRUE(normalized.has_value()) << "process_line declined: " << normalized.error();
+
+        // ASSERTED FIRST, because it is what makes the level split attributable. Two doors that
+        // routed to DIFFERENT strategies would disagree about the level for a reason that has
+        // nothing to do with stage 1, and the arm below would then be reading a routing difference
+        // while claiming a normalization one.
+        ASSERT_EQ(stable->format, normalized->format)
+            << "the two doors routed this line to different strategies, so nothing below is a "
+               "statement about stage 1.\n  "
+            << describe("stable      ", *stable) << "\n  " << describe("process_line", *normalized);
+
+        EXPECT_FALSE(is_failing(stable->level))
+            << "the stable door read a failure its cue head cannot reach on the caller's bytes: "
+               "`failed` starts at raw byte "
+            << cue_raw << ", past the " << kCueHeadBytes
+            << "-byte head. Either that head grew, or the stable door normalized — the wrong fix "
+               "ADR-21.D4 names.\n  "
+            << describe("stable", *stable);
+
+        EXPECT_TRUE(is_failing(normalized->level))
+            << "the normalized door did not read the cue at stripped byte " << cue_stripped
+            << " — stage 1 is unconditional at that door, and with the escape runs gone the cue is "
+               "inside the head.\n  "
+            << describe("process_line", *normalized);
+
+        // The pair, as one statement: this is the door's PRICE. A caller that hands
+        // presentation-bearing bytes to the stable door gets the silently-coarser answer, and the
+        // difference is a whole alerting level — on Stage 2's byte-bounded cue head now, the one
+        // budget ADR-16.D7 leaves in raw bytes.
+        EXPECT_NE(stable->level, normalized->level)
+            << "both doors read this line as " << to_string(stable->level)
+            << ". They agree, so the exemption now costs nothing on the one input chosen because "
+               "it costs something. Either Stage 2's cue head stopped being a byte budget — in "
+               "which case ADR-21.D4's recorded price needs re-deriving, not updating — or one of "
+               "the doors changed.\n  "
+            << describe("stable      ", *stable) << "\n  " << describe("process_line", *normalized);
+    }
 }
 
 // ── ARM 4 — THE ANTI-VACUITY CONTROL ──────────────────────────────────────────────────────────

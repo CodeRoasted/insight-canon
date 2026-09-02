@@ -1,14 +1,19 @@
 // leading_level_token_index_measure — the standing G-L11 instrument (ADR-16.D7, ROADMAP N98).
 //
-// WHAT IT MEASURES. infer_leading_log_level's Stage 1 reads the producer's own level word only
-// when that word STARTS within kLeadingScanHead{40} raw bytes (time_utils.cpp). ADR-16.D7 rules
-// that a budget deciding whether the producer's kind word is read at all is part of the CLAIM and
-// must be counted in significant TOKENS, and that its VALUE is a measurement — the token index at
-// which the leading level word sits, over the corpora, cut with a declared residual — never a
-// judgment. This tool takes that measurement: per corpus root it prints the index distribution,
-// what the present 40-byte head reaches, and what every candidate token budget would gain, lose
-// and leave — with the residual's classes, so the cut can be declared the way kKeywordHead{128}
-// declares its own.
+// WHAT IT MEASURES. infer_leading_log_level's Stage 1 read the producer's own level word only
+// when that word STARTED within kLeadingScanHead{40} raw bytes, until ROADMAP N98 replaced that
+// byte head with the token budget kLeadingScanTokens{8} (time_utils.cpp) on this instrument's
+// numbers. ADR-16.D7 rules that a budget deciding whether the producer's kind word is read at all
+// is part of the CLAIM and must be counted in significant TOKENS, and that its VALUE is a
+// measurement — the token index at which the leading level word sits, over the corpora, cut with a
+// declared residual — never a judgment. This tool takes that measurement: per corpus root it
+// prints the index distribution, what the replaced 40-byte head reached, and what every candidate
+// token budget gains, loses and leaves against that head — with the residual's classes, so the
+// cut is declared the way kKeywordHead{128} declares its own, and a re-derivation after the
+// landing still reads against the same baseline. Per root it also prints the pipeline's LEVEL
+// histogram: run at two commits over the same roots, the diff of that line is the classification
+// delta at count grain (the G-L2 leg DN-54.D10 owes), which the index histogram — budget-blind by
+// construction — cannot show.
 //
 // WHY A CLI TOOL AND NOT A TEST: the f13_cardinality_measure ruling (DN-18.D1 § 3.3). The
 // population is whatever the operator mounts, so the report DECLARES it (files, lines, doors, the
@@ -16,10 +21,10 @@
 //
 // THE PREDICATE IS THE SHIPPED ONE, NOT A COPY. for_each_token is the tokenizer Stage 1 scans
 // with and parse_log_level is the vocabulary it matches; both are public, and this tool calls them
-// with scan_limit 0 (the whole remainder) and reports the index of the first hit. Today's reach
-// is reproduced without re-implementing the scan: for_each_token visits exactly the tokens whose
-// START lies within the limit, so "the first level token starts at byte < 40" IS "Stage 1 sees a
-// level token today".
+// with scan_limit 0 (the whole remainder) and reports the index of the first hit. The replaced
+// byte head's reach is reproduced without re-implementing its scan: for_each_token visits exactly
+// the tokens whose START lies within a byte limit, so "the first level token starts at byte < 40"
+// IS "the 40-byte head saw a level token".
 //
 // THE DOOR IS MODELLED, AND THE MODEL IS MEASURED. No strategy hands the scanner the line: each
 // hands a REMAINDER (rfc3339_text.cpp scans after the stamp token, raw_text.cpp after a left-trim,
@@ -59,17 +64,21 @@ using insight::tokenization::MaskConfig;
 using insight::tokenization::Tokenizer;
 
 constexpr std::size_t kArenaBytes{std::size_t{8} * 1024 * 1024};
-// The constant under measurement, QUOTED: it is function-local to infer_leading_log_level and
-// cannot be linked. Re-derive it against time_utils.cpp before citing any "today" column.
-constexpr std::size_t kLeadingScanHeadBytesToday{40};
+// The byte head the token budget REPLACED, quoted: kLeadingScanHead{40} was function-local to
+// infer_leading_log_level and no longer exists in the tree. It stays the fixed baseline every
+// budget column is read against, so a run after the landing still reports what the landing gained
+// and lost, in the same columns the value was decided on.
+constexpr std::size_t kReplacedByteHead{40};
 constexpr std::size_t kHistogramWidth{24}; // indices printed one per row up to here, then pooled
 constexpr std::size_t kPrefixShapeMaxTokens{8};
 constexpr std::size_t kTopShapesShown{6};
 constexpr std::size_t kFormatCount{static_cast<std::size_t>(LogFormat::Unknown) + 1U};
 constexpr std::size_t kLevelCount{static_cast<std::size_t>(LogLevel::Unknown) + 1U};
 // The budgets tabulated for every root, besides the coverage cuts the data itself produces. 7 is
-// the pre-registered expectation (DN-54.D22 / ADR-16.D7: mass at index <= 6); the detailed cuts
-// print the residual / gained / lost CLASSES for the candidates a ruling would choose between.
+// the pre-registered expectation (DN-54.D22 / ADR-16.D7: mass at index <= 6) and 8 is the landed
+// value (kLeadingScanTokens, time_utils.cpp — Eqya's ruling of 2026-09-02 on the nested-record
+// residual); the detailed cuts print the residual / gained / lost CLASSES for the candidates a
+// ruling chooses between.
 constexpr std::array<std::size_t, 10> kCandidateBudgets{2, 3, 4, 5, 6, 7, 8, 10, 12, 16};
 constexpr std::array<std::size_t, 4> kDetailedBudgets{7, 8, 12, 16};
 constexpr std::size_t kPreRegisteredBudget{7};
@@ -116,7 +125,7 @@ struct LevelHit
     LogLevel level{LogLevel::Unknown};
     RegisterProxy proxy{RegisterProxy::Bare};
     // No token follows the level word on the line — the one register in which an UNANCHORED
-    // level word is still authoritative today (time_utils.cpp: "the terminal / sole significant
+    // level word is still authoritative (time_utils.cpp: "the terminal / sole significant
     // token"), so a bare residual word that is terminal is a verdict a budget decides, and a bare
     // one that is not falls through to Stage 2 whatever the budget.
     bool terminal{false};
@@ -333,14 +342,14 @@ struct Classes
 
 struct IndexStats
 {
-    // By exact token index, split on whether the level word STARTS inside today's 40-byte head
-    // on the stripped bytes — the two populations a budget trades against each other.
-    std::vector<Classes> in_head;           // byte start < 40: Stage 1 reads the word today
-    std::vector<Classes> beyond_head;       // byte start >= 40: Stage 1 does not
+    // By exact token index, split on whether the level word STARTS inside the replaced 40-byte
+    // head on the stripped bytes — the two populations a budget trades against that head.
+    std::vector<Classes> in_head;           // byte start < 40: the byte head read the word
+    std::vector<Classes> beyond_head;       // byte start >= 40: it did not
     std::vector<std::uint64_t> in_head_raw; // byte start < 40 on the RAW bytes (parse_stable)
     std::uint64_t lines{0};
 
-    void record(const LevelHit& hit, bool head_today, bool head_raw)
+    void record(const LevelHit& hit, bool in_byte_head, bool in_byte_head_raw)
     {
         if (hit.token_index >= in_head.size())
         {
@@ -349,8 +358,8 @@ struct IndexStats
             in_head_raw.resize(hit.token_index + 1, 0);
         }
         ++lines;
-        (head_today ? in_head : beyond_head)[hit.token_index].add(hit);
-        if (head_raw)
+        (in_byte_head ? in_head : beyond_head)[hit.token_index].add(hit);
+        if (in_byte_head_raw)
             ++in_head_raw[hit.token_index];
     }
 
@@ -369,7 +378,7 @@ struct IndexStats
             sum += total_at(index);
         return sum;
     }
-    [[nodiscard]] std::uint64_t head_today_total() const noexcept
+    [[nodiscard]] std::uint64_t byte_head_total() const noexcept
     {
         std::uint64_t sum{0};
         for (const Classes& classes : in_head)
@@ -380,16 +389,16 @@ struct IndexStats
     {
         return std::accumulate(in_head_raw.begin(), in_head_raw.end(), std::uint64_t{0});
     }
-    // Lines the 40-byte head reads today and a token budget would NOT: index >= budget, byte < 40.
-    [[nodiscard]] Classes lost_vs_today(std::size_t budget) const
+    // Lines the replaced 40-byte head read and a token budget does NOT: index >= budget, byte < 40.
+    [[nodiscard]] Classes lost_vs_byte_head(std::size_t budget) const
     {
         Classes lost;
         for (std::size_t index{budget}; index < in_head.size(); ++index)
             lost.merge(in_head[index]);
         return lost;
     }
-    // Lines a token budget reads and the 40-byte head does NOT: index < budget, byte >= 40.
-    [[nodiscard]] Classes gained_vs_today(std::size_t budget) const
+    // Lines a token budget reads and the replaced 40-byte head did NOT: index < budget, byte >= 40.
+    [[nodiscard]] Classes gained_vs_byte_head(std::size_t budget) const
     {
         Classes gained;
         for (std::size_t index{0}; index < std::min(budget, beyond_head.size()); ++index)
@@ -433,6 +442,11 @@ struct RootReport
     std::uint64_t nonempty{0};
     std::uint64_t declined{0}; // the pipeline produced no event (a blank-after-peel line)
     std::array<std::uint64_t, kFormatCount> routed{};
+    // Every routed event's level, declared or inferred, on every door: the one line of this report
+    // that MOVES when Stage 1's budget moves. Diffed between two builds over the same root it is
+    // the count-grain classification delta; the index histogram cannot show it, because the index
+    // of a level word does not depend on whether the pipeline read it.
+    std::array<std::uint64_t, kLevelCount> pipeline_levels{};
     std::uint64_t modelled{0};
     std::uint64_t unmodelled{0};
     std::uint64_t control_agree{0};
@@ -454,7 +468,7 @@ struct RootReport
 // Runs BEFORE the walk and refuses the run on any disagreement: a zero from an instrument that
 // never demonstrated it can see the phenomenon is not a measurement. Rows 2 and 3 are ADR-16.D7's
 // own pre-registered shapes; row 3 is also its "real path, ANSI stripped" witness row, whose level
-// word starts at byte 43 — past today's head with no escape byte anywhere.
+// word starts at byte 43 — past the replaced 40-byte head with no escape byte anywhere.
 struct SelfTestRow
 {
     std::string_view name;
@@ -625,6 +639,7 @@ void measure_file(const std::filesystem::path& file, RootReport& report, ArenaAl
         arena.reset(); // every view the event held is dead from here; only values are read below
 
         ++report.routed[static_cast<std::size_t>(routed)];
+        ++report.pipeline_levels[static_cast<std::size_t>(pipeline_level)];
         const DoorModel door{door_model_of(routed)};
         const std::string_view stripped{insight::tokenization::normalize(raw, scratch).bytes()};
         const std::string_view stripped_scan{remainder_for(door, stripped)};
@@ -665,12 +680,12 @@ void measure_file(const std::filesystem::path& file, RootReport& report, ArenaAl
         if (!hit)
             continue;
         const std::optional<LevelHit> raw_hit{first_level_token(raw_scan)};
-        const bool head_today{hit->byte_start < kLeadingScanHeadBytesToday};
-        const bool head_raw{raw_hit.has_value() &&
-                            raw_hit->byte_start < kLeadingScanHeadBytesToday};
+        const bool in_byte_head{hit->byte_start < kReplacedByteHead};
+        const bool in_byte_head_raw{raw_hit.has_value() &&
+                                    raw_hit->byte_start < kReplacedByteHead};
         IndexStats& stats{door == DoorModel::Unmodelled ? report.unmodelled_stats
                                                         : report.modelled_stats};
-        stats.record(*hit, head_today, head_raw);
+        stats.record(*hit, in_byte_head, in_byte_head_raw);
     }
 }
 
@@ -739,18 +754,18 @@ void print_cut(const IndexStats& stats, std::size_t budget)
     print_classes(std::format("residual beyond N={}", budget), stats.residual_beyond(budget),
                   stats.lines);
     print_classes(std::format("gained at N={} vs the 40-byte head", budget),
-                  stats.gained_vs_today(budget), stats.lines);
+                  stats.gained_vs_byte_head(budget), stats.lines);
     print_classes(std::format("lost at N={} vs the 40-byte head", budget),
-                  stats.lost_vs_today(budget), stats.lines);
+                  stats.lost_vs_byte_head(budget), stats.lines);
 }
 
 void print_budget_table(const IndexStats& stats)
 {
-    const std::uint64_t head_today{stats.head_today_total()};
-    std::println("  40-byte head today (stripped bytes): reaches {} of {} ({:.4f}%), misses {}",
-                 head_today, stats.lines, percent(head_today, stats.lines),
-                 stats.lines - head_today);
-    std::println("  40-byte head on the raw bytes      : reaches {} of {} ({:.4f}%)",
+    const std::uint64_t byte_head{stats.byte_head_total()};
+    std::println("  40-byte head, REPLACED (stripped bytes): reached {} of {} ({:.4f}%), missed {}",
+                 byte_head, stats.lines, percent(byte_head, stats.lines),
+                 stats.lines - byte_head);
+    std::println("  40-byte head on the raw bytes          : reached {} of {} ({:.4f}%)",
                  stats.head_raw_total(), stats.lines, percent(stats.head_raw_total(), stats.lines));
     std::println("  {:>4} {:>11} {:>9} {:>11} {:>14} {:>13}", "N", "covered", "cum%", "missed",
                  "gained-vs-40B", "lost-vs-40B");
@@ -759,7 +774,8 @@ void print_budget_table(const IndexStats& stats)
         const std::uint64_t covered{stats.covered_by(budget)};
         std::println("  {:>4} {:>11} {:>9.4f} {:>11} {:>14} {:>13}", budget, covered,
                      percent(covered, stats.lines), stats.lines - covered,
-                     stats.gained_vs_today(budget).lines, stats.lost_vs_today(budget).lines);
+                     stats.gained_vs_byte_head(budget).lines,
+                     stats.lost_vs_byte_head(budget).lines);
     }
     std::println("  coverage cuts: N(99%)={}  N(99.9%)={}  N(100%)={}",
                  stats.budget_covering(kCoverage99), stats.budget_covering(kCoverage999),
@@ -802,11 +818,18 @@ void print_root(const RootReport& report)
                  report.modelled_stats.lines, percent(report.modelled_stats.lines, report.modelled),
                  report.unmodelled_stats.lines,
                  percent(report.unmodelled_stats.lines, report.unmodelled));
+    std::string levels;
+    for (std::size_t level{0}; level < kLevelCount; ++level)
+        levels += std::format(" {}={}", insight::to_string(static_cast<LogLevel>(level)),
+                              report.pipeline_levels[level]);
+    std::println("pipeline level:{}  (every routed event, declared or inferred, all doors — the "
+                 "line that moves with Stage 1's budget: diff it between two builds over this root)",
+                 levels);
 
     std::println("--- token index of the leading level word — MODELLED doors ({} lines) ---",
                  report.modelled_stats.lines);
     print_histogram(report.modelled_stats);
-    std::println("--- today's 40-byte head vs a token budget N — MODELLED doors ---");
+    std::println("--- the replaced 40-byte head vs a token budget N — MODELLED doors ---");
     print_budget_table(report.modelled_stats);
     for (const std::size_t budget : kDetailedBudgets)
         print_cut(report.modelled_stats, budget);
@@ -874,9 +897,10 @@ try
 
     if (!run_self_test())
         return kExitSelfTestFailed;
-    std::println("today's head : kLeadingScanHead = {} raw bytes (quoted from time_utils.cpp — "
-                 "re-derive before citing)",
-                 kLeadingScanHeadBytesToday);
+    std::println("baseline head: the REPLACED kLeadingScanHead = {} raw bytes (N98 landed "
+                 "kLeadingScanTokens{{8}} in time_utils.cpp; the byte figure is quoted, the "
+                 "constant no longer exists)",
+                 kReplacedByteHead);
 
     // Generic corpus routing is semantic-unaware — a degenerate (zero-package) composition.
     // `composed` precedes every Tokenizer so it outlives the const-ref each one holds.
@@ -913,13 +937,13 @@ try
     {
         const IndexStats& stats{report.modelled_stats};
         std::println("  {:<18} {:>11} {:>9} {:>8.4f} {:>5} {:>6} {:>6} {:>9} {:>8} {:>9} {:>8}",
-                     report.label, stats.lines, stats.head_today_total(),
-                     percent(stats.lines - stats.head_today_total(), stats.lines),
+                     report.label, stats.lines, stats.byte_head_total(),
+                     percent(stats.lines - stats.byte_head_total(), stats.lines),
                      stats.budget_covering(kCoverage99), stats.budget_covering(kCoverage999),
-                     stats.max_index() + 1, stats.gained_vs_today(kPreRegisteredBudget).lines,
-                     stats.lost_vs_today(kPreRegisteredBudget).lines,
-                     stats.gained_vs_today(kPreRegisteredBudget + 1).lines,
-                     stats.lost_vs_today(kPreRegisteredBudget + 1).lines);
+                     stats.max_index() + 1, stats.gained_vs_byte_head(kPreRegisteredBudget).lines,
+                     stats.lost_vs_byte_head(kPreRegisteredBudget).lines,
+                     stats.gained_vs_byte_head(kPreRegisteredBudget + 1).lines,
+                     stats.lost_vs_byte_head(kPreRegisteredBudget + 1).lines);
     }
     return kExitOk;
 }

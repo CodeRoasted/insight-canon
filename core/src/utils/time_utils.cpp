@@ -807,17 +807,39 @@ EventLevel infer_leading_log_level(std::string_view line) noexcept
     //     "INFO" can't override it.
     //  2) Otherwise, scan the head for an error/warning CUE as a standalone token
     //     (pytest "…OperationalError", tracebacks, bare "connection refused").
-    // A COST BOUND on the leading-level search, and nothing else: how far into the line an explicit
-    // level token may START. It states nothing about what precedes the level word and decides no
-    // verdict — the register decision (SRC-D-OUT-4c's kind slot) and the terminality decision below
-    // are both derived over the WHOLE line. It read as a position rule once ("covers an ISO-8601
-    // timestamp + the level start"), and that framing was the defect: a byte budget is only ever a
-    // proxy for position, and a proxy over presentation bytes moves when the presentation moves —
-    // for_each_token's limit is a RAW-BYTE offset, so an ANSI run before the level word spends the
-    // budget and pushes the word out of the head entirely. Bound the scan, never the claim
-    // (ADR-20). Bounded ⇒ alloc-free hot-path discipline (ADR-9).
-    constexpr std::size_t kLeadingScanHead{40};
-    // Head scanned for a failure/warning cue. 128 (not 64), aligned with the pass/fail-glyph
+    // THE LEADING-LEVEL BUDGET COUNTS SIGNIFICANT TOKENS, NEVER RAW BYTES (ADR-16.D7; DN-54.D22 is
+    // the argument). What it bounds: how many significant tokens may precede the producer's own
+    // level word before Stage 1 stops looking. What it costs: a level word further in is not read
+    // and the line falls through to Stage 2. It is the budget that decides whether the producer's
+    // kind word is read AT ALL, which makes it part of the CLAIM — and as a 40-byte head it made
+    // that verdict a function of the prefix's LENGTH: `<path>:<line>:<col>: warning:` with a
+    // 34-byte build path put `warning` at byte 43, past the head, so Stage 2 answered from the
+    // message body and one producer's one diagnostic classified Warn or Error by how long its
+    // path was (an ANSI run is one more spender of the same budget, not the class). The register
+    // decision (SRC-D-OUT-4c's kind slot) and the terminality decision below stay derived over the
+    // WHOLE line: bound the scan, never the claim (ADR-20). Bounded ⇒ alloc-free hot-path
+    // discipline (ADR-9); for_each_token's byte limit is untouched — the scan passes 0 (the whole
+    // line) and the visitor counts its own visits.
+    //
+    // THE VALUE IS A MEASUREMENT, NOT A JUDGMENT — the instrument is
+    // tools/leading_level_token_index_measure (self-testing; re-run it before moving this). Over
+    // 12 corpora, 62 187 513 lines (insight-canon e084a31, 2026-09-02): 8 tokens — indices 0..7 —
+    // reads every level word the 40-byte head turned into a verdict (the lines it no longer
+    // reaches are bare, non-terminal words that fell through to Stage 2 under the head too: 0
+    // verdict changes) and reads the path-prefixed diagnostic class the head dropped — 31 % of
+    // GitHub Actions' level words and 91 % of gcc's. ADR-16.D7's pre-registered 7 would lose 30
+    // terminal-bare GitLab verdicts, which is why 8. The declared residual, level words at index
+    // >= 8 that Stage 1 does not read, as a share of level-bearing lines: GitHub Actions 5.85 %,
+    // Jenkins 2.06 %, GitLab 1.38 %, gcc 0.29 %. Its verdict-shaped part (GitHub Actions 23 324
+    // lines, 2.05 %) is a NESTED record — a CI line wrapping an application or syslog record,
+    // level word at token 8-15 — and Eqya ruled it a residual (2026-09-02, as the claim
+    // boundary's owner): that word is the INNER record's level, and reading it as the line's
+    // verdict would attribute the inner severity to the outer line. Reversible by the Founder;
+    // the cost of moving the value is one re-run of the instrument.
+    constexpr std::size_t kLeadingScanTokens{8};
+    // Head scanned for a failure/warning cue — the other side of ADR-16.D7's criterion: a COST
+    // bound over canon's OWN cue vocabulary, which may stay in raw bytes because its residual is
+    // declared below, unlike the claim budget above. 128 (not 64), aligned with the pass/fail-glyph
     // kOutcomeHead: a VERDICT ANCHOR can sit at the END of a long line — a deeply-namespaced CI
     // test verdict (`Tests\E2E\…\DocumentsDBCustomServerTest::testTimeout (FAILED)`) puts the
     // `(FAILED)` anchor at col ~69, past the old 64 head, so the strongest possible failure signal
@@ -828,8 +850,9 @@ EventLevel infer_leading_log_level(std::string_view line) noexcept
     // residual (the measure-first catalog discipline). Still bounded → no hot-path scan blow-up.
     constexpr std::size_t kKeywordHead{128};
 
-    // Stage 1 — first exact level token whose start lies within the head, but
-    // authoritative only IN VERDICT REGISTER (SRC-D-OUT-4). parse_log_level is outcome-blind:
+    // Stage 1 — the first exact level token among the first kLeadingScanTokens significant
+    // tokens, but authoritative only IN VERDICT REGISTER (SRC-D-OUT-4). parse_log_level is
+    // outcome-blind:
     // it maps the bare words failure/fatal/critical → Fatal, error → Error, warn → Warn,
     // so a descriptive line ("error handling enabled", "failure modes documented") whose
     // FIRST token is a level WORD would otherwise be classified alerting and authoritative,
@@ -839,14 +862,17 @@ EventLevel infer_leading_log_level(std::string_view line) noexcept
     // status). An unanchored, non-terminal level word falls THROUGH to Stage 2's anchored cue scan.
     LogLevel leading{LogLevel::Unknown};
     std::string_view level_token{};
-    // The return (did-stop-early) is unused: we read the captured leading/level_token, set as side
-    // effects, instead.
-    (void)for_each_token(line, kLeadingScanHead,
+    std::size_t visited{0};
+    // Scan limit 0 = the whole line; the visitor ends the walk itself — at the first level word,
+    // or once kLeadingScanTokens tokens have been examined, so token index kLeadingScanTokens is
+    // never visited whatever byte it starts at. The return (did-stop-early) is unused: the
+    // captured leading/level_token, set as side effects, are what Stage 1 reads.
+    (void)for_each_token(line, 0U,
                          [&](std::string_view token) noexcept
                          {
                              const LogLevel level{parse_log_level(token)};
                              if (level == LogLevel::Unknown)
-                                 return false;
+                                 return ++visited == kLeadingScanTokens; // budget spent: stop
                              leading = level; // first level token wins
                              level_token = token;
                              return true; // stop — Stage 1 has everything it reads
