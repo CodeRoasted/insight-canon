@@ -1,5 +1,5 @@
 // NOLINTBEGIN — measurement harness: long literals, wide reports and raw loops are the point.
-// t5_payload_stamp_template_measurement_test.cpp — the pre-registered measurement owed by the
+// payload_stamp_template_count_measurement_test.cpp — the pre-registered measurement owed by the
 // ruling that a PAYLOAD stamp is dialect content, never a transport envelope (and the evidence
 // that settles what the masker then owes).
 //

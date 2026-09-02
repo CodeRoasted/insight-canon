@@ -1651,7 +1651,7 @@ inline constexpr int kDefaultReferenceYear{2024};
 //     core/src/mask/mask.cpp), which tests a bracket interior with this function.
 //   MEASUREMENT (one, in two spellings): the frozen G-T5-PEEL oracle
 //     (core/tests/transport/test_bracket_peel_equivalence_gate.cpp) and the Jenkins T5 stamp
-//     measurement (semantic/jenkins/tests/t5_payload_stamp_template_measurement_test.cpp), which
+//     measurement (semantic/jenkins/tests/payload_stamp_template_count_measurement_test.cpp), which
 //     re-implement the position logic AROUND this grammar, so the stamped/unstamped partition
 //     they measure moves under them.
 // So WIDENING THIS GRAMMAR IS NOT A MASKING CHANGE: it moves a content boundary on two formats

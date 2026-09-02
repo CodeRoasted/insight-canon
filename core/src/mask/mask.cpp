@@ -758,7 +758,7 @@ namespace
     // bracket-peel row and `has_stamp_at_head` (transport.cpp), both of which decide CONTENT
     // vs TRANSPORT; the `bracket_timestamp` composite above; and two frozen measurement
     // oracles (test_bracket_peel_equivalence_gate.cpp,
-    // t5_payload_stamp_template_measurement_test.cpp) that re-implement the position logic
+    // payload_stamp_template_count_measurement_test.cpp) that re-implement the position logic
     // AROUND it. Widening moves a Jenkins/GitHub content boundary and quietly falsifies
     // `has_stamp_at_head`'s stated `kMinDatetimeLen{19}` invariant (18 < 19) — none of it
     // visible to a masking-focused review. This grammar has ONE caller, in this translation

@@ -45,7 +45,7 @@ namespace insight::semantic::jenkins
 // which is why the number is recorded here rather than explained away. Template IDs move; the
 // count is stable — measured ±strip 3 337 vs 3 339, the +2 fully attributed (one dual-occurrence
 // twin + the bare-`[<*>]` cell from 134 timestamp-only lines; the prefix-image triangle —
-// `PrefixImageExitGate` in tests/t5_payload_stamp_template_measurement_test.cpp — returned
+// `PrefixImageExitGate` in tests/payload_stamp_template_count_measurement_test.cpp — returned
 // REPAIRED 2026-07-30, per stamped line template(unstripped) == "[<*>]" ⧺ M(rest), zero
 // exceptions on 6 416 stamped lines). A re-baseline, not a regression.
 

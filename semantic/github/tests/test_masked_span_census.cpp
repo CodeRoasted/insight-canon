@@ -94,9 +94,9 @@
 // of file names; the file set, the walk order and every printed set are sorted, so the output is a
 // pure function of the banked bytes.
 //
-// CORPUS-GATED (`d4_realcorpus` precedent): the banked run logs are third-party derivatives that
-// live outside every checkout, so this SKIPS cleanly when the mount is absent — green in CI and on
-// every clone.
+// CORPUS-GATED (`cold_vs_unified_realcorpus` precedent): the banked run logs are third-party
+// derivatives that live outside every checkout, so this SKIPS cleanly when the mount is absent —
+// green in CI and on every clone.
 //
 //   CODEROAST_G1_LOGS     directory holding the `*.annotated.log` members
 //   CODEROAST_G1_SUBJECT  the committed subject TSV (side, run_id, repo, workflow, file)
