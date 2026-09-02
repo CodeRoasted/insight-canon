@@ -439,6 +439,24 @@ namespace
 // case-fold ⇒ cross-stdlib and MSVC bit-identical (F5).
 namespace detail
 {
+    // MEMBERSHIP, not firing — the predicate an INSTRUMENT needs and no product path does. Whether
+    // Stage 2 has an entry for a word at all is the question underneath "the register declined it":
+    // `lexicon_hit` consults `is_verdict_anchored` only AFTER a `kFailureLexicon` match, so a word
+    // the table does not hold is not declined by any register, it is invisible. Exposed here rather
+    // than re-listed at the call site because a measurement that enumerates the eighteen words for
+    // itself measures its own copy of the vocabulary and goes stale silently the day one is added
+    // (`DN-37.D20`). Same table, same `iequals` comparison, one walk — the identical shape
+    // `leading_outcome_is_fail` uses above. Role-blind on purpose: a `SelfAnchoring` word and a
+    // `RegisterAnchored` one are both IN the lexicon, and the role is what the register question
+    // asks NEXT.
+    [[nodiscard]] bool is_failure_lexicon_word(std::string_view token) noexcept
+    {
+        for (const FailureWord& entry : kFailureLexicon)
+            if (iequals(token, entry.word))
+                return true;
+        return false;
+    }
+
     [[nodiscard]] bool leading_outcome_is_pass(std::string_view line) noexcept
     {
         static constexpr std::size_t kOutcomeHead{128U}; // generous monorepo scope-prefix bound

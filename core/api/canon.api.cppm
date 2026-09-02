@@ -1517,6 +1517,23 @@ namespace detail
     // failure_lexicon.cpp.
     [[nodiscard]] bool leading_outcome_is_pass(std::string_view line) noexcept;
 
+    // Is `token` one of the failure lexicon's words at all — MEMBERSHIP, never firing. The two
+    // questions are not the same and the order is the reason: `lexicon_hit` consults
+    // `is_verdict_anchored` only AFTER a `kFailureLexicon` match, so a word the table does not hold
+    // reaches no register and is DECLINED BY NOTHING — it is invisible to Stage 2. Case-
+    // insensitive, whole-token, role-blind (a `SelfAnchoring` word and a `RegisterAnchored` one are
+    // both members; the role decides what happens next, not membership).
+    //
+    // NO PRODUCT PATH CALLS THIS. It exists for the standing instruments that must report which of
+    // the two a residual line is — `tools/leading_level_token_index_measure`'s R1/R2 split —
+    // WITHOUT re-listing the eighteen words on their own side, which would measure the
+    // instrument's copy of the vocabulary rather than the product's and would go stale in silence
+    // the day a word is added (`DN-37.D20`). Internal/detail, NOT a public product surface: the
+    // public failure-lexicon API stays contains_failure_cue / contains_warning_cue. Defined with
+    // the lexicon in failure_lexicon.cpp; pure byte-compare + ASCII case-fold, order-independent
+    // ⇒ cross-stdlib and MSVC bit-identical (F5).
+    [[nodiscard]] bool is_failure_lexicon_word(std::string_view token) noexcept;
+
     // The verdict-register kernel (SRC-D-OUT-4) — true iff `token` carries the structural
     // decoration CI/test tooling uses to mark an outcome, so a benign-collision-prone
     // failure token classifies its line ONLY in verdict register (never in a path / config
