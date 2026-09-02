@@ -154,7 +154,14 @@ namespace
         if (line.front() == '<')
             candidates.add(LogFormat::RFC5424);
 
-        if (line.front() == '-')
+        // A BGL/Thunderbird record opens with LogHub's alert-class column: `-` on a normal
+        // record, an uppercase class name on an anomalous one (DN-43.D14). Offering BGL only on
+        // `-` is what kept 348 460 alert-flagged lines of the pinned corpus — 7.34 % of it, and
+        // 100 % of its labelled records — out of the candidate list entirely, so they never
+        // reached a strategy that could read their declared FATAL. The uppercase arm is cheap to
+        // widen because the label alphabet excludes lowercase: `Jun 14 15:16:01 …` fails it at the
+        // second byte. The predicate proper runs in `confidence()`, as every format's does.
+        if (line.front() == '-' || is_upper(line.front()))
             candidates.add(LogFormat::BGL);
 
         if (line.front() == '[')

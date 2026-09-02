@@ -1186,6 +1186,135 @@ TEST_F(BGLStrategyTest, ConfidenceHighForBGL)
     EXPECT_GT(strategy.confidence(kThunderbirdLine), 0.5);
 }
 
+// ── The ALERT-LABEL column (DN-43.D14) ───────────────────────────────────────────────────────
+// LogHub's curators prepended an alert-class column to records BGL's RAS system wrote without one.
+// It is the corpus's ANSWER KEY, so the grammar validates it and no projection field carries it:
+// a labelled line must project identically to its `-` twin, or one event class splits by curation.
+
+// `kBGLLine` with the label column set to an alert class and the declared level raised to FATAL —
+// the exact byte shape of 348 398 of the pinned corpus's 348 460 labelled lines.
+static constexpr std::string_view kBGLAlertLine =
+    "KERNDTLB 1117838570 2005.06.03 R02-M1-N0-C:J12-U11 2005-06-03-15.42.50.675872 "
+    "R02-M1-N0-C:J12-U11 RAS KERNEL FATAL data TLB error interrupt";
+
+TEST_F(BGLStrategyTest, ClaimsAnAlertLabelledLineAndReadsItsDeclaredLevel)
+{
+    auto result{strategy.parse(kBGLAlertLine, arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const auto& pl{result.value()};
+    EXPECT_TRUE(pl.timestamp.has_value());
+    EXPECT_EQ(pl.level, LogLevel::Fatal) << "level = " << to_string(pl.level.value());
+    EXPECT_TRUE(pl.level.is_declared()) << "BGL writes its severity in a fixed column";
+    EXPECT_EQ(pl.component, "KERNEL");
+    EXPECT_EQ(pl.host, "R02-M1-N0-C:J12-U11");
+    EXPECT_EQ(pl.content, "data TLB error interrupt");
+}
+
+// The label reaches NO field. Asserted per field rather than on the projection as a whole, so a
+// failure names the field that leaked the oracle.
+TEST_F(BGLStrategyTest, TheAlertLabelReachesNoProjectionField)
+{
+    auto result{strategy.parse(kBGLAlertLine, arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const auto& pl{result.value()};
+    EXPECT_EQ(pl.content.find("KERNDTLB"), std::string_view::npos) << "content = " << pl.content;
+    EXPECT_EQ(pl.component.find("KERNDTLB"), std::string_view::npos)
+        << "component = " << pl.component;
+    EXPECT_EQ(pl.host.find("KERNDTLB"), std::string_view::npos) << "host = " << pl.host;
+}
+
+// The second BGL header shape: `<node>` is `-` and the node is NOT repeated, so `<FACILITY>`
+// arrives one token early. 306 lines of the pinned corpus, today mis-parsed to `level` Unknown
+// with `component` = `FATAL` — the field-shift the predicate now refuses to publish.
+TEST_F(BGLStrategyTest, ParsesTheSecondHeaderShapeWithNoRepeatedNode)
+{
+    static constexpr std::string_view kNoRepeatedNodeLine =
+        "- 1133447860 2005.12.01 - 2005-12-01-06.37.40.117709 RAS KERNEL FATAL "
+        "data storage interrupt";
+    auto result{strategy.parse(kNoRepeatedNodeLine, arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const auto& pl{result.value()};
+    EXPECT_EQ(pl.component, "KERNEL");
+    EXPECT_EQ(pl.host, "-");
+    EXPECT_EQ(pl.level, LogLevel::Fatal) << "level = " << to_string(pl.level.value());
+    EXPECT_EQ(pl.content, "data storage interrupt");
+}
+
+// `<node2>` is itself the literal `NULL` on 89 296 pinned-corpus lines. Probing the second header
+// shape first would read that node as the facility and decline every one of them, so the canonical
+// shape is probed first and this line is the detector for that order.
+TEST_F(BGLStrategyTest, ParsesARecordWhoseRepeatedNodeIsTheLiteralNull)
+{
+    static constexpr std::string_view kNullNodeLine =
+        "- 1117867321 2005.06.03 NULL 2005-06-03-23.42.01.596122 NULL RAS MMCS INFO "
+        "ciodb has been restarted.";
+    auto result{strategy.parse(kNullNodeLine, arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const auto& pl{result.value()};
+    EXPECT_EQ(pl.component, "MMCS");
+    EXPECT_EQ(pl.host, "NULL");
+    EXPECT_EQ(pl.level, LogLevel::Info) << "level = " << to_string(pl.level.value());
+    EXPECT_EQ(pl.content, "ciodb has been restarted.");
+}
+
+// A record whose `<node2>` holds a spliced message fragment instead of a node: the facility is at
+// neither position, so the parse would be off by several fields. It DECLINES — 10 lines of the
+// pinned corpus — rather than publishing a message fragment on the cube's WHERE axis.
+TEST_F(BGLStrategyTest, DeclinesARecordWhoseFacilityIsAtNeitherPosition)
+{
+    static constexpr std::string_view kSplicedLine =
+        "- 1133447861 2005.12.01 - 2005-12-01-06.37.41.417709 time for a single instance of a "
+        "correctable ddr. RAS KERNEL INFO 0 microseconds spent in the rbs signal handler";
+    EXPECT_DOUBLE_EQ(strategy.confidence(kSplicedLine), 0.0);
+    EXPECT_FALSE(strategy.parse(kSplicedLine, arena).has_value());
+}
+
+// A complete header with no message. Legitimate (DN-43.D6 member (a)): the empty template is the
+// correct identity of a content-less line, and the header fields are still published. 34 470 lines
+// of the pinned corpus.
+TEST_F(BGLStrategyTest, AnEmptyBodyProjectsToEmptyContentWithItsHeaderFieldsSet)
+{
+    static constexpr std::string_view kEmptyBodyLine =
+        "- 1117838570 2005.06.03 R02-M1-N0 2005-06-03-15.42.50.675872 R02-M1-N0 "
+        "RAS KERNEL FATAL";
+    auto result{strategy.parse(kEmptyBodyLine, arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const auto& pl{result.value()};
+    EXPECT_TRUE(pl.content.empty()) << "content = " << pl.content;
+    EXPECT_EQ(pl.component, "KERNEL");
+    EXPECT_EQ(pl.host, "R02-M1-N0");
+    EXPECT_EQ(pl.level, LogLevel::Fatal) << "level = " << to_string(pl.level.value());
+}
+
+// The Thunderbird branch with NO delimited tag. Nothing is removed: the remainder stays content
+// and `component` is empty. 1 309 pinned-corpus lines used to lose their whole body to
+// `component` here, leaving a template that is the SHA-256 of nothing.
+TEST_F(BGLStrategyTest, AThunderbirdLineWithNoDelimitedTagKeepsItsWholeRemainder)
+{
+    static constexpr std::string_view kNoTagLine =
+        "- 1131566461 2005.11.09 dn228 Nov 9 12:01:01 dn228/dn228 exiting on signal 15";
+    auto result{strategy.parse(kNoTagLine, arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const auto& pl{result.value()};
+    EXPECT_TRUE(pl.component.empty()) << "component = " << pl.component;
+    EXPECT_EQ(pl.content, "exiting on signal 15");
+    EXPECT_EQ(pl.host, "dn228");
+}
+
+// The one-token bound also refuses a multi-token pseudo-tag: `Server Administrator:` is two
+// tokens, so its colon is not a tag delimiter and the whole remainder stays content.
+TEST_F(BGLStrategyTest, AThunderbirdMultiTokenPseudoTagIsNotATag)
+{
+    static constexpr std::string_view kPseudoTagLine =
+        "VAPI 1131566461 2005.11.09 dn228 Nov 9 12:01:01 dn228/dn228 "
+        "Server Administrator: Instrumentation Service EventID: 1000";
+    auto result{strategy.parse(kPseudoTagLine, arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const auto& pl{result.value()};
+    EXPECT_TRUE(pl.component.empty()) << "component = " << pl.component;
+    EXPECT_EQ(pl.content, "Server Administrator: Instrumentation Service EventID: 1000");
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // AndroidLogcatStrategy
 // ─────────────────────────────────────────────────────────────────────────────

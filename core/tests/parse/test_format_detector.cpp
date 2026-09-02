@@ -213,6 +213,26 @@ TEST_F(FormatDetectorTest, DetectsBGL)
     EXPECT_EQ(s->format(), LogFormat::BGL);
 }
 
+// The alert-label column routes exactly as `-` does (DN-43.D14). Before it did not: the candidate
+// list was gated on a leading `-`, so 348 460 lines of the pinned BGL corpus were never offered a
+// BGL probe at all and fell to the raw-text fallback with their declared FATAL unread.
+TEST_F(FormatDetectorTest, DetectsAnAlertLabelledBGLLine)
+{
+    auto* s{detector.detect("KERNDTLB 1117838570 2005.06.03 R02-M1-N0 2005-06-03-15.42.50 "
+                            "R02-M1-N0 RAS KERNEL FATAL data TLB error interrupt")};
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->format(), LogFormat::BGL);
+}
+
+// The uppercase arm of the candidate gate must not start claiming BSD syslog: the label alphabet
+// has no lowercase, so a month name fails it at the second byte.
+TEST_F(FormatDetectorTest, AnUppercaseLeadingSyslogLineStillRoutesToSyslog)
+{
+    auto* s{detector.detect("Jun 14 15:16:01 combo sshd[19939]: authentication failure")};
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->format(), LogFormat::Syslog);
+}
+
 TEST_F(FormatDetectorTest, DetectsAndroidLogcat)
 {
     auto* s{detector.detect("03-17 16:13:38.859  2227  2227 D TextView: visible is system.time")};

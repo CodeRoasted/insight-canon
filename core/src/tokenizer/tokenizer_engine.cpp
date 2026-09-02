@@ -105,10 +105,15 @@ struct Tokenizer::Impl
             ++empty_projections;
             if (empty_projections == 1 || empty_projections % kEmptyProjectionWarnEvery == 0)
             {
-                // `component` is printed because it is what separates the two readings a bare
-                // count cannot: EMPTY means the line's body genuinely ended at the header (a
-                // legitimate `cron[1]:` with nothing after it), NON-EMPTY means the message body
-                // was moved onto a cube dimension — the defect shape itself.
+                // `component` is printed because on a SYSLOG-shaped grammar it separates the
+                // two readings a bare count cannot: EMPTY means the line's body genuinely ended
+                // at the header (a legitimate `cron[1]:` with nothing after it), NON-EMPTY means
+                // the message body was moved onto a cube dimension — the defect shape itself.
+                // IT DOES NOT GENERALISE, and reading it as if it did is how the next reader acts
+                // on a false positive (DN-43.D14). A grammar with a SUBSYSTEM column fills
+                // `component` from the header, so BGL's 34 470 genuinely-empty bodies each print
+                // `component="KERNEL"` and read as the defect shape. The warning is a COUNT; the
+                // per-strategy expectation carries the verdict.
                 INSIGHT_LOG_WARN(
                     logging::tokenizer_logger(),
                     "empty projection: format={} kept 0 content bytes of {} component=\"{}\" "

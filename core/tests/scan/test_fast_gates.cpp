@@ -170,9 +170,23 @@ TEST(FastGatesPrefix, ApacheError)
 
 TEST(FastGatesPrefix, BglHealthAppHpc)
 {
-    EXPECT_TRUE(is_bgl_prefix("- 1117838570 2005.06.03 R02-M1-N0-C:J12-U11 RAS KERNEL INFO"));
-    EXPECT_FALSE(is_bgl_prefix("1117838570 2005.06.03 missing the leading dash"));
-    EXPECT_FALSE(is_bgl_prefix("- 1117838570 2005-06-03 dashes, not dots"));
+    EXPECT_TRUE(
+        is_bgl_labelled_prefix("- 1117838570 2005.06.03 R02-M1-N0-C:J12-U11 RAS KERNEL INFO"));
+    EXPECT_FALSE(is_bgl_labelled_prefix("1117838570 2005.06.03 missing the leading label"));
+    EXPECT_FALSE(is_bgl_labelled_prefix("- 1117838570 2005-06-03 dashes, not dots"));
+
+    // The alert-label column: `-` or a bounded uppercase class name, and nothing else (DN-43.D14).
+    EXPECT_TRUE(is_bgl_labelled_prefix(
+        "KERNDTLB 1117838570 2005.06.03 R02-M1-N0-C:J12-U11 RAS KERNEL FATAL"));
+    EXPECT_TRUE(
+        is_bgl_labelled_prefix("APPSEV 1117838570 2005.06.03 R02-M1-N0 RAS APP FAILURE msg"));
+    EXPECT_TRUE(is_bgl_labelled_prefix("R_ID9 1117838570 2005.06.03 R02-M1-N0 RAS APP INFO msg"));
+    EXPECT_FALSE(is_bgl_labelled_prefix("kerndtlb 1117838570 2005.06.03 lowercase is not a label"));
+    EXPECT_FALSE(is_bgl_labelled_prefix("Kerndtlb 1117838570 2005.06.03 mixed case is not one"));
+    // 17 bytes — one past the bound, so the label does not end at whitespace and the line is not
+    // silently re-read as a 16-byte label plus a junk epoch.
+    EXPECT_FALSE(is_bgl_labelled_prefix("ABCDEFGHIJKLMNOPQ 1117838570 2005.06.03 R02-M1-N0 RAS"));
+    EXPECT_TRUE(is_bgl_labelled_prefix("ABCDEFGHIJKLMNOP 1117838570 2005.06.03 R02-M1-N0 RAS"));
 
     EXPECT_TRUE(is_health_app_prefix("20171223-22:15:29:606|Step_LSC|30002312|onStandStepChanged"));
     EXPECT_TRUE(is_health_app_prefix("20171223-2:15:29:606|single-digit hour"));

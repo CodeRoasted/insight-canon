@@ -51,8 +51,11 @@ class ApacheErrorLogStrategy final : public IFormatStrategy
 export namespace insight::tokenization
 {
 
-/// Parses BlueGene/L (BGL) and Thunderbird supercomputer log formats:
+/// Parses BlueGene/L (BGL) and Thunderbird supercomputer log formats. The leading column is
+/// LogHub's alert LABEL — `-` on a normal record, otherwise a bounded uppercase class name — and
+/// it is validated by the grammar and carried in no projection field (DN-43.D14):
 ///   BGL:         "- 1117838570 2005.06.03 R02-M1 ... RAS KERNEL INFO msg"
+///   BGL alert:   "KERNDTLB 1117838570 2005.06.03 R02-M1 ... RAS KERNEL FATAL msg"
 ///   Thunderbird: "- 1131566461 2005.11.09 dn228 Nov 9 12:01:01 dn228 crond:
 ///   msg"
 class BGLStrategy final : public IFormatStrategy
@@ -369,6 +372,42 @@ class SparkHDFSStrategy final : public IFormatStrategy
     [[nodiscard]] LogFormat format() const noexcept override;
     [[nodiscard]] double confidence(std::string_view line) const noexcept override;
 };
+
+} // namespace insight::tokenization
+
+// ──────── the BGL RECORD predicate — ONE scan, two readers (DN-43.D2, DN-43.D14) ────────
+// Module-internal: defined in bgl.cpp, whose grammar it is, and consumed by nothing else.
+namespace insight::tokenization
+{
+
+// What BGLStrategy CLAIMS, and therefore what it validates before removing a byte from `content`
+// (DN-43.D11 condition 1). The grammar is
+//
+//   <label> <epoch> <date> <node> <ts2> <node2> <FACILITY> <SUBSYS> <LEVEL> <msg>   (RAS records)
+//   <label> <epoch> <date> <node> <ts2>         <FACILITY> <SUBSYS> <LEVEL> <msg>   (306 corpus
+//   lines) <label> <epoch> <date> <node> <Mon> <DD> <HH:MM:SS> <host> [<tag>[pid]:] <msg>
+//   (Thunderbird)
+//
+// `<label>` is the alert class and is carried NOWHERE — see is_bgl_labelled_prefix. `<FACILITY>`,
+// `<node2>` and `<date>` are read by the predicate and dropped: they are validated grammar, not
+// content. Everything the parse then publishes is below, so `confidence()` scoring non-zero means
+// exactly "this parse will succeed", which is the only construction under which the gate and the
+// grammar cannot drift apart.
+struct BglRecord
+{
+    std::string_view epoch;     // <epoch> — seconds since the Unix epoch; the record's event time
+    std::string_view node;      // <node> — the node identity (F3b: host, hors-cube)
+    std::string_view component; // RAS: <SUBSYS>. Thunderbird: the daemon tag, EMPTY when none
+    std::string_view content;   // every byte after the header — the total projection (DN-43.D6)
+    // Engaged on the RAS branch only: BGL DECLARES its severity in a fixed column, so the level is
+    // read, not guessed. Disengaged on the Thunderbird branch, which has no level column at all
+    // and infers from the message body in the `inferred` species (DN-43.D5).
+    std::optional<LogLevel> declared_level;
+};
+
+// nullopt = the line is not a BGL or Thunderbird record. Bounded by the HEADER: every scan stops
+// at a whitespace boundary and the message body is handed over as a tail view, never scanned.
+[[nodiscard]] std::optional<BglRecord> scan_bgl_record(std::string_view line) noexcept;
 
 } // namespace insight::tokenization
 

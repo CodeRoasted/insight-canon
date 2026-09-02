@@ -240,6 +240,36 @@ TEST_F(TokenizerTest, SameStructuredLinesSameTemplateID)
     EXPECT_EQ(r1.value().template_str, r2.value().template_str);
 }
 
+// ── The alert label must not enter template identity (DN-43.D14) ─────────────────────────────
+// The load-bearing property of claiming the labelled shape. LogHub's alert-class column is the
+// corpus's ANSWER KEY: an identity that varied with it would split ONE event class — `RAS KERNEL
+// FATAL data TLB error interrupt`, flagged on 348 398 pinned-corpus lines and unflagged on
+// 506 797 — 42 ways by curation rather than by structure. Asserted at the pipeline grain, because
+// template identity is what the wire carries and a per-field strategy assertion cannot see it.
+TEST_F(TokenizerTest, AnAlertLabelledBGLLineHasTheSameTemplateAsItsUnlabelledTwin)
+{
+    constexpr std::string_view kLabelled{
+        "KERNDTLB 1117838570 2005.06.03 R02-M1-N0-C:J12-U11 2005-06-03-15.42.50.675872 "
+        "R02-M1-N0-C:J12-U11 RAS KERNEL FATAL data TLB error interrupt"};
+    constexpr std::string_view kTwin{
+        "- 1117838570 2005.06.03 R02-M1-N0-C:J12-U11 2005-06-03-15.42.50.675872 "
+        "R02-M1-N0-C:J12-U11 RAS KERNEL FATAL data TLB error interrupt"};
+    auto labelled{tokenizer.process_line(kLabelled)};
+    auto twin{tokenizer.process_line(kTwin)};
+    ASSERT_TRUE(labelled.has_value());
+    ASSERT_TRUE(twin.has_value());
+    EXPECT_EQ(labelled.value().template_str, twin.value().template_str)
+        << "labelled = " << labelled.value().template_str
+        << " | twin = " << twin.value().template_str;
+    EXPECT_EQ(template_id_of(labelled.value().template_str),
+              template_id_of(twin.value().template_str));
+    // And the twin pair agrees on every projected field, not just on identity.
+    EXPECT_EQ(labelled.value().component, twin.value().component);
+    EXPECT_EQ(labelled.value().level, twin.value().level);
+    EXPECT_TRUE(labelled.value().declared_level)
+        << "BGL declares its severity in a fixed column, so the level is read, never guessed";
+}
+
 TEST_F(TokenizerTest, VariablePartBecomesWildcardInTemplate)
 {
     // The IPv4 token is masked to "<*>" per-line (stateless); the kept literal "User"

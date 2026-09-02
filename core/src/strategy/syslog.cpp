@@ -24,20 +24,17 @@ import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitive
 namespace insight::tokenization
 {
 
-// extract_syslog_tag lives in insight.canon.detail.scan (shared with the BGL/Thunderbird
-// branch, F3b). SyslogStrategy no longer calls it: its delimiter search runs over the WHOLE
-// remainder, which is how `cache key=session:1021 hit=true` produced the component
-// `cache key=session` and the content `1021 hit=true` — a message body moved onto a cube axis.
-// A syslog tag is ONE token, and bounding the search to one token makes that extractor's
-// no-delimiter branch — the branch that eats the message — unreachable from here, which is a
-// stronger guarantee than deleting it (DN-43.D3).
+// The tag scan lives in insight.canon.detail.scan as `take_bounded_syslog_tag`, shared with the
+// BGL/Thunderbird branch (F3b). It is bounded to ONE token: the former whole-remainder search is
+// how `cache key=session:1021 hit=true` produced the component `cache key=session` and the content
+// `1021 hit=true` — a message body moved onto a cube axis (DN-43.D3). Bounding it made the
+// no-delimiter branch unreachable FROM HERE; DN-43.D14 removed the branch itself, because it was
+// still reachable from the Thunderbird caller, where it ate 1 309 whole message bodies.
 
 std::optional<SyslogHeader> scan_syslog_header(std::string_view line) noexcept
 {
     static constexpr std::size_t kBsdTimeLen{8U};        // "HH:MM:SS"
     static constexpr std::string_view kHostReject{"[:"}; // a tag delimiter inside a host token
-    static constexpr std::string_view kTagStop{"[: \t"}; // first delimiter OR the token's end
-    static constexpr std::string_view kPidStop{"] \t"};  // the `[pid]` must close inside the token
 
     std::string_view stamp{line};
     std::string_view rest{line};
@@ -83,33 +80,15 @@ std::optional<SyslogHeader> scan_syslog_header(std::string_view line) noexcept
         return std::nullopt;
 
     // ── Clause 2: TAG, bounded to ONE token ──────────────────────────────────
-    // One find over the tag token: whitespace or end-of-line before any delimiter means the token
-    // carries no ':' and the line is not syslog.
-    const auto stop{rest.find_first_of(kTagStop)};
-    if (stop == std::string_view::npos || is_space(rest[stop]))
-        return std::nullopt;
-
-    std::string_view tag{rest};
-    tag.remove_suffix(rest.size() - stop); // keep bytes [0, stop) — noexcept, unlike substr
+    // A tag-less line is not syslog: the HEADER is this strategy's claim, and `TIMESTAMP HOST`
+    // with an unconstrained remainder is a stamp, not a header (DN-43.D11). So an empty result
+    // from the shared bounded scan DECLINES here — the one point where this caller and the
+    // Thunderbird branch, which keeps the remainder instead, legitimately differ.
+    std::string_view body{rest};
+    const std::string_view tag{take_bounded_syslog_tag(body)};
     if (tag.empty())
         return std::nullopt;
 
-    std::size_t body_at{stop + 1U};
-    if (rest[stop] == '[')
-    {
-        // The `[pid]` must CLOSE inside the token and be followed immediately by the tag's ':' —
-        // so `sshd[12:34]`, whose colon is inside the brackets, is not a tag and `nginx[2451]:` is.
-        const auto close{rest.find_first_of(kPidStop, stop + 1U)};
-        if (close == std::string_view::npos || rest[close] != ']' || close + 1U >= rest.size() ||
-            rest[close + 1U] != ':')
-            return std::nullopt;
-        body_at = close + 2U;
-    }
-
-    std::string_view body{rest};
-    body.remove_prefix(body_at); // in range: the colon branch proved stop < size, the bracket
-                                 // branch proved close + 1 < size
-    sv_skip_ws(body);
     return SyslogHeader{.stamp = stamp, .tag = tag, .body = body, .bsd = bsd};
 }
 

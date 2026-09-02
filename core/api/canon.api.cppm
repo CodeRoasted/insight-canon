@@ -139,7 +139,26 @@ using EventID = uint64_t;
 // the §2.4 gate by construction (re-derive, never migrate). The residue is declared, not
 // pending: a GitHub run id tailing an artifact name (`playwright-frontend-coverage-<run id>`)
 // is byte-isomorphic to stable names and gets NO masking fix.
-inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-13"};
+// -14 = BGL's ALERT-LABEL COLUMN, claimed instead of rejected. `BGLStrategy`'s grammar gains
+// LogHub's leading alert-class column — `-` on a normal record, `[A-Z][A-Z0-9_]{0,15}` on an
+// anomalous one — which the predicate VALIDATES and every projection field DROPS, because the
+// column is the corpus curators' answer key rather than producer content (DN-43.D14). The bump is
+// owed because the RULE'S OWN ACCEPTANCE SET widens: 348 460 of the pinned `BGL.log`'s 4 747 963
+// lines and 226 095 of `Thunderbird_5M.log`'s 5 000 000 move from a whole-line raw-text template
+// to a parsed BGL record, and on BGL they carry a DECLARED fatal-class level (`FATAL` 348 398,
+// `FAILURE` 62) that nothing was reading. A labelled line now projects IDENTICALLY to its `-`
+// twin, so `template_str`/`template_id` move for those lines and one event class stops being
+// splittable 42 ways by curation label. Three narrower moves ride the same generation, all in the
+// same strategy: a second BGL header shape (306 lines with no repeated node) parses instead of
+// yielding `level` Unknown and `component` = `FATAL`; the Thunderbird branch takes DN-43.D3's
+// one-token tag bound, so 405 401 lines stop having a message fragment cut onto `component` and
+// 1 309 of those stop projecting to empty content entirely; and 10 BGL lines whose `<node2>` field
+// holds a spliced message fragment now DECLINE to raw text rather than publishing a mis-aligned
+// parse. `template_str`/`template_id`, `dominant_level` and `component` all move, so this is
+// output-affecting three times over. It is a CONTENT re-base under ADR-31, never a determinism
+// regression: two runs of THIS generation over the same bytes stay bit-identical, and old/new
+// documents are incomparable at the §2.4 gate by construction (re-derive, never migrate).
+inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-14"};
 
 // ── Template identity (insight_perf_template_id.md SRC-D-TIR-1) ──
 // The structural identity of a canonicalised template: the first 16 bytes of

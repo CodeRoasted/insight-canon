@@ -422,20 +422,49 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
     return match_time_at(str, pos);
 }
 
-// "- N YYYY.MM.DD" — BGL prefix.
-[[nodiscard]] constexpr bool is_bgl_prefix(std::string_view str) noexcept
+// The byte class of BGL's uppercase identifier tokens. Two columns of the RAS grammar share it —
+// the curators' alert LABEL and the SUBSYS column — and they differ only in their length bound, so
+// the class is written once and each caller carries its own bound.
+[[nodiscard]] constexpr bool is_bgl_identifier_byte(char chr) noexcept
+{
+    return is_upper(chr) || is_digit(chr) || chr == '_';
+}
+
+// "<label> N YYYY.MM.DD" — the BGL / Thunderbird record's opening three fields.
+//
+// `<label>` is LogHub's alert-class column: `-` on a normal record, otherwise an uppercase token
+// bounded at 16 bytes (41 distinct values over the pinned BGL corpus, the longest 9 bytes). It is
+// part of the GRAMMAR and part of NO projection field (DN-43.D14): it is the corpus curators'
+// answer key, written by nobody in the producing system, and an instrument measured against an
+// oracle must not ingest that oracle as a feature. Rejecting on it — which is what the former
+// `str[0] != '-'` test did — declined 348 460 of the corpus's 4 747 963 lines, every one of them
+// an alert-flagged record carrying a DECLARED fatal-class level word.
+[[nodiscard]] constexpr bool is_bgl_labelled_prefix(std::string_view str) noexcept
 {
     static constexpr std::size_t kBglMinLen{14U};
     static constexpr std::size_t kBglMaxDigits{20U};
+    static constexpr std::size_t kBglLabelMaxLen{16U}; // [A-Z] then up to 15 [A-Z0-9_]
     static constexpr std::size_t kBglDateLen{10U};
     static constexpr std::size_t kBglMon1{5U};
     static constexpr std::size_t kBglMon2{6U};
     static constexpr std::size_t kBglSep2{7U};
     static constexpr std::size_t kBglDay1{8U};
     static constexpr std::size_t kBglDay2{9U};
-    if (str.size() < kBglMinLen || str[0] != '-')
+    if (str.size() < kBglMinLen)
         return false;
     std::size_t pos{1U};
+    if (str[0] != '-')
+    {
+        if (!is_upper(str[0]))
+            return false;
+        while (pos < str.size() && pos < kBglLabelMaxLen && is_bgl_identifier_byte(str[pos]))
+            ++pos;
+    }
+    // The label is a TOKEN: it must end at whitespace. Without this the bound above would silently
+    // truncate an over-long or mixed-case run and hand `<epoch>` a suffix of it, which is the gate
+    // and the grammar drifting apart (DN-43.D2) — the parse takes whole tokens.
+    if (pos >= str.size() || !is_space(str[pos]))
+        return false;
     pos = skip_spaces(str, pos);
     if (!consume_digits(str, pos, 1U, kBglMaxDigits))
         return false;
@@ -775,34 +804,49 @@ inline void sv_skip_ws(std::string_view& str) noexcept
     return sv_take_until(str, '"');
 }
 
-// Parse a syslog "process[pid]:" tag — the daemon/program name (F3b functional source).
-// Returns the name before '[' or ':' (the `[pid]` is identity → stripped); advances `str`
-// past the ']' and ':' and trailing whitespace, so `str` is left at the message body. Shared
-// by SyslogStrategy and BGLStrategy (the Thunderbird branch) — one tag extractor, no dup.
-[[nodiscard]] inline std::string_view extract_syslog_tag(std::string_view& str) noexcept
+// The syslog daemon TAG, bounded to ONE token (DN-43.D3). A tag is one token that ends in `:`, or
+// in `[pid]:` whose bracket closes inside that same token — `sshd[12:34]`, whose colon sits inside
+// the brackets, is therefore not a tag and `nginx[2451]:` is. On success the tag is returned with
+// its `[pid]` stripped (the pid is instance identity, never the functional source) and `str` is
+// left at the message body.
+//
+// WHEN NO TAG IS DELIMITED, NOTHING IS REMOVED: the result is empty and `str` is untouched. That
+// branch is the whole repair. Its predecessor searched the WHOLE remainder for `[` or `:`, so
+// `cache key=session:1021 hit=true` yielded the component `cache key=session`, and a remainder
+// with no delimiter at all yielded the entire message as the component and an EMPTY content — a
+// line whose template is the SHA-256 of nothing. Measured over the pinned `Thunderbird_5M.log`:
+// 1 309 lines lost their whole body that way (`exiting on signal 15`), and 405 401 in total had a
+// multi-token remainder cut at a colon that was not a tag delimiter.
+//
+// The two callers differ only in what they do with an empty result, and both are correct:
+// SyslogStrategy DECLINES the line (a tag-less line is not syslog — the header is its claim),
+// while BGLStrategy's Thunderbird branch KEEPS the remainder as content with an empty component
+// (the record is already identified by its BGL header, so nothing about it is in doubt). That is
+// projection totality (DN-43.D6) and naming totality (DN-43.D11) in one branch.
+[[nodiscard]] inline std::string_view take_bounded_syslog_tag(std::string_view& str) noexcept
 {
-    const auto delim{str.find_first_of("[:")};
-    if (delim == std::string_view::npos)
-    {
-        const std::string_view tag{str};
-        str = {};
-        return tag;
-    }
-    // `delim` is a found index (< size), so these are noexcept in-place trims rather than `substr`,
-    // whose out-of-range `throw` path the analyzer cannot rule out here
-    // (bugprone-exception-escape).
+    static constexpr std::string_view kTagStop{"[: \t"}; // first delimiter OR the token's end
+    static constexpr std::string_view kPidStop{"] \t"};  // the `[pid]` must close inside the token
+
+    const auto stop{str.find_first_of(kTagStop)};
+    if (stop == std::string_view::npos || is_space(str[stop]) || stop == 0U)
+        return {};
+
     std::string_view tag{str};
-    tag.remove_suffix(str.size() - delim); // keep bytes [0, delim)
-    while (!tag.empty() && is_space(tag.back()))
-        tag.remove_suffix(1U);
-    str.remove_prefix(delim);
-    if (!str.empty() && str[0] == '[')
+    tag.remove_suffix(str.size() - stop); // keep bytes [0, stop) — noexcept, unlike substr
+
+    std::size_t body_at{stop + 1U};
+    if (str[stop] == '[')
     {
-        const auto rbracket{str.find(']')};
-        str.remove_prefix(rbracket != std::string_view::npos ? rbracket + 1U : 1U);
+        const auto close{str.find_first_of(kPidStop, stop + 1U)};
+        if (close == std::string_view::npos || str[close] != ']' || close + 1U >= str.size() ||
+            str[close + 1U] != ':')
+            return {};
+        body_at = close + 2U;
     }
-    if (!str.empty() && str[0] == ':')
-        str.remove_prefix(1U);
+
+    str.remove_prefix(body_at); // in range: the colon branch proved stop < size, the bracket
+                                // branch proved close + 1 < size
     sv_skip_ws(str);
     return tag;
 }
