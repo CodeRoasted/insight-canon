@@ -873,7 +873,7 @@ EventLevel infer_leading_log_level(std::string_view line) noexcept
                              const LogLevel level{parse_log_level(token)};
                              if (level == LogLevel::Unknown)
                                  return ++visited == kLeadingScanTokens; // budget spent: stop
-                             leading = level; // first level token wins
+                             leading = level;                            // first level token wins
                              level_token = token;
                              return true; // stop — Stage 1 has everything it reads
                          });

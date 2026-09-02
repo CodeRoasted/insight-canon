@@ -149,7 +149,8 @@ TEST(VerdictRegisterKindSlot, VerdictIsInvariantUnderPrefixLengthAcrossTheScanHe
 {
     constexpr std::string_view kBody{"Failed to resolve action download info. Error: boom"};
     constexpr std::size_t kMinPad{1};
-    constexpr std::size_t kMaxPad{60}; // comfortably past the 40-byte head the token budget replaced
+    constexpr std::size_t kMaxPad{
+        60}; // comfortably past the 40-byte head the token budget replaced
 
     const auto padded{[&](std::size_t pad)
                       { return "[" + std::string(pad, 'a') + "] " + std::string{kBody}; }};
@@ -164,8 +165,7 @@ TEST(VerdictRegisterKindSlot, VerdictIsInvariantUnderPrefixLengthAcrossTheScanHe
         EXPECT_EQ(infer_leading_log_level(line), reference)
             << "the verdict moved at padding length " << pad << " (the level word starts at byte "
             << line.find("info")
-            << ") — a register decision must not depend on a byte budget\n  line: "
-            << line;
+            << ") — a register decision must not depend on a byte budget\n  line: " << line;
     }
 }
 

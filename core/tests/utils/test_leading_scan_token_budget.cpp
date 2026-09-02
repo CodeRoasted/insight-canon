@@ -85,10 +85,9 @@ constexpr std::string_view kInlineBody{
 // anchor is the pure token test (anchor #1) and needs no kind-slot walk to be authoritative.
 [[nodiscard]] std::string caps_after_brackets(std::size_t count)
 {
-    constexpr std::array<std::string_view, 10> kTags{"runner-7",  "job-42",  "step-3",
-                                                     "attempt-1", "linux-x64", "gcc-16",
-                                                     "release",   "shard-2", "cache-hit",
-                                                     "retry-0"};
+    constexpr std::array<std::string_view, 10> kTags{"runner-7",  "job-42", "step-3",  "attempt-1",
+                                                     "linux-x64", "gcc-16", "release", "shard-2",
+                                                     "cache-hit", "retry-0"};
     std::string line;
     for (std::size_t i{0}; i < count; ++i)
         line += "[" + std::string{kTags[i % kTags.size()]} + "] ";
@@ -170,8 +169,8 @@ TEST(LeadingScanTokenBudget, TheLastIndexInsideTheBudgetIsReadAndTheFirstOutside
                                               << kBudget - 1 << ", got " << inside_word.index;
     EXPECT_EQ(infer_leading_log_level(inside), LogLevel::Warn)
         << "index " << kBudget - 1 << " is the last index inside kLeadingScanTokens{" << kBudget
-        << "} and must be read (the word starts at byte " << inside_word.byte << ")\n  line: "
-        << inside;
+        << "} and must be read (the word starts at byte " << inside_word.byte
+        << ")\n  line: " << inside;
 
     const std::string outside{caps_after_brackets(kBudget)};
     const LevelWord outside_word{locate_level_word(outside)};
