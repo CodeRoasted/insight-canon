@@ -1269,6 +1269,87 @@ TEST_F(BGLStrategyTest, DeclinesARecordWhoseFacilityIsAtNeitherPosition)
     EXPECT_FALSE(strategy.parse(kSplicedLine, arena).has_value());
 }
 
+// ── `<date>` IS validated, and NOT where the consumption site suggests (DN-43.D15) ───────────
+// DN-43.D15's rule is general and it is not a BGL exception: a grammar field the parse CONSUMES
+// but does not PUBLISH is validated if and only if its value is what proves the record's FIELD
+// ALIGNMENT — never as byte hygiene. Three of BGL's fields are consumed and unpublished, and they
+// do NOT share a verdict:
+//   * `<FACILITY>` is validated — `starts_with_facility` selects between the two RAS header shapes.
+//   * `<node2>` is NOT — the alignment proof sits on the token BEHIND it, so a record whose
+//     `<node2>` holds a binary blob parses, and DN-43.D15 rules it must keep parsing.
+//   * `<date>` IS validated, by a predicate that is nowhere near where it is consumed. The
+//     consumption site is `(void)sv_take_token(rest)` in `scan_bgl_record` and applies nothing;
+//     the predicate ran already, in the FORMAT GATE `is_bgl_labelled_prefix`, which keys the
+//     BGL/Thunderbird grammar on three opening fields — the label, the digit `<epoch>`, and
+//     `<date>`'s exact dotted `YYYY.MM.DD` shape. That is a discriminator, so it is on the
+//     alignment side of DN-43.D15's criterion, not the hygiene side.
+// These two arms are that contrast, and they exist because a reader who checks the verdict at the
+// consumption site reads `<date>` and `<node2>` as the same case and gets one of them backwards.
+TEST_F(BGLStrategyTest, TheDateFieldIsValidatedByTheFormatGateNotAtItsConsumptionSite)
+{
+    // The canonical line with the third field replaced. Everything else is byte-identical, so a
+    // decline can only be `<date>`'s.
+    const std::array<std::pair<std::string_view, std::string_view>, 2> kRejected{{
+        {"printable non-date", "not-a-date"},
+        {"the right date, the wrong separator", "2005-06-03"},
+    }};
+    for (const auto& [name, date] : kRejected)
+    {
+        const std::string line{"- 1117838570 " + std::string{date} +
+                               " R02-M1-N0-C:J12-U11 2005-06-03-15.42.50.675872 "
+                               "R02-M1-N0-C:J12-U11 RAS KERNEL INFO instruction cache parity "
+                               "error corrected"};
+        EXPECT_DOUBLE_EQ(strategy.confidence(line), 0.0)
+            << "variant '" << name
+            << "': the gate IS the grammar (DN-43.D2), so a field the gate refuses must score zero";
+        EXPECT_FALSE(strategy.parse(line, arena).has_value())
+            << "variant '" << name
+            << "' PARSED. `<date>` carries a real predicate — the exact "
+               "dotted YYYY.MM.DD shape, checked in is_bgl_labelled_prefix before a single token "
+               "is consumed. If this parses, that predicate is gone and the BGL/Thunderbird "
+               "grammar has lost one of the three fields it discriminates on\n  line: "
+            << line;
+    }
+    // The same position, a well-formed value: the control, without which the rows above would pass
+    // a strategy that had simply stopped parsing BGL.
+    static constexpr std::string_view kValidDateLine =
+        "- 1117838570 2005.06.03 R02-M1-N0-C:J12-U11 2005-06-03-15.42.50.675872 "
+        "R02-M1-N0-C:J12-U11 RAS KERNEL INFO instruction cache parity error corrected";
+    auto control{strategy.parse(kValidDateLine, arena)};
+    ASSERT_TRUE(control.has_value()) << control.error();
+    EXPECT_EQ(control.value().component, "KERNEL");
+    EXPECT_EQ(control.value().level, LogLevel::Info)
+        << "level = " << to_string(control.value().level.value());
+}
+
+// The other side of DN-43.D15's partition, on the SAME line and one field over: `<node2>` has no
+// predicate anywhere, so a binary blob in it parses and every published field stays true. Eight
+// lines of the pinned BGL corpus are exactly this, and the ruling turns on their still parsing —
+// declining them would move the blob out of a DROPPED field into `RawTextStrategy`'s whole-line
+// `content`, where it becomes a stable template NAME, and would throw away a DECLARED level.
+// The corpus-scale count is `LogHubProjectionPinGate`'s, which needs the corpus mounted; this arm
+// pins the BEHAVIOUR with no corpus at all, so the ruling is not resting on a gate that skips.
+TEST_F(BGLStrategyTest, ARecordWhoseUnvalidatedNode2HoldsABinaryBlobStillParsesAndPublishesTruth)
+{
+    static const std::string kBlobNodeLine{
+        "- 1117838570 2005.06.03 R02-M1-N0-C:J12-U11 2005-06-03-15.42.50.675872 "
+        "\x01\x02\x03 RAS KERNEL INFO instruction cache parity error corrected"};
+    EXPECT_GT(strategy.confidence(kBlobNodeLine), 0.5);
+    auto result{strategy.parse(kBlobNodeLine, arena)};
+    ASSERT_TRUE(result.has_value())
+        << "DECLINED: " << result.error()
+        << "\n  a decline here means <node2> acquired a byte-hygiene predicate, which DN-43.D15 "
+           "refuses: the alignment proof sits on the token BEHIND <node2> and succeeds truthfully";
+    const auto& pl{result.value()};
+    EXPECT_EQ(pl.component, "KERNEL");
+    EXPECT_EQ(pl.host, "R02-M1-N0-C:J12-U11") << "host comes from <node>, never from <node2>";
+    EXPECT_EQ(pl.level, LogLevel::Info)
+        << "level = " << to_string(pl.level.value()) << " — the DECLARED level must survive";
+    EXPECT_EQ(pl.content, "instruction cache parity error corrected");
+    EXPECT_EQ(pl.content.find('\x01'), std::string_view::npos)
+        << "the blob must reach NO published field; content = " << pl.content;
+}
+
 // A complete header with no message. Legitimate (DN-43.D6 member (a)): the empty template is the
 // correct identity of a content-less line, and the header fields are still published. 34 470 lines
 // of the pinned corpus.

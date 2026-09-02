@@ -8,7 +8,11 @@
 // pin, in order: the two shapes the budget's value was pre-registered on (the G-L11 instrument,
 // tools/leading_level_token_index_measure.cpp, self-tests the same two rows); the property the unit
 // change buys — the verdict follows the level word's token INDEX and not the byte it starts at;
-// the budget's two edges; and the declared residual, as a positive boundary assertion.
+// the budget's two edges; and the declared residual, as a positive boundary assertion — in BOTH
+// its halves. Row 5 is Stage 1's half (the budget does not reach a nested record's kind word);
+// Row 6 is Stage 2's, ADR-16.D8's R2 class (the register refuses a lowercase `error:` behind that
+// same frame). ADR-16.D8 refuses two remedies ON the R2 shape, so the shape is asserted here
+// rather than left to shift silently.
 //
 // EVERY DIAGNOSTIC ROW CARRIES A FAILURE CUE IN ITS BODY, on purpose. A `warning:` line whose
 // message says nothing alarming classifies Warn under Stage 2's warning cue as well, so such a row
@@ -34,6 +38,10 @@ namespace
 // pins the budget's EDGES by behaviour (index 7 read, index 8 not), so a value edit there reds
 // here — the coupling is the point, exactly as the kind-slot rows couple to the prefix classes.
 constexpr std::size_t kBudget{8};
+// Stage 2's cue head, quoted the same way and for the same reason: kKeywordHead{128} raw bytes is
+// the byte a token must START before to be read by the cue scan, and Row 6 needs it to assert that
+// its fixture satisfies Stage 2's condition (a) rather than assuming it.
+constexpr std::size_t kCueHead{128};
 
 // Where the first level word sits, under the shared canon tokenisation Stage 1 scans with — the
 // same predicate the instrument's self-test uses, so an index asserted here is the instrument's
@@ -44,6 +52,7 @@ struct LevelWord
     bool found{false};
     std::size_t index{0};
     std::size_t byte{0};
+    std::size_t size{0};
     LogLevel level{LogLevel::Unknown};
 };
 
@@ -63,6 +72,7 @@ struct LevelWord
                              word = {.found = true,
                                      .index = index,
                                      .byte = static_cast<std::size_t>(token.data() - line.data()),
+                                     .size = token.size(),
                                      .level = level};
                              return true;
                          });
@@ -92,6 +102,23 @@ constexpr std::string_view kInlineBody{
     for (std::size_t i{0}; i < count; ++i)
         line += "[" + std::string{kTags[i % kTags.size()]} + "] ";
     return line + "WARNING " + std::string{kInlineBody};
+}
+
+// A NESTED RECORD, in the shape ADR-16.D8 names: an outer CI frame — runner, job, step, attempt —
+// then a wrapped syslog record with its own bare month/day/time/host/tag frame, then that inner
+// record's kind word. `kind` is spliced in so the two arms of Row 6 differ in the CASE OF ONE
+// WORD and in nothing else.
+//
+// THE OUTER FRAME IS BRACKETED ON PURPOSE. `[runner-7]` and its siblings ARE declared prefix
+// material (SRC-D-OUT-4c class 2), so they do NOT displace the kind slot; the first token that
+// does is `May`, the INNER record's own bare frame. Without that the row would be re-pinning
+// `VerdictRegisterKindSlot.ALeadingTimestampIsNotPrefixMaterialDeclaredLimitation` — a different
+// declared limitation, whose displacing token is a leading timestamp at index 0 — and an R2 row
+// whose refusal is not attributable to the nested record proves nothing about R2.
+[[nodiscard]] std::string nested_record(std::string_view kind)
+{
+    return "[runner-7] [job-42] [step-3] [attempt-1] May 29 10:00:00 api-1 kernel: " +
+           std::string{kind} + ": worker died";
 }
 } // namespace
 
@@ -212,5 +239,87 @@ TEST(LeadingScanTokenBudget, ANestedRecordsKindWordAtIndexNineIsTheDeclaredResid
         << "} and is the declared residual: Stage 1 must not read it, and Stage 2 has no cue on "
            "this line. An Info is the budget reaching a nested record's kind word\n  line: "
         << kLine;
+}
+
+// ── Row 6 — the OTHER half of the same declared residual: the R2 shape ──────────────────────
+// ADR-16.D8 partitions the UNREAD nested-record population by which of Stage 2's three conditions
+// fails: (a) the word starts inside kKeywordHead{128} raw bytes, (b) it is a kFailureLexicon word,
+// (c) it is verdict-anchored. R2 is the class where (a) and (b) HOLD and (c) does not — a
+// lowercase `error:` at token index >= kLeadingScanTokens{8}, behind a nested record's bare outer
+// frame, whose kind slot those bare tokens break (SRC-D-OUT-4c). Row 5 above pins Stage 1's half
+// of the residual; this row pins Stage 2's, and the two are one subject.
+//
+// WHY IT IS OWED. At ADR-16.D8's coordinate — three CI corpus roots, measured 2026-09-02 — R2 is
+// 51 of GitHub Actions' 86 unread error-class inner words and 83 of GitLab's 83, and the ruling
+// REFUSES to relax the register on exactly this shape (admitting it would promote 62 GitLab words
+// sitting in runs that PASSED, against a precision-first contract). A refusal argued from a
+// boundary that can move without notice rests on nothing, so the boundary is asserted here.
+//
+// TWO-SIDED, AND BOTH SIDES ARE CHANGES THE REFUSAL WAS ARGUED AGAINST:
+//   * the lowercase arm reads Unknown — if it starts reading Error, the register admitted the
+//     shape and the ruling's refusal is no longer describing the code;
+//   * the CAPS arm on the SAME line reads Error — anchor #1 is a pure token test and needs no kind
+//     slot. If that stops firing, the line no longer reaches Stage 2 at all (the lexicon lost
+//     `error`, the cue head shrank, the tokenizer moved) and the Unknown above has become VACUOUS
+//     — still green, pinning nothing. That is the failure mode a one-sided residual row cannot
+//     see, and it is why the ADR names the caps control as the row's second side.
+//
+// The fixture's own preconditions are ASSERTED rather than assumed: (a) and (b) must hold, or the
+// line is R3 or R1 and this row would be pinning a different class under R2's name.
+TEST(LeadingScanTokenBudget, ANestedRecordsLowercaseErrorAtIndexElevenIsTheDeclaredR2Residual)
+{
+    const std::string declined{nested_record("error")};
+    const LevelWord word{locate_level_word(declined)};
+    ASSERT_TRUE(word.found) << "no level word located on: " << declined;
+    ASSERT_EQ(word.index, 11U)
+        << "fixture error: the R2 witness is pre-registered at token index 11; got " << word.index
+        << "\n  line: " << declined;
+    ASSERT_GE(word.index, kBudget)
+        << "fixture error: the word must sit OUTSIDE kLeadingScanTokens{" << kBudget
+        << "} — inside it, Stage 1 reads it and the line is not in the residual at all";
+    // Condition (a) — the word starts inside Stage 2's cue head, so R3 (past the head) is excluded.
+    ASSERT_LT(word.byte, kCueHead)
+        << "fixture error: the word starts at byte " << word.byte << ", outside kKeywordHead{"
+        << kCueHead << "} — that is class R3 (a BUDGET), not R2 (the REGISTER)";
+    const std::string_view token{std::string_view{declined}.substr(word.byte, word.size)};
+    // Condition (b) — membership asked of the SHIPPED table, never a re-listing here (DN-37.D20):
+    // a row that enumerates the eighteen words for itself goes stale the day one is added.
+    ASSERT_TRUE(insight::utils::detail::is_failure_lexicon_word(token))
+        << "fixture error: `" << token
+        << "` is not a kFailureLexicon word — that is class R1 (invisible to every register), not "
+           "R2";
+    // Condition (c) — the one that fails, and the mechanism named rather than inferred from the
+    // verdict: the kind-slot walk stops at `May`, the inner record's first bare token.
+    EXPECT_FALSE(insight::utils::detail::is_verdict_anchored(declined, token))
+        << "R2 IS the register's population: `" << token
+        << "` must be REFUSED the anchor. Anchored here means the kind-slot walk now accepts a "
+           "nested record's bare outer frame as prefix material\n  line: "
+        << declined;
+
+    EXPECT_EQ(infer_leading_log_level(declined), LogLevel::Unknown)
+        << "the wrapped record's `" << token << "` at token index " << word.index << " (byte "
+        << word.byte << ", inside kKeywordHead{" << kCueHead
+        << "}) is ADR-16.D8's R2 residual: Stage 1 is past its budget and Stage 2's register "
+           "refuses it, so the line reads Unknown. An Error here means the register ADMITTED the "
+           "shape — the ruling refused that on measurement (62 GitLab words in runs that passed) "
+           "and the refusal must be re-argued before this row moves\n  line: "
+        << declined;
+
+    // The second side. Same frame, same index, same byte, one word's CASE.
+    const std::string anchored{nested_record("ERROR")};
+    const LevelWord caps{locate_level_word(anchored)};
+    ASSERT_TRUE(caps.found) << "no level word located on: " << anchored;
+    ASSERT_EQ(caps.index, word.index)
+        << "fixture error: the control must differ from the R2 line in CASE ONLY — token index "
+        << caps.index << " against " << word.index;
+    ASSERT_EQ(caps.byte, word.byte)
+        << "fixture error: the control must differ from the R2 line in CASE ONLY — byte "
+        << caps.byte << " against " << word.byte;
+    EXPECT_EQ(infer_leading_log_level(anchored), LogLevel::Error)
+        << "the CAPS control on the same frame must fire: anchor #1 is a pure token test and needs "
+           "no kind slot. An Unknown here means the R2 assertion above is VACUOUS — the line stops "
+           "reaching Stage 2 (lexicon, cue head or tokenizer moved) and would keep passing while "
+           "pinning nothing\n  line: "
+        << anchored;
 }
 // NOLINTEND

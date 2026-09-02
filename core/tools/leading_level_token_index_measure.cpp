@@ -33,7 +33,17 @@
 // failed / unstable / other) lives HERE, in one self-tested function, and a malformed row is an
 // error rather than a skipped row (alert_grain_measure's rule: a reader that drops what it cannot
 // parse reports a partition over the rows it happened to understand). A file with no row is
-// UNDECLARED, never defaulted into a bucket. The transcriptions, for the corpora this leg was first
+// UNDECLARED, never defaulted into a bucket.
+//
+// THE UNREAD POPULATION'S THREE CLASSES, AND R3's DISCHARGE COUNTERS (ADR-16.D8). The leg also
+// partitions the lines it finds UNREAD by which of Stage 2's three conditions failed — past the
+// byte head (R3), absent from the lexicon (R1), or in the lexicon and refused the anchor (R2) —
+// and, for R3 only, reports how many of those words WOULD have satisfied conditions (b) and (c)
+// had the byte head reached them. That last pair is ADR-16.D8's stated discharge condition for the
+// one remedy it does not close outright, and it is report-only: nothing here asserts on it, and no
+// gate may.
+//
+// The transcriptions, for the corpora this leg was first
 // run on (each manifest's own field, no renaming):
 //   GitHub Actions  jq -r 'select(.log_annotated != null)
 //                          | [(.log_annotated | sub("^log_annotated/"; "")), .ci_outcome] | @tsv'
@@ -71,9 +81,12 @@
 // number.
 //
 // The pipeline runs stage 1 (the ANSI strip) before routing, and for_each_token treats an escape
-// run as a delimiter, so the token index is presentation-invariant; only the BYTE offset moves.
-// Both offsets are reported: on the stripped bytes (the parse_line door) and on the raw bytes
-// (the parse_stable door, which strips nothing — ADR-16.D7).
+// run as a delimiter, so the token index is presentation-invariant (ADR-16.D7 — that is what
+// making Stage 1's budget a TOKEN count bought); only the BYTE offset moves. Both offsets are
+// reported: on the stripped bytes (the parse_line door) and on the raw bytes (the parse_stable
+// door, which performs no stage 1 at all — ADR-21.D4, which enumerates the producer doors and
+// states that exemption in full. ADR-16.D7 is NOT its owner and says so in its own words: whether
+// parse_stable should carry two views is "not a consequence of this ruling").
 //
 // NOTHING FROM A LINE IS PRINTED. Prefix SHAPES (one class letter per token) and counts only — the
 // private corpora may be measured here and published as counts, never as bytes.
@@ -567,8 +580,11 @@ struct IndexStats
 
 // One line of the nested-record residual, read at three coordinates: the inner word itself, what
 // the pipeline emitted for the line (the parse_line door), and what the same remainder reads on
-// the raw bytes (the parse_stable door, modelled on the same routing — the byte a cue starts at is
-// the one thing the strip moves, ADR-16.D7).
+// the raw bytes (the parse_stable door, modelled on the same routing — it performs no stage 1,
+// ADR-21.D4). The token index is identical through both doors, so the byte a CUE starts at is the
+// one thing the strip moves and the two doors part company on kKeywordHead alone — ADR-21.D4's
+// own statement of where that door's price is now paid, and the reason this leg reports both
+// offsets.
 struct NestedLine
 {
     LogLevel word{LogLevel::Unknown};         // the inner level word's own class
@@ -712,6 +728,24 @@ struct NestedResidual
     // glyph) and calling it "the register declined it" would be the same conflation one level down.
     std::uint64_t r2_register_declined{0};
     std::uint64_t r2_anchored_yet_unread{0};
+    // ADR-16.D8's DISCHARGE CONDITION, and it is REPORT-ONLY — no gate, no assertion, no
+    // behaviour. R3 fails condition (a), which is checked FIRST, so the product path never asks
+    // (b) or (c) of an R3 word at all. Asking them here is the counterfactual the ruling names:
+    // if a material share of R3 is in Stage 2's lexicon AND verdict-anchored, then a longer
+    // kKeywordHead would actually READ those words, the byte head is buying something, and its
+    // value returns as a cost question; if it is not, R3 — the last lever this residual has left,
+    // the other two being refused on measurement — closes on measurement too and the limitation is
+    // final. Both fields are already computed per line by classify_nested, so this is two counters
+    // on the same walk, never a second pass.
+    //
+    // THE CONJUNCTION IS THE NUMBER THE CONDITION TURNS ON, and the two components are printed
+    // beside it rather than instead of it. Anchored WITHOUT membership answers a question nothing
+    // asks — `is_verdict_anchored` is reached only from `lexicon_hit`, AFTER a lexicon match — so
+    // quoting r3_anchored alone would re-commit, one class over, exactly the conflation the
+    // R1/R2/R3 split exists to undo.
+    std::uint64_t r3_in_stage2_lexicon{0};
+    std::uint64_t r3_verdict_anchored{0};
+    std::uint64_t r3_in_lexicon_and_anchored{0};
     // The lexeme histograms. R1's is the one the ruling turns on — its candidate vocabulary is the
     // closed set `err` / `severe` / `critical` / `crit` — and R2's is printed beside it because
     // "`error:` is the overwhelmingly common CI spelling" is a claim this run can settle.
@@ -741,6 +775,12 @@ struct NestedResidual
         case UnreadClass::R3:
             ++r3_by_outcome[bucket];
             ++r3_lexemes[lexeme];
+            if (line.in_stage2_lexicon)
+                ++r3_in_stage2_lexicon;
+            if (line.verdict_anchored)
+                ++r3_verdict_anchored;
+            if (line.in_stage2_lexicon && line.verdict_anchored)
+                ++r3_in_lexicon_and_anchored;
             break;
         case UnreadClass::NotInPopulation:
             break;
@@ -873,6 +913,13 @@ struct NestedSelfTestRow
     // claim the partition can get wrong just as easily as a misfiled R1.
     UnreadClass unread_class;
     bool in_stage2_lexicon;
+    // Condition (c), pre-registered per row because ADR-16.D8's R3 discharge counters now turn on
+    // it: the anchor answer used to be PRINTED beside each row and asserted by nothing, which is
+    // exactly the state a self-test exists to refuse. Rows 3 and 9 are the discharge counters' own
+    // two-sidedness — the same far-past-the-head frame, in-lexicon on both, anchored on the CAPS
+    // one and refused on the lowercase one — so a run in which those counters cannot see the
+    // phenomenon refuses itself instead of reporting a zero.
+    bool verdict_anchored;
 };
 
 [[nodiscard]] constexpr std::string_view unread_class_name(UnreadClass unread_class) noexcept
@@ -901,7 +948,8 @@ struct NestedSelfTestRow
          .inferred = LogLevel::Error,
          .promoted_by_word = true,
          .unread_class = UnreadClass::NotInPopulation, // the pipeline READ it
-         .in_stage2_lexicon = true},
+         .in_stage2_lexicon = true,
+         .verdict_anchored = true}, // anchor #1: CAPS, no kind slot needed
         {.name = "info-class nested word at index 9: the residual, not promoted",
          .scanned = "[2026-05-29 10:00:00] [runner-7] [job-42] May api-1 kernel: INFO: worker "
                     "restarted",
@@ -911,7 +959,8 @@ struct NestedSelfTestRow
          .inferred = LogLevel::Unknown,
          .promoted_by_word = false,
          .unread_class = UnreadClass::NotInPopulation, // INFO is not error-class
-         .in_stage2_lexicon = false},
+         .in_stage2_lexicon = false,
+         .verdict_anchored = true}, // `INFO` is CAPS — anchored, and still not error-class
         {.name = "error-class nested word at index 8 starting past byte 128: outside the cue "
                  "head, not promoted",
          .scanned = kFarNested,
@@ -921,7 +970,11 @@ struct NestedSelfTestRow
          .inferred = LogLevel::Unknown,
          .promoted_by_word = false,
          .unread_class = UnreadClass::R3,
-         .in_stage2_lexicon = true},
+         // The DISCHARGE row: in the lexicon AND anchored, and unread only because the byte head
+         // is checked first. This is the shape whose SHARE decides whether kKeywordHead is buying
+         // anything, so the counter has a witness it must be able to see.
+         .in_stage2_lexicon = true,
+         .verdict_anchored = true},
         {.name = "error-class nested word beside a `failed` cue: promoted, NOT by the word",
          .scanned = "[2026-05-29 10:00:00] [runner-7] [job-42] May api-1 kernel: ERROR: build "
                     "failed",
@@ -931,7 +984,8 @@ struct NestedSelfTestRow
          .inferred = LogLevel::Error,
          .promoted_by_word = false,
          .unread_class = UnreadClass::NotInPopulation, // read by ANOTHER cue, but read
-         .in_stage2_lexicon = true},
+         .in_stage2_lexicon = true,
+         .verdict_anchored = true},
         {.name = "bare nested word at index 10: prose-shaped, outside the class",
          .scanned = "the job on the runner in the pool hit an error while syncing",
          .class_member = false,
@@ -943,7 +997,8 @@ struct NestedSelfTestRow
          // for it — even though `error` IS a lexicon word and unread_class_of alone would say R2.
          // The row pins that COMPOSITION: the membership gate runs first.
          .unread_class = UnreadClass::NotInPopulation,
-         .in_stage2_lexicon = true},
+         .in_stage2_lexicon = true,
+         .verdict_anchored = false}, // bare, mid-prose: no caps, no kind slot, no bracket
         {.name = "lowercase colon-anchored `error:` at index 9: in the class, in the head, and "
                  "DECLINED by the cue path (the kind slot is broken by the bare outer tokens)",
          .scanned = "[2026-05-29 10:00:00] [runner-7] [job-42] May api-1 kernel: error: worker "
@@ -954,7 +1009,8 @@ struct NestedSelfTestRow
          .inferred = LogLevel::Unknown,
          .promoted_by_word = false,
          .unread_class = UnreadClass::R2,
-         .in_stage2_lexicon = true},
+         .in_stage2_lexicon = true,
+         .verdict_anchored = false},
         // ── DN-54.D23's three rows, one per class of the unread partition ──────────────────────
         // R2, on a SECOND lexicon word so the class is not pinned by `error` alone: `fatal` is
         // RegisterAnchored, colon-anchored, and its kind slot is broken by the same bare outer
@@ -969,7 +1025,8 @@ struct NestedSelfTestRow
          .inferred = LogLevel::Unknown,
          .promoted_by_word = false,
          .unread_class = UnreadClass::R2,
-         .in_stage2_lexicon = true},
+         .in_stage2_lexicon = true,
+         .verdict_anchored = false},
         // R1 — the same position, the same register, the same shape, and a DIFFERENT class,
         // which is the whole finding: `severe` is error-class for Stage 1 (parse_log_level maps
         // it to Error) and Stage 2 has no entry for it, so it reaches no register and is declined
@@ -985,7 +1042,8 @@ struct NestedSelfTestRow
          .inferred = LogLevel::Unknown,
          .promoted_by_word = false,
          .unread_class = UnreadClass::R1,
-         .in_stage2_lexicon = false},
+         .in_stage2_lexicon = false,
+         .verdict_anchored = false},
         // R3 — an IN-LEXICON word past the cue head. The word is `error`, so if condition (a)
         // were NOT checked first this row would come back R2; it is the ordering test, and it is
         // lowercase on purpose so it differs from the caps `ERROR:` row above in register too.
@@ -998,7 +1056,11 @@ struct NestedSelfTestRow
          .inferred = LogLevel::Unknown,
          .promoted_by_word = false,
          .unread_class = UnreadClass::R3,
-         .in_stage2_lexicon = true},
+         // The discharge row's NEGATIVE side: same frame, same class, same membership, one word's
+         // CASE — and the anchor is refused. Without it the counter could report every R3 word as
+         // anchored and stay green.
+         .in_stage2_lexicon = true,
+         .verdict_anchored = false},
     }};
     bool all_ok{true};
     for (const NestedSelfTestRow& row : rows)
@@ -1023,18 +1085,20 @@ struct NestedSelfTestRow
             member == row.class_member && is_error_class(line.word) == row.error_class &&
             line.in_cue_head == row.in_cue_head && line.pipeline == row.inferred &&
             line.promoted_by_word == row.promoted_by_word &&
-            line.in_stage2_lexicon == row.in_stage2_lexicon && unread_class == row.unread_class};
+            line.in_stage2_lexicon == row.in_stage2_lexicon &&
+            line.verdict_anchored == row.verdict_anchored && unread_class == row.unread_class};
         all_ok = all_ok && row_ok;
         std::println("  [{}] {}: expected member={} error-class={} in-head={} level={} by-word={} "
-                     "lexicon={} class={}  got member={} error-class={} in-head={} level={} "
-                     "by-word={} lexicon={} class={} (lexeme='{}' idx={} byte={} anchored={})",
+                     "lexicon={} anchored={} class={}  got member={} error-class={} in-head={} "
+                     "level={} by-word={} lexicon={} anchored={} class={} (lexeme='{}' idx={} "
+                     "byte={})",
                      row_ok ? "ok" : "FAIL", row.name, row.class_member, row.error_class,
                      row.in_cue_head, insight::to_string(row.inferred), row.promoted_by_word,
-                     row.in_stage2_lexicon, unread_class_name(row.unread_class), member,
-                     is_error_class(line.word), line.in_cue_head, insight::to_string(line.pipeline),
-                     line.promoted_by_word, line.in_stage2_lexicon, unread_class_name(unread_class),
-                     casefold(line.lexeme), hit->token_index, hit->byte_start,
-                     line.verdict_anchored);
+                     row.in_stage2_lexicon, row.verdict_anchored,
+                     unread_class_name(row.unread_class), member, is_error_class(line.word),
+                     line.in_cue_head, insight::to_string(line.pipeline), line.promoted_by_word,
+                     line.in_stage2_lexicon, line.verdict_anchored, unread_class_name(unread_class),
+                     casefold(line.lexeme), hit->token_index, hit->byte_start);
     }
     return all_ok;
 }
@@ -1482,6 +1546,16 @@ void print_unread_partition(const NestedResidual& nested)
                  "yet still unread (a count / NOTE register, or a leading pass glyph — NOT the "
                  "register rule): {}",
                  r2, nested.r2_register_declined, nested.r2_anchored_yet_unread);
+    std::println("        of the {} R3 — ADR-16.D8's DISCHARGE CONDITION, report-only: in Stage "
+                 "2's lexicon (b): {} ({:.2f}%); verdict-anchored (c): {} ({:.2f}%); BOTH — the "
+                 "share a longer kKeywordHead would actually read: {} ({:.2f}%). A material share "
+                 "means the byte head is buying something and its value returns as a cost "
+                 "question; a negligible one closes the last lever on measurement. (b) and (c) are "
+                 "never ASKED of R3 by the product path — (a) is checked first — so these are "
+                 "counterfactuals, and the CONJUNCTION is the figure the condition turns on",
+                 r3, nested.r3_in_stage2_lexicon, percent(nested.r3_in_stage2_lexicon, r3),
+                 nested.r3_verdict_anchored, percent(nested.r3_verdict_anchored, r3),
+                 nested.r3_in_lexicon_and_anchored, percent(nested.r3_in_lexicon_and_anchored, r3));
     std::println("      lexeme histograms (casefolded; membership by the SHIPPED "
                  "kFailureLexicon test, never a re-listing — DN-37.D20)");
     std::println("        R1:{}", lexeme_cells(nested.r1_lexemes));

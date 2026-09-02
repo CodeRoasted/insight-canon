@@ -391,16 +391,27 @@ namespace insight::tokenization
 // `<label>` is the alert class and is carried NOWHERE — see is_bgl_labelled_prefix.
 //
 // THREE FIELDS ARE CONSUMED AND NOT PUBLISHED, AND THEY DO NOT SHARE A VERDICT — this sentence
-// used to say all three were "validated grammar", and one of them was never validated at all.
-// `<FACILITY>` IS validated: `starts_with_facility` is what selects between the two RAS header
-// shapes, so its value proves the record's FIELD ALIGNMENT. `<node2>` and `<date>` are read and
-// dropped with NO predicate applied to their bytes — `(void)sv_take_token(...)`, bgl.cpp — and
-// `DN-43.D15` rules that they must STAY unvalidated: a consumed-but-unpublished field is validated
-// iff its value proves the alignment, never as byte hygiene, and `<node2>` proves nothing because
-// the alignment proof sits on the token behind it. Validating it would also be actively harmful:
-// the 8 pinned-corpus records whose `<node2>` holds a binary blob have flawless headers, and
-// declining them moves the blob out of a DROPPED field and into `RawTextStrategy`'s whole-line
-// `content` — a published template name, i.e. canon ingesting corruption as a feature.
+// used to say all three were "validated grammar", and exactly ONE of them is not validated.
+// `DN-43.D15`'s criterion decides each: a consumed-but-unpublished field is validated iff its
+// value proves the record's FIELD ALIGNMENT, never as byte hygiene.
+//   * `<FACILITY>` IS validated — `starts_with_facility` is what selects between the two RAS
+//     header shapes.
+//   * `<date>` IS validated, and NOT at the site where it is consumed, which is the trap this
+//     enumeration exists to close. `scan_bgl_record`'s `(void)sv_take_token(rest)` applies nothing
+//     to it; the predicate already ran in the FORMAT GATE `is_bgl_labelled_prefix`
+//     (`F-SRC-insight-canon:canon.detail.scan.cppm`), which keys the BGL/Thunderbird grammar on
+//     three opening fields — the label, the digit `<epoch>`, and `<date>`'s exact dotted
+//     `YYYY.MM.DD` shape. A discriminator, so it sits on the alignment side of the criterion.
+//     Reading its verdict off the consumption site instead gets it backwards.
+//   * `<node2>` is the ONE that is not validated, anywhere. No predicate touches its bytes, and
+//     `DN-43.D15` rules it must STAY that way: the alignment proof sits on the token BEHIND it
+//     (the `RAS`/`NULL` probe), which succeeds truthfully without reading it. Validating it would
+//     be actively harmful — the 8 pinned-corpus records whose `<node2>` holds a binary blob have
+//     flawless headers, and declining them moves the blob out of a DROPPED field into
+//     `RawTextStrategy`'s whole-line `content`, a published template NAME, while throwing away a
+//     level the producer DECLARED.
+// Both verdicts are pinned by `BGLStrategyTest` (`F-SRC-insight-canon:test_strategies.cpp`), with
+// no corpus mounted: a malformed `<date>` declines, a binary `<node2>` parses.
 //
 // Everything the parse then publishes is below, so `confidence()` scoring non-zero means exactly
 // "this parse will succeed", which is the only construction under which the gate and the grammar
