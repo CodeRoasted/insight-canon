@@ -8,7 +8,7 @@ required_conan_version = ">=2.28"
 
 class InsightCanonConan(ConanFile):
     name = "insight_canon"
-    version = "1.10.3"
+    version = "1.10.4"
     package_type = "library"
     license = "Apache-2.0"
     url = "https://github.com/CodeRoasted/insight-canon"
