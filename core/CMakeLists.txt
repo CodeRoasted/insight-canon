@@ -282,6 +282,15 @@ target_link_libraries(f13_cardinality_measure PRIVATE insight::canon)
 target_compile_features(f13_cardinality_measure PRIVATE cxx_std_23)
 set_target_properties(f13_cardinality_measure PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
 
+# The G-L11 leading-level TOKEN-INDEX re-measure (ADR-16.D7, ROADMAP N98): the same shape as the
+# F13 tool above — a CLI over the PUBLIC facade whose population is operator-mounted, so it declares
+# (files, lines, doors, the model's own control) and never asserts. It is what the token budget's
+# VALUE is taken from, and it re-runs on every corpus the budget is later re-derived against.
+add_executable(leading_level_token_index_measure tools/leading_level_token_index_measure.cpp)
+target_link_libraries(leading_level_token_index_measure PRIVATE insight::canon)
+target_compile_features(leading_level_token_index_measure PRIVATE cxx_std_23)
+set_target_properties(leading_level_token_index_measure PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
+
 ###########################################################
 #  Tests (unit + regression)
 ###########################################################
