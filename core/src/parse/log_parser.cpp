@@ -150,10 +150,12 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
 
     // SRC-D-TID-11 — see canon.api.cppm for the contract.
     //
-    // This is THE one named site where the parser performs stage 1 unconditionally — the
-    // invariant that entitles `attest()` to exist. The ESC-gated fast path (no ESC byte → the
-    // normalized line borrows `raw_line`, no scratch copy) now lives INSIDE `normalize()`, so the
-    // gate this call site used to spell is the factory's own.
+    // This is THE one named site where the parser performs stage 1 unconditionally — the invariant
+    // `attest()` carries on THIS path only; reached via `parse_stable` it carries door provenance
+    // instead, since that door runs no stage 1 (ADR-21.D4, and attest()'s own declaration).
+    // The ESC-gated fast path (no ESC byte → the normalized line borrows `raw_line`, no scratch
+    // copy) now lives INSIDE `normalize()`, so the gate this call site used to spell is the
+    // factory's own.
     const NormalizedLine normalized{normalize(raw_line, escape_scratch_)};
     if (normalized.bytes().empty()) // the (non-empty) line was all escape bytes
     {

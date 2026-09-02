@@ -131,14 +131,23 @@ class LogParser
     [[nodiscard]] std::vector<std::expected<ParsedLine, std::string>>
     parse_batch(std::span<const std::string_view> lines);
 
-    // The §12.5.1(c) attestation — issued by the PERFORMER of stage 1. Every byte a strategy's
-    // `ParsedLine::content` carries derives from a line this parser normalized unconditionally at
-    // its one named site (parse_line's stage-1 step; SRC-D-TID-11 — see
-    // canon.api.cppm (normalize()) for the contract.)
-    // — including the six strategies that
-    // REBUILD content into arena bytes, which assemble from post-strip input. That invariant is
-    // local to this class, reviewable in one place, which is what entitles it to hold the one
-    // passkey. ⚠ For strategy-produced content ONLY. Anything else goes through `normalize()`.
+    // The §12.5.1(c) attestation. WHAT IT CARRIES DEPENDS ON WHICH PARSE PRODUCED THE BYTES, and
+    // the caller does not branch: `Tokenizer::Impl::make_event` (tokenizer_engine.cpp) serves both
+    // producer doors and calls this on `ParsedLine::content` either way (ADR-21.D4).
+    //   • reached via parse_line — stage-1 PERFORMANCE. Every byte derives from a line this parser
+    //     normalized unconditionally at its one named site (SRC-D-TID-11 — see canon.api.cppm
+    //     (normalize()) for the contract), including the six strategies that REBUILD content into
+    //     arena bytes, which assemble from post-strip input.
+    //   • reached via parse_stable — DOOR PROVENANCE, and nothing more: canon produced these bytes.
+    //     That door performs no stage 1 at all, deliberately — it holds ONE view and the
+    //     echoed-source demotion must read the raw, ANSI-bearing one — so the content attested
+    //     there was never normalized.
+    // The mint is not broken by that: it answers WHO may mint, its key's friend list is still
+    // exactly one entry, and that list is still the audit surface the door-census gate pins. It was
+    // never an instrument for WHAT ran before it, and a consumer reading it as evidence that
+    // normalization ran is wrong on one path in two. What entitles this class to hold the one
+    // passkey is that BOTH answers are local to it and reviewable in one place.
+    // ⚠ For strategy-produced content ONLY. Anything else goes through `normalize()`.
     // Deliberately NON-static: the attestation is issued by a HELD parser instance — the caller
     // must possess the performer, not merely name its class.
     // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
