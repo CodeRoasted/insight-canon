@@ -10,14 +10,16 @@ import insight.canon.internal; // std (expected/unique_ptr/vector/span/string fo
 export import insight.canon.api; // public surface (types, det_math, arena, ...)
 // compose()/ComposedSemantics (ADR-17) — Tokenizer takes it. The comment sits ABOVE the
 // directive deliberately: as a trailing comment it pushed the line past the column limit, and the
-// formatter then wrapped the MODULE NAME across lines. gcc-15 rejects that (a module-import
-// directive is one logical line); clang-21 accepts it, so the break reaches only the ship
-// toolchain. Keep this line short enough that no formatter has a reason to touch it.
+// formatter then wrapped the MODULE NAME across lines. A wrapped module name is ill-formed by the
+// STANDARD, not by a compiler version: [cpp.pre] spells a pp-import as ONE logical line, so gcc is
+// the conforming reader and clang-21's acceptance is the leniency. First met on gcc-15.3, but no
+// gcc bump can ever retire it — the rule is the language's, not a defect's — and only the ship leg
+// sees it. Keep this line short enough that no formatter has a reason to touch it.
 export import insight.canon.compose;
 // The transport vocabulary (ADR-23): IngestDeclaration, the catalogue, and the stream-scoped
 // peel. Re-exported because a CONSUMER declares the stack — it is the caller's provenance, not a
-// package's data. Same short-line discipline as the directive above (gcc-15 rejects a module name
-// wrapped across lines).
+// package's data. Same short-line discipline as the directive above: a module name wrapped across
+// physical lines is ill-formed by [cpp.pre] on any gcc, and only the ship leg reds on it.
 export import insight.canon.transport;
 
 // ──────── from api/insight/tokenization/tokenizer_engine.hpp ────────
