@@ -507,7 +507,15 @@ TEST(ArenaAllocator_ResetPoison, ReleasedBytesAreOverwrittenSoAUseAfterResetIsOb
         GTEST_SKIP() << "release build: reset() rewinds without overwriting, by design — under a "
                         "rewind a use-after-reset is INDISTINGUISHABLE from a correct read, so "
                         "there is nothing here to assert (this skip is the honest outcome, not a "
-                        "gap). Run the debug or --asan leg to exercise the instrument.";
+                        "gap). Run the debug or --asan leg to exercise the instrument."
+                     << " TO ARM IT AT A DESK: -DINSIGHT_CANON_ARENA_POISON_MODE=ON, or "
+                        "--asan. This is not a formality since malf-toolchain 4b1f32e: the dev "
+                        "profile linux-clang21-libcxx-release now configures CMAKE_BUILD_TYPE="
+                        "Release, so the AUTO default (core/CMakeLists.txt, ON for Debug only) is "
+                        "OFF and this arm — which used to run on every desk build — now SKIPS "
+                        "there by default. A skip that changed meaning under a toolchain repair "
+                        "reads exactly like the skip it always was, which is why the remedy is "
+                        "printed here rather than remembered.";
 
     ArenaAllocator arena{4096};
     constexpr std::string_view kStored{"GET /api/users -> 200"};
@@ -526,7 +534,8 @@ TEST(ArenaAllocator_ResetPoison, ReleasedBytesAreOverwrittenSoAUseAfterResetIsOb
 TEST(ArenaAllocator_ResetPoison, PoisonSpansTheWholeHandedOutExtentNotJustTheFirstBytes)
 {
     if (!insight::tokenization::arena_poisons_on_reset())
-        GTEST_SKIP() << "release build: reset() rewinds without overwriting, by design.";
+        GTEST_SKIP() << "release build: reset() rewinds without overwriting, by design. To arm "
+                        "this arm at a desk: -DINSIGHT_CANON_ARENA_POISON_MODE=ON, or --asan.";
 
     // A partial fill would leave later allocations readable and make the instrument's coverage a
     // function of WHERE in the line the stale view happened to point — a detector that fires
