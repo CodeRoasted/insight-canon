@@ -136,7 +136,7 @@
 //   `is_all_digits`):
 //         GREEN — the status-keyword + single-digit class has zero instances in the 82 bare traces'
 //         templated surface; recorded as a fact about these bytes, not about the gate.
-//   B-B2  [2026-07-30] the digit-leading whole-token mask disabled (D-TID-12 #5 trigger forced
+//   B-B2  [2026-07-30] the digit-leading whole-token mask disabled (SRC-D-TID-12 #5 trigger forced
 //         false): RED — 74/82 traces DIGEST MOVED, and on every reported row the legible counts
 //         were IDENTICAL (e.g. Accumulo_2_1__496: produced 4114/4114, distinct 2630/2630, digest
 //         moved) — observed proof that the whole-surface digest is STRICTLY stronger than the

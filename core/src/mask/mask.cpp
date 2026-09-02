@@ -616,7 +616,7 @@ namespace
     // Admitted under SRC-D-TID-14 (contract: canon.api.cppm) — all byte-only and
     // single-token, which is what makes them cross-stdlib identical.
 
-    // D-TID-12 #5: digit-leading (after an optional sign) ⇒ a number / measurement /
+    // SRC-D-TID-12 #5: digit-leading (after an optional sign) ⇒ a number / measurement /
     // version / timestamp, intrinsically high-card. Subsumes the all-digit mask AND
     // numbers-with-separators / decimals / number+unit / versions in ONE rule, no unit
     // lexicon (`512MB`/`6.2s`/`0.25.5-3` mask; `sha256`/`x86` are letter-leading → keep).
@@ -628,7 +628,7 @@ namespace
         return pos < tok.size() && is_digit(tok[pos]);
     }
 
-    // D-TID-12 #3: a standalone UUID (8-4-4-4-12 hex-with-dashes) or a hex-only run
+    // SRC-D-TID-12 #3: a standalone UUID (8-4-4-4-12 hex-with-dashes) or a hex-only run
     // ≥ 16 chars (a git SHA / content hash). The ≥16 floor keeps short hex-looking
     // words ("deadbeef", "cafe") literal — only genuinely high-card hashes mask.
     [[nodiscard]] inline bool is_uuid_or_long_hash(std::string_view tok) noexcept
@@ -691,7 +691,7 @@ namespace
     // keep-class/ mask-instance shape). A DECIDABLE numeric: there is no low-card *keyword* of
     // shape
     // `<marker><digits>` worth protecting (shell positionals `$1`/`$2` are negligible-in-logs and
-    // lossless to mask), so it joins the D-TID-12 #5 digit-leading numerics that the first-char
+    // lossless to mask), so it joins the SRC-D-TID-12 #5 digit-leading numerics that the first-char
     // `is_digit_leading` test misses on a leading marker. The core is digits + one optional
     // `.`-fraction; a trailing alpha/digit after a clean core rejects (`$42abc` is not a counter,
     // like `#42abc`), trailing punctuation is kept (`$463,` → `$<*>,`). `$HOME` (`$`+letter) has no
@@ -805,7 +805,7 @@ namespace
         return true;
     }
 
-    // D-TID-12 #3, reached INSIDE a token: mask a UUID (8-4-4-4-12), a long hex-run
+    // SRC-D-TID-12 #3, reached INSIDE a token: mask a UUID (8-4-4-4-12), a long hex-run
     // (≥ 16, delimiter-bounded) or a COMPACT UTC INSTANT (`2026-06-09T185733Z`) that is
     // EMBEDDED in a larger token — temp-dir paths (`/…/_temp/<uuid>/cache.tzst`,
     // `/…/_temp/<instant>.json`), `git-credentials-<uuid>.config`, `{worker-uuid}`,
@@ -913,7 +913,7 @@ namespace
         return true;
     }
 
-    // ── The composite normalizer catalog (D-TID-12 step #2) ──────────────────────────
+    // ── The composite normalizer catalog (SRC-D-TID-12 step #2) ──────────────────────────
     // The KEEP-class / mask-instance rules, as a DECLARED array whose ORDER IS THE PRECEDENCE:
     // tried top-to-bottom, the first rule that claims the token wins (the former `||`
     // short-circuit, now data). Each rule is a pure `bool(tok, out&)` — fills `out` with the
@@ -941,12 +941,12 @@ namespace
         {.name = "diagnostic_composite",
          .normalize = normalize_diagnostic_composite},                     // SRC-D-MSK-1  (-4)
         {.name = "ephemeral_root", .normalize = normalize_ephemeral_root}, // SRC-D-MSK-2  (-4)
-        {.name = "versioned_ref", .normalize = normalize_versioned_ref},   // D-TID-12 #2
+        {.name = "versioned_ref", .normalize = normalize_versioned_ref},   // SRC-D-TID-12 #2
         {.name = "bracket_timestamp", .normalize = normalize_bracket_timestamp}, // SRC-D-MSK-5 (-8)
         {.name = "bracket_index", .normalize = normalize_bracket_index},         // SRC-D-TID-13(b)
         {.name = "hash_counter", .normalize = normalize_hash_counter},           // SRC-D-TID-13(a)
         {.name = "marker_number", .normalize = normalize_marker_number}, // SRC-D-TID-22 (-3)
-        {.name = "embedded_identity", .normalize = normalize_embedded_identity}, // D-TID-12 #3
+        {.name = "embedded_identity", .normalize = normalize_embedded_identity}, // SRC-D-TID-12 #3
         {.name = "kv_value", .normalize = normalize_kv_value},                   // SRC-D-TID-17
     }};
 
@@ -997,7 +997,7 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
     std::string_view prev{};              // raw previous token — context for status KEEP
     bool first{true};
 
-    // The declared per-token classification in TOTAL precedence (D-TID-12 §8.2): KEEP
+    // The declared per-token classification in TOTAL precedence (SRC-D-TID-12 §8.2): KEEP
     // carve-outs win first, then the F13 masks. A masked position contributes a param
     // (the raw token); a kept/normalized position does not.
     for_each_token(

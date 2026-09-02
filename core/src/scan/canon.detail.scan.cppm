@@ -130,7 +130,7 @@ inline constexpr std::array<WrapperPair, 6> kWrapperPairs{{
 
 // ── TokenShape — one-pass per-token byte profile (ADR-16.D5, the precedence) ──────
 // The masker classifies each whitespace token KEEP / MASK / NORMALIZE in a fixed precedence
-// (D-TID-12). Several steps of that dispatch each re-walked the token: is_all_digits (the
+// (SRC-D-TID-12). Several steps of that dispatch each re-walked the token: is_all_digits (the
 // status-value KEEP), the composite-trigger any_of, and is_digit_leading (the digit mask).
 // TokenShape walks the token's bytes ONCE and records the facts they all need, so the dispatch
 // reads fields instead of re-scanning. Each field is the byte-exact equivalent of the scan it
