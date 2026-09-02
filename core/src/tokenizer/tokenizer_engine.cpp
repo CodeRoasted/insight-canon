@@ -266,6 +266,11 @@ std::size_t Tokenizer::events_produced() const noexcept
 {
     return impl_->produced;
 }
+std::size_t Tokenizer::empty_projections() const noexcept
+{
+    return impl_->empty_projections;
+}
+
 std::size_t Tokenizer::lines_parsed() const noexcept
 {
     return impl_->parser.lines_parsed();

@@ -144,6 +144,19 @@ class Tokenizer
     [[nodiscard]] std::size_t events_produced() const noexcept;
     [[nodiscard]] std::size_t lines_parsed() const noexcept;
 
+    // The PROJECTION-TOTALITY instrument's counter (DN-43.D6) for this stream: lines that had
+    // bytes and projected to empty `content`. Until this accessor existed the number left canon
+    // ONLY through a rate-limited WARNING (first, then every 100th, tokenizer_engine.cpp), so the
+    // one way to obtain it was to parse a log stream and multiply — and DN-43.D14 (4) pins the
+    // figure per corpus, which a number read off a warning stream cannot support. Same species as
+    // the two counters above: a monotonic per-stream total, reset by nothing, read after the walk.
+    //
+    // IT IS NOT A DEFECT COUNT, and the distinction is the whole reason DN-43.D14 (4) had to be
+    // written: the population has two members — a genuinely empty body, which is the CORRECT
+    // identity for a content-less line, and a projection bug that moved the body onto a cube
+    // dimension. This counter is the sum. Only a per-strategy expectation separates them.
+    [[nodiscard]] std::size_t empty_projections() const noexcept;
+
   private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

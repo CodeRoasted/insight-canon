@@ -388,11 +388,23 @@ namespace insight::tokenization
 //   lines) <label> <epoch> <date> <node> <Mon> <DD> <HH:MM:SS> <host> [<tag>[pid]:] <msg>
 //   (Thunderbird)
 //
-// `<label>` is the alert class and is carried NOWHERE — see is_bgl_labelled_prefix. `<FACILITY>`,
-// `<node2>` and `<date>` are read by the predicate and dropped: they are validated grammar, not
-// content. Everything the parse then publishes is below, so `confidence()` scoring non-zero means
-// exactly "this parse will succeed", which is the only construction under which the gate and the
-// grammar cannot drift apart.
+// `<label>` is the alert class and is carried NOWHERE — see is_bgl_labelled_prefix.
+//
+// THREE FIELDS ARE CONSUMED AND NOT PUBLISHED, AND THEY DO NOT SHARE A VERDICT — this sentence
+// used to say all three were "validated grammar", and one of them was never validated at all.
+// `<FACILITY>` IS validated: `starts_with_facility` is what selects between the two RAS header
+// shapes, so its value proves the record's FIELD ALIGNMENT. `<node2>` and `<date>` are read and
+// dropped with NO predicate applied to their bytes — `(void)sv_take_token(...)`, bgl.cpp — and
+// `DN-43.D15` rules that they must STAY unvalidated: a consumed-but-unpublished field is validated
+// iff its value proves the alignment, never as byte hygiene, and `<node2>` proves nothing because
+// the alignment proof sits on the token behind it. Validating it would also be actively harmful:
+// the 8 pinned-corpus records whose `<node2>` holds a binary blob have flawless headers, and
+// declining them moves the blob out of a DROPPED field and into `RawTextStrategy`'s whole-line
+// `content` — a published template name, i.e. canon ingesting corruption as a feature.
+//
+// Everything the parse then publishes is below, so `confidence()` scoring non-zero means exactly
+// "this parse will succeed", which is the only construction under which the gate and the grammar
+// cannot drift apart.
 struct BglRecord
 {
     std::string_view epoch;     // <epoch> — seconds since the Unix epoch; the record's event time
