@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers, string literals and printed diagnostics are intended.
 // test_transport_declaration.cpp — G1's SHAPE arm, homed as a canon-core unit suite.
 //
 // HOMING (Kleio). The transport contract states G1's property and leaves the test design to me;
@@ -610,4 +609,3 @@ TEST(TransportRenderer, AcceptsExactlyTheStampsInsideTheFourDigitYearWindow)
 }
 
 } // namespace
-// NOLINTEND

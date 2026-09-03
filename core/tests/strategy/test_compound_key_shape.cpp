@@ -1,4 +1,3 @@
-// NOLINTBEGIN — Unit tests: allow short identifiers and test-specific patterns
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -294,5 +293,3 @@ TEST(CompoundKeyShape, AnEcsRecordLeavesNoRoleWitnessMarkerBehind)
         << "\". The marker going quiet on ECS lines IS this fix's success criterion; while it "
            "fires, the record path is still telling the caller it understood nothing";
 }
-
-// NOLINTEND

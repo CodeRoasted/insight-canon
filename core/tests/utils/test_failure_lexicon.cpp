@@ -1,4 +1,3 @@
-// NOLINTBEGIN
 // Unit tests: allow short identifiers and test-specific patterns
 // tests/unit/test_failure_lexicon.cpp
 //
@@ -475,5 +474,3 @@ TEST(FailureLexicon, ScanLimitBoundsTheHead)
     EXPECT_TRUE(contains_failure_cue("OperationalError: happened later", 5))
         << "the cue token starts at offset 0, within the head";
 }
-
-// NOLINTEND

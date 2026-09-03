@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_normalized_content_doors.cpp — the DOOR CENSUS of the typed ingest precondition
 // (the door census, the pinned-absence traits, plus Eqya's ruling-1 addition).
 //
@@ -170,4 +169,3 @@ TEST(NormalizedContentDoors, TheMintKeyHasExactlyOneFriendAndItIsTheParser)
 }
 
 } // namespace
-// NOLINTEND

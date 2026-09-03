@@ -1,4 +1,3 @@
-// NOLINTBEGIN
 // Unit tests: allow short identifiers and test-specific patterns
 // core/tests/utils/test_time_utils_dialect_ts.cpp
 //
@@ -413,5 +412,3 @@ TEST(DialectTimestampCalendar, LeapDayAndYearBoundariesAgreeWithTheCivilCalendar
                      utc_epoch(1999, 12, 31, 23, 59, 59));
     EXPECT_PARSES_TO(parse_nginx_error_ts("2000/01/01 00:00:00"), utc_epoch(2000, 1, 1, 0, 0, 0));
 }
-
-// NOLINTEND

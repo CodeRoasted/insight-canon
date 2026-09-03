@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_where_wiring.cpp — MaskConfig.recognize_test_where, the flag-gated identity-derived WHERE on
 // the tokenizer (SRC-II-8 — the WHERE has ONE source, the identity spine). REPLACES the 1.7.4
 // tests/identity/test_where_wiring.cpp, re-homed to core as a SYNTHETIC-composition mechanism test
@@ -125,4 +124,3 @@ TEST(WhereWiring, FlagOnNonTestLineStaysEmpty)
     EXPECT_TRUE(result.value().component.empty())
         << "a non-test line names no WHERE; got \"" << result.value().component << '"';
 }
-// NOLINTEND

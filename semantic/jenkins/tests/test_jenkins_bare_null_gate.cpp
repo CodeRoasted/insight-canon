@@ -1,4 +1,3 @@
-// NOLINTBEGIN — corpus gate: literals and printed diagnostics are intended.
 // test_jenkins_bare_null_gate.cpp — G-T5-BARE: the 82 bare Jenkins traces' whole surface, frozen
 // and change-detected against a committed baseline.
 //
@@ -680,4 +679,3 @@ TEST_F(JenkinsBareNullGate, TheBareSurfaceIsByteIdenticalToTheCommittedBaseline)
                             "corpus mount or the attestation and re-run; never lower the pin.";
 }
 } // namespace
-// NOLINTEND

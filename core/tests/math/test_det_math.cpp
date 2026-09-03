@@ -1,4 +1,4 @@
-// NOLINTBEGIN — Unit tests for the deterministic math primitive.
+// Unit tests for the deterministic math primitive.
 //
 // Two kinds of assertion:
 //   * REFERENCE VECTOR (exact ==): the bit-exact int64 outputs of det_log2_fixed
@@ -152,4 +152,3 @@ TEST(DetMath, FixedToDoubleIsExactForPowerOfTwoScale)
 }
 
 } // namespace
-// NOLINTEND

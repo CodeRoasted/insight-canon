@@ -1,4 +1,3 @@
-// NOLINTBEGIN
 // Unit tests: allow short identifiers and test-specific patterns
 // tests/utils/test_leading_scan_token_budget.cpp
 //
@@ -322,4 +321,3 @@ TEST(LeadingScanTokenBudget, ANestedRecordsLowercaseErrorAtIndexElevenIsTheDecla
            "pinning nothing\n  line: "
         << anchored;
 }
-// NOLINTEND

@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers, string literals and printed diagnostics are intended.
 // test_transport_identity.cpp — G1's IDENTITY arm, homed in canon core's compose
 // suite.
 //
@@ -189,4 +188,3 @@ TEST(TransportIdentityDeathTest, DeclarationCoordinatesAreActuallyRead)
 }
 
 } // namespace
-// NOLINTEND

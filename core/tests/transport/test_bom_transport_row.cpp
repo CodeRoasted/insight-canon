@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers, byte literals and printed diagnostics are intended.
 // test_bom_transport_row.cpp — G-BOM-1 (peel equivalence) and G-BOM-2 (stack order, with its RED
 // arm), the two MECH arms DN-25.D5 owes for the `utf8-bom-line-prefix` catalogue row.
 //
@@ -626,4 +625,3 @@ TEST(BomTransportRowGBom2, BothPeelDoorsAgreeOnBomBearingLines)
 }
 
 } // namespace
-// NOLINTEND

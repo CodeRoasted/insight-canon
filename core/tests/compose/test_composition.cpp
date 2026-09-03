@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_composition.cpp — the composition CONTRACT, canon's semantic-unaware
 // machinery, over SYNTHETIC manifests. Five permanent properties:
 //   • G-SP-5 fail-closed — an exact-duplicate key across packages is a BUILD error (constexpr
@@ -360,4 +359,3 @@ TEST(Composition, SemanticIdentityIsReproducibleOrderIndependentAndContentSensit
     EXPECT_NE(compose({}).identity(), compose(a).identity())
         << "core-only and core+alpha must not collide";
 }
-// NOLINTEND

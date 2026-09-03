@@ -1,4 +1,3 @@
-// NOLINTBEGIN
 // Unit tests for the stateless template masker (SRC-D-TID-1/SRC-D-TID-2).
 // The property tests are committed regression guards — chiefly the phantom-pair kill
 // (the whole point). The F13 masker-cardinality RE-MEASURE lived here as an
@@ -1040,5 +1039,3 @@ TEST(StatelessTemplate, EmbeddedIdentityArmsAreDisjoint)
                                  << "\n  actual   : " << one;
     }
 }
-
-// NOLINTEND

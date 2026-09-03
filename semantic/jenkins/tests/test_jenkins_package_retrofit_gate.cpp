@@ -1,4 +1,3 @@
-// NOLINTBEGIN — integration gate: literals and printed diagnostics are intended.
 // test_jenkins_package_retrofit_gate.cpp — the Jenkins RECOGNIZER RETROFIT over jenkins-markers/v2.
 // The link the Jenkins audit was missing: nothing in the tree scored the SHIPPED rows against real
 // bytes. Built on the GitLab package-proof precedent, and holding the same rule — the claim word is
@@ -1164,4 +1163,3 @@ TEST(JenkinsRetrofitConformanceTripwire, TheKitsOwnStageProbeFires)
     }
 }
 } // namespace
-// NOLINTEND

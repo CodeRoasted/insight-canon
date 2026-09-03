@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and literals are fine.
 // test_template_id.cpp — the SRC-D-TIR-1 invariants for canon's TemplateId
 // These are the golden-preserving guards the whole
 // perf refactor rests on: byte-lexicographic order == "h:"+hex order, render/parse
@@ -136,5 +135,3 @@ TEST(NgramIdInvariants, DistinctSequencesGiveDistinctIds)
         by_id[ngram_id_of(sequences[i])] = i;
     EXPECT_EQ(by_id.size(), sequences.size()) << "ngram_id collision across distinct sequences";
 }
-
-// NOLINTEND

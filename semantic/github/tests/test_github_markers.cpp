@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_github_markers.cpp — the GitHub-Actions INTENT-MARKER vocabulary. Migrated from
 // canon tests/identity/test_intent_marker.cpp: the recognition MECHANISM
 // (insight::tokenization::recognize over the composed marker rows) is CANON's algorithm; the
@@ -243,4 +242,3 @@ TEST(GithubMarkers, RawPayloadFeedsAlignmentClass)
     EXPECT_EQ(canonicalize_intent(step.name), "actions/checkout@vX")
         << "raw \"" << step.name << "\" did not collapse to the versioned-action class";
 }
-// NOLINTEND

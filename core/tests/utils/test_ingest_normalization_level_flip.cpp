@@ -1,4 +1,3 @@
-// NOLINTBEGIN
 // Unit tests: allow short identifiers and test-specific patterns
 // tests/utils/test_ingest_normalization_level_flip.cpp
 //
@@ -146,4 +145,3 @@ TEST(IngestNormalizationLevelFlip, NormalizationDoesNotDisarmGenuineFailureLines
             << "' read " << to_string(infer_leading_log_level(normalized).value());
     }
 }
-// NOLINTEND

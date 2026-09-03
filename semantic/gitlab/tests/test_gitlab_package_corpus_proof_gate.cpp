@@ -1,4 +1,3 @@
-// NOLINTBEGIN — integration gate: literals and printed diagnostics are intended.
 // test_gitlab_package_corpus_proof_gate.cpp — the GitLab PACKAGE PROOF over marker_corpus_v1.
 // The property: does the SHIPPED `insight.semantic.gitlab` see on real GitLab traces what the
 // frozen Python instrument that authored its rows saw? That is one component over bytes it does
@@ -1087,4 +1086,3 @@ TEST_F(GitLabPackageCorpusProofGate, TheOutcomeLegRecoversThePlatformVerdictFrom
 }
 
 } // namespace
-// NOLINTEND

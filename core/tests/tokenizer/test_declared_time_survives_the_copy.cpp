@@ -1,4 +1,3 @@
-// NOLINTBEGIN — Unit tests: allow short identifiers and test-specific patterns
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -145,5 +144,3 @@ TEST(DeclaredTimeCopy, AParsedTimestampCrossesAsPARSEDAndStillCarriesItsTime)
            "parseable time at all and falls to forward-fill — the value was lost in the copy even "
            "though the provenance was right";
 }
-
-// NOLINTEND

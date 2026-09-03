@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_github_outcome.cpp — the GHA run-outcome VOCABULARY, the GHA half of the outcome mapping:
 // the seven native `result`/`conclusion` strings map into the core four-class RunOutcome, the
 // no-verdict conclusions (skipped/neutral/action_required) MAP to Unknown (never a guess, never a
@@ -132,4 +131,3 @@ TEST(GithubOutcome, AuthoritativeSideInputCarriesTheGhaVerdict)
     EXPECT_FALSE(res.divergent) << "no console verdict exists — nothing to diverge from";
     EXPECT_TRUE(res.note.empty()) << res.note;
 }
-// NOLINTEND

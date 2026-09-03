@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_gitlab_markers.cpp — the GitLab section VOCABULARY (measured on real traces, then graduated
 // into grammar-5 rows). What it guards:
 //   SECTION = a line-anchored `section_start:<unix-ts>:<name>[<options>]` open, kind=Step (a GitLab
@@ -158,4 +157,3 @@ TEST(GitLabMarkers, RowsAreDialectGatedAndFailClosedWhenUndeclared)
               IntentMarkerKind::None)
         << "an UNDECLARED stream withholds every concretely-gated row (fail-closed on depth)";
 }
-// NOLINTEND

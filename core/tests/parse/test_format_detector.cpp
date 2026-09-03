@@ -1,4 +1,3 @@
-// NOLINTBEGIN
 // Unit tests: allow short identifiers and test-specific patterns
 // tests/1_tokenization/test_format_detector.cpp
 //
@@ -323,5 +322,3 @@ TEST_F(FormatDetectorTest, DetectsHPC)
     ASSERT_NE(s, nullptr);
     EXPECT_EQ(s->format(), LogFormat::HPC);
 }
-
-// NOLINTEND

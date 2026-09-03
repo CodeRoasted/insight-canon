@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_run_outcome.cpp — the grammar-2 run-outcome MECHANISMS over SYNTHETIC manifests
 // (canon core stays semantic-unaware —
 // no dialect literal here; the Jenkins/GHA vocabularies are package data, tested in their packages;
@@ -680,4 +679,3 @@ TEST(OutcomeRegressed, StrictlyWorseOnTheAxisOnly)
     EXPECT_FALSE(outcome_regressed(RunOutcome::Success, RunOutcome::Unknown));
     EXPECT_FALSE(outcome_regressed(RunOutcome::Unknown, RunOutcome::Failure));
 }
-// NOLINTEND

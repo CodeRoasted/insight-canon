@@ -1,4 +1,3 @@
-// NOLINTBEGIN — integration gate: literals and printed diagnostics are intended.
 // test_transport_peel_equivalence_gate.cpp — G1's CORPUS arm + G1-PEEL, homed here.
 //
 // ⚠ THE ORACLE IS FROZEN, AND THIS GATE HAS CHANGED KIND. Read this before
@@ -981,4 +980,3 @@ TEST_F(TransportPeelEquivalenceGate, BomRowUndropsExactlyTheBomDeclinedLinesAndN
 }
 
 } // namespace
-// NOLINTEND

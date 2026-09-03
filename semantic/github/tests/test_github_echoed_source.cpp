@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_github_echoed_source.cpp — the GitHub-Actions echoed-source CODE TIER (SRC-D-PROV-1).
 // Migrated from canon tests/parse/test_echoed_source.cpp. Two altitudes:
 //   1. RECOGNITION — github::is_echoed_source(raw): the byte-exact command-echo SGR predicate,
@@ -164,4 +163,3 @@ TEST(GithubEchoedSource, TokenizerKeepsRealColouredErrorAsError)
         << "a real coloured ERROR keeps its alerting level after the SGR is stripped (got "
         << static_cast<int>(real->level) << ")";
 }
-// NOLINTEND

@@ -1,4 +1,3 @@
-// NOLINTBEGIN : Unit tests may intentionally violate some style rules for clarity or simplicity.
 // Unit tests: allow short identifiers and test-specific patterns
 // tests/scan/test_fast_gates.cpp
 //
@@ -440,5 +439,3 @@ TEST(FastGatesTokenShape, EmptyTokenIsAllFalseExceptEmpty)
     EXPECT_FALSE(empty.digit_leading);
     EXPECT_FALSE(empty.has_separator);
 }
-
-// NOLINTEND

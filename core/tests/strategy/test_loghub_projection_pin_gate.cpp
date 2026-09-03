@@ -1,4 +1,3 @@
-// NOLINTBEGIN — corpus gate: literals and printed diagnostics are intended.
 // test_loghub_projection_pin_gate.cpp — the instrument `DN-43.D14` (4) NAMES BUT DID NOT HAVE.
 //
 // ═══ WHY THIS FILE EXISTS ══════════════════════════════════════════════════════════════════════
@@ -358,4 +357,3 @@ TEST_F(LogHubProjectionPinGate, EveryPinnedCorpusHoldsItsDeclineAndEmptyProjecti
 }
 
 } // namespace
-// NOLINTEND

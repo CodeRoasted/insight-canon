@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_jenkins_outcome.cpp — the Jenkins run-outcome VOCABULARY: the five native `result` strings
 // map into the core four-class RunOutcome, and the console-tail `Finished: <RESULT>` epilogue is
 // recognized through this package's own strategy + marker row over a realistic mini console
@@ -137,4 +136,3 @@ TEST(JenkinsOutcome, AuthoritativeSideInputOverridesDivergentConsole)
     EXPECT_TRUE(res.divergent);
     EXPECT_EQ(res.console, RunOutcome::Aborted);
 }
-// NOLINTEND

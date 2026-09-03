@@ -1,4 +1,3 @@
-// NOLINTBEGIN — golden gate: literals, printed diagnostics and a file read are intended.
 // test_mask_rule_golden.cpp — the arm ROADMAP N74 asks for: a golden that pins MASKED OUTPUT for a
 // named line population, so a masking-rule change reds WITHOUT a `kCanonicalizationVersion` change.
 //
@@ -870,4 +869,3 @@ TEST(MaskRuleGolden, DISABLED_RegenerateGolden)
     for (const std::string& item : rewritten)
         std::printf("  rewritten %s\n", item.c_str());
 }
-// NOLINTEND

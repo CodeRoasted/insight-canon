@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_manifest_equivalence.cpp — the conformance kit's THIRD entry point,
 // `manifest_equivalence_report(lhs, rhs)`: "do these two semantic packages agree, field for field?"
 // (DN-17.D21 §5). The comparator exists to say WHERE two rulesets differ; `semantic_identity`
@@ -581,5 +580,3 @@ TEST(ManifestEquivalence, EmptyManifestsAreEquivalentAndStillDiscriminate)
     // two code-tier members are absent on BOTH sides, so they legitimately stay green.
     EXPECT_EQ(failing_names(split_report).size(), 12U) << failures_of(split_report);
 }
-
-// NOLINTEND

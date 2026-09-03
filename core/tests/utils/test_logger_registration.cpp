@@ -1,4 +1,3 @@
-// NOLINTBEGIN
 // Unit tests: allow short identifiers and test-specific patterns
 //
 // Every declared module logger must resolve to a REGISTERED logger carrying its own name.
@@ -76,4 +75,3 @@ TEST(LoggerRegistration, EveryNameInTheRegistrationSetHasAnAccessorArmHere)
         << " accessors — add the missing accessor arm to bound_loggers() above, or this gate "
            "silently stops covering the new logger";
 }
-// NOLINTEND

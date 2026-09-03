@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_jenkins_markers.cpp — the Jenkins stage/step VOCABULARY (measured on real consoles by the
 // frozen spike, then graduated into grammar-2 rows). What it guards, against those semantics:
 //   STAGE = a NAMED `[Pipeline] { (<name>)` block open (declared stage OR parallel/matrix Branch),
@@ -132,4 +131,3 @@ TEST(JenkinsMarkers, DialectGatedToTheDeclaringStream)
     EXPECT_EQ(recognize(norm_probe("[Pipeline] { (Build)"), declared).kind, IntentMarkerKind::Job);
     EXPECT_EQ(recognize(norm_probe("[Pipeline] sh"), declared).kind, IntentMarkerKind::Step);
 }
-// NOLINTEND

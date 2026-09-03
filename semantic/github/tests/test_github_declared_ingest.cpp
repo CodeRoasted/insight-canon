@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_github_declared_ingest.cpp — the GitHub-Actions dialect over the DECLARED ingest path
 // This file replaces `test_github_strategy.cpp`, whose whole
 // subject — `GitHubActionsStrategy`: `format()`, `confidence()`, the detection race against Syslog,
@@ -252,4 +251,3 @@ TEST(GithubDeclaredIngest, ThePackageShipsNoStrategyAndOneProvenanceHook)
     EXPECT_TRUE(composed.packages()[0].has_echoed_source)
         << "the echoed-source provenance hook is the code tier that remains";
 }
-// NOLINTEND

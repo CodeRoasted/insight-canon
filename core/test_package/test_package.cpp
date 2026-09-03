@@ -1,4 +1,4 @@
-// NOLINTBEGIN Smoke test: consumes insight::canon as if external.
+// Smoke test: consumes insight::canon as if external.
 #include <expected>
 #include <gtest/gtest.h>
 #include <string_view>
@@ -82,4 +82,3 @@ TEST(InsightCanonPackage, TokenizesSyslogLine)
     const auto& event{result.value()};
     EXPECT_FALSE(event.component.empty());
 }
-// NOLINTEND

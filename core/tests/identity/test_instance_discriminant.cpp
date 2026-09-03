@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_instance_discriminant.cpp — discriminant_of, canon's SEMANTIC-UNAWARE complement of
 // canonicalize_intent — the third role on the identity spine (SRC-II-9). The class MASKS
 // drift tokens to group siblings; the discriminant KEEPS the raw declared coordinate verbatim to
@@ -123,4 +122,4 @@ TEST(InstanceDiscriminant, SeparatesCellsSharingAFirstMaskedSpan)
 // NOTE: the child_order marker-row property (job=Unordered, step=Ordered) migrated
 // with the GitHub-Actions marker VOCABULARY to the github package suite
 // (test_github_markers::JobUnorderedStepOrdered); discriminant_of / canonicalize_intent above are
-// canon's SEMANTIC-UNAWARE algorithm and stay core. NOLINTEND
+// canon's SEMANTIC-UNAWARE algorithm and stay core.

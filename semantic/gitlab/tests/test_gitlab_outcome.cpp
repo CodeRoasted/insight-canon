@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_gitlab_outcome.cpp — the GitLab run-verdict VOCABULARY.
 // What it guards:
 //   the API `status` token map — success/failed/canceled/skipped/manual, with the last two mapping
@@ -162,4 +161,3 @@ TEST(GitLabOutcome, AnIndentedBannerMatchesAndTheLastMatchIsWhatSaves)
             .outcome,
         RunOutcome::Success);
 }
-// NOLINTEND

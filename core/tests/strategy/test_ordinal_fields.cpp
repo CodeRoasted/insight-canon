@@ -1,4 +1,3 @@
-// NOLINTBEGIN
 // Unit tests for the W1 declared ordinal field-route (SRC-D-W1-3): JsonStrategy recognizes a
 // declared structured numeric field (kOrdinalFieldCatalog) by EXACT top-level key and captures it
 // as a consumed-not-tokenized CanonicalEvent.ordinals observation — value parsed from the decimal
@@ -156,5 +155,3 @@ TEST_F(OrdinalFieldTest, SlowPathMultipleOrdinalsAndDecimal)
     EXPECT_EQ(find(ev, "latency_ms")->value, 12 * kMs + 250'000); // 12.25 ms
     EXPECT_EQ(find(ev, "response_bytes")->value, 8192);
 }
-
-// NOLINTEND

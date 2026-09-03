@@ -1,4 +1,3 @@
-// NOLINTBEGIN
 // Unit tests: allow short identifiers and test-specific patterns
 // core/tests/utils/test_time_utils.cpp
 //
@@ -542,5 +541,3 @@ TEST(InferLeadingLogLevel, LeadingPassWordDemotesLevel)
     EXPECT_EQ(infer_leading_log_level("worker crashed but all 4 checks passed"), LogLevel::Error)
         << "'crashed' is the first significant token; a TRAILING 'passed' must not demote it";
 }
-
-// NOLINTEND

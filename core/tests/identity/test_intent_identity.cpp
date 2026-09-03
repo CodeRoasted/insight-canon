@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_intent_identity.cpp — the frozen `intent-gha-2` canonicalizer contract (canon d2d460d).
 // These pin the closure-as-identity constructor: matrix legs / shards / version-parameterized
 // jobs of ONE intent canonicalize to ONE CLASS and pair across homologous runs,
@@ -201,5 +200,3 @@ TEST(IntentIdentity, IdIsHashOfCanonicalForm)
             << "intent_id_of diverged from template_id_of(canonicalize_intent()) for: \"" << name
             << '"';
 }
-
-// NOLINTEND

@@ -1,4 +1,3 @@
-// NOLINTBEGIN
 // Unit tests: allow short identifiers and test-specific patterns
 // tests/1_tokenization/test_arena_allocator.cpp
 //
@@ -571,5 +570,3 @@ TEST(ArenaAllocator_ResetPoison, PoisonSpansTheWholeHandedOutExtentNotJustTheFir
                "so the instrument detects a use-after-reset only for some offsets";
     }
 }
-
-// NOLINTEND

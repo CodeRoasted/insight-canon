@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_location_families.cpp — the test-framework FILE-LOCATION vocabulary (SRC-II-8).
 // Migrated from canon tests/identity/test_location_recognizer.cpp: the matching MECHANISM
 // (insight::recognize_location, the three closed LocationMatchKind algorithms over the composed
@@ -106,4 +105,3 @@ TEST(LocationFamilies, NoFalsePositives)
     expect_loc(tf, "import helper from './helpers.ts'", ""); // .ts but no .test./.spec. infix
     expect_loc(tf, "", "");                                  // empty line opens no WHERE
 }
-// NOLINTEND

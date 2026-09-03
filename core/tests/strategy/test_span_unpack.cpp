@@ -1,4 +1,3 @@
-// NOLINTBEGIN — Unit tests: allow short identifiers and test-specific patterns
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -406,5 +405,3 @@ TEST(SpanUnpack, UnpackedRecordsRoundTripThroughTheFlatSpanParser)
     ASSERT_EQ(span1->ordinals.size(), 1U);
     EXPECT_EQ(span1->ordinals[0].value, 300); // 1400 − 1100
 }
-
-// NOLINTEND

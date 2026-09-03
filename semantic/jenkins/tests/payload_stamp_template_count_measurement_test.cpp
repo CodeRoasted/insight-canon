@@ -1,4 +1,3 @@
-// NOLINTBEGIN — measurement harness: long literals, wide reports and raw loops are the point.
 // payload_stamp_template_count_measurement_test.cpp — the pre-registered measurement owed by the
 // ruling that a PAYLOAD stamp is dialect content, never a transport envelope (and the evidence
 // that settles what the masker then owes).
@@ -958,4 +957,3 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
         << "P3 (NEW-PHENOMENON arm): distinct_B != distinct_A + |dual(A)| + |refine(A)| + "
            "|cell_B| — a partition error P0/P2 did not catch.";
 }
-// NOLINTEND

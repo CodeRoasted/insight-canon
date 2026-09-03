@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_masked_span_census.cpp — `DN-38`'s measure-first GATE 2, half one: is the PRODUCER'S name
 // safe to render, and on how much of the real stream does the rendered headline move?
 //
@@ -682,4 +681,3 @@ TEST(MaskedSpanCensus, TheProducerNameRenderDeltaOnTheG1Bank)
               "not — the set the ruling is answerable for)",
               at_risk);
 }
-// NOLINTEND

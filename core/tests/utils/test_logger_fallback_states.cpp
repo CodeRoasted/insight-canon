@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and test-specific patterns are fine.
 //
 // test_logger_fallback_states.cpp — the accessor fallback is TWO states, and the whole point of
 // the change under test is that they stopped being the same state.
@@ -874,5 +873,3 @@ TEST(LoggerFallbackStateADeathTest, NoModuleRecordReachesStdoutWhenInitLoggingNe
         << " = the child was not in state (A) at all. The child's own diagnostic, with the "
            "captured bytes, is printed above under \"Actual msg\".";
 }
-
-// NOLINTEND

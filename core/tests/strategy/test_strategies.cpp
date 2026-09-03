@@ -1,4 +1,3 @@
-// NOLINTBEGIN : Unit tests may intentionally violate some style rules for clarity or simplicity.
 // Unit tests: allow short identifiers and test-specific patterns
 // tests/strategy/test_strategies.cpp
 //
@@ -2346,5 +2345,3 @@ INSTANTIATE_TEST_SUITE_P(Strategies, RejectsCLFAndKV,
 INSTANTIATE_TEST_SUITE_P(Strategies, ConfidenceZeroForSyslog,
                          ::testing::ValuesIn(rows_with_zero_syslog_confidence()),
                          strategy_case_name);
-
-// NOLINTEND : Unit tests may intentionally violate some style rules for clarity or simplicity.

@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_gitlab_strategy.cpp — the GitLab dialect CODE TIER: the line-selective
 // format strategy. What it guards: the strategy claims EXACTLY the dialect-marked shapes (a line
 // carrying the 32-byte runner transport prefix, a bare `section_start:` marker, the terminal
@@ -123,4 +122,3 @@ TEST(GitLabStrategy, ANonGitLabLineIsDeclinedWithADiagnosticRatherThanMisParsed)
     ASSERT_FALSE(parsed.has_value());
     EXPECT_FALSE(parsed.error().empty()) << "a decline must say why";
 }
-// NOLINTEND

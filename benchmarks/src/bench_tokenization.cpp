@@ -1,4 +1,3 @@
-// NOLINTBEGIN
 // Tokenization throughput benchmark — two arms (ADR-17 / SRC-SP-5).
 //
 // Measures end-to-end Tokenizer::process_line() cost — stateless per-line template
@@ -238,4 +237,3 @@ BENCHMARK(BM_TokenizationThroughputDegenerate)->Arg(4)->Arg(8)->Unit(benchmark::
 BENCHMARK(BM_TokenizationThroughputNestedJson)->Unit(benchmark::kMicrosecond);
 
 } // namespace
-// NOLINTEND

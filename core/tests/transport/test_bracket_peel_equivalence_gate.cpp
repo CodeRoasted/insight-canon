@@ -1,4 +1,3 @@
-// NOLINTBEGIN — corpus gate: literals and printed diagnostics are intended.
 // test_bracket_peel_equivalence_gate.cpp — G-T5-PEEL: the bracket row's peel-equivalence gate
 // (the G1-PEEL shape one row over; the transport contract's owed obligation for the Jenkins
 // Timestamper row, discharged).
@@ -485,4 +484,3 @@ TEST(BracketPeelSyntheticArms, StripAndBlankLawsMatchTheFrozenSpelling)
     EXPECT_EQ(offset_form.content, "tail");
 }
 } // namespace
-// NOLINTEND

@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_github_roles.cpp — the GitHub-Actions STRUCTURAL-ROLE vocabulary. Migrated from
 // canon tests/utils/test_structural_role.cpp: the classification MECHANISM
 // (insight::tokenization::classify, longest-match over the composed role rows) is CANON's; the
@@ -204,4 +203,3 @@ TEST(GithubRoles, TokenizerSeesTheStampWithoutADeclaration)
         << "the masked leading position must carry the stamp's own bytes; params[0] = \""
         << event->params.front() << "\"";
 }
-// NOLINTEND

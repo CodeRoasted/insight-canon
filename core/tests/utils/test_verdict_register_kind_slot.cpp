@@ -1,4 +1,3 @@
-// NOLINTBEGIN
 // Unit tests: allow short identifiers and test-specific patterns
 // tests/utils/test_verdict_register_kind_slot.cpp
 //
@@ -246,4 +245,3 @@ TEST(VerdictRegisterKindSlot, ALeadingTimestampIsNotPrefixMaterialDeclaredLimita
         << "and the same line with the timestamp removed fires — the timestamp is the whole "
            "difference";
 }
-// NOLINTEND

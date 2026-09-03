@@ -1,4 +1,3 @@
-// NOLINTBEGIN
 // Unit tests: allow short identifiers and test-specific patterns
 // tests/1_tokenization/test_tokenizer.cpp
 //
@@ -683,5 +682,3 @@ TEST_F(TokenizerTest, EmojiContentEndToEnd)
     ASSERT_TRUE(r2.has_value());
     EXPECT_EQ(r1.value().template_str, r2.value().template_str);
 }
-
-// NOLINTEND

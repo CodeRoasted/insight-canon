@@ -1,4 +1,3 @@
-// NOLINTBEGIN : Unit tests may intentionally violate some style rules for clarity or simplicity.
 // tests/scan/test_ansi_normalization.cpp
 //
 // Unit coverage for STAGE 1 — `normalize()`.
@@ -150,4 +149,3 @@ TEST(AnsiNormalization, TheScratchIsClearedSoReuseCannotLeakThePreviousLine)
     const auto once{normalize("\x1b[31mfirst line\x1b[0m", scratch)};
     EXPECT_EQ(normalize(once.bytes(), again).bytes(), once.bytes());
 }
-// NOLINTEND

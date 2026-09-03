@@ -1,4 +1,3 @@
-// NOLINTBEGIN — unit test: short identifiers and string literals are fine.
 // test_semantic_walkers.cpp — the composed-recognition ALGORITHMS, canon's
 // semantic-unaware core code, exercised over SYNTHETIC rows so the mechanism is proven
 // VOCABULARY-FREE. This is the homing counterpart to the package suites: the github/test_frameworks
@@ -447,4 +446,3 @@ TEST(SemanticWalkers, RecognizersDoNotHeapAllocate)
         << "the composed recognition walkers must be heap-free (SRC-SP-5): observed " << observed
         << " allocation(s) over the probe path.";
 }
-// NOLINTEND

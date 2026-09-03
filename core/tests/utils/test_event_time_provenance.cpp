@@ -1,4 +1,3 @@
-// NOLINTBEGIN — Unit tests: allow short identifiers and test-specific patterns
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -97,5 +96,3 @@ TEST(EventTimeProvenance, AnAbsentParsedTimeIsNeitherPresentNorDeclared)
         << "an EMPTY event time claims declared provenance — rung 1 would then win with no value "
            "to contribute, and the transport stamp that should have applied is discarded";
 }
-
-// NOLINTEND
