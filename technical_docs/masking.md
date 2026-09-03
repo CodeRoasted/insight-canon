@@ -156,8 +156,10 @@ directory (`insig247…` vs `insigea56…`) now collapse to **one** template ins
 new/vanished pair every run — the defect this catalog exists to kill. The scope is clamped to `Instance` here
 regardless of what the entry declares, so the location tail is never masked.
 
-The kv-value normalizer carries the **same status carve-out** as rule 1: `status=200` / `code=0` stay literal
-(a status keyword + short numeric value), so the green→red flip survives in `key=value` form too. It masks
+The kv-value normalizer **declines** a status value rather than claiming it: on `status=200` / `code=0`
+(a status keyword + short numeric value) `normalize_kv_value` returns *no match*, the token falls through to
+**rule 6** and stays literal — so the green→red flip survives in `key=value` form, but the rule that keeps it is
+rule 6, not this normalizer (the golden's `status=200` witness is a `literal_keep` row for exactly that reason). It masks
 **numeric** values only — `user=alice` (letter-leading) stays literal, because masking *all* values would
 collapse `status=ok` and `status=failed` (telling an instance key from a categorical key needs cardinality,
 which a stateless per-line masker cannot see — see §6).
