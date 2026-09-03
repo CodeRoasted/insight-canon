@@ -58,7 +58,13 @@ LogFormat HealthAppStrategy::format() const noexcept
 
 double HealthAppStrategy::confidence(std::string_view line) const noexcept
 {
-    static constexpr std::string_view::size_type kMinimumCandidateLength{22};
+    // The shortest line the grammar can accept, derived rather than guessed: 8 date digits + '-'
+    // + a 1-digit hour + ':' + a 1-digit minute + ':' + a 1-digit second + ':' + 1 millisecond
+    // digit = 16, then the record's three separators = 19. It read 22 while the predicate
+    // demanded a 2-digit minute and 3-digit milliseconds; DN-43.O5 widened both, and a stale
+    // early-out is a silent false negative — the predicate below would accept a 19-byte line
+    // that this guard never lets it see.
+    static constexpr std::string_view::size_type kMinimumCandidateLength{19};
     static constexpr double kHealthAppConfidence{0.92};
     static constexpr double kNoConfidence{0.0};
     if (line.size() < kMinimumCandidateLength)

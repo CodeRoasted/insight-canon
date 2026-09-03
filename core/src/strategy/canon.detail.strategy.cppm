@@ -117,8 +117,14 @@ class CloudWatchStrategy final : public IFormatStrategy
 export namespace insight::tokenization
 {
 
-/// Parses pipe-delimited HealthApp log format:
+/// Parses the pipe-delimited HealthApp record — FOUR fields, THREE separators:
+///   "YYYYMMDD-HH:MM:SS:mmm|component|process_id|message"
 ///   "20171223-22:15:29:606|Step_LSC|30002312|onStandStepChanged 3579"
+/// Every clock field is variable-width and the corpus is NOT zero-padded, so
+/// "20171224-0:0:0:232|Step_SPUtils|30002312|setDiffTotalSteps=8874" is the same grammar.
+/// The claim predicate (is_health_app_prefix) proves the head AND all three separators: the
+/// arity is grammar, because parse() consumes three separators unconditionally and a
+/// parse()-side decline deletes the line rather than demoting it (DN-43.D16).
 class HealthAppStrategy final : public IFormatStrategy
 {
   public:

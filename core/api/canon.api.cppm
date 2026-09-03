@@ -167,7 +167,8 @@ using EventID = uint64_t;
 // (`##[error]fs/rc/rcserver/rcserver_test.go`). A `loc_is_path` byte class walked backwards from
 // the match now establishes the start: the exact mirror of the boundary test at the other end,
 // and semantic-unaware (SRC-SP-1) — no dialect literal, no marker table.
-// `template_str`/`template_id` do NOT move (the masker is untouched) and neither does any
+// `template_str`/`template_id` do NOT move FOR THIS RIDER (the masker is untouched) and neither
+// does any
 // `dedup_id_of`, which hashes the class tag and the template ids only; the serialized `component`
 // DOES move, on the `MaskConfig::recognize_test_where` path. Measured over the 4 082-file GitHub
 // revert corpus (2.34 GB, 694 484 lines resolving a location): 738 resolved lines change label,
@@ -186,6 +187,35 @@ using EventID = uint64_t;
 // -14 or -15. What it costs is re-blessing insight-metalog's three committed vector files, whose
 // only moved bytes are this string. A CONTENT re-base under ADR-31, never a determinism
 // regression: two runs of THIS generation over the same bytes stay bit-identical.
+//
+// -15 RIDER 2 — HealthApp recall, and it DOES move `template_id`, unlike the rider above.
+// `is_health_app_prefix` demanded a 2-digit minute and 3-digit milliseconds; LogHub's own
+// HealthApp_2k.log is not zero-padded anywhere, so 247 of its 2 000 lines (12.35 %) were declined
+// to RawText, where the whole line — timestamp and process id included — became the template. The
+// predicate now accepts 1-2 digits per clock field and 1-3 millisecond digits, and
+// `parse_health_app_ts` widens its minute to match (DN-43.O5; DN-43.D16 for the arity half).
+// Measured over that corpus through the public `Tokenizer::process_line` at a zero-package
+// composition: routing 1 753 HealthApp / 247 RawText -> 2 000 HealthApp / 0 RawText, sum of
+// `template_str` bytes 68 699 -> 70 555, sum of `component` bytes 20 811 -> 23 623, lines with a
+// typed event time 1 813 -> 2 000, empty projections 0 -> 0, declines 0 -> 0. So 247 lines change
+// `template_str`, `template_id`, `component` and `format`, and every one of them was being
+// published as an unmasked whole-line literal and now is not.
+//
+// IT RIDES -15 RATHER THAN SPENDING -16, which is ADR-2.D9's batch-or-do-not-spend and
+// ADR-16.D2's land-once-at-a-cut-head applied unchanged: -15 landed after v1.10.3 and
+// `git tag --contains a1eee2e` is empty, so this repair lands inside the SAME unreleased window
+// the entry above occupies. A consumer crossing the next cut pays exactly ONE comparability event
+// whichever token that cut carries — v1.10.3 ships -13 — so a third token buys nothing and costs a
+// second re-base of every committed vector. The Founder's 2026-09-03 ruling authorised a SECOND
+// SPEND for the location-recognition change on an honesty argument that does not reach here: that
+// change moved a serialized field while leaving identity untouched, which is exactly the state a
+// reader can mistake for "nothing moved". This one moves `template_id` itself, so it is already
+// legible in the identity a consumer compares.
+// WHY NO VECTOR RE-BASE IS OWED: swept 2026-09-03 across every repo — no committed golden,
+// fixture or vector outside insight-canon's own tests carries a HealthApp-format line, insight-
+// metalog's three vector files included. The one PUBLISHED artifact that does is
+// `coderoast-hub/showcase/canon/loghub.canon.txt`, which renders this corpus in four transport
+// declarations; it is a release-cut surface and is deliberately not re-rendered here.
 inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-15"};
 
 // ── Template identity (insight_perf_template_id.md SRC-D-TIR-1) ──

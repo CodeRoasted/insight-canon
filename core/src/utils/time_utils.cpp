@@ -46,7 +46,12 @@ namespace time_constants
     inline constexpr std::size_t kCompactDateWidth{6};
     inline constexpr std::size_t kShortYearSlashMinLength{17};
     inline constexpr std::size_t kApacheErrorMinLength{24};
-    inline constexpr std::size_t kHealthAppMinLength{18};
+    // "YYYYMMDD-H:M:S:" — 8 date digits, the dash, three 1-digit clock fields and the three ':'
+    // that close them. The trailing millisecond digits are the second field's TERMINATOR and are
+    // never read, so they are not part of this bound. It read 18 while the minute was fixed at
+    // two digits and could not be lowered silently: after DN-43.O5 widened every clock field,
+    // an 18-byte floor would refuse a 16-byte stamp the predicate now proves valid.
+    inline constexpr std::size_t kHealthAppMinLength{15};
     inline constexpr std::size_t kLog4jMinLength{23};
     inline constexpr std::size_t kNginxErrorMinLength{19};
 
@@ -606,8 +611,18 @@ std::optional<Timestamp> parse_apache_error_ts(std::string_view timestamp_str) n
     return std::chrono::system_clock::from_time_t(utc_mktime(parsed_tm));
 }
 
-// HealthApp: "YYYYMMDD-HH:MM:SS:mmm" or "YYYYMMDD-H:MM:S:mmm" (variable-width
-// hour/second)
+// HealthApp: "YYYYMMDD-HH:MM:SS:mmm" or "YYYYMMDD-H:M:S:m" — ALL THREE clock fields are
+// variable-width, and so is the millisecond field the second's terminator introduces.
+//
+// The minute was read as EXACTLY two digits until DN-43.O5, which is why widening
+// is_health_app_prefix alone would have been a half-fix: of the 247 lines of LogHub's
+// HealthApp_2k.log the old predicate rejected, 187 carry a 1-digit minute. Those 187 would have
+// started routing to HealthApp — gaining a component/content split and a structural template —
+// and would still have got NO event time, because this function would have declined them.
+// The failure was safe (std::nullopt, never a wrong instant: parse_fixed required from_chars to
+// consume exactly the requested width, so "5:" was refused rather than read as 5) but it was
+// silent, and it was an inconsistency rather than a decision: the hour and the second beside it
+// were already variable-width, with a test and a comment saying the format genuinely is.
 std::optional<Timestamp> parse_health_app_ts(std::string_view timestamp_str) noexcept
 {
     if (timestamp_str.size() < time_constants::kHealthAppMinLength)
@@ -626,38 +641,49 @@ std::optional<Timestamp> parse_health_app_ts(std::string_view timestamp_str) noe
     if (ptr[8] != '-')
         return std::nullopt;
 
-    // Parse variable-width "H:MM:S" or "HH:MM:SS" portion after the dash.
+    // Parse the variable-width "H:M:S" / "HH:MM:SS" portion after the dash. One helper for all
+    // three fields: they share a grammar (1 or 2 digits closed by ':'), and three spellings of
+    // one grammar is how the minute came to differ from its neighbours in the first place.
+    //
+    // The digit test before from_chars is load-bearing and is NOT redundant: from_chars accepts a
+    // leading '-' for a signed type, so a bare from_chars would read "-5" as minute -5, hand it to
+    // utc_mktime, and publish a silently NORMALIZED instant — a wrong timestamp rather than a
+    // refused one. The old fixed-width minute could not reach that state; the hour and second
+    // beside it always could. Bounding at two digits keeps this function's accepted language equal
+    // to what is_health_app_prefix proves, so the only production caller can hand it nothing new.
     const char* time_ptr = ptr + 9;
-    const char* end_ptr = ptr + timestamp_str.size();
+    const char* const end_ptr = ptr + timestamp_str.size();
 
-    // Hour: 1 or 2 digits before first ':'
+    const auto take_clock_field{[end_ptr](const char*& cursor, int& out_value) noexcept
+                                {
+                                    static constexpr std::ptrdiff_t kMaxFieldDigits{2};
+                                    static constexpr unsigned kDecimalRadix{10U};
+                                    if (cursor >= end_ptr ||
+                                        static_cast<unsigned>(*cursor) - '0' >= kDecimalRadix)
+                                    {
+                                        return false;
+                                    }
+                                    const char* const scan_end{
+                                        std::min(cursor + kMaxFieldDigits, end_ptr)};
+                                    const auto result{std::from_chars(cursor, scan_end, out_value)};
+                                    if (result.ec != std::errc{} || result.ptr >= end_ptr ||
+                                        *result.ptr != ':')
+                                    {
+                                        return false;
+                                    }
+                                    cursor = result.ptr + 1; // step over the ':'
+                                    return true;
+                                }};
+
     int hour{0};
-    auto hour_result{std::from_chars(time_ptr, end_ptr, hour)};
-    if (hour_result.ec != std::errc{} || hour_result.ptr >= end_ptr || *hour_result.ptr != ':')
-    {
-        return std::nullopt;
-    }
-    time_ptr = hour_result.ptr + 1; // skip ':'
-
-    // Minute: always 2 digits
     int minute{0};
-    if (time_ptr + 2 > end_ptr)
-        return std::nullopt;
-    if (!parse_fixed(time_ptr, 2, minute))
-        return std::nullopt;
-    time_ptr += 2;
-    if (time_ptr >= end_ptr || *time_ptr != ':')
-        return std::nullopt;
-    ++time_ptr; // skip ':'
-
-    // Second: 1 or 2 digits before next ':'
     int second{0};
-    auto second_result{std::from_chars(time_ptr, end_ptr, second)};
-    if (second_result.ec != std::errc{} || second_result.ptr >= end_ptr ||
-        *second_result.ptr != ':')
-    {
+    if (!take_clock_field(time_ptr, hour))
         return std::nullopt;
-    }
+    if (!take_clock_field(time_ptr, minute))
+        return std::nullopt;
+    if (!take_clock_field(time_ptr, second))
+        return std::nullopt;
 
     std::tm parsed_tm{};
     parsed_tm.tm_year = year - 1900;

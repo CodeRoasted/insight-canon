@@ -195,8 +195,23 @@ TEST(FastGatesPrefix, BglHealthAppHpc)
     // made the second arm's green a statement about pipe count rather than about millisecond
     // width, the vacuity shape MEM:synthetic-gate-vacuity-vs-judgment names.
     EXPECT_TRUE(is_health_app_prefix("20171223-2:15:29:606|c|1|single-digit hour"));
-    EXPECT_FALSE(is_health_app_prefix("20171223-22:15:29:66|c|1|two millis digits"));
     EXPECT_FALSE(is_health_app_prefix("20171223 22:15:29:606|c|1|space, not dash"));
+
+    // EVERY clock field is variable-width (DN-43.O5). This arm asserted the OPPOSITE until
+    // 2026-09-03 — `EXPECT_FALSE(is_health_app_prefix("20171223-22:15:29:66|two millis digits"))`
+    // PINNED the two-digit-millisecond rejection — and the pin was wrong about the format, not
+    // about the code. LogHub's own HealthApp_2k.log is not zero-padded anywhere: the 2-digit-minute
+    // and 3-digit-millisecond requirements rejected 247 of its 2 000 lines, 12.35 %, which got no
+    // event time and a whole-line raw-text template. The flip is the ruling landing, not a
+    // regression; the reason nine generations of green never showed it is that logcraft's
+    // fmt_health_app zero-pads unconditionally, so every synthetic HealthApp line was padded.
+    EXPECT_TRUE(is_health_app_prefix("20171223-22:15:29:66|c|1|two millisecond digits"));
+    EXPECT_TRUE(is_health_app_prefix("20171223-22:15:29:6|c|1|one millisecond digit"));
+    EXPECT_TRUE(is_health_app_prefix("20171223-22:1:29:606|c|1|single-digit minute"));
+    EXPECT_TRUE(is_health_app_prefix("20171223-2:1:9:6|c|1|every clock field one digit"));
+    // Still bounded above: a field wider than the grammar allows is not a HealthApp head.
+    EXPECT_FALSE(is_health_app_prefix("20171223-22:151:29:606|c|1|three-digit minute"));
+    EXPECT_FALSE(is_health_app_prefix("20171223-22:15:29:6066|c|1|four millisecond digits"));
 
     // ARITY IS GRAMMAR (DN-43.D16): the predicate proves all three separators, because the parse
     // consumes three unconditionally. At one separator the second take swallowed the message body

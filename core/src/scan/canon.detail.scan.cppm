@@ -491,13 +491,24 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
             return false;
     if (str[kHealthSepAt] != '-')
         return false;
+    // EVERY time field is variable-width, and this is DN-43.O5 measured rather than assumed.
+    // The predicate used to demand a 2-digit minute and 3-digit milliseconds; LogHub's own
+    // HealthApp_2k.log is not zero-padded anywhere, and those two requirements alone rejected
+    // 247 of its 2 000 lines (12.35 %). Measured field widths over that corpus: hour/minute/
+    // second 1,1,1 on 81 lines, 1,1,2 on 37, 1,2,1 on 27, 1,2,2 on 79, 2,1,1 on 46, 2,1,2 on 23,
+    // 2,2,1 on 289 and 2,2,2 on 1 418; millisecond width 1 on 9, 2 on 66, 3 on 1 925.
+    //
+    // NINE GENERATIONS OF GREEN SAID NOTHING ABOUT THIS, and the reason is the point: every
+    // HealthApp test line came from logcraft's fmt_health_app or from a sample copied out of it,
+    // and that writer zero-pads unconditionally. THE GENERATOR IS STRICTER THAN THE CORPUS, so a
+    // synthetic gate cannot see a gap its own generator forecloses.
     std::size_t pos{kHealthTimeAt};
     if (!consume_digits(str, pos, 1U, 2U))
         return false;
     if (pos >= str.size() || str[pos] != ':')
         return false;
     ++pos;
-    if (!consume_digits(str, pos, 2U, 2U))
+    if (!consume_digits(str, pos, 1U, 2U))
         return false;
     if (pos >= str.size() || str[pos] != ':')
         return false;
@@ -507,7 +518,7 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
     if (pos >= str.size() || str[pos] != ':')
         return false;
     ++pos;
-    if (!consume_digits(str, pos, 3U, 3U))
+    if (!consume_digits(str, pos, 1U, 3U))
         return false;
     if (pos >= str.size() || str[pos] != '|')
         return false;

@@ -260,6 +260,39 @@ TEST(ParseHealthAppTs, SingleDigitHourAndSecondParsed)
     EXPECT_PARSES_TO(parse_health_app_ts("20171223-9:15:9:606"), utc_epoch(2017, 12, 23, 9, 15, 9));
 }
 
+TEST(ParseHealthAppTs, SingleDigitMinuteParsed)
+{
+    // The MINUTE was read as exactly two digits until DN-43.O5, and that made widening
+    // is_health_app_prefix a half-fix: 187 of the 247 lines of LogHub's HealthApp_2k.log that the
+    // old predicate rejected carry a 1-digit minute, so they would have routed to HealthApp and
+    // still carried NO event time. The old failure was SAFE — std::nullopt, never a wrong instant
+    // — but silent, and it was an inconsistency rather than a decision: the hour and second beside
+    // it were already variable-width.
+    EXPECT_PARSES_TO(parse_health_app_ts("20171223-22:5:29:606"),
+                     utc_epoch(2017, 12, 23, 22, 5, 29));
+    EXPECT_PARSES_TO(parse_health_app_ts("20171224-0:0:0:232"), utc_epoch(2017, 12, 24, 0, 0, 0));
+    EXPECT_PARSES_TO(parse_health_app_ts("20171223-9:7:6:1"), utc_epoch(2017, 12, 23, 9, 7, 6));
+}
+
+TEST(ParseHealthAppTs, ASignedFieldIsRefusedRatherThanNormalized)
+{
+    // std::from_chars accepts a leading '-' for a signed type, so reading a clock field with a
+    // bare from_chars would take "-5" as minute -5, hand it to utc_mktime and publish a silently
+    // NORMALIZED instant — a WRONG timestamp, not a refused one. Precision-first: refuse.
+    EXPECT_FALSE(parse_health_app_ts("20171223--5:15:29:606").has_value()) << "negative hour";
+    EXPECT_FALSE(parse_health_app_ts("20171223-22:-5:29:606").has_value()) << "negative minute";
+    EXPECT_FALSE(parse_health_app_ts("20171223-22:15:-9:606").has_value()) << "negative second";
+}
+
+TEST(ParseHealthAppTs, AClockFieldWiderThanTwoDigitsIsRefused)
+{
+    // The accepted language stays equal to what is_health_app_prefix proves (1 or 2 digits per
+    // clock field), so canon's only production caller can hand this function nothing new.
+    EXPECT_FALSE(parse_health_app_ts("20171223-221:15:29:606").has_value()) << "three-digit hour";
+    EXPECT_FALSE(parse_health_app_ts("20171223-22:151:29:606").has_value()) << "three-digit minute";
+    EXPECT_FALSE(parse_health_app_ts("20171223-22:15:299:606").has_value()) << "three-digit second";
+}
+
 TEST(ParseHealthAppTs, MillisecondsAreConsumedButNotRetained)
 {
     // The trailing ":mmm" is required as a TERMINATOR for the variable-width second, yet
