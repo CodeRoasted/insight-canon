@@ -189,9 +189,28 @@ TEST(FastGatesPrefix, BglHealthAppHpc)
     EXPECT_TRUE(is_bgl_labelled_prefix("ABCDEFGHIJKLMNOP 1117838570 2005.06.03 R02-M1-N0 RAS"));
 
     EXPECT_TRUE(is_health_app_prefix("20171223-22:15:29:606|Step_LSC|30002312|onStandStepChanged"));
-    EXPECT_TRUE(is_health_app_prefix("20171223-2:15:29:606|single-digit hour"));
-    EXPECT_FALSE(is_health_app_prefix("20171223-22:15:29:66|two millis digits"));
-    EXPECT_FALSE(is_health_app_prefix("20171223 22:15:29:606|space, not dash"));
+    // Every line below carries the record's THREE separators, so each arm fails for the reason
+    // its text names and not for its arity (DN-43.D16). Before that rule landed these two read
+    // `...:606|single-digit hour` and `...:66|two millis digits` — one separator each — which
+    // made the second arm's green a statement about pipe count rather than about millisecond
+    // width, the vacuity shape MEM:synthetic-gate-vacuity-vs-judgment names.
+    EXPECT_TRUE(is_health_app_prefix("20171223-2:15:29:606|c|1|single-digit hour"));
+    EXPECT_FALSE(is_health_app_prefix("20171223-22:15:29:66|c|1|two millis digits"));
+    EXPECT_FALSE(is_health_app_prefix("20171223 22:15:29:606|c|1|space, not dash"));
+
+    // ARITY IS GRAMMAR (DN-43.D16): the predicate proves all three separators, because the parse
+    // consumes three unconditionally. At one separator the second take swallowed the message body
+    // onto `component` and published an EMPTY `content`; at two, the process-id skip consumed the
+    // body and it reached NO projection field at all. Both now score 0.0 and are demoted to
+    // RawText — which keeps every byte — instead of being parsed into a lie.
+    EXPECT_FALSE(is_health_app_prefix("20171223-22:15:29:606|onStandStepChanged 3579"))
+        << "one separator: a four-field record's arity is not proven by its head";
+    EXPECT_FALSE(is_health_app_prefix("20171223-22:15:29:606|Step_LSC|onStandStepChanged 3579"))
+        << "two separators: the process-id field is absent, so the message body has no home";
+    EXPECT_TRUE(is_health_app_prefix("20171223-22:15:29:606|||"))
+        << "three separators with every field empty is a well-formed record, not a failure";
+    EXPECT_TRUE(is_health_app_prefix("20171223-22:15:29:606|c|1|a|b|c"))
+        << "separators inside the message body are content, not extra fields";
 
     EXPECT_TRUE(is_hpc_prefix("227 node-246 unix.hw state_change.unavailable 1077804742 1 boot"));
     EXPECT_FALSE(is_hpc_prefix("227 node-246 unix.hw state_change.unavailable 107780 1 short ts"))

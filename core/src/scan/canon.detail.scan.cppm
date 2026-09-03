@@ -509,7 +509,20 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
     ++pos;
     if (!consume_digits(str, pos, 3U, 3U))
         return false;
-    return pos < str.size() && str[pos] == '|';
+    if (pos >= str.size() || str[pos] != '|')
+        return false;
+    // ARITY IS GRAMMAR (DN-43.D16). The record is
+    // `YYYYMMDD-HH:MM:SS:mmm|component|process_id|message` — four fields, three separators —
+    // and HealthAppStrategy::parse consumes three '|' unconditionally. The separator count
+    // therefore belongs here and not in parse(): a confidence() above zero commits parse() to
+    // succeed, and the two declines are not two spellings of one act. A parse()-side decline
+    // DELETES the line (LogParser::parse_line yields no event of any kind); a predicate-side
+    // decline DEMOTES it to RawTextStrategy, which keeps every byte in `content`. Proving the
+    // two remaining separators here is what makes the three takes in parse() total.
+    const std::string_view::size_type second_sep{str.find('|', pos + 1U)};
+    if (second_sep == std::string_view::npos)
+        return false;
+    return str.find('|', second_sep + 1U) != std::string_view::npos;
 }
 
 // HPC prefix: "N <s> <s> <s> NNNNNNNNNN N "

@@ -262,6 +262,52 @@ TEST_F(FormatDetectorTest, DetectsHealthApp)
     EXPECT_EQ(s->format(), LogFormat::HealthApp);
 }
 
+// DN-43.D16 — a HealthApp head with too few separators is DEMOTED, and demotion keeps the bytes.
+//
+// The two arms below assert `content`, not merely the routed format, because an arm that checks
+// only the format is satisfied by the defective code too: before this rule both lines routed to
+// LogFormat::HealthApp and both published an EMPTY `content`. At one separator the second
+// sv_take_until found no delimiter and returned the whole remainder, so the message body was
+// published as `component` — high-cardinality free text on an identity field. At two separators
+// the process-id skip consumed the body outright and it reached NO projection field at all.
+//
+// The seat matters and it is the ruling: the fix moves the separator count into
+// is_health_app_prefix rather than adding a guard to parse(). A parse()-side decline is a
+// DELETION — LogParser::parse_line increments failed_count_ and returns std::unexpected, so the
+// line yields no event of any kind. A confidence() of 0.0 is a DEMOTION — FormatDetector::detect
+// falls back to RawTextStrategy whenever best_score is 0.0, and RawTextStrategy::parse puts the
+// whole line in `content`. Both arms therefore end on the same assertion: every byte survives.
+TEST_F(FormatDetectorTest, HealthAppHeadWithTooFewSeparatorsDemotesToRawTextKeepingEveryByte)
+{
+    ArenaAllocator arena{4096};
+
+    struct Case
+    {
+        std::string_view line;
+        std::string_view why;
+    };
+    const std::vector<Case> cases{
+        Case{.line = "20171223-22:15:29:606|onStandStepChanged 3579",
+             .why = "one separator: parse() would publish the message body as `component`"},
+        Case{.line = "20171223-22:15:29:606|Step_LSC|onStandStepChanged 3579",
+             .why = "two separators: the process-id skip would swallow the message body"}};
+
+    for (const auto& tc : cases)
+    {
+        auto* strategy{detector.detect(tc.line)};
+        ASSERT_NE(strategy, nullptr) << tc.why;
+        EXPECT_EQ(strategy->format(), LogFormat::RawText)
+            << "routed to " << to_string(strategy->format()) << ", expected RawText — " << tc.why
+            << "\n  line: " << tc.line;
+
+        auto parsed{strategy->parse(tc.line, arena)};
+        ASSERT_TRUE(parsed.has_value()) << parsed.error() << " — " << tc.why;
+        EXPECT_EQ(parsed.value().content, tc.line)
+            << "the demotion lost bytes.\n  expected content: " << tc.line
+            << "\n  actual content:   " << parsed.value().content << "\n  " << tc.why;
+    }
+}
+
 TEST_F(FormatDetectorTest, DetectsProxifier)
 {
     auto* s{detector.detect("[10.30 16:49:06] chrome.exe - "

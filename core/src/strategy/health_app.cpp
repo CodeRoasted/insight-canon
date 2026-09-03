@@ -25,18 +25,17 @@ std::expected<ParsedLine, std::string> HealthAppStrategy::parse(std::string_view
     }
 
     // Format: "YYYYMMDD-HH:MM:SS:mmm|component|process_id|message"
+    // The three takes are total by construction: is_health_app_prefix proves all three
+    // separators exist (DN-43.D16 — arity is grammar), so none of them can run off the end
+    // and swallow a neighbouring field. There is no post-take field guard: a decline here
+    // would DELETE the line rather than demote it, and an empty `component` is a positive
+    // statement that the record declares no functional source (ADR-16.D5 fail-safe KEEP),
+    // not a parse failure.
     std::string_view rest{line};
     const std::string_view ts_str{sv_take_until(rest, '|')};
     const std::string_view component{sv_take_until(rest, '|')};
     (void)sv_take_until(rest, '|'); // skip process_id
     // rest = message
-
-    if (ts_str.empty() || component.empty())
-    {
-        INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=HealthApp parse miss (bad fields)");
-        return std::unexpected(
-            std::string("HealthAppStrategy: line does not match HealthApp format"));
-    }
 
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
