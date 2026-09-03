@@ -75,4 +75,57 @@ struct StatelessTemplate
 [[nodiscard]] StatelessTemplate
 stateless_template(std::string_view content, ArenaAllocator& out_arena, const MaskConfig& config);
 
+// ── The DECLARED catalogs, made ENUMERABLE (ROADMAP N74) ────────────────────────────────────
+// `kCompositeRules` in mask.cpp already calls itself "the single enumerable place" a rule-set
+// change can be stated, and the ephemeral-root / status-keyword / currency-marker / wrapper-pair
+// tables each call themselves a single source of truth. Nothing could ENUMERATE any of them from
+// outside the TU, so no gate could ask the question those declarations exist to answer: *does the
+// witness population still cover the rule set?* A hand-written witness list answers "does it cover
+// the rules I remembered", which is the same defect one level up. It was live in this tree:
+// `Ipv4MasksInsideEveryDeclaredWrapperPair` claimed catalog completeness over six typed literals
+// that a seventh `kWrapperPairs` entry would not have touched — repaired in the same pass by
+// deriving its shells from the table, which is only possible because the table is reachable.
+//
+// These accessors add NO behaviour and cost the hot path nothing: `composite_rule_claiming` runs
+// the SAME `try_composite` helper the dispatcher runs (one loop, one pre-gate — a second copy is
+// how two maskers diverge), and every other accessor returns a view of a `constexpr` table that is
+// DERIVED from the catalog rather than restated beside it. The shard is sealed and never installed
+// (PRIVATE file set), so this is test-visible surface, not public API.
+//
+// They are the SECOND limb of the SRC-D-TID-16 obligation, and only the second: they see a rule or
+// a catalog entry being ADDED, REMOVED or REORDERED. Widening an existing rule's acceptance set in
+// place leaves every table below byte-identical — that limb is the masked-output golden
+// (`tests/mask/mask_rules.golden`), and neither limb substitutes for the other.
+namespace rule_catalog
+{
+
+    // The composite-layer rule ids, in the precedence order the dispatcher tries them.
+    [[nodiscard]] std::span<const std::string_view> composite_rule_ids() noexcept;
+
+    // The id of the first composite rule that CLAIMS `token`, or an empty view if the composite
+    // layer declines it (including when the `maybe_composite` pre-gate skips the catalog outright).
+    // This is what lets a witness row prove it exercises the rule it NAMES rather than merely
+    // asserting so. NOT noexcept: it allocates a scratch string for the normalizer's output. An
+    // allocating function that declares noexcept turns an allocation failure into a terminate,
+    // which is an OOM policy this accessor has no standing to set.
+    [[nodiscard]] std::string_view composite_rule_claiming(std::string_view token);
+
+    // The rule-1 / kv-carve-out status lexicon (`code`, `status`, `exit`, `signal`), lowercase.
+    [[nodiscard]] std::span<const std::string_view> status_keywords() noexcept;
+
+    // The declared currency markers, as their literal byte sequences.
+    [[nodiscard]] std::span<const std::string_view> currency_markers() noexcept;
+
+    // The declared ephemeral roots, each as its ordered path COMPONENTS (a root is components,
+    // never a string containing '/'). A caller that wants a printable id joins them with '/'.
+    [[nodiscard]] std::span<const std::span<const std::string_view>>
+    ephemeral_root_segments() noexcept;
+
+    // The hex-run length at or above which a run is an instance hash rather than a word (rule 3 /
+    // embedded-identity). Exposed so a witness can assert it sits BELOW the floor instead of
+    // hard-coding 16 in a second place.
+    [[nodiscard]] std::size_t min_hash_length() noexcept;
+
+} // namespace rule_catalog
+
 } // namespace insight::tokenization

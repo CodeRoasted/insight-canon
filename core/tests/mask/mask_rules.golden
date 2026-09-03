@@ -1,0 +1,114 @@
+# insight-canon — the masking-rule golden (ROADMAP N74)
+#
+# One row per WITNESS:   rule_id | subject_token | input_line | expected_template
+#
+# `expected_template` is the exact `StatelessTemplate::template_str` that
+# `stateless_template(input_line, arena, MaskConfig{})` must return. A masking rule that changes
+# what a line canonicalises to moves one of these rows, and the gate reds WITHOUT waiting for
+# anyone to remember `kCanonicalizationVersion` — which is the whole point: every other pin in the
+# workspace fires on the VERSION and none fires on the RULES.
+#
+# `rule_id` is the rule the row exists to witness, and it is CHECKED, not merely declared:
+# `test_mask_rule_golden.cpp` routes each composite subject back through the same catalog the
+# dispatcher runs and reds if a different rule claims it. The population's coverage of the declared
+# rule set (the 9 composite rules, the 5 ephemeral roots, the 6 wrapper pairs, the 4 status
+# keywords, the currency markers) is likewise read from those catalogs, so a rule or entry added
+# with no witness reds by NAME.
+#
+# Every line here is SYNTHETIC or first-party. This is a public repo: no third-party corpus byte
+# lands in it, and no address, hash or path below belongs to anyone.
+#
+# TO CHANGE A VALUE: you cannot, without first bumping `kCanonicalizationVersion` in
+# `core/api/canon.api.cppm`. The regenerator refuses otherwise. See the test file's header.
+#
+canonicalization_version = stateless-masks-15
+
+# ── rule 1 — status-value KEEP. The green->red split, the one collapse masking may never make.
+# One witness per declared status keyword; each is non-vacuous (remove the keyword, the value masks).
+status_keep | 0 | process exited with exit code 0 | process exited with exit code 0
+status_keep | 404 | request finished status 404 | request finished status 404
+status_keep | 137 | container killed signal 137 | container killed signal 137
+status_keep | 2 | worker returned exit 2 | worker returned exit 2
+
+# ── rule 3 — UUID / long hash. Letter-leading on purpose: a digit-leading hash would be masked by
+# rule 5 anyway, and the row would name the wrong rule.
+uuid_or_hash | deadbeefcafe0badf00d5678 | commit deadbeefcafe0badf00d5678 landed | commit <*> landed
+
+# ── rule 4 — IPv4, the only knob-gated rule. Every witness is OPENER-LED: a bare address is
+# digit-leading, so rule 5 masks it whatever the knob says. One per declared wrapper pair — the
+# shell whose absence once leaked a real address into a published render.
+ipv4 | (10.0.0.1) | client (10.0.0.1) connected | client <*> connected
+ipv4 | [10.0.0.1] | client [10.0.0.1] connected | client <*> connected
+ipv4 | {10.0.0.1} | client {10.0.0.1} connected | client <*> connected
+ipv4 | <10.0.0.1> | client <10.0.0.1> connected | client <*> connected
+ipv4 | "10.0.0.1" | client "10.0.0.1" connected | client <*> connected
+ipv4 | '10.0.0.1' | client '10.0.0.1' connected | client <*> connected
+
+# ── rule 5 — digit-leading. One rule subsumes number+unit, percent, grouped, hex-with-0x, and the
+# status-digit ceiling (a 4-digit value after a status keyword is an id, not a code).
+digit_leading | 512MB | freed 512MB from cache | freed <*> from cache
+digit_leading | 76.5% | done 76.5% of targets | done <*> of targets
+digit_leading | 31,260 | compiled 31,260 targets | compiled <*> targets
+digit_leading | 0xdeadbeef | fault at 0xdeadbeef now | fault at <*> now
+digit_leading | 1234 | worker exit code 1234 | worker exit code <*>
+digit_leading | 8080 | listening on port 8080 | listening on port <*>
+
+# ── rule 6 — literal KEEP. The OVER-MASKING boundary: a rule that widened too far shows up here
+# and nowhere else, and over-masking destroys signal irrecoverably.
+literal_keep | eu-west | deploy region eu-west complete | deploy region eu-west complete
+literal_keep | ORD-123 | order ORD-123 shipped | order ORD-123 shipped
+literal_keep | $HOME | export $HOME to child | export $HOME to child
+literal_keep | deadbeef | marker deadbeef seen | marker deadbeef seen
+literal_keep | bazel-out/k8-fastbuild/bin/app | built bazel-out/k8-fastbuild/bin/app ok | built bazel-out/k8-fastbuild/bin/app ok
+literal_keep | user=alice | login user=alice ok | login user=alice ok
+literal_keep | utf8 | decode utf8 stream | decode utf8 stream
+
+# ── rule 2, the composite layer — one section per declared rule of kCompositeRules, in its
+# precedence order.
+
+# diagnostic_composite — the general per-segment rule that subsumed source-location.
+diagnostic_composite | tokenizer.cpp:4500:30: | error at tokenizer.cpp:4500:30: bad token | error at tokenizer.cpp:<*>:<*>: bad token
+diagnostic_composite | [6226:0609/094020.430910:ERROR:dbus/bus.cc:408] | [6226:0609/094020.430910:ERROR:dbus/bus.cc:408] Failed to connect | [<*>:<*>/<*>:ERROR:dbus/bus.cc:<*>] Failed to connect
+
+# ephemeral_root — one witness per DECLARED root, with its declared anchor and scope visible in the
+# expected value (Subtree collapses the remainder; Instance keeps the tail).
+ephemeral_root | /tmp/pw-electron-userdata-Kw9v4a | opened /tmp/pw-electron-userdata-Kw9v4a ok | opened /tmp/<*> ok
+ephemeral_root | /var/tmp/build-a1b2c3/out.log | wrote /var/tmp/build-a1b2c3/out.log ok | wrote /var/tmp/<*> ok
+ephemeral_root | /var/folders/aB/cD/T/scratch | dir /var/folders/aB/cD/T/scratch ready | dir /var/folders/<*> ready
+ephemeral_root | /home/runner/.conan2/p/b/insig247e3d1dffc33/p/lib/libx.so | loading /home/runner/.conan2/p/b/insig247e3d1dffc33/p/lib/libx.so now | loading /home/runner/.conan2/p/b/<*>/p/lib/libx.so now
+ephemeral_root | /nix/store/abc123def456-glibc/lib/libc.so | mapping /nix/store/abc123def456-glibc/lib/libc.so now | mapping /nix/store/<*>/lib/libc.so now
+
+# versioned_ref — keep the name, mask the version.
+versioned_ref | zlib/1.3 | building zlib/1.3 from source | building zlib/<*> from source
+
+# bracket_timestamp — the whole-token bracketed datetime; the bracket is the entire difference.
+bracket_timestamp | [2026-06-23T15:11:09.020Z] | [2026-06-23T15:11:09.020Z] + git fetch | [<*>] + git fetch
+
+# bracket_index — the class prefix inside the bracket survives; only the index is high-cardinality.
+bracket_index | make[2]: | make[2]: entering directory | make[<*>]: entering directory
+bracket_index | [gw0] | [gw0] PASSED test_alpha | [gw<*>] PASSED test_alpha
+
+# hash_counter — keep the counter marker, mask the number.
+hash_counter | #26 | step #26 done | step #<*> done
+
+# marker_number — one witness per declared currency marker.
+marker_number | $463.50 | charged $463.50 today | charged $<*> today
+
+# embedded_identity — an id INSIDE a larger token: hash-in-path, a shell-only structure, and the
+# compact UTC instant.
+embedded_identity | f7f63412-b7a7-468d-bd31-1a6ae1ca2680 | session f7f63412-b7a7-468d-bd31-1a6ae1ca2680 opened | session <*> opened
+embedded_identity | ~/.cache/gradle/f7f63412b7a7468dbd311a6ae1ca2680/lib.jar | reading ~/.cache/gradle/f7f63412b7a7468dbd311a6ae1ca2680/lib.jar ok | reading ~/.cache/gradle/<*>/lib.jar ok
+embedded_identity | (d41d8cd98f00b204e9800998ecf8427e) | digest (d41d8cd98f00b204e9800998ecf8427e) ok | digest (<*>) ok
+embedded_identity | /home/runner/work/_temp/2026-06-09T185733Z.json | wrote /home/runner/work/_temp/2026-06-09T185733Z.json ok | wrote /home/runner/work/_temp/<*>.json ok
+
+# kv_value — mask the value, keep the key.
+# The status carve-out in key=value form (`status=200` stays literal) is homed as a
+# literal_keep row DIRECTLY BELOW, and the reason is a MEASURED one this gate found on its
+# first run: `normalize_kv_value` DECLINES a status key=value pair rather than claiming it
+# and echoing it back, so the token falls through to rule 6 and rule 6 is what keeps it.
+# The observable output is identical either way, which is exactly why the label had to be
+# checked against the dispatcher instead of asserted — the row was written as `kv_value`
+# from the docs and was wrong about WHICH rule protects the green->red split in KV form.
+kv_value | order=100000 | checkout completed order=100000 | checkout completed order=<*>
+kv_value | total=$18 | order completed total=$18 | order completed total=$<*>
+literal_keep | status=200 | request status=200 returned | request status=200 returned

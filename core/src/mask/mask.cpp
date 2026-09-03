@@ -149,10 +149,18 @@ namespace
         return true;
     }
 
+    // The lexicon as a TABLE rather than a `||` chain, for the reason every other catalog in this
+    // file is a table: a chain cannot be enumerated, so nothing could ask whether the witness
+    // population still covers it, and a fifth keyword would join the rule set unwitnessed. Same
+    // membership, same case-folding, same order — a pure restatement.
+    inline constexpr std::array<std::string_view, 4> kStatusKeywords{
+        {std::string_view{"code"}, std::string_view{"status"}, std::string_view{"exit"},
+         std::string_view{"signal"}}};
+
     [[nodiscard]] inline bool is_status_keyword(std::string_view tok) noexcept
     {
-        return equals_ascii_lower(tok, "code") || equals_ascii_lower(tok, "status") ||
-               equals_ascii_lower(tok, "exit") || equals_ascii_lower(tok, "signal");
+        return std::ranges::any_of(kStatusKeywords, [tok](const std::string_view keyword)
+                                   { return equals_ascii_lower(tok, keyword); });
     }
 
     // ── Ephemeral-root catalog + matcher (SRC-D-MSK-4) ───────────────────────────
@@ -629,14 +637,21 @@ namespace
         return pos < tok.size() && is_digit(tok[pos]);
     }
 
+    // The hex-run floor: at or above this length a hex-only run is an instance hash, below it a
+    // word. ONE declaration, read by rule 3's standalone check below AND by the embedded-identity
+    // scanner further down — which each carried their own `16` before, so the floor could be moved
+    // in one and not the other and the two maskers would disagree about the same token. Exposed
+    // through `rule_catalog::min_hash_length()` so a witness can state it sits below the floor
+    // instead of hard-coding a third copy in the test tree.
+    constexpr std::size_t kMinHashLen{16};
+
     // SRC-D-TID-12 #3: a standalone UUID (8-4-4-4-12 hex-with-dashes) or a hex-only run
-    // ≥ 16 chars (a git SHA / content hash). The ≥16 floor keeps short hex-looking
+    // ≥ kMinHashLen chars (a git SHA / content hash). The floor keeps short hex-looking
     // words ("deadbeef", "cafe") literal — only genuinely high-card hashes mask.
     [[nodiscard]] inline bool is_uuid_or_long_hash(std::string_view tok) noexcept
     {
         constexpr std::size_t kUuidLen{36};
         static constexpr std::size_t kUuidDash1{8}, kUuidDash2{13}, kUuidDash3{18}, kUuidDash4{23};
-        constexpr std::size_t kMinHashLen{16};
         if (tok.size() == kUuidLen && tok[kUuidDash1] == '-' && tok[kUuidDash2] == '-' &&
             tok[kUuidDash3] == '-' && tok[kUuidDash4] == '-')
         {
@@ -733,7 +748,8 @@ namespace
     // paper-over.
     constexpr std::size_t kUuidLen{36};
     constexpr std::array<std::size_t, 4> kUuidDashes{8, 13, 18, 23};
-    constexpr std::size_t kMinHashLen{16};
+    // kMinHashLen is declared ONCE, above rule 3's `is_uuid_or_long_hash` — the embedded-identity
+    // scanner below reads that same declaration rather than a second copy of the number.
 
     // A UUID (8-4-4-4-12 hex-with-dashes) starting exactly at `pos`.
     [[nodiscard]] inline bool uuid_at(std::string_view tok, std::size_t pos) noexcept
@@ -951,6 +967,29 @@ namespace
         {.name = "kv_value", .normalize = normalize_kv_value},                   // SRC-D-TID-17
     }};
 
+    // THE composite step, in ONE place. `stateless_template`'s dispatch below and
+    // `rule_catalog::composite_rule_claiming` (the coverage gate's discriminator) both call this,
+    // so the gate cannot be answering a question about a loop the masker no longer runs. The
+    // pre-gate is part of the step, not a caller's precondition: a token carrying no separator and
+    // no declared marker never reaches the catalog at all, so "which rule claims it" is *none* even
+    // where a rule's own predicate would have said yes.
+    // `shape` is passed in because the dispatcher already computed it — recomputing here would put
+    // a second byte-walk of every token back on the hot path this struct exists to keep off it.
+    [[nodiscard]] inline bool try_composite(std::string_view tok, const TokenShape& shape,
+                                            std::string& out, std::string_view* claimed_by)
+    {
+        if (marker_prefix_len(tok) == 0 && !shape.has_separator)
+            return false;
+        for (const CompositeRule& rule : kCompositeRules)
+            if (rule.normalize(tok, out))
+            {
+                if (claimed_by != nullptr)
+                    *claimed_by = rule.name;
+                return true;
+            }
+        return false;
+    }
+
     template <typename Cb>
         requires std::invocable<Cb, std::string_view>
     inline void for_each_token(std::string_view content, Cb callback)
@@ -1001,64 +1040,63 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
     // The declared per-token classification in TOTAL precedence (SRC-D-TID-12 §8.2): KEEP
     // carve-outs win first, then the F13 masks. A masked position contributes a param
     // (the raw token); a kept/normalized position does not.
-    for_each_token(
-        content,
-        [&](std::string_view tok)
-        {
-            if (!first)
-                tmpl.push_back(' ');
-            first = false;
-            // One pass over the token's bytes → the shape facts the dispatch below
-            // reads, replacing the separate is_all_digits / composite-trigger any_of /
-            // is_digit_leading scans (byte-exact equivalents → identity unchanged).
-            const TokenShape shape{tok};
-            const auto mask{[&]
-                            {
-                                tmpl.append(kWildcard);
-                                params.push_back(tok);
-                            }};
+    for_each_token(content,
+                   [&](std::string_view tok)
+                   {
+                       if (!first)
+                           tmpl.push_back(' ');
+                       first = false;
+                       // One pass over the token's bytes → the shape facts the dispatch below
+                       // reads, replacing the separate is_all_digits / composite-trigger any_of /
+                       // is_digit_leading scans (byte-exact equivalents → identity unchanged).
+                       const TokenShape shape{tok};
+                       const auto mask{[&]
+                                       {
+                                           tmpl.append(kWildcard);
+                                           params.push_back(tok);
+                                       }};
 
-            // 1. status-value KEEP (identity): "exit code 0" stays distinct
-            //    from "exit code 1" — a green→red flip must not collapse.
-            if (shape.all_digits && tok.size() <= kMaxStatusDigits && is_status_keyword(prev))
-            {
-                tmpl.append(tok);
-                prev = tok;
-                return;
-            }
-            // 2. composite → the normalized literal (KEEP class, mask instance). The
-            //    declared rule set AND its precedence are kCompositeRules (tried in array
-            //    order, first claim wins — the former `||` short-circuit, now data).
-            //    maybe_composite is the cheap pre-gate that skips the whole catalog for a
-            //    token carrying no separator (shape) and no declared currency marker.
-            const bool maybe_composite{marker_prefix_len(tok) != 0 || shape.has_separator};
-            if (maybe_composite)
-            {
-                for (const CompositeRule& rule : kCompositeRules)
-                    if (rule.normalize(tok, composite))
-                    {
-                        tmpl.append(composite);
-                        prev = tok;
-                        return;
-                    }
-            }
-            // 3. UUID / long hash → MASK.
-            // 4. IPv4 → MASK.
-            // 5. digit-leading numeric (or empty) → MASK. `0x`-hex needs no arm of its own:
-            //    a `0x…` token starts with '0', a digit, so `digit_leading` already carries it.
-            //    The former rule-5 predicate accepted a STRICT SUBSET of digit_leading and could
-            //    never be the reason a token masked (DN-027, proven over all inputs).
-            if (shape.empty || is_uuid_or_long_hash(tok) ||
-                (config.mask_ip_addresses && is_ipv4_token(tok)) || shape.digit_leading)
-            {
-                mask();
-                prev = tok;
-                return;
-            }
-            // 6. literal KEEP.
-            tmpl.append(tok);
-            prev = tok;
-        });
+                       // 1. status-value KEEP (identity): "exit code 0" stays distinct
+                       //    from "exit code 1" — a green→red flip must not collapse.
+                       if (shape.all_digits && tok.size() <= kMaxStatusDigits &&
+                           is_status_keyword(prev))
+                       {
+                           tmpl.append(tok);
+                           prev = tok;
+                           return;
+                       }
+                       // 2. composite → the normalized literal (KEEP class, mask instance). The
+                       //    declared rule set AND its precedence are kCompositeRules (tried in
+                       //    array order, first claim wins — the former `||` short-circuit, now
+                       //    data). try_composite carries the cheap pre-gate that skips the whole
+                       //    catalog for a token carrying no separator (shape) and no declared
+                       //    currency marker, and is the SAME step the rule-coverage gate's
+                       //    discriminator runs.
+                       if (try_composite(tok, shape, composite, nullptr))
+                       {
+                           tmpl.append(composite);
+                           prev = tok;
+                           return;
+                       }
+                       // 3. UUID / long hash → MASK.
+                       // 4. IPv4 → MASK.
+                       // 5. digit-leading numeric (or empty) → MASK. `0x`-hex needs no arm of its
+                       // own:
+                       //    a `0x…` token starts with '0', a digit, so `digit_leading` already
+                       //    carries it. The former rule-5 predicate accepted a STRICT SUBSET of
+                       //    digit_leading and could never be the reason a token masked (DN-027,
+                       //    proven over all inputs).
+                       if (shape.empty || is_uuid_or_long_hash(tok) ||
+                           (config.mask_ip_addresses && is_ipv4_token(tok)) || shape.digit_leading)
+                       {
+                           mask();
+                           prev = tok;
+                           return;
+                       }
+                       // 6. literal KEEP.
+                       tmpl.append(tok);
+                       prev = tok;
+                   });
 
     const std::string_view tmpl_view{out_arena.store_string(tmpl)};
     std::span<const std::string_view> params_span{};
@@ -1072,5 +1110,65 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
     }
     return {.template_str = tmpl_view, .params = params_span};
 }
+
+// ── rule_catalog — the declared catalogs, made enumerable (ROADMAP N74) ───────────────────────
+// Contract in canon.detail.mask.cppm. Every table below is DERIVED from the catalog the masker
+// itself reads, never restated beside it: a parallel list is how a coverage gate ends up green
+// against a rule set that moved.
+namespace rule_catalog
+{
+
+    std::span<const std::string_view> composite_rule_ids() noexcept
+    {
+        static constexpr auto kIds{[]
+                                   {
+                                       std::array<std::string_view, kCompositeRules.size()> ids{};
+                                       for (std::size_t pos{0}; pos < kCompositeRules.size(); ++pos)
+                                           ids[pos] = kCompositeRules[pos].name;
+                                       return ids;
+                                   }()};
+        return kIds;
+    }
+
+    std::string_view composite_rule_claiming(std::string_view token)
+    {
+        std::string scratch;
+        std::string_view claimed{};
+        const TokenShape shape{token};
+        // The return value is deliberately dropped: `claimed` stays empty exactly when the step
+        // declines, which is the same fact and the one the caller asked for.
+        (void)try_composite(token, shape, scratch, &claimed);
+        return claimed;
+    }
+
+    std::span<const std::string_view> status_keywords() noexcept
+    {
+        return kStatusKeywords;
+    }
+
+    std::span<const std::string_view> currency_markers() noexcept
+    {
+        return kCurrencyMarkers;
+    }
+
+    std::span<const std::span<const std::string_view>> ephemeral_root_segments() noexcept
+    {
+        static constexpr auto kSegments{
+            []
+            {
+                std::array<std::span<const std::string_view>, kEphemeralRoots.size()> segs{};
+                for (std::size_t pos{0}; pos < kEphemeralRoots.size(); ++pos)
+                    segs[pos] = kEphemeralRoots[pos].segments;
+                return segs;
+            }()};
+        return kSegments;
+    }
+
+    std::size_t min_hash_length() noexcept
+    {
+        return kMinHashLen;
+    }
+
+} // namespace rule_catalog
 
 } // namespace insight::tokenization

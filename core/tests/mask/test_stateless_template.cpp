@@ -694,16 +694,30 @@ TEST(StatelessTemplate, Ipv4MasksInsideEveryDeclaredWrapperPair)
 {
     ArenaAllocator arena{256U * 1024U};
 
-    // One address, every declared shell, both directions of each pair, plus the port form.
-    // `[…]` is today's only passing row and is kept here so the table shows the class, not the
-    // repair's delta.
+    // THE BALANCED SHELLS ARE DERIVED FROM `kWrapperPairs`, NOT TYPED OUT (ROADMAP N74).
+    // They were a hand-written list of six literals under a name that claims CATALOG
+    // COMPLETENESS — so a seventh declared pair would have joined the shell grammar with this
+    // test still green and still called "EveryDeclaredWrapperPair". That is the same defect the
+    // repair below it exists for, one level up: the shell catalog's whole point is that nothing
+    // CHOSE `[` over `(`, and a witness list nobody derives makes exactly that choice again.
+    // Building the tokens from the table means a new pair arrives with a row already asserting it.
+    std::vector<std::string> shells;
+    for (const auto& pair : kWrapperPairs)
+        shells.push_back(std::string{pair.open} + "10.20.30.40" + std::string{pair.close});
+    for (const std::string& tok : shells)
+    {
+        const std::string got{masked_with(tok, arena, MaskConfig{})};
+        EXPECT_EQ(got, "<*>")
+            << "a wrapped IPv4 must MASK for EVERY declared wrapper pair — this row was built "
+               "from kWrapperPairs, so it covers the pair that exists rather than the pair "
+               "someone remembered.\n  token:    "
+            << tok << "\n  expected: <*>\n  actual:   " << got;
+    }
+
+    // The shapes that are NOT one-per-pair: unbalanced openers, closer-only controls, the port
+    // form and the sentence byte. These stay hand-written because each is a distinct claim about
+    // the GRAMMAR rather than about the catalog.
     for (const std::string_view tok : {
-             "(10.20.30.40)",
-             "[10.20.30.40]",
-             "{10.20.30.40}",
-             "<10.20.30.40>",
-             "\"10.20.30.40\"",
-             "'10.20.30.40'",
              // An opener with no closer still leaks: the defect is the byte that PRECEDES the
              // address, so the unbalanced-open fragment is the same failure, not a lesser one.
              "(10.20.30.40",

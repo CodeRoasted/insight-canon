@@ -327,6 +327,12 @@ if(INSIGHT_CANON_BUILD_TESTS)
         set_target_properties(insight_canon_tests PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
         target_compile_definitions(insight_canon_tests PRIVATE
             $<IF:$<CONFIG:Debug>,SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE,SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO>)
+        # The masking-rule golden (ROADMAP N74) is read from the SOURCE tree, not a copy in the
+        # build tree: the regeneration action writes back through this same path, so a copy would
+        # regenerate an artifact git never sees. An absolute path baked at configure time is what
+        # makes the gate independent of the working directory ctest happens to launch it from.
+        target_compile_definitions(insight_canon_tests PRIVATE
+            INSIGHT_CANON_MASK_GOLDEN_PATH="${CMAKE_CURRENT_SOURCE_DIR}/tests/mask/mask_rules.golden")
         # The test target RECOMPILES arena_allocator.cpp (white-box, above), so it needs the switch
         # in its own right — inheriting the library's PRIVATE define is not a thing. Without this
         # the arena's own instrument test would read `arena_poisons_on_reset() == false` inside a
