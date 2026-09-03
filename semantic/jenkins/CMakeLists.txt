@@ -1,7 +1,11 @@
 ###########################################################
 #  insight_semantic_jenkins — the Jenkins Pipeline dialect semantic package (ADR-17).
-#  One module interface unit (insight.semantic.jenkins) + one impl unit — NO partitions
-#  (the cross-package BMI closure must not deepen — ADR-17.D8 / the gcc-15 hazard).
+#  One module interface unit (insight.semantic.jenkins) + one impl unit — NO partitions.
+#  ADR-17.D8 owns this and states it WITHOUT a compiler version: "module hygiene is one interface
+#  unit per package, no partitions — the cross-package module closure is the BMI hazard zone and
+#  packages must not deepen it." The old text here added "/ the gcc-15 hazard", which read as an
+#  expiry date on an architectural rule; it is removed for that reason, not because the hazard was
+#  disproved. Nothing about this constraint is waiting on a compiler fix.
 ###########################################################
 cmake_minimum_required(VERSION 3.28)
 
