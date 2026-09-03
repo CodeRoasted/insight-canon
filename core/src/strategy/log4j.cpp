@@ -142,7 +142,7 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
     sv_skip_ws(rest);
 
     // Component is until ':' or " -". The colon TERMINATES it, so its absence means this line names
-    // no component — not that the component is the rest of the line (DN-43.D6,
+    // no component — not that the component is the rest of the line (ADR-16.D9,
     // sv_take_until_or_none): the unbounded form emptied `content` and put the whole message on the
     // cube's WHERE axis.
     const std::string_view component{sv_take_until_or_none(rest, ':')};

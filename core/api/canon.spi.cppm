@@ -199,7 +199,7 @@ class IFormatStrategy
     // via ArenaAllocator::store_string(); their string_views remain valid until the arena is reset
     // or destroyed.
     //
-    // ⚠ PROJECTION TOTALITY, and it is an obligation on every implementer (DN-43.D6):
+    // ⚠ PROJECTION TOTALITY, and it is an obligation on every implementer (ADR-16.D9):
     //
     //     `ParsedLine::content` is a TOTAL projection. `content.empty()` implies the line has no
     //     message bytes beyond the header this strategy parsed. A strategy that cannot satisfy

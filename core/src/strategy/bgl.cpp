@@ -83,7 +83,7 @@ namespace
             return std::nullopt;
 
         // `fields` is now the message body, empty when the record's body genuinely ended at the
-        // header — 34 470 corpus lines, and a legitimate empty projection (DN-43.D6 member (a)),
+        // header — 34 470 corpus lines, and a legitimate empty projection (ADR-16.D9 member (a)),
         // not the swallow the projection-totality instrument hunts.
         return BglRecord{.epoch = epoch,
                          .node = node,

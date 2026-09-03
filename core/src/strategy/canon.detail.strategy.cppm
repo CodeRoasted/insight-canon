@@ -427,7 +427,7 @@ struct BglRecord
     std::string_view epoch;     // <epoch> — seconds since the Unix epoch; the record's event time
     std::string_view node;      // <node> — the node identity (F3b: host, hors-cube)
     std::string_view component; // RAS: <SUBSYS>. Thunderbird: the daemon tag, EMPTY when none
-    std::string_view content;   // every byte after the header — the total projection (DN-43.D6)
+    std::string_view content;   // every byte after the header — the total projection (ADR-16.D9)
     // Engaged on the RAS branch only: BGL DECLARES its severity in a fixed column, so the level is
     // read, not guessed. Disengaged on the Thunderbird branch, which has no level column at all
     // and infers from the message body in the `inferred` species (DN-43.D5).
@@ -461,7 +461,7 @@ struct SyslogHeader
 {
     std::string_view stamp; // the raw timestamp field — the branch's own timestamp parser reads it
     std::string_view tag;   // the daemon/program name, `[pid]` stripped — the F3b functional source
-    std::string_view body;  // EVERY byte after the tag's ':' — the total projection (DN-43.D6)
+    std::string_view body;  // EVERY byte after the tag's ':' — the total projection (ADR-16.D9)
     bool bsd{false};        // which stamp grammar matched; selects the timestamp parser
 };
 

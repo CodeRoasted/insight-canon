@@ -91,7 +91,7 @@ struct Tokenizer::Impl
         }
         const ParsedLine& parsed_line = parsed.value();
 
-        // ── The PROJECTION-TOTALITY instrument (DN-43.D6) ────────────────────────────────────
+        // ── The PROJECTION-TOTALITY instrument (ADR-16.D9) ────────────────────────────────────
         // A strategy that emptied `content` on a line that HAS bytes broke the SPI contract, and
         // the breach is invisible downstream: the line templates to the SHA-256 prefix of the empty
         // string, a universal collision bucket that reaches the wire as an ordinary identity. A

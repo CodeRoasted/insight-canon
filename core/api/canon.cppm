@@ -146,7 +146,7 @@ class Tokenizer
     [[nodiscard]] std::size_t events_produced() const noexcept;
     [[nodiscard]] std::size_t lines_parsed() const noexcept;
 
-    // The PROJECTION-TOTALITY instrument's counter (DN-43.D6) for this stream: lines that had
+    // The PROJECTION-TOTALITY instrument's counter (ADR-16.D9) for this stream: lines that had
     // bytes and projected to empty `content`. Until this accessor existed the number left canon
     // ONLY through a rate-limited WARNING (first, then every 100th, tokenizer_engine.cpp), so the
     // one way to obtain it was to parse a log stream and multiply — and DN-43.D14 (4) pins the

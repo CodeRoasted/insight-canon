@@ -773,7 +773,7 @@ inline void sv_skip_ws(std::string_view& str) noexcept
 }
 
 // The PROJECTION-TOTALITY-safe form of sv_take_until, for the case where the delimiter is what
-// TERMINATES a named field rather than merely what separates two of them (DN-43.D6).
+// TERMINATES a named field rather than merely what separates two of them (ADR-16.D9).
 //
 // sv_take_until's no-delimiter branch hands back the WHOLE remainder and leaves `str` empty. A
 // caller that names the result — `component = sv_take_until(rest, ':'); content = rest;` —
@@ -846,7 +846,7 @@ inline void sv_skip_ws(std::string_view& str) noexcept
 // SyslogStrategy DECLINES the line (a tag-less line is not syslog — the header is its claim),
 // while BGLStrategy's Thunderbird branch KEEPS the remainder as content with an empty component
 // (the record is already identified by its BGL header, so nothing about it is in doubt). That is
-// projection totality (DN-43.D6) and naming totality (DN-43.D11) in one branch.
+// projection totality (ADR-16.D9) and naming totality (DN-43.D11) in one branch.
 [[nodiscard]] inline std::string_view take_bounded_syslog_tag(std::string_view& str) noexcept
 {
     static constexpr std::string_view kTagStop{"[: \t"}; // first delimiter OR the token's end
