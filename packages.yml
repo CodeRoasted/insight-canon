@@ -5,40 +5,37 @@ packages:
   insight_canon:
     path: core
     version: 1.10.4
-    license: Apache-2.0
-    public: true
+    source_public: true
     release: true
     depends: []
-  # Semantic packages (ADR-17.D1): per-dialect VOCABULARY (rule rows + code tier), Apache-2.0, statically
+  # Semantic packages (ADR-17.D1): per-dialect VOCABULARY (rule rows + code tier), statically
   # composed via insight::semantic::compose(). One module interface unit each — no partitions (the
   # cross-package BMI closure must not deepen). gcc/cloud are PO-scheduled successors riding the
-  # same contract, never pre-built.
+  # same contract, never pre-built. The licence is declared ONCE, in each package's own
+  # conanfile.py `license` attribute — that is the value conan carries into package metadata,
+  # and pin_coherence INV-20 checks it against `source_public` here.
   insight_semantic_github:
     path: semantic/github
     version: 1.10.4
-    license: Apache-2.0
-    public: true
+    source_public: true
     release: true
     depends: [insight_canon]
   insight_semantic_jenkins:
     path: semantic/jenkins
     version: 1.10.4
-    license: Apache-2.0
-    public: true
+    source_public: true
     release: true
     depends: [insight_canon]
   insight_semantic_gitlab:
     path: semantic/gitlab
     version: 1.10.4
-    license: Apache-2.0
-    public: true
+    source_public: true
     release: true
     depends: [insight_canon]
   insight_semantic_test_frameworks:
     path: semantic/test_frameworks
     version: 1.10.4
-    license: Apache-2.0
-    public: true
+    source_public: true
     release: true
     depends: [insight_canon]
   # The composed benchmark harness (ADR-17.D8 · SRC-SP-5): a leaf APPLICATION package — the perf gate
@@ -48,8 +45,7 @@ packages:
   insight_canon_bench:
     path: benchmarks
     version: 1.10.4
-    license: Apache-2.0
-    public: true
+    source_public: true
     release: false
     depends: [insight_canon, insight_semantic_github, insight_semantic_gitlab, insight_semantic_jenkins, insight_semantic_test_frameworks]
 

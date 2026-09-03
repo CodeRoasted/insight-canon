@@ -176,7 +176,7 @@ insight-canon/
 ├── benchmarks/             insight_canon_bench — the composed perf harness (SRC-SP-5 gate)
 ├── proof/                  Public determinism proof gate (composes core + every package)
 ├── scripts/                det_public_proof.sh · sp1_semantic_unawareness_lint.sh · download_logs.sh
-├── packages.yml            The package manifest (paths, versions, public/release flags)
+├── packages.yml            The package manifest (paths, versions, source_public/release flags)
 └── .github/workflows/      ci.yml · lint.yml · golden.yaml · release.yaml
 ```
 
