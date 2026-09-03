@@ -158,7 +158,35 @@ using EventID = uint64_t;
 // output-affecting three times over. It is a CONTENT re-base under ADR-31, never a determinism
 // regression: two runs of THIS generation over the same bytes stay bit-identical, and old/new
 // documents are incomparable at the §2.4 gate by construction (re-derive, never migrate).
-inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-14"};
+// -15 = the RECOGNIZED LOCATION ESTABLISHES ITS START. This generation is spent on a
+// CLASSIFICATION change with the masker untouched — the -7/-9 class, not the -4/-8 one.
+// `recognize_location` (core/src/compose/semantic_walkers.cpp) fixed a match's END, where every
+// LocationMatchKind family already applies a word-boundary test, and then sliced the token from
+// offset 0 — so the location's START was never established, and a producer annotation glued to a
+// path with no separator was published INSIDE the resolved WHERE
+// (`##[error]fs/rc/rcserver/rcserver_test.go`). A `loc_is_path` byte class walked backwards from
+// the match now establishes the start: the exact mirror of the boundary test at the other end,
+// and semantic-unaware (SRC-SP-1) — no dialect literal, no marker table.
+// `template_str`/`template_id` do NOT move (the masker is untouched) and neither does any
+// `dedup_id_of`, which hashes the class tag and the template ids only; the serialized `component`
+// DOES move, on the `MaskConfig::recognize_test_where` path. Measured over the 4 082-file GitHub
+// revert corpus (2.34 GB, 694 484 lines resolving a location): 738 resolved lines change label,
+// distinct labels 12 299 -> 12 265, and resolution coverage is EXACTLY invariant — the walk moves
+// a slice's start, never whether a token matches.
+// THE FLAG'S DEFAULT DOES NOT EXEMPT THE GENERATION, and that is what this entry records.
+// `recognize_test_where` is default OFF, so every default-path document is byte-identical across
+// -14 and -15 except this string — but the RULES FUNCTION differs for a flag-ON producer, and a
+// generation naming two different serialized `component` vocabularies is the defect -9 was minted
+// for: masker untouched, identity unmoved, a serialized field moved, therefore output-affecting.
+// THE SECOND SPEND INSIDE ONE OPEN CUT, ruled by the Founder on 2026-09-03 and not this lane's
+// call: -14 landed after v1.10.3 and is in no tag, so ADR-16.D2's land-once-at-a-cut-head and
+// ADR-2.D9's batch-or-do-not-spend would otherwise have had this change RIDE -14. What the second
+// spend buys is honesty inside the unreleased window, not compatibility — v1.10.3 ships -13, so a
+// consumer crossing the next cut pays exactly ONE comparability event whether that cut carries
+// -14 or -15. What it costs is re-blessing insight-metalog's three committed vector files, whose
+// only moved bytes are this string. A CONTENT re-base under ADR-31, never a determinism
+// regression: two runs of THIS generation over the same bytes stay bit-identical.
+inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-15"};
 
 // ── Template identity (insight_perf_template_id.md SRC-D-TIR-1) ──
 // The structural identity of a canonicalised template: the first 16 bytes of
@@ -1286,8 +1314,11 @@ struct MaskConfig
     // line whose NATIVE component is empty (GHA carries none) gets its recognize_location()
     // test-file as `component` — populating the cube WHERE axis ABOVE the empty native tier
     // (never faking it — GHA WHERE is identity-derived by construction). OFF by default so every
-    // existing path is byte-identical (an additive gated block keeps the wire version: no output
-    // change, no golden movement, no version bump); the batch aligned pipeline turns it on to
+    // existing path is byte-identical: the additive gated block keeps the wire version, moves no
+    // default-path output and no golden. It does NOT keep the canonicalization generation —
+    // `stateless-masks-15` was spent on a change confined to this path, because the generation
+    // names the RULES FUNCTION over the whole config space and not the default slice of it (see
+    // the ledger above kCanonicalizationVersion). The batch aligned pipeline turns the flag on to
     // feed the where_set_shift coverage verdict (§5.4).
     bool recognize_test_where{false};
 };

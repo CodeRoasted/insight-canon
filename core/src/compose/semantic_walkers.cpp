@@ -14,7 +14,10 @@ import insight.canon.compose; // ComposedSemantics
 // composed pipeline is byte-identical (G-SP-1). ONE deliberate departure since:
 // `recognize_location` now establishes the location's START as well as its end (`loc_is_path`,
 // below) instead of slicing the token from offset 0. It is confined to the flag-gated
-// `MaskConfig::recognize_test_where` path — default OFF — so no G-SP-1 default path moves.
+// `MaskConfig::recognize_test_where` path — default OFF — so no G-SP-1 default path moves. The
+// canonicalization generation moved anyway: `stateless-masks-14` -> `-15` is spent on THIS
+// departure, because the generation names the rules function over the whole config space and a
+// flag-ON producer's serialized `component` differs across it (ledger in canon.api.cppm).
 
 namespace insight
 {
