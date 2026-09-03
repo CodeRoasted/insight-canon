@@ -1349,7 +1349,7 @@ TEST_F(BGLStrategyTest, ARecordWhoseUnvalidatedNode2HoldsABinaryBlobStillParsesA
         << "the blob must reach NO published field; content = " << pl.content;
 }
 
-// A complete header with no message. Legitimate (DN-43.D6 member (a)): the empty template is the
+// A complete header with no message. Legitimate (ADR-16.D9 member (a)): the empty template is the
 // correct identity of a content-less line, and the header fields are still published. 34 470 lines
 // of the pinned corpus.
 TEST_F(BGLStrategyTest, AnEmptyBodyProjectsToEmptyContentWithItsHeaderFieldsSet)
@@ -2084,7 +2084,7 @@ TEST_F(RawTextStrategyTest, LeadingWhitespaceTrimmedForContinuationGrouping)
 // `canonical_line` is now populated on EVERY row, which deliberately extends RawLinePreserved to
 // the six strategies that had no row in it. The rule above bars an ACCIDENTAL blanket-extension
 // during a mechanical fold; this one is chosen, and it is what makes ProjectionIsTotal — the
-// DN-43.D6 design-time half of the invariant — total over every registered strategy rather than
+// ADR-16.D9 design-time half of the invariant — total over every registered strategy rather than
 // over the two branches DN-43 repairs. Each added line is one an existing per-strategy TEST_F
 // already proves that strategy parses.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2300,7 +2300,7 @@ TEST_P(RawLinePreserved, CanonicalLineEchoedVerbatim)
     EXPECT_EQ(result.value().raw_line, canonical_line) << "strategy=" << GetParam().name;
 }
 
-// DN-43.D6, the design-time half. `ParsedLine::content` is a TOTAL projection: `content.empty()`
+// ADR-16.D9, the design-time half. `ParsedLine::content` is a TOTAL projection: `content.empty()`
 // implies the line has no message bytes beyond the header the strategy parsed. Checked here for
 // EVERY registered strategy — the invariant is the SPI's, not Syslog's, and the failure it guards
 // against is invisible downstream (an emptied content templates to the SHA-256 prefix of the empty

@@ -25,7 +25,7 @@
 //     wrong twice — the count (10, not 18) and the description, which is what hid the count. The
 //     two populations are disjoint: see the RawText pin's own comment for the decomposition.
 //   * empty projections — lines that carried bytes and projected to empty `content`, read off the
-//     SHIPPED counter (`Tokenizer::empty_projections()`, the `DN-43.D6` projection-totality
+//     SHIPPED counter (`Tokenizer::empty_projections()`, the `ADR-16.D9` projection-totality
 //     instrument) and never off the rate-limited warning stream, which is exactly what the ruling
 //     asked for and exactly what no reader could do before that accessor existed.
 //
@@ -329,7 +329,7 @@ TEST_F(LogHubProjectionPinGate, EveryPinnedCorpusHoldsItsDeclineAndEmptyProjecti
 
         EXPECT_EQ(walked.empty_projections, pin.empty_projections)
             << pin.why
-            << "\n  empty projections (Tokenizer::empty_projections(), the DN-43.D6 "
+            << "\n  empty projections (Tokenizer::empty_projections(), the ADR-16.D9 "
                "projection-totality counter): got "
             << walked.empty_projections << ", pinned " << pin.empty_projections
             << ".\n  THIS IS A SUM, NOT A DEFECT COUNT (DN-43.D14 (4)): member (a) is a genuinely "
