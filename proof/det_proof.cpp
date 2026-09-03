@@ -8,10 +8,14 @@
 // and emits a CANONICAL, INTEGER-DOMAIN text digest. No metalog, no eidos, no
 // proprietary surface; nothing here reveals the moat.
 //
-// scripts/det_public_proof.sh builds this across the gcc x clang x -O{0,2,3} x
-// -ffp-contract{off,fast} matrix; the digest MUST be byte-identical across every
-// build and match the committed golden (proof/golden.sha256). Determinism is
-// preserved by construction:
+// scripts/det_public_proof.sh builds this across the gcc x clang x -O{0,3} matrix;
+// the digest MUST be byte-identical across every build, and the workflow compares the
+// legs' emitted digests against each other. Two claims that stood here were false and
+// are recorded so they are not restored by habit: the `-O2` cell and the
+// `-ffp-contract{off,fast}` axis (the axis was inert — canon forces -ffp-contract=off
+// PUBLIC, so it won in all four cells; the script's header carries the measurement),
+// and `proof/golden.sha256`, a committed golden retired with the cross-leg-agreement
+// model and absent from this repo. Determinism is preserved by construction:
 //   * std::map (ordered) for the template set — iteration order is by key, never
 //     hash-order (the std::hash cross-stdlib hazard cannot appear);
 //   * det_math entropy emitted as the RAW Qk __int128 (Σ c·log2(c) via the no-libm

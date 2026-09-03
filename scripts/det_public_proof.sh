@@ -5,14 +5,17 @@
 # (bibles/determinism_model.md §3).
 #
 # Canon-only by construction: it builds ONLY canon's public Apache module across
-# the (ship gcc/libstdc++ × clang-21/libc++)  x  -O{0,3}  x  -ffp-contract{off,fast}
+# the (ship gcc/libstdc++ × clang-21/libc++)  x  -O{0,3}
 # matrix — the cross-compiler AND cross-stdlib DIAGONAL (the modules build forces the
 # stdlib per compiler: clang's std module ships with libc++). Strictly stronger than
 # the pre-unwrap both-libstdc++ textual matrix, and the pairing the determinism
 # contract pins. It replays a canon-local PUBLIC corpus (proof/corpus/), asserts the canonical
-# digest is byte-identical across every build AND matches the committed golden hash
-# (proof/golden.sha256). No metalog, no eidos, no private surface — an outsider can
-# clone the public repo and run this to verify the determinism claim.
+# digest is byte-identical across every build. It does NOT compare against a committed
+# golden hash: `proof/golden.sha256` was retired with the cross-leg-agreement model (see
+# "NEW MODEL" below) and no longer exists in this repo — the sentence that stood here
+# claimed an assertion this script had stopped making, 80 lines above the paragraph that
+# says why it stopped. No metalog, no eidos, no private surface — an outsider can clone
+# the public repo and run this to verify the determinism claim.
 #
 # ── Approach B (Daidalos ruling 2026-06-06; bibles/determinism_model.md) ──────
 # The methodology is unchanged: build N ways → canonical digest → assert identical
@@ -32,7 +35,54 @@
 # Requires conan + a prior canon dep resolution (fmt/spdlog/simdjson in the cache;
 # `malf test` / `conan create .` populates it). The compiler×stdlib axis is a conan
 # profile (linux-gcc16-release = ship gcc/libstdc++, linux-clang21-release =
-# clang-21/libstdc++); -O / -ffp-contract are appended per cell after the profile.
+# clang-21/libstdc++); -O is appended per cell after the profile.
+#
+# ── WHY THERE IS NO -ffp-contract AXIS HERE, and how that stays honest ─────────
+# This sweep used to run a third axis, -ffp-contract={off,fast}, doubling the cell
+# count to four per leg. It was INERT, for two independent reasons, both measured
+# at the desk on 2026-09-03:
+#
+#   1. THE FLAG NEVER REACHED THE COMPILE LINE AS `fast`. canon declares
+#      -ffp-contract=off with target_compile_options(... PUBLIC ...) — the
+#      determinism requirement itself, and the four semantic packages declare it
+#      the same way. proof/CMakeLists.txt injects the cell's flags through
+#      add_compile_options at DIRECTORY scope, and CMake emits directory options
+#      BEFORE a target's own, so the effective flag on every TU in this harness —
+#      canon's, the semantic packages', and det_proof.cpp's, which consumes the
+#      INTERFACE options through its link — was `off` in all four cells. Last flag
+#      wins in gcc/clang. Reproduced in a two-file CMake project: the compile line
+#      came out `-O3 -march=x86-64-v2 -O0 -ffp-contract=fast -ffp-contract=off`.
+#      Note the -O axis in that same line: `-O0` DOES follow `-O3`, so the
+#      optimization axis was live and is kept.
+#   2. AND THE ISA COULD NOT HAVE CONTRACTED ANYWAY. The profiles pin
+#      -march=x86-64-v2, which predates FMA3. Measured on both toolchains
+#      (g++ 16.2.0, clang 21.1.8): `-march=x86-64-v2 -dM -E` defines __SSE4_2__
+#      and defines neither __FMA__ nor __AVX__. With no FMA instruction available
+#      there is nothing for `fast` to fuse.
+#
+# So four cells were two configurations run twice, while the PASS line claimed a
+# full -O × -ffp sweep — a false CLAIM over an intact GUARANTEE, paid for with 2x
+# the build time on a single self-hosted box.
+#
+# WHY THE AXIS WAS RETIRED RATHER THAN MADE TO VARY. Making it vary needs canon to
+# stop forcing -ffp-contract=off PUBLIC, and that flag IS the invariant (the
+# determinism contract: a flag a consumer may unset is not an invariant). Testing an
+# invariant by disabling it tests nothing. It would ALSO need the ISA pin moved off
+# the ship baseline, so the proof would stop proving the shipped configuration. And
+# the coverage the `fast` cell was meant to buy — a tripwire against a future float
+# introduction — is bought more strongly by the PUBLIC flag plus the integer-domain
+# rule than by a cell that cannot fail.
+#
+# THE PREMISE IS RE-DERIVED EVERY RUN, never trusted: assert_ffp_contract_forced_off
+# below reads each cell's own compile_commands.json and reds if any TU's EFFECTIVE
+# (last-wins) -ffp-contract is anything but `off`. If canon ever stops forcing it,
+# the retirement stops being justified and this gate says so on the spot instead of
+# going quietly uncovered.
+#
+# NOT TOUCHED, and the difference is the reason: the MSVC leg's /fp:fast dominant
+# corner stays live. canon's flag is emitted under a
+# $<$<OR:GNU,Clang,AppleClang>:...> generator expression, so MSVC inherits nothing
+# and its fp axis genuinely varies.
 #
 #   det_public_proof.sh                          run the cross-build determinism check (PASS/FAIL)
 #   DETERMINISM_OUT=<path> det_public_proof.sh   ALSO emit this leg's digest to <path>, for the
@@ -106,6 +156,57 @@ if [ -n "${DETERMINISM_LEG:-}" ]; then
   esac
 fi
 
+# Every FIRST-PARTY compile line in a cell must end up at -ffp-contract=off (last flag
+# wins in gcc/clang) — the premise under which the -ffp-contract axis was retired from
+# this sweep (header). A TU at `fast`, or one carrying no -ffp-contract at all (gcc's
+# default IS `fast`), means the flag stopped being forced and this gate is no longer
+# covering what it stopped claiming to cover.
+#
+# SCOPED TO SOURCES UNDER $CANON, and the scoping is load-bearing rather than tidy. The
+# harness's compile_commands.json also lists translation units this repo does not own —
+# CMake synthesises one for the `std` module under CXX_MODULE_STD, in the BUILD tree, and
+# it links no first-party target. Judging those would put a red on this gate for a flag
+# nobody here declares. The anti-vacuity cost of scoping is paid below: a filter that
+# matched NOTHING would pass silently, so an empty first-party set is itself a red.
+#
+# Pure grep + bash on the cell's own compile_commands.json: no python, no jq — an outsider
+# must be able to run this proof with conan and cmake and nothing else.
+assert_ffp_contract_forced_off() {
+  local cc="$1" tag="$2" root="$3" total=0 bad=0 line src eff
+  if [ ! -f "$cc" ]; then
+    echo "FFP PREMISE UNCHECKABLE: $tag emitted no compile_commands.json at $cc" >&2
+    echo "  — CMAKE_EXPORT_COMPILE_COMMANDS is set in proof/CMakeLists.txt; its absence is a harness break." >&2
+    return 1
+  fi
+  while IFS= read -r line; do
+    src="${line##*-c }"; src="${src%\",}"
+    case "$src" in "$root"/*) ;; *) continue ;; esac
+    total=$((total + 1))
+    case "$line" in
+      *-ffp-contract=*) eff="${line##*-ffp-contract=}"; eff="${eff%%[^a-z]*}" ;;
+      *)                eff="<unset>" ;;
+    esac
+    if [ "$eff" != "off" ]; then
+      bad=$((bad + 1))
+      [ "$bad" -le 5 ] && echo "   effective -ffp-contract=$eff on $src" >&2
+    fi
+  done < <(grep '"command":' "$cc")
+  if [ "$total" -eq 0 ]; then
+    echo "FFP PREMISE UNCHECKABLE: $tag's compile_commands.json lists no compile line under $root." >&2
+    echo "  A scoped assertion that matches nothing is a vacuous pass, so it is a red instead." >&2
+    return 1
+  fi
+  if [ "$bad" -ne 0 ]; then
+    echo "FFP PREMISE BROKEN: $bad of $total first-party compile line(s) in cell $tag are NOT at -ffp-contract=off." >&2
+    echo "  This sweep dropped its -ffp-contract={off,fast} axis because canon forces the flag PUBLIC," >&2
+    echo "  making the axis inert (see this script's header). That is no longer true. Either restore the" >&2
+    echo "  PUBLIC declaration in the package that lost it, or restore the axis here — not neither." >&2
+    return 1
+  fi
+  echo "  ffp premise: $total first-party TU(s) in $tag at -ffp-contract=off" >&2
+  return 0
+}
+
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 echo "canon=$CANON  conan_home=$CONAN_HOME  corpus=$(echo "$CORPUS" | wc -l) files" >&2
 
@@ -137,11 +238,14 @@ for leg in "${LEGS[@]}"; do
   toolchain="$(find "$legdir" -name conan_toolchain.cmake 2>/dev/null | head -1)"
   [ -f "$toolchain" ] || { echo "CONAN INSTALL FAIL: $cxx — no conan_toolchain.cmake under $legdir" >&2; continue; }
 
-  for opt in -O0 -O3; do for fpc in off fast; do
-    tag="${cxx//+/p}_${opt#-}_${fpc}"
+  for opt in -O0 -O3; do
+    tag="${cxx//+/p}_${opt#-}"
     bdir="$WORK/$tag"
     # SPDLOG OFF: engine/debug logs carry a wall-clock stamp; keep them out of the digest.
-    cell_flags="$opt -ffp-contract=$fpc -DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF"
+    # -ffp-contract=off is stated rather than inherited: canon forces it PUBLIC anyway (the
+    # header's retirement argument), and a cell that names the flag it is built under is one
+    # the assertion below can be read against.
+    cell_flags="$opt -ffp-contract=off -DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF"
     if cmake -S "$PROOF" -B "$bdir" -G Ninja \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_C_COMPILER="$cc_abs" -DCMAKE_CXX_COMPILER="$cxx_abs" \
@@ -149,6 +253,10 @@ for leg in "${LEGS[@]}"; do
           -DCANON_ROOT="$CANON" \
           -DCELL_FLAGS="$cell_flags" >"$bdir.cfg.log" 2>&1 \
        && cmake --build "$bdir" --target det_proof >"$bdir.build.log" 2>&1; then
+      # The retired -ffp-contract axis's premise, re-derived from THIS cell's own compile
+      # lines. A hard exit, not a BUILD FAIL: a broken premise means the sweep silently lost
+      # coverage it stopped claiming, which is not a condition to carry on through.
+      assert_ffp_contract_forced_off "$bdir/compile_commands.json" "$tag" "$CANON" || exit 4
       bin="$(find "$bdir" -name det_proof -type f -perm -u+x 2>/dev/null | head -1)"
       if [ -x "$bin" ]; then builds+=("$tag"); BIN["$tag"]="$bin";
       else echo "BUILD FAIL: $tag (no det_proof binary)" >&2; fi
@@ -156,7 +264,7 @@ for leg in "${LEGS[@]}"; do
       echo "BUILD FAIL: $tag" >&2
       { tail -4 "$bdir.build.log" "$bdir.cfg.log" 2>/dev/null | sed 's/^/   /' >&2; } || true
     fi
-  done; done
+  done
 done
 [ "${#builds[@]}" -gt 0 ] || { echo "no builds succeeded" >&2; exit 1; }
 
@@ -185,7 +293,8 @@ if [ $rc -ne 0 ]; then
   echo "FAIL: cross-build divergence over canon's public entry — a determinism regression." >&2
   exit 1
 fi
-echo "PASS: canon public digest byte-identical across ${#builds[@]} builds." >&2
+echo "PASS: canon public digest byte-identical across ${#builds[@]} builds (compiler×stdlib × -O{0,3};" >&2
+echo "      -ffp-contract is NOT an axis of this sweep and is asserted forced-off per cell — header)." >&2
 
 digest_sha="$(sha256sum "$ref" | awk '{print $1}')"
 echo "canon public digest sha256=$digest_sha" >&2
