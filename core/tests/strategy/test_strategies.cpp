@@ -2228,10 +2228,17 @@ static constexpr std::array kStrategyTable{
 };
 
 // The adaptors are spelled as function calls, not `operator|`. Reaching the pipe operator through
-// `import insight.canon.test` trips a gcc-15 BMI defect: the CRTP `_Derived` of the first closure
-// type in the TU leaks into every later `_Partial`, so the second and third helpers fail to deduce
-// (`use of operator| ... before deduction of auto`). clang-21/libc++ accepts the pipe form, so this
-// only ever breaks on the ship toolchain.
+// `import insight.canon.test` tripped a gcc BMI defect: the CRTP `_Derived` of the first closure
+// type in the TU leaked into every later `_Partial`, so the second and third helpers failed to
+// deduce (`use of operator| ... before deduction of auto`). First met on gcc-15; clang-21/libc++
+// accepted the pipe form throughout, so it only ever broke on the ship toolchain.
+//
+// RE-MEASURED 2026-09-03, wiped build trees, all THREE helpers below restored to the pipe form at
+// once — the count matters, since the reported failure was in the second and third, not the first
+// — on both legs: gcc-16.2 (`linux-gcc16-release`) rc=0 and clang-21/libc++ rc=0, with this TU
+// compiled in each. The defect does not reproduce on the current ship compiler. The function-call
+// spelling is RETAINED per ADR-3.D7: the measurement covers these two legs at this commit, and a
+// wrong removal reds the ship leg at the tag while a wrong retention costs a spelling.
 [[nodiscard]] std::vector<StrategyCase> rows_with_canonical_line()
 {
     return std::ranges::to<std::vector>(

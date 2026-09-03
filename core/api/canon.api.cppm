@@ -2154,10 +2154,20 @@ namespace detail
 // the arrow only runs the other way) — and a linkage-specification attaches a declaration to the
 // GLOBAL module, which is what makes the sealed definition and this name ONE entity across the
 // module boundary (the std module's own mechanism). It is EXPORTED so the shard, importing this
-// unit, redeclares THE VISIBLE entity rather than a twin gcc-15 never merges — measured: a
-// non-exported spelling built on clang-21 and failed friendship access on gcc-15. Exporting leaks
-// only an INCOMPLETE name: the definition is sealed and the constructor private, so no consumer
-// can construct or complete it — unforgeability is unchanged.
+// unit, redeclares THE VISIBLE entity rather than a twin gcc never merges — first measured on
+// gcc-15: a non-exported spelling built on clang-21 and failed friendship access on gcc. Exporting
+// leaks only an INCOMPLETE name: the definition is sealed and the constructor private, so no
+// consumer can construct or complete it — unforgeability is unchanged.
+//
+// RE-MEASURED 2026-09-03 on the gcc-16.2 ship leg (`linux-gcc16-release`), wiped build tree, by
+// deleting the `export` below and building: STILL LIVE, and it reds exactly as it did on gcc-15 —
+//     canon.detail.parse.cppm:86: error: conflicting declaration 'insight::tokenization::
+//         LogParserPasskey' / note: previous declaration ... canon.api.cppm (the fwd decl)
+//     canon.detail.parse.cppm:156: error: 'LogParserPasskey' was not declared in this scope
+// i.e. the sealed definition and this declaration become TWO entities and the §12.5.1(c) mint
+// stops resolving. This `export` is load-bearing on the CURRENT ship compiler; no gcc bump has
+// retired it and none is expected to, because what it buys is entity identity across the module
+// boundary, not a defect workaround. Do not delete it.
 export extern "C++"
 {
     namespace insight::tokenization
@@ -2248,8 +2258,16 @@ class NormalizedContent
     friend class NormalizedLine; // the suffix door (and, through it, the declared peel)
     // QUALIFIED on purpose: a qualified friend is a pure REFERENCE to the prior (global-module,
     // extern "C++") declaration above — it cannot declare a fresh module-attached entity, which
-    // is how the sealed definition in insight.canon.detail.parse stays THIS friend on both
-    // gcc-15 and clang-21 (an unqualified spelling bound differently across the two).
+    // is how the sealed definition in insight.canon.detail.parse stays THIS friend. An unqualified
+    // spelling once bound differently across gcc-15 and clang-21.
+    //
+    // RE-MEASURED 2026-09-03, wiped build trees, this friend UNQUALIFIED, both legs: gcc-16.2
+    // (`linux-gcc16-release`) rc=0 and clang-21/libc++ (`linux-clang21-libcxx-release`) rc=0, with
+    // the sealed shard's `LogParserPasskey{}.mint(...)` compiling — so the friendship still bound
+    // to the one sealed entity under both. The cross-compiler divergence does not reproduce on the
+    // current pair. KEPT QUALIFIED per ADR-3.D7: the qualified spelling is the one that cannot
+    // declare a fresh entity by construction, so it is correct independently of which compilers
+    // happen to agree this month, and a wrong removal reds the ship leg at the tag.
     friend class insight::tokenization::LogParserPasskey; // the §12.5.1(c) mint
 
     constexpr explicit NormalizedContent(std::string_view bytes) noexcept : bytes_{bytes} {}

@@ -144,8 +144,12 @@ TEST(NormalizedContentDoors, NormalizedContentHasExactlyTheTwoAuditedFriends)
     ASSERT_FALSE(api.empty()) << "could not read canon.api.cppm from " << kCoreRoot;
     const std::vector<std::string> found{friends_of(api, "NormalizedContent")};
     // The passkey friend is QUALIFIED in source: a qualified friend is a pure reference to the
-    // exported global-module forward declaration, which is what keeps gcc-15 and clang-21 binding
-    // it to the ONE sealed entity (see the note at the declaration).
+    // exported global-module forward declaration, which is what binds it to the ONE sealed entity
+    // (see the note at the declaration, which carries the measurement). The qualification is kept
+    // for that by-construction reason, NOT because a named compiler still needs it: unqualifying
+    // it was re-measured green on gcc-16.2 and clang-21 on 2026-09-03. What that same experiment
+    // found STILL LIVE is the `export` on the forward declaration itself — so this census pins the
+    // spelling, and the declaration's own note pins the export.
     const std::vector<std::string> expected{"friend class NormalizedLine",
                                             "friend class insight::tokenization::LogParserPasskey"};
     EXPECT_EQ(found, expected)
