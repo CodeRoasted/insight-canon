@@ -654,26 +654,24 @@ std::optional<Timestamp> parse_health_app_ts(std::string_view timestamp_str) noe
     const char* time_ptr = ptr + 9;
     const char* const end_ptr = ptr + timestamp_str.size();
 
-    const auto take_clock_field{[end_ptr](const char*& cursor, int& out_value) noexcept
-                                {
-                                    static constexpr std::ptrdiff_t kMaxFieldDigits{2};
-                                    static constexpr unsigned kDecimalRadix{10U};
-                                    if (cursor >= end_ptr ||
-                                        static_cast<unsigned>(*cursor) - '0' >= kDecimalRadix)
-                                    {
-                                        return false;
-                                    }
-                                    const char* const scan_end{
-                                        std::min(cursor + kMaxFieldDigits, end_ptr)};
-                                    const auto result{std::from_chars(cursor, scan_end, out_value)};
-                                    if (result.ec != std::errc{} || result.ptr >= end_ptr ||
-                                        *result.ptr != ':')
-                                    {
-                                        return false;
-                                    }
-                                    cursor = result.ptr + 1; // step over the ':'
-                                    return true;
-                                }};
+    const auto take_clock_field{
+        [end_ptr](const char*& cursor, int& out_value) noexcept
+        {
+            static constexpr std::ptrdiff_t kMaxFieldDigits{2};
+            static constexpr unsigned kDecimalRadix{10U};
+            if (cursor >= end_ptr || static_cast<unsigned>(*cursor) - '0' >= kDecimalRadix)
+            {
+                return false;
+            }
+            const char* const scan_end{std::min(cursor + kMaxFieldDigits, end_ptr)};
+            const auto result{std::from_chars(cursor, scan_end, out_value)};
+            if (result.ec != std::errc{} || result.ptr >= end_ptr || *result.ptr != ':')
+            {
+                return false;
+            }
+            cursor = result.ptr + 1; // step over the ':'
+            return true;
+        }};
 
     int hour{0};
     int minute{0};
