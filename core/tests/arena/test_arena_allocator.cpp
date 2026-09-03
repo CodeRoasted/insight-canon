@@ -484,6 +484,26 @@ TEST(ArenaAllocator_Accessors, UsedNeverExceedsCapacity)
 // Deliberately NOT written as `poisoned == 0xDD…`: that would pin the fill value, and the value is
 // an implementation choice. The property is "the released bytes no longer read as what was stored",
 // which is what makes a stale `string_view` observable, and it survives a change of poison byte.
+//
+// WHY THE SKIPS BELOW PRINT THEIR REMEDY instead of leaving it in this comment: these two arms used
+// to run on every desk build, and silently stopped. Since malf-toolchain 4b1f32e the dev profile
+// linux-clang21-libcxx-release configures CMAKE_BUILD_TYPE=Release, so the AUTO default
+// (core/CMakeLists.txt — the instrument resolves to `$<CONFIG:Debug>`) is OFF at the desk. A skip
+// that changed meaning under a toolchain repair reads exactly like the skip it always was, so the
+// way out is program OUTPUT at the moment of the block, not a comment the blocked reader is not
+// reading.
+
+// The single spelling of the remedy, so the two skips cannot drift apart. The three routes differ
+// in WHAT THEY BUY and not only in price, which is why the message states both halves.
+constexpr const char* kArmTheInstrument{
+    "ARM IT — three routes, and they do not buy the same thing. "
+    "(1) Reconfigure THIS tree with -DINSIGHT_CANON_ARENA_POISON_MODE=ON: the poison alone, "
+    "no new cache, cheapest if you are already built. "
+    "(2) `malf test insight-canon --profile linux-clang21-libcxx-debug`: the whole desk debug "
+    "leg (poison + trace logging + live assert()), no sanitizer tax, and the cheapest seat "
+    "for an actual lifetime hunt. It pays a ONE-TIME profile-keyed cache and build-tree "
+    "rebuild, costed in malf/README.md under 'Shared config & profiles'. "
+    "(3) `malf test insight-canon --asan`: that same debug leg plus AddressSanitizer."};
 
 TEST(ArenaAllocator_ResetPoison, InstrumentIsDeclaredAndReadableAtRuntime)
 {
@@ -504,18 +524,11 @@ TEST(ArenaAllocator_ResetPoison, InstrumentIsDeclaredAndReadableAtRuntime)
 TEST(ArenaAllocator_ResetPoison, ReleasedBytesAreOverwrittenSoAUseAfterResetIsObservable)
 {
     if (!insight::tokenization::arena_poisons_on_reset())
-        GTEST_SKIP() << "release build: reset() rewinds without overwriting, by design — under a "
-                        "rewind a use-after-reset is INDISTINGUISHABLE from a correct read, so "
-                        "there is nothing here to assert (this skip is the honest outcome, not a "
-                        "gap). Run the debug or --asan leg to exercise the instrument."
-                     << " TO ARM IT AT A DESK: -DINSIGHT_CANON_ARENA_POISON_MODE=ON, or "
-                        "--asan. This is not a formality since malf-toolchain 4b1f32e: the dev "
-                        "profile linux-clang21-libcxx-release now configures CMAKE_BUILD_TYPE="
-                        "Release, so the AUTO default (core/CMakeLists.txt, ON for Debug only) is "
-                        "OFF and this arm — which used to run on every desk build — now SKIPS "
-                        "there by default. A skip that changed meaning under a toolchain repair "
-                        "reads exactly like the skip it always was, which is why the remedy is "
-                        "printed here rather than remembered.";
+        GTEST_SKIP() << "the arena reset-poison instrument is OFF in this build: reset() rewinds "
+                        "without overwriting, so a use-after-reset is INDISTINGUISHABLE from a "
+                        "correct read and there is nothing here to assert (this skip is the honest "
+                        "outcome, not a gap). "
+                     << kArmTheInstrument;
 
     ArenaAllocator arena{4096};
     constexpr std::string_view kStored{"GET /api/users -> 200"};
@@ -534,8 +547,9 @@ TEST(ArenaAllocator_ResetPoison, ReleasedBytesAreOverwrittenSoAUseAfterResetIsOb
 TEST(ArenaAllocator_ResetPoison, PoisonSpansTheWholeHandedOutExtentNotJustTheFirstBytes)
 {
     if (!insight::tokenization::arena_poisons_on_reset())
-        GTEST_SKIP() << "release build: reset() rewinds without overwriting, by design. To arm "
-                        "this arm at a desk: -DINSIGHT_CANON_ARENA_POISON_MODE=ON, or --asan.";
+        GTEST_SKIP() << "the arena reset-poison instrument is OFF in this build: reset() rewinds "
+                        "without overwriting, by design. "
+                     << kArmTheInstrument;
 
     // A partial fill would leave later allocations readable and make the instrument's coverage a
     // function of WHERE in the line the stale view happened to point — a detector that fires
