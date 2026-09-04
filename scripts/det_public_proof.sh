@@ -207,6 +207,27 @@ assert_ffp_contract_forced_off() {
   return 0
 }
 
+# det_proof's stderr, bounded and shown from BOTH ENDS. The two ends are load-bearing rather
+# than tidy: the fixture's two error exits sit on opposite sides of its logger init, so `usage:`
+# (written before init_logging) is necessarily the FIRST line, and `cannot open <path>` (written
+# after it) is necessarily the LAST. Measured 2026-09-04 on this repo's own
+# proof/build-inventory-gcc16-release/det_proof, a build that does NOT compile the log macros out:
+# `cannot open` came back as line 21 of 21, behind 20 log records. A head-only excerpt would have
+# printed twenty lines of noise and hidden the one line that says what went wrong.
+surface_fixture_stderr() {
+  local tag="$1" err="$2" lines bytes
+  [ -s "$err" ] || return 0
+  lines="$(wc -l < "$err")"; bytes="$(wc -c < "$err")"
+  echo "  --- $tag stderr: $lines line(s), $bytes byte(s) ---" >&2
+  if [ "$lines" -le 12 ]; then
+    sed 's/^/  | /' "$err" >&2
+  else
+    head -3 "$err" | sed 's/^/  | /' >&2
+    echo "  | ... $((lines - 8)) line(s) elided ..." >&2
+    tail -5 "$err" | sed 's/^/  | /' >&2
+  fi
+}
+
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 echo "canon=$CANON  conan_home=$CONAN_HOME  corpus=$(echo "$CORPUS" | wc -l) files" >&2
 
@@ -279,9 +300,43 @@ for req in ${DETERMINISM_REQUIRE_COMPILERS:-}; do
 done
 
 # ── Each build replays the whole corpus in one process; the digest is its stdout ─
+#
+# THE STATUS IS READ EXPLICITLY AND THE STDERR IS KEPT. What `2>/dev/null` cost here was never a
+# false green: this script runs under `set -e`, so a non-zero fixture DID abort the loop before the
+# compare (measured 2026-09-04 — the loop dies carrying the fixture's own status, and the PASS line
+# below is never reached). What it cost was the DIAGNOSIS and the ATTRIBUTION. Nothing named the
+# cell, nothing said why, and the fixture's error exit is 2 — the same 2 this script returns for a
+# missing prerequisite (no conan, no cmake, no corpus) — so an operator could not tell "a corpus
+# file is unreadable" from "conan is not installed" without reproducing the run by hand.
+# det_proof has exactly two orderly error exits, both `return 2`, and both diagnose ONLY on the
+# stream that went to /dev/null: no corpus arguments ("usage: det_proof <corpus-file> ..."), and a
+# corpus file it cannot open ("cannot open <path>", which names the file). A third failure shape is
+# not a return at all — its main is NOLINT(bugprone-exception-escape), so an escaping exception
+# aborts the process and the shell reports 134. Exit 5 is this script's own and is distinct from the
+# 1/2/3/4 used above, so a failing fixture can never again be read as a missing prerequisite.
+#
+# THE STDERR GOES TO A FILE AND IS NEVER MERGED INTO STDOUT, and that is a determinism requirement
+# rather than hygiene. Canon's module loggers carry a wall-clock `[%Y-%m-%d %H:%M:%S.%e]` pattern.
+# These cells compile them out (-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF above), so their stderr is
+# empty — but a build without that flag emits them, measured 2026-09-04 on this repo's
+# proof/build-inventory-gcc16-release/det_proof over ONE corpus file: 20 records, 1679 bytes, every
+# line carrying the clock. A `2>&1` here would hash the operator's clock into the digest and make
+# two runs of one binary on one input differ, which is precisely the defect this gate exists to
+# catch. stdout stays the digest and nothing else.
 for tag in "${builds[@]}"; do
+  run_rc=0
   # shellcheck disable=SC2086
-  "${BIN[$tag]}" $CORPUS > "$WORK/$tag.out" 2>/dev/null
+  "${BIN[$tag]}" $CORPUS > "$WORK/$tag.out" 2>"$WORK/$tag.err" || run_rc=$?
+  if [ "$run_rc" -ne 0 ]; then
+    echo "FIXTURE FAIL: cell $tag -- det_proof exited $run_rc over $(echo "$CORPUS" | wc -l) corpus file(s)." >&2
+    echo "  Its stdout stopped at $(wc -c < "$WORK/$tag.out") byte(s), so that file is a PREFIX of a digest and" >&2
+    echo "  not a digest. Every cell fails on the same input at the same point, so a compare run over these" >&2
+    echo "  files would find the prefixes IDENTICAL and report agreement between truncated outputs as" >&2
+    echo "  determinism. The walk stops here instead." >&2
+    surface_fixture_stderr "$tag" "$WORK/$tag.err"
+    exit 5
+  fi
+  surface_fixture_stderr "$tag" "$WORK/$tag.err"
 done
 ref="$WORK/${builds[0]}.out"; rc=0
 echo "reference: ${builds[0]}  digest-sha=$(sha256sum "$ref" | cut -c1-16)…" >&2
