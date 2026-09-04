@@ -520,14 +520,27 @@ TEST(ArenaAllocator_ResetPoison, InstrumentIsDeclaredAndReadableAtRuntime)
 #endif
 }
 
+// THE TWO CASES BELOW ARE COMPILE-TIME GATED, NOT RUNTIME-SKIPPED (Founder, 2026-09-04). They
+// used to open with `if (!arena_poisons_on_reset()) GTEST_SKIP()`, and the skip was honest about
+// its reason while still being the wrong SHAPE: a gtest skip exits 0 and ctest counts it as
+// passed, so a release build reported two green cases for a subject that cannot exist in it.
+// Whether the instrument is compiled in is a property of THIS TU — `INSIGHT_CANON_ARENA_POISON`
+// is set on this target by the same generator expression as on the library — so the honest
+// expression is not to register the cases at all where they could not run.
+//
+// Nothing is lost by that. `InstrumentIsDeclaredAndReadableAtRuntime` above is UNCONDITIONAL and
+// asserts BOTH directions, so a build whose runtime query disagrees with its own macro still
+// reds — which was the only thing the skipping cases could have caught in an unpoisoned build.
+#ifdef INSIGHT_CANON_ARENA_POISON
+
 TEST(ArenaAllocator_ResetPoison, ReleasedBytesAreOverwrittenSoAUseAfterResetIsObservable)
 {
-    if (!insight::tokenization::arena_poisons_on_reset())
-        GTEST_SKIP() << "the arena reset-poison instrument is OFF in this build: reset() rewinds "
-                        "without overwriting, so a use-after-reset is INDISTINGUISHABLE from a "
-                        "correct read and there is nothing here to assert (this skip is the honest "
-                        "outcome, not a gap). "
-                     << kArmTheInstrument;
+    // A belt, not a gate: inside this #ifdef the instrument MUST be on, and the case above
+    // already pins that. If it is ever false here the two disagree and this fails loudly rather
+    // than measuring a rewind that never poisoned.
+    ASSERT_TRUE(insight::tokenization::arena_poisons_on_reset())
+        << "compiled WITH INSIGHT_CANON_ARENA_POISON but the runtime query denies it. "
+        << kArmTheInstrument;
 
     ArenaAllocator arena{4096};
     constexpr std::string_view kStored{"GET /api/users -> 200"};
@@ -545,10 +558,9 @@ TEST(ArenaAllocator_ResetPoison, ReleasedBytesAreOverwrittenSoAUseAfterResetIsOb
 
 TEST(ArenaAllocator_ResetPoison, PoisonSpansTheWholeHandedOutExtentNotJustTheFirstBytes)
 {
-    if (!insight::tokenization::arena_poisons_on_reset())
-        GTEST_SKIP() << "the arena reset-poison instrument is OFF in this build: reset() rewinds "
-                        "without overwriting, by design. "
-                     << kArmTheInstrument;
+    ASSERT_TRUE(insight::tokenization::arena_poisons_on_reset())
+        << "compiled WITH INSIGHT_CANON_ARENA_POISON but the runtime query denies it. "
+        << kArmTheInstrument;
 
     // A partial fill would leave later allocations readable and make the instrument's coverage a
     // function of WHERE in the line the stale view happened to point — a detector that fires
@@ -570,3 +582,5 @@ TEST(ArenaAllocator_ResetPoison, PoisonSpansTheWholeHandedOutExtentNotJustTheFir
                "so the instrument detects a use-after-reset only for some offsets";
     }
 }
+
+#endif // INSIGHT_CANON_ARENA_POISON

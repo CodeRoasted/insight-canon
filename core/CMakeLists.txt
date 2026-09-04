@@ -169,6 +169,21 @@ target_compile_definitions(insight_canon PRIVATE
 # `arena_poisons_on_reset()` exists so downstream can still read the answer truthfully.
 target_compile_definitions(insight_canon PRIVATE
     $<${INSIGHT_CANON_ARENA_POISON_CONDITION}:INSIGHT_CANON_ARENA_POISON>)
+
+# THE SWITCH STAYS PRIVATE; THE FACT IS EXPORTED. These are different things and the distinction
+# is the whole reason this second definition is safe. `INSIGHT_CANON_ARENA_POISON` above CHANGES
+# behaviour, so a consumer compiling with it could disagree with the linked implementation — it
+# must stay PRIVATE. `INSIGHT_CANON_ARENA_POISON_AVAILABLE` changes nothing: it is the compile-time
+# form of the read-only answer `arena_poisons_on_reset()` already gives at runtime, carried on the
+# same generator expression so the two cannot disagree.
+#
+# WHY IT IS NEEDED (2026-09-04). A downstream lifetime arm — `insight-eidos`'s ArenaLifetime — can
+# only say anything in a poisoning build, and with no compile-time way to know that, it opened with
+# `if (!arena_poisons_on_reset()) GTEST_SKIP()`. A gtest skip exits 0, so every release build
+# counted that arm as PASSED for a lifetime it could not observe. With the fact exported, the arm
+# is registered only where it can run, and there is no skip to miscount.
+target_compile_definitions(insight_canon INTERFACE
+    $<${INSIGHT_CANON_ARENA_POISON_CONDITION}:INSIGHT_CANON_ARENA_POISON_AVAILABLE>)
 # Printed UNCONDITIONALLY and naming the MODE, because under AUTO there is no single answer to
 # print: on a multi-config generator the instrument is on for the Debug configuration and off for
 # the others, decided after this file has been read.

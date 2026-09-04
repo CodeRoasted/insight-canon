@@ -213,10 +213,12 @@ TEST(DetInt128Portable, WeightWideningIsValuePreserving)
 }
 
 #else
-TEST(DetInt128Portable, NoNativeInt128OnThisPlatform)
-{
-    GTEST_SKIP() << "no native __int128 to compare against";
-}
+// NO PLACEHOLDER CASE HERE, deliberately (Founder, 2026-09-04). This #else used to host a single
+// `GTEST_SKIP() << "no native __int128 to compare against"`, whose only job was to leave a visible
+// mark on a platform the suite cannot cover. That is the false-pass shape: a gtest skip exits 0,
+// so the mark was counted as a passing test. A platform without `__int128` simply has no case to
+// register — the #if above IS the statement, and the per-platform difference stays visible in the
+// discovered test count rather than in a green line that asserted nothing.
 #endif
 
 } // namespace
