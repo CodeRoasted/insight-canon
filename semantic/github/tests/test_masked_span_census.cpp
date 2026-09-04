@@ -496,7 +496,7 @@ TEST(MaskedSpanCensus, TheProducerNameRenderDeltaOnTheMarkerCoverageBank)
     const std::optional<std::string> subject_path{env("CODEROAST_MARKER_COVERAGE_SUBJECT")};
     if (!logs || !subject_path || !std::filesystem::exists(*logs) ||
         !std::filesystem::exists(*subject_path))
-        GTEST_SKIP() << kUnmounted;
+        FAIL() << kUnmounted;
 
     std::string subject_error;
     const std::vector<SubjectRow> subject{read_subject(*subject_path, subject_error)};

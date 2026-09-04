@@ -205,10 +205,10 @@ class LogHubProjectionPinGate : public ::testing::Test
         // which is the only place an absent corpus is allowed to be loud.
         const char* const raw{std::getenv(kCorpusVar)};
         if (raw == nullptr || *raw == '\0')
-            GTEST_SKIP() << kCorpusVar
-                         << " unset — the LogHub full corpus is not mounted. It lives in the "
-                            "private warehouse (zenodo_corpora/loghub/data/loghub-full/) and is "
-                            "re-acquirable from Zenodo 8196385 under CC-BY-4.0.";
+            FAIL() << kCorpusVar
+                   << " unset — the LogHub full corpus is not mounted. It lives in the "
+                      "private warehouse (zenodo_corpora/loghub/data/loghub-full/) and is "
+                      "re-acquirable from Zenodo 8196385 under CC-BY-4.0.";
         root_ = std::filesystem::path{raw};
         ASSERT_TRUE(std::filesystem::is_directory(root_))
             << kCorpusVar << "=" << root_.string()

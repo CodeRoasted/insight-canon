@@ -399,9 +399,8 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
 {
     const auto manifest_path{env_value("JENKINS_PAYLOAD_STAMP_MANIFEST")};
     if (!manifest_path.has_value())
-        GTEST_SKIP()
-            << "JENKINS_PAYLOAD_STAMP_MANIFEST unset — the payload-stamped slice is private and "
-               "out-of-tree";
+        FAIL() << "JENKINS_PAYLOAD_STAMP_MANIFEST unset — the payload-stamped slice is private and "
+                  "out-of-tree";
     const std::vector<std::string> logs{read_manifest(*manifest_path)};
     ASSERT_FALSE(logs.empty()) << "manifest " << *manifest_path << " listed no logs";
 
@@ -613,9 +612,8 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
 {
     const auto manifest_path{env_value("JENKINS_PAYLOAD_STAMP_MANIFEST")};
     if (!manifest_path.has_value())
-        GTEST_SKIP()
-            << "JENKINS_PAYLOAD_STAMP_MANIFEST unset — the payload-stamped slice is private and "
-               "out-of-tree";
+        FAIL() << "JENKINS_PAYLOAD_STAMP_MANIFEST unset — the payload-stamped slice is private and "
+                  "out-of-tree";
     const std::vector<std::string> logs{read_manifest(*manifest_path)};
     ASSERT_FALSE(logs.empty()) << "manifest " << *manifest_path << " listed no logs";
 

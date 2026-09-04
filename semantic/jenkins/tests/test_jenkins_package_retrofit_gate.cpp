@@ -528,10 +528,10 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
         // Clause 2 — UNSET vs SET-BUT-BROKEN are different states and must not share a verdict.
         const char* const raw{std::getenv(kCorpusVar)};
         if (raw == nullptr || *raw == '\0')
-            GTEST_SKIP() << kCorpusVar
-                         << " unset — the private Jenkins marker corpus is not present. Point "
-                            "it at the tree holding the RETRO-v2.*.tsv projections and data/v2/ "
-                            "(i.e. .../coderoast-corpora/jenkins_corpora/marker_corpus).";
+            FAIL() << kCorpusVar
+                   << " unset — the private Jenkins marker corpus is not present. Point "
+                      "it at the tree holding the RETRO-v2.*.tsv projections and data/v2/ "
+                      "(i.e. .../coderoast-corpora/jenkins_corpora/marker_corpus).";
         root_ = std::filesystem::path{raw};
         ASSERT_TRUE(std::filesystem::is_regular_file(root_ / kTraceSidecar))
             << kCorpusVar << " is set to '" << raw << "' but there is no " << kTraceSidecar

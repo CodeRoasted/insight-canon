@@ -454,11 +454,11 @@ class TransportPeelEquivalenceGate : public ::testing::Test
         // would sail past it into a confusing failure.
         const char* const raw{std::getenv(kSliceDirVar)};
         if (raw == nullptr || *raw == '\0')
-            GTEST_SKIP() << kSliceDirVar
-                         << " unset — the private D11 corpus slice is not present. Point it at a "
-                            "slice directory holding corpus.jsonl AND log_annotated/, i.e. "
-                            ".../github_corpora/revert_corpus/data/v1/sample (fast, 33 MB) or "
-                            ".../data/v1/full (the full claim, 2.3 GB).";
+            FAIL() << kSliceDirVar
+                   << " unset — the private D11 corpus slice is not present. Point it at a "
+                      "slice directory holding corpus.jsonl AND log_annotated/, i.e. "
+                      ".../github_corpora/revert_corpus/data/v1/sample (fast, 33 MB) or "
+                      ".../data/v1/full (the full claim, 2.3 GB).";
 
         slice_ = std::filesystem::path{raw};
         // Set-but-broken is a WIRING FAILURE, not an absent corpus: the operator declared the slice

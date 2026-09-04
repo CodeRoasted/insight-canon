@@ -98,6 +98,23 @@ if(INSIGHT_SEMANTIC_JENKINS_BUILD_TESTS)
         target_compile_options(insight_semantic_jenkins_tests PRIVATE
             $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-ffp-contract=off>)
         include(GoogleTest)
-        gtest_discover_tests(insight_semantic_jenkins_tests)
+        # THE CORPUS POPULATION IS SPLIT OUT BY LABEL, NEVER MIXED INTO THE DEFAULT RUN
+        # (Founder, 2026-09-04: "I also dont want to mix up big corpus tests/gates with regular
+        # self sustaining tests"). A `corpus` test needs a PRIVATE third-party corpus mounted
+        # through an environment variable; from a checkout alone it cannot run at all. Mixed into
+        # the default run it did the one thing a test must never do — report a PASS for a subject
+        # it never reached — because a gtest skip exits 0 and ctest counts a skipping case as
+        # passed. `malf test` now runs `-LE corpus`, and `malf test --corpus` runs `-L corpus`.
+        #
+        # Two discovery passes over ONE binary rather than two binaries: the split is about which
+        # ctest run a case belongs to, not about what it links, and a second executable would
+        # duplicate this target's whole link line for no gain.
+        #
+        # The suite list here is checked against `scripts/run_corpus_gates.sh`'s registry by that
+        # script's `--census` arm, so the two cannot drift apart silently.
+        set(CORPUS_SUITES "JenkinsPayloadStampMeasurement.*:JenkinsRecognizerRetrofitGate.*:JenkinsBareNullGate.*")
+        gtest_discover_tests(insight_semantic_jenkins_tests TEST_FILTER "-${CORPUS_SUITES}")
+        gtest_discover_tests(insight_semantic_jenkins_tests TEST_FILTER "${CORPUS_SUITES}"
+                             PROPERTIES LABELS corpus)
     endif()
 endif()

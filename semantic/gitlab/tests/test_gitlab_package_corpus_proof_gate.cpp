@@ -521,12 +521,11 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
         // Empty counts as unset: an undefined `vars.X` expands to "" on a runner.
         const char* const raw{std::getenv(kCorpusVar)};
         if (raw == nullptr || *raw == '\0')
-            GTEST_SKIP()
-                << kCorpusVar
-                << " unset — the private GitLab marker corpus is not present. Point it "
-                   "at the tree holding "
-                << kSidecarFile << ", " << kOracleFile
-                << " and data/v1/ (i.e. .../coderoast-corpora/gitlab_corpora/marker_corpus).";
+            FAIL() << kCorpusVar
+                   << " unset — the private GitLab marker corpus is not present. Point it "
+                      "at the tree holding "
+                   << kSidecarFile << ", " << kOracleFile
+                   << " and data/v1/ (i.e. .../coderoast-corpora/gitlab_corpora/marker_corpus).";
 
         root_ = std::filesystem::path{raw};
         // Set-but-broken is a WIRING FAILURE, not an absent corpus: the operator declared the

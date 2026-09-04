@@ -245,8 +245,7 @@ class BracketPeelEquivalenceGate : public ::testing::Test
         // Clause 2 — UNSET vs SET-BUT-BROKEN must not share a verdict.
         const char* const raw{std::getenv(kCorpusVar)};
         if (raw == nullptr || *raw == '\0')
-            GTEST_SKIP() << kCorpusVar
-                         << " unset — the private Jenkins marker corpus is not present.";
+            FAIL() << kCorpusVar << " unset — the private Jenkins marker corpus is not present.";
         root_ = std::filesystem::path{raw};
         ASSERT_TRUE(std::filesystem::is_regular_file(root_ / kTraceSidecar))
             << kCorpusVar << " is set but " << kTraceSidecar
