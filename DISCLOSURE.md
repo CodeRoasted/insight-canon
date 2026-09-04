@@ -16,9 +16,7 @@ acceptance to this repository's historic refs.
 
 ## The exact set
 
-The 16 tags `v1.5.4` … `v1.7.5` plus the stray `1.6.4`, each carrying the 17-file
-`corpora/loghub/slice/` tree (16 `*_2k.log` files + attribution). No other ref of this
-repository carries any of it.
+The 15 tags `v1.5.4` … `v1.7.5` each carrying the 17-file `corpora/loghub/slice/` tree (12 `*_2k.log` files + attribution). No other ref of this repository carries any of it.
 
 ## The upstream publication of record
 
