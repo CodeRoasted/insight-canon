@@ -383,6 +383,29 @@ if(INSIGHT_CANON_BUILD_TESTS)
         gtest_discover_tests(insight_canon_tests TEST_FILTER "-${CORPUS_SUITES}")
         gtest_discover_tests(insight_canon_tests TEST_FILTER "${CORPUS_SUITES}"
                              PROPERTIES LABELS corpus)
+
+        # The determinism proof's REPORTING gate — the desk-runnable proof that a failing fixture
+        # reds scripts/det_public_proof.sh, and that its -ffp-contract premise assertion refuses a
+        # vacuous pass. Those paths were demonstrated once, by hand, by building the four-cell
+        # module tower with a corpus file made unreadable; at minutes of compile per assertion
+        # nothing re-checked them, so the gate's RED was unproven and its green read for more than
+        # it was worth. The script sources the proof (which returns early when sourced) and drives
+        # the reporting functions against hand-made files: no build, no compiler, well under a
+        # second.
+        #
+        # IT LIVES IN core/ BECAUSE THIS IS THE TREE THAT ACTUALLY RUNS. proof/ is the proof's own
+        # harness and is driven only by det_public_proof.sh — it is outside the package sweep, and
+        # that is exactly how insight-canon/proof/ once rotted unseen for a full release cycle.
+        #
+        # NOT ON WINDOWS, and the absence is declared rather than incidental: the subject is a bash
+        # script, and the MSVC determinism leg does not run it (.github/workflows/golden.yaml drives
+        # that leg through its own PowerShell path). A `find_program(bash)`-conditional registration
+        # would make the same absence silent, which is the failure this comment exists to avoid.
+        if(NOT WIN32)
+            add_test(NAME det_public_proof_reporting
+                COMMAND "${CMAKE_COMMAND}" -E env "bash"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/../scripts/tests/det_public_proof_reporting_test.sh")
+        endif()
     endif()
 endif()
 

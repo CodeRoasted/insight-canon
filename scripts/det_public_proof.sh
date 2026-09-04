@@ -89,6 +89,12 @@
 #                                                Determinism-Golden-Proof workflow to cross-compare
 #                                                against the other legs (no committed golden to rot)
 #
+# ITS OWN FAILURE PATHS ARE PROVED SEPARATELY, and in under a second:
+# scripts/tests/det_public_proof_reporting_test.sh (ctest gate `det_public_proof_reporting`) sources
+# this script — which returns early when sourced — and drives the three reporting functions against
+# hand-made files. What a green there means and does NOT mean is stated in that script's header;
+# short version, it proves the VERDICT, never that the cells build or that their digests agree.
+#
 # NEW MODEL — cross-leg agreement, not a committed golden. This script proves the per-leg invariant
 # (byte-identity across this leg's compiler × -O × -ffp sweep) and EMITS the leg's digest. The
 # workflow runs every leg (gcc/clang × x86/arm64 + msvc) and compares their emitted digests: all
@@ -228,6 +234,43 @@ surface_fixture_stderr() {
   fi
 }
 
+# The failing-fixture verdict, as a function rather than inline in the run loop below — that is
+# what makes it provable at a desk without building the four-cell tower (the ctest gate
+# `det_public_proof_reporting`, scripts/tests/). It is the ONLY thing there is to extract here:
+# canon runs the fixture ONCE over the whole corpus, so there is no per-section writer a stub
+# binary could substitute for, only the failure semantics. Returns 5 — this script's own status,
+# distinct from the 1/2/3/4 above — so a failing fixture can never be read as a missing
+# prerequisite.
+report_fixture_failure() {   # <tag> <fixture-rc> <stdout-file> <stderr-file> <corpus-count>
+  local tag="$1" run_rc="$2" out="$3" err="$4" corpus_count="$5"
+  echo "FIXTURE FAIL: cell $tag -- det_proof exited $run_rc over $corpus_count corpus file(s)." >&2
+  echo "  Its stdout stopped at $(wc -c < "$out") byte(s), so that file is a PREFIX of a digest and" >&2
+  echo "  not a digest. Every cell fails on the same input at the same point, so a compare run over these" >&2
+  echo "  files would find the prefixes IDENTICAL and report agreement between truncated outputs as" >&2
+  echo "  determinism. The walk stops here instead." >&2
+  surface_fixture_stderr "$tag" "$err"
+  return 5
+}
+
+# ── SOURCED, NOT EXECUTED: stop here, before the first side effect (the mktemp below) ──────────
+#
+# This is the seam the desk-runnable killability gate drives: sourcing yields the three reporting
+# functions above and runs no build. Until it existed, the only proof that a failing fixture reds
+# this gate was a full four-cell module-tower run with a corpus file deliberately made unreadable —
+# minutes of build per assertion, so in practice the failure paths were exercised once, by hand,
+# and never again.
+#
+# IT IS DELIBERATELY NOT AN ENVIRONMENT VARIABLE, and that is the whole design. An env-var override
+# of the fixture binary is the cheap seam and it is the WRONG one: this proof is PUBLIC and
+# outsider-checkable, and a proof whose binary can be swapped by a variable stops being one. A
+# variable that merely short-circuits the run carries the same defect from the other side — a stray
+# export would turn this gate into a vacuous pass. Sourcing is detectable with NO variable at all,
+# so there is nothing to leak and an EXECUTED run can never take this branch, whatever the
+# environment holds.
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+  return 0
+fi
+
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 echo "canon=$CANON  conan_home=$CONAN_HOME  corpus=$(echo "$CORPUS" | wc -l) files" >&2
 
@@ -328,13 +371,8 @@ for tag in "${builds[@]}"; do
   # shellcheck disable=SC2086
   "${BIN[$tag]}" $CORPUS > "$WORK/$tag.out" 2>"$WORK/$tag.err" || run_rc=$?
   if [ "$run_rc" -ne 0 ]; then
-    echo "FIXTURE FAIL: cell $tag -- det_proof exited $run_rc over $(echo "$CORPUS" | wc -l) corpus file(s)." >&2
-    echo "  Its stdout stopped at $(wc -c < "$WORK/$tag.out") byte(s), so that file is a PREFIX of a digest and" >&2
-    echo "  not a digest. Every cell fails on the same input at the same point, so a compare run over these" >&2
-    echo "  files would find the prefixes IDENTICAL and report agreement between truncated outputs as" >&2
-    echo "  determinism. The walk stops here instead." >&2
-    surface_fixture_stderr "$tag" "$WORK/$tag.err"
-    exit 5
+    report_fixture_failure "$tag" "$run_rc" "$WORK/$tag.out" "$WORK/$tag.err" \
+                           "$(echo "$CORPUS" | wc -l)" || exit $?
   fi
   surface_fixture_stderr "$tag" "$WORK/$tag.err"
 done
