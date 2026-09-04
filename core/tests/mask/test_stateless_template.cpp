@@ -1039,3 +1039,37 @@ TEST(StatelessTemplate, EmbeddedIdentityArmsAreDisjoint)
                                  << "\n  actual   : " << one;
     }
 }
+
+// ── The mask is an IDENTITY instrument, not a scrub — the pair, asserted together ────────────
+//
+// DN-86.D3 rules that a masked value is RELOCATED into `params`, never deleted: the masker exists
+// so two lines that differ only in their instance share an identity, and `params` is where the
+// instance goes. Nobody had asserted the two halves TOGETHER, so the shape read equally well as a
+// scrub — and a reader who takes it for a scrub will publish a MetaLog document believing the
+// values are gone.
+//
+// The address is RFC 5737 `TEST-NET-1` (192.0.2.0/24), reserved for documentation and routable
+// nowhere: this fixture cannot become a real address by someone's later edit.
+TEST(StatelessTemplate, MaskingRelocatesTheValueIntoParamsRatherThanDeletingIt)
+{
+    ArenaAllocator arena{256U * 1024U};
+    constexpr std::string_view kDocAddress{"192.0.2.146"};
+    const std::string line{std::string{"connection refused from "} + std::string{kDocAddress} +
+                           " after 3 retries"};
+
+    arena.reset();
+    const StatelessTemplate result{stateless_template(line, arena, cfg())};
+
+    // Half 1 — the identity no longer carries the instance.
+    EXPECT_EQ(result.template_str, "connection refused from <*> after <*> retries")
+        << "the address must reach the template as a wildcard, or two hosts are two identities";
+    EXPECT_EQ(result.template_str.find(kDocAddress), std::string_view::npos)
+        << "the address is still in the template: " << result.template_str;
+
+    // Half 2 — and it is KEPT, verbatim, beside it. This is the half that makes "mask" the wrong
+    // word for what happens to the value.
+    EXPECT_NE(std::ranges::find(result.params, kDocAddress), result.params.end())
+        << "the address left the template and is in NO param — that would be a scrub, and the "
+           "egress ruling (DN-86.D5) rests on it NOT being one.\n  template : "
+        << result.template_str << "\n  params   : " << result.params.size() << " entr(y|ies)";
+}
