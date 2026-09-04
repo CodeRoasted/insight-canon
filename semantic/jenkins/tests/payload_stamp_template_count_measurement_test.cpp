@@ -55,11 +55,12 @@
 //
 // CORPUS-GATED. The Jenkins marker corpus is private and out-of-tree, so this SKIPS cleanly
 // when the manifest env is unset/missing — green in CI and on every clone.
-//   JENKINS_T5_MANIFEST  one absolute log path per line (the 19 payload-stamped logs of
+//   JENKINS_PAYLOAD_STAMP_MANIFEST  one absolute log path per line (the 19 payload-stamped logs of
 //                        jenkins-markers/v2; the class definition is the frozen triage in
 //                        coderoast-corpora .../scripts/t0_transport.py — one classifier, one
 //                        owner, never re-invented here)
-//   JENKINS_T5_OUT       (optional) directory for a per-line TSV dump, for the offline cross-check
+//   JENKINS_PAYLOAD_STAMP_OUT       (optional) directory for a per-line TSV dump, for the offline
+//   cross-check
 //
 // BYTE FIDELITY. Every read is binary; lines are split on '\n' ONLY and no '\r' is trimmed
 // (a CR-folding read has already fabricated a gate score in this workspace). Both arms see the
@@ -396,10 +397,11 @@ TEST(JenkinsPayloadStampMeasurement, TheMaskerClaimsTheTimestamperTokenToTheBrac
 // The measurement. Corpus-gated: skips cleanly without the private corpus.
 TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
 {
-    const auto manifest_path{env_value("JENKINS_T5_MANIFEST")};
+    const auto manifest_path{env_value("JENKINS_PAYLOAD_STAMP_MANIFEST")};
     if (!manifest_path.has_value())
-        GTEST_SKIP() << "JENKINS_T5_MANIFEST unset — the payload-stamped slice is private and "
-                        "out-of-tree";
+        GTEST_SKIP()
+            << "JENKINS_PAYLOAD_STAMP_MANIFEST unset — the payload-stamped slice is private and "
+               "out-of-tree";
     const std::vector<std::string> logs{read_manifest(*manifest_path)};
     ASSERT_FALSE(logs.empty()) << "manifest " << *manifest_path << " listed no logs";
 
@@ -424,7 +426,7 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
     std::size_t declined_a{0};
     std::size_t declined_b{0};
 
-    const auto out_dir{env_value("JENKINS_T5_OUT")};
+    const auto out_dir{env_value("JENKINS_PAYLOAD_STAMP_OUT")};
 
     std::cout << "\n=== payload-stamp template measurement — per-log ===\n"
               << std::format("{:>7} {:>7} {:>7} {:>7} {:>7} {:>7}  {}\n", "lines", "stamped",
@@ -609,10 +611,11 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
 // (Eqya·9), measurement-gated, never a second change in this pass.
 TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
 {
-    const auto manifest_path{env_value("JENKINS_T5_MANIFEST")};
+    const auto manifest_path{env_value("JENKINS_PAYLOAD_STAMP_MANIFEST")};
     if (!manifest_path.has_value())
-        GTEST_SKIP() << "JENKINS_T5_MANIFEST unset — the payload-stamped slice is private and "
-                        "out-of-tree";
+        GTEST_SKIP()
+            << "JENKINS_PAYLOAD_STAMP_MANIFEST unset — the payload-stamped slice is private and "
+               "out-of-tree";
     const std::vector<std::string> logs{read_manifest(*manifest_path)};
     ASSERT_FALSE(logs.empty()) << "manifest " << *manifest_path << " listed no logs";
 

@@ -97,8 +97,9 @@
 // derivatives that live outside every checkout, so this SKIPS cleanly when the mount is absent —
 // green in CI and on every clone.
 //
-//   CODEROAST_G1_LOGS     directory holding the `*.annotated.log` members
-//   CODEROAST_G1_SUBJECT  the committed subject TSV (side, run_id, repo, workflow, file)
+//   CODEROAST_MARKER_COVERAGE_LOGS     directory holding the `*.annotated.log` members
+//   CODEROAST_MARKER_COVERAGE_SUBJECT  the committed subject TSV (side, run_id, repo, workflow,
+//   file)
 //                         `coderoast-corpora/sift_assessment/1.10.2/gd_leg1_span_census/`
 #include <gtest/gtest.h>
 
@@ -319,7 +320,8 @@ struct Bucketed
 }
 
 constexpr std::string_view kUnmounted{
-    "CODEROAST_G1_LOGS / CODEROAST_G1_SUBJECT unset or missing — the banked GitHub run logs are "
+    "CODEROAST_MARKER_COVERAGE_LOGS / CODEROAST_MARKER_COVERAGE_SUBJECT unset or missing — the "
+    "banked GitHub run logs are "
     "third-party derivatives that stay outside every checkout, so this census runs only where the "
     "corpus is mounted."};
 
@@ -488,10 +490,10 @@ TEST(MaskedSpanCensus, TrimIsCanonInvariant)
 }
 
 // ── `DN-38` GATE 2, HALF ONE — THE RENDER DELTA ON THE `G1` BANK ───────────────────────────────
-TEST(MaskedSpanCensus, TheProducerNameRenderDeltaOnTheG1Bank)
+TEST(MaskedSpanCensus, TheProducerNameRenderDeltaOnTheMarkerCoverageBank)
 {
-    const std::optional<std::string> logs{env("CODEROAST_G1_LOGS")};
-    const std::optional<std::string> subject_path{env("CODEROAST_G1_SUBJECT")};
+    const std::optional<std::string> logs{env("CODEROAST_MARKER_COVERAGE_LOGS")};
+    const std::optional<std::string> subject_path{env("CODEROAST_MARKER_COVERAGE_SUBJECT")};
     if (!logs || !subject_path || !std::filesystem::exists(*logs) ||
         !std::filesystem::exists(*subject_path))
         GTEST_SKIP() << kUnmounted;
