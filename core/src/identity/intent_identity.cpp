@@ -1,51 +1,10 @@
 module insight.canon.api;
 import insight.canon.internal;
 
-// intent_identity.cpp — the canon-owned INTENT identity (bibles/intent_identity.md §2-§4).
-//
-// CLOSURE MODEL — geometry TREE, axis species POPULATION (ADR-25.D6 routes it). What this file
-// constructs are identities INCOMPARABLE WITHIN ONE EXECUTION: matrix legs, shards and
-// version-parameterized jobs of one intent are exchangeable siblings, not one identity shifted
-// along an axis. So the relation is Intent, and the algebra is ALIGNMENT (ADR-18) — never
-// compose/baseline. The complementary ORDINAL axis (BuildId) is applied by the aligner above,
-// which is what makes a Continuation reading an Intent reading via an axis; nothing here knows
-// it, and a compose/pyramid reading of this class is the category error ADR-25.D6 names.
-//
-// VOCABULARY TRAP, written out because the word is overloaded on the opposite subject: the
-// "ordinal" refused below (`discriminant_of`, "never a masked ordinal") is an APPEARANCE
-// ordinal — a forbidden identity key. It is not the ordinal AXIS SPECIES of the line above.
-//
-// `canonicalize_intent` is the templating discipline of the stateless value masker
-// (canon.detail.mask, SRC-D-TID-1/SRC-D-TID-2) REAPPLIED to identifiers — the
-// closure-as-identity-constructor make-or-break (§5.1 detail 1). It is a DISTINCT rule set from the
-// value masker, by design:
-//   - the value masker keeps structure to DISTINGUISH   ( `yarn (1/10)` → `yarn (1/<*>` )
-//   - identity canonicalization COLLAPSES to ALIGN      ( `yarn (1/10)` → `yarn (M)`     )
-// so that matrix legs / shards / version-parameterized jobs of ONE intent map to ONE class. The
-// class is the alignment SCOPE; the raw `discriminant_of` (below) is the complementary third role
-// (ADR-18 / SRC-II-9) that separates co-occurring siblings WITHIN the class — never a masked
-// ordinal, never a fingerprint-similarity merge (SRC-II-2). Gate G1 (studies/004) measured the
-// class mask on the real GH-Actions corpus: matrix jobs collapse to one class (`Test (M)`); the
-// discriminant keeps the raw tuple/version so the aligner pairs the right legs and surfaces
-// cross-run drift (v6→v7) as a REPLACED, not a masked-away 0-row or a raw-key storm (ADR-18).
-//
-// The frozen canonicalization rule set (the intent-canonicalization ALGORITHM — canon-owned; the
-// dialect marker VOCABULARY it applies to lives in the semantic packages, hashed into
-// semantic_identity — ADR-17). Applied left-to-right in ONE pass, at word boundaries (\w =
-// [A-Za-z0-9_]), each rule masking the maximal token it claims:
-//   R1 dotted-version   v?\d+(\.\d+)+   → vX   (`1.2.3`, `v1.2.3`)   — before R3 so it is not
-//   fragmented R2 v-version         v\d+           → vX   (`v6`, `v7`) R3 multi-digit       \d{2,}
-//   → N    (`Node 18`, `worker-42`) — shard/index/build numbers R4 paren group       (...) → (M)
-//   (`(1/10)`, `(Shard 1/5)`, `(ubuntu-latest)`) — first `)` (non-greedy)
-// A single bare digit (no `v`, no dot) is KEPT — collapsing it would over-merge (`Shard 1` vs
-// `Shard 2` are distinct WHERE, separated as instances, not fused). ASCII-only classification (no
-// locale isalnum — a locale-dependent classifier is a determinism hazard); pure function of the
-// name's bytes.
-//
-// `intent_id_of` = template_id_of(canonicalize_intent(name)): the 16-byte SHA-256 structural key
-// (SRC-II-1). Identity IS "the hash under the registry version", so it is co-located here, exactly
-// as template identity is co-located with kCanonicalizationVersion (template_id.cpp).
-
+// refs: BIB:intent_identity, ADR-25.D6, ADR-17, ADR-18
+// invariant: geometry TREE, axis species POPULATION: matrix legs and shards are exchangeable
+// siblings, so the algebra is alignment, never compose.
+// note: the appearance ordinal refused below is a forbidden identity key, not that axis species.
 namespace insight
 {
 namespace
@@ -53,10 +12,9 @@ namespace
     constexpr std::string_view kVersionMask{"vX"};
     constexpr std::string_view kDigitMask{"N"};
     constexpr std::string_view kParenMask{"(M)"};
-    constexpr std::size_t kMinMaskedDigits{2}; // R3: \d{2,} — a single digit is kept
+    constexpr std::size_t kMinMaskedDigits{2};
 
-    // ASCII \w = [A-Za-z0-9_]. Manual (never <cctype> isalnum — locale-dependent, a determinism
-    // hazard); a word boundary is a transition word↔non-word.
+    // invariant: ASCII only — a locale-dependent classifier is a determinism hazard.
     [[nodiscard]] constexpr bool is_word(char chr) noexcept
     {
         return (chr >= 'a' && chr <= 'z') || (chr >= 'A' && chr <= 'Z') ||
@@ -68,24 +26,21 @@ namespace
         return chr >= '0' && chr <= '9';
     }
 
-    // Trailing word boundary at `pos` (end-of-string, or the next char is non-word). The masks
-    // R1–R3 are anchored `\b…\b`: a numeric run glued to trailing letters (`v6x`, `42px`,
-    // `1.2.3rc`) is NOT a version/index token and stays literal (the regex would find no closing \b
-    // and not match).
+    // invariant: R1-R3 are anchored at both ends, so a numeric run glued to trailing letters (v6x,
+    // 42px) is not a version token and stays literal.
     [[nodiscard]] constexpr bool boundary_after(std::string_view str, std::size_t pos) noexcept
     {
         return pos >= str.size() || !is_word(str[pos]);
     }
 
-    // Try R1/R2/R3 at a leading word boundary `i`. Returns the mask + the end offset when one
-    // claims the token; std::nullopt otherwise (the char is emitted literally by the caller). `i`
-    // is known to be a word boundary and str[i] is 'v' or a digit.
     struct NumericClaim
     {
         std::string_view mask;
         std::size_t end;
     };
 
+    // post: the mask and end offset when a rule claims the token at `start`, nullopt when none
+    // does.
     [[nodiscard]] std::optional<NumericClaim> claim_numeric(std::string_view str,
                                                             std::size_t start) noexcept
     {
@@ -96,47 +51,31 @@ namespace
         const std::size_t digits_start{pos};
         while (pos < str.size() && is_digit(str[pos]))
             ++pos;
-        if (pos == digits_start) // 'v' not followed by a digit → not a version (e.g. "verbose")
+        if (pos == digits_start)
             return std::nullopt;
 
-        // Dotted continuation: (\.\d+)+ — a '.' followed by ≥1 digit, repeated.
         std::size_t dot_end{pos};
         std::size_t dot_groups{0};
         while (dot_end + 1 < str.size() && str[dot_end] == '.' && is_digit(str[dot_end + 1]))
         {
-            ++dot_end; // consume '.'
+            ++dot_end;
             while (dot_end < str.size() && is_digit(str[dot_end]))
                 ++dot_end;
             ++dot_groups;
         }
 
-        if (dot_groups > 0 && boundary_after(str, dot_end)) // R1: v?\d+(\.\d+)+
+        if (dot_groups > 0 && boundary_after(str, dot_end))
             return NumericClaim{.mask = kVersionMask, .end = dot_end};
-        if (has_v && boundary_after(str, pos)) // R2: v\d+
+        if (has_v && boundary_after(str, pos))
             return NumericClaim{.mask = kVersionMask, .end = pos};
-        if (!has_v && (pos - digits_start) >= kMinMaskedDigits &&
-            boundary_after(str, pos)) // R3: \d{2,}
+        if (!has_v && (pos - digits_start) >= kMinMaskedDigits && boundary_after(str, pos))
             return NumericClaim{.mask = kDigitMask, .end = pos};
         return std::nullopt;
     }
-    // The bytes trimmed off a marker payload's ends before it is classed. ONE definition, because
-    // canonicalize_intent and discriminant_of are explicit COMPLEMENTS ("same scan, same rules") —
-    // if they trimmed different byte sets, one name would yield a class and a discriminant that
-    // disagree about where it starts.
-    //
-    // `\r` is in the set because a CR is a MATERIALIZATION artifact, not part of the intent: a
-    // Windows runner emits CRLF, so a genuine banner on a windows-latest leg carries a trailing CR
-    // (measured: 52121/511861 = 10.2% of real banners; 337 distinct step payloads seen BOTH bare
-    // and CR corpus-wide). Trimming it is exactly what canon's materialization-invariance goal
-    // demands — the same intent rendered by a different runner must reach the same identity.
-    //
-    // Prevalence, honestly (measured, and the bound on severity): CR rides the runner OS, which is
-    // near-stable across builds, so it only fragments pairing when CR-ness FLIPS for the same
-    // job+step across two builds — 18/34640 same-job same-step pairs (0.052%), all windows-latest.
-    // Real and reproducible (one VanishedPhase + one NewPhase for a step that never changed), but
-    // rare. What makes it worth fixing at the root anyway is that it is UN-DIAGNOSABLE from the
-    // output: both rows render the byte-identical string, so the report shows a step vanishing and
-    // reappearing with the same name and no visible difference.
+    // refs: DN-38.D1
+    // invariant: ONE definition, because the class and the discriminant are complements —
+    // different trim sets would disagree about where a name starts.
+    // note: CR is a materialization artifact — a Windows runner emits CRLF into banners.
     [[nodiscard]] constexpr bool is_intent_trim_byte(char byte) noexcept
     {
         return byte == ' ' || byte == '\t' || byte == '\r';
@@ -145,7 +84,6 @@ namespace
 
 std::string_view trimmed_intent_name(std::string_view name) noexcept
 {
-    // The marker payload is extracted verbatim after the banner prefix; G1 strips.
     while (!name.empty() && is_intent_trim_byte(name.front()))
         name.remove_prefix(1);
     while (!name.empty() && is_intent_trim_byte(name.back()))
@@ -153,6 +91,12 @@ std::string_view trimmed_intent_name(std::string_view name) noexcept
     return name;
 }
 
+// refs: SRC-D-TID-1, SRC-D-TID-2, SRC-II-2, STU-4
+// invariant: a DISTINCT rule set from the value masker: the masker keeps structure to distinguish,
+// identity canonicalization collapses it to align.
+// invariant: the rules run left-to-right in one pass at word boundaries, R1 before R3 so a dotted
+// version is not fragmented.
+// note: a single bare digit is KEPT — collapsing it would over-merge two WHEREs.
 std::string canonicalize_intent(std::string_view name)
 {
     name = trimmed_intent_name(name);
@@ -160,12 +104,11 @@ std::string canonicalize_intent(std::string_view name)
     std::string out;
     out.reserve(name.size());
     std::size_t idx{0};
-    bool prev_is_word{false}; // start-of-string is a boundary
+    bool prev_is_word{false};
     while (idx < name.size())
     {
         const char chr{name[idx]};
 
-        // R4: a paren group → (M). Non-greedy: to the FIRST ')'. Unbalanced '(' stays literal.
         if (chr == '(')
         {
             const std::size_t close{name.find(')', idx + 1)};
@@ -173,19 +116,18 @@ std::string canonicalize_intent(std::string_view name)
             {
                 out.append(kParenMask);
                 idx = close + 1;
-                prev_is_word = false; // ')' is non-word
+                prev_is_word = false;
                 continue;
             }
         }
 
-        // R1/R2/R3 fire only at a leading word boundary, on a 'v' or digit anchor.
         if (!prev_is_word && (chr == 'v' || is_digit(chr)))
         {
             if (const std::optional<NumericClaim> claim{claim_numeric(name, idx)}; claim)
             {
                 out.append(claim->mask);
                 idx = claim->end;
-                prev_is_word = true; // last emitted char ('X'/'N') is a word char
+                prev_is_word = true;
                 continue;
             }
         }
@@ -197,6 +139,7 @@ std::string canonicalize_intent(std::string_view name)
     return out;
 }
 
+// refs: SRC-II-1
 TemplateId intent_id_of(std::string_view name)
 {
     return template_id_of(canonicalize_intent(name));
@@ -204,41 +147,22 @@ TemplateId intent_id_of(std::string_view name)
 
 std::string_view discriminant_of(std::string_view name) noexcept
 {
-    // The instance discriminant is the COMPLEMENT of canonicalize_intent: the class MASKS the drift
-    // tokens (R1–R4), the discriminant KEEPS them VERBATIM. Same scan, same rules, same trim set —
-    // this loop is `canonicalize_intent`'s, with the emission replaced by the recording of where
-    // the masked spans START and END.
-    //
-    // The answer is the ENVELOPE of those spans: the subview from the START of the FIRST to the
-    // END of the LAST, the class material BETWEEN them included, verbatim. `ESLint v6` → `v6`,
-    // `Test (ubuntu-latest, Node 24.x)` → `(ubuntu-latest, Node 24.x)`, `macos-14 (15.3)` →
-    // `14 (15.3)`. Zero spans → empty. One span → that span. Two or more → strictly wider than
-    // the span alone, which is the only case where this differs from keeping the first.
-    //
-    // WHY THE ENVELOPE SEPARATES, and it is not injectivity. For two payloads that share a class,
-    // the bytes outside the envelope and the bytes between the spans are class material, so the
-    // envelope determines every masked span: `(class, envelope)` separates any two names whose
-    // spans occupy the same class positions — every runner matrix, shard set and
-    // version-parameterized job. It is NOT injective over arbitrary strings (`N 42` and `42 N`
-    // share the class `N N` and the envelope `42`), and no spelling of the complement removes
-    // that: which of a class's `N` tokens was a mask is not recoverable from the class. Declared,
-    // not defended — it takes a producer naming a job in the mask alphabet itself.
-    //
-    // WHY ONE CONTIGUOUS VIEW AND NOT THE SPAN LIST. An owning `std::string` or a
-    // `std::vector<string_view>` would make this allocate, and `recognize()` — the one production
-    // site that stores the result — is `noexcept` and runs per banner; a JOINED string needs a
-    // separator, and a separator is an injectivity hazard of its own (`["1", "2:3"]` and
-    // `["1:2", "3"]` join alike under `:`). The envelope joins nothing, so it needs no separator.
+    // refs: ADR-18, SRC-II-9, DN-38.D3
+    // post: the envelope of the masked spans, first span's start to last span's end, class material
+    // between them included; empty when no span is claimed.
+    // invariant: (class, envelope) separates two names whose spans occupy the same class positions;
+    // it is NOT injective over arbitrary strings.
+    // note: a contiguous view, not a span list: a join would need a separator.
     name = trimmed_intent_name(name);
 
-    std::size_t first{std::string_view::npos}; // offset of the first masked span's start
-    std::size_t last{0};                       // offset one past the last masked span's end
+    std::size_t first{std::string_view::npos};
+    std::size_t last{0};
     std::size_t idx{0};
     bool prev_is_word{false};
     while (idx < name.size())
     {
         const char chr{name[idx]};
-        if (chr == '(') // R4 paren group → the raw tuple
+        if (chr == '(')
         {
             if (const std::size_t close{name.find(')', idx + 1)}; close != std::string_view::npos)
             {
@@ -246,12 +170,11 @@ std::string_view discriminant_of(std::string_view name) noexcept
                     first = idx;
                 last = close + 1;
                 idx = close + 1;
-                prev_is_word = false; // ')' is non-word
+                prev_is_word = false;
                 continue;
             }
         }
-        if (!prev_is_word &&
-            (chr == 'v' || is_digit(chr))) // R1/R2/R3 → the raw version/digit token
+        if (!prev_is_word && (chr == 'v' || is_digit(chr)))
         {
             if (const std::optional<NumericClaim> claim{claim_numeric(name, idx)}; claim)
             {
@@ -259,7 +182,7 @@ std::string_view discriminant_of(std::string_view name) noexcept
                     first = idx;
                 last = claim->end;
                 idx = claim->end;
-                prev_is_word = true; // last claimed char ('X'/'N' in the class) is a word char
+                prev_is_word = true;
                 continue;
             }
         }

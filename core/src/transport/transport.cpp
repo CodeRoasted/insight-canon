@@ -4,11 +4,9 @@ module insight.canon.transport;
 import insight.canon.internal;
 import insight.canon.api;
 
-// transport.cpp — the transform ALGORITHMS (`ADR-23.D3`) and the fail-closed declaration
-// resolution (`ADR-23.D4`). Canon owns every algorithm; the catalogue owns only rows. A new
-// transform kind is a catalogue-version bump with its algorithm landing here, never a
-// package-local peel.
-
+// refs: ADR-23.D3, ADR-23.D4
+// invariant: canon owns every transform ALGORITHM and the catalogue owns only rows, so a new
+// transform kind is a catalogue-version bump, never a package-local peel.
 namespace insight::transport
 {
 
@@ -20,57 +18,23 @@ namespace
         return chr == ' ' || chr == '\t';
     }
 
-    // The `LinePrefixTimestamp` declared byte grammar: a COMPLETE RFC 3339 full-datetime occupying
-    // EXACTLY `width` bytes at line head.
-    //
-    // Shape-checked rather than width-trusted, and that is the DECLARED RULE, not a detection:
-    // "remove these bytes IF they are a stamp of this shape" is one total rule whose effect is
-    // nothing on a line that does not carry one (ADR-23). Trusting the width blindly would
-    // corrupt every non-conforming line instead of leaving it alone, which is a worse reading of
-    // the same declaration — and it would make a single unstamped line silently shift the whole
-    // template.
-    //
-    // ⚠ THE WIDTH IS A CLAIM ABOUT THE BYTES, NEVER A PROMISE ABOUT THEM. This predicate once
-    // validated the invariant 19-byte head and let the declared width cover the remaining 9 —
-    // 19 checked, 9 trusted — and a stamp of a DIFFERENT width whose first 19 bytes are a valid
-    // RFC 3339 head then satisfied it by arithmetic coincidence, so the row peeled `width` bytes
-    // off a line it did not describe. Three arms of that one root were measured, on three
-    // different streams: a serving API whose 27-byte stamp plus its separator is exactly 28
-    // (a false declaration deleted 20 real error-class gaps while IMPROVING the benign share);
-    // our own writer at a 6-digit fraction, the same arithmetic; and a whole-second syslog line
-    // `2024-01-15T10:30:00Z host1 myapp[123]: …`, which lost 28 bytes and with them the `m` of
-    // `myapp`. Each was compensated for one tier out and closed in none.
-    //
-    // The asymmetry that let it stand is worth naming, because it is the general shape: the
-    // VARIABLE-width sibling below already delegates to this same public grammar — it MUST, it
-    // needs the grammar to find the end — while the FIXED-width kind does not have to, so it did
-    // not. A fixed parameter made validation optional, and optional validation is what turned a
-    // width into a coincidence. `rfc3339_datetime_length` is the one owner of the full-datetime
-    // byte grammar (canon.api.cppm); requiring `== width` completes an already-declared grammar
-    // and teaches canon to infer nothing (ADR-22): the row still declines, it never deduces.
+    // refs: ADR-22, ADR-23
+    // invariant: the declared width is a CLAIM about the bytes, never a promise: the stamp is
+    // shape-checked and the row declines rather than deducing.
+    // note: a row whose bytes do not match peels nothing; that is the rule's effect.
     [[nodiscard]] constexpr bool has_stamp_at_head(std::string_view line,
                                                    std::size_t width) noexcept
     {
-        // The shortest complete full-datetime the shared grammar can return, `YYYY-MM-DDTHH:MM:SS`.
-        // The guard's one live case is `width == 0`: the equality below would otherwise be
-        // satisfied by every line carrying no datetime at all, which is a malformed row reading as
-        // a universal match. `line.size() < width` needs no guard — the grammar never returns more
-        // bytes than the line holds, so a width past the end cannot compare equal.
+        // assert: the live case is `width == 0`, which would otherwise match every line carrying no
+        // datetime at all.
         constexpr std::size_t kMinDatetimeLen{19U};
         return width >= kMinDatetimeLen &&
                insight::utils::rfc3339_datetime_length(line, 0U) == width;
     }
 
-    // Apply ONE row over a plain view. Returns the shortened view; sets `observation_time` when
-    // the row declares that extract AND the stamp actually parses. The ONE algorithm both public
-    // doors share — `peel` and `peel_raw` differ only in what their parameter PROVES and their
-    // return type STATES, never in bytes (a byte divergence between the two would be the
-    // two-implementations defect this whole contract is about).
-    // Shared by both prefix kinds: the post-stamp separator/indentation strip (greedy `[ \t]+`,
-    // leading only). For the bracketed kind this reproduces the deleted JenkinsStrategy's bundled
-    // behavior #3 BYTE-EXACTLY (`ADR-23.D6` — peel-equivalence is the obligation; the bundled
-    // enumeration it is measured against is executed record, routed by `ADR-23.O2`. The merit
-    // question stays parked in flaws.md).
+    // refs: ADR-23.D6, ADR-23.O2
+    // invariant: `peel` and `peel_raw` share ONE algorithm and differ only in what the parameter
+    // proves and the return type states, never in bytes.
     void strip_separator(const TransportTransformRow& row, RawPeeledLine& peeled) noexcept
     {
         if (!row.strip_leading_space)
@@ -87,12 +51,12 @@ namespace
         {
             const std::size_t width{row.prefix_width};
             if (!has_stamp_at_head(peeled.content, width))
-                return; // the rule's effect on these bytes is nothing (§2)
+                return;
 
             if (row.extract == TransportExtract::EventObservationTime)
             {
-                // Enrichment only. See TransportExtract::EventObservationTime: never an ordering
-                // key, never asserted monotone, never a replay input.
+                // invariant: enrichment only — never an ordering key, never asserted monotone,
+                // never a replay input.
                 peeled.observation_time =
                     insight::utils::parse_iso8601(peeled.content.substr(0U, width));
             }
@@ -102,13 +66,10 @@ namespace
         }
         case TransportTransformKind::LinePrefixBracketedTimestamp:
         {
-            // The deleted JenkinsStrategy's `timestamper_prefix_end` position logic, verbatim in
-            // effect (G-T5-PEEL scores the equivalence against the frozen oracle spelling): `[` at
-            // byte 0, the SHARED full-datetime grammar starting at byte 1 (one owner —
-            // rfc3339_datetime_length; the strictness carve-outs fail it by construction), `]`
-            // immediately after, nothing in between. Variable width; `prefix_width` unread.
+            // invariant: `rfc3339_datetime_length` is the single owner of the full-datetime byte
+            // grammar; this kind is variable width and leaves `prefix_width` unread.
             if (peeled.content.empty() || peeled.content.front() != '[')
-                return; // the rule's effect on these bytes is nothing (§2)
+                return;
             const std::size_t datetime_len{
                 insight::utils::rfc3339_datetime_length(peeled.content, 1U)};
             if (datetime_len == 0U)
@@ -119,7 +80,6 @@ namespace
 
             if (row.extract == TransportExtract::EventObservationTime)
             {
-                // The bracket interior — same enrichment-only contract as above.
                 peeled.observation_time =
                     insight::utils::parse_iso8601(peeled.content.substr(1U, datetime_len));
             }
@@ -129,28 +89,21 @@ namespace
         }
         case TransportTransformKind::LinePrefixByteOrderMark:
         {
-            // A FIXED three-byte prefix, removed ONCE. All three bytes are shape-checked rather
-            // than a declared width being trusted: `EF BB` alone, `EF BB BE`, and the UTF-16 marks
-            // `FF FE` / `FE FF` must all survive untouched, and a width-2 acceptor would eat the
-            // first two bytes of the last two silently. Never a `while` loop: a second BOM is
-            // content (DN-25.D3). Never a `find`: only offset 0 is delivery.
+            // refs: DN-25.D3
+            // invariant: all three bytes are shape-checked, so `EF BB` alone and the UTF-16 marks
+            // survive untouched; removed once and never in a loop, a second mark is content.
+            // note: nothing is extracted and no separator is stripped — a mark carries no datum.
             static constexpr std::string_view kUtf8Bom{"\xEF\xBB\xBF"};
             if (!peeled.content.starts_with(kUtf8Bom))
-                return; // the rule's effect on these bytes is nothing (§2)
+                return;
             peeled.content.remove_prefix(kUtf8Bom.size());
-            // No `strip_separator`: the row declares `strip_leading_space = false`, so a space
-            // after the mark is a content byte and stays. Nothing is extracted — a BOM carries no
-            // datum, which is why this is the catalogue's first `TransportExtract::None` row.
             break;
         }
         }
     }
 
-    // Proleptic-Gregorian calendar decomposition of a day count since 1970-01-01 (Howard
-    // Hinnant's `civil_from_days`, the standard integer-only algorithm — the era/cycle constants
-    // below are the algorithm's own and carry its citation rather than local names: 146097 days
-    // per 400-year era, 719468 days from 0000-03-01 to 1970-01-01, 153-day 5-month cycles).
-    // Pure integer — no <ctime>, no locale, no wall-clock (determinism MUST M8).
+    // invariant: pure integer — no <ctime>, no locale, no wall-clock reaches this decomposition.
+    // note: Hinnant's civil_from_days; the era and cycle constants are the algorithm's.
     struct CivilDate
     {
         std::int64_t year;
@@ -175,7 +128,7 @@ namespace
         return {.year = year + (month <= 2 ? 1 : 0), .month = month, .day = day};
     }
 
-    // Two zero-padded decimal digits into `out` at `pos` (pos advances). Caller guarantees range.
+    // pre: `pos` and `pos + 1` are inside `out`.
     constexpr void put_two_digits(std::span<char> out, std::size_t& pos, unsigned value) noexcept
     {
         out[pos] = static_cast<char>('0' + (value / 10U));
@@ -183,10 +136,10 @@ namespace
         pos += 2U;
     }
 
-    // ADR-23 — an UNKNOWN transform name is a hard error, symmetric with an unknown dialect and an
-    // unknown channel: a MISTAKE must not share a code path with an ABSENT stack, which is a
-    // CHOICE. The operator-facing text below states that rule and its remedy without naming this
-    // record: canon ships public, and a reader of the message cannot open the shelf it lives on.
+    // refs: ADR-23
+    // invariant: an unknown transform name fails closed — a MISTAKE must not share a code path
+    // with an ABSENT stack, which is a choice.
+    // note: the text names no shelf — canon ships public and a reader cannot open one.
     [[noreturn]] void fail_unknown_transform(std::string_view name)
     {
         std::cerr << "FATAL: insight::transport::resolve_transport_stack — unknown transport "
@@ -198,11 +151,6 @@ namespace
                      "VERIFIES, it does not infer. An unknown transform is a MISTAKE and fails "
                      "closed here; an ABSENT stack is a CHOICE and peels nothing. Declare one of "
                      "the names above, or declare no stack at all.\n"
-                     // The sentence used to end "or none.", which reads as a literal token. A
-                     // caller took it at its word, passed `none`, reached this check and got
-                     // SIGABRT (measured 3/3) — a diagnostic that recommends the input which kills
-                     // the process. `none` is not and never was a catalogue name; saying "no stack
-                     // at all" is the same instruction without the invitation.
                      "(A driver may accept its own spelling for the empty stack — `sift` takes "
                      "`--transport none` — but no such token reaches this catalogue.)\n";
         std::terminate();
@@ -213,8 +161,8 @@ namespace
 RawPeeledLine TransportStack::peel_raw(std::string_view line) const noexcept
 {
     RawPeeledLine peeled{.content = line, .observation_time = std::nullopt};
-    // Outside-in, in declaration order: the outermost delivery layer was applied last on the way
-    // out, so it comes off first on the way in.
+    // invariant: outside-in, in declaration order — the outermost delivery layer was applied last
+    // on the way out, so it comes off first on the way in.
     for (const TransportTransformRow* row : rows_)
         apply_row(*row, peeled);
     return peeled;
@@ -222,11 +170,8 @@ RawPeeledLine TransportStack::peel_raw(std::string_view line) const noexcept
 
 PeeledLine TransportStack::peel(const insight::tokenization::NormalizedLine& line) const noexcept
 {
-    // One algorithm, run over the NORMALIZED bytes; the result is re-expressed as a suffix of the
-    // NormalizedLine, which is what entitles this door to hand back a NormalizedContent — the peel
-    // only ever SHORTENS from the head, so the narrowing preserves the stage-1 evidence by
-    // construction. From this seat the suffix width comes from DECLARED catalogue rows; the door's
-    // name records the OTHER producer's limitation (an inferred strip), not this caller's.
+    // post: the peel only ever SHORTENS from the head, so re-expressing the result as a suffix
+    // preserves the stage-1 evidence by construction.
     const RawPeeledLine raw{peel_raw(line.bytes())};
     const std::size_t offset{static_cast<std::size_t>(raw.content.data() - line.bytes().data())};
     return PeeledLine{.content = line.undeclared_suffix(offset),
@@ -239,25 +184,18 @@ std::size_t render_transport_prefix(const TransportTransformRow& row, insight::T
     switch (row.kind)
     {
     case TransportTransformKind::LinePrefixTimestamp:
-        // NO writer dual, deliberately (T5 §3.3): the GHA API stamp is the platform's, baked into
-        // the GHA IntentFormat's own writer — see the interface contract.
         return 0U;
     case TransportTransformKind::LinePrefixBracketedTimestamp:
         break;
     case TransportTransformKind::LinePrefixByteOrderMark:
-        // NO writer dual, and unlike the GHA row's absence this one is structural rather than a
-        // homing choice: a BOM is not a rendering of any datum, so there is nothing to render.
         return 0U;
     }
 
     if (out.size() < kBracketedTimestampPrefixBytes)
         return 0U;
 
-    // The ONE fixed lexical form: `[YYYY-MM-DDTHH:MM:SS.mmmZ]` + one separator space —
-    // `kBracketedTimestampPrefixBytes`, composed in a stack scratch and copied once at the end.
-    // The scratch is what makes the 0-return honest: an unrenderable year is discovered after the
-    // civil conversion, and writing straight into `out` would leave a caller who checked the
-    // return a buffer holding a half-formed prefix.
+    // invariant: composed in a stack scratch and copied once, so a 0 return never leaves the caller
+    // a buffer holding a half-formed prefix.
     static constexpr std::int64_t kMillisPerSecond{1000};
     static constexpr std::int64_t kMillisPerDay{86'400'000};
     static constexpr std::int64_t kSecondsPerMinute{60};
@@ -277,8 +215,7 @@ std::size_t render_transport_prefix(const TransportTransformRow& row, insight::T
     }
     const CivilDate date{civil_from_days(days)};
     if (date.year < 0 || date.year > kMaxRenderableYear)
-        return 0U; // outside the four-digit window the fixed form can spell — never a wrong
-                   // prefix
+        return 0U;
 
     const std::int64_t millis{millis_in_day % kMillisPerSecond};
     const std::int64_t seconds_in_day{millis_in_day / kMillisPerSecond};

@@ -294,7 +294,7 @@ struct NgramId
 // name a report shows (`DN-38.D1`): a report whose render trimmed a different set from the class
 // would show one intent two ways on two runners. `\r` is in the set for that reason and not for
 // tidiness — a Windows runner emits CRLF, so 10.2% of real banners carry a trailing CR (measured;
-// the set's own definition in intent_identity.cpp carries the numbers).
+// DN-38.D1 carries the numbers).
 [[nodiscard]] std::string_view trimmed_intent_name(std::string_view name) noexcept;
 
 // The raw INSTANCE DISCRIMINANT (ADR-18, SRC-II-9 — the third role on the identity spine): the

@@ -167,3 +167,179 @@ format. Behaviour: `malf test insight-canon` **809 of 809** on clang-21 and **80
 `--profile linux-gcc16-release`, equal to the baseline. Lint: `malf lint --all-files` **21
 findings**, equal to the baseline. Count: 39 comment lines at HEAD to 17 as the gate counts them,
 a **56 % reduction**.
+
+## Unit 2 — `core/src/identity/` (2 files, 376 lines, 132 would-be violations)
+
+Intent identity and template identity: `canonicalize_intent` (the class), `discriminant_of` (the
+complementary instance coordinate), `trimmed_intent_name` (the one trim set all three roles share),
+and the SHA-256 template id with its n-gram key. The densest argumentative prose in the source tier
+so far — the file header alone carried the closure model, a vocabulary trap, the frozen rule set
+and a corpus measurement.
+
+| files | comment lines HEAD → gate | forms written |
+|---|---|---|
+| `intent_identity.cpp`, `template_id.cpp` | 136 → 34 | post 2 · invariant 8 · note 5 · refs 6 · 9 continuations · 4 tool |
+
+**No `refs:` at the file head.** The ten addresses the old prose carried do not fit one line — a
+`refs:` is one line by grammar — so they were distributed to the sites they actually govern:
+`BIB:intent_identity, ADR-25.D6, ADR-17, ADR-18` at the header, `SRC-D-TID-1, SRC-D-TID-2,
+SRC-II-2, STU-4` at `canonicalize_intent`, `SRC-II-1` at `intent_id_of`, `ADR-18, SRC-II-9,
+DN-38.D3` at `discriminant_of`, `DN-38.D1` at the trim set, `SRC-D-TIR-1` at `template_id.cpp`.
+That is a better outcome than a header block and it was forced by the budget, not chosen.
+
+### Census (`OPS-8.S4`), with the address leg
+
+`NOLINT` 0, `/*name=*/` 0, namespace closers 4 → 4. **Address sets: nothing LOST.** All six `SRC-`
+codes and all three ADRs survive into `refs:` lines. Three deliberate ADDITIONS, each recorded
+here as the step requires: `BIB:intent_identity` (the prose carried the path
+`bibles/intent_identity.md`, which is not a registry form — `ADR-6.D13` form), and `DN-38.D1` /
+`DN-38.D3` and `STU-4`, which name the documents that own the measurements the prose was carrying
+inline.
+
+**The CR measurement was deleted from source, and that is correct rather than a loss.** The old
+comment carried *"52121/511861 = 10.2% of real banners"*, *"337 distinct step payloads"* and
+*"18/34640 same-job same-step pairs (0.052%)"*. `OPS-8.S9`'s new row asks whether the claim can be
+re-derived today; the answer here is **yes, from two places outside canon** —
+`DN-38` states the 10.2 % and the 18 / 34 640, and `insight-eidos`'s
+`sift/tests/phase/test_intent_channel_phantom.cpp` carries all of the figures in full at its ARM 4
+block. So this is a citation, not the unsourced-measurement case, and `refs: DN-38.D1` is what
+replaces it. The cold reader recovered every figure without the source comment, which is the
+measurement that settles it.
+
+### Interrogation
+
+One fresh agent, 13 questions, 43 tool uses, 133 k tokens, 5.9 minutes. No git command; transcript
+checked. **13 of 13 recovered, 0 not recovered, 0 wrong.**
+
+Recovery was repeatedly *better* than the prose it replaced:
+
+* Q4 (why R1 before R3) came back with a derivation the comment never gave — with R3 first, `'.'`
+  is a non-word byte so `boundary_after` accepts it as a right anchor, and `10.2.3` canonicalizes
+  to `N.vX` instead of `vX`, which splits two homologous runs into two classes.
+* Q8 (why the envelope and not the first span) came back with `DN-38.D2`'s measurement — nine
+  macOS matrix cells collapsing to one class, five of them sharing the coordinate `14` — plus the
+  two refused alternatives and *why* each was refused.
+* Q10 (what fixes the id at 16 bytes) came back from **`metalog-spec/SPEC.md` §3.2**, which makes
+  it a MUST for every producer, and `RATIONALE.md` §R2 for the sizing. The deleted trailing comment
+  said only *"spec §3.2"*; the reader found the spec.
+
+### One line THIS conversion wrote was wrong, and the reader caught it before the commit
+
+The header `note:` read *"the appearance ordinal refused below is not the ordinal AXIS SPECIES
+**above**"*. The reader's Q3 answer ended: *"the source comment's cross-reference is dangling — it
+says 'not the ordinal AXIS SPECIES above', and nothing above it in the current file mentions an
+axis species."* Correct: the deleted prose opened *"geometry TREE, axis species POPULATION"* and
+the conversion had dropped that clause while keeping a pointer to it. **A dangling reference the
+conversion itself created.** Repaired at the claims script and the whole unit re-derived from
+`HEAD`, re-stripped, re-placed, re-formatted and re-witnessed: the `invariant:` now opens
+*"geometry TREE, axis species POPULATION"* and the `note:` says *"not that axis species"*.
+
+### Two stale claims, one of them created by this unit's own deletion
+
+1. **`core/api/canon.api.cppm` — repaired in this commit.** Above `trimmed_intent_name` it read
+   *"the set's own definition in intent_identity.cpp carries the numbers"*. Deleting the numbers
+   from `intent_identity.cpp` made that sentence false, so the pointer now names `DN-38.D1`, which
+   does carry them. This is a comment-only edit to a file outside the unit, made deliberately: the
+   falsehood is one this unit created, and leaving a known-false pointer standing to respect a unit
+   boundary would be shipping a defect. It is recorded rather than deferred.
+   **This is a general hazard `OPS-8` has no step for** — see the verdict at the end of this file.
+
+2. **`insight-eidos/sift/tests/phase/test_intent_channel_phantom.cpp` — a finding for another
+   lane, not fixed here.** Its ARM 4 block states *"canonicalize_intent trims `' '` and `'\t'` —
+   NOT `'\r'` (intent_identity.cpp)"*. `is_intent_trim_byte` returns true for `'\r'` today, so the
+   premise the block states is contradicted by the code it names. It is in another repo and outside
+   this migration; addressee below.
+
+### Dispositions
+
+**Nothing re-homed.** All thirteen held claims were carried by the converted code, its tests, the
+owning design note, the studies shelf or the MetaLog specification. No disposition needed a law
+block.
+
+### Findings for other lanes — none fixed here
+
+1. **The eidos CR comment contradicts canon — Hephaïstos, with Kleio.** As above. The block's
+   numbers are correct and worth keeping; its opening premise is not.
+2. **`kTemplateIdBytes` and `TemplateId::bytes`' extent are two independent literals — Hephaïstos.**
+   The reader observed that `template_id.cpp`'s `constexpr std::size_t kTemplateIdBytes{16}` and
+   `canon.api.cppm`'s `std::array<std::uint8_t, 16>` are both spelled `16` with neither derived
+   from the other. `metalog-spec` §3.2 makes 16 a wire MUST, so the value is right; the duplication
+   is a code change and did not belong in a comment-only commit.
+
+### Witnesses
+
+Comment-only: the code token stream of both files, and of `canon.api.cppm`, is identical to
+`HEAD`'s. Grammar: `malf format --check core/src/identity` — 34 comment lines, **0 would-be
+violations**, post format. Count: 136 comment lines at HEAD to 34, a **75 % reduction**.
+
+## Unit 3 — `core/src/transport/` + `core/src/canon.internal.cppm` (2 files, 364 lines, 107 would-be violations)
+
+The transport transform algorithms (stamp peel, bracketed peel, byte-order mark), the fail-closed
+declaration resolution, the writer dual, and the module that is canon's single `import std`.
+`canon.internal.cppm` joins this unit rather than getting its own: it is 8 violations and 25 lines,
+and no question about it is separable from "how does a canon module unit reach std", which the
+transport unit answers by importing it.
+
+| files | comment lines HEAD → gate | forms written |
+|---|---|---|
+| `transport.cpp`, `canon.internal.cppm` | 111 → 40 | pre 1 · post 1 · invariant 12 · assert 1 · note 4 · refs 6 · 13 continuations · 2 tool |
+
+`refs:` targets: `ADR-3.D4`, `ADR-22`, `ADR-23`, `ADR-23.D3`, `ADR-23.D4`, `ADR-23.D6`,
+`ADR-23.O2`, `DN-25.D3`.
+
+### Census (`OPS-8.S4`)
+
+`NOLINT` 0, `/*name=*/` 0, namespace closers 2 → 2, `SRC-` codes 0 → 0. **Clean, zero differences
+and zero addresses lost** — every ADR and DN address the prose carried is in a `refs:` line.
+
+### The history that went, and the rule that stayed
+
+`has_stamp_at_head` carried nineteen lines describing a defect that had already been fixed: the
+predicate *"once validated the invariant 19-byte head and let the declared width cover the
+remaining 9"*, and three measured arms of the resulting corruption (a 27-byte serving-API stamp,
+a 6-digit-fraction writer, a whole-second syslog line losing the `m` of `myapp`). That is **H —
+history of a closed defect** — and `ADR-26.D1` rules a rejected alternative out of source, so it
+was deleted rather than converted. What survives is the rule it established, as an `invariant:`:
+the declared width is a CLAIM about the bytes, never a promise. The reader recovered the
+consequence unaided.
+
+### Interrogation
+
+One fresh agent, 15 questions, 11 tool uses, 79 k tokens, 2.1 minutes. No git command; transcript
+checked. **15 of 15 recovered, 0 not recovered, 0 wrong, and no line this conversion wrote was
+found false.**
+
+Three answers came back sharper than the claim that prompted them, each from the api module the
+`refs:` and the types point at:
+
+* Q1 — the reader added the consequence the prose never stated: trusting the declared width would
+  not only cut content head-first, it would then run `strip_separator` and eat the line's leading
+  indentation as well, because the shipped row sets `strip_leading_space = true`.
+* Q3 — it confirmed the `assert:` (`width == 0` is the live case) and derived why 1–18 are
+  unreachable: 19 is the shortest string `rfc3339_datetime_length` can return, so the comparison
+  can only be met at 0 or at ≥ 19.
+* Q5 — it recovered the enrichment-only contract **with its measurement**, from
+  `canon.transport.cppm`: a whole-stream transport stamp covers lines written by different clocks,
+  measured on Jenkins at 0 inversions for controller annotations against 7–701 per log for agent
+  payload. The unit's own `invariant:` states the prohibition; the number lives where it is owned.
+
+Q4 drew a distinction worth recording because it refines rather than contradicts the written
+`invariant:`. The line says the two doors *"share ONE algorithm and differ only in what the
+parameter proves and the return type states, never in bytes"*. The reader agreed for identical
+input bytes and then noted that on the same **original** line the two can still land differently,
+because `peel`'s input has already been ANSI-stripped while `peel_raw`'s has not — an escape ahead
+of the transport prefix makes the row decline on one path and not the other. That is
+`canon.transport.cppm`'s "TWO DOORS" block, and it is why the claim is scoped to bytes rather than
+to lines.
+
+### Dispositions
+
+**Nothing re-homed.** All fifteen held claims were carried by the converted code, the transport
+api module, or the ADR a `refs:` names. No disposition needed a law block.
+
+### Witnesses
+
+Comment-only: the code token stream of both files is identical to `HEAD`'s. Grammar:
+`malf format --check core/src/transport` and the standalone gate over `canon.internal.cppm` — 40
+comment lines, **0 would-be violations**, post format. Count: 111 comment lines at HEAD to 40, a
+**64 % reduction**.
