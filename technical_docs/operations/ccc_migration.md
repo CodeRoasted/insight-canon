@@ -282,7 +282,7 @@ transport unit answers by importing it.
 
 | files | comment lines HEAD → gate | forms written |
 |---|---|---|
-| `transport.cpp`, `canon.internal.cppm` | 111 → 40 | pre 1 · post 1 · invariant 12 · assert 1 · note 4 · refs 6 · 13 continuations · 2 tool |
+| `transport.cpp`, `canon.internal.cppm` | 109 → 40 | pre 1 · post 1 · invariant 12 · assert 1 · note 4 · refs 6 · 13 continuations · 2 tool |
 
 `refs:` targets: `ADR-3.D4`, `ADR-22`, `ADR-23`, `ADR-23.D3`, `ADR-23.D4`, `ADR-23.D6`,
 `ADR-23.O2`, `DN-25.D3`.
@@ -341,5 +341,292 @@ api module, or the ADR a `refs:` names. No disposition needed a law block.
 
 Comment-only: the code token stream of both files is identical to `HEAD`'s. Grammar:
 `malf format --check core/src/transport` and the standalone gate over `canon.internal.cppm` — 40
-comment lines, **0 would-be violations**, post format. Count: 111 comment lines at HEAD to 40, a
-**64 % reduction**.
+comment lines, **0 would-be violations**, post format. Count: 109 comment lines at HEAD to 40, a
+**63 % reduction**.
+
+## Unit 4 — `core/src/tokenizer/` (1 file, 279 lines, 112 would-be violations)
+
+The `Tokenizer` facade: parse → mask → `CanonicalEvent`, the projection-totality instrument, the
+two provenance pairs, and the OTEL span-document doors. The densest `refs:` surface of the run so
+far — eleven `refs:` lines carrying eight `SRC-` codes, four ADR slots and four design-note slots.
+
+| files | comment lines HEAD → gate | forms written |
+|---|---|---|
+| `tokenizer_engine.cpp` | 114 → 48 | invariant 13 · note 7 · refs 11 · 13 continuations · 4 tool |
+
+### Census (`OPS-8.S4`)
+
+Namespace closers 2 → 2, `/*name=*/` 0. **No address lost**: all eight `SRC-` codes
+(`SRC-D-OTEL-1`, `SRC-D-OTEL-9`, `SRC-D-OTEL-18`, `SRC-D-PROV-1`, `SRC-D-TID-11`, `SRC-D-W1-3`,
+`SRC-II-8`, `SRC-SP-1`), all four ADRs and all four design notes survive into `refs:` lines.
+
+**One difference, and it is not a directive: `NOLINT` 3 → 2.** The third occurrence was the *word*
+"NOLINT" inside a prose sentence (*"NOLINT for the same non-owning-ref reason as `arena`"*), which
+went with the prose. Both real directives survive; see `OPS-8` verdict finding 7.
+
+### The two suppressions, measured
+
+`clang-tidy-21` over a copy with both directives removed: **2 findings, both
+`cppcoreguidelines-avoid-const-or-ref-data-members`, on `arena` and on `composed`. With them in
+place: 0.** Both kept, both moved from a trailing position onto their own `NOLINTNEXTLINE` line
+under a `note:`, and re-measured at **0 findings** after the conversion — so the re-homed
+directives still bind.
+
+**The first attempt at that measurement was contaminated and is worth recording** (verdict finding
+9): removing `// NOLINT(...)` with a regex cut the directive out of a trailing comment that
+*continues onto a second line*, leaving the continuation text where code is expected. clang-tidy
+answered with six `clang-diagnostic-error`s alongside the one real finding. The tell is
+`clang-diagnostic-error` in the output — it means the measurement broke its own input.
+
+### Interrogation
+
+One fresh agent, 14 questions, 45 tool uses, 135 k tokens, 4.4 minutes. No git command; transcript
+checked. **14 of 14 recovered, 0 not recovered, 0 wrong, and no line this conversion wrote was
+found false.**
+
+The recoveries reached instruments the prose never named:
+
+* Q8 (what keeps the timestamp pair together) came back with the mechanism AND its enforcement —
+  `EventTime` is structurally unsplittable upstream, `CanonicalEvent` deliberately flattens it back
+  to a `bool`, and the one-write-site property is held by a checked lint,
+  `scripts/provenance_one_write_site_lint.sh`, which no comment mentions.
+* Q11 (what stops dialect knowledge entering core) came back with
+  `scripts/sp1_semantic_unawareness_lint.sh` — a deny-list scan over comment-stripped `core/src`
+  and `core/api` that also fails a vacuously-green scan. The `invariant:` states the property; the
+  gate that holds it was found by reading the tree.
+* Q6 (why the empty-projection check is an instrument and not a rule) came back with the pinned
+  per-corpus expectation `LogHubProjectionPinGate` at 40 959, and with `ADR-16.D9`'s record that a
+  universal checked postcondition is **owed** and blocked on what `ParsedLine` cannot express.
+* Q13 (the two OTEL recognisers) came back with the asymmetry the comment only gestured at: L1 runs
+  on every JSON line so it is tuned for precision, L3 is the acquisition door where a false
+  positive costs one walk returning 0 and a false negative silently drops a conformant export.
+
+### Dispositions
+
+**Nothing re-homed.** All fourteen held claims were carried by the converted code, the api and spi
+module interfaces, the owning ADR or design note, or a repo script the reader found. No disposition
+needed a law block.
+
+### Witnesses
+
+Comment-only: the code token stream is identical to `HEAD`'s. Grammar:
+`malf format --check core/src/tokenizer` — 48 comment lines, **0 would-be violations**, post
+format. Behaviour: **809 of 809** on clang-21 and **809 of 809** on gcc-16.2, equal to the
+baseline. Count: 114 comment lines at HEAD to 48, a **58 % reduction**.
+
+---
+
+# The `OPS-8` verdict — third cold reader, first at scale
+
+`insight-canon` is `OPS-8`'s third run and its first large one. Nine findings, ordered by what
+they cost. Items 1 and 5 are the ones that change the runbook; item 5 needs a Founder ruling
+before the `core/api/` units can be converted at all.
+
+## 1. `OPS-8.S5`'s cross-check equality is FALSE in any unit that has a suppression
+
+The step says: *"The stripper's REMOVED count must equal the unit's would-be violation count from
+`OPS-8.S1`, and its KEPT count the tool-form count."* `strip_to_v1.py` does not behave that way and
+says so in its own body: it deliberately **keeps** `suppression-without-why` and `trailing-nolint`,
+so the hand pass can re-home them. The true identities are
+
+```
+removed == violations − (suppression-without-why + trailing-nolint)
+kept    == tool-forms  + (suppression-without-why + trailing-nolint)
+```
+
+Measured on both units of this run that carry suppressions. Unit 1: 37 violations, 5 kept-as-
+violation, removed 32, kept 7 = 2 tool + 5. Unit 4: 112 violations, 2 trailing-NOLINT, removed 110,
+kept 4 = 2 tool + 2. **`insight-twin` had zero suppressions, so the equality as written held
+VACUOUSLY there** (644 = 644, 8 = 8) and the defect could not show. An operator who follows the step
+literally on a unit with suppressions sees a mismatch, and the step gives him no way to tell a
+benign one from the silent deletion the cross-check exists to catch.
+
+## 2. The fixed cold-reader prompt forbids only LogCraft's ledger, by name
+
+`interrogation_prompt.md` names `logcraft/technical_docs/operations/ccc_migration.md`. Every
+migrated repo now has its own ledger at the same relative path, and **from unit 2 onward the
+migrating repo's own ledger contains the previous units' answers, dispositions and stale-claim
+findings** — the exact material the reader must not see. The prompt was adapted for every reader in
+this run to forbid any file named `ccc_migration.md` in any repo, plus `OPS-8` itself. The fix
+belongs in the committed prompt, not in each lane's memory.
+
+## 3. `OPS-8.S3.3` states the indent-aware byte budget; the worked example does not implement it
+
+The step is explicit that the budget *"must be indent-aware, not the flat 100"* and that the limit
+counts bytes. The committed per-unit scripts (`tests15_claims.py` … `tests18_claims.py`) check a
+flat `150` / `85` **character** count. This run implemented the step as written — the checker
+reproduces `wrap_tagged.py`'s own flow at the site's real indentation and rejects any produced line
+over 100 bytes — and it **rejected six claims across units 1–4 that the flat check would have
+passed**, every one of them inside a function body at indent 8 to 12. The shared implementation is
+`claims_lib.py`; the per-unit scripts carry only claims.
+
+## 4. A deletion inside one unit can falsify prose in another, and no step covers it
+
+Measured, and it fired. Unit 2 deleted the CR prevalence figures from `intent_identity.cpp` —
+correctly, because `DN-38` and an `insight-eidos` test both carry them. `canon.api.cppm`, a file in
+a much later unit, said *"the set's own definition in intent_identity.cpp carries the numbers"*, and
+that sentence became false the instant the deletion landed. The unit-2 cold reader caught it.
+
+`OPS-8.S9`'s *wrong* row assumes the wrong line is inside the unit being converted (*"Fix the line
+in the tree"*). The missing step is upstream of it: **before deleting a claim, sweep the repo for
+prose that POINTS AT that claim, and repair the pointer in the same commit.** A pointer into a unit
+that has not converted yet is invisible to every witness the protocol has — the code-only diff, the
+grammar gate and the test suite are all green while the repo now contains a sentence its own author
+made false.
+
+## 5. STOP AND REPORT — `SRC-<code>` codes are DECLARED in source prose, and this is the repo that declares them
+
+**This is a Founder ruling, not a lane decision, and it blocks `core/api/`.**
+
+`LEXICON.md` defines the form: `SRC-<code>` is *"a decision code whose **contract is the source** —
+the comment at its declaring site IS the statement"*. CCC deletes source prose. The two doctrines
+meet head-on for the first time in this repo, and the numbers are:
+
+* **66 distinct `SRC-` codes have their site in `insight-canon` source.**
+* **61 of the 66 are cited from OUTSIDE the repo** — `technical_docs`, `insight-eidos`,
+  `insight-metalog`, `coderoast-server`. (Verified with an explicit positive control after a first
+  measurement returned a false zero: the pattern needs `rg -P`, and the run that lacked it exited 2
+  while a discarded stderr made it read as "no citations anywhere".)
+* **`registry_grammar_lint` cannot protect this, and the reason is sharper than a weak gate.** Its
+  G5 leg does fail per missing code (`return 1 if fails else 0`, one `fails` entry per code with no
+  site) — an earlier draft of this verdict said it was only a majority floor and that was **wrong**;
+  the `missing * 2 > codes` branch is a separate *instrument-broken* tripwire on top of the per-code
+  failure. What the gate actually cannot see is the **content**. `src_codes_present` classes a site
+  as a DECLARATION by **position** — any site in a `.cppm`/`.hpp`/`.h`/`.ipp`, or any site in a
+  `.cpp`'s first 40 lines — and its own docstring says why: *"checking it by POSITION is what makes
+  it checkable at all."* So a bare `refs: SRC-D-TID-6` line in `canon.api.cppm` satisfies G5
+  **exactly as the full prose paragraph did**. Carry every code into a `refs:` and the gate stays
+  green while the text that `ADR-6.D8` and `LEXICON.md` say IS the statement is gone. The loss is
+  invisible to every witness this protocol has.
+* **9 codes have exactly ONE site inside canon**: seven in `core/api/canon.api.cppm`
+  (`SRC-D-OTEL-8`, `SRC-D-TID-6`, `SRC-D-TID-10`, `SRC-D-W1-2`, `SRC-D-W1-4`, `SRC-D-W1-5`,
+  `SRC-D-W1-8`), one in `core/src/utils/time_utils.cpp` (`SRC-D-RNK-2`), one in
+  `core/tests/strategy/test_span_unpack.cpp` (`SRC-D-OTEL-23`). The last two are BODY sites, so
+  canon declares neither — checked, and both declare in sibling repos
+  (`insight-eidos/sift/api/sift.api-config.cppm` and `insight-metalog/api/metalog.api.cppm` for
+  `SRC-D-RNK-2`; `logcraft/core/api/core.api-agent.cppm` for `SRC-D-OTEL-23`). The declaration
+  surface is WORKSPACE-wide, which is why the gate is green today and why reasoning about it
+  one repo at a time is unsafe. The seven in `canon.api.cppm` are declared there and nowhere else.
+* The density map says where the problem lives: `canon.api.cppm` 96 occurrences, `mask.cpp` 50,
+  `failure_lexicon.cpp` 29, `json.cpp` 25, `canon.spi.cppm` 22, `canon.detail.mask.cppm` 16.
+
+`LEXICON.md` names the successor form itself: *"migration to `LSRC-n` is wanted at the next occasion
+that opens the declaring site"*. **A CCC conversion is precisely that occasion, and it opens all 66
+at once.** `LSRC-n` is the `D-LSRC-n` law block, whose numbering is workspace-global, append-only and
+dense; this lane is instructed not to mint one, and the next free number was ruled to be LogCraft's
+start. So the doctrine's own prescribed remedy is the one form this run may not create.
+
+Units 1–4 are unaffected and were converted safely, because they **cite** these codes rather than
+declaring them: every code was carried into a `refs:` line and the address census confirms none was
+lost. That is not available for `canon.api.cppm`, where the prose beside a code IS the code's text.
+
+**What the Founder has to choose between**, stated so the decision is one reading:
+
+1. Give `insight-canon` a law-number range and convert the statement-bearing codes into
+   `D-LSRC-n` blocks at their existing sites. Faithful to `LEXICON`, and it is the largest option.
+2. Rule that a `refs:`-carrying site satisfies the `SRC-` declaration, and move each statement into
+   the ADR or design note that owns its subject, cited from the site. Smaller, and it converts
+   `SRC-` from a source-declared code into an ordinary citation.
+3. Rule the codes retired for canon, repointing all 61 external citations to their owning slots.
+   Largest blast radius, cleanest end state.
+
+**Nothing here is done on this lane's initiative.** This run stopped at the boundary and converted
+only units whose codes are citations.
+
+## 6. `OPS-8.S1.4` is CORRECT for a repo that already has a `technical_docs/` shelf — verified, not assumed
+
+The step's three-part branch (create the directory, a roster README **and** a superproject
+`ShelfRuling` row) does **not** apply here, and that was checked rather than taken on the brief's
+word. `scripts/docs_lint.py`'s `ShelfRuling("insight-canon", SHELF_TREE_PART, ROSTER, …)` covers the
+whole `technical_docs` tree recursively, so a new `operations/` subdirectory holding one file needs
+no row — only a roster entry. Proven falsifiable: with the entry removed, `docs_lint` exits 1 and
+names the file (*"does not link `operations/ccc_migration.md`, which is tracked under this shelf"*);
+with it, exit 0. Tracked-doc population 142 → 143.
+
+**One trap worth adding to the step, met here:** these gates must be run from the workspace ROOT.
+Run from inside the repo, `python3 scripts/docs_lint.py` exits 2 for a missing file, and an operator
+reading only the exit code sees a red gate rather than a mistyped path.
+
+## 7. The census token is a DIRECTIVE, not the string `NOLINT`
+
+Unit 4's census read `NOLINT 3 → 2`. The third occurrence was the **word** "NOLINT" inside a prose
+sentence (*"NOLINT for the same non-owning-ref reason as `arena`"*), which the conversion deleted
+along with the prose while both real directives survived and were re-homed. Not a defect in the
+run, but `OPS-8.S4` says *"every `NOLINT` (all spellings)"* and an operator counting string
+occurrences will chase a difference that is not one.
+
+## 8. `tag-mid-line` is a false-positive class on this repo's subject matter
+
+All 11 `tag-mid-line` sites at the baseline are prose containing the substring `note:`, and nine of
+them are describing the **compiler diagnostic marker** `<path>:<line>:<col>: note: ` that canon's
+failure lexicon parses (the NOTE register, `SRC-D-NOTE-1`). Not one is an author writing in CCC's
+style before it was doctrine. The gate's pattern excludes a preceding word character, backtick,
+quote, slash, dot, colon or hyphen — so a space before `note:` matches and the diagnostic marker
+trips it.
+
+**This is a live constraint on two units not yet converted** (`core/src/utils/failure_lexicon.cpp`,
+`core/api/canon.api.cppm`): a legitimate `note:` or `invariant:` whose text must quote the marker
+will be rejected. **The escape is a TIGHT backtick** — `` `note:` `` is excluded by the lookbehind,
+while `` `: note: ` `` still matches, because the character immediately before `note` is the space.
+Verified against the checker's own compiled pattern.
+
+## 9. Measure a suppression by stripping WHOLE comments, never the directive fragment
+
+A first attempt to measure unit 4's suppressions removed `// NOLINT(...)` with a regex. Two of the
+sites are trailing comments that **continue onto a second line**, so the removal left the
+continuation text sitting where code is expected, and clang-tidy answered with six
+`clang-diagnostic-error`s on top of the one real finding. **The tell is `clang-diagnostic-error` in
+the output**: it means the measurement broke its own input, and the finding counts from that run are
+worthless. The sound procedure is to strip through `strip_to_v1.py` and then delete the kept
+trailing suppressions as whole comments; re-measured that way, unit 4 reads 2 findings without the
+suppressions and 0 with them.
+
+## Departures from `OPS-8` in this run, declared
+
+* **Units 2 and 3 landed in ONE commit**, against `OPS-8.S10`'s one-commit-per-unit. Both are
+  comment-only, both were in the tree together, and a single `malf test` pass on each toolchain is
+  their shared behaviour witness. The ledger keeps a separate entry per unit.
+* **`canon.api.cppm` was edited outside its unit**, one comment line, to repair the pointer unit 2's
+  deletion falsified (finding 4).
+
+---
+
+# Where this run stopped, and why
+
+**Four units converted, the repo NOT armed.** `malf format --check insight-canon` reads **14 230
+comment lines and 13 854 would-be violations** against the baseline's 14 489 and 14 242 — 388
+violations converted, **2.7 % of the repo**, in four commits. Arming (`OPS-8.S12`) requires the
+whole repo at zero and is not reached, so `comment_contract: true` is NOT set and the CCC phase
+still counts this repo rather than failing it.
+
+| unit | surface | violations | comment lines | reader |
+|---|---|---|---|---|
+| 1 | `core/src/arena/` | 37 | 39 → 17 | 10/10 recovered |
+| 2 | `core/src/identity/` | 132 | 136 → 34 | 13/13 recovered |
+| 3 | `core/src/transport/` + `canon.internal.cppm` | 107 | 109 → 40 | 15/15 recovered |
+| 4 | `core/src/tokenizer/` | 112 | 114 → 48 | 14/14 recovered |
+| | **total** | **388** | **398 → 139 (65 %)** | **52/52, 0 wrong** |
+
+Forms standing in the repo: `pre` 1 · `post` 3 · `invariant` 34 · `assert` 2 · `note` 22 ·
+`refs` 24 · 36 continuations · 254 tool forms. **Zero law blocks.**
+
+**The run stopped on the verdict's finding 5, deliberately and not for lack of time.** The
+`SRC-<code>` question is a Founder ruling, and it does not only block `core/api/` — the answer
+decides what a `refs:` line MEANS in every remaining unit. Under the smallest reading (a
+`refs:`-carrying site is a declaration) the four units converted here are correct as they stand.
+Under either of the other two readings, the `refs:` lines this run wrote in units 1–4 are the
+wrong shape and would be rewritten. **Converting ten more units under an assumption that may be
+overturned would multiply the rework rather than reduce it**, which is why the lane stopped at a
+unit boundary with every witness green instead of pressing on.
+
+The units that remain unblocked once the ruling lands — those that only CITE codes rather than
+declaring them — are `core/src/parse`, `core/src/scan`, `core/src/compose`, `core/src/conformance`
+and the whole test tier. `core/api/canon.api.cppm` (96 `SRC-` occurrences), `core/src/mask/mask.cpp`
+(50), `core/src/utils/failure_lexicon.cpp` (29), `core/src/strategy/json.cpp` (25) and
+`core/api/canon.spi.cppm` (22) are where the ruling actually bites.
+
+**Falsifiability of the grammar phase, proven on this run's own output.** The repo cannot be armed,
+so the arming proof `OPS-8.S12` asks for is not available. What was proven instead, on a converted
+unit: the standalone checker reads 0 violations over `arena_allocator.cpp`; appending one bare
+prose line makes it report exactly that line at its coordinate (`bare=1`); restoring the file
+returns it to 0, byte-for-byte identical (sha256 checked). The gate sees what it claims to see.
