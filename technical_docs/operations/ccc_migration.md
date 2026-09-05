@@ -630,3 +630,42 @@ so the arming proof `OPS-8.S12` asks for is not available. What was proven inste
 unit: the standalone checker reads 0 violations over `arena_allocator.cpp`; appending one bare
 prose line makes it report exactly that line at its coordinate (`bare=1`); restoring the file
 returns it to 0, byte-for-byte identical (sha256 checked). The gate sees what it claims to see.
+
+---
+
+## RULED — 2026-09-05, and the answer is wider than the three options this ledger offered
+
+The Founder ruled, verbatim: *"`SRC-<code>` is going out. It is weaker then the others. `F-SRC` if
+completely resolvable, same for `D-LSRC`. … each `SRC-<code>` become `ref:LSRC`, and for each
+missing `D-LSRC`, add it to the most appropriate place."*
+
+**None of the three options above was taken — the form itself is retired, workspace-wide.** Option 1
+proposed law blocks for canon's statement-bearing codes; option 2 proposed keeping `SRC-` as a
+citation with the statement moved to a slot; option 3 proposed retiring the codes *for canon*. The
+ruling retires `SRC-<code>` **everywhere** and makes `LSRC-n` its successor at every citing site. The
+criterion he gave is **resolvability**: `F-SRC-<repo>:<file>` and `LSRC-n` each resolve to exactly
+one site by construction; `SRC-<code>` never did, which `LEXICON.md` had always said —
+*"form 2, and it is NOT stable"*.
+
+`ADR-26.D5` carries the ruling and its measured scope: **108 distinct codes, 1 577 occurrences over
+12 surfaces**, of which `insight-canon` holds 476 — the largest share in the workspace, which is why
+the collision surfaced here. The frozen corpus keeps the bare form and is not rewritten.
+
+**WHAT THIS LANE MUST NOT DO WHEN IT RESUMES.** The `SRC-` → `LSRC-` cascade is **not** a
+comment-only lane's work and must not be improvised inside a CCC unit: it repoints citations in five
+repos and the durable doc tier, and a comment-only commit cannot carry it. It is its own pass, and
+its ordering against the remaining ~15 units is the pilot's to sequence.
+
+**AND ONE THING IS STILL OPEN, WHICH IS WHY UNITS 5+ HAVE NOT RESUMED.** The same ruling ended
+*"Donc forget the multiline comment form for `D-LSRC` -> `/******** D-LSRC-n *********/`"*, and that
+sentence admits two readings that differ at every site: **(a)** the block loses its prose body and
+becomes a resolvable anchor whose statement lives in the owning slot, or **(b)** the C-comment frame
+stops being mandatory so the form can be declared where `/* */` is not a comment — the ruling
+arrived with a conan profile open at the line declaring `LSRC-4`, where comments are `#`. The
+question is open with the Founder and no lane may mint a law block until it lands (the law numbering
+is separately dense over four declarations, with `5` ruled to be LogCraft's start, so a canon block
+would need a range he gives). **It decides what a `refs:` line points at**,
+so units 1–4's `refs:` lines are correct under (a) and may need reshaping under (b).
+
+**Units 1–4 stand either way** and needed no change: they **cite** codes rather than declaring them,
+and the address census confirms none was lost.
