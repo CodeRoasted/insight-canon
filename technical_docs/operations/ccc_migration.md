@@ -653,19 +653,28 @@ the collision surfaced here. The frozen corpus keeps the bare form and is not re
 
 **WHAT THIS LANE MUST NOT DO WHEN IT RESUMES.** The `SRC-` → `LSRC-` cascade is **not** a
 comment-only lane's work and must not be improvised inside a CCC unit: it repoints citations in five
-repos and the durable doc tier, and a comment-only commit cannot carry it. It is its own pass, and
-its ordering against the remaining ~15 units is the pilot's to sequence.
+repos and the durable doc tier, and a comment-only commit cannot carry it. It is its own pass, run
+by the pilot once this repo is flat. What the lane DOES own at a declaring site is `OPS-8.O5`,
+below — the two are not the same act and the split is what keeps every gate green.
 
-**AND ONE THING IS STILL OPEN, WHICH IS WHY UNITS 5+ HAVE NOT RESUMED.** The same ruling ended
-*"Donc forget the multiline comment form for `D-LSRC` -> `/******** D-LSRC-n *********/`"*, and that
-sentence admits two readings that differ at every site: **(a)** the block loses its prose body and
-becomes a resolvable anchor whose statement lives in the owning slot, or **(b)** the C-comment frame
-stops being mandatory so the form can be declared where `/* */` is not a comment — the ruling
-arrived with a conan profile open at the line declaring `LSRC-4`, where comments are `#`. The
-question is open with the Founder and no lane may mint a law block until it lands (the law numbering
-is separately dense over four declarations, with `5` ruled to be LogCraft's start, so a canon block
-would need a range he gives). **It decides what a `refs:` line points at**,
-so units 1–4's `refs:` lines are correct under (a) and may need reshaping under (b).
+**THE FORM QUESTION IS ANSWERED AND UNITS 5+ RESUME.** The same ruling ended *"Donc forget the
+multiline comment form for `D-LSRC` -> `/******** D-LSRC-n *********/`"*, which this ledger read as
+possibly retiring the block's prose body. The Founder closed it on the same day by pointing at the
+already-converted specimen in the programme's design note and ruling *"D-LSRC have multiline
+comments"*. **The body stays**: a rule line, the `D-LSRC-n — <title>` line, free prose, a closing
+rule — and the frame is the **host language's** comment syntax, not C's, which is what `LSRC-3`
+(a `CMakeLists.txt`) and `LSRC-4` (a conan profile) already are in `#`. So a `refs:` line points at
+a statement that exists at the site, and units 1–4's `refs:` lines need no reshaping.
+
+**Minting is unheld, but this lane still does not pick a number.** Law numbers are workspace-global,
+append-only and checked dense; the next free integer is **5**, and the pilot issues them one at a
+time (`OPS-8.O4`). Ask before writing a block.
+
+**The `SRC-` work this lane DOES own is `OPS-8.O5`, and it is narrower than the cascade.** A
+**citing** site keeps its `refs: SRC-<code>` form untouched. A **declaring** site — the seven codes
+whose statement lives in `core/api/canon.api.cppm` — becomes a law block at that same site naming
+the code it absorbs, which is what keeps `registry_grammar_lint` G5 green while every external citer
+still resolves. Record each code's citer list; repoint nothing outside this repo.
 
 **Units 1–4 stand either way** and needed no change: they **cite** codes rather than declaring them,
 and the address census confirms none was lost.
