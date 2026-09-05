@@ -1,21 +1,13 @@
 module;
-#include "utils/log_macros.hpp" // textual macro layer (ADR-3.D4)
+// refs: ADR-3.D4
+#include "utils/log_macros.hpp"
 
 module insight.canon.detail.parse;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.spi;             // ProvenanceHook
-import insight.canon.compose;         // ComposedSemantics (echoed-source hooks)
-import insight.canon.detail.strategy; // IFormatStrategy, ParsedLine
-
-// LogParser: orchestrates arena allocation, format detection, and strategy
-// dispatch for a stream of raw log lines.
-//
-// Ownership model:
-//   - The arena is owned externally; LogParser holds a reference.
-//   - Each detected raw line is copied into the arena before strategy parsing
-//     so string_views inside the returned ParsedLine are stable for the arena's
-//     lifetime.
+import insight.canon.spi;
+import insight.canon.compose;
+import insight.canon.detail.strategy;
 
 namespace insight::tokenization
 {
@@ -32,11 +24,10 @@ LogParser::LogParser(ArenaAllocator& arena, const insight::semantic::ComposedSem
 {
 }
 
-// SRC-D-PROV-1 echoed-source register: the GHA command-echo SGR wrapper is destroyed by the
-// stage-1 normalize() before any strategy sees the line, so the composed provenance hooks
-// classify the RAW (ANSI-bearing) line — the only place it survives. Strategy-INDEPENDENT (a
-// wrapped line is echoed source whatever it routed to), reproducing the pre-split
-// is_echoed_source_line exactly. Canon core names no hook: every provenance hook arrives from a
+// refs: SRC-D-PROV-1
+// pre: `raw_line` is the RAW, ANSI-bearing line — stage-1 `normalize()` destroys the SGR wrapper
+// the hooks key on.
+// invariant: strategy-independent, and core names no hook — every provenance hook arrives from a
 // semantic package.
 [[nodiscard]] static bool
 is_echoed_source(std::string_view raw_line,
@@ -47,31 +38,14 @@ is_echoed_source(std::string_view raw_line,
                                { return hook(raw_line); });
 }
 
-// The DECLARED level lift (ADR-22): the resolved view's LevelLiftRow set is canon-walked
-// here and OVERRIDES whatever level the strategy inferred — reproducing the pre-relocation
-// precedence exactly, where the GHA strategy consulted its own kLevelLifts array first and fell
-// back to `infer_leading_log_level` only when no row matched.
-//
-// PLACEMENT IS LOAD-BEARING, twice over:
-//   * AFTER the strategy — the lift keys on `ParsedLine::content`, the strategy's own product (for
-//     a dialect with a line prefix, the content past it). There is no earlier point where that
-//     exists.
-//   * BEFORE the echoed-source demotion — an echoed-source line is script text, not an observed
-//     event, so SRC-D-PROV-1 drives its level to Unknown unconditionally. That demotion outranked
-//     the lift when the lift lived inside parse(), and it must keep outranking it.
-// An UNDECLARED stream's view carries no concretely-gated level-lift row at all (ADR-22.D6),
-// so the walk is over an empty span and costs nothing — the dialect gate is not tested here,
-// because it was tested once at `resolve_stream` and the row is either in this view or it is not.
-// That is what makes the lift independent of per-line format detection.
-//
-// Unknown from the walk means "no declared row claims this line" — it is the ABSENCE of a lift, not
-// a level, so it must never overwrite the strategy's inference.
-//
-// DN-32.D3: a lifted level is DECLARED, and this is the seam that knows it. A LevelLiftRow is a
-// dialect's ANNOUNCED level marker — the producer saying "this line is an error" in a position
-// whose meaning is exactly that — which is the declared layer ADR-22.D3 separates from canon's
-// content inference. So the lift both overwrites the strategy's value AND upgrades its provenance;
-// the two are one assignment because they are one fact.
+// refs: ADR-22, ADR-22.D3, ADR-22.D6, DN-32.D3
+// pre: runs AFTER the strategy, whose `content` the lift keys on, and BEFORE the echoed-source
+// demotion, which must outrank it.
+// invariant: Unknown from the walk is the ABSENCE of a declared row, never a level, so it must not
+// overwrite the strategy's inference.
+// invariant: a lifted level is DECLARED — the value and its provenance are one assignment because
+// they are one fact.
+// note: an undeclared stream's view carries no gated row, so the walk is empty.
 static void apply_level_lift(ParsedLine& parsed,
                              const insight::semantic::ComposedSemantics& composed) noexcept
 {
@@ -79,8 +53,6 @@ static void apply_level_lift(ParsedLine& parsed,
         parsed.level = EventLevel::declared(lifted);
 }
 
-// O(1) fast path: tries sticky strategy first; falls back to full detect.
-// Updates sticky_strategy_ / active_strategy_ as a side-effect.
 IFormatStrategy* LogParser::select_strategy(std::string_view line)
 {
     if (auto_detect_ && sticky_strategy_ != nullptr && sticky_strategy_->confidence(line) > 0.0)
@@ -97,13 +69,10 @@ IFormatStrategy* LogParser::select_strategy(std::string_view line)
     return found;
 }
 
-// Force a specific format strategy; deactivates per-line auto-detection.
-// If no strategy matches the requested format, active_strategy_ remains null
-// and auto-detection is re-enabled on the next call.
 void LogParser::set_format(LogFormat fmt)
 {
     active_strategy_ = nullptr;
-    sticky_strategy_ = nullptr; // reset sticky on explicit format override
+    sticky_strategy_ = nullptr;
     for (const auto& strategy_candidate : detector_.strategies())
     {
         if (strategy_candidate->format() == fmt)
@@ -114,7 +83,6 @@ void LogParser::set_format(LogFormat fmt)
             return;
         }
     }
-    // Requested format not registered — fall back to auto-detect.
     auto_detect_ = true;
     INSIGHT_LOG_INFO(logging::parser_logger(), "format {} not found, falling back to auto-detect",
                      to_string(fmt));
@@ -126,21 +94,15 @@ void LogParser::set_auto_detect(bool enabled)
     if (enabled)
     {
         active_strategy_ = nullptr;
-        sticky_strategy_ = nullptr; // reset sticky when switching modes
+        sticky_strategy_ = nullptr;
     }
     INSIGHT_LOG_INFO(logging::parser_logger(), "auto-detect {}", enabled ? "enabled" : "disabled");
 }
 
-// Successful parses are O(line.size()) for the arena copy + strategy parsing.
-// Rejected lines skip the arena copy.
 std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view raw_line)
 {
-    // AN EMPTY LINE IS ORDINARY INPUT, NOT A FAILURE — it is counted as skipped (see
-    // `skipped_count_`'s declaration for the measurement). It still returns `unexpected`, because
-    // the caller must learn that this line produced no event, and this is the one place that
-    // decision belongs: hoisting it to the callers duplicates a canon-internal rule in every
-    // consumer, and two first-party callers already disagree about it
-    // (`f13_cardinality_measure` pre-skips empty lines, `incident_episode_measure` does not).
+    // invariant: an empty line is ordinary input, not a failure — counted as skipped, and still
+    // returned as `unexpected` so the caller learns it produced no event.
     if (raw_line.empty())
     {
         ++skipped_count_;
@@ -148,18 +110,14 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
         return std::unexpected(std::string("LogParser: empty line"));
     }
 
-    // SRC-D-TID-11 — see canon.api.cppm for the contract.
-    //
-    // This is THE one named site where the parser performs stage 1 unconditionally — the invariant
-    // `attest()` carries on THIS path only; reached via `parse_stable` it carries door provenance
-    // instead, since that door runs no stage 1 (ADR-21.D4, and attest()'s own declaration).
-    // The ESC-gated fast path (no ESC byte → the normalized line borrows `raw_line`, no scratch
-    // copy) now lives INSIDE `normalize()`, so the gate this call site used to spell is the
-    // factory's own.
+    // refs: SRC-D-TID-11, ADR-21.D4
+    // invariant: THE one named site where this parser performs stage 1 unconditionally;
+    // `parse_stable` performs none.
     const NormalizedLine normalized{normalize(raw_line, escape_scratch_)};
-    if (normalized.bytes().empty()) // the (non-empty) line was all escape bytes
+    // note: a non-empty line normalizing to nothing was all escape bytes — no event.
+    if (normalized.bytes().empty())
     {
-        ++skipped_count_; // same class as the empty line above: no event, no failure
+        ++skipped_count_;
         INSIGHT_LOG_TRACE(logging::parser_logger(), "parse: line was all escape bytes, skipped");
         return std::unexpected(std::string("LogParser: empty line"));
     }
@@ -173,7 +131,6 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
     if (strategy == nullptr)
     {
         ++failed_count_;
-        // Rate-limited warning: first failure + every 100th thereafter.
         if (failed_count_ == 1 || failed_count_ % kWarnEveryNFailures == 0)
         {
             INSIGHT_LOG_WARN(logging::parser_logger(), "no strategy matched (total failures={})",
@@ -182,27 +139,24 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
         return std::unexpected(std::string("LogParser: no strategy matched the line format"));
     }
 
-    // Persist raw bytes only after a strategy is known. Failed detection
-    // should not consume arena capacity in long-running streams.
+    // invariant: the arena copy happens only after a strategy is known — a failed detection must
+    // not consume arena capacity in a long-running stream.
     const std::string_view stable{arena_.store_string(line)};
 
     auto result{strategy->parse(stable, arena_)};
     if (result.has_value())
     {
         ++parsed_count_;
-        last_format_ =
-            strategy->format(); // the routed winner for this event (per-line observability)
+        last_format_ = strategy->format();
         apply_level_lift(*result, composed_);
-        // SRC-D-PROV-1 (echoed-source register): the GHA command-echo SGR wrapper was destroyed
-        // by the stage-1 normalize() above, so detect it on the RAW (ANSI-bearing) line — the
-        // only place it survives. An echoed-source line is run-step SCRIPT text, not an
-        // observed runtime event: demote its level to Unknown so a failure WORD in echoed
-        // shell source ("echo \"Download failed …\"") confers NO alerting level. Single root —
-        // the level demotion transitively suppresses NewErrorPattern across all eidos channels.
+        // refs: SRC-D-PROV-1
+        // invariant: an echoed-source line is run-step SCRIPT text, not an observed event, so its
+        // level is driven to absence.
+        // note: a failure word in echoed shell source must confer no alerting level.
         if (is_echoed_source(raw_line, composed_))
         {
             result->echoed_source = true;
-            result->level = EventLevel{}; // absence, and an absent level is never declared
+            result->level = EventLevel{};
         }
         INSIGHT_LOG_TRACE(logging::parser_logger(), "parse ok: strategy={} echoed_source={}",
                           to_string(strategy->format()), result->echoed_source);
@@ -210,10 +164,8 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
     else
     {
         ++failed_count_;
-        // Rate-limited warning: first failure + every 100th thereafter. It carries the strategy's
-        // own REASON because this is the only bounded record of it: the tokenizer facade used to
-        // reprint every failure's text at WARN with no rate limit at all, and that unbounded
-        // duplicate is what turned one corpus pass into 57.7 MB of stderr.
+        // invariant: the ONE rate-limited record of a strategy's failure reason — the facade's
+        // own reprint is DEBUG level and unbounded.
         if (failed_count_ == 1 || failed_count_ % kWarnEveryNFailures == 0)
         {
             INSIGHT_LOG_WARN(logging::parser_logger(),
@@ -222,16 +174,14 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
         }
     }
 
-    // canon-internal DEBUG gate (see the note in tokenizer_engine.cpp). SPDLOG_ACTIVE_LEVEL is
-    // canon's PRIVATE build-type compile def, via the textual log_macros.hpp include — kept off the
-    // public insight.canon.api surface so the level macro never leaks to consumers.
+    // invariant: SPDLOG_ACTIVE_LEVEL is canon's PRIVATE build definition, kept off the public api
+    // surface so the level macro never leaks onto a consumer's command line.
     constexpr bool kDebugLogsEnabled{SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_DEBUG};
     if constexpr (kDebugLogsEnabled)
     {
+        // invariant: the denominator is parsed + failed only, so a line counted as skipped cannot
+        // move the failure rate; `seen` includes skips and gates the cadence.
         static constexpr std::size_t kStatsEveryNLines{1000};
-        // Periodic stats every 1000 lines SEEN. `skipped` (no-event input) is printed and is out
-        // of the rate's denominator: a stream that is half blank lines has no higher failure rate
-        // than the same stream without them.
         const auto seen{parsed_count_ + failed_count_ + skipped_count_};
         const auto attempted{parsed_count_ + failed_count_};
         if (seen > 0 && seen % kStatsEveryNLines == 0 && attempted > 0)
@@ -246,12 +196,9 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
     return result;
 }
 
-// Fast variant: skips arena store_string(). Caller guarantees stable_line is
-// valid for the arena's lifetime. All string_views returned from parse() will
-// alias stable_line's storage directly (no extra copy).
 std::expected<ParsedLine, std::string> LogParser::parse_stable(std::string_view stable_line)
 {
-    if (stable_line.empty()) // ordinary input, not a failure — see parse_line's empty-line branch
+    if (stable_line.empty())
     {
         ++skipped_count_;
         INSIGHT_LOG_TRACE(logging::parser_logger(), "parse_stable: empty line skipped");
@@ -274,20 +221,18 @@ std::expected<ParsedLine, std::string> LogParser::parse_stable(std::string_view 
         return std::unexpected(std::string("LogParser: no strategy matched the line format"));
     }
 
-    // Caller guarantees stable_line is arena-stable: no store_string() needed.
     auto result{strategy->parse(stable_line, arena_)};
     if (result.has_value())
     {
         ++parsed_count_;
-        last_format_ =
-            strategy->format(); // the routed winner for this event (per-line observability)
+        last_format_ = strategy->format();
         apply_level_lift(*result, composed_);
-        // SRC-D-PROV-1: echoed-source demotion (see parse_line). Detect on the supplied line; a
-        // pre-ANSI-stripped stable line carries no wrapper, so this is a no-op there.
+        // refs: SRC-D-PROV-1
+        // note: a caller that already stripped ANSI hands no wrapper here, so this is a no-op.
         if (is_echoed_source(stable_line, composed_))
         {
             result->echoed_source = true;
-            result->level = EventLevel{}; // absence, and an absent level is never declared
+            result->level = EventLevel{};
         }
         INSIGHT_LOG_TRACE(logging::parser_logger(), "parse_stable ok: strategy={} echoed_source={}",
                           to_string(strategy->format()), result->echoed_source);
@@ -295,8 +240,6 @@ std::expected<ParsedLine, std::string> LogParser::parse_stable(std::string_view 
     else
     {
         ++failed_count_;
-        // Rate-limited, and it carries the strategy's REASON for the same reason parse_line's
-        // twin does: this is the only bounded record of it.
         if (failed_count_ == 1 || failed_count_ % kWarnEveryNFailures == 0)
         {
             INSIGHT_LOG_WARN(logging::parser_logger(),

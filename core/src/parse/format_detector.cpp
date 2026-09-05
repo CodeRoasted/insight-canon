@@ -1,18 +1,13 @@
 module;
-#include "utils/log_macros.hpp" // textual macro layer (ADR-3.D4)
+// refs: ADR-3.D4
+#include "utils/log_macros.hpp"
 
 module insight.canon.detail.parse;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.spi;             // StrategyFactory
-import insight.canon.compose;         // ComposedSemantics
-import insight.canon.detail.strategy; // the 20 core representation strategies registered here
-
-// FormatDetector: registers all built-in format strategies and selects the
-// best match for a given line or sample batch.
-//
-// The constructor auto-registers built-in strategies. Additional strategies
-// can be injected at runtime via register_strategy().
+import insight.canon.spi;
+import insight.canon.compose;
+import insight.canon.detail.strategy;
 
 namespace insight::tokenization
 {
@@ -39,15 +34,11 @@ namespace
             if (size >= formats.size())
                 return;
             for (std::size_t i = 0; i < size; ++i)
-                if (formats[i] == format) // NOLINT
+                if (formats[i] == format)
                     return;
-            formats[size++] = format; // NOLINT
+            formats[size++] = format;
         }
     };
-
-    // is_digit / is_alpha: the canonical char-class predicates from insight.canon.detail.scan
-    // (imported by this module via the parse interface) — not re-declared here (A3 consolidation,
-    // single source of truth). Behaviour-identical to the former local copies on every byte.
 
     [[nodiscard]] std::string_view trim_left(std::string_view line) noexcept
     {
@@ -134,6 +125,8 @@ namespace
                before == '.';
     }
 
+    // invariant: a BUILTIN absent from this list is never probed, so every builtin claimant of a
+    // shape must be offered here; a custom strategy is walked on every line regardless.
     [[nodiscard]] CandidateList candidates_for(std::string_view raw_line) noexcept
     {
         static constexpr std::size_t kTimestampSeparatorIndex{10};
@@ -154,13 +147,8 @@ namespace
         if (line.front() == '<')
             candidates.add(LogFormat::RFC5424);
 
-        // A BGL/Thunderbird record opens with LogHub's alert-class column: `-` on a normal
-        // record, an uppercase class name on an anomalous one (DN-43.D14). Offering BGL only on
-        // `-` is what kept 348 460 alert-flagged lines of the pinned corpus — 7.34 % of it, and
-        // 100 % of its labelled records — out of the candidate list entirely, so they never
-        // reached a strategy that could read their declared FATAL. The uppercase arm is cheap to
-        // widen because the label alphabet excludes lowercase: `Jun 14 15:16:01 …` fails it at the
-        // second byte. The predicate proper runs in `confidence()`, as every format's does.
+        // refs: DN-43.D14
+        // note: the alert class column is `-` normally, an uppercase label when anomalous.
         if (line.front() == '-' || is_upper(line.front()))
             candidates.add(LogFormat::BGL);
 
@@ -191,10 +179,8 @@ namespace
         {
             if (line.size() > kTimestampSeparatorIndex && line[kTimestampSeparatorIndex] == 'T')
             {
-                // BOTH core representation candidates for an RFC3339+T line, and they are
-                // DISJOINT: Syslog claims it only if the syslog header holds, Rfc3339Text only if
-                // it does not (DN-43.D4). Listing both is what makes the split reachable — the
-                // detector scores candidates, and a builtin absent from this list is never probed.
+                // refs: DN-43.D4
+                // note: the two RFC3339+T claimants are disjoint — the syslog header decides.
                 candidates.add(LogFormat::Syslog);
                 candidates.add(LogFormat::Rfc3339Text);
             }
@@ -234,9 +220,6 @@ FormatDetector::FormatDetector(const insight::semantic::ComposedSemantics& compo
         by_format_.at(index) = strategies_.back().get();
     };
 
-    // The core REPRESENTATION-format strategies (semantic-unaware — how data is represented, not
-    // what an ecosystem means). The GitHub-Actions DIALECT strategy is no longer a builtin; it
-    // arrives via the composition below (ADR-17).
     add_builtin(std::make_unique<JsonStrategy>());
     add_builtin(std::make_unique<SyslogStrategy>());
     add_builtin(std::make_unique<Rfc3339TextStrategy>());
@@ -258,10 +241,9 @@ FormatDetector::FormatDetector(const insight::semantic::ComposedSemantics& compo
     add_builtin(std::make_unique<SystemdJournalStrategy>());
     fallback_ = std::make_unique<RawTextStrategy>();
 
-    // Composed DIALECT strategies (ADR-17): each factory the composition carries produces one
-    // strategy, registered through the existing injection seam (probed once-per-line via
-    // custom_strategies_). Canon core names no dialect: every dialect strategy arrives from a
-    // semantic package. The factories are in canonical (package-sorted) order.
+    // refs: ADR-17
+    // invariant: the factories arrive in canonical package-sorted order, so registration order is
+    // run-independent.
     for (const insight::semantic::StrategyFactory factory : composed.strategy_factories())
         register_strategy(factory());
 
@@ -280,8 +262,6 @@ void FormatDetector::register_strategy(std::unique_ptr<IFormatStrategy> strategy
     custom_strategies_.push_back(strategies_.back().get());
 }
 
-// Returns the strategy with the highest confidence score for the given line.
-// O(C + U) where C is the heuristic candidate count and U is custom strategy count.
 IFormatStrategy* FormatDetector::detect(std::string_view line) const
 {
     IFormatStrategy* best = nullptr;
@@ -290,7 +270,7 @@ IFormatStrategy* FormatDetector::detect(std::string_view line) const
 
     for (std::size_t i = 0; i < candidates.size; ++i)
     {
-        IFormatStrategy* strategy = by_format_[format_index(candidates.formats[i])]; // NOLINT
+        IFormatStrategy* strategy = by_format_[format_index(candidates.formats[i])];
         if (strategy == nullptr)
             continue;
         const double score{strategy->confidence(line)};
@@ -308,7 +288,7 @@ IFormatStrategy* FormatDetector::detect(std::string_view line) const
         bool already_evaluated = false;
         for (std::size_t i = 0; i < candidates.size; ++i)
         {
-            if (by_format_[format_index(candidates.formats[i])] == strategy) // NOLINT
+            if (by_format_[format_index(candidates.formats[i])] == strategy)
             {
                 already_evaluated = true;
                 break;
@@ -333,16 +313,11 @@ IFormatStrategy* FormatDetector::detect(std::string_view line) const
         return best;
     }
 
-    // No structured strategy matched: template the line as raw text rather than
-    // dropping it (empty lines stay dropped). The fallback never enters the
-    // sticky fast-path because its confidence is a constant 0.0.
+    // invariant: the fallback can be LATCHED as sticky but never arms the fast path — its
+    // confidence is a constant 0.0, so full detection always resumes.
     return trim_left(line).empty() ? nullptr : fallback_.get();
 }
 
-// Weighted-sum detection across a sample batch.
-// For each line, heuristic candidates and custom strategies contribute scores.
-// Returns the strategy with the highest cumulative confidence.
-// O((C + U) * N) where N is sample size.
 IFormatStrategy* FormatDetector::detect_from_batch(std::span<const std::string_view> sample) const
 {
     if (sample.empty() || strategies_.empty())
@@ -355,16 +330,16 @@ IFormatStrategy* FormatDetector::detect_from_batch(std::span<const std::string_v
         const CandidateList candidates = candidates_for(line);
         for (std::size_t i = 0; i < candidates.size; ++i)
         {
-            const auto index{format_index(candidates.formats[i])};                  // NOLINT
-            if (IFormatStrategy* strategy = by_format_[index]; strategy != nullptr) // NOLINT
-                scores[index] += strategy->confidence(line);                        // NOLINT
+            const auto index{format_index(candidates.formats[i])};
+            if (IFormatStrategy* strategy = by_format_[index]; strategy != nullptr)
+                scores[index] += strategy->confidence(line);
         }
         for (IFormatStrategy* strategy : custom_strategies_)
         {
             bool already_evaluated = false;
             for (std::size_t i = 0; i < candidates.size; ++i)
             {
-                if (by_format_[format_index(candidates.formats[i])] == strategy) // NOLINT
+                if (by_format_[format_index(candidates.formats[i])] == strategy)
                 {
                     already_evaluated = true;
                     break;
@@ -372,27 +347,22 @@ IFormatStrategy* FormatDetector::detect_from_batch(std::span<const std::string_v
             }
             if (already_evaluated)
                 continue;
-            scores[format_index(strategy->format())] += strategy->confidence(line); // NOLINT
+            scores[format_index(strategy->format())] += strategy->confidence(line);
         }
     }
 
-    // `auto` (not `auto*`): max_element returns an ITERATOR — a raw pointer on libstdc++/libc++ but
-    // a wrapper class on MSVC's STL, so forcing pointer deduction breaks there. *it and
-    // std::distance below work for any random-access iterator. NOLINT: clang-tidy's qualified-auto
-    // wants `auto*`, which is the very libstdc++-ism that broke MSVC — keep `auto`.
+    // note: `auto`, not `auto*`: max_element is a class on MSVC's STL, not a pointer.
     // NOLINTNEXTLINE(readability-qualified-auto)
     const auto max_score_it{std::ranges::max_element(scores)};
     if (*max_score_it == 0.0)
     {
-        // No structured format dominates the sample — fall back to raw text so a
-        // batch of unstructured CI output is templated rather than dropped.
         const bool any_content{std::ranges::any_of(sample, [](std::string_view line)
                                                    { return !trim_left(line).empty(); })};
         return any_content ? fallback_.get() : nullptr;
     }
 
     const auto winning_index{static_cast<std::size_t>(std::distance(scores.begin(), max_score_it))};
-    IFormatStrategy* winner = by_format_[winning_index]; // NOLINT
+    IFormatStrategy* winner = by_format_[winning_index];
     if (winner == nullptr)
         return nullptr;
     INSIGHT_LOG_DEBUG(logging::detector_logger(),

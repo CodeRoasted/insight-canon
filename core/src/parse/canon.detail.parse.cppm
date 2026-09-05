@@ -1,39 +1,36 @@
-// insight.canon.detail.parse — SEALED detection/parsing domain (
-// ADR-3.D4). FormatDetector (strategy registry + majority vote) and LogParser (arena + detector +
-// sticky active-strategy state). Top of the strategy chain: imports detail.strategy for the
-// IFormatStrategy/ParsedLine contract it routes. Never re-exported by the facade and never
-// installed (PRIVATE file set).
+// refs: ADR-3.D4
+// invariant: SEALED — never re-exported by the facade and never installed (a PRIVATE file set),
+// so nothing outside canon can import it.
 export module insight.canon.detail.parse;
-import insight.canon.internal; // std + global C types
-import insight.canon.api;      // LogFormat, ArenaAllocator
-import insight.canon.spi;      // SemanticPackageManifest (composed strategy factories)
-import insight.canon.compose;  // ComposedSemantics — composed strategies + echoed-source hooks
-import insight.canon.detail.strategy; // IFormatStrategy, ParsedLine
-import insight.canon.detail.scan;     // fast_gates char-class predicates (FormatDetector's probes)
+import insight.canon.internal;
+import insight.canon.api;
+import insight.canon.spi;
+import insight.canon.compose;
+import insight.canon.detail.strategy;
+import insight.canon.detail.scan;
 
-// ──────── from src/insight/tokenization/format_detector.hpp ────────
 export namespace insight::tokenization
 {
 
 class FormatDetector
 {
   public:
-    // Registers the built-in REPRESENTATION-format strategies, then the composed DIALECT strategies
-    // (ADR-17): the strategy factories `composed` carries are instantiated via
-    // register_strategy. No dialect strategy is hardcoded here — core is semantic-unaware
-    // (SRC-SP-1).
+    // refs: ADR-17, SRC-SP-1
+    // invariant: only REPRESENTATION strategies are named here; every DIALECT strategy arrives as a
+    // factory carried by `composed`, so canon core names no dialect.
     explicit FormatDetector(const insight::semantic::ComposedSemantics& composed);
 
     void register_strategy(std::unique_ptr<IFormatStrategy> strategy);
 
-    // Returns best-matching strategy for a given line
+    // post: the highest-confidence strategy, or the raw-text fallback on a non-empty line no
+    // structured strategy claims; O(C + U) in candidates and custom strategies.
     [[nodiscard]] IFormatStrategy* detect(std::string_view line) const;
 
-    // Detect from a sample batch (majority vote)
+    // post: the strategy with the highest CUMULATIVE confidence over the sample — a sum, so one
+    // strong line can outweigh a numerical majority; O((C + U) * N).
     [[nodiscard]] IFormatStrategy*
     detect_from_batch(std::span<const std::string_view> sample) const;
 
-    // Get all registered strategies
     [[nodiscard]] std::span<const std::unique_ptr<IFormatStrategy>> strategies() const noexcept;
 
   private:
@@ -44,8 +41,8 @@ class FormatDetector
     std::vector<IFormatStrategy*> custom_strategies_;
     std::array<IFormatStrategy*, kFormatSlotCount> by_format_{};
 
-    // Last-resort catch-all. Used only when no structured strategy scores on a
-    // non-empty line, so unstructured text is templated rather than dropped.
+    // invariant: reached only when no structured strategy scores on a NON-EMPTY line, so
+    // unstructured text is templated rather than dropped; an empty line stays dropped.
     std::unique_ptr<IFormatStrategy> fallback_;
 };
 
@@ -53,32 +50,16 @@ class FormatDetector
 
 export namespace insight::tokenization
 {
-// Declared before the passkey below so its friend declaration binds to THIS (module-attached)
-// entity — a friend naming an undeclared class inside a linkage-specification would mint a
-// global-module phantom instead.
+// note: declared here so the passkey's friend binds this module-attached class.
 class LogParser;
 } // namespace insight::tokenization
 
-// ── The privileged mint — the canon-interior half of the boundary scope (ADR-21.D4) ─────────────
-// THE one non-public producer of `NormalizedContent`, and the friend list below is the audit
-// surface: growing it is a visible, reviewable edit, and the door-census gate pins it at ONE.
-//
-// WHY IT EXISTS: canon's own tokenizer hands strategy-produced `ParsedLine::content` to the
-// walkers, and six of the 22 strategies REBUILD content into arena bytes — not a suffix of the
-// line — so no public narrowing door can express them. The attestation is issued by `LogParser`
-// (the object that PERFORMS stage 1, unconditionally, at its one named site;
-// SRC-D-TID-11 — see canon.api.cppm (normalize()) for the contract.), not
-// asserted by the consumer.
-//
-// WHY `extern "C++"`: a linkage-specification attaches the class to the GLOBAL module, which is
-// what lets the public api unit (which cannot import this sealed shard) name it in a friend
-// declaration and have both refer to ONE entity. The key stays sealed all the same: this shard is
-// never installed and never re-exported, so no consumer outside canon can complete — or
-// construct — the type.
-//
-// ⚠ THE CONFORMANCE KIT MUST NEVER REACH FOR THIS. Its nine synthesized probes are escape-free by
-// construction, so `normalize()` is a fixed point on them and the public factory is the honest
-// door — minting there would grow this friend list to two and delete the mechanism (§12.5.2).
+// refs: ADR-21.D4, SRC-D-TID-11, F-SRC-insight-canon:test_normalized_content_doors.cpp
+// invariant: THE one non-public producer of `NormalizedContent` — the passkey's friend list is
+// pinned at ONE by the door census, and growing it deletes the mechanism.
+// invariant: the conformance kit must never mint here; its probes are escape-free by construction,
+// so `normalize()` is a fixed point on them and the public factory serves.
+// note: `extern "C++"` puts the class on the GLOBAL module so api and this shard name ONE entity.
 extern "C++"
 {
     namespace insight::tokenization
@@ -86,8 +67,6 @@ extern "C++"
         class LogParserPasskey
         {
           public:
-            // The mint. Callable only by whoever can construct the key — LogParser, and nobody
-            // else.
             [[nodiscard]] NormalizedContent mint(std::string_view stage1_bytes) const noexcept
             {
                 return NormalizedContent{stage1_bytes};
@@ -95,7 +74,7 @@ extern "C++"
 
           private:
             constexpr LogParserPasskey() noexcept = default;
-            friend class LogParser; // THE friend list — size one, asserted by the door-census gate
+            friend class LogParser;
         };
     } // namespace insight::tokenization
 }
@@ -103,53 +82,35 @@ extern "C++"
 export namespace insight::tokenization
 {
 
-// LogParser wraps arena + FormatDetector + active strategy.
-// Thread-safety: NOT thread-safe; use one instance per thread / strand.
+// invariant: NOT thread-safe — one instance per thread or strand.
 class LogParser
 {
   public:
-    // Holds the composed vocabulary (borrowed): the FormatDetector's dialect strategies + the
-    // echoed-source provenance hooks it consults on the raw line (ADR-17). Must outlive the
-    // parser.
+    // refs: ADR-17
+    // pre: `composed` is borrowed — the composed vocabulary must outlive the parser.
     LogParser(ArenaAllocator& arena, const insight::semantic::ComposedSemantics& composed);
 
-    // Force a specific format; disables auto-detection.
+    // post: auto-detection is off; a format no registered strategy carries re-enables it instead.
     void set_format(LogFormat fmt);
 
-    // Enable / disable per-line auto-detection (default: enabled).
     void set_auto_detect(bool enabled);
 
-    // Parse a single line. Once a strategy is selected, the line is copied into
-    // the arena so string_views inside the returned ParsedLine are stable.
+    // post: the line is copied into the arena, so every string_view on the returned ParsedLine
+    // stays valid until the arena is reset.
     [[nodiscard]] std::expected<ParsedLine, std::string> parse_line(std::string_view line);
 
-    // Like parse_line() but skips the arena store_string() copy.
-    // The caller guarantees that `stable_line` and all string_views sliced from
-    // it remain valid for the arena's lifetime (e.g. mmap'd or pre-stored buffers).
+    // pre: `stable_line` and every view sliced from it stay valid for the arena's lifetime; this
+    // door makes no arena copy.
     [[nodiscard]] std::expected<ParsedLine, std::string> parse_stable(std::string_view stable_line);
 
     [[nodiscard]] std::vector<std::expected<ParsedLine, std::string>>
     parse_batch(std::span<const std::string_view> lines);
 
-    // The §12.5.1(c) attestation. WHAT IT CARRIES DEPENDS ON WHICH PARSE PRODUCED THE BYTES, and
-    // the caller does not branch: `Tokenizer::Impl::make_event` (tokenizer_engine.cpp) serves both
-    // producer doors and calls this on `ParsedLine::content` either way (ADR-21.D4).
-    //   • reached via parse_line — stage-1 PERFORMANCE. Every byte derives from a line this parser
-    //     normalized unconditionally at its one named site (SRC-D-TID-11 — see canon.api.cppm
-    //     (normalize()) for the contract), including the six strategies that REBUILD content into
-    //     arena bytes, which assemble from post-strip input.
-    //   • reached via parse_stable — DOOR PROVENANCE, and nothing more: canon produced these bytes.
-    //     That door performs no stage 1 at all, deliberately — it holds ONE view and the
-    //     echoed-source demotion must read the raw, ANSI-bearing one — so the content attested
-    //     there was never normalized.
-    // The mint is not broken by that: it answers WHO may mint, its key's friend list is still
-    // exactly one entry, and that list is still the audit surface the door-census gate pins. It was
-    // never an instrument for WHAT ran before it, and a consumer reading it as evidence that
-    // normalization ran is wrong on one path in two. What entitles this class to hold the one
-    // passkey is that BOTH answers are local to it and reviewable in one place.
-    // ⚠ For strategy-produced content ONLY. Anything else goes through `normalize()`.
-    // Deliberately NON-static: the attestation is issued by a HELD parser instance — the caller
-    // must possess the performer, not merely name its class.
+    // refs: ADR-21.D4, SRC-D-TID-11
+    // pre: `stage1_content` is strategy-produced; any other bytes go through `normalize()`.
+    // post: attests WHO minted, never WHAT ran before — via `parse_line` the bytes carry stage-1
+    // performance, via `parse_stable` door provenance only.
+    // note: non-static on purpose — the caller must hold the performer, not name its class.
     // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
     [[nodiscard]] NormalizedContent attest(std::string_view stage1_content) const noexcept
     {
@@ -159,47 +120,34 @@ class LogParser
     [[nodiscard]] std::size_t lines_parsed() const noexcept;
     [[nodiscard]] std::size_t lines_failed() const noexcept;
     [[nodiscard]] LogFormat detected_format() const noexcept;
-    // The format the most recent line was actually ROUTED to (the sticky/auto-detect winner).
-    // detected_format() reports only an explicitly set_format() — it stays Unknown under
-    // auto-detect, where the winner lives in sticky_strategy_. LogFormat::Unknown until a line
-    // routes. Per-line observability for the mixed-stream router (mis-route measurement).
+    // post: the format the last line ROUTED to, Unknown until one routes — detected_format()
+    // reports only an explicit set_format() and is Unknown under auto-detect.
     [[nodiscard]] LogFormat routed_format() const noexcept;
 
   private:
-    // Selects the active strategy for the given line, updating sticky/active
-    // state as a side-effect. Returns nullptr if no strategy matches.
     [[nodiscard]] IFormatStrategy* select_strategy(std::string_view line);
-    ArenaAllocator& arena_; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members): parser is
-                            // a non-owning facade over a caller-managed arena.
-    // The composed vocabulary (borrowed): the echoed-source provenance hooks parse_line consults.
-    // Declared BEFORE detector_ so it is constructed first (detector_ is built from it). NOLINT for
-    // the same non-owning-ref reason as arena_.
-    const insight::semantic::ComposedSemantics&
-        composed_; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+    // note: a non-owning facade over a caller-managed arena, which outlives the parser.
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
+    ArenaAllocator& arena_;
+    // note: borrowed — the composed vocabulary must outlive the parser.
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
+    const insight::semantic::ComposedSemantics& composed_;
     FormatDetector detector_;
     IFormatStrategy* active_strategy_{nullptr};
-    // Sticky: remembers the last auto-detected strategy. Tried first on each
-    // line to short-circuit the O(strategies) detection scan for homogeneous
-    // streams (the common case). Falls back to full detection when confidence
-    // returns 0.0 (format change) or on the first line.
+    // invariant: tried first on every line to short-circuit the O(strategies) detection scan; full
+    // detection resumes when its confidence returns 0.0.
     IFormatStrategy* sticky_strategy_{nullptr};
     bool auto_detect_{true};
-    LogFormat last_format_{LogFormat::Unknown}; // the format the last routed line was parsed with
+    LogFormat last_format_{LogFormat::Unknown};
     std::size_t parsed_count_{0};
     std::size_t failed_count_{0};
-    // Lines that carry NO EVENT and are not a failure: an empty line, and a line whose bytes were
-    // all escape sequences. Counted APART from `failed_count_`, because that counter gates the
-    // failure warns (first + every Nth) and feeds the failure-rate stat — and ordinary input
-    // diluting it is not cosmetic. Measured 2026-09-01, one pass over 4 082 GitHub CI logs:
-    // 523 126 empty lines against 87 643 real strategy failures, i.e. 85.6 % of the counter was
-    // ordinary input. Splitting them moved the SAME pass's bounded failure reports from 837 to
-    // 1 439, and two failure classes (IIS WNC, key=value) went from ZERO bounded reports to 47
-    // and 1 — a real failure was being crowded out of its own rate limit.
+    // refs: F-SRC-insight-canon:test_transport_peel_equivalence_gate.cpp
+    // invariant: lines carrying NO EVENT — empty, or all escape bytes — are counted here and
+    // never in failed_count_, which gates the failure warns and the failure rate.
     std::size_t skipped_count_{0};
-    // Reusable buffer for the stage-1 strip.
-    // SRC-D-TID-11 — see canon.api.cppm (normalize()) for the contract.
-    // Local: result is ≤ input, so the retained capacity makes the strip
-    // allocation-free in steady state.
+    // refs: SRC-D-TID-11
+    // invariant: the strip's result is never longer than its input, so the retained capacity makes
+    // stage 1 allocation-free in steady state.
     std::string escape_scratch_;
 };
 

@@ -414,6 +414,179 @@ Comment-only: the code token stream is identical to `HEAD`'s. Grammar:
 format. Behaviour: **809 of 809** on clang-21 and **809 of 809** on gcc-16.2, equal to the
 baseline. Count: 114 comment lines at HEAD to 48, a **58 % reduction**.
 
+## Unit 5 — `core/src/parse/` (3 files, 954 lines, 265 would-be violations)
+
+The detection and parsing domain: `FormatDetector` (the candidate heuristic plus the confidence
+scan), `LogParser` (arena, sticky routing, the stage-1 site, the level lift and the echoed-source
+demotion), and the sealed module interface that carries the `LogParserPasskey` privileged mint.
+The first unit of the resumed run, and the first in which the cold reader falsified **four**
+lines the conversion had written.
+
+| files | comment lines HEAD → gate | forms written |
+|---|---|---|
+| `canon.detail.parse.cppm`, `format_detector.cpp`, `log_parser.cpp` | 273 → 103 | pre 5 · post 6 · invariant 22 · note 12 · refs 17 · 29 continuations · 12 tool |
+
+`refs:` targets: `ADR-3.D4`, `ADR-16.D9`, `ADR-17`, `ADR-21.D4`, `ADR-22`, `ADR-22.D3`,
+`ADR-22.D6`, `DN-32.D3`, `DN-43.D4`, `DN-43.D14`, `SRC-D-PROV-1`, `SRC-D-TID-11`, `SRC-SP-1`,
+`F-SRC-insight-canon:test_normalized_content_doors.cpp`,
+`F-SRC-insight-canon:test_transport_peel_equivalence_gate.cpp`.
+
+### Census (`OPS-8.S4`), and the eleven suppressions that silenced nothing
+
+Namespace closers 8 → 8, `/*name=*/` 0, `clang-format off` 0, `wall-clock:` 0, `SPDX` 0. **No
+address lost**: every `SRC-` code, ADR and design-note slot the prose carried survives into a
+`refs:` line. Two `NOLINT` differences, both decisions:
+
+* **`canon.detail.parse.cppm` 4 → 3.** The fourth occurrence was the WORD "NOLINT" inside a prose
+  sentence (*"NOLINT for the same non-owning-ref reason as `arena_`"*), the class the verdict's
+  finding 7 named on unit 4. All three real directives survive and were re-homed.
+* **`format_detector.cpp` 12 → 1, and this is the unit's suppression finding.** Ten bare trailing
+  `// NOLINT` on array-index expressions plus one on a `CandidateList` member write were **measured
+  to silence nothing**: `clang-tidy-21` over a copy with every directive removed reports exactly
+  **one** finding, `readability-qualified-auto` at `max_score_it`, and the check the ten were
+  written for — `cppcoreguidelines-pro-bounds-constant-array-index` — is **disabled in the one
+  shared `.clang-tidy`** (`malf/config/.clang-tidy`, the symlink target). They were deleted with
+  that evidence. The eleventh, `NOLINTNEXTLINE(readability-qualified-auto)`, silences a real
+  diagnostic and was re-homed under its `note:`.
+
+The three real directives in `canon.detail.parse.cppm` were measured the same way: **with them in
+place 1 finding, without them 4** — `readability-convert-member-functions-to-static` on `attest`
+and `cppcoreguidelines-avoid-const-or-ref-data-members` on `arena_` and on `composed_`. The
+remaining finding, `mint` can be made static, is unsuppressed at `HEAD` and stays unsuppressed.
+After the conversion the same three files read **1, 0, 0**, identical to before, so both re-homed
+`NOLINTNEXTLINE`s still bind.
+
+**One of those two members needed the reflow to bind, and it is worth recording as a shape.**
+`composed_`'s declaration was split across two lines *because* its trailing `// NOLINT` pushed it
+over the column limit. Moving the directive to its own line above shortened the declaration, so
+clang-format rejoined `const insight::semantic::ComposedSemantics& composed_;` onto one line — and
+only then does a `NOLINTNEXTLINE` above it cover the line the diagnostic is reported on. Verified
+by re-running clang-tidy on the formatted result, not assumed.
+
+### Interrogation
+
+One fresh agent, 35 questions, 56 tool uses, 160 k tokens, 7.6 minutes. No git command was run;
+the transcript was checked. **31 of 35 recovered, 0 not recovered, 4 wrong — and all four wrong
+verdicts landed on lines THIS conversion wrote.** That is the highest wrong count of the run and
+the most valuable reader so far.
+
+Recovery reached instruments and mechanisms the prose never named: the module's seal was recovered
+from `core/CMakeLists.txt`'s `PRIVATE FILE_SET cxx_modules_detail` and the `install(TARGETS …)`
+rule rather than from any comment; the friend-list-of-one was recovered as the gtest
+`NormalizedContentDoors.TheMintKeyHasExactlyOneFriendAndItIsTheParser`, with the reader
+establishing by sweep that it is the **only** enforcer; the registration order was recovered from
+`compose.cpp`'s `canonical_order`, a byte-wise sort on package name with version as tiebreak; and
+the `parse_stable` price was recovered with a number from a test the unit does not mention
+(Stage 2's `kKeywordHead{128}` raw-byte cue budget).
+
+### The four lines the conversion wrote that were WRONG, each re-derived at the artifact
+
+1. **`composed_`'s declaration order was never load-bearing.** The old prose said *"Declared BEFORE
+   `detector_` so it is constructed first (`detector_` is built from it)"*, and the conversion
+   carried it into an `invariant:`. The reader answered that the constructor initializes
+   `detector_` from the **parameter**, not from the member: `: arena_(arena), composed_(composed),
+   detector_(composed)`. Re-read at `log_parser.cpp`: correct — swapping the two member
+   declarations would change nothing observable, and a reference member's binding needs no prior
+   construction anyway. **The claim was false in the original prose and the conversion signed it.**
+   Disposition: the `invariant:` is deleted, not repaired; the `note:` that `composed_` is borrowed
+   and must outlive the parser stands.
+2. **"a format absent from the candidate list is never probed" is true only of the BUILTINS.** The
+   reader answered that a composed strategy is pushed into `custom_strategies_` as well, and that
+   vector is walked on every line regardless of the candidate list. Re-read at
+   `format_detector.cpp`: correct. Repaired to *"a BUILTIN absent from this list is never probed …
+   a custom strategy is walked on every line regardless."*
+3. **"the fallback never becomes the sticky strategy" is false about the assignment.** The reader:
+   *"inaccurate about the member assignment and accurate about the behaviour."* Re-read at
+   `select_strategy`: `sticky_strategy_ = found` runs whenever `found` is non-null, and `detect()`
+   returns `fallback_.get()` on an unclaimed non-empty line — so the fallback **is** latched. What
+   it can never do is arm the fast path, because the guard is `confidence(line) > 0.0` and
+   `RawTextStrategy::confidence` is a constant `0.0`. Repaired to *"can be LATCHED as sticky but
+   never arms the fast path."*
+4. **"blank input must not move the rate" is false for a whitespace-only line.** The reader:
+   `parse_line` skips only a zero-length `raw_line`; a line of spaces reaches `detect()`, which
+   tests `trim_left(line).empty()` and returns `nullptr`, so it lands in `failed_count_`. Re-read
+   at both sites: correct, and `core/tests/parse/test_format_detector.cpp`'s
+   `ReturnsNullForEmptyLine` asserts `detect("   ") == nullptr` in so many words. The line was
+   repaired to state only what holds — *"the denominator is parsed + failed only, so a line counted
+   as skipped cannot move the failure rate"* — and the underlying gap became finding 1 below.
+
+A fifth line was **imprecise rather than wrong** and was tightened on the same reading: the
+`parse_stable` note said *"a pre-ANSI-stripped stable line carries no wrapper — the demotion is a
+no-op"*, which reads as unconditional. The reader pointed out that the door exists precisely for
+callers who did **not** strip, where the demotion is live. Now: *"a caller that already stripped
+ANSI hands no wrapper here, so this is a no-op."*
+
+### Two stale claims in the OLD prose, deleted with the evidence
+
+1. **`detect_from_batch` is not a majority vote.** Two comments called it one (*"Detect from a
+   sample batch (majority vote)"* at the declaration, and the module header's *"strategy registry +
+   majority vote"*). The function accumulates `scores[index] += strategy->confidence(line)` over the
+   sample and takes `max_element`, so one high-confidence line can outweigh a numerical majority of
+   another format's. Deleted; the `post:` now says **CUMULATIVE confidence** and says why that is not
+   a count. The reader reached the same verdict independently.
+2. **`set_format`'s fallback is immediate, not deferred.** The comment said *"auto-detection is
+   re-enabled on the next call"*; `log_parser.cpp` sets `auto_detect_ = true` in that same call,
+   before returning. The `post:` at the declaration states the immediate behaviour.
+
+### Two unsourced measurements deleted rather than re-homed (`OPS-8.S9`'s new row)
+
+* **`skipped_count_`'s justification.** The prose carried *"one pass over 4 082 GitHub CI logs:
+  523 126 empty lines against 87 643 real strategy failures, i.e. 85.6 % of the counter was
+  ordinary input"*, and an effect measurement — bounded failure reports 837 → 1 439, IIS WNC 0 → 47,
+  key=value 0 → 1. **Half of it is re-derivable and half is not.** `523'126` is pinned in this
+  repo, as the `blank_and_empty` field of the `data/v1/full` slice (4 082 logs) in
+  `F-SRC-insight-canon:test_transport_peel_equivalence_gate.cpp`, so that leg has a home and the
+  `refs:` now names it. `87 643`, the 85.6 %, and every effect figure appear **nowhere else in the
+  workspace** — verified by an allowlisted sweep over every sibling repo and every tracked
+  top-level file. They are deleted and become finding 2 below; the RULE they justified survives as
+  the `invariant:`.
+* **The 57.7 MB stderr figure.** The `parse failed:` WARN carried *"the tokenizer facade used to
+  reprint every failure's text at WARN with no rate limit at all, and that unbounded duplicate is
+  what turned one corpus pass into 57.7 MB of stderr."* The string `57.7` occurs in no other file
+  in the workspace. Deleted. What survives is the live half, and the reader confirmed it at the
+  artifact: `tokenizer_engine.cpp` still reprints `parsed.error()`, now at **DEBUG and unbounded**,
+  so this WARN really is the only rate-limited record.
+
+### Dispositions
+
+**Nothing re-homed above the comment rung, and no law block minted.** All 31 recovered claims were
+carried by the converted code, the api and spi module interfaces, `core/CMakeLists.txt`, the ADR
+or design note a `refs:` names, or a test the reader found. The four wrong lines were repaired in
+the tree before the commit and the unit was re-derived from `HEAD`, re-stripped, re-placed,
+re-formatted and re-witnessed (`OPS-8.S9`'s hand-edit rule, taken as a full regeneration rather
+than a hand edit).
+
+### Findings for other lanes — none fixed here
+
+1. **A whitespace-only line is counted as a FAILURE, not a skip — Hephaïstos (canon), with Kleio
+   for the witness.** `LogParser::parse_line` short-circuits on `raw_line.empty()` only. A line of
+   spaces or tabs is non-empty, survives stage 1 unchanged, reaches `FormatDetector::detect`, which
+   returns `nullptr` because it tests `trim_left(line).empty()` — and the caller then does
+   `++failed_count_`. `skipped_count_` exists precisely so no-event input cannot dilute the failure
+   counter that gates the bounded WARN and feeds the failure-rate stat, and whitespace-only input
+   defeats it. This is a **code** change and did not belong in a comment-only commit.
+2. **The measurement that justified splitting the two counters has no home — Eqya, to route.**
+   87 643 strategy failures over the 4 082-log GitHub CI slice, and the 837 → 1 439 bounded-report
+   effect with its two zero-to-nonzero classes, exist only in the comment this unit deleted. The
+   population is the same one `test_transport_peel_equivalence_gate.cpp` pins, so the missing half
+   is re-derivable by running the measurement again — but it is not knowledge the tree currently
+   holds, and re-asserting it in a tagged line would have been the conversion inventing a fact.
+3. **A test caption states a rule the code does not implement —
+   `F-SRC-insight-canon:test_format_detector.cpp`, for this migration's own test tier.**
+   `BatchHandlesMixedFormats` opens with *"Majority JSON (2/3) should win"*. The winner is the
+   highest cumulative confidence, not the most-claimed format; the fixture's sum and count happen
+   to agree, so the test passes without discriminating the two rules. The caption is repaired when
+   `core/tests/parse/` converts, and the test that would discriminate them is Kleio's call.
+
+### Witnesses
+
+Comment-only: the code token stream of all three files is identical to `HEAD`'s. Grammar:
+`malf format --check core/src/parse` — 103 comment lines, **0 would-be violations**, post format.
+Behaviour: `malf test insight-canon` **809 of 809** on clang-21 and **809 of 809** with
+`--profile linux-gcc16-release`, equal to the baseline. Lint: the three files read 1, 0, 0
+clang-tidy findings, identical to `HEAD`. Count: 273 comment lines at HEAD to 103, a **62 %
+reduction**.
+
 ---
 
 # The `OPS-8` verdict — third cold reader, first at scale
