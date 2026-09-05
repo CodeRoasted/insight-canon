@@ -1,107 +1,67 @@
-// insight.canon.detail.scan — SEALED scanning foundation (ADR-3.D4).
-// The fast_gates layer: branch-light constexpr char/prefix predicates + the SSE2 sv_* parsing
-// primitives the strategy confidence()/parse() hot paths ride. Interface-only (everything inline /
-// constexpr — no impl units). Bottom of the canon detail DAG: imports internal only; SSE2
-// intrinsics live in the textual GMF.
-// Never re-exported by the facade and never installed (PRIVATE file set).
+// refs: ADR-3.D4
+// invariant: SEALED — never re-exported by the facade and never installed (a PRIVATE file set);
+// the bottom of the canon detail DAG, importing internal only.
+// invariant: interface-only — every entity here is inline or constexpr, so the module has no
+// implementation unit.
 module;
-// SSE2 is ABI-baseline on every x86-64 target, but the compilers ANNOUNCE it differently:
-// gcc/clang define __SSE2__ (here implied by -march=x86-64-v2); MSVC never does — it signals x64
-// via _M_X64 (and 32-bit SSE2 via _M_IX86_FP>=2). Detect the x86-64 target portably, then pull the
-// SSE2 intrinsics from each toolchain's header (<emmintrin.h> on gcc/clang/MSVC; <intrin.h> is the
-// MSVC umbrella that includes it). INSIGHT_CANON_SSE2 then gates BOTH the include AND the use
-// below, so a non-x86 target compiles the scalar fallback rather than failing on undeclared
-// intrinsics.
+// note: MSVC never defines __SSE2__; it announces x64 as _M_X64 — detect the target.
+// invariant: INSIGHT_CANON_SSE2 gates BOTH the include and every use below, so a non-x86 target
+// compiles the scalar fallback instead of failing on an undeclared intrinsic.
 #if defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
-// A pure feature-test gate consumed only by `#ifdef INSIGHT_CANON_SSE2` (never as a value),
-// so it carries no `1` — that is what makes it a compile-time switch rather than a constant.
+// note: a feature-test gate read only by #ifdef, never as a value — hence no value.
 #define INSIGHT_CANON_SSE2
-#include <emmintrin.h> // SSE2 intrinsics (fast_gates)
+#include <emmintrin.h>
 #endif
 
 export module insight.canon.detail.scan;
-import insight.canon.internal; // std + global C types
+import insight.canon.internal;
 
-// ──────── from src/insight/tokenization/strategies/detail/fast_gates.hpp ────────
-// fast_gates.hpp
-//
-// Branch-light, allocation-free predicates used by strategy `confidence()`
-// hot paths. All inline, all noexcept. The point is to shave the ~50–100 ns
-// per-strategy-probe RE2 cost (PartialMatch + char class scans) down to a
-// handful of cycles for non-matching strategies and ~10 ns for matches.
-//
-// Each predicate corresponds to a deterministic prefix/anchor pattern that
-// the strategy's parse() already checks rigorously. confidence() only needs
-// a fast yes/no — false positives are caught by parse(); false negatives are
-// caught nowhere, so every predicate must be a *strict subset* of what its
-// parse() pattern accepts at the same anchor position.
-//
-// The sv_* parsing primitives used in parse() hot paths are also here.
-// They use SSE2 SIMD (guaranteed on -march=x86-64-v2) for whitespace
-// scanning. The constexpr char predicates above remain constexpr; the
-// sv_* parse helpers are plain inline (runtime-only).
-
-// SSE2 is guaranteed by -march=x86-64-v2 (baseline x86-64 v2 ABI).
-
+// invariant: every predicate here accepts a STRICT SUBSET of what its strategy's parse() accepts at
+// the same anchor — parse() catches a false positive, nothing catches a false negative.
+// invariant: each is_*_prefix predicate is true iff `str` BEGINS with the shape its name describes,
+// at offset 0 unless the name says otherwise.
 export namespace insight::tokenization
 {
 
-// ── Character class primitives ───────────────────────────────────────────
-
 [[nodiscard]] constexpr bool is_digit(char chr) noexcept
 {
-    static constexpr unsigned kDecimalRadix{10U}; // range of decimal digits [0-9]
+    static constexpr unsigned kDecimalRadix{10U};
     return static_cast<unsigned>(chr) - '0' < kDecimalRadix;
 }
 
 [[nodiscard]] constexpr bool is_upper(char chr) noexcept
 {
-    static constexpr unsigned kAlphabetSize{26U}; // range of alpha letters [A-Z]
+    static constexpr unsigned kAlphabetSize{26U};
     return static_cast<unsigned>(chr) - 'A' < kAlphabetSize;
 }
 
 [[nodiscard]] constexpr bool is_lower(char chr) noexcept
 {
-    static constexpr unsigned kAlphabetSize{26U}; // range of alpha letters [a-z]
+    static constexpr unsigned kAlphabetSize{26U};
     return static_cast<unsigned>(chr) - 'a' < kAlphabetSize;
 }
 
-// ASCII letter [A-Za-z] — the canonical alpha predicate for the tokenization-detail world
-// (mask / format_detector route here instead of carrying private copies). Composed from the
-// trusted upper/lower pair, so a non-ASCII byte (signed-char-negative) is false by construction.
+// invariant: composed from the upper/lower pair, so a non-ASCII (signed-negative) byte is false by
+// construction.
+// note: THE alpha predicate here — mask and format_detector route to it, never a copy.
 [[nodiscard]] constexpr bool is_alpha(char chr) noexcept
 {
     return is_upper(chr) || is_lower(chr);
 }
 
+// invariant: space and tab only — the strategy patterns spell \s+, and only these two occur at
+// the prefixes they check.
 [[nodiscard]] constexpr bool is_space(char chr) noexcept
 {
-    // POSIX [ \t]; the strategy patterns use \s+ but only space+tab occur
-    // in practice for these prefix checks.
     return chr == ' ' || chr == '\t';
 }
 
-// ── The WRAPPER-SHELL catalog (SRC-D-MSK-6) ──────────────────────────────────────
-// FROZEN, DECLARED byte pairs: the punctuation a producer wraps a whole token in. A shell is NOT
-// part of the value it surrounds, and no mask rule may treat it as one.
-//
-// WHY THIS IS A CATALOG AND NOT AN `if`, AND WHY IT LIVES HERE. The IPv4 rule already decided that
-// a shell does not defeat the class — its grammar spelled `\[?…\]?` — and then implemented that
-// decision over a hand-picked subset of ONE pair. `(10.100.0.250)` therefore failed at byte 0, was
-// not digit-leading, and fell to literal KEEP; SIX rows of the published render
-// `coderoast-hub/showcase/canon/loghub.canon.txt` carry a real third-party address for exactly that
-// reason, inside their `templates` section — where the reader has been told the addresses are gone.
-// Nothing anywhere chose `[` over `(`: it was the pair the first corpus happened to show. A closed
-// table makes the next delimiter a lookup instead of a second incident (the kEphemeralRoots /
-// kCurrencyMarkers discipline), and it sits in scan because TWO call sites read it — rule 4's
-// grammar in mask.cpp and `has_separator` below. A second copy is how two maskers diverge and
-// template identity stops being a pure function of the line (SRC-D-MSK-4's stated reason).
-//
-// WHAT THE ASYMMETRY ACTUALLY WAS, measured rather than assumed: only the OPENING byte was ever the
-// defect. A trailing closer leaves byte 0 a digit, so `10.100.0.250)` was already masked by the
-// digit-leading rule and never leaked; an opener destroys digit-leading and leaves rule 4 the only
-// rule that can see the token. The closers matter as the shell's trailing half, never as a second
-// entry point.
+// refs: SRC-D-MSK-4, SRC-D-MSK-6
+// invariant: FROZEN, DECLARED byte pairs — a shell is NOT part of the value it surrounds, and no
+// mask rule may treat it as one.
+// invariant: ONE catalog for every reader — a second copy is how two maskers diverge and template
+// identity stops being a pure function of the line.
+// note: only the OPENING byte was ever the defect — a closer leaves byte 0 a digit.
 struct WrapperPair
 {
     char open;
@@ -128,33 +88,20 @@ inline constexpr std::array<WrapperPair, 6> kWrapperPairs{{
                                [chr](const WrapperPair& pair) { return pair.close == chr; });
 }
 
-// ── TokenShape — one-pass per-token byte profile (ADR-16.D5, the precedence) ──────
-// The masker classifies each whitespace token KEEP / MASK / NORMALIZE in a fixed precedence
-// (SRC-D-TID-12). Several steps of that dispatch each re-walked the token: is_all_digits (the
-// status-value KEEP), the composite-trigger any_of, and is_digit_leading (the digit mask).
-// TokenShape walks the token's bytes ONCE and records the facts they all need, so the dispatch
-// reads fields instead of re-scanning. Each field is the byte-exact equivalent of the scan it
-// replaces — same KEEP/MASK/NORMALIZE decision per token → masked template (hence template_id)
-// unchanged. Pure byte-only, single-token, no float, order-independent → cross-stdlib + MSVC
-// bit-identical (the SRC-D-TID-9 oracle). The composite normalizers keep their own segment walks;
-// this is the shared primitive for the common-case dispatch, and the seam A2's rule catalog reads.
+// refs: ADR-16.D5, SRC-D-TID-9, SRC-D-TID-12
+// invariant: each field is the byte-exact equivalent of the scan it replaces, so the
+// KEEP/MASK/NORMALIZE decision per token — and hence the template id — is unchanged.
+// invariant: byte-only, single-token, no float and order-independent, so the profile is
+// bit-identical across stdlibs and on MSVC.
+// note: one walk of the token's bytes replaces three the mask dispatch used to make.
 struct TokenShape
 {
-    bool empty{true};       // the token has no bytes
-    bool all_digits{false}; // non-empty AND every byte is an ASCII digit (== is_all_digits)
-    bool digit_leading{
-        false}; // first byte after an optional +/- sign is a digit (== is_digit_leading)
-    // contains a composite separator `: / # - =` OR any kWrapperPairs byte (the maybe_composite
-    // gate). The wrapper bytes joined this set with the SRC-D-MSK-6 repair, and the reason is the
-    // set's own history: `[` was in it and `( { < " '` were not, so a hex hash wrapped in brackets
-    // reached `embedded_identity` and normalized to `[<*>]` while the SAME hash in parentheses was
-    // never offered to the catalog and was KEPT WHOLE. A wrapped UUID escaped that only by
-    // accident — a UUID carries `-`, which was already in the set — and the accident is precisely
-    // what hid the hex case. Extending the gate (rather than teaching rule 3 a shell) is what
-    // reproduces the normal form the bracketed and UUID forms already produce, instead of minting
-    // a second one for the same class. `embedded_identity` is the ONLY rule the widened gate can
-    // newly reach: every other normalizer carries its own `: / # = $` trigger, all of which were
-    // already in the set.
+    bool empty{true};
+    bool all_digits{false};
+    bool digit_leading{false};
+    // invariant: embedded_identity is the ONLY rule the wrapper bytes newly reach — every other
+    // normalizer already carries its own trigger.
+    // note: the trigger set is `: / # - =` plus every kWrapperPairs byte.
     bool has_separator{false};
 
     explicit constexpr TokenShape(std::string_view tok) noexcept : empty(tok.empty())
@@ -175,7 +122,6 @@ struct TokenShape
     }
 };
 
-// Skip 1+ leading spaces/tabs starting at pos. Returns new offset.
 [[nodiscard]] constexpr std::size_t skip_spaces(std::string_view str, std::size_t pos) noexcept
 {
     while (pos < str.size() && is_space(str[pos]))
@@ -183,7 +129,7 @@ struct TokenShape
     return pos;
 }
 
-// Skip exactly N digits starting at pos. Returns true on success and advances pos.
+// post: advances `pos` over at most max_n digits, and is true iff at least min_n were consumed.
 [[nodiscard]] constexpr bool consume_digits(std::string_view str, std::size_t& pos,
                                             std::size_t min_n, std::size_t max_n) noexcept
 {
@@ -193,27 +139,19 @@ struct TokenShape
     return (pos - start) >= min_n;
 }
 
-// ── Constants shared between predicate and parse() ───────────────────────
-// Strategy parse() methods import this module and use these directly; they
-// cannot be function-local.
-constexpr std::size_t kBsdMinLen{15U};  // "Mon DD HH:MM:SS" minimum
-constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
-// kGhaPrefixLen + is_github_actions_prefix relocated to insight_semantic_github (ADR-17 —
-// GHA line-format detection is dialect knowledge). is_rfc3339_prefix below stays (Syslog uses it).
+// invariant: namespace-scope so a strategy parse() body importing this module reads the SAME bound;
+// a function-local copy would be a second constant.
+constexpr std::size_t kBsdMinLen{15U};
+constexpr std::size_t kHdfsMinLen{16U};
 
-// ── Composite prefix predicates ──────────────────────────────────────────
-// Each returns true iff `str` begins (at offset 0 unless noted) with the
-// shape described by its name.
-
-// "YYYY-MM-DD" at offset `pos`.
 [[nodiscard]] constexpr bool match_iso_date_at(std::string_view str, std::size_t pos) noexcept
 {
-    static constexpr std::size_t kIsoDateLen{10U}; // "YYYY-MM-DD"
-    static constexpr std::size_t kIsoMon1{5U};     // first month digit
-    static constexpr std::size_t kIsoMon2{6U};     // second month digit
-    static constexpr std::size_t kIsoSep2{7U};     // '-' before day
-    static constexpr std::size_t kIsoDd1{8U};      // first day digit
-    static constexpr std::size_t kIsoDd2{9U};      // second day digit
+    static constexpr std::size_t kIsoDateLen{10U};
+    static constexpr std::size_t kIsoMon1{5U};
+    static constexpr std::size_t kIsoMon2{6U};
+    static constexpr std::size_t kIsoSep2{7U};
+    static constexpr std::size_t kIsoDd1{8U};
+    static constexpr std::size_t kIsoDd2{9U};
     if (pos + kIsoDateLen > str.size())
         return false;
     return is_digit(str[pos]) && is_digit(str[pos + 1]) && is_digit(str[pos + 2]) &&
@@ -222,13 +160,12 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
            is_digit(str[pos + kIsoDd1]) && is_digit(str[pos + kIsoDd2]);
 }
 
-// "HH:MM:SS" at offset `pos`.
 [[nodiscard]] constexpr bool match_time_at(std::string_view str, std::size_t pos) noexcept
 {
-    static constexpr std::size_t kTimeLen{8U};    // "HH:MM:SS"
-    static constexpr std::size_t kTimeColon2{5U}; // second ':' separator
-    static constexpr std::size_t kTimeSec1{6U};   // first second digit
-    static constexpr std::size_t kTimeSec2{7U};   // second second digit
+    static constexpr std::size_t kTimeLen{8U};
+    static constexpr std::size_t kTimeColon2{5U};
+    static constexpr std::size_t kTimeSec1{6U};
+    static constexpr std::size_t kTimeSec2{7U};
     if (pos + kTimeLen > str.size())
         return false;
     return is_digit(str[pos]) && is_digit(str[pos + 1]) && str[pos + 2] == ':' &&
@@ -236,11 +173,9 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
            is_digit(str[pos + kTimeSec1]) && is_digit(str[pos + kTimeSec2]);
 }
 
-// "Mon DD HH:MM:SS" — BSD syslog date. e.g. "Jan 15 08:03:22"
 [[nodiscard]] constexpr bool is_bsd_syslog_prefix(std::string_view str) noexcept
 {
-    static constexpr std::size_t kTimeLen{
-        8U}; // "HH:MM:SS" — for the size guard before match_time_at
+    static constexpr std::size_t kTimeLen{8U};
     if (str.size() < kBsdMinLen)
         return false;
     if (!is_upper(str[0]) || !is_lower(str[1]) || !is_lower(str[2]))
@@ -257,24 +192,19 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
     return match_time_at(str, pos);
 }
 
-// "YYYY-MM-DDTHH:MM:SS" — RFC 3339 prefix (T separator).
 [[nodiscard]] constexpr bool is_rfc3339_prefix(std::string_view str) noexcept
 {
-    static constexpr std::size_t kRfc3339TAt{10U};    // position of 'T' separator
-    static constexpr std::size_t kRfc3339TimeAt{11U}; // time field start
+    static constexpr std::size_t kRfc3339TAt{10U};
+    static constexpr std::size_t kRfc3339TimeAt{11U};
     return match_iso_date_at(str, 0) && str.size() > kRfc3339TAt && str[kRfc3339TAt] == 'T' &&
            match_time_at(str, kRfc3339TimeAt);
 }
 
-// (is_github_actions_prefix relocated to insight_semantic_github — ADR-17.)
-
-// "YYYY-MM-DD HH:MM:SS" — log4j / windows_cbs / iis_w3c shape.
-// Optionally requires a trailing fractional separator ('.' or ',').
 [[nodiscard]] constexpr bool is_iso_datetime_space_prefix(std::string_view str,
                                                           bool require_fraction) noexcept
 {
-    static constexpr std::size_t kIsoDateLen{10U}; // "YYYY-MM-DD"
-    static constexpr std::size_t kTimeLen{8U};     // "HH:MM:SS"
+    static constexpr std::size_t kIsoDateLen{10U};
+    static constexpr std::size_t kTimeLen{8U};
     if (!match_iso_date_at(str, 0))
         return false;
     if (str.size() <= kIsoDateLen || !is_space(str[kIsoDateLen]))
@@ -288,7 +218,6 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
     return pos < str.size() && (str[pos] == '.' || str[pos] == ',');
 }
 
-// "YYYY/MM/DD HH:MM:SS [" — nginx error prefix.
 [[nodiscard]] constexpr bool is_nginx_error_prefix(std::string_view str) noexcept
 {
     static constexpr std::size_t kNginxMinLen{22U};
@@ -311,14 +240,12 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
         return false;
     if (!match_time_at(str, kNginxTimeAt))
         return false;
-    // Find next '['; allow some space after time.
     for (std::size_t i{kNginxScanFrom}; i < str.size() && i < kNginxScanTo; ++i)
         if (str[i] == '[')
             return true;
     return false;
 }
 
-// "YY/MM/DD HH:MM:SS" — spark style (two-digit year-month-day).
 [[nodiscard]] constexpr bool is_spark_prefix(std::string_view str) noexcept
 {
     static constexpr std::size_t kSparkMinLen{17U};
@@ -338,7 +265,6 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
     return match_time_at(str, kSparkTimeAt);
 }
 
-// "YYMMDD HHMMSS digits..." — HDFS style (two 6-digit groups + a number).
 [[nodiscard]] constexpr bool is_hdfs_prefix(std::string_view str) noexcept
 {
     static constexpr std::size_t kHdfsDateLen{6U};
@@ -360,7 +286,6 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
     return is_space(str[kHdfsLastSpace]) && is_digit(str[kHdfsLastDigit]);
 }
 
-// "[DD.MM HH:MM:SS]" — proxifier prefix.
 [[nodiscard]] constexpr bool is_proxifier_prefix(std::string_view str) noexcept
 {
     static constexpr std::size_t kProxifierMinLen{17U};
@@ -380,7 +305,6 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
     return str.size() > kProxifierBracket && str[kProxifierBracket] == ']';
 }
 
-// "<NNN>D " — RFC 5424 PRI + version, then ISO date.
 [[nodiscard]] constexpr bool is_rfc5424_prefix(std::string_view str) noexcept
 {
     static constexpr std::size_t kRfc5424MinLen{6U};
@@ -400,7 +324,6 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
     return match_iso_date_at(str, skip_spaces(str, pos));
 }
 
-// "[Mon Mon DD HH:MM:SS" — apache error prefix. e.g. "[Tue Apr 27 10:15:22"
 [[nodiscard]] constexpr bool is_apache_error_prefix(std::string_view str) noexcept
 {
     static constexpr std::size_t kApacheMinLen{22U};
@@ -422,28 +345,22 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
     return match_time_at(str, pos);
 }
 
-// The byte class of BGL's uppercase identifier tokens. Two columns of the RAS grammar share it —
-// the curators' alert LABEL and the SUBSYS column — and they differ only in their length bound, so
-// the class is written once and each caller carries its own bound.
+// invariant: two RAS columns share this byte class — the alert LABEL and SUBSYS — and differ
+// only in a length bound, which each caller carries.
 [[nodiscard]] constexpr bool is_bgl_identifier_byte(char chr) noexcept
 {
     return is_upper(chr) || is_digit(chr) || chr == '_';
 }
 
-// "<label> N YYYY.MM.DD" — the BGL / Thunderbird record's opening three fields.
-//
-// `<label>` is LogHub's alert-class column: `-` on a normal record, otherwise an uppercase token
-// bounded at 16 bytes (41 distinct values over the pinned BGL corpus, the longest 9 bytes). It is
-// part of the GRAMMAR and part of NO projection field (DN-43.D14): it is the corpus curators'
-// answer key, written by nobody in the producing system, and an instrument measured against an
-// oracle must not ingest that oracle as a feature. Rejecting on it — which is what the former
-// `str[0] != '-'` test did — declined 348 460 of the corpus's 4 747 963 lines, every one of them
-// an alert-flagged record carrying a DECLARED fatal-class level word.
+// refs: DN-43.D14
+// invariant: the alert-class column is part of the GRAMMAR and of NO projection field — an
+// instrument must never ingest its own oracle as a feature.
+// note: the column is the corpus curators' answer key, written by no producer.
 [[nodiscard]] constexpr bool is_bgl_labelled_prefix(std::string_view str) noexcept
 {
     static constexpr std::size_t kBglMinLen{14U};
     static constexpr std::size_t kBglMaxDigits{20U};
-    static constexpr std::size_t kBglLabelMaxLen{16U}; // [A-Z] then up to 15 [A-Z0-9_]
+    static constexpr std::size_t kBglLabelMaxLen{16U};
     static constexpr std::size_t kBglDateLen{10U};
     static constexpr std::size_t kBglMon1{5U};
     static constexpr std::size_t kBglMon2{6U};
@@ -460,9 +377,9 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
         while (pos < str.size() && pos < kBglLabelMaxLen && is_bgl_identifier_byte(str[pos]))
             ++pos;
     }
-    // The label is a TOKEN: it must end at whitespace. Without this the bound above would silently
-    // truncate an over-long or mixed-case run and hand `<epoch>` a suffix of it, which is the gate
-    // and the grammar drifting apart (DN-43.D2) — the parse takes whole tokens.
+    // refs: DN-43.D2
+    // assert: the label is a TOKEN and must end at whitespace — otherwise the length bound
+    // silently truncates an over-long run and hands `<epoch>` a suffix of it.
     if (pos >= str.size() || !is_space(str[pos]))
         return false;
     pos = skip_spaces(str, pos);
@@ -477,7 +394,6 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
            is_digit(str[pos + kBglDay1]) && is_digit(str[pos + kBglDay2]);
 }
 
-// "DDDDDDDD-H:MM:S:MMM|" — health app prefix. e.g. "20171223-22:15:29:606|"
 [[nodiscard]] constexpr bool is_health_app_prefix(std::string_view str) noexcept
 {
     static constexpr std::size_t kHealthMinLen{18U};
@@ -491,17 +407,10 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
             return false;
     if (str[kHealthSepAt] != '-')
         return false;
-    // EVERY time field is variable-width, and this is DN-43.O5 measured rather than assumed.
-    // The predicate used to demand a 2-digit minute and 3-digit milliseconds; LogHub's own
-    // HealthApp_2k.log is not zero-padded anywhere, and those two requirements alone rejected
-    // 247 of its 2 000 lines (12.35 %). Measured field widths over that corpus: hour/minute/
-    // second 1,1,1 on 81 lines, 1,1,2 on 37, 1,2,1 on 27, 1,2,2 on 79, 2,1,1 on 46, 2,1,2 on 23,
-    // 2,2,1 on 289 and 2,2,2 on 1 418; millisecond width 1 on 9, 2 on 66, 3 on 1 925.
-    //
-    // NINE GENERATIONS OF GREEN SAID NOTHING ABOUT THIS, and the reason is the point: every
-    // HealthApp test line came from logcraft's fmt_health_app or from a sample copied out of it,
-    // and that writer zero-pads unconditionally. THE GENERATOR IS STRICTER THAN THE CORPUS, so a
-    // synthetic gate cannot see a gap its own generator forecloses.
+    // refs: DN-43.O5
+    // assert: every time field is variable width — LogHub's own HealthApp sample is not
+    // zero-padded anywhere.
+    // note: the generator zero-pads, so nine green generations could not see this gap.
     std::size_t pos{kHealthTimeAt};
     if (!consume_digits(str, pos, 1U, 2U))
         return false;
@@ -522,22 +431,16 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
         return false;
     if (pos >= str.size() || str[pos] != '|')
         return false;
-    // ARITY IS GRAMMAR (DN-43.D16). The record is
-    // `YYYYMMDD-HH:MM:SS:mmm|component|process_id|message` — four fields, three separators —
-    // and HealthAppStrategy::parse consumes three '|' unconditionally. The separator count
-    // therefore belongs here and not in parse(): a confidence() above zero commits parse() to
-    // succeed, and the two declines are not two spellings of one act. A parse()-side decline
-    // DELETES the line (LogParser::parse_line yields no event of any kind); a predicate-side
-    // decline DEMOTES it to RawTextStrategy, which keeps every byte in `content`. Proving the
-    // two remaining separators here is what makes the three takes in parse() total.
+    // refs: DN-43.D16
+    // assert: proving the two remaining separators HERE is what makes parse()'s three unconditional
+    // takes total.
+    // note: a parse()-side decline deletes the line; a decline here demotes it to raw text.
     const std::string_view::size_type second_sep{str.find('|', pos + 1U)};
     if (second_sep == std::string_view::npos)
         return false;
     return str.find('|', second_sep + 1U) != std::string_view::npos;
 }
 
-// HPC prefix: "N <s> <s> <s> NNNNNNNNNN N "
-// (id, source, target, ?, big-timestamp(>=10 digits), id, space).
 [[nodiscard]] constexpr bool is_hpc_prefix(std::string_view str) noexcept
 {
     static constexpr std::size_t kHpcMaxDigits{20U};
@@ -545,7 +448,6 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
     std::size_t pos{0};
     if (!consume_digits(str, pos, 1U, kHpcMaxDigits))
         return false;
-    // Three "non-space tokens".
     for (int i{0}; i < 3; ++i)
     {
         pos = skip_spaces(str, pos);
@@ -555,7 +457,6 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
             ++pos;
     }
     pos = skip_spaces(str, pos);
-    // 10+ digit timestamp.
     const std::size_t ts_start{pos};
     while (pos < str.size() && is_digit(str[pos]))
         ++pos;
@@ -569,8 +470,6 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
     return pos < str.size() && is_space(str[pos]);
 }
 
-// CLF anchor: locate "[DD/Mon/YYYY:HH:MM:SS" anywhere in the line.
-// Linear scan; in CLF the bracket is near the start, so this is cheap.
 [[nodiscard]] constexpr bool has_clf_timestamp(std::string_view str) noexcept
 {
     static constexpr std::size_t kClfMinLen{22U};
@@ -590,7 +489,6 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
         if (str[i] != '[')
             continue;
         const std::size_t pos{i + 1U};
-        // DeMorgan: !(A && B && ...) → !A || !B || ...
         if (!is_digit(str[pos]) || !is_digit(str[pos + 1]) || str[pos + 2] != '/' ||
             !is_upper(str[pos + 3]) || !is_lower(str[pos + 4]) || !is_lower(str[pos + kClfMon3]) ||
             str[pos + kClfSlash2] != '/')
@@ -605,8 +503,6 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
     return false;
 }
 
-// Find a kv-style '=' between two non-space, non-quote chars.
-// Used as the substring gate before running the more expensive RE2.
 [[nodiscard]] constexpr std::size_t count_kv_pair_signatures(std::string_view str,
                                                              std::size_t cap) noexcept
 {
@@ -617,10 +513,8 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
             continue;
         const char prev{str[i - 1]};
         const char next{str[i + 1]};
-        // key char before
         const bool key_ok{is_lower(prev) || is_upper(prev) || is_digit(prev) || prev == '_' ||
                           prev == '.' || prev == '-'};
-        // value start (non-space, non-equals)
         const bool val_ok{!is_space(next) && next != '='};
         if (key_ok && val_ok)
             ++found;
@@ -628,29 +522,18 @@ constexpr std::size_t kHdfsMinLen{16U}; // "YYMMDD HHMMSS digit" minimum
     return found;
 }
 
-// ── Zero-copy scanning primitives for parse() hot paths ──────────────────
-// `line` in parse() is already arena-stable (LogParser copies it before
-// calling parse()). These helpers slice string_views directly from `line`
-// — no heap copies needed for any split field.
-//
-// SIMD note: find_non_ws_ptr / find_ws_ptr use SSE2 16-byte scans when INSIGHT_CANON_SSE2 is
-// defined (every x86-64 target — see the GMF guard), and a scalar byte loop otherwise. The two
-// paths return identical pointers by construction (the scalar loop is the SIMD remainder handler,
-// reused as the whole-range path), so the canonical digest is invariant to the SSE2 decision.
-
+// refs: SRC-D-TID-9
+// invariant: the SIMD and scalar paths return identical pointers, so the canonical digest is
+// invariant to whether SSE2 was compiled in.
+// note: the scalar loop IS the SIMD remainder handler, reused as the whole range.
 namespace simd_detail
 {
 
-    constexpr int kSseWidth{16};             // 128-bit SSE register = 16 bytes
-    constexpr unsigned kSseMaskAll{0xFFFFU}; // 16-bit lane mask for 16-byte block
+    constexpr int kSseWidth{16};
+    constexpr unsigned kSseMaskAll{0xFFFFU};
 
+    // note: the intrinsics need a reinterpret_cast; the bounded views are not null-terminated.
     // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast, bugprone-not-null-terminated-result)
-    // SSE2 intrinsic path: raw pointer stride and _mm_loadu_si128 reinterpret_cast are required by
-    // the intrinsic API. find_non_ws_ptr / find_ws_ptr operate on bounded ranges expressed as
-    // string_view — no null termination is assumed or required.
-
-    // Returns pointer to the first non-whitespace byte in str,
-    // or str.data() + str.size() if all bytes are whitespace.
     [[nodiscard]] inline const char* find_non_ws_ptr(std::string_view str) noexcept
     {
         const char* ptr = str.data();
@@ -661,31 +544,24 @@ namespace simd_detail
         while (ptr + kSseWidth <= end)
         {
             const __m128i chunk = _mm_loadu_si128(reinterpret_cast<const __m128i*>(ptr));
-            // mask bit i = 1 means byte i is space or tab
             const auto mask = static_cast<unsigned>(_mm_movemask_epi8(
                 _mm_or_si128(_mm_cmpeq_epi8(chunk, vsp), _mm_cmpeq_epi8(chunk, vtab))));
             if ((mask & kSseMaskAll) != kSseMaskAll)
             {
-                // At least one non-ws byte in this block. countr_zero (std <bit>) replaces the
-                // gcc/clang-only __builtin_ctz: bit-exact for the non-zero input guaranteed here
-                // (~mask masked to kSseMaskAll has a clear bit ⇒ never 0), and portable to MSVC so
-                // the SSE2 path is identical across all three compilers (cross-OS determinism leg).
+                // assert: `~mask & kSseMaskAll` is non-zero here, the block holding a non-ws byte,
+                // so countr_zero is bit-exact with __builtin_ctz.
+                // note: std::countr_zero is portable to MSVC; __builtin_ctz was gcc/clang only.
                 ptr += std::countr_zero(~mask & kSseMaskAll);
                 return ptr;
             }
             ptr += kSseWidth;
         }
 #endif
-        // Scalar path: the SIMD remainder, or the WHOLE range on a non-SSE2 target. Byte-for-byte
-        // identical result to the SIMD block above — it IS the correctness reference the SIMD path
-        // mirrors — so the canonical digest is invariant to whether SSE2 was compiled in.
         while (ptr < end && is_space(*ptr))
             ++ptr;
         return ptr;
     }
 
-    // Returns pointer to the first whitespace byte in str,
-    // or str.data() + str.size() if no whitespace exists.
     [[nodiscard]] inline const char* find_ws_ptr(std::string_view str) noexcept
     {
         const char* ptr = str.data();
@@ -700,37 +576,31 @@ namespace simd_detail
                 _mm_or_si128(_mm_cmpeq_epi8(chunk, vsp), _mm_cmpeq_epi8(chunk, vtab))));
             if ((mask & kSseMaskAll) != 0U)
             {
-                // (mask & kSseMaskAll) != 0 guarantees a set bit ⇒ countr_zero input is non-zero ⇒
-                // bit-exact with the retired __builtin_ctz, portable to MSVC.
+                // assert: `mask & kSseMaskAll` has a set bit here, so countr_zero is bit-exact with
+                // the __builtin_ctz it replaced.
                 ptr += std::countr_zero(mask & kSseMaskAll);
                 return ptr;
             }
             ptr += kSseWidth;
         }
 #endif
-        // Scalar path: SIMD remainder, or the whole range on a non-SSE2 target (see
-        // find_non_ws_ptr).
         while (ptr < end && !is_space(*ptr))
             ++ptr;
         return ptr;
     }
 
     // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast, bugprone-not-null-terminated-result)
-
 } // namespace simd_detail
 
-// Skip leading whitespace in-place (SIMD-accelerated).
 inline void sv_skip_ws(std::string_view& str) noexcept
 {
     const char* const ptr = simd_detail::find_non_ws_ptr(str);
     str = str.substr(static_cast<std::size_t>(ptr - str.data()));
 }
 
-// Take next non-whitespace token; advance str past token + trailing whitespace.
-// Returns the token (empty if str is all-whitespace).
-// Every substr pos is in-bounds: find_*_ptr returns a pointer in [data, data+size],
-// and the all-whitespace case (non_ws_off == size) early-returns before any substr.
-// Every substr has pos <= size, so this noexcept body cannot throw.
+// post: the next non-whitespace token, with `str` advanced past it and past the whitespace that
+// follows; empty when `str` is all whitespace.
+// note: every substr pos is <= size, so this noexcept body cannot throw.
 // NOLINTNEXTLINE(bugprone-exception-escape)
 [[nodiscard]] inline std::string_view sv_take_token(std::string_view& str) noexcept
 {
@@ -746,17 +616,15 @@ inline void sv_skip_ws(std::string_view& str) noexcept
     const auto tok_size = static_cast<std::size_t>(ws_ptr - remaining.data());
     const std::string_view tok{remaining.substr(0, tok_size)};
 
-    // Skip trailing whitespace; leave str positioned at the next token start.
     const std::string_view after_tok{remaining.substr(tok_size)};
     const char* const next = simd_detail::find_non_ws_ptr(after_tok);
     str = after_tok.substr(static_cast<std::size_t>(next - after_tok.data()));
     return tok;
 }
 
-// Take chars up to (not including) delim; advance str past delim.
-// If delim not found, returns all of str and sets str to {}.
-// substr(0,pos) has pos arg 0; substr(pos+1U) runs only when find() returned a valid
-// index pos < size (npos returns early), so pos+1 <= size — the noexcept body cannot throw.
+// post: the bytes before `delim` with `str` advanced past it; all of `str`, and `str` emptied, when
+// `delim` is absent.
+// note: substr(pos + 1U) runs only after find() returned pos < size — cannot throw.
 // NOLINTNEXTLINE(bugprone-exception-escape)
 [[nodiscard]] constexpr std::string_view sv_take_until(std::string_view& str, char delim) noexcept
 {
@@ -772,23 +640,12 @@ inline void sv_skip_ws(std::string_view& str) noexcept
     return result;
 }
 
-// The PROJECTION-TOTALITY-safe form of sv_take_until, for the case where the delimiter is what
-// TERMINATES a named field rather than merely what separates two of them (ADR-16.D9).
-//
-// sv_take_until's no-delimiter branch hands back the WHOLE remainder and leaves `str` empty. A
-// caller that names the result — `component = sv_take_until(rest, ':'); content = rest;` —
-// therefore moves the entire message body onto a cube dimension and empties `content` on any line
-// the delimiter is missing from. That line then templates to the SHA-256 prefix of the empty
-// string, a universal collision bucket published on the wire as an ordinary identity, and the
-// component it invented is high-card free text on the cube's WHERE axis. It is the exact defect
-// DN-43 was opened for, and bounding one caller (SyslogStrategy) did not reach the branch's SHAPE
-// at the others.
-//
-// Here the field is simply NOT NAMED when its terminator is absent: `str` is left untouched, so
-// every byte survives into the caller's `content`, and an empty component is a positive statement
-// that this line declares no functional source — the direction ADR-16.D5's fail-safe KEEP demands,
-// and strictly cheaper than dropping the line (which would cost the timestamp and the declared
-// level the header already yielded).
+// refs: ADR-16.D9, ADR-16.D5, DN-43.D11
+// post: the field is simply NOT NAMED when its terminator is absent — `str` is left untouched, so
+// every byte survives into the caller's content.
+// invariant: sv_take_until's no-delimiter branch hands back the WHOLE remainder, which moves a
+// message body onto a cube dimension and templates the line to the hash of the empty string.
+// note: an empty component positively states that the line declares no source.
 [[nodiscard]] constexpr std::string_view sv_take_until_or_none(std::string_view& str,
                                                                char delim) noexcept
 {
@@ -797,8 +654,7 @@ inline void sv_skip_ws(std::string_view& str) noexcept
     return sv_take_until(str, delim);
 }
 
-// Take exactly n chars; advance str by n (capped at str.size()).
-// substr(0,actual) has pos arg 0; substr(actual) has actual = min(n,size) <= size — cannot throw.
+// note: actual is min(n, size), so both substr calls are in range and cannot throw.
 // NOLINTNEXTLINE(bugprone-exception-escape)
 [[nodiscard]] constexpr std::string_view sv_take_n(std::string_view& str, std::size_t n) noexcept
 {
@@ -808,8 +664,8 @@ inline void sv_skip_ws(std::string_view& str) noexcept
     return result;
 }
 
-// Expect '['; take until ']'; advance past ']'.
-// Returns inner content; returns {} and leaves str advanced if not '['.
+// post: the bracketed content with `str` advanced past `]`; on a view not opening `[`, an empty
+// result and `str` untouched.
 [[nodiscard]] constexpr std::string_view sv_take_bracketed(std::string_view& str) noexcept
 {
     if (str.empty() || str[0] != '[')
@@ -818,8 +674,8 @@ inline void sv_skip_ws(std::string_view& str) noexcept
     return sv_take_until(str, ']');
 }
 
-// Expect '"'; take until closing '"'; advance past '"'.
-// Returns inner content (without quotes); returns {} if str doesn't start with '"'.
+// post: the quoted content without its quotes; on a view not opening `"`, an empty result and `str`
+// untouched.
 [[nodiscard]] constexpr std::string_view sv_take_quoted(std::string_view& str) noexcept
 {
     if (str.empty() || str[0] != '"')
@@ -828,36 +684,24 @@ inline void sv_skip_ws(std::string_view& str) noexcept
     return sv_take_until(str, '"');
 }
 
-// The syslog daemon TAG, bounded to ONE token (DN-43.D3). A tag is one token that ends in `:`, or
-// in `[pid]:` whose bracket closes inside that same token — `sshd[12:34]`, whose colon sits inside
-// the brackets, is therefore not a tag and `nginx[2451]:` is. On success the tag is returned with
-// its `[pid]` stripped (the pid is instance identity, never the functional source) and `str` is
-// left at the message body.
-//
-// WHEN NO TAG IS DELIMITED, NOTHING IS REMOVED: the result is empty and `str` is untouched. That
-// branch is the whole repair. Its predecessor searched the WHOLE remainder for `[` or `:`, so
-// `cache key=session:1021 hit=true` yielded the component `cache key=session`, and a remainder
-// with no delimiter at all yielded the entire message as the component and an EMPTY content — a
-// line whose template is the SHA-256 of nothing. Measured over the pinned `Thunderbird_5M.log`:
-// 1 309 lines lost their whole body that way (`exiting on signal 15`), and 405 401 in total had a
-// multi-token remainder cut at a colon that was not a tag delimiter.
-//
-// The two callers differ only in what they do with an empty result, and both are correct:
-// SyslogStrategy DECLINES the line (a tag-less line is not syslog — the header is its claim),
-// while BGLStrategy's Thunderbird branch KEEPS the remainder as content with an empty component
-// (the record is already identified by its BGL header, so nothing about it is in doubt). That is
-// projection totality (ADR-16.D9) and naming totality (DN-43.D11) in one branch.
+// refs: DN-43.D3, DN-43.D11, ADR-16.D9
+// post: a tag bounded to ONE token ending in `:`, or in `[pid]:` closing inside that token,
+// returned with its pid stripped and `str` left at the message body.
+// invariant: when no tag is delimited NOTHING is removed — the result is empty and `str` is
+// untouched, so no caller loses a body to a colon that was not a delimiter.
+// note: syslog declines an empty result; BGL's Thunderbird branch keeps the remainder.
 [[nodiscard]] inline std::string_view take_bounded_syslog_tag(std::string_view& str) noexcept
 {
-    static constexpr std::string_view kTagStop{"[: \t"}; // first delimiter OR the token's end
-    static constexpr std::string_view kPidStop{"] \t"};  // the `[pid]` must close inside the token
+    static constexpr std::string_view kTagStop{"[: \t"};
+    static constexpr std::string_view kPidStop{"] \t"};
 
     const auto stop{str.find_first_of(kTagStop)};
     if (stop == std::string_view::npos || is_space(str[stop]) || stop == 0U)
         return {};
 
     std::string_view tag{str};
-    tag.remove_suffix(str.size() - stop); // keep bytes [0, stop) — noexcept, unlike substr
+    // note: remove_suffix keeps bytes [0, stop) and is noexcept, unlike substr.
+    tag.remove_suffix(str.size() - stop);
 
     std::size_t body_at{stop + 1U};
     if (str[stop] == '[')
@@ -869,26 +713,11 @@ inline void sv_skip_ws(std::string_view& str) noexcept
         body_at = close + 2U;
     }
 
-    str.remove_prefix(body_at); // in range: the colon branch proved stop < size, the bracket
-                                // branch proved close + 1 < size
+    // assert: `body_at` is in range — the colon branch proved stop < size and the bracket branch
+    // proved close + 1 < size.
+    str.remove_prefix(body_at);
     sv_skip_ws(str);
     return tag;
 }
-
-// ── ANSI / terminal escape stripping. SRC-D-TID-11 — see canon.api.cppm
-// (normalize()) for the contract.
-// Relocated to insight.canon.api
-// ─────────────────── The stage-1 factory `normalize()` + kEsc/kBel + the two body scanners live in
-// the PUBLIC api unit. They were never detail-scan knowledge: the cluster depends on nothing in
-// this shard (no strategy, no gate, no SSE2 primitive) and sat here only because its one caller,
-// LogParser, lives in detail.parse. Stage 1 is an obligation on every `recognize()`/`classify()`
-// CONSUMER, not just on canon's own parser, so it must be reachable — a sealed shard cannot carry a
-// precondition that external callers are required to satisfy.
-
-// ── Echoed-source detection (SRC-D-PROV-1) relocated to insight_semantic_github (ADR-17) ──
-// The GHA command-echo SGR catalog (`\x1b[36;1m … \x1b[0m`), parse_sgr_params, and
-// is_echoed_source_line are dialect knowledge — they now live in the github package's code tier and
-// reach LogParser as a composed ProvenanceHook. The stage-1 strip stays core: it is a universal
-// ANSI ingest normalization, not dialect-specific.
 
 } // namespace insight::tokenization
