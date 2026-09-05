@@ -1,53 +1,34 @@
-// insight.canon.conformance — the permanent, package-agnostic CONFORMANCE KIT (ADR-17,
-// SRC-SP-2). The canon-shipped harness EVERY semantic package (ours or an external author's) must
-// pass. A package's test target instantiates it in one line:
-//
-//     import insight.canon.conformance;
-//     import insight.semantic.github;
-//     TEST(Conformance, GithubPackagePassesTheKit) {
-//         const auto
-//         report{insight::semantic::conformance::run(insight::semantic::github::kManifest)}; for
-//         (const auto& check : report.checks)
-//             EXPECT_TRUE(check.passed) << "[" << check.name << "] " << check.detail;
-//     }
-//
-// It is the OPEN-SOURCE HONESTY MECHANISM (SRC-SP-2): the identical kit ships installed so an
-// external package author runs the same gate CodeRoast's own packages are held to.
-// Verbose-on-failure matters doubly here — a failing check must diagnose itself for someone who has
-// never read canon's internals.
-//
-// PURE by design: imports only the facade (compose/ComposedSemantics + the recognition walkers) +
-// spi (the row grammar + manifest). NO gtest dependency (a package's ~10-line test file adapts the
-// report to its own framework), and — deliberately — NO global `operator new` override (that must
-// never ship in the canon library). The DYNAMIC heap/float-freedom guard is homed where a `new`
-// override is legitimate (the canon core test binary, tests/compose/test_semantic_walkers.cpp):
-// allocation-freedom is a canon-ALGORITHM property, proven once over the walkers, not re-proven per
-// data-only package.
-//
-// The probe corpus is DERIVED FROM THE MANIFEST, so the kit is self-adapting — it works for any
-// package's vocabulary with zero per-package configuration. An intent-marker probe is its own row's
-// PAIRED EMIT ROW, materialized (`marker_probe_for`); a structural-role probe, which has no writer
-// dual, is still the key plus a payload token.
-//
-// RED-CAPABILITY, OBSERVED 2026-07-29 rather than asserted. Mutation: build the marker probe as
-// `prefix + " probe"` — what this kit did before grammar-5 — and run the Jenkins package suite.
-// Reported: `[dialect_gate.marker_own] marker key "[Pipeline] { (" did NOT fire on its OWN medium …
-// for the probe "[Pipeline] { ( probe"`, 4/5 checks passed. That is the defect the current shape
-// repairs: the naive probe is valid only for a RemainderAfterPrefix row, so Jenkins's STAGE row
-// could not fire ANYWHERE, and `dialect_gate.marker_leak` was reporting green about a row it could
-// never have caught. Reverted; the suite returns to 21/21.
+/***************************************************************************************************
+D-LSRC-5 — the conformance kit SHIPS INSTALLED — a gate the vendor keeps is a claim, not a gate
+Absorbs SRC-SP-2, whose form ADR-26.D5 retires: this block IS that code's statement, and it
+sits at the code's only declaration-position site. The kit is installed and public, so an
+external semantic-package author runs the IDENTICAL gate CodeRoast's own packages are held
+to — same source, same checks, same verdicts.
+A gate held privately cannot make "every package passes the kit" falsifiable by anyone outside
+this tree, and an honesty mechanism only its author can run is the thing it claims to replace.
+Two obligations follow from shipping it and neither is negotiable. Verbose-on-failure is
+doubled here: a failing check must diagnose itself to a reader who has never seen canon's
+internals, so every `detail` carries actual-vs-expected and the offending row's key. And the
+kit stays PURE — the facade and spi only, no gtest, and no global `operator new` override,
+which must never ship inside the canon library; the heap/float-freedom guard is homed where a
+`new` override is legitimate, in the canon core test binary, because allocation-freedom is a
+canon-ALGORITHM property proven once over the walkers, not re-proven per data-only package.
+***************************************************************************************************/
+// refs: ADR-17, F-SRC-insight-canon:test_semantic_walkers.cpp
+// invariant: the probe corpus is DERIVED from the manifest, so the kit self-adapts to any package's
+// vocabulary with zero per-package configuration.
 module;
 
 export module insight.canon.conformance;
-import insight.canon.internal; // std
-import insight.canon; // compose / ComposedSemantics / classify / recognize / recognize_location + enums
-import insight.canon.spi; // SemanticPackageManifest + the grammar rows + kAnyDialect + find_conflict
+import insight.canon.internal;
+import insight.canon;
+import insight.canon.spi;
 
 export namespace insight::semantic::conformance
 {
 
-// One check's outcome. `detail` carries the verbose-on-failure diagnostic (actual-vs-expected, the
-// offending row's key) and is empty on pass.
+// invariant: `detail` carries the verbose-on-failure diagnostic — actual-vs-expected and the
+// offending row's key — and is empty on a pass.
 struct CheckResult
 {
     std::string_view name;
@@ -55,7 +36,6 @@ struct CheckResult
     std::string detail;
 };
 
-// The kit's report over one manifest. Iterate `checks` in the package's own assertion framework.
 struct Report
 {
     std::vector<CheckResult> checks;
@@ -66,8 +46,6 @@ struct Report
                                    [](const CheckResult& check) noexcept { return check.passed; });
     }
 
-    // "K/N checks passed" + the names of any failures — a one-line summary for the top-level
-    // assertion.
     [[nodiscard]] std::string summary() const
     {
         std::size_t passed{0};
@@ -89,110 +67,52 @@ struct Report
     }
 };
 
-// Run the full conformance kit over one package manifest. Deterministic, single-threaded, seedless
-// — the recognizers are pure byte functions, so every check is a pure function of the manifest
-// data.
+// post: one check per conformance property over one manifest; deterministic, single-threaded and
+// seedless, so the report is a pure function of the manifest data.
 [[nodiscard]] Report run(const SemanticPackageManifest& manifest);
 
-// The studies/008 G2 round-trip closure kit — the RUNTIME (value) half of the C2 bidirectionality
-// obligation the DialectIntent concept enforces at COMPILE time (shared_intent_declaration §3.2/§6,
-// G2). For every recognition marker, materialize its PAIRED generation row (render_row) with a
-// probe payload and assert canon recognizes the declared (kind, child_order, payload) back —
-// recognize(render_row(W))==R. Pure, deterministic, seedless, self-adapting over ANY dialect's row
-// spans (zero per-package config, the same honesty-kit spirit as run()). Target: 100% — a miss is a
-// declaration-expressivity bug, never a knob (studies/008 §5 G2).
-//
-// Reads BOTH projections off the MANIFEST (ADR-23 — the G4 identity wiring this signature was
-// waiting on: `emits` is now a manifest member, so the rows the kit round-trips are the same rows
-// `semantic_identity` hashes). It formerly took the two spans separately, from the dialect TYPE,
-// because the manifest had no emit member; that split meant the kit could have closed over one
-// array while the digest covered another — precisely the two-writers-one-identity divergence
-// SRC-SID-2 forbids. Kept a SEPARATE entry point from run(): it needs the recognizer composition,
-// and a package may want the closure report on its own.
+// refs: ADR-23, STU-8, SRC-SID-2
+// post: for every recognition marker, its PAIRED generation row is materialized and canon must
+// recognize the declared kind, child order and payload back.
+// invariant: both projections are read off the MANIFEST, so the rows this closes over are the rows
+// `semantic_identity` hashes — one array, never two.
+// note: a miss is a declaration-expressivity defect, never a knob.
 [[nodiscard]] Report round_trip_report(const SemanticPackageManifest& manifest,
                                        const ComposedSemantics& composed);
 
-// The MANIFEST EQUIVALENCE comparator (DN-17.D21 §5) — "do these two semantic packages agree,
-// FIELD FOR FIELD?". A THIRD question, so a third entry point rather than a mode on an existing
-// one: run() asks whether ONE package satisfies the contract, round_trip_report() asks whether one
-// package's two projections close on each other, and this asks whether TWO packages are the same
-// ruleset. The kit is canon's package-introspection surface, which is why an equivalence report
-// lives in a module named for conformance; the tension is named rather than smoothed, and if the
-// kit grows a fourth question the module earns a rename, not a split.
-//
-// WHY IT EXISTS WHEN A DIGEST ALREADY ANSWERS THE QUESTION. `compose({m}).identity()` decides
-// equality better than any comparator can — it covers every data-tier field the serializer writes
-// and is wrong only on a 2^-128 collision — but it is a 16-byte hash, so it can only ever say
-// THAT two rulesets differ. This says WHERE: which member, which index, which field, and both
-// values. That locator is the entire deliverable, which is why the report is a per-member Report
-// and never a bool.
-//
-// SCOPE, AND IT IS NARROWER THAN "the packages behave identically". The two CODE-TIER members are
-// compared by PRESENCE ONLY — their checks are named `strategy_presence_only` and
-// `echoed_source_presence_only` so the report itself says so, in the report, to a reader who never
-// opened this file. Two different packages hold two different function symbols, so comparing
-// pointer values is a guaranteed can't-PASS, and `compose.cpp`'s serializer makes the same call for
-// the same reason ("code tier, nominal"). Whether the two code tiers COMPUTE the same answers is a
-// separate obligation with a separate leg (DN-17.D21 §2, leg 2b: run both hooks over a fixture set
-// and require verdict-for-verdict agreement) and nothing here may be read as covering it.
-//
-// It is an EQUIVALENCE report, not a NON-VACUITY report: two empty manifests are genuinely
-// equivalent and this returns 14 green checks for them. A caller who needs the comparison to mean
-// something must feed it a package with rows — the subject is the caller's to choose, and
-// pretending otherwise would make an empty package permanently non-conformant.
-//
-// Rows pair BY INDEX, matching the identity serializer, which walks each span in declared order:
-// two manifests whose rows are the same SET in a different ORDER hash differently and are reported
-// differently here too, because declared order is ruleset content.
-//
-// Pure and deterministic: reads the two manifests and allocates only the report strings. Always
-// returns exactly one check per manifest member.
+// refs: DN-17.D21
+// post: one check per manifest member, locating WHERE two rulesets differ — which member, which
+// index, which field, and both values.
+// invariant: rows pair BY INDEX, matching the identity serializer, so two manifests holding the
+// same rows in a different ORDER are reported as differing.
+// invariant: the two CODE-TIER members are compared by PRESENCE only — two packages hold two
+// different symbols, so a pointer compare could never pass.
+// note: two empty manifests are equivalent — non-vacuity is the caller's subject.
 [[nodiscard]] Report manifest_equivalence_report(const SemanticPackageManifest& lhs,
                                                  const SemanticPackageManifest& rhs);
 
-// The kit's own marker probe, EXPORTED for regression tripwires (bibles/jenkins_dialect.md §3,
-// leg L-C). The repaired construction is `render_row(paired_writer_row(row), "probe")` — the
-// writer dual materialized, self-adapting over every extractor. The OLD form (`prefix + " probe"`)
-// yielded, for the Jenkins STAGE row, `[Pipeline] { ( probe` — a probe that fires NOWHERE, which
-// made the `dialect_gate.marker_leak` leg vacuous. A consumer asserting "this probe FIRES on its
-// own dialect stream" observes THIS function, so a regression to the old form is a loud red in
-// the consumer, never a silent vacuity inside the kit. Returns "" for an UNPAIRED row (already
-// red under grammar.unpaired_marker).
+// refs: BIB:jenkins_dialect
+// post: the row's writer dual materialized with a probe payload; "" for an UNPAIRED row, which
+// `check_grammar_wellformed` already reds.
+// invariant: EXPORTED so a consumer can assert the probe fires on its own dialect stream, which
+// makes a regression a loud red OUTSIDE the kit.
 [[nodiscard]] std::string marker_probe_for(const IntentMarkerRow& row,
                                            std::span<const IntentEmitRow> emits);
 
 } // namespace insight::semantic::conformance
 
-// ════════════════════════════════════════════════════════════════════════════════════════════════════
-// Implementation (inline in the module interface — the kit is small, pure, and self-contained so an
-// external author can read the whole gate in one file).
-// ════════════════════════════════════════════════════════════════════════════════════════════════════
+// note: inline in the interface so an external author reads the whole gate in one file.
 namespace insight::semantic::conformance
 {
 
-// The payload every probe carries. One benign single-token ASCII word: not a Jenkins
-// kStepExcludes structural token, no parens/brackets/whitespace/CR that a payload extractor
-// would trim — so a probe that fails to fire is a real gate failure, never an artifact of the
-// probe. Deterministic (a fixed literal, no RNG). Module linkage (not in the unnamed namespace)
-// because the exported marker_probe_for below renders with it.
+// invariant: one benign single-token ASCII word carrying no structural token and no byte a payload
+// extractor trims, so a probe that fails to fire is a real failure.
+// note: module linkage, not the unnamed namespace — the exported probe renders it.
 constexpr std::string_view kProbePayload{"probe"};
 
-// A probe line for an INTENT MARKER row: the row's own writer dual, materialized. `prefix +
-// " probe"` is only a valid probe for a RemainderAfterPrefix row, and building one that way was
-// a live defect — for the Jenkins STAGE row it yields `[Pipeline] { ( probe`, which fails
-// RemainderToClosingParen's required line-final ')', so the row cannot fire and the
-// `dialect_gate.marker_leak` leg then asserted "it did not fire on a foreign stream" about a
-// probe that fires NOWHERE. A gate that cannot fail. It would have been vacuous for every
-// GitLab row too (NumericFieldThenRemainder needs a numeric field the naive probe has no way to
-// produce), which is what surfaced it.
-//
-// The repair is the canonical inverse, which `round_trip_report` already uses: render the paired
-// writer row. That makes the probe self-adapting over every present and future extractor by
-// construction, because the two projections are each other's duals. An UNPAIRED row has no
-// probe — `check_grammar_wellformed` fails that separately (grammar.unpaired_marker), so the
-// empty string here reaches only a manifest already red, and it fires no row.
-// EXPORTED (declared in the interface block above) so the Jenkins retrofit's L-C leg can assert
-// the kit's own probe fires — vacuity-by-regression guarded outside the kit.
+// invariant: the probe is the row's own writer dual, so it self-adapts to every present and future
+// extractor by construction — the two projections are duals.
+// note: `prefix + " probe"` is valid only for a RemainderAfterPrefix row.
 std::string marker_probe_for(const IntentMarkerRow& row, std::span<const IntentEmitRow> emits)
 {
     const IntentEmitRow* writer{paired_writer_row(row, emits)};
@@ -202,52 +122,39 @@ std::string marker_probe_for(const IntentMarkerRow& row, std::span<const IntentE
 namespace
 {
 
-    // A byte is ASCII when its high bit is clear (< 0x80). Locale-safety is structural: every row
-    // key is ASCII and every matcher is a byte comparison, so no locale-sensitive path exists (the
-    // SRC-II-6 / ASCII-only determinism hazard — det_math musts). We ASSERT the ASCII property
-    // rather than argue it.
+    // refs: SRC-II-6
+    // invariant: every row key is ASCII and every matcher is a byte comparison, so no
+    // locale-sensitive path exists; the property is ASSERTED here rather than argued.
     [[nodiscard]] bool is_ascii(std::string_view str) noexcept
     {
         return std::ranges::all_of(str, [](char chr) noexcept
                                    { return static_cast<unsigned char>(chr) < 0x80U; });
     }
 
-    // Declared dialects distinct from a row's own gate, for the "does NOT fire cross-dialect" leg
-    // (ADR-22 — the gate is a composed package NAME). Two are enough and they are
-    // deliberately different in kind: `kUndeclaredDialect` is the caller declining to declare (the
-    // fail-closed leg, which a `kAnyDialect` row must still survive), and `kForeignDialect` is a
-    // real, different, composed package name.
-    //
-    // ⚠ The foreign name must be one the SUT manifest is not. `run()` composes ONE manifest at a
-    // time, so a name no package carries would fatal `for_stream` on the unknown-dialect path
-    // before any probe ran; the checks below therefore build the foreign view from a second,
-    // synthetic manifest carrying only that name. See `dialect_leak_view`.
+    // refs: ADR-22
+    // invariant: the two differ in KIND — one is the caller declining to declare, which a
+    // kAnyDialect row must still survive, the other a real foreign package name.
+    // note: the foreign name must be one the manifest is not, or `for_stream` fatals.
     constexpr std::string_view kUndeclaredDialect{};
     constexpr std::string_view kForeignDialect{"conformance-foreign-dialect"};
 
-    // A probe line for a row that has no writer dual — the structural-role rows. The key is
-    // line-anchored and a role row carries no payload grammar, so `key + " probe"` matches iff the
-    // row fires.
+    // invariant: a role row's key is line-anchored and carries no payload grammar, so `key + "
+    // probe"` matches iff the row fires.
     [[nodiscard]] std::string probe_for(std::string_view prefix)
     {
         return std::string{prefix} + ' ' + std::string{kProbePayload};
     }
 
-    // The kit's ONE door to the walkers' NormalizedContent. The probes this kit synthesizes
-    // (render_row / probe_for / marker_probe_for) are ESCAPE-FREE BY CONSTRUCTION, so stage 1 is
-    // a FIXED POINT on them: `normalize()` copies nothing (the returned content views the probe
-    // itself, so `scratch` is untouched and a caller-scoped scratch may be shared across probes),
-    // no count can move, and the kit exercises the same public ingest a production consumer does.
-    // ⚠ NEVER the LogParser mint here — that would grow its friend list to two and delete the
-    // mechanism (ADR-21.D4 — the friend list IS the audit surface; named in advance).
+    // refs: ADR-21.D4, LSRC-5
+    // invariant: the kit's ONE door to the walkers' NormalizedContent, and stage 1 is a FIXED POINT
+    // on its escape-free probes, so no count can move.
+    // note: never the LogParser mint here — that would grow its friend list to two.
     [[nodiscard]] insight::tokenization::NormalizedContent normalized_probe(std::string_view probe,
                                                                             std::string& scratch)
     {
         return insight::tokenization::normalize(probe, scratch).undeclared_suffix(0);
     }
 
-    // ── Check 1: determinism — identical identity + identical recognizer output across independent
-    // runs ──
     CheckResult check_determinism(const SemanticPackageManifest& manifest)
     {
         const std::array<SemanticPackageManifest, 1> one{manifest};
@@ -263,7 +170,6 @@ namespace
                     first.identity_hex() + " vs " + second.identity_hex() +
                     " — composition is not a pure function of the manifest (SP-6 violated)."};
 
-        // Recognizer output must be bit-identical run-to-run for every derived probe.
         for (const IntentMarkerRow& row : manifest.markers)
         {
             const std::string probe{marker_probe_for(row, manifest.emits)};
@@ -286,16 +192,8 @@ namespace
         return {.name = "determinism", .passed = true, .detail = {}};
     }
 
-    // ── Check 2: dialect-gate honesty — a gated row is inert outside its dialect; kAnyDialect
-    // fires under every declaration ──
-    //
-    // The FOREIGN view. `run()` composes ONE manifest, so `for_stream("some-other-name", …)` would
-    // fatal on the unknown-dialect path before any probe ran — canon verifies names, and that is
-    // the behavior, not an obstacle to route around. So the leak leg composes the manifest under
-    // test WITH a synthetic, row-less second package whose only content is a name, and resolves to
-    // THAT name. Every concretely-gated row of the manifest is then legitimately absent, and every
-    // kAnyDialect row is legitimately present — which is exactly the two-sided property this check
-    // asserts.
+    // invariant: the leak view composes the manifest WITH a synthetic row-less package and resolves
+    // to THAT name, so gated rows are legitimately absent.
     [[nodiscard]] ComposedSemantics dialect_leak_view(const SemanticPackageManifest& manifest)
     {
         const SemanticPackageManifest foreign{.name = kForeignDialect, .version = "0.0.0"};
@@ -303,26 +201,23 @@ namespace
         return compose(pair).for_stream(kForeignDialect, kAnyChannel);
     }
 
-    // one conformance property verified end-to-end (dialect-gate honesty); the sequence of guarded
-    // assertions is the check — splitting it scatters a single verdict across helpers.
+    // note: one conformance property end-to-end; splitting the sequence scatters one verdict.
     // NOLINTNEXTLINE(readability-function-cognitive-complexity)
     CheckResult check_dialect_gate_honesty(const SemanticPackageManifest& manifest,
                                            const ComposedSemantics& composed)
     {
-        // The two views the legs are scored under, both built ONCE (ADR-22 — the gate is
-        // a stream-scoped resolution, so the probe has to be one too; probing a row against a
-        // per-call coordinate is the shape T4 removed).
+        // refs: ADR-22
+        // assert: both views are built ONCE — the gate is a stream-scoped resolution, so the
+        // probe must be one too.
         const ComposedSemantics own{composed.for_stream(manifest.name, kAnyChannel)};
         const ComposedSemantics foreign{dialect_leak_view(manifest)};
 
-        // Structural roles.
         std::string scratch;
         for (const StructuralRoleRow& row : manifest.roles)
         {
             const std::string probe{probe_for(row.prefix)};
             if (row.dialect_gate == kAnyDialect)
             {
-                // Must fire under EVERY declaration — check the undeclared view and a foreign one.
                 for (const auto& [view, label] :
                      {std::pair{std::cref(composed), std::string_view{"the UNDECLARED view"}},
                       std::pair{std::cref(foreign), kForeignDialect}})
@@ -337,7 +232,6 @@ namespace
             }
             else
             {
-                // Must be present under its OWN dialect and inert under a foreign one.
                 if (insight::tokenization::classify(normalized_probe(probe, scratch), own) !=
                     row.role)
                     return {.name = "dialect_gate.role_own",
@@ -357,16 +251,10 @@ namespace
                                       std::string{kForeignDialect} + "\" — SRC-II-6 gate leak."};
             }
         }
-        // Intent markers (always concretely gated by construction — SRC-II-6): present under their
-        // own MEDIUM, inert under a foreign declaration.
-        //
-        // The OWN leg is scored at the row's own Medium (`dialect × channel`), not against the
-        // kAnyChannel view — a channel-gated marker is legitimately absent from that one, which is
-        // why the leg used to be skipped altogether. Skipping it is what let the leak leg go
-        // vacuous: a probe that fires NOWHERE also fails to leak, so `marker_leak` reported green
-        // about a row it could never have caught. It is asserted here rather than left to
-        // `round_trip_report` because that is a SEPARATE entry point a package may never call, and
-        // a leg whose non-vacuity depends on another test being run is not guarded.
+        // refs: SRC-II-6
+        // assert: the OWN leg is scored at the row's own Medium, never the kAnyChannel view, where
+        // a channel-gated marker is legitimately absent.
+        // note: skipping the own leg is what let the leak leg go vacuous.
         for (const IntentMarkerRow& row : manifest.markers)
         {
             if (row.dialect_gate == kAnyDialect)
@@ -398,8 +286,6 @@ namespace
                               "anything — either the emit row is not the extractor's inverse, or "
                               "the row cannot match its own generated bytes."};
         }
-        // Outcome tokens (grammar-2, always concretely gated — a dialect's verdict string never
-        // resolves under another dialect, ADR-17).
         for (const OutcomeTokenRow& row : manifest.outcome_tokens)
         {
             if (row.dialect_gate == kAnyDialect)
@@ -420,10 +306,8 @@ namespace
                                   "\") RESOLVED on a stream declaring \"" +
                                   std::string{kForeignDialect} + "\" — SRC-II-6 gate leak."};
         }
-        // The UNDECLARED stream is fail-closed on DEPTH: no concretely-gated row of any kind may
-        // fire. This is the leg that would have caught "the filter was never applied", which the
-        // foreign-view legs cannot — a filter that silently kept everything would still drop the
-        // manifest's rows under a foreign NAME only if the filter runs at all.
+        // assert: an UNDECLARED stream is fail-closed on DEPTH — no concretely-gated row of any
+        // kind may fire, which is the leg that catches a filter that never ran.
         for (const OutcomeTokenRow& row : manifest.outcome_tokens)
             if (row.dialect_gate != kAnyDialect &&
                 insight::map_outcome_token(row.token, composed).has_value())
@@ -449,8 +333,6 @@ namespace
         return {.name = "dialect_gate_honesty", .passed = true, .detail = {}};
     }
 
-    // ── Check 3: ASCII / locale safety — every row key is ASCII (byte-only matching ⇒
-    // locale-independent) ──
     CheckResult check_ascii_safety(const SemanticPackageManifest& manifest)
     {
         const auto span_ok{[](std::span<const std::string_view> strings) noexcept
@@ -468,8 +350,9 @@ namespace
                         .detail =
                             "marker key or payload-exclusion entry contains a non-ASCII byte: \"" +
                             std::string{row.prefix} + "\"."};
-        // ADR-23: the generation projection is manifest data and identity-bearing, so it is
-        // held to the same locale-safety property as the recognition rows it is the dual of.
+        // refs: ADR-23
+        // assert: the generation projection is manifest data and identity-bearing, so it is held to
+        // the same locale-safety property as the rows it is dual to.
         for (const IntentEmitRow& row : manifest.emits)
             if (!is_ascii(row.prefix))
                 return {.name = "ascii.emit",
@@ -504,10 +387,7 @@ namespace
         return {.name = "ascii_safety", .passed = true, .detail = {}};
     }
 
-    // ── Check 4: grammar well-formedness — non-empty keys, no self-conflict, LocationRow
-    // param/kind match ──
-    // one conformance property verified end-to-end (grammar well-formedness); the guarded-assertion
-    // sequence is the check, not decomposable sprawl.
+    // note: one conformance property end-to-end; the guarded sequence IS the check.
     // NOLINTNEXTLINE(readability-function-cognitive-complexity)
     CheckResult check_grammar_wellformed(const SemanticPackageManifest& manifest)
     {
@@ -526,12 +406,9 @@ namespace
                 return {.name = "grammar.empty_emit",
                         .passed = false,
                         .detail = "an intent-emit row has an empty prefix."};
-        // ADR-23 / SRC-SID-2: with `emits` on the manifest, "a reader without a writer" is a
-        // MANIFEST property and the runtime kit can state it as one. The DialectIntent concept
-        // already refuses it at compile time for a package that models the concept — this catches
-        // the package that declares markers on its manifest but wires `.emits` to a different (or
-        // absent) array, which the concept cannot see and which would make the identity hash cover
-        // a generation projection nothing round-trips.
+        // refs: ADR-23, SRC-SID-2
+        // assert: a reader without a writer is a MANIFEST property, so the runtime kit states it
+        // — the concept cannot see an `emits` wired to another array.
         for (const IntentMarkerRow& row : manifest.markers)
             if (paired_writer_row(row, manifest.emits) == nullptr)
                 return {.name = "grammar.unpaired_marker",
@@ -565,9 +442,6 @@ namespace
                                       "\" carries an empty payload-exclusion entry (would exclude "
                                       "every payload)."};
 
-        // Self-conflict: a package must not carry an exact-duplicate key within itself (the runtime
-        // compose would fatal on it — the kit catches it as a well-formedness failure, not a
-        // crash).
         const std::array<SemanticPackageManifest, 1> one{manifest};
         if (const ConflictInfo conflict{find_conflict(one)}; conflict.has_conflict)
             return {.name = "grammar.self_conflict",
@@ -576,8 +450,6 @@ namespace
                               std::string{conflict.kind} + " key \"" + std::string{conflict.key} +
                               "\" within its own rows (would fatal at compose)."};
 
-        // LocationRow: the selected LocationMatchKind must be parameterized by the params that
-        // algorithm reads.
         for (const LocationRow& row : manifest.locations)
         {
             const auto fail{[&](std::string_view why)
@@ -606,8 +478,6 @@ namespace
         return {.name = "grammar_wellformed", .passed = true, .detail = {}};
     }
 
-    // ── Check 5: code-tier well-behaved — the strategy/hook (if any) are deterministic + in-range
-    // ──
     CheckResult check_code_tier(const SemanticPackageManifest& manifest)
     {
         if (manifest.strategy != nullptr)
@@ -623,13 +493,11 @@ namespace
                         .passed = false,
                         .detail = "the dialect strategy reports LogFormat::Unknown — a dialect "
                                   "must own a concrete format."};
-            // confidence() must be O(1), in [0,1], and deterministic (same line → same score).
             constexpr std::string_view kProbe{"2026-01-01T00:00:00.0000000Z probe line"};
             const double first{strategy->confidence(kProbe)};
             const double second{strategy->confidence(kProbe)};
-            // Written as the negation of an in-range test, NOT `first < 0.0 || first > 1.0`: a NaN
-            // confidence fails `>= 0.0 && <= 1.0` (⇒ out of range, caught), but passes neither
-            // `< 0.0` nor `> 1.0`, so the DeMorgan form would let NaN slip through.
+            // assert: the negation of an in-range test — a NaN passes neither `< 0.0` nor `>
+            // 1.0`, so the DeMorgan form would misreport it as non-deterministic.
             const bool confidence_in_range{first >= 0.0 && first <= 1.0};
             if (!confidence_in_range || first != second)
                 return {.name = "code_tier.confidence",
@@ -648,18 +516,12 @@ namespace
         return {.name = "code_tier", .passed = true, .detail = {}};
     }
 
-    // ── Check 6: the outcome round-trip law (T5 §3.1) — scan_run_outcome(render_outcome(…))
-    // recovers the row's own verdict ──
-    //
-    // The writer dual of the console-tail scan, held to the same one-owner closure as the intent
-    // rows' G2 round-trip: for every outcome-marker row, the line `render_outcome` materializes is
-    // recognized back by the shipped scan under the package's OWN declaration, and the verdict it
-    // resolves is the one the rendered row/token carries. Self-adapting over both grammar-5 shapes:
-    // a RemainderToken row round-trips once per declared outcome token (the remainder maps through
-    // the SAME token set both ways), a PrefixIsVerdict row round-trips its prefix alone (its
-    // remainder is free-form and unread). Trivially green for a package that ships tokens but no
-    // marker (GHA — it has no run-verdict console line to render); the law is about the marker's
-    // two projections, not about token existence.
+    // refs: ADR-27.D4
+    // post: for every outcome-marker row, the line `render_outcome` materializes is recognized back
+    // by the shipped scan under the package's OWN declaration.
+    // invariant: self-adapting over both marker shapes — a RemainderToken row round-trips once
+    // per declared token, a PrefixIsVerdict row round-trips its prefix alone.
+    // note: trivially green for a package with tokens but no outcome marker.
     CheckResult check_outcome_round_trip(const SemanticPackageManifest& manifest,
                                          const ComposedSemantics& composed)
     {
@@ -730,11 +592,24 @@ Report run(const SemanticPackageManifest& manifest)
 namespace
 {
 
-    // Verbose-on-failure enum names (no canon to_string exists for these two — G2's diagnostic
-    // needs them). Both are switches with no `default:` label so the `-Werror=switch` / `/we4062`
-    // option set in core/CMakeLists.txt covers them; `order_name` is a switch over a two-valued
-    // enum for exactly that reason — as the equivalent ternary it was outside the option's reach
-    // and a third ChildOrder would have printed "Ordered" for the new value, silently.
+    /***********************************************************************************************
+    D-LSRC-7 — a switch over a canon enum carries NO `default:` label
+    `core/CMakeLists.txt` sets `-Werror=switch` (GCC/Clang) and `/we4062` (MSVC) PRIVATE on
+    `insight_canon` and `insight_canon_tests`, so an unhandled enumerator is a COMPILE ERROR at
+    the switch instead of a "?" in a diagnostic nobody reads twice. A `default:` label disarms
+    that arm completely: it makes every future enumerator handled, silently and wrongly, and the
+    cost is paid by the reader of a failure message rather than by the author of the enum.
+    Measured 2026-08-26 on `extract_name`. The rule reaches further than it looks, in both
+    directions. It is why `order_name` is a switch over a TWO-valued enum rather than the
+    equivalent ternary: the ternary sat outside the option's reach, and a third `ChildOrder`
+    would have printed "Ordered" for the new value. And it is why the unreachable trailing
+    return under each switch exists at all — the function is non-void, and the option, not the
+    return, is what makes the switch total. Obeyed by every *_name function in this file and by
+    `dual()` in `core/api/canon.spi.cppm`. ONE LIMIT, stated so nobody reads the rule wider: the
+    option is PRIVATE, so it binds THIS build. A consumer compiling the installed module
+    interface gets no such enforcement, and the totality it relies on is ours to keep.
+    ***********************************************************************************************/
+    // note: no canon `to_string` exists for these two enums; the diagnostic needs both names.
     [[nodiscard]] std::string_view kind_name(insight::tokenization::IntentMarkerKind kind) noexcept
     {
         using insight::tokenization::IntentMarkerKind;
@@ -776,9 +651,8 @@ Report round_trip_report(const SemanticPackageManifest& manifest, const Composed
         const IntentEmitRow* writer{paired_writer_row(reader, emits)};
         if (writer == nullptr)
         {
-            // The DialectIntent concept should have rejected this at compile time; the runtime kit
-            // asserts it too so an external author who bypassed the concept still gets a legible
-            // failure.
+            // assert: the concept should have refused this at compile time; the kit asserts it too
+            // so an author who bypassed the concept still gets a legible failure.
             report.checks.push_back(
                 {.name = "round_trip.unpaired",
                  .passed = false,
@@ -789,13 +663,10 @@ Report round_trip_report(const SemanticPackageManifest& manifest, const Composed
             continue;
         }
 
-        // ADR-22 / ADR-22: the Medium is `dialect × IntentChannel`, so the
-        // round-trip closes PER MEDIUM — a row is recognized under the stream view its writer
-        // materializes into. Reading BOTH coordinates off the ROW keeps the kit self-adapting (zero
-        // per-package config): a kAnyChannel row round-trips under the undeclared channel view, a
-        // channel-gated row under its own channel, and every row under its own dialect. Recognizing
-        // every row against ONE composition would be asking whether the stripped banner is a banner
-        // in the annotated channel — which is the phantom, not the closure.
+        // refs: ADR-22
+        // invariant: the Medium is dialect × channel, so the round trip closes PER MEDIUM — both
+        // coordinates are read off the ROW, which keeps the kit self-adapting.
+        // note: ONE composition for every row would ask the phantom, not the closure.
         const std::string line{render_row(*writer, kProbePayload)};
         std::string scratch;
         const ComposedSemantics medium_view{
@@ -826,36 +697,19 @@ Report round_trip_report(const SemanticPackageManifest& manifest, const Composed
     return report;
 }
 
-// ════════════════════════════════════════════════════════════════════════════════════════════════════
-// The MANIFEST EQUIVALENCE comparator (DN-17.D21 §5) — implementation.
-// ════════════════════════════════════════════════════════════════════════════════════════════════════
-
 namespace
 {
 
-    // How many differing rows one member's diagnostic enumerates before it summarizes, and how many
-    // unpaired rows a length mismatch names. Bounded on purpose: a report is read by a human, and
-    // an 800-row diff is a wall, not a locator. The COUNTS are always exact — only the enumeration
-    // is capped, so the cap can never make a difference look smaller than it is.
+    // invariant: the COUNTS are always exact and only the enumeration is capped, so the cap can
+    // never make a difference look smaller than it is.
     constexpr std::size_t kMaxReportedRowDiffs{8};
     constexpr std::size_t kMaxReportedUnpairedRows{4};
 
-    // ── Value renderers ─────────────────────────────────────────────────────────────────────────
-    // Verbose-on-failure IS the deliverable here: leg 3 (semantic_identity equal) already decides
-    // the boolean, so this report earns its keep only by locating. Every enum therefore prints as
-    // its NAME — "extract: lhs=RemainderAfterPrefix rhs=None" locates a defect, "extract: lhs=1
-    // rhs=0" sends the reader back to the header to decode a byte. Produced strings are ASCII only:
-    // the report crosses into an external author's test framework and the surrounding kit asserts
-    // ASCII of every row key, so the diagnostic must not be the one place a multi-byte glyph
-    // enters.
-    //
-    // The five *_name switches below carry no `default:` label, deliberately, and what enforces
-    // that is a build option rather than this comment: `core/CMakeLists.txt` sets `-Werror=switch`
-    // (GCC/Clang) and `/we4062` (MSVC) PRIVATE on `insight_canon` and `insight_canon_tests`, so an
-    // unhandled enumerator is a compile error HERE instead of a "?" in a diagnostic nobody reads
-    // twice. Measured 2026-08-26 on `extract_name`. `dual()` in canon.spi.cppm stands on the same
-    // option for the same reason. The trailing return exists only because the function is non-void.
-
+    // refs: LSRC-7
+    // invariant: every enum prints as its NAME, because the identity hash already decides the
+    // boolean and this report earns its keep only by LOCATING.
+    // invariant: produced strings are ASCII only — the report crosses into an external author's
+    // framework, and the surrounding kit asserts ASCII of every row key.
     [[nodiscard]] std::string_view extract_name(PayloadExtract extract) noexcept
     {
         switch (extract)
@@ -1002,12 +856,7 @@ namespace
         return std::string{value_class_name(cls)};
     }
 
-    // ── Field equality ──────────────────────────────────────────────────────────────────────────
-    // `std::span` has NO operator== (deliberately, upstream: it is a view, and the committee
-    // refused to pick between identity and element-wise), which is exactly why this comparator has
-    // to exist at all — the manifest is nine spans and no compiler-generated equality can be
-    // defaulted onto it. The constrained template therefore does not apply to a span at all and the
-    // span overload takes it, element-wise, which is the semantics the identity serializer encodes.
+    // note: `std::span` has no operator==, so a nine-span manifest has no defaulted equality.
     template <typename Value>
         requires requires(const Value& lhs, const Value& rhs) {
             { lhs == rhs } -> std::convertible_to<bool>;
@@ -1023,8 +872,7 @@ namespace
         return std::ranges::equal(lhs, rhs);
     }
 
-    // Accumulates the FIELDS of one row pair that differ, as "field: lhs=<v> rhs=<v>",
-    // comma-joined. Empty text is the equality verdict: a row pair is equal exactly when no field
+    // invariant: empty text IS the equality verdict — a row pair is equal exactly when no field
     // was recorded.
     class FieldDiff
     {
@@ -1052,16 +900,19 @@ namespace
         std::string text_;
     };
 
-    // ── Row comparison ──────────────────────────────────────────────────────────────────────────
-    // ⚠ THE STRUCTURED BINDING IS THE COVERAGE INSTRUMENT, NOT A STYLE CHOICE — do not "simplify"
-    // these to member access. A comparator whose apparent subject is "the row" and whose real
-    // subject is "the fields someone remembered" is a silent, green, wrong answer, and the failure
-    // is invisible precisely because a partial comparator still reports. A structured binding must
-    // name EXACTLY as many members as the type has, so adding a field to any row struct — or to the
-    // manifest itself, bound the same way in manifest_equivalence_report below — is a COMPILE ERROR
-    // at that line, in this file, on the next build. The instrument costs one line per row kind and
-    // it is the only thing standing between this function and the defect class it lives inside.
-
+    /***********************************************************************************************
+    D-LSRC-6 — the structured binding IS the coverage instrument, never a style choice
+    Every row comparator below, and `manifest_equivalence_report` itself, destructures its subject
+    with a structured binding and never with member access. Do not "simplify" that away. A
+    comparator whose apparent subject is "the row" and whose real subject is "the fields someone
+    remembered" is a silent, green, WRONG answer, and the failure is invisible precisely because
+    a partial comparator still reports: the missing member's check simply never appears in a list
+    nobody counts. A structured binding must name EXACTLY as many members as the type has, so
+    adding a field to any row struct — or to `SemanticPackageManifest`, bound the same way —
+    is a COMPILE ERROR at that line, in this file, on the next build. It costs one line per row
+    kind and it is the only thing standing between this comparator and the defect class it lives
+    inside.
+    ***********************************************************************************************/
     [[nodiscard]] std::string row_differences(const StructuralRoleRow& lhs,
                                               const StructuralRoleRow& rhs)
     {
@@ -1163,18 +1014,14 @@ namespace
         diff.field("prefix", lhs_prefix, rhs_prefix);
         diff.field("dialect_gate", lhs_dialect, rhs_dialect);
         diff.field("shape", lhs_shape, rhs_shape);
-        // `outcome` is INERT on a RemainderToken row (its verdict rides its remainder), and it is
-        // compared anyway — for the same reason the identity serializer writes it for every row:
-        // the manifest's content is a fixed field layout, not a per-shape union, so a row that
-        // changed shape must report the field that moved rather than have the comparison shift
-        // underneath.
+        // assert: `outcome` is INERT on a RemainderToken row and compared anyway — the manifest
+        // is a fixed field layout, not a per-shape union.
         diff.field("outcome", lhs_outcome, rhs_outcome);
         return diff.text();
     }
 
-    // The short human handle a row is named by when a LENGTH mismatch leaves it unpaired. A
-    // LocationRow has no key of its own — it is an ALGORITHM plus its vocabulary — so it names its
-    // algorithm, which is the only field a reader can act on without the full row.
+    // invariant: a LocationRow has no key of its own — it is an algorithm plus its vocabulary —
+    // so it names its algorithm, the only field a reader can act on alone.
     [[nodiscard]] std::string_view row_key(const StructuralRoleRow& row) noexcept
     {
         return row.prefix;
@@ -1208,8 +1055,6 @@ namespace
         return row.prefix;
     }
 
-    // Name the rows one side declares past the paired prefix — the "what was added / removed"
-    // half of a length mismatch, which the paired-row diff structurally cannot show.
     template <typename Row>
     [[nodiscard]] std::string unpaired_note(std::string_view side, std::span<const Row> longer,
                                             std::size_t paired)
@@ -1236,10 +1081,8 @@ namespace
         return out;
     }
 
-    // One manifest row-span member, compared row by row and field by field. Rows pair BY INDEX
-    // (the identity serializer's own semantics — declared order is ruleset content), so a length
-    // mismatch is reported as counts plus the unpaired keys, and the paired prefix is still
-    // compared: an appended row and a mutated row are different findings and a reader needs both.
+    // invariant: rows pair BY INDEX, so a length mismatch reports counts plus the unpaired keys AND
+    // still compares the paired prefix.
     template <typename Row>
     [[nodiscard]] CheckResult compare_rows(std::string_view check_name, std::string_view member,
                                            std::span<const Row> lhs, std::span<const Row> rhs)
@@ -1305,8 +1148,8 @@ namespace
                 .detail = std::string{member} + ": lhs=" + quoted(lhs) + " rhs=" + quoted(rhs)};
     }
 
-    // A declared VOCABULARY member (channels, dialect_revisions): a short closed set, so both sides
-    // print in full rather than by index — the whole value IS the locator at this size.
+    // invariant: a short closed vocabulary prints in FULL on both sides — at this size the whole
+    // value is the locator.
     [[nodiscard]] CheckResult compare_vocabulary(std::string_view check_name,
                                                  std::string_view member,
                                                  std::span<const std::string_view> lhs,
@@ -1320,10 +1163,10 @@ namespace
                           " rhs=" + render_value(rhs)};
     }
 
-    // The code tier, PRESENCE ONLY — see the entry point's contract above. The two packages hold
-    // two different symbols, so a pointer compare is a can't-PASS, and the behavioural comparison
-    // is a separate leg. The check NAME carries the word `presence_only` so the scope travels with
-    // the report into a framework that shows nothing but names.
+    // refs: DN-17.D21
+    // invariant: the check NAME carries `presence_only`, so the scope travels with the report into
+    // a framework that shows nothing but names.
+    // note: whether two present hooks AGREE is a separate obligation, not covered.
     [[nodiscard]] CheckResult compare_presence(std::string_view check_name, std::string_view member,
                                                bool lhs, bool rhs)
     {
@@ -1343,12 +1186,9 @@ namespace
 Report manifest_equivalence_report(const SemanticPackageManifest& lhs,
                                    const SemanticPackageManifest& rhs)
 {
-    // ⚠ THE STRUCTURED BINDING IS THE COVERAGE INSTRUMENT (see the row_differences block above).
-    // SemanticPackageManifest has fourteen members and this names fourteen; adding a fifteenth is a
-    // COMPILE ERROR here rather than a member this report silently never looks at. That failure —
-    // a comparator whose apparent subject is "the manifest" and whose real subject is "the members
-    // someone remembered" — is the one this function is most likely to have, because it reports
-    // either way and the missing member's check simply never appears in a list nobody counts.
+    // refs: LSRC-6
+    // assert: fourteen members bound, so a fifteenth is a COMPILE ERROR here and forces the edit
+    // — it does not force the matching check to be pushed.
     const auto& [lhs_name, lhs_version, lhs_roles, lhs_markers, lhs_emits, lhs_level_lifts,
                  lhs_locations, lhs_value_classes, lhs_outcome_tokens, lhs_outcome_markers,
                  lhs_channels, lhs_dialect_revisions, lhs_strategy, lhs_echoed_source] = lhs;
