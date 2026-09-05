@@ -8,7 +8,7 @@ on:
 
 jobs:
   lint:
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-lint.yml@61fc5534e116d8b278f44ccad8845926ae721ff9
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-lint.yml@5c17d8aa7aa74ea4c4ae1c16a7a5eccd4e5a0688
     # PUBLIC repo: no runs-on passthrough — a self-hosted runner reachable from a fork PR is an RCE.
     # No `with:` at all: every gate in the reusable workflow defaults TRUE, so a caller that says
     # nothing is fully gated, and a hole would have to be a written line here.
