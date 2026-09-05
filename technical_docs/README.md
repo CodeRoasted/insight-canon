@@ -18,6 +18,13 @@ subsystem's rules change, exactly one doc moves with it.
 | **[classification.md](classification.md)** | The **semantic classification** canon emits: log **level** (two-stage inference), the **failure / warning / outcome** lexicon (verdict-register awareness, pass/fail glyphs), and **structural roles**. |
 | **[determinism.md](determinism.md)** | The cross-cutting **determinism contract** — why every rule above is byte-exact and order-independent, and what the `canonicalization_version` gate guarantees. |
 
+## Operations
+
+- [operations/ccc_migration.md](operations/ccc_migration.md) - the Code & Comment as Contract
+  migration ledger: per unit, the claims each deleted comment carried, the cold-reader
+  interrogation that tested whether the code alone still carries them, and where every
+  unrecovered claim was re-homed. A record of a completed run, not a reference.
+
 ## Pipeline position
 
 ```text
