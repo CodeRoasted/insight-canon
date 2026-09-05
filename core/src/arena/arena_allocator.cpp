@@ -4,7 +4,8 @@ module;
 #ifdef INSIGHT_HAS_NUMA
 #include <numa.h>
 #endif
-#include "utils/log_macros.hpp" // textual macro layer (ADR-3.D4)
+// refs: ADR-3.D4
+#include "utils/log_macros.hpp"
 
 module insight.canon.api;
 import insight.canon.internal;
@@ -20,27 +21,8 @@ namespace
         return value != 0 && (value & (value - 1U)) == 0;
     }
 
-    // ── The reset poison: a DEBUG-BUILD INSTRUMENT, not a safety feature ────────────────────────
-    //
-    // WHY IT EXISTS. `reset()` is a bump-pointer rewind: the bytes it releases are still there and
-    // still readable. So a caller that resets the arena while a `CanonicalEvent`'s `template_str`
-    // still points into it reads the right bytes anyway, and NO test can tell correct from lucky
-    // — the suite is green and stays green whatever the lifetime actually is. That is the
-    // green-BLIND failure mode: the gate cannot fail, so its green carries no information.
-    // Overwriting the released bytes is what makes the whole class observable at all; it turns
-    // every existing test into a detector for it, which is the deliverable — not any one case.
-    //
-    // WHY IT COSTS NOTHING IN RELEASE, AND WHY IT ADDS NO FIELD. The fill is `if constexpr`, so a
-    // release `reset()` is byte-for-byte the loop it always was. It deliberately introduces NO
-    // member and NO block field: `offset` already says exactly how much was handed out, so the
-    // instrument reads state that exists rather than adding state. That keeps `ArenaAllocator` and
-    // `Block` layout-identical in every build — the property that makes it safe to link a poisoned
-    // canon against a release consumer, which is precisely the configuration the eidos-side arm
-    // needs (an ODR/layout mismatch there would be a far worse bug than the one being hunted).
-    //
-    // 0xDD is the conventional "released memory" fill. Any non-zero value works; a NON-printable,
-    // non-zero one is chosen so a corrupted read is loud in a diff (garbage, not an empty string)
-    // and can never coincide with test content.
+    // invariant: the poison adds no member and no block field, so Block and ArenaAllocator stay
+    // layout-identical in every build.
     inline constexpr bool kPoisonOnReset{
 #ifdef INSIGHT_CANON_ARENA_POISON
         true
@@ -48,6 +30,7 @@ namespace
         false
 #endif
     };
+    // note: non-printable and non-zero, so a use-after-reset read is loud in a diff.
     inline constexpr int kResetPoisonByte{0xDD};
 
     [[nodiscard]] std::uintptr_t align_up(std::uintptr_t value, std::size_t alignment) noexcept
@@ -227,7 +210,8 @@ ArenaAllocator& ArenaAllocator::operator=(ArenaAllocator&& other) noexcept
     return *this;
 }
 
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static): NUMA builds use policy_.
+// note: the NUMA arm reads policy_, so this cannot be static; a non-NUMA build cannot see that.
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 ArenaAllocator::Block ArenaAllocator::make_block(std::size_t bytes, std::size_t alignment) const
 {
     const std::size_t block_alignment = std::max(kDefaultBlockAlignment, alignment);
@@ -275,7 +259,9 @@ void* ArenaAllocator::allocate(std::size_t size, std::size_t alignment)
     while (true)
     {
         auto& block{blocks_[active_index_]};
-        const auto base{reinterpret_cast<std::uintptr_t>(block.storage)}; // NOLINT
+        // note: the bump pointer is address arithmetic, so the block base becomes an integer.
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+        const auto base{reinterpret_cast<std::uintptr_t>(block.storage)};
         const auto raw{base + block.offset};
         const auto aligned{align_up(raw, alignment)};
         const auto padding{static_cast<std::size_t>(aligned - raw)};
@@ -287,7 +273,9 @@ void* ArenaAllocator::allocate(std::size_t size, std::size_t alignment)
             INSIGHT_LOG_TRACE(logging::arena_logger(),
                               "arena alloc: size={} align={} used={} capacity={}", size, alignment,
                               bytes_used_, capacity());
-            return reinterpret_cast<void*>(aligned); // NOLINT
+            // note: the aligned address returns as a pointer; both checks read that round trip.
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,performance-no-int-to-ptr)
+            return reinterpret_cast<void*>(aligned);
         }
         grow_to_fit(size, alignment);
     }
@@ -307,8 +295,7 @@ void ArenaAllocator::reset() noexcept
 {
     for (auto& block : blocks_)
     {
-        // Poison BEFORE the rewind: `offset` is the handed-out extent, and after the rewind that
-        // information is gone. Release compiles this branch away entirely (see kPoisonOnReset).
+        // assert: offset still holds the handed-out extent — the rewind below erases it.
         if constexpr (kPoisonOnReset)
         {
             if (block.storage != nullptr && block.offset > 0)
@@ -320,14 +307,7 @@ void ArenaAllocator::reset() noexcept
     bytes_used_ = 0;
 }
 
-// Build provenance, deliberately a RUNTIME query rather than a constant on the api surface.
-// `INSIGHT_CANON_ARENA_POISON` is PRIVATE to canon's own translation units, so a consumer that
-// compiled the api module itself would read a compile-time constant reflecting ITS flags, not the
-// flags the linked `reset()` was built with — i.e. exactly the wrong answer, and silently. Reading
-// it through a function defined in this TU makes the answer come from the build that owns the
-// behaviour. A downstream lifetime gate MUST consult this and SKIP rather than pass when the
-// instrument is absent: a gate that quietly passes under a non-poisoning build is the green-BLIND
-// shape this instrument exists to remove.
+// note: a runtime query, not a constant: the poison macro is private to canon's TUs.
 bool arena_poisons_on_reset() noexcept
 {
     return kPoisonOnReset;
@@ -365,12 +345,15 @@ bool ArenaAllocator::owns(const void* ptr) const noexcept
 {
     if (ptr == nullptr)
         return false;
-    const auto address{reinterpret_cast<std::uintptr_t>(ptr)}; // NOLINT
+    // note: the ownership test compares addresses, so both pointers become integers.
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+    const auto address{reinterpret_cast<std::uintptr_t>(ptr)};
     return std::ranges::any_of(blocks_,
                                [address](const Block& block)
                                {
                                    const auto begin{
-                                       reinterpret_cast<std::uintptr_t>(block.storage)}; // NOLINT
+                                       reinterpret_cast<std::uintptr_t>(block.storage)};
+                                   // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
                                    const auto end{begin + block.size};
                                    return address >= begin && address < end;
                                });
