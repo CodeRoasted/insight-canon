@@ -1194,7 +1194,7 @@ and the address census confirms none was lost.
 # Where the SECOND run stands (units 5-7, 2026-09-06)
 
 **Seven units converted, the repo still NOT armed.** `malf format --check insight-canon` reads
-**13 707 comment lines and 12 992 would-be violations** against the baseline's 14 489 and 14 242 —
+**13 709 comment lines and 12 992 would-be violations** against the baseline's 14 489 and 14 242 —
 **1 250 violations converted, 8.8 % of the repo**, in six commits across two runs. Arming
 (`OPS-8.S12`) requires the whole repo at zero and is not reached, so `comment_contract: true` is
 NOT set and the CCC phase still counts this repo rather than failing it.
