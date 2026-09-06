@@ -1,28 +1,6 @@
-// NOLINTBEGIN Test
-// Canon public determinism proof — fixture.
-//
-// The externally-checkable half of the "same input → same output, bit-for-bit"
-// claim (bibles/determinism_model.md §3).
-// Drives ONLY canon's public Apache API — the tokenizer/stateless-masker template set,
-// `failure_lexicon` token-scan, and `det_math` — over a canon-local PUBLIC corpus,
-// and emits a CANONICAL, INTEGER-DOMAIN text digest. No metalog, no eidos, no
-// proprietary surface; nothing here reveals the moat.
-//
-// scripts/det_public_proof.sh builds this across the gcc x clang x -O{0,3} matrix;
-// the digest MUST be byte-identical across every build, and the workflow compares the
-// legs' emitted digests against each other. Two claims that stood here were false and
-// are recorded so they are not restored by habit: the `-O2` cell and the
-// `-ffp-contract{off,fast}` axis (the axis was inert — canon forces -ffp-contract=off
-// PUBLIC, so it won in all four cells; the script's header carries the measurement),
-// and `proof/golden.sha256`, a committed golden retired with the cross-leg-agreement
-// model and absent from this repo. Determinism is preserved by construction:
-//   * std::map (ordered) for the template set — iteration order is by key, never
-//     hash-order (the std::hash cross-stdlib hazard cannot appear);
-//   * det_math entropy emitted as the RAW Qk __int128 (Σ c·log2(c) via the no-libm
-//     det_log2_fixed) — integer-domain, so no float formatting can diverge;
-//   * per-file fresh arena/Tokenizer — the template set is a pure function of that
-//     file's content and line order.
 
+// note: bare and file-wide; measured to silence 4 checks, main's complexity among them.
+// NOLINTBEGIN Test
 #include <algorithm>
 #include <cstdint>
 #include <fstream>
@@ -30,23 +8,18 @@
 #include <map>
 #include <optional>
 #include <span>
-#include <spdlog/common.h> // spdlog::level — named for init_logging's sink/level choice below
+#include <spdlog/common.h>
 #include <string>
 #include <vector>
 #if defined(_WIN32)
-#include <fcntl.h> // _O_BINARY
-#include <io.h>    // _setmode, _fileno
+#include <fcntl.h>
+#include <io.h>
 #endif
 
-// 1.5.1 unwrap (Approach B): the textual public headers are gone — the canon module's
-// public surface (Tokenizer, det::FixedReducer, failure_lexicon cues, to_string,
-// CanonicalEvent / StructuralRole) is all reachable through the single facade import.
 import insight.canon;
-// ADR-17: the Tokenizer now takes a ComposedSemantics. The proof composes the SAME package set a
-// product binary does — insight_semantic_github + insight_semantic_jenkins +
-// insight_semantic_test_frameworks (the eidos composition TU's exact set and order) — so the
-// composed pipeline (GHA + Jenkins dialects + test-file locations) is what the 5-leg byte-identity
-// compare proves (G-SP-1; the grammar-2 composed identity = G-OUT-6, extending G-SP-4).
+// invariant: the proof composes the SAME package set, in the same order, that the one product
+// composition does — a divergence here proves a pipeline nothing ships.
+// refs: ADR-17, F-SRC-insight-eidos:pipeline/composition.cpp
 import insight.semantic.github;
 import insight.semantic.gitlab;
 import insight.semantic.jenkins;
@@ -54,18 +27,15 @@ import insight.semantic.test_frameworks;
 
 namespace
 {
-// det::i128 → decimal string (no std::to_string overload exists). Works on BOTH det_math 128-bit
-// representations (native __int128 on gcc/clang, the portable struct on MSVC) — det::i128/u128 are
-// the aliases from det_int128.hpp, and the ops used here (sign via is_negative()-equivalent
-// compare, magnitude(), %/÷ by ten, != 0) are provided on both. This output IS part of the
-// canonical digest, so it must be byte-identical across compilers — hence it goes through the same
-// portable shim.
+// invariant: this decimal text is part of the canonical digest, so it goes through the portable
+// 128-bit shim and is byte-identical on every compiler.
 std::string i128_to_dec(insight::det::i128 value)
 {
     using insight::det::i128;
     using insight::det::u128;
     const bool negative{!(value >= i128{0})};
-    // magnitude in u128: -value for negatives (two's-complement -, exact for INT_MIN too).
+    // assert: u128 is what REPRESENTS the most-negative value's magnitude; i128 cannot, and its own
+    // operator set carries no remainder.
     const u128 magnitude{static_cast<u128>(negative ? -value : value)};
     std::string out;
     u128 rest{magnitude};
@@ -85,19 +55,19 @@ std::string i128_to_dec(insight::det::i128 value)
 
 std::string basename_of(const std::string& path)
 {
-    // Strip BOTH separators: the gate passes POSIX paths on Linux ('/') and Windows paths on MSVC
-    // ('\\', e.g. D:\...\corpus\ci_build.log). Splitting on '/' only left the full drive path on
-    // Windows, so the digest's `## file` header — and ONLY that header — diverged cross-OS while
-    // every templates/events/det_math payload was already byte-identical. The digest must encode
-    // the basename, never the platform-specific input path.
+    // assert: both separators are stripped — a Windows drive path left the `## file` header
+    // platform-dependent while every other section was already byte-identical.
     const auto slash{path.find_last_of("/\\")};
     return slash == std::string::npos ? path : path.substr(slash + 1);
 }
 } // namespace
 
-// Proof tool, not a hot path; basename_of's substr(slash+1) runs only when find_last_of
-// returned a valid index. main is flagged by default; an escaping exception just aborts the tool —
-// acceptable in a standalone proof binary's main.
+// post: a canonical, integer-domain text digest that must be byte-identical across every compiler,
+// optimisation and stdlib leg the sweep builds.
+// invariant: drives canon's public API only, over a public corpus — nothing here reveals the
+// moat.
+// refs: BIB:determinism_model
+// note: an escaping exception aborts a standalone proof binary, which is acceptable here.
 // NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char** argv)
 {
@@ -107,88 +77,50 @@ int main(int argc, char** argv)
         return 2;
     }
 
-    // Binary stdout: the digest is hashed byte-for-byte, so the `\n` separators MUST stay LF on
-    // every platform. Windows std::cout defaults to TEXT mode, translating `\n`→`\r\n`, which would
-    // make the Windows digest diverge from the LF Linux golden on EVERY line. POSIX has no such
-    // translation, so this is a Windows-only no-op elsewhere. (The divergence this prevents is a
-    // platform artifact, never an engine difference — keep it out of the canonical bytes.)
+// assert: the digest is hashed byte for byte, so the separators must stay LF; Windows std::cout is
+// text mode and would translate them, and POSIX makes this a no-op.
 #if defined(_WIN32)
     (void)_setmode(_fileno(stdout), _O_BINARY);
 #endif
 
-    // Same invariant, second threat: NOTHING but the digest may reach this stdout. Canon's engine
-    // loggers carry a wall-clock `[%Y-%m-%d %H:%M:%S.%e]` pattern, so a record interleaved into
-    // the hashed bytes makes the digest a function of the operator instead of of the corpus: two
-    // runs of ONE binary on ONE input differ. Measured 2026-08-18 on the `malf inventory` build,
-    // back when an un-initialised canon resolved to spdlog's default STDOUT logger: 18 such lines
-    // on stdout for a 6-line input. det_public_proof.sh's cells compiled the macros out
-    // (`-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF` in `scripts/det_public_proof.sh`), which is why
-    // the release legs never saw it, while the inventory build, scripts/samples_showcase.sh and a
-    // desk run all got the corrupting default.
-    //
-    // canon's un-initialised state is stderr-only now (DN-53.D3), so this call is no longer what
-    // stands between the digest and a log line. It stays because it buys the other two things
-    // this fixture wants and the quiet fallback deliberately does not give: the module records
-    // carry their `[insight.*]` tag, and the level is `info` rather than the fallback's `warn`.
-    // Level stays `info` rather than `off`: the diagnostics were never the defect, their
-    // DESTINATION was — silencing them would answer artifact purity by deleting observability.
+    // invariant: nothing but the digest may reach this stdout — a log record interleaved into the
+    // hashed bytes makes the digest a function of the operator, not of the corpus.
+    // assert: this call no longer guards that; canon's un-initialised state is stderr-only. It
+    // stays for the module tag and for level info rather than the fallback's warn.
+    // refs: DN-53.D3
+    // note: info rather than off — the destination was the defect, never the diagnostics.
     insight::logging::init_logging(spdlog::level::info);
 
     namespace tk = insight::tokenization;
 
-    // ASCII-only banner: the digest is hashed byte-for-byte, so a non-ASCII byte (the old em-dash,
-    // U+2014) made the prologue's bytes depend on the compiler's execution charset — MSVC emitted a
-    // different sequence than gcc/clang's UTF-8, diverging the digest on that ONE line while every
-    // other (pure-ASCII) section matched. A byte-hashed canonical output must contain no character
-    // whose encoding varies by toolchain/locale. Plain '--'.
-    // v2: the grammar-2 cut (ADR-17) — jenkins joins the composed set and every file section
-    // gains a `### run_outcome` line (the console-tail scan surface the compare must cover).
-    // v4: grammar-5 (ADR-17) — gitlab joins the composed set with its own declared ARM and its
-    // own corpus file, so the numeric-field extractor and the prefix-verdict outcome walker are
-    // both on the cross-OS compare surface. The composed `semantic_identity` moves with the grammar
-    // token, which is expected and is exactly what the emitted digest line records.
-    // v3: T4 (ADR-22) — the dialect and the transport peel are DECLARED, so every file is scored
-    // once per declared ARM (below) instead of once. The compare covers only what the fixture
-    // EMITS, and after T4 an undeclared stream sees no concretely-gated row at all: without the
-    // declared arms this proof would still be green while covering none of the dialect walkers.
+    // assert: ASCII only — a non-ASCII byte makes the prologue depend on the compiler's execution
+    // charset, and one line of the digest diverged on MSVC while the rest matched.
     std::cout << "# canon public determinism proof -- v4\n";
 
-    // The composition is loop-invariant (the SAME package set tokenizes every file), so build it
-    // ONCE here and thread it into each file's per-file arena/Tokenizer below.
+    // invariant: the composition is loop-invariant — the same package set tokenizes every file.
     const std::array<insight::semantic::SemanticPackageManifest, 4> manifests{
         insight::semantic::github::kManifest, insight::semantic::gitlab::kManifest,
         insight::semantic::jenkins::kManifest, insight::semantic::test_frameworks::kManifest};
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose(manifests)};
 
-    // G-SP-4 (ADR-17): the composed `semantic_identity` content hash must be bit-identical
-    // across independent builds and every OS/ISA leg (no paths/timestamps/link-order in its input —
-    // by construction, verified anyway). Emitting it into THIS canonical digest folds G-SP-4 into
-    // the existing 5-leg byte-identity compare — a divergent identity byte diverges the digest and
-    // fails the gate. This is a REAL, non-redundant surface: the behavioral rows below could match
-    // while the hash serialization itself diverges cross-toolchain (endianness, string_view
-    // ordering) — exactly what this line catches. The package list rides for legibility (the wire
-    // block's §4.2 label).
+    // invariant: the composed identity hash carries no path, timestamp or link order, so it is
+    // bit-identical across builds and legs.
+    // note: the behavioural rows can match while the hash serialization itself diverges.
     std::cout << "# semantic_identity " << composed.identity_hex() << '\n';
     std::cout << "# semantic_packages";
     for (const auto& pkg : composed.packages())
         std::cout << ' ' << pkg.name << '@' << pkg.version;
     std::cout << '\n';
 
-    // ── The declared ARMS (ADR-23 / ADR-22). ──
-    //
-    // EVERY arm is applied to EVERY file, on purpose. Choosing an arm per file would be inference —
-    // "this one looks like GHA" — which is precisely the per-line content dependence T4 deleted,
-    // and a proof binary that re-introduced it to look tidy would be proving the wrong thing.
-    // Applying all arms to all files also gives the compare the NEGATIVE cells for free: a Jenkins
-    // fixture read under the `github` declaration must produce no GHA structure, byte-identically,
-    // on every leg.
-    //
-    // The stamped arm declares `api-rfc3339-line-prefix` because GitHub's serving API stamps every
-    // line it returns; that peel used to be DETECTED by a strategy in the github package and is now
-    // the caller's declaration.
+    // invariant: EVERY arm is applied to EVERY file — choosing an arm per file would be
+    // inference, which is the per-line content dependence the declared-ingest cut deleted.
+    // note: it also buys the negative cells: a Jenkins file read as github fires no gated row.
+    // refs: ADR-22, ADR-23
+    // note: GitHub's serving API stamps every line it returns, so the peel is declared here.
     struct Arm
     {
-        std::string_view label; // what the `## file` header records; "-" is the undeclared stream
+        // note: what the `## file` header records; "-" is the undeclared stream.
+        std::string_view label;
         std::string_view dialect;
         std::span<const std::string_view> stack;
     };
@@ -198,8 +130,8 @@ int main(int argc, char** argv)
         Arm{.label = "github+api-rfc3339-line-prefix",
             .dialect = insight::semantic::github::kDialect,
             .stack = kRfc3339Stack},
-        // GitLab declares NO transport stack: its 32-byte runner prefix carries a line-DELIMITATION
-        // field, so ADR-23.D1 HOLDS the catalogue row and the dialect strategy peels it instead.
+        // note: its runner prefix carries a line-delimitation field, so the dialect peels it.
+        // refs: ADR-23.D1
         Arm{.label = "gitlab", .dialect = insight::semantic::gitlab::kDialect, .stack = {}},
         Arm{.label = "jenkins", .dialect = insight::semantic::jenkins::kDialect, .stack = {}},
     };
@@ -224,17 +156,15 @@ int main(int argc, char** argv)
 
         for (const Arm& arm : arms)
         {
-            // The ONE call a caller makes at stream open (ADR-23): both semantic coordinates
-            // verified and filtered into the view, and the transport stack resolved — all before
-            // the first line, so nothing downstream can depend on content.
+            // assert: one call at stream open resolves both semantic coordinates and the transport
+            // stack, before the first line, so nothing downstream can depend on content.
+            // refs: ADR-23
             const insight::semantic::ResolvedStream stream{insight::semantic::resolve_stream(
                 composed, insight::transport::IngestDeclaration{
                               .stack = arm.stack, .dialect = arm.dialect, .channel = {}})};
 
-            // The peel runs at the CALLER, outside the tokenizer, and only `content` crosses (§4 —
-            // line identity is a pure function of peeled content). `peeled_lines` is materialized
-            // because the run-outcome scan takes a whole-log span; it also keeps the peel applied
-            // exactly once per line rather than once per consumer.
+            // assert: the peel runs at the CALLER and only `content` crosses; the vector applies it
+            // exactly once per line.
             std::vector<std::string> peeled_lines;
             peeled_lines.reserve(lines.size());
             std::vector<std::optional<insight::Timestamp>> observation_times;
@@ -246,11 +176,15 @@ int main(int argc, char** argv)
                 observation_times.push_back(peeled.observation_time);
             }
 
+            // invariant: a fresh arena and Tokenizer per file and per arm, so the template set is a
+            // pure function of that file's content and line order.
             constexpr std::size_t kArenaBytes{std::size_t{1} << 22};
             tk::ArenaAllocator arena{kArenaBytes};
             tk::Tokenizer tokenizer{arena, tk::MaskConfig{}, stream.semantics};
 
-            std::map<std::string, std::uint64_t> templates; // ordered → deterministic iteration
+            // invariant: ordered, so iteration is by key and never by hash order — the
+            // cross-stdlib std::hash hazard cannot appear.
+            std::map<std::string, std::uint64_t> templates;
             struct Row
             {
                 std::string level;
@@ -258,7 +192,8 @@ int main(int argc, char** argv)
                 std::string tmpl;
                 bool failure;
                 bool warning;
-                bool observed; // the peel extracted an observation time for this line
+                // note: true when the peel extracted an observation time for this line.
+                bool observed;
             };
             std::vector<Row> rows;
             rows.reserve(lines.size());
@@ -266,9 +201,9 @@ int main(int argc, char** argv)
             for (std::size_t idx{0}; idx < peeled_lines.size(); ++idx)
             {
                 auto event{tokenizer.process_line(peeled_lines[idx])};
-                // THE TIMESTAMP HANDOVER (ADR-23 / ADR-22): the extract is
-                // the CALLER's to inject, because §4 forbids handing the stack to the Tokenizer.
-                // ⚠ An OBSERVATION time, never an ordering key and never a replay input.
+                // assert: an OBSERVATION time the caller injects, never an ordering key or a replay
+                // input.
+                // refs: ADR-22, ADR-23
                 if (event && observation_times[idx])
                     event->timestamp = *observation_times[idx];
                 std::string tmpl{event ? std::string{event->template_str}
@@ -292,7 +227,8 @@ int main(int argc, char** argv)
             {
                 std::cout << count << '\t' << tmpl << '\n';
                 total += count;
-                reducer.add_weighted_log2(count, count); // Σ c·log2(c), the det_math entropy term
+                // note: the det_math entropy term, a weighted log2 sum.
+                reducer.add_weighted_log2(count, count);
             }
 
             std::cout << "### events\n";
@@ -303,28 +239,20 @@ int main(int argc, char** argv)
                           << row.role << '\t' << row.tmpl << '\n';
             }
 
+            // assert: the entropy is emitted as the raw fixed-point integer, so no float formatting
+            // can diverge between legs.
             std::cout << "### det_math total=" << total
                       << " sum_c_log2c_qk=" << i128_to_dec(reducer.raw()) << '\n';
 
-            // G-OUT-6 behavioral arm: the console-tail run-outcome scan + the degenerate (no
-            // side-input) resolution, per file and per declared arm. The composed identity line
-            // above already pins the grammar-2 HASH; this pins the outcome-scan BYTES — the compare
-            // covers only what the fixture emits, so the surface must be emitted to be proven.
-            // Byte-exact ASCII walk + last-match-wins integer line index ⇒ deterministic by
-            // construction; any cross-leg divergence here is an engine bug the gate must catch.
+            // assert: the compare covers only what this fixture EMITS, so these bytes are emitted
+            // to be proven.
             const insight::RunOutcomeScan outcome_scan{
                 insight::scan_run_outcome(peeled_lines, stream.semantics)};
-            // `{}` is the empty SideInputVerdict — no token AND no vocabulary — which is exactly
-            // what the bare `""` meant here before DN-32.D6 made a caller-declared verdict a PAIR:
-            // this proof declares nothing and asserts rung 2, the console tail. Under DN-32.D7 an
-            // empty pair is the third state, never a defaulted success.
-            //
-            // `stream.semantics` is passed TWICE deliberately, and it cannot move a byte. The two
-            // parameters are different questions — rung 2 reads the STREAM view (a marker came out
-            // of these bytes), rung 1 reads the DECLARER's vocabulary — but rung 1's vocabulary
-            // argument is only ever evaluated when the pair NAMES one. With an empty pair the
-            // resolver never touches it, so the fourth argument is unread on this path and the
-            // proof's output is byte-identical to the pre-DN-32.D6 form.
+            // assert: the empty side-input verdict is the third state, never a defaulted success
+            // — this proof declares nothing and asserts rung 2.
+            // refs: DN-32.D6, DN-32.D7
+            // assert: `stream.semantics` is passed twice deliberately and cannot move a byte —
+            // rung 1's vocabulary is read only when the pair names a token.
             const insight::RunOutcomeResolution outcome_resolution{
                 insight::resolve_run_outcome({}, outcome_scan, stream.semantics, stream.semantics)};
             std::cout << "### run_outcome marker=" << (outcome_scan.marker_present ? '1' : '0')

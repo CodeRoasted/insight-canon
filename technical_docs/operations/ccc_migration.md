@@ -1459,12 +1459,239 @@ why that instruction exists.
   is 2026-07-17. So the pointer cannot resolve and by that register's own rule never will again.
   **Addressee: the `failure_lexicon.cpp` conversion.**
 
+## Unit 11 — `proof/det_proof.cpp` (1 file, 340 lines, 142 would-be violations)
+
+The public determinism proof's fixture — the binary a cross-compiler, cross-stdlib, cross-`-O`
+sweep builds and whose emitted digest the legs compare against each other. It was taken out of the
+plan's order (the harness tier before the source tier is finished) because verdict finding 20 blocks
+every remaining SOURCE unit in this repo and this one is clean of the code shape that trips it.
+
+| files | comment lines HEAD → gate | forms written |
+|---|---|---|
+| `det_proof.cpp` | 144 → 64 | post 1 · invariant 9 · assert 12 · note 10 · refs 8 · 20 continuations · 4 tool |
+
+Baseline, measured with the standalone checker rather than derived: 144 comment lines, 142 would-be
+violations (bare 127, spacer 6, trailing 7, suppression-without-why 2), tool forms 2.
+
+The `refs:` targets are `ADR-17` (the composed-semantics cut), `ADR-22` and `ADR-23` (the declared
+dialect and transport envelope), `ADR-23.D1` (the catalogue row GitLab's runner prefix falls under),
+`DN-32.D6` and `DN-32.D7` (the side-input verdict as a PAIR, and the empty pair as a third state),
+`DN-53.D3` (canon's un-initialised state being stderr-only), `BIB:determinism_model` and
+`F-SRC-insight-eidos:pipeline/composition.cpp`.
+
+### Census (`OPS-8.S4`) and the stripper cross-check (`OPS-8.S5`)
+
+`NOLINT` directives 3 → 3, namespace closers 1 → 1, `/*name=*/` 0, `clang-format off` 0,
+`wall-clock:` 0, `SPDX` 0, registry addresses no loss. Zero census differences. The cross-check held
+in its corrected form: `removed == violations − (suppression-without-why + trailing-nolint)` →
+140 == 142 − (2 + 0), and `kept == tool-forms + those classes` → 4 == 2 + 2.
+
+### The three suppressions, measured — and the file-wide one is BARE and load-bearing
+
+Same instrument as unit 10, run against `proof/build-inventory-clang21-libcxx-release`'s own compile
+database and by swapping the stripped copy into the file's OWN path (verdict finding 21). **With the
+directives: 14 NOLINT-suppressed, 0 main-file diagnostics. Without: 9 NOLINT-suppressed, 5 main-file
+diagnostics.** The residual 9 are header directives, so the difference is attributable: **5 own-file
+suppressions, 5 diagnostics.**
+
+| directive | what it silences, measured |
+|---|---|
+| `NOLINTNEXTLINE(bugprone-exception-escape)` above `main` | `bugprone-exception-escape` on `main` |
+| the file-wide bare `NOLINTBEGIN` / `NOLINTEND` pair | `readability-function-cognitive-complexity` (main, 60 against a threshold of 25) · `bugprone-unchecked-optional-access` · `readability-use-concise-preprocessor-directives` twice |
+
+**All three are kept.** The bare pair does real work — four diagnostics, none of them reachable by
+the named directive — so it is not the class `OPS-8.S3` deletes. Its FORM was repaired: the grammar
+requires a `note:` or `refs:` immediately above a directive, and the bare pair had none, so it now
+carries a `note:` saying it is bare, file-wide, and measured to silence four checks.
+
+**Whether that bare pair should be narrowed to the four checks it covers is a DESIGN QUESTION this
+lane did not settle**, and it is recorded as a finding below rather than answered in a comment-only
+commit.
+
+### The `refs:` line has two traps this unit met, and only the pre-push lint sees either
+
+**① A sub-step is not an address.** `refs: OPS-8.S3.4` was rejected by the CCC gate as
+`refs-prose` — the admitted form is `OPS-n.Sm`, and both the gate and `registry_grammar_lint` agree
+on that shape, so the third component is prose after a valid address. The runbook and every ledger
+in this programme address sub-steps that way in PROSE; a `refs:` line cannot. **And the failure
+cascades**: the rejected `refs:` stopped being a why, so the `NOLINTBEGIN` under it was reported
+`suppression-without-why` in the same run. The claim was rewritten to carry its why in the `note:`
+alone.
+
+**② A form-3 file address can be form-correct and still resolve to nothing, and the CCC gate cannot
+see it.** The first draft cited the eidos composition unit by its BASENAME alone. It passed the CCC
+gate — which checks the FORM of a `refs:` line and delegates RESOLUTION to `registry_grammar_lint`
+by design — and then failed `G15` at the pre-push run: `insight-eidos` carries **two** tracked files
+with that basename, one under `engine/src/pipeline/` and one under `sift/src/engine/`, and the
+form's file field is the shortest suffix naming exactly one. Repaired to
+`F-SRC-insight-eidos:pipeline/composition.cpp`. This is `OPS-8.S11`'s instruction earning its keep
+for the second time in this run, and it is why the two lints run before the push and not after.
+
+### Stale and false claims deleted, with the evidence and where the search went
+
+* **The composed-package enumeration omitted `gitlab`.** The header block claimed the fixture
+  composes *"insight_semantic_github + insight_semantic_jenkins + insight_semantic_test_frameworks
+  (the eidos composition TU's exact set and order)"*. The fixture composes **four** — github,
+  gitlab, jenkins, test_frameworks — and a `v4` line further down the same file records gitlab
+  joining, so the two halves of one file disagreed. **The CLAIM survives and the ENUMERATION goes:**
+  the search left the repo and `insight-eidos/engine/src/pipeline/composition.cpp` composes exactly
+  the same four in exactly the same order, so *"the same package set a product binary does"* is true
+  and is now the written `invariant:`. Re-listing the four would be a mirror of the array three
+  lines below it.
+* **The `-O2` cell and the `-ffp-contract{off,fast}` axis history is deleted, not lost.**
+  `insight-canon/scripts/det_public_proof.sh` carries the whole measurement in its own header — why
+  the axis was retired, that canon forces `-ffp-contract=off` PUBLIC so it won in all four cells,
+  and the flag ordering that made four cells two configurations run twice. A rejected alternative is
+  not a comment when a live doc owns it.
+* **`proof/golden.sha256` really is absent**, so the sentence saying so was true and is deleted as
+  history of a retired model rather than as a falsehood.
+* **The `2026-08-18` measurement — 18 log lines on stdout for a 6-line input — is deleted as history
+  of a FIXED defect, and it is not a finding.** It appears nowhere else in the live tree, which
+  would normally make it an unsourced measurement; what makes it history instead is that the same
+  comment states the condition no longer exists (canon's un-initialised state is stderr-only,
+  `DN-53.D3`). The claim it justified — why `init_logging` is still called — has a live reason
+  stated beside it, and that is what survives as the written `assert:`.
+* **The `1.5.1` unwrap note and the `v2`/`v3`/`v4` digest changelog are deleted as history.** The
+  emitted `v4` token is the live fact; why it moved from `v2` is the planning tier's and git's.
+
+### Interrogation
+
+One fresh agent, 18 questions built from the held R claims, 78 tool uses, 198 k tokens, 8.9 minutes.
+**No git command was run**, verified mechanically over the transcript rather than from the reader's
+closing line.
+
+**17 of 18 recovered, 0 not recovered, 1 WRONG.** Scored one question at a time from the evidence
+each answer cites.
+
+Recovery landed **above** the deleted prose on five of the eighteen, and on two of those the reader
+found the mechanism the prose never named:
+
+* Q13 (why a fresh arena and Tokenizer per file and per arm) named the actual carrier the prose
+  only gestured at: `LogParser`'s sticky-strategy latch with its `last_format_`, tried first on
+  every line, plus `Tokenizer::Impl`'s `next_id` / `produced` / `empty_projections`, which are
+  monotonic per stream and reset by nothing. Its conclusion is sharper than the claim: a shared
+  Tokenizer would make the digest a function of the corpus **argument order**, and
+  `localize_digest.py`'s per-block attribution would then point at the wrong block.
+* Q12 (why `std::map`) recovered the ordering argument AND bounded it: the count, the total and the
+  entropy term would NOT move under a hash map, because the reducer accumulates in exact 128-bit
+  integers and is order-independent. So the breakage is precisely the printed row order.
+* Q1 recovered more than the written `post:` says — the sweep is five legs, and the compare is
+  fail-closed on a missing one rather than merely comparing what arrives.
+* Q17 (the GitHub/GitLab asymmetry) recovered the reason the `note:` compresses: GitLab's 32-byte
+  prefix carries a **continuation flag**, a line-delimitation field, so peeling it would discard
+  the delimitation and honouring it would rejoin lines — the row is HELD, not refused.
+* Q18 recovered the whole observation-time contract, including that `declared_timestamp` stays
+  false, from `ADR-23.D5` and the transport interface rather than from this file.
+
+### The line THIS conversion wrote that was WRONG, re-derived at the artifact
+
+**Q3 — the `assert:` on `i128_to_dec`'s magnitude said the negation happens in the unsigned type.
+It does not.** The written line was *"negating in u128 is exact for the most-negative value too"*,
+carried from prose that read *"magnitude in u128: -value for negatives (two's-complement -, exact
+for INT_MIN too)"*. The code negates in the SIGNED type and casts afterwards, so the line names the
+wrong operation in the wrong domain — and on native `__int128` that signed negation of the
+most-negative value is an overflow rather than an exact operation.
+
+What is true, and what the repaired line says: **`u128` is what REPRESENTS the magnitude** — `2^127`
+is not a value `i128` can hold, so no operation in the signed type can produce it, and it is the
+reinterpretation of the two's-complement bit pattern as unsigned that yields the right digits. The
+reader added a second reason the conversion had not seen: the portable 128-bit struct declares
+`operator%` on `u128` and **not** on `i128`, so digit extraction in the signed type would not
+compile on the MSVC leg at all. Re-derived at `core/api/det/det_int128.hpp` before the repair.
+
+### Two more lines repaired before the commit, one caught by this lane and one by the registry lint
+
+* **Caught by re-reading, not by the reader: *"a Jenkins file read as github emits no rows"* is
+  false.** The fixture emits a `### events` row for every line under every arm; what a negative cell
+  shows is the absence of GitHub-gated STRUCTURE, not the absence of rows. The reader's own Q8
+  answer independently uses the correct form (*"fires no dialect-gated rows"*), which is the shape
+  the repaired `note:` now carries. The reader did not flag the line, so this one is the lane's
+  catch and is recorded as such rather than as a reader finding.
+* **Caught by `registry_grammar_lint`, invisible to the CCC gate: the eidos composition unit cited
+  by basename alone resolves to two files.** See the `refs:` traps above.
+
+### A claim in THIS LEDGER'S OWN DRAFT that the cold reader falsified
+
+The draft of the bare-suppression finding below asserted that `det_proof.cpp` sits **outside**
+`malf lint`'s file set, so narrowing the waiver would cost nothing. The reader answered the
+opposite with a mechanism: `malf` folds each `build-inventory-<key>/compile_commands.json` into the
+repo-root database **specifically so** `malf lint --all-files` covers `proof/`, and under
+`--all-files` an uncovered translation unit is fatal.
+
+Re-derived at the artifact and **the reader is right**: the repo-root
+`build-clang21-libcxx-release/compile_commands.json` holds 126 entries and `det_proof.cpp` is among
+them. **The lane's evidence was unsound in a way worth naming** — it was
+`grep -c det_proof lint_output.txt` returning 0, and that file lists FINDINGS, not files checked. A
+file with no findings appears zero times, and this file has no findings *because the bare waiver
+suppresses them all*. The inference read a consequence of the thing under test as evidence about
+it. The finding below is rewritten on the corrected fact, and its conclusion moves: narrowing the
+waiver is not free.
+
+### Dispositions
+
+* **Recovered (17)** — Q1, Q2, Q4 through Q18. The prose was redundant; nothing re-homed.
+* **Wrong (1)** — Q3, repaired in the tree before the commit, as above.
+* **Not recovered (0).**
+
+### Witnesses
+
+Comment-only: `det_proof.cpp`'s code token stream is byte-identical to `HEAD`'s, re-taken after all
+three repairs. Grammar: `malf format --check` over the file — 65 comment lines, **0 would-be
+violations**, post format; over the whole repo, **126 files, 13 219 comment lines, 12 276 would-be
+violations**, 0 misformatted. Addressability: the per-file census reads **additions only, no loss**
+— `BIB:determinism_model` and `F-SRC-insight-eidos:pipeline/composition.cpp` — exit 0. Registry:
+`scripts/registry_grammar_lint.py` **2 failures, NEITHER of them this repo's**; docs:
+`scripts/docs_lint.py` **0 failures**. Lint: `malf lint --all-files` **21 findings** over 56 files checked, equal to the standing baseline. Behaviour:
+`malf test insight-canon` **809 of 809** on clang-21 (734 + 32 + 25 + 13 + 5) and **809 of 809** with
+`--profile linux-gcc16-release`, in one slot acquisition covering unit 11 alone. Count: 144 comment
+lines at `HEAD` to 65, a **55 % reduction** — the lowest of the run so far, and the reason is that
+this file is almost entirely argument: 12 of its 65 surviving lines are `assert:` claims inside
+`main`, which is the shape a fixture whose whole content is determinism reasoning converts into.
+
+### Findings for other lanes — none fixed here
+
+* **The file-wide bare `NOLINTBEGIN` is a DESIGN QUESTION, not a defect, and this lane refuses to
+  settle it in a comment-only commit.** It is spelled `NOLINTBEGIN Test` — no check list — so it
+  waives every check the shared configuration arms, and today four of them fire on this file. Two
+  readings are open and they are not equivalent. **Narrowing it** to the four measured checks makes
+  the waiver a declared one, which is CCC's whole thesis. **Keeping it bare** is the posture the
+  trailing word `Test` was reaching for — a fixture is exempt wholesale.
+  **The cost of narrowing is REAL and this lane got it backwards before the cold reader corrected
+  it** — see the falsified-claim entry below: `det_proof.cpp` **is inside** `malf lint --all-files`'s
+  subject, and canon's `.clang-tidy` makes `bugprone-*`, `performance-*` and `cppcoreguidelines-*`
+  **errors**, so a narrowed list arms 231 other checks on a file whose findings would red the gate
+  and, through `lint.yml`, the tag. **Addressee: the canon source lane, via the pilot.** The
+  measurement it needs is in the table above; the decision is not this lane's.
+* **A `refs:` may cite `OPS-8.S3` and never `OPS-8.S3.4`.** Both the CCC gate and
+  `registry_grammar_lint` define the form as `OPS-n.Sm`; the sub-step numbering this programme uses
+  everywhere in prose is one component too deep for an address. Any lane citing a runbook sub-step
+  from source will meet it, and it fails as `refs-prose` PLUS a `suppression-without-why` on
+  whatever the line was the why for. **Addressee: every remaining CCC lane.**
+* **A SECOND `registry_grammar_lint` failure appeared on `main` mid-session, and it is not this
+  lane's either.** `G15` fails a form-3 address in `coderoast-server`'s insight config source that
+  names the eidos end-to-end coverage document with a leading directory segment it does not need:
+  that basename is tracked exactly once in `insight-eidos`, so the shortest suffix naming one file
+  IS the basename, and the over-specified spelling is refused. It was absent when this run started
+  and present when it finished, so the workspace-root gate now carries failures from sibling CCC
+  lanes, none of them in `insight-canon`. **Addressee: the `coderoast-server` lane, via the
+  pilot.** The exact spelling is in the gate's own output; it is not reproduced here, for the
+  reason the next finding gives. Worth pairing with this unit's own experience of the same arm: a form-3 address is
+  the ONE `refs:` form whose spelling has no author discretion, it is checked in both directions —
+  too short resolves to two files, too long is refused outright — and the CCC gate sees neither,
+  by design. It is the pre-push `registry_grammar_lint` run or nothing.
+* **`insight-canon/.github/workflows/golden.yaml` describes the composed package set as
+  "github + jenkins + test_frameworks", which is stale for the same reason this unit's header block
+  was.** Found by the cold reader while answering the composed-set question, and it is a third site
+  for one drift: the two `composition.cpp` sources and `det_proof.cpp` all compose four packages
+  including gitlab. **Addressee: Argos** (the workflow surface). Not repaired here — it is outside
+  this repo's source tier and outside a comment-only commit's reach.
+
 ---
 
 # The `OPS-8` verdict — third cold reader, first at scale
 
 `insight-canon` is `OPS-8`'s third run and its first large one; findings 14 onward come from the
-third run (units 8-9) and findings 20-21 from the fourth (unit 10). **Twenty-one findings**, ordered
+third run (units 8-9) and findings 20-22 from the fourth (units 10-11). **Twenty-two findings**, ordered
 by what they cost within each run. Items 1, 5, 14 and **20** are the ones that change the runbook;
 item 5 needed a Founder ruling before the `core/api/` units could be converted at all, and it has
 one — see the RULED section below. **Item 20 needs a one-character repair to an instrument outside
@@ -1816,6 +2043,36 @@ The sound instrument is to swap the stripped file into its OWN path, measure, an
 byte-for-byte backup taken before the swap — `sha256sum` equal on both files, verified here — and
 **never with `git checkout`**, which is finding 15.
 
+## 22. REPORTING A CITATION DEFECT IN A STABLE DOC REPRODUCES IT, AND THIS RUN DID IT THREE TIMES
+
+A CCC ledger is a **stable doc**, so `docs_lint` and `registry_grammar_lint` read every token in it
+as a live citation. A finding whose subject IS a malformed citation therefore commits the same
+defect the moment it quotes its evidence, and the gate cannot tell a report from an assertion —
+nothing in either instrument distinguishes *"this address is wrong"* from *"this address"*.
+
+Three instances in one run, each caught by the pre-push pair and none by any earlier witness:
+
+* **A bare source coordinate.** Recording a sibling lane's `G15-coord` red meant naming the three
+  `path:line` tokens it fails on — which reds `G15-coord` here as well — and naming the planning
+  surface they live on, which reds `docs_lint`'s volatile-plan-tier arm twice more. Three failures
+  from one finding.
+* **A dependency version.** Stating that a source comment named the wrong `spdlog` version put a
+  bare three-part version in a stable doc, which the unshipped-version arm reads as an unshipped
+  CodeRoast cut. **And the paragraph written to warn the next lane about it reproduced it a second
+  time**, because that paragraph quoted the offending form to explain it.
+* **A malformed form-3 address.** Explaining that a basename-only citation resolves to two files,
+  and quoting a sibling's over-specified one, put three unresolvable addresses on this shelf.
+
+**The repair is the same every time and it is not a workaround: DESCRIBE the defective token, never
+spell it.** *"the eidos composition unit cited by basename alone"*, *"three bare source coordinates
+on two adjacent lines"*, *"the conan reference form"*. The gate's own output holds the exact
+spelling for whoever repairs it, which is where a reader should be sent anyway — a ledger quoting a
+token that is about to be repaired goes stale the moment it is.
+
+**Where this bites hardest is a findings-for-other-lanes section**, which is precisely where a CCC
+ledger reports defects it may not fix. Expect it there, and run BOTH lints before every push —
+this run's three instances were caught at that step and nowhere else.
+
 ## Departures from `OPS-8` in this run, declared
 
 * **Units 2 and 3 landed in ONE commit**, against `OPS-8.S10`'s one-commit-per-unit. Both are
@@ -2112,12 +2369,12 @@ pilot.
 
 ---
 
-# Where the FOURTH run stands (unit 10, 2026-09-06)
+# Where the FOURTH run stands (units 10-11, 2026-09-06)
 
-**Ten units converted, the repo still NOT armed, and the run stopped on an instrument defect
+**Eleven units converted, the repo still NOT armed, and the run stopped on an instrument defect
 rather than on time or on a design question.** `malf format --check insight-canon` reads
-**13 297 comment lines and 12 418 would-be violations** against the original baseline's 14 489 and
-14 242 — **1 824 violations converted, 12.8 % of the repo**, in nine commits across four runs.
+**13 219 comment lines and 12 276 would-be violations** against the original baseline's 14 489 and
+14 242 — **1 966 violations converted, 13.8 % of the repo**, in ten commits across four runs.
 Arming (`OPS-8.S12`) requires the whole repo at zero and is not reached, so `comment_contract: true`
 is NOT set and the CCC phase still counts this repo rather than failing it.
 
@@ -2133,9 +2390,11 @@ is NOT set and the CCC phase still counts this repo rather than failing it.
 | 8 | `core/src/compose/` | 395 | 404 → 113 | 35/38, 2 not recovered, **1 wrong** |
 | 9 | `core/api/utils/` + `core/api/det/` | 95 | 97 → 45 | 19/21, 1 not recovered, **1 wrong** |
 | 10 | `core/src/utils/logger.cpp` | 84 | 86 → 18 | 13/14, **1 wrong** |
-| | **total** | **1 824** | **1 863 → 672 (64 %)** | **206/233, 3 not recovered, 10 wrong** |
+| 11 | `proof/det_proof.cpp` | 142 | 144 → 65 | 17/18, **1 wrong** |
+| | **total** | **1 966** | **2 007 → 737 (63 %)** | **223/251, 3 not recovered, 11 wrong** |
 
-Forms standing in the repo: `pre` 12 · `post` 50 · `invariant` 112 · `assert` 20 · `note` 99 · `refs` 110 · 154 continuations · 265 tool forms. **4 law blocks**, unchanged — this run minted none, and the
+Forms standing in the repo: `pre` 12 · `post` 51 · `invariant` 121 · `assert` 32 · `note` 109 ·
+`refs` 118 · 176 continuations · 267 tool forms. **4 law blocks**, unchanged — this run minted none, and the
 law-number range issued to it (11 onward) was NOT opened, so nothing in the tree reserves it.
 
 **The fourth run's headline is not a number, it is a blocked road.** Two of the unit's three files
@@ -2146,13 +2405,44 @@ spread over `core/src/utils`, `core/src/mask`, `core/src/strategy`, `core/tools`
 two test directories, so the defect is between this repo and its arming, not beside it. Verdict
 finding 20 carries the two patterns, the population and the one-character repair.
 
+## What the fourth run cost in slot contention, measured
+
+**Two acquisitions, one per unit, 12 minutes 44 seconds of slot held between them (7 min 57 s and
+4 min 47 s), against three sibling CCC lanes live on the same global slot throughout.** The first
+wait was **8 minutes 3 seconds** measured from the first poll to a successful `acquire`. The second
+is not quoted as one figure because the lane lost an acquire to a sibling between seeing FREE and
+asking for it — the race `OPS-8.S1.1` describes, met once and survived by retrying.
+
+**One acquire was attempted from a DETACHED background poller and was cancelled before it could
+land.** `OPS-8.S1.1` forbids exactly that: the stamp's anchor is the acquiring process's nearest
+non-shell ancestor, and from a detached poller that ancestor exits the moment the command returns,
+so the slot reads reclaimable about a second later and a sibling takes it out from under a live
+build. The poller was stopped, confirmed to have acquired nothing, and both acquisitions were then
+taken in the foreground with the polling left in the background. Recorded because the step's rule is
+easy to break while trying to be polite about a contended resource.
+
+## Two census tokens checked in this repo on a sibling lane's measurement, both with a population of ZERO
+
+* **The determinism waiver token** that `wallclock_lint.py` and `random_determinism_lint.py` read —
+  which the CCC grammar does not list, so the stripper deletes it silently, and a sibling lane
+  measured a gate going from PASS to FAIL after one was stripped. **Swept over `insight-canon`'s
+  whole source tree: zero occurrences**, so neither unit of this run could have deleted one. Census
+  it before and after every strip regardless — the population is a fact about today, not a property
+  of the repo. It is NOT the same token as the wall-clock waiver, which the CCC checker admits as a
+  tool form and the stripper keeps.
+* **A `note:` that spells the suppression token it explains** opens a second suppression region,
+  because clang-tidy scans comment TEXT and not only directives; the measured error is an unmatched
+  region with no close. **Checked over both units' converted files: no `note:` or `refs:` line
+  contains that token.** The surviving why for this run's one bare region says *"bare and
+  file-wide"* and gives the count, and names the directive nowhere.
+
 ## What remains, and what the next session should take first
 
 Unconverted, by violation count: `core/api/` 2 697 (`canon.api.cppm` 1 193, `canon.spi.cppm` 672,
 `canon.transport.cppm` 322, `canon.compose.cppm` 268, `canon.cppm` 242) · `core/src/strategy` 1 275
-· `core/src/utils` 546 (the two blocked files) · `core/src/mask` 530 · `core/tools` 420 · `proof`
-142 · `benchmarks/src` 53 · `core/test_package` 15 · the test tier 4 682 · the three dialect
-packages 2 058.
+· `core/src/utils` 546 (the two blocked files) · `core/src/mask` 530 · `core/tools` 420 ·
+`benchmarks/src` 53 · `core/test_package` 15 · the test tier 4 682 · the three dialect packages
+2 058.
 
 **THE NEXT SESSION'S FIRST ACT IS NOT A UNIT.** Verdict finding 20 must be repaired in
 `malf/comment_contract_lint.py` — by the pilot, Argos or a Hephaïstos lane holding the `malf`
@@ -2161,9 +2451,10 @@ surface — or the next lane will re-derive the same wall. With that one charact
 recorded in this ledger's unit-10 entry, the suppression measurements are complete and the four
 dead `readability-magic-numbers` directives are identified with their evidence.
 
-**Without that repair, what is still convertible in this repo is `proof/` (142), `benchmarks/src/`
-(53) and `core/test_package/` (15) — 210 violations, against the 12 418 the repo still carries.**
-Every other remaining surface cites a suffixed code, checked file group by file group.
+**Without that repair, what is still convertible in this repo is `benchmarks/src/` (53) and
+`core/test_package/` (15) — 68 violations, against the 12 276 the repo still carries.** `proof/`
+was the third and this run took it. Every other remaining surface cites a suffixed code, checked
+file group by file group; four of the test tier's directories do too.
 
 **`core/src/mask/` still wants a law-number range AND the finding-20 repair.**
 `canon.detail.mask.cppm` is an interface unit, so every site in it is a declaration position, and it
