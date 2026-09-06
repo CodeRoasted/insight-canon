@@ -6148,6 +6148,18 @@ a code change and is out of scope for a comment-only pass; it lands as its own c
 is named rather than hidden: the assertion's own failure TEXT still states the retired 40-byte head,
 and a string literal is code.
 
+**FOLLOW-UP, landed immediately after this unit as its own commit.** The arm was repaired rather
+than left as a documented hole. SEVEN bare-word filler tokens now separate the stamp from the level
+word, putting it at token 8 of the remainder and token 9 of the whole line; the walk stops after
+eight unknown tokens, so the level is reachable from the remainder and unreachable from the line
+start. **The first repair attempt FAILED and is worth recording**: bracketed and key-value fillers
+do not cost exactly one token each, so seven of them put the level out of reach of BOTH scans and
+the arm went red on unmutated code — the fixture had to be sized in TOKENS the walk actually counts,
+which is a fact about the tokenizer that reading the budget constant does not give you.
+Falsifiability was then OBSERVED and reverted: the call-site mutation REDS the repaired arm, and the
+suite holds at 809 of 809 on both toolchains. The assertion's failure text was corrected in the same
+commit.
+
 ### The anchor audit caught a claim that was simply wrong about its own test
 
 Printing every block's resolved anchor beside its first claim, one row read

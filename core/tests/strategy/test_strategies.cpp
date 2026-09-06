@@ -681,19 +681,22 @@ TEST_F(Rfc3339TextStrategyTest, KeepsTheStampAndProjectsTheWholeRemainder)
     EXPECT_TRUE(pl.component.empty()) << "component = \"" << pl.component << "\"";
 }
 
-// invariant: this arm was built to discriminate a byte-0 level scan from a post-stamp one, and it
-// NO LONGER DOES.
-// invariant: it was written when stage 1 carried a 40-byte RAW-BYTE head, under which the level
-// word at byte 45 of the whole line was unreachable and a byte-0 scan read an Unknown level.
-// invariant: stage 1's budget is now a TOKEN count and the stamp costs it exactly ONE token, so the
-// level word sits at token 3 of the whole line and a byte-0 scan reaches it.
-// invariant: MEASURED 2026-09-07 — replacing the post-stamp remainder with the whole line at the
-// call site left this arm GREEN and the whole default suite green at 734 of 734.
-// invariant: so that mechanism is currently guarded by nothing, and the repair is a fixture with
-// EIGHT non-level tokens before the level word, since the walk stops after eight unknown ones.
-// invariant: the level would then be unreachable from the line start and still reachable from the
-// remainder, which is exactly the difference the arm claims to measure.
-// invariant: what the CONTENT assertion pins is unaffected and still real — content is the whole
+// invariant: this arm discriminates a byte-0 level scan from a post-stamp one, and its fixture is
+// sized to the BUDGET that decides it rather than to a byte offset.
+// invariant: it was written when stage 1 carried a 40-byte RAW-BYTE head that the stamp spent; the
+// budget is now a TOKEN count, and the stamp costs it exactly ONE token.
+// invariant: MEASURED 2026-09-07 — under the old single-filler fixture this arm had gone VACUOUS,
+// because the level word sat at token 3 and a byte-0 scan reached it.
+// invariant: the call-site mutation then left this arm green AND the whole default suite green at
+// 734 of 734, so nothing in the repository guarded the mechanism.
+// invariant: SEVEN non-level filler tokens now separate the stamp from the level word, putting it
+// at token 8 of the remainder and token 9 of the whole line.
+// invariant: the walk stops after eight UNKNOWN tokens, so the level is reachable from the
+// remainder and unreachable from the line start, which is the difference the arm measures.
+// invariant: the fillers are BARE WORDS on purpose — a bracketed or key-value filler does not cost
+// exactly one token, which is how the first repair attempt put the level out of reach of both.
+// invariant: falsifiability was OBSERVED and reverted: the call-site mutation REDS this arm.
+// invariant: what the CONTENT assertion pins is independent of all that — content is the whole
 // line, stamp bytes included.
 // invariant: THE LEVEL MUST BE NON-ALERTING for any such arm to discriminate at all.
 // invariant: stage 2's cue scan carries a 128-byte head and the alerting words are themselves
@@ -705,15 +708,17 @@ TEST_F(Rfc3339TextStrategyTest, KeepsTheStampAndProjectsTheWholeRemainder)
 TEST_F(Rfc3339TextStrategyTest, InfersTheLevelPastAStampThatSpendsTheLeadingHead)
 {
     static constexpr std::string_view kHeadSpendingLine{
-        "2026-05-31T08:00:01.123456Z [worker-7-of-16] INFO batch 4 of 9 dispatched"};
+        "2026-05-31T08:00:01.123456Z alpha beta gamma delta epsilon zeta eta INFO batch 4 of 9 "
+        "dispatched"};
     EXPECT_GT(strategy.confidence(kHeadSpendingLine), 0.0);
     auto result{strategy.parse(kHeadSpendingLine, arena)};
     ASSERT_TRUE(result.has_value());
     const auto& pl{result.value()};
     EXPECT_EQ(pl.content, kHeadSpendingLine) << "content = \"" << pl.content << "\"";
     EXPECT_EQ(pl.level, LogLevel::Info)
-        << "the level word starts at byte 45 of the WHOLE line, past the leading head, so a byte-0 "
-           "scan reads inferred(Unknown); level = "
+        << "seven non-level tokens follow the stamp, so the level word is the EIGHTH token of the "
+           "remainder and the NINTH of the whole line; stage 1 stops after eight unknown tokens, "
+           "so a byte-0 scan reads inferred(Unknown); level = "
         << to_string(pl.level.value());
     EXPECT_FALSE(pl.level.is_declared());
 }
