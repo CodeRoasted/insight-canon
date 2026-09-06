@@ -1,18 +1,19 @@
 module;
-#include "utils/log_macros.hpp" // textual macro layer (ADR-3.D4)
+#include "utils/log_macros.hpp"
 #include <cstring>
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
+import insight.canon.detail.scan;
 
-// HPCStrategy — parses HPC event logs:
-//   "134681 node-246 unix.hw state_change.unavailable 1077804742 1 Component State Change: ..."
-//
-// Hand-written scanner: zero RE2. Component "facility.event_type" is the
-// only constructed string; built directly in the arena.
-
+// post: an HPC event record — a record id, a node, a facility, an event type, an epoch and a
+// flag, then the message.
+// invariant: the joined facility and event type is the ONLY constructed string, and it is built
+// directly in the arena.
+// invariant: the log macros stay TEXTUAL in the global module fragment, so no first-party
+// declaration leaks through it.
+// refs: ADR-3.D4
 namespace insight::tokenization
 {
 
@@ -26,14 +27,13 @@ std::expected<ParsedLine, std::string> HPCStrategy::parse(std::string_view line,
     }
 
     std::string_view rest{line};
-    (void)sv_take_token(rest); // skip record_id
-    (void)sv_take_token(rest); // skip node (not stored)
+    (void)sv_take_token(rest);
+    (void)sv_take_token(rest);
     const std::string_view facility{sv_take_token(rest)};
     const std::string_view event_type{sv_take_token(rest)};
     const std::string_view epoch{sv_take_token(rest)};
-    (void)sv_take_token(rest); // skip flag
+    (void)sv_take_token(rest);
 
-    // Build "facility.event_type" in arena.
     const std::size_t clen{facility.size() + 1U + event_type.size()};
     auto* cbuf{static_cast<char*>(arena.allocate(clen, 1U))};
     const std::span<char> buf_span{cbuf, clen};

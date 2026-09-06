@@ -1432,7 +1432,9 @@ parse_log4j_timestamp(std::string_view timestamp_str) noexcept;
 // refs: ADR-22.D3, DN-32.D3
 [[nodiscard]] EventLevel infer_leading_log_level(std::string_view line) noexcept;
 
-// post: an Nginx error-log timestamp, the same format as the Apache one.
+// post: an Nginx error-log timestamp — a slash-separated date and clock, 19 characters.
+// invariant: NOT the Apache error-log layout, which is a weekday, a month name and a TRAILING
+// year; the two are byte-distinct and have separate parsers.
 [[nodiscard]] std::optional<Timestamp>
 parse_nginx_error_ts(std::string_view timestamp_str) noexcept;
 } // namespace insight::utils

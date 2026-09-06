@@ -1,16 +1,18 @@
 module;
-#include "utils/log_macros.hpp" // textual macro layer (ADR-3.D4)
+#include "utils/log_macros.hpp"
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
+import insight.canon.detail.scan;
 
-// NginxErrorStrategy — parses Nginx error-log format:
-//   "2024/03/27 10:15:23 [error] 12345#0: *99 connect() failed"
-//
-// Hand-written scanner: zero RE2, zero string copies.
-
+// post: an Nginx error-log record — a slash-separated date and clock, a bracketed level, a
+// process and thread id, then the message.
+// invariant: a hand-written scanner with no regex and, on the SUCCESS path, no string copies — a
+// decline builds an error message.
+// invariant: the log macros stay TEXTUAL in the global module fragment, so no first-party
+// declaration leaks through it.
+// refs: ADR-3.D4
 namespace insight::tokenization
 {
 
@@ -24,8 +26,6 @@ std::expected<ParsedLine, std::string> NginxErrorStrategy::parse(std::string_vie
             std::string("NginxErrorStrategy: line does not match Nginx error format"));
     }
 
-    // "YYYY/MM/DD HH:MM:SS [level] PID#TID: msg"
-    // Timestamp = first 19 chars: "YYYY/MM/DD HH:MM:SS"
     std::string_view rest{line};
     const std::string_view ts_str{sv_take_n(rest, 19U)};
     sv_skip_ws(rest);
@@ -38,8 +38,7 @@ std::expected<ParsedLine, std::string> NginxErrorStrategy::parse(std::string_vie
             std::string("NginxErrorStrategy: line does not match Nginx error format"));
     }
 
-    (void)sv_take_token(rest); // skip "PID#TID:"
-    // rest = message (may start with "*CID ")
+    (void)sv_take_token(rest);
 
     ParsedLine parsed;
     parsed.raw_line = line;

@@ -1,28 +1,27 @@
 module;
-#include "utils/log_macros.hpp" // textual macro layer (ADR-3.D4)
+#include "utils/log_macros.hpp"
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
+import insight.canon.detail.scan;
 
-// SparkHDFSStrategy — parses Spark and HDFS log formats.
-//
-// Spark:  "17/06/09 20:10:40 INFO executor.CoarseGrainedExecutorBackend: msg"
-// HDFS:   "081109 203615 148 INFO dfs.DataNode$PacketResponder: msg"
-//
-// Hand-written scanner: zero RE2, zero string copies.
-
+// post: a Spark or an HDFS record — a short-year slash date, or a compact six-digit date and
+// clock followed by a counter.
+// invariant: a hand-written scanner with no regex and, on the SUCCESS path, no string copies — a
+// decline builds an error message.
+// invariant: the log macros stay TEXTUAL in the global module fragment, so no first-party
+// declaration leaks through it.
+// refs: ADR-3.D4
 namespace insight::tokenization
 {
 
 std::expected<ParsedLine, std::string> SparkHDFSStrategy::parse(std::string_view line,
                                                                 ArenaAllocator& /*arena*/) const
 {
-    static constexpr std::size_t kSparkTimestampLen{17U};      // "YY/MM/DD HH:MM:SS"
-    static constexpr std::size_t kHdfsTimestampEndOffset{13U}; // YYMMDD + space + HHMMSS
+    static constexpr std::size_t kSparkTimestampLen{17U};
+    static constexpr std::size_t kHdfsTimestampEndOffset{13U};
 
-    // ── Spark: "YY/MM/DD HH:MM:SS LEVEL component: msg" ────────────────────
     if (is_spark_prefix(line))
     {
         if (line.size() < kSparkTimestampLen)
@@ -31,15 +30,15 @@ std::expected<ParsedLine, std::string> SparkHDFSStrategy::parse(std::string_view
             return std::unexpected(
                 std::string("SparkHDFSStrategy: line too short for Spark format"));
         }
-        // "YY/MM/DD HH:MM:SS" — 17 contiguous chars; directly sliceable.
         const std::string_view ts_str{line.substr(0, kSparkTimestampLen)};
         std::string_view rest{line.substr(kSparkTimestampLen)};
         sv_skip_ws(rest);
 
         const std::string_view level_sv{sv_take_token(rest)};
-        // The colon TERMINATES the component; absent it this line names none (ADR-16.D9). The
-        // unbounded sv_take_until emptied `content` and moved the message onto the cube's WHERE
-        // axis — the defect shape DN-43 repaired at SyslogStrategy and left live here.
+        // invariant: the colon TERMINATES the component; absent it this line names none.
+        // invariant: the unbounded form emptied content and moved the message onto the cube's WHERE
+        // axis — the same defect shape repaired at the syslog strategy and left live here.
+        // refs: ADR-16.D9, DN-43.D3
         const std::string_view component{sv_take_until_or_none(rest, ':')};
         sv_skip_ws(rest);
 
@@ -56,7 +55,6 @@ std::expected<ParsedLine, std::string> SparkHDFSStrategy::parse(std::string_view
         return std::expected<ParsedLine, std::string>{parsed_line};
     }
 
-    // ── HDFS: "YYMMDD HHMMSS N LEVEL component: msg" ──────────────────────
     if (is_hdfs_prefix(line))
     {
         if (line.size() < kHdfsMinLen)
@@ -70,9 +68,9 @@ std::expected<ParsedLine, std::string> SparkHDFSStrategy::parse(std::string_view
         std::string_view rest{line.substr(kHdfsTimestampEndOffset)};
         sv_skip_ws(rest);
 
-        (void)sv_take_token(rest); // skip record count / thread id
+        (void)sv_take_token(rest);
         const std::string_view level_sv{sv_take_token(rest)};
-        const std::string_view component{sv_take_until_or_none(rest, ':')}; // see the Spark arm
+        const std::string_view component{sv_take_until_or_none(rest, ':')};
         sv_skip_ws(rest);
 
         ParsedLine parsed_line;

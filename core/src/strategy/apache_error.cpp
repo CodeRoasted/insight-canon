@@ -1,26 +1,28 @@
 module;
-#include "utils/log_macros.hpp" // textual macro layer (ADR-3.D4)
+#include "utils/log_macros.hpp"
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
+import insight.canon.detail.scan;
 
-// ApacheErrorLogStrategy — parses Apache httpd error-log format:
-//   "[Sun Dec 04 04:47:44 2005] [notice] workerEnv.init() ok ..."
-//   "[Sun Dec 04 04:47:44 2005] [error] [client 10.0.0.1] mod_jk child ..."
-//
-// Hand-written scanner: zero RE2, zero string copies.
-
+// post: an Apache httpd error-log record — a bracketed full date, a bracketed level, then any
+// number of further bracketed sections before the message.
+// invariant: a hand-written scanner: no regex and, on the SUCCESS path, no string copies — a
+// decline builds an error message.
+// invariant: the log macros stay TEXTUAL in the global module fragment, so no first-party
+// declaration leaks through it.
+// refs: ADR-3.D4
 namespace insight::tokenization
 {
 
 namespace
 {
-    // Extract the level word from a bracket like "error", "warn", "php:error".
-    // RE2 pattern was `\[(\w+)\]` — \w+ stops at non-word chars, so for
-    // "[php:error]" RE2 captured "php". We replicate: take word chars only.
-    // substr(0, idx) has pos arg 0, always <= size, so this noexcept body cannot throw.
+    // post: the WORD characters of a bracket's interior, so a compound level yields its first
+    // segment only.
+    // invariant: that reproduces the retired regex exactly — its word class stopped at the first
+    // non-word byte, and this replicates the same cut rather than inventing a new one.
+    // note: the directive below is LOAD-BEARING: the position argument is 0, so this cannot throw.
     // NOLINTNEXTLINE(bugprone-exception-escape)
     [[nodiscard]] constexpr std::string_view extract_level_word(std::string_view bracket) noexcept
     {
@@ -44,7 +46,6 @@ ApacheErrorLogStrategy::parse(std::string_view line, ArenaAllocator& /*arena*/) 
     }
 
     std::string_view rest{line};
-    // "[Dow Mon DD HH:MM:SS YYYY]"
     const std::string_view raw_ts{sv_take_bracketed(rest)};
     if (raw_ts.empty())
     {
@@ -54,12 +55,12 @@ ApacheErrorLogStrategy::parse(std::string_view line, ArenaAllocator& /*arena*/) 
     }
 
     sv_skip_ws(rest);
-    // "[error]" or "[error:debug]" or "[php:error]"
     const std::string_view level_bracket{sv_take_bracketed(rest)};
     const std::string_view level_word{extract_level_word(level_bracket)};
 
     sv_skip_ws(rest);
-    // Skip any number of extra bracketed sections: [pid N], [client IP], etc.
+    // invariant: any number of further bracketed sections may follow the level, so they are skipped
+    // as a group rather than enumerated.
     while (!rest.empty() && rest[0] == '[')
     {
         (void)sv_take_bracketed(rest);

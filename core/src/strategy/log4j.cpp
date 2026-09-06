@@ -1,30 +1,24 @@
 module;
-#include "utils/log_macros.hpp" // textual macro layer (ADR-3.D4)
+#include "utils/log_macros.hpp"
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
+import insight.canon.detail.scan;
 
-// Log4jStrategy — parses Java Log4j / Python logging formats.
-//
-// Standard Log4j (Hadoop):
-//   "2015-10-18 18:01:47,978 INFO [main] org.apache.hadoop.mapreduce: msg"
-//
-// Dash-variant (Zookeeper):
-//   "2015-07-29 17:41:44,747 - INFO  [QuorumPeer[myid=1]] - Notification time out"
-//
-// Python/OpenStack:
-//   "nova-api.log.1 2017-05-16 00:00:00.008 25746 INFO nova.osapi [req-id] msg"
-//
-// Hand-written scanner: zero RE2, zero string copies.
-
+// post: a Java Log4j or Python logging record in one of three layouts — the standard one, the
+// dash variant, and the prefixed one that carries a process id.
+// invariant: a hand-written scanner with no regex and, on the SUCCESS path, no string copies — a
+// decline builds an error message.
+// invariant: the log macros stay TEXTUAL in the global module fragment, so no first-party
+// declaration leaks through it.
+// refs: ADR-3.D4
 namespace insight::tokenization
 {
 
 namespace
 {
-    // Returns true and sets ts_start to the index where the ISO timestamp begins.
+    // post: true, with the index where the timestamp begins, when the line carries one.
     constexpr bool find_log4j_ts_start(std::string_view line, std::size_t& ts_start) noexcept
     {
         static constexpr std::size_t kIsoTimestampMinLen{20U};
@@ -34,7 +28,8 @@ namespace
             ts_start = 0;
             return true;
         }
-        // OpenStack: optional "prefix " before timestamp
+        // invariant: the search for an optional leading prefix is BOUNDED, so a line that carries
+        // no timestamp at all costs a bounded scan rather than a whole-line one.
         constexpr std::size_t kScanLimit{96U};
         const std::size_t limit{line.size() < kScanLimit ? line.size() : kScanLimit};
         for (std::size_t i{1U}; i + kIsoTimestampMinLen <= limit; ++i)
@@ -63,11 +58,11 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
             std::string("Log4jStrategy: line does not match any Log4j/Python logging format"));
     }
 
-    // ── Extract 23-char timestamp "YYYY-MM-DD HH:MM:SS,mmm" ───────────────
     std::string_view rest{line.substr(ts_start)};
     const std::string_view ts_str{sv_take_n(rest, 23U)};
 
-    // Peek at next token to identify variant.
+    // invariant: the variant is identified by peeking at the token after the timestamp, so the
+    // three layouts share one entry rather than three predicates.
     sv_skip_ws(rest);
 
     if (rest.empty())
@@ -81,15 +76,14 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
     parsed_line.raw_line = line;
     parsed_line.timestamp = EventTime::parsed(utils::parse_log4j_timestamp(ts_str));
 
-    // ── Dash variant: "ts - LEVEL [thread] - msg" ─────────────────────────
     if (rest[0] == '-' && (rest.size() < 2U || is_space(rest[1])))
     {
-        (void)sv_take_token(rest); // consume '-'
+        (void)sv_take_token(rest);
         const std::string_view level_sv{sv_take_token(rest)};
         const std::string_view thread_name{sv_take_bracketed(rest)};
         sv_skip_ws(rest);
         if (!rest.empty() && rest[0] == '-')
-            (void)sv_take_token(rest); // consume trailing '-'
+            (void)sv_take_token(rest);
 
         parsed_line.level = EventLevel::declared(utils::parse_log_level(level_sv));
         parsed_line.component = thread_name;
@@ -101,11 +95,10 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
         return std::expected<ParsedLine, std::string>{parsed_line};
     }
 
-    // ── OpenStack variant: "prefix ts PID LEVEL component [req-id] msg" ───
-    // ts_start > 0 means a prefix token was skipped; next non-ts token is PID.
+    // invariant: a non-zero timestamp offset means a prefix token was skipped, which is what
+    // identifies the layout that carries a process id.
     if (ts_start > 0U)
     {
-        // next token should be a numeric PID
         const std::string_view pid_or_level{sv_take_token(rest)};
         bool is_pid{true};
         for (const char chr : pid_or_level)
@@ -122,7 +115,6 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
             level_sv = pid_or_level;
 
         const std::string_view component{sv_take_token(rest)};
-        // Skip optional "[req-id ...]"
         if (!rest.empty() && rest[0] == '[')
             (void)sv_take_bracketed(rest);
 
@@ -136,17 +128,16 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
         return std::expected<ParsedLine, std::string>{parsed_line};
     }
 
-    // ── Standard variant: "ts LEVEL [thread] component: msg" ──────────────
     const std::string_view level_sv{sv_take_token(rest)};
-    (void)sv_take_bracketed(rest); // skip [thread]
+    (void)sv_take_bracketed(rest);
     sv_skip_ws(rest);
 
-    // Component is until ':' or " -". The colon TERMINATES it, so its absence means this line names
-    // no component — not that the component is the rest of the line (ADR-16.D9,
-    // sv_take_until_or_none): the unbounded form emptied `content` and put the whole message on the
-    // cube's WHERE axis.
+    // invariant: the colon TERMINATES the component, so its ABSENCE means this line names no
+    // component — not that the component is the rest of the line.
+    // invariant: the unbounded form emptied content and put the whole message on the cube's WHERE
+    // axis.
+    // refs: ADR-16.D9
     const std::string_view component{sv_take_until_or_none(rest, ':')};
-    // the delimiter (when present) is already consumed, rest is now " msg" or "- msg"
     sv_skip_ws(rest);
     if (!rest.empty() && rest[0] == '-')
         (void)sv_take_token(rest);

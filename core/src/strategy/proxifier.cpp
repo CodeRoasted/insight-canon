@@ -1,17 +1,18 @@
 module;
-#include "utils/log_macros.hpp" // textual macro layer (ADR-3.D4)
+#include "utils/log_macros.hpp"
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
+import insight.canon.detail.scan;
 
-// ProxifierStrategy — parses Proxifier network log format:
-//   "[10.30 16:49:06] chrome.exe - proxy.cse.cuhk.edu.hk:5070 open through proxy"
-//   "[10.30 16:49:07] chrome.exe *64 close, 0 bytes sent, ..."
-//
-// Hand-written scanner: zero RE2, zero string copies.
-
+// post: a Proxifier network record — a bracketed day and clock, a process name, an optional
+// separator, then the connection event.
+// invariant: a hand-written scanner with no regex and, on the SUCCESS path, no string copies — a
+// decline builds an error message.
+// invariant: the log macros stay TEXTUAL in the global module fragment, so no first-party
+// declaration leaks through it.
+// refs: ADR-3.D4
 namespace insight::tokenization
 {
 
@@ -25,19 +26,19 @@ std::expected<ParsedLine, std::string> ProxifierStrategy::parse(std::string_view
             std::string("ProxifierStrategy: line does not match Proxifier format"));
     }
 
-    // "[DD.MM HH:MM:SS] process [-|*N] message"
     std::string_view rest{line};
-    (void)sv_take_bracketed(rest); // skip timestamp bracket (not stored)
+    (void)sv_take_bracketed(rest);
     sv_skip_ws(rest);
     const std::string_view process{sv_take_token(rest)};
 
-    // Skip optional separator: "-" or "*N"
     if (!rest.empty() && (rest[0] == '-' || rest[0] == '*'))
         (void)sv_take_token(rest);
 
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
-    parsed_line.timestamp = EventTime::parsed(std::nullopt); // Proxifier ts lacks full date
+    // invariant: the timestamp is PARSED as absent rather than declared: the prefix carries a
+    // month-day pair and a clock, but NO YEAR, so no instant can be built without inventing one.
+    parsed_line.timestamp = EventTime::parsed(std::nullopt);
     parsed_line.level = EventLevel{};
     parsed_line.component = process;
     parsed_line.content = rest;

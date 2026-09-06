@@ -1,27 +1,24 @@
 module;
-#include "utils/log_macros.hpp" // textual macro layer (ADR-3.D4)
+#include "utils/log_macros.hpp"
 #include <cstring>
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
+import insight.canon.detail.scan;
 
-// IISW3CStrategy — parses IIS W3C Extended Log Format:
-//   "2024-01-15 10:30:00 W3SVC1 SERVER GET /index.html - 80 - 10.0.0.1 Mozilla/5.0 200 0 0 15"
-//   "2024-01-15 10:30:00 GET /index.html - 80 - 10.0.0.1 Mozilla/5.0 200 0 0 15"
-//
-// Content = "METHOD URI REST_FIELDS" assembled in-arena.
-// HTTP status code is the first 3-digit 2xx/3xx/4xx/5xx token in REST_FIELDS.
-//
-// Hand-written scanner: zero RE2. Arena used only for content concat.
-
+// post: an IIS W3C extended access record, in either the full or the short field order.
+// invariant: the content is the method, the URI and the remaining fields, assembled in the arena;
+// the status is the first three-digit HTTP code in that remainder.
+// invariant: the log macros stay TEXTUAL in the global module fragment, so no first-party
+// declaration leaks through it.
+// refs: ADR-3.D4
 namespace insight::tokenization
 {
 
 namespace
 {
-    constexpr std::size_t kTimestampPrefixLen{19}; // "YYYY-MM-DD HH:MM:SS"
+    constexpr std::size_t kTimestampPrefixLen{19};
 
     constexpr bool is_http_method(std::string_view tok) noexcept
     {
@@ -29,7 +26,7 @@ namespace
                tok == "OPTIONS" || tok == "PATCH" || tok == "PROPFIND" || tok == "MKCOL";
     }
 
-    // Scan rest for first 3-digit HTTP status code (2xx/3xx/4xx/5xx).
+    // post: the level implied by the first three-digit HTTP status code in the remainder.
     LogLevel status_to_level(std::string_view rest) noexcept
     {
         std::string_view scan{rest};
@@ -50,7 +47,7 @@ namespace
         return LogLevel::Info;
     }
 
-    // Build "method uri rest" in the arena.  Returns {buf, len}.
+    // post: the joined content in arena storage, returned as a view over it.
     std::string_view build_content(ArenaAllocator& arena, std::string_view method,
                                    std::string_view uri, std::string_view rest) noexcept
     {
@@ -77,7 +74,8 @@ namespace
 std::expected<ParsedLine, std::string> IISW3CStrategy::parse(std::string_view line,
                                                              ArenaAllocator& arena) const
 {
-    // Skip comment/directive lines.
+    // invariant: a directive line is skipped rather than parsed — this format interleaves its own
+    // header comments with records.
     if (!line.empty() && line[0] == '#')
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=IISW3C comment_or_directive");
@@ -90,21 +88,19 @@ std::expected<ParsedLine, std::string> IISW3CStrategy::parse(std::string_view li
         return std::unexpected(std::string("IISW3CStrategy: line does not match IIS W3C format"));
     }
 
-    // Timestamp: "YYYY-MM-DD HH:MM:SS" = first 19 chars (validated by confidence).
     const std::string_view ts_str{line.substr(0, kTimestampPrefixLen)};
     std::string_view rest{line.substr(kTimestampPrefixLen)};
     sv_skip_ws(rest);
 
-    // Detect full vs short format by checking whether next token is an HTTP method.
+    // invariant: the full and short field orders are told apart by whether the next token is an
+    // HTTP method, so no separate declaration is needed.
     std::string_view component{"IIS"};
 
     const std::string_view tok1{sv_take_token(rest)};
     if (!is_http_method(tok1))
     {
-        // Full format: tok1=site, next=server, then method.
         const std::string_view server{sv_take_token(rest)};
         component = server.empty() ? tok1 : server;
-        // Now tok1 for method
         const std::string_view method{sv_take_token(rest)};
         const std::string_view uri{sv_take_token(rest)};
         if (method.empty() || uri.empty() || !is_http_method(method))
@@ -126,7 +122,6 @@ std::expected<ParsedLine, std::string> IISW3CStrategy::parse(std::string_view li
         return std::expected<ParsedLine, std::string>{parsed};
     }
 
-    // Short format: tok1 is already the HTTP method.
     const std::string_view uri{sv_take_token(rest)};
     ParsedLine parsed;
     parsed.raw_line = line;

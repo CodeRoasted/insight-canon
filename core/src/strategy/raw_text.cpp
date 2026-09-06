@@ -4,20 +4,19 @@ module insight.canon.detail.strategy;
 import insight.canon.internal;
 import insight.canon.api;
 
-// RawTextStrategy — last-resort catch-all for unstructured text.
-//
-// Zero-copy: the input is already arena-stable when parse() is invoked, so the
-// message body is a subview of it after a pointer-arithmetic left-trim. The masker
-// (with its per-token numeric/IP/hex masking) does the templating downstream.
-
+// invariant: the last-resort catch-all for unstructured text.
+// invariant: zero-copy — the input is already arena-stable when parse is invoked, so the body is
+// a subview of it after a pointer-arithmetic left trim.
+// invariant: the masker does the templating downstream, with its per-token numeric, address and hex
+// rules.
 namespace insight::tokenization
 {
 
 std::expected<ParsedLine, std::string> RawTextStrategy::parse(std::string_view line,
                                                               ArenaAllocator& /*arena*/) const
 {
-    // Trim leading ASCII whitespace so indented continuation lines (e.g. Python
-    // traceback frames) group with their peers. Pure pointer arithmetic — no copy.
+    // invariant: leading ASCII whitespace is trimmed so indented continuation lines group with
+    // their peers; pure pointer arithmetic, no copy.
     std::size_t start{0};
     while (start < line.size() && (line[start] == ' ' || line[start] == '\t'))
         ++start;
@@ -26,11 +25,9 @@ std::expected<ParsedLine, std::string> RawTextStrategy::parse(std::string_view l
     parsed.raw_line = line;
     parsed.timestamp = EventTime::parsed(std::nullopt);
     parsed.component = {};
-    // Subview of the arena-stable input: no store_string(), no allocation.
     parsed.content = line.substr(start);
-    // Even unstructured lines usually lead with a level / marker (ERROR, WARN,
-    // FAILED, ##[error]); recover it so the dominant-level signal survives into
-    // MetaLog for downstream severity-aware ranking (Sift) and detection (Eidos).
+    // invariant: even unstructured lines usually LEAD with a level or a marker, so the level is
+    // recovered here and the dominant-level signal survives into the document.
     parsed.level = utils::infer_leading_log_level(parsed.content);
     return parsed;
 }
@@ -42,12 +39,14 @@ LogFormat RawTextStrategy::format() const noexcept
 
 double RawTextStrategy::confidence(std::string_view /*line*/) const noexcept
 {
-    // MUST stay a constant 0.0 — two behaviours depend on it: this catch-all
-    // never wins the structured majority vote, and it never arms LogParser's
-    // sticky fast-path. A >0 value here would let the fast-path latch this
-    // strategy and greedily template every FOLLOWING line as raw text, starving
-    // the structured strategies. So it is reached only via FormatDetector's
-    // explicit fallback (and only for a non-empty line), never by scoring.
+    // invariant: the confidence MUST stay a constant zero, and two distinct behaviours depend on
+    // it.
+    // invariant: this catch-all never wins the structured majority vote, and it never arms the
+    // parser's sticky fast path.
+    // invariant: any positive value would let the fast path latch this strategy and greedily
+    // template every FOLLOWING line as raw text, starving the structured strategies.
+    // invariant: so it is reached only through the detector's explicit fallback, and only for a
+    // non-empty line, never by scoring.
     return 0.0;
 }
 

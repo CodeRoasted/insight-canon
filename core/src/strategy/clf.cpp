@@ -1,23 +1,20 @@
 module;
-#include "utils/log_macros.hpp" // textual macro layer (ADR-3.D4)
+#include "utils/log_macros.hpp"
 #include <cstring>
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
+import insight.canon.detail.scan;
 
-// CLFStrategy — parses Apache/Nginx Common Log Format and Combined Log Format.
-//
-// CLF:      host ident user [timestamp] "method url proto" status bytes
-// Combined: … "referer" "user-agent"
-//
-// The masker input content is constructed as: "METHOD URL STATUS" — a compact
-// form useful for template extraction of HTTP access patterns.
-//
-// Hand-written scanner: zero RE2, zero string copies except for the
-// three-part content construction ("METHOD URL STATUS").
-
+// post: an Apache or Nginx Common or Combined Log Format access record.
+// invariant: the masker input is assembled as method, url and status — a compact form for
+// templating HTTP access patterns.
+// invariant: a hand-written scanner with no regex; the only copies on the SUCCESS path are that
+// three-part content construction, and a decline builds an error message.
+// invariant: the log macros stay TEXTUAL in the global module fragment, so no first-party
+// declaration leaks through it.
+// refs: ADR-3.D4
 namespace insight::tokenization
 {
 
@@ -26,21 +23,14 @@ namespace
     constexpr int kDefaultSuccessStatusCode{200};
 } // namespace
 
-// Group 1: client IP / hostname
-// Group 2: CLF timestamp (content of the [...] brackets)
-// Group 3: request string "GET /path HTTP/1.0"  — quotes stripped by capture
-// Group 4: HTTP status code (3 digits)
-// Group 5: response bytes (number or "-")
-// Groups 6,7 (optional): referer, user-agent (Combined Log Format)
-//
 std::expected<ParsedLine, std::string> CLFStrategy::parse(std::string_view line,
                                                           ArenaAllocator& arena) const
 {
     std::string_view rest{line};
 
     const std::string_view host{sv_take_token(rest)};
-    (void)sv_take_token(rest); // skip ident
-    (void)sv_take_token(rest); // skip user
+    (void)sv_take_token(rest);
+    (void)sv_take_token(rest);
 
     sv_skip_ws(rest);
     const std::string_view raw_ts{sv_take_bracketed(rest)};
@@ -58,7 +48,7 @@ std::expected<ParsedLine, std::string> CLFStrategy::parse(std::string_view line,
     }
     const std::string_view request{sv_take_quoted(rest)};
     const std::string_view status_str{sv_take_token(rest)};
-    (void)sv_take_token(rest); // skip bytes
+    (void)sv_take_token(rest);
 
     if (host.empty() || status_str.size() != 3U)
     {
@@ -67,17 +57,17 @@ std::expected<ParsedLine, std::string> CLFStrategy::parse(std::string_view line,
     }
 
     int status_code{kDefaultSuccessStatusCode};
-    // const char* (not begin()/end()): portable across stdlibs (MSVC's sv iterator isn't a
-    // pointer).
+    // invariant: a raw pointer pair rather than iterators, because a string view's iterator is not
+    // a pointer on every standard library.
     std::from_chars(status_str.data(), status_str.data() + status_str.size(), status_code);
 
-    // Build content: "METHOD URL STATUS" — extracted from request string.
-    // request already points into the arena-stable `line`.
+    // invariant: the request already points into the arena-stable line, so the three parts are
+    // views and only the joined content is built.
     std::string_view req{request};
     const std::string_view method{sv_take_token(req)};
     const std::string_view url{sv_take_token(req)};
 
-    // Allocate directly in arena — one bump-pointer advance, no heap.
+    // invariant: allocated directly in the arena — one bump-pointer advance and no heap.
     const std::size_t clen{method.size() + 1U + url.size() + 1U + status_str.size()};
     auto* const cbuf{static_cast<char*>(arena.allocate(clen, 1U))};
     const auto buf{std::span<char>{cbuf, clen}};
@@ -96,14 +86,15 @@ std::expected<ParsedLine, std::string> CLFStrategy::parse(std::string_view line,
     parsed_line.raw_line = line;
     parsed_line.timestamp = EventTime::parsed(parse_clf_timestamp(raw_ts));
     parsed_line.level = EventLevel::declared(status_code_to_level(status_code));
-    // Group 1 is a NODE IDENTITY — high-card, and the requester rather than the producer of the
-    // line — so it belongs in `host`, the field written for exactly that, and NOT on the cube's
-    // WHERE axis. It sat in `component` until DN-43.D8: `component` is copied to CanonicalEvent
-    // unmasked, so the same octets were masked in `content` and published raw as a dimension.
-    // `component` stays EMPTY and that is a POSITIVE statement: this layout declares no functional
-    // source. A constant (`apache_error.cpp`'s "httpd") would be sound only for a grammar that is
-    // one server's; CLF is emitted by Apache, nginx, HAProxy, Caddy, Envoy and every load balancer,
-    // so a constant here would be a fabricated fact.
+    // invariant: the leading field is a NODE IDENTITY — high-card, and the REQUESTER rather than
+    // the producer of the line — so it belongs in host and NOT on the cube's WHERE axis.
+    // invariant: it sat in component until the field contract ruled otherwise: component is copied
+    // unmasked, so the same octets were masked in content and published raw as a dimension.
+    // invariant: component stays EMPTY and that is a POSITIVE statement — this layout declares no
+    // functional source.
+    // invariant: a constant would be sound only for a grammar that is one server's, and this one is
+    // emitted by every web server and load balancer, so a constant would be a fabricated fact.
+    // refs: ADR-19.D4, DN-43.D8
     parsed_line.host = host;
     parsed_line.content = {buf.data(), clen};
 
@@ -123,25 +114,19 @@ double CLFStrategy::confidence(std::string_view line) const noexcept
     static constexpr double kStrongConfidence{0.95};
     static constexpr double kNoConfidence{0.0};
 
-    // Manual gate: locate "[DD/Mon/YYYY:HH:MM:SS". Strong vs weak distinction
-    // (the strong path also requires `"GET / HTTP/1.x`) is left to parse() —
-    // the cost difference between strong and weak confidences here was a
-    // tie-break only, and parse() will catch malformed lines anyway.
+    // invariant: the gate locates the bracketed timestamp only; the strong-versus-weak distinction
+    // was a tie-break, and the parse catches a malformed line anyway.
     if (has_clf_timestamp(line))
         return kStrongConfidence;
     return kNoConfidence;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Private helpers
-// ─────────────────────────────────────────────────────────────────────────────
 
 std::optional<Timestamp> CLFStrategy::parse_clf_timestamp(std::string_view timestamp_str)
 {
     return utils::parse_clf_timestamp(timestamp_str);
 }
 
-// Map HTTP status codes to LogLevel for downstream anomaly detection.
+// post: an HTTP status code mapped to a level, for downstream anomaly detection.
 LogLevel CLFStrategy::status_code_to_level(int status)
 {
     static constexpr int kServerErrorStatusStart{500};

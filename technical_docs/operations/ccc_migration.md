@@ -5631,6 +5631,201 @@ and all three came from the reader rather than from the operator.
 on each), equal to the pre-unit baseline. `registry_grammar_lint` exit 0 with sixteen `D-LSRC-`
 declarations and numbering DENSE; `docs_lint` clean.
 
+## Unit 24 — `core/src/strategy/` plaintext group (19 files, 543 comment lines, 493 would-be violations) — eleven suppressions measured down to three, and `core/src/` reads zero
+
+The nineteen hand-written representation strategies. Baseline split: bare 346 · trailing 97 ·
+spacer 35 · ruler 6 · trailing-nolint 4 · suppression-without-why 5. After: **417 comment lines,
+0 would-be violations** — `pre` 1 · `post` 34 · `invariant` 147 · `note` 4 · `refs` 37 ·
+143 continuations · 51 tool forms. Repo-level delta **5 175 → 4 682 = exactly 493**.
+
+**`core/src/` is now FLAT.** Everything remaining in this repo is the test tier.
+
+### Eleven suppressions, three kept — and the two disabled-check regions needed no run at all
+
+| site | check | armed? | with | without | verdict |
+|---|---|---|---|---|---|
+| `apache_error.cpp` | `bugprone-exception-escape` | yes, and in `WarningsAsErrors` | 0 | **1 ERROR** | **KEPT** |
+| `kv.cpp` ×2 | `readability-function-cognitive-complexity` | yes | 0 | **2** (complexity 30 and 26) | **KEPT** |
+| `rfc5424.cpp` ×5 | `readability-magic-numbers` | **NO — disabled workspace-wide** | — | — | **DELETED by inventory** |
+| `systemd_journal.cpp` ×2 | `readability-magic-numbers` | **NO — disabled** | — | — | **DELETED by inventory** |
+| `rfc5424.cpp` ×1 | **BARE** | every armed check | 0 | 0 | **DELETED with a control** |
+
+Three things in that table are worth stating rather than leaving to be re-derived.
+
+**The seven `readability-magic-numbers` directives needed no measurement, and attempting one would
+have been unsound.** The check is disabled in the one shared `.clang-tidy`, so the inventory
+argument is complete for a DELETION — `OPS-8.S3.4` says exactly that. It is also the case that no
+positive control could have been built for them: a NAMED region can only ever suppress the check it
+names, so with that check disabled there is no diagnostic that could be made to fire inside it. **A
+measurement with no possible positive control is not a weak measurement, it is not a measurement**,
+and the inventory is the right instrument precisely because it does not need one.
+
+**The BARE directive is the opposite case and it DID need a control.** Bare means every armed
+check — 235 of them — so the inventory argument is unavailable by construction. Run over the FULL
+check set, in place, directive text renamed and code untouched, it reported **0 main-file
+diagnostics with and 0 without**, which on its own is the uninformative pair `OPS-8.S3.4` warns
+about. The control: a short identifier (`qq`) introduced on the directive's own line, which
+`readability-identifier-length` (armed) flags. **With the directive present the probe is suppressed
+and clang-tidy reports `1 NOLINT`; with it renamed the diagnostic is reported.** So the directive is
+live, armed and being read, the two zeros carry information, and the deletion is evidenced.
+
+**And the same check behaved OPPOSITELY here and in unit 23.** Unit 23's three
+`readability-function-cognitive-complexity` waivers were all inert; `kv.cpp`'s two are both
+load-bearing at complexity 30 and 26. The difference is not the check and not the author: in unit 23
+a later edit had grown a comment block BETWEEN the directive and its declaration, so
+`NOLINTNEXTLINE` waived a comment. Here nothing sits between them. **That is the drift this repo's
+`.clang-tidy` predicts in writing, measured in both directions in one session** — and it is why an
+armed check never licenses KEEPING a directive without running the TU twice.
+
+### The uniform patch that was false in ONE of nineteen files
+
+The census reported `ADR-3.D4` LOST from every one of the nineteen — it lived in the trailing
+comment on each file's `#include "utils/log_macros.hpp"`, naming the textual-global-module-fragment
+discipline that include obeys. The restoration was written once and applied to all nineteen headers.
+
+**`raw_text.cpp` has no such include.** It imports the module and nothing else, so the claim I had
+just written into it — *"the log macros stay TEXTUAL in the global module fragment"* — was **false
+in that file**, and the address it carried was one the file had never held. The tell was in the
+census's own output and I nearly read past it: eighteen files showed `LOST ADR-3.D4` and the
+nineteenth showed `added ADR-3.D4`, which is not a restoration at all.
+
+This is the session's recurring defect in its purest form — **a claim whose SCOPE is narrower than
+its wording**, reached this time not by a sweep but by a PATTERN: nineteen files that look alike,
+one uniform edit, one exception. Unit 22's version was a bulk disposition over a LOST list; this one
+is a bulk ASSERTION over a file list. The guard is the same and it is cheap: before applying one
+claim to N sites, run the predicate the claim rests on over all N and read the column.
+
+### The stripper cross-check (`OPS-8.S5`), held NON-vacuously
+
+Removed **484**, kept 59. The kept violation classes are `trailing-nolint` 4 plus
+`suppression-without-why` 5, so the identity is `484 == 493 − 9` with something genuinely
+subtracted. Clearing them from the draft had to distinguish the two: **seven own-line directives
+were dropped whole and four TRAILING ones had only their directive TEXT stripped**, because a
+trailing directive shares its line with code and deleting the line would have deleted the code —
+`OPS-8.S3.4`'s stripped-copy trap, met here in the draft rather than in a measurement.
+
+### Two placement defects, both anchors landing on a bare brace
+
+The anchor audit — print every block's resolved anchor beside its first claim and read the table —
+flagged two of ninety-four, and the gate would have flagged neither.
+
+* **`android_logcat.cpp`**: a claim about there being no regex fallback resolved onto the `}` that
+  closes the anonymous namespace. The prose it came from was a free-standing note at the end of a
+  namespace, with no entity of its own. Folded into `parse_fast`'s `post:`, which is the function
+  whose FALSE return the claim is actually about.
+* **`cloudwatch.cpp`**: a claim about the fast path resolved onto the bare `{` that opens a scope
+  block — `OPS-8.S6.1`'s "resolves successfully to a `{`" exactly. Re-anchored past it onto the
+  first real statement.
+
+### The address census, both legs
+
+**Outbound: clean after the repair** — zero LOST, `ADR-19.D4` added at the two sites that state the
+component-versus-host contract, and two refinements (`ADR-20` → `ADR-20.D3`, `DN-43` → `DN-43.D3`)
+where the prose named a subject and the conversion names the slot.
+
+**Inbound: 145 mentions, one real lead and it holds.** `DN-43` rests a claim on this unit's prose in
+terms — *"the constant 0.0 exists to prevent precisely that, and the comment at
+`F-SRC-insight-canon:raw_text.cpp:RawTextStrategy::confidence` says so."* The conversion carries
+that argument as four `invariant:` lines at that same function, and the address resolves. Nothing
+owed. Everything else is fixture data: these filenames appear inside masked-template test strings
+and inside the published determinism golden, because a compiler warning naming one of these paths
+is one of the masker's own worked examples.
+
+### The cold reader (`OPS-8.S8`) — 55 questions, 50 recovered, FIVE convictions, and a sixth against unit 22
+
+Reader A took the seven structured and JSON-shaped strategies; reader B the twelve plaintext ones.
+`GIT COMMANDS RUN: none` from both. One disclosure, reader A: two excluded filenames appeared in
+`ls` listings of `adr/` and `design_notes/`; neither file was opened and no line of either printed.
+
+| reader | questions | recovered | wrong |
+|---|---|---|---|
+| A — bgl, clf, cloudwatch, systemd_journal, iis_w3c, hpc, kv | 25 | 25 | 0 |
+| B — the twelve plaintext strategies | 30 | 25 | **5** |
+
+**This is the sharpest reader result of the run, and every one of the five was verified at the
+artifact before a line was touched.**
+
+1. **`rfc3339_text.cpp` — *"the leading head is a RAW-BYTE budget and a stamp spends most of it"*.**
+   `OPS-8.O3`'s *the world moved* class, and the tree already contains its own correction. Stage 1's
+   budget is a TOKEN count (`kLeadingScanTokens{8}`, scanned over the whole line with a byte limit
+   of 0), so a stamp costs it ONE token. The surviving byte-shaped constraint is stage 2's
+   `kKeywordHead{128}`, whose window the stamp does shift — which is the real reason to scan late.
+   **`test_ingest_normalization_level_flip.cpp` states the supersession in terms**, and the strategy
+   comment was never updated; the conversion carried it faithfully and thereby asserted it.
+2. **`android_logcat.cpp` — *"ONE implementation … guarantees the two never disagree"*.** True about
+   the CLOCK PREFIX and false about the contract. `confidence` returns 0.90 on `has_logcat_prefix`
+   alone; `parse_fast` then applies four further checks — pid and tid digit runs, a level character
+   followed by a space, a colon, a non-empty tag. A claim whose SCOPE is wider than its warrant.
+3. **`proxifier.cpp` — *"carries no year and no month-day pair"*.** `is_proxifier_prefix` validates
+   `[DD.MM ` — two digits, a dot, two digits — so there IS a month-day pair. The missing YEAR is the
+   whole blocker, and naming a second absent field that is present weakens the true reason.
+4. **`windows_cbs.cpp` — *"the confidence already validated … so this is a recheck"*.** The reader
+   supplied the mechanism I had smoothed away: under `set_format` the parse is reachable with the
+   score never having run, so the guard is BOUND SAFETY for two fixed-offset reads, not a
+   re-validation. It is also a weaker bound than the score's, which is the tell.
+5. **Seven file headers — *"zero string copies"*.** False on the MISS path in every file that
+   declines: each builds a `std::string` for its error message, and the count across the unit's
+   files runs to sixteen constructions. Scoped to the SUCCESS path, which is where the promise is
+   real and where it matters.
+
+**And a sixth, against unit 22, already committed and pushed.** Asked what `nginx_error.cpp` and
+`apache_error.cpp` share, reader B checked both parsers and reported that `canon.api.cppm`'s
+*"an Nginx error-log timestamp, the same format as the Apache one"* **is wrong as written**.
+Verified: nginx is `2024/01/15 10:30:00`, nineteen characters with a slash date; apache is
+`Sun Dec 04 04:47:44 2005`, twenty-four with a weekday, a month name and a TRAILING year. Two
+byte-distinct layouts with two separate parsers. The carried prose said the same thing and unit 22
+promoted it to an asserted `post:`. Repaired in this unit's commit, with the difference stated
+rather than the resemblance.
+
+**The general lesson, and it is about UNIT BOUNDARIES rather than about this file.** A unit's reader
+is scoped to that unit's files, so a false claim about file X written into file Y is invisible to
+Y's own interrogation — unit 22's reader was never asked to compare two timestamp parsers, because
+neither parser is in `canon.api.cppm`. It surfaced only because a LATER unit's reader happened to
+stand at the other end of the same sentence. **A committed unit is not a closed one**, and the cheap
+consequence is that a conviction arriving from a sibling unit is repaired in the sibling's commit
+rather than deferred.
+
+### What a `recovered` verdict still carried — the third instance of this shape
+
+Reader A answered Q20 (how `kv.cpp` treats a message key) correctly and then reported behaviour the
+comment does not state: **the write is guarded by `first_content`, so a message key arriving after
+another unclaimed pair is SILENTLY DROPPED.** Verified at the code — `level=INFO user_id=42
+msg="hello"` yields `content = "user_id=42"` and the message is gone, where the same pairs in the
+other order keep it. The claim was not false; it was incomplete, and the missing half is the part a
+reader needs. Repaired.
+
+That is now three units in a row where the score column was not the whole answer: unit 22's fifth
+defect came from reading a reader's CITATIONS against the line, unit 23's from reading its
+CONFIDENCE SPLIT, and this one from reading an answer that was marked recovered and went further
+than the question.
+
+### Findings for other lanes — three, all code and none repairable in a comment-only commit
+
+* **`AndroidLogcatStrategy::confidence` violates the spi's own invariant.** `canon.spi.cppm` states
+  *"non-zero only if parse() is structurally committed to succeeding on that line"*, and this
+  strategy scores 0.90 on an 18-byte clock prefix while the parse applies four further checks. The
+  consequence is not a mis-route but a DROP: a prefix-valid, body-malformed line is selected by
+  logcat, fails, and is counted as a parse failure — `LogParser` does not re-route to the raw-text
+  fallback, which is reachable only when DETECTION finds no strategy. Every sibling strategy that
+  states *"the gate IS the grammar"* holds the invariant; this one does not.
+  **Addressee: the `insight-canon` strategy lane.**
+* **`KVStrategy::parse` silently drops a late message key**, as above, and **no test exercises it**:
+  every KV fixture puts `msg=` ahead of any other unclaimed pair, because `ts`, `level` and
+  `component` are consumed as fields and never reach the content buffer. Unguarded as well as
+  undocumented. **Addressee: the `insight-canon` strategy lane.**
+* **`extract_level_word` returns the FIRST segment of a compound bracket**, so an Apache 2.4-style
+  `[core:error]` yields `core`, which `parse_log_level` maps to Unknown — no level at all. That is
+  faithful to the retired regex it replicates, and it is covered by no test: both Apache fixtures
+  are 2.2-style single-word brackets. Whether 2.4 is in scope is a product question, not a comment
+  one. **Addressee: the `insight-canon` strategy lane, and Eqya for the scope call.**
+
+### The behaviour witness
+
+`malf test insight-canon` on **both** toolchains after the unit landed: **809 of 809** on
+`linux-clang21-libcxx-release` and **809 of 809** on `linux-gcc16-release`, equal to the pre-unit
+baseline. The witness covers this unit AND the unit-22 repair, which rode the same tree.
+
+
 
 
 ---

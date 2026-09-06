@@ -1,30 +1,27 @@
 module;
-#include "utils/log_macros.hpp" // textual macro layer (ADR-3.D4)
+#include "utils/log_macros.hpp"
 #include <cstring>
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
+import insight.canon.detail.scan;
 
-// KVStrategy — parses key=value log lines (Logfmt-style).
-//
-// Supported syntax:
-//   key=value          bare value (no spaces/commas/semicolons)
-//   key="quoted value" double-quoted value (may contain spaces)
-//
-// Well-known keys are mapped to structured fields; the rest are concatenated
-// into the content string as free-form pairs for the masker.
-//
-// Hand-written KV scanner: zero RE2, zero per-pair string copies.
-
+// post: a logfmt-style key-equals-value record; a bare value, or a double-quoted one that may
+// contain spaces.
+// invariant: well-known keys map to structured fields and the rest are concatenated into the
+// content as free-form pairs for the masker.
+// invariant: a hand-written scanner with no regex and no per-pair string copies.
+// invariant: the log macros stay TEXTUAL in the global module fragment, so no first-party
+// declaration leaks through it.
+// refs: ADR-3.D4
 namespace insight::tokenization
 {
 
 namespace
 {
 
-    // Key-valid chars: \w + '.' + '-'
+    // invariant: a key may carry word characters, a dot and a hyphen.
     [[nodiscard]] constexpr bool is_kv_key_char(char chr) noexcept
     {
         return is_digit(chr) || is_upper(chr) || is_lower(chr) || chr == '_' || chr == '.' ||
@@ -39,13 +36,13 @@ namespace
         return !is_space(chr) && chr != ',' && chr != ';';
     }
 
-    // True iff `line` opens (after leading whitespace) with a `key=value` token.
-    // Genuine logfmt lines lead with a pair (`ts=`, `level=`, `key=`); a lone
-    // trailing pair inside otherwise free text (e.g. "INFO checkout completed
-    // order=42") does NOT — and must NOT be claimed by KV, which keeps only the
-    // pairs as content and would drop the human-readable message, fragmenting
-    // the template per value. Such lines belong to the raw-text fallback, which
-    // preserves the full line and infers the leading level.
+    // post: true iff the line OPENS, after leading whitespace, with a key-equals-value token.
+    // invariant: a genuine logfmt line leads with a pair; a lone trailing pair inside otherwise
+    // free text does NOT, and must not be claimed here.
+    // invariant: claiming it would keep only the pairs as content and drop the human-readable
+    // message, fragmenting the template per value.
+    // invariant: such a line belongs to the raw-text fallback, which preserves the full line and
+    // infers the leading level.
     [[nodiscard]] constexpr bool leads_with_kv_pair(std::string_view line) noexcept
     {
         std::size_t pos{0};
@@ -62,7 +59,9 @@ namespace
 
 } // namespace
 
-// Mapping well-known keys to structured fields is inherently branch-heavy.
+// invariant: mapping well-known keys onto structured fields is inherently branch-heavy, and the
+// branch count IS the well-known key set.
+// note: the directive below is measured LOAD-BEARING: 0 findings with it, 1 without.
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 std::expected<ParsedLine, std::string> KVStrategy::parse(std::string_view line,
                                                          ArenaAllocator& arena) const
@@ -77,7 +76,8 @@ std::expected<ParsedLine, std::string> KVStrategy::parse(std::string_view line,
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
 
-    // Allocate content buffer in arena (upper bound: line.size() + separators).
+    // invariant: the content buffer is sized to an upper bound — the line plus one separator per
+    // pair — so it is allocated once in the arena and never grown.
     const std::size_t content_cap{line.size() + pairs.size() + 1U};
     char* const content_buf{static_cast<char*>(arena.allocate(content_cap, 1U))};
     const std::span<char> content_span{content_buf, content_cap};
@@ -86,7 +86,6 @@ std::expected<ParsedLine, std::string> KVStrategy::parse(std::string_view line,
 
     for (const auto& [key, value] : pairs)
     {
-        // Timestamp keys
         if (!parsed_line.timestamp.has_value())
         {
             if (key == "ts" || key == "timestamp" || key == "time" || key == "@timestamp")
@@ -95,7 +94,6 @@ std::expected<ParsedLine, std::string> KVStrategy::parse(std::string_view line,
                 continue;
             }
         }
-        // Level keys
         if (parsed_line.level == LogLevel::Unknown)
         {
             if (key == "level" || key == "severity" || key == "loglevel" || key == "log_level")
@@ -104,17 +102,19 @@ std::expected<ParsedLine, std::string> KVStrategy::parse(std::string_view line,
                 continue;
             }
         }
-        // Component / service keys
         if (parsed_line.component.empty())
         {
             if (key == "component" || key == "source" || key == "logger" || key == "service" ||
                 key == "module")
             {
-                parsed_line.component = value; // direct slice; line is arena-stable
+                parsed_line.component = value;
                 continue;
             }
         }
-        // Message keys → write value only (no key=prefix)
+        // invariant: a message key writes its VALUE only, with no key prefix, because the message
+        // is the record's content rather than one of its pairs.
+        // invariant: and ONLY when nothing has been written yet — a message key arriving after
+        // another unclaimed pair is DROPPED rather than appended.
         if (key == "msg" || key == "message" || key == "log" || key == "text" || key == "body")
         {
             if (first_content)
@@ -125,7 +125,6 @@ std::expected<ParsedLine, std::string> KVStrategy::parse(std::string_view line,
             }
             continue;
         }
-        // All remaining pairs: "key=value"
         if (!first_content)
             content_span[write_pos++] = ' ';
         std::memcpy(content_span.subspan(write_pos).data(), key.data(), key.size());
@@ -138,7 +137,8 @@ std::expected<ParsedLine, std::string> KVStrategy::parse(std::string_view line,
 
     if (write_pos == 0)
     {
-        // No content written — fall back to the full line for the masker.
+        // invariant: when no content was written the whole line is handed to the masker, so a
+        // record whose pairs were all consumed as fields still templates on something.
         parsed_line.content = line;
     }
     else
@@ -168,9 +168,8 @@ double KVStrategy::confidence(std::string_view line) const noexcept
     static constexpr double kLowConfidence{0.30};
     static constexpr double kNoConfidence{0.0};
 
-    // A line that does not OPEN with a key=value pair is free text with at most
-    // an embedded assignment — not logfmt. Defer to the raw-text fallback so the
-    // message and leading level survive.
+    // invariant: a line that does not OPEN with a pair is free text with at most an embedded
+    // assignment, so it defers to the raw-text fallback and its message and level survive.
     if (!leads_with_kv_pair(line))
         return kNoConfidence;
     const std::size_t count{count_kv_pair_signatures(line, kHighConfidencePairCount)};
@@ -183,9 +182,10 @@ double KVStrategy::confidence(std::string_view line) const noexcept
     return kNoConfidence;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Private helpers
-// ─────────────────────────────────────────────────────────────────────────────
+// post: the key-value pairs of the line, each a view into it; an empty value is skipped.
+// invariant: the scan is inherently branch-heavy because the value grammar has two forms and the
+// key grammar is a character class.
+// note: the directive below is measured LOAD-BEARING: 0 findings with it, 1 without.
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 std::vector<KVStrategy::KVPair> KVStrategy::extract_pairs(std::string_view line)
 {
@@ -195,25 +195,21 @@ std::vector<KVStrategy::KVPair> KVStrategy::extract_pairs(std::string_view line)
 
     while (pos < len)
     {
-        // Advance to potential key start (must be word char).
         if (!is_kv_key_start(line[pos]))
         {
             ++pos;
             continue;
         }
 
-        // Scan forward over key chars: [\w.\-]+
         const std::size_t k_start{pos};
         while (pos < len && is_kv_key_char(line[pos]))
             ++pos;
         const std::size_t k_end{pos};
 
-        // Must be followed immediately by '='
         if (pos >= len || line[pos] != '=')
             continue;
-        ++pos; // skip '='
+        ++pos;
 
-        // Extract value: quoted or bare.
         std::size_t v_start{pos};
         std::size_t v_end{};
         if (pos < len && line[pos] == '"')
@@ -224,7 +220,7 @@ std::vector<KVStrategy::KVPair> KVStrategy::extract_pairs(std::string_view line)
                 ++pos;
             v_end = pos;
             if (pos < len)
-                ++pos; // skip closing '"'
+                ++pos;
         }
         else
         {
@@ -234,7 +230,7 @@ std::vector<KVStrategy::KVPair> KVStrategy::extract_pairs(std::string_view line)
         }
 
         if (v_end == v_start)
-            continue; // empty value — skip
+            continue;
 
         pairs.push_back({.key = line.substr(k_start, k_end - k_start),
                          .value = line.substr(v_start, v_end - v_start)});

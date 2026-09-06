@@ -1,28 +1,27 @@
 module;
-#include "strategy/simdjson_scratch.hpp" // textual: TU-local simdjson entities (ADR-3.D4 family)
-#include "utils/log_macros.hpp"          // textual macro layer (ADR-3.D4)
+#include "strategy/simdjson_scratch.hpp"
+#include "utils/log_macros.hpp"
 #include <simdjson.h>
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
+import insight.canon.detail.scan;
 
-// SystemdJournalStrategy — parses systemd journal JSON export format:
-//   {"__REALTIME_TIMESTAMP":"1705312200000000","PRIORITY":"6",
-//    "_COMM":"nginx","MESSAGE":"Worker started"}
-//
-// Hot path uses simdjson on-demand via the shared scratch helpers; nlohmann is
-// no longer linked into the production library.
-
+// post: a systemd journal JSON export record — a microsecond realtime stamp, a priority, a
+// command name and the message.
+// invariant: the hot path uses simdjson on-demand through the shared scratch helpers.
+// invariant: the log macros and the simdjson entities stay TEXTUAL in the global module fragment
+// and are TU-local, so no first-party declaration leaks through it.
+// refs: ADR-3.D4
 namespace insight::tokenization
 {
 
 namespace
 {
 
-    // systemd journal PRIORITY follows syslog severity: 0=emerg .. 7=debug
-    // NOLINTBEGIN(readability-magic-numbers)
+    // invariant: the journal priority follows syslog severity, so it decodes on the same ladder
+    // rather than on a private one.
     LogLevel priority_to_level(int priority) noexcept
     {
         switch (priority)
@@ -30,21 +29,20 @@ namespace
         case 0:
         case 1:
         case 2:
-            return LogLevel::Fatal; // emerg/alert/crit
+            return LogLevel::Fatal;
         case 3:
             return LogLevel::Error;
         case 4:
             return LogLevel::Warn;
         case 5:
         case 6:
-            return LogLevel::Info; // notice/info
+            return LogLevel::Info;
         case 7:
             return LogLevel::Debug;
         default:
             return LogLevel::Unknown;
         }
     }
-    // NOLINTEND(readability-magic-numbers)
 
     bool has_journal_indicators(std::string_view line) noexcept
     {
@@ -52,8 +50,8 @@ namespace
                line.contains("SYSLOG_IDENTIFIER");
     }
 
-    // PRIORITY is encoded as a string in journalctl -o json. Parse with from_chars
-    // (no allocation) over the simdjson string view.
+    // invariant: the priority is encoded as a STRING by the journal exporter, so it is parsed with
+    // an allocation-free numeric conversion over the view.
     int parse_priority(std::string_view priority_view) noexcept
     {
         static constexpr int kDefaultInfoPriority{6};
@@ -76,8 +74,8 @@ std::expected<ParsedLine, std::string> SystemdJournalStrategy::parse(std::string
     static constexpr std::array<std::string_view, 1> kSystemdUnitKeys{"_SYSTEMD_UNIT"};
     static constexpr std::array<std::string_view, 1> kMessageKeys{"MESSAGE"};
 
-    // Cheap substring gate: production-shape journal lines always contain one
-    // of these markers. Avoids a full simdjson parse on generic JSON.
+    // invariant: the cheap substring gate is what avoids a full simdjson parse on generic JSON;
+    // production-shape journal lines always carry one of the markers.
     if (!has_journal_indicators(line))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(),
@@ -109,7 +107,6 @@ std::expected<ParsedLine, std::string> SystemdJournalStrategy::parse(std::string
 
     std::string_view scratch_view;
 
-    // Timestamp: __REALTIME_TIMESTAMP is microseconds since epoch (string-encoded).
     if (try_get_string(root, kRealtimeKeys, scratch_view))
     {
         std::int64_t microsecs{};
@@ -126,7 +123,8 @@ std::expected<ParsedLine, std::string> SystemdJournalStrategy::parse(std::string
     if (try_get_string(root, kPriorityKeys, scratch_view))
         parsed.level = EventLevel::declared(priority_to_level(parse_priority(scratch_view)));
 
-    // Component: prefer _COMM, fall back to SYSLOG_IDENTIFIER, then _SYSTEMD_UNIT.
+    // invariant: the component prefers the command name, then the syslog identifier, then the unit
+    // — most specific first, so a record that declares both yields the finer source.
     if (try_get_string(root, kCommKeys, scratch_view) ||
         try_get_string(root, kSyslogIdentifierKeys, scratch_view) ||
         try_get_string(root, kSystemdUnitKeys, scratch_view))
@@ -138,7 +136,8 @@ std::expected<ParsedLine, std::string> SystemdJournalStrategy::parse(std::string
     }
     else
     {
-        // Fallback: arena-store the raw line (no dump() heap alloc).
+        // invariant: the fallback arena-stores the RAW line, which avoids the heap allocation a
+        // re-serialisation would force.
         parsed.content = arena.store_string(line);
     }
 

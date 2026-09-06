@@ -1,32 +1,29 @@
 module;
-#include "utils/log_macros.hpp" // textual macro layer (ADR-3.D4)
+#include "utils/log_macros.hpp"
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
+import insight.canon.detail.scan;
 
-// RFC5424Strategy — parses IETF RFC 5424 syslog format:
-//   "<PRI>VERSION TIMESTAMP HOSTNAME APP-NAME PROCID MSGID [SD] MSG"
-//   e.g. "<134>1 2024-01-15T10:30:00.003Z server sshd 1234 ID47 - Accepted password"
-//   e.g. "<165>1 2024-01-15T10:30:00Z router - - - Network interface down"
-//
-// PRI = facility * 8 + severity (RFC 5424 §6.2.1)
-// Severity: 0=emerg, 1=alert, 2=crit, 3=error, 4=warn, 5=notice, 6=info, 7=debug
-//
-// Hand-written scanner: zero RE2, zero string copies.
-
+// post: an RFC 5424 syslog record — a bracketed priority and version, then the declared field
+// order, with a dash standing for any absent field.
+// invariant: the priority decomposes as facility times eight plus severity, so the low three bits
+// ARE the severity.
+// invariant: a hand-written scanner with no regex and, on the SUCCESS path, no string copies — a
+// decline builds an error message.
+// invariant: the log macros stay TEXTUAL in the global module fragment, so no first-party
+// declaration leaks through it.
+// refs: ADR-3.D4
 namespace insight::tokenization
 {
 
 namespace
 {
 
-    // NOLINTBEGIN(readability-magic-numbers)
-
     LogLevel severity_to_level(int pri) noexcept
     {
-        const int severity{pri & 0x07}; // NOLINT low 3 bits
+        const int severity{pri & 0x07};
         switch (severity)
         {
         case 0:
@@ -34,23 +31,21 @@ namespace
         case 1:
             [[fallthrough]];
         case 2:
-            return LogLevel::Fatal; // emerg/alert/crit
+            return LogLevel::Fatal;
         case 3:
-            return LogLevel::Error; // err
+            return LogLevel::Error;
         case 4:
-            return LogLevel::Warn; // warning
-        case 5:                    // NOLINT(readability-magic-numbers)
+            return LogLevel::Warn;
+        case 5:
             [[fallthrough]];
-        case 6:                     // NOLINT(readability-magic-numbers)
-            return LogLevel::Info;  // notice/info
-        case 7:                     // NOLINT(readability-magic-numbers)
-            return LogLevel::Debug; // debug
+        case 6:
+            return LogLevel::Info;
+        case 7:
+            return LogLevel::Debug;
         default:
             return LogLevel::Unknown;
         }
     }
-
-    // NOLINTEND(readability-magic-numbers)
 
 } // namespace
 
@@ -64,17 +59,18 @@ std::expected<ParsedLine, std::string> RFC5424Strategy::parse(std::string_view l
     }
 
     std::string_view rest{line};
-    rest.remove_prefix(1U); // skip '<' (validated by is_rfc5424_prefix)
+    rest.remove_prefix(1U);
     const std::string_view pri_str{sv_take_until(rest, '>')};
 
-    (void)sv_take_token(rest); // skip version
+    (void)sv_take_token(rest);
     const std::string_view timestamp_str{sv_take_token(rest)};
     const std::string_view hostname{sv_take_token(rest)};
     const std::string_view appname{sv_take_token(rest)};
-    (void)sv_take_token(rest); // skip procid
-    (void)sv_take_token(rest); // skip msgid
+    (void)sv_take_token(rest);
+    (void)sv_take_token(rest);
 
-    // Strip structured-data prefix "- " or "[sd-id ...] "
+    // invariant: the structured-data field is stripped whether it is the absent dash or a bracketed
+    // element, because it is metadata rather than message.
     std::string_view msg{rest};
     if (msg.starts_with("- "))
         msg.remove_prefix(2U);

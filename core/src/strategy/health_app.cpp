@@ -1,16 +1,18 @@
 module;
-#include "utils/log_macros.hpp" // textual macro layer (ADR-3.D4)
+#include "utils/log_macros.hpp"
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
+import insight.canon.detail.scan;
 
-// HealthAppStrategy — parses pipe-delimited HealthApp logs:
-//   "20171223-22:15:29:606|Step_LSC|30002312|onStandStepChanged 3579"
-//
-// Hand-written scanner: zero RE2, zero string copies.
-
+// post: a pipe-delimited HealthApp record — a compact date and clock, a component, a process id
+// and the message.
+// invariant: a hand-written scanner with no regex and, on the SUCCESS path, no string copies — a
+// decline builds an error message.
+// invariant: the log macros stay TEXTUAL in the global module fragment, so no first-party
+// declaration leaks through it.
+// refs: ADR-3.D4
 namespace insight::tokenization
 {
 
@@ -24,18 +26,17 @@ std::expected<ParsedLine, std::string> HealthAppStrategy::parse(std::string_view
             std::string("HealthAppStrategy: line does not match HealthApp format"));
     }
 
-    // Format: "YYYYMMDD-HH:MM:SS:mmm|component|process_id|message"
-    // The three takes are total by construction: is_health_app_prefix proves all three
-    // separators exist (DN-43.D16 — arity is grammar), so none of them can run off the end
-    // and swallow a neighbouring field. There is no post-take field guard: a decline here
-    // would DELETE the line rather than demote it, and an empty `component` is a positive
-    // statement that the record declares no functional source (ADR-16.D5 fail-safe KEEP),
-    // not a parse failure.
+    // invariant: the three takes are TOTAL BY CONSTRUCTION — the claim predicate proved all three
+    // separators exist, so none of them can run off the end and swallow a neighbouring field.
+    // invariant: there is deliberately NO post-take field guard: a decline here would DELETE the
+    // line rather than demote it.
+    // invariant: an empty component is a POSITIVE statement that the record declares no functional
+    // source, never a parse failure.
+    // refs: ADR-16.D5, DN-43.D16
     std::string_view rest{line};
     const std::string_view ts_str{sv_take_until(rest, '|')};
     const std::string_view component{sv_take_until(rest, '|')};
-    (void)sv_take_until(rest, '|'); // skip process_id
-    // rest = message
+    (void)sv_take_until(rest, '|');
 
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
@@ -58,12 +59,12 @@ LogFormat HealthAppStrategy::format() const noexcept
 
 double HealthAppStrategy::confidence(std::string_view line) const noexcept
 {
-    // The shortest line the grammar can accept, derived rather than guessed: 8 date digits + '-'
-    // + a 1-digit hour + ':' + a 1-digit minute + ':' + a 1-digit second + ':' + 1 millisecond
-    // digit = 16, then the record's three separators = 19. It read 22 while the predicate
-    // demanded a 2-digit minute and 3-digit milliseconds; DN-43.O5 widened both, and a stale
-    // early-out is a silent false negative — the predicate below would accept a 19-byte line
-    // that this guard never lets it see.
+    // invariant: the shortest acceptable line is DERIVED rather than guessed — eight date digits,
+    // a separator, one digit per clock field, one millisecond digit, and the record's three pipes.
+    // invariant: it read 22 while the predicate demanded a two-digit minute and three millisecond
+    // digits, and widening one without the other is a SILENT false negative.
+    // invariant: a stale early-out would reject a 19-byte line the predicate would have accepted.
+    // refs: DN-43.O5
     static constexpr std::string_view::size_type kMinimumCandidateLength{19};
     static constexpr double kHealthAppConfidence{0.92};
     static constexpr double kNoConfidence{0.0};

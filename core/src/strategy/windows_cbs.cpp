@@ -1,36 +1,38 @@
 module;
-#include "utils/log_macros.hpp" // textual macro layer (ADR-3.D4)
+#include "utils/log_macros.hpp"
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
+import insight.canon.detail.scan;
 
-// WindowsCBSStrategy — parses Windows CBS/CSI log format:
-//   "2016-09-28 04:30:30, Info                  CBS    Loaded Servicing Stack v6.1..."
-//
-// Distinctive anchor: "YYYY-MM-DD HH:MM:SS, Level  Component  message"
-// (comma-space after timestamp, level word, then component word).
-//
-// Hand-written scanner: zero RE2, zero string copies.
-
+// post: a Windows CBS or CSI record — a full timestamp, a comma, a level word, a component word,
+// then the message.
+// invariant: the comma immediately after the timestamp is the distinctive anchor.
+// invariant: a hand-written scanner with no regex and, on the SUCCESS path, no string copies — a
+// decline builds an error message.
+// invariant: the log macros stay TEXTUAL in the global module fragment, so no first-party
+// declaration leaks through it.
+// refs: ADR-3.D4
 namespace insight::tokenization
 {
 
 namespace
 {
-    constexpr std::size_t kTimestampLen{19U}; // "YYYY-MM-DD HH:MM:SS"
-    constexpr std::size_t kRestOffset{20U};   // past timestamp + comma
+    constexpr std::size_t kTimestampLen{19U};
+    constexpr std::size_t kRestOffset{20U};
 
 } // namespace
 
 std::expected<ParsedLine, std::string> WindowsCBSStrategy::parse(std::string_view line,
                                                                  ArenaAllocator& /*arena*/) const
 {
-    static constexpr std::size_t kMinLineLen{21U}; // timestamp + ", "
+    static constexpr std::size_t kMinLineLen{21U};
 
-    // Confidence already validates "YYYY-MM-DD HH:MM:SS, Level".
-    // Minimum: 19 chars timestamp + comma + space + level.
+    // invariant: NOT redundant with the confidence score — under an explicit format declaration
+    // the parse is reachable without the score ever having run.
+    // invariant: this is what keeps the two fixed-offset reads below in bounds, and it is a weaker
+    // bound than the score's: length plus the separator, where the score wants the whole stamp.
     if (line.size() < kMinLineLen || line[kTimestampLen] != ',' || !is_space(line[kRestOffset]))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=WindowsCBS parse miss");
@@ -38,9 +40,8 @@ std::expected<ParsedLine, std::string> WindowsCBSStrategy::parse(std::string_vie
             std::string("WindowsCBSStrategy: line does not match Windows CBS/CSI format"));
     }
 
-    // Timestamp is first 19 chars: "YYYY-MM-DD HH:MM:SS"
     const std::string_view ts_str{line.substr(0, kTimestampLen)};
-    std::string_view rest{line.substr(kRestOffset)}; // skip ','
+    std::string_view rest{line.substr(kRestOffset)};
     sv_skip_ws(rest);
 
     const std::string_view level_sv{sv_take_token(rest)};

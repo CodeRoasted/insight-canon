@@ -1,17 +1,18 @@
 module;
-#include "utils/log_macros.hpp" // textual macro layer (ADR-3.D4)
+#include "utils/log_macros.hpp"
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
 import insight.canon.api;
 
-// AndroidLogcatStrategy — parses Android logcat format:
-//   "03-17 16:13:38.811  1702  2395 D WindowManager: msg"
-//
-// Hot path: a hand-written std::string_view parser walks the line in a single
-// pass with O(1) layout checks at fixed offsets — no regex, no heap.
-// Malformed lines that fail the fast path are a parse miss (returned as error).
-
+// post: an Android logcat record — a month-day clock, a pid and a tid, a one-letter level, then a
+// colon-terminated tag.
+// invariant: a single-pass hand-written scanner with O(1) layout checks at fixed offsets — no
+// regex and no heap on the hot path.
+// invariant: a malformed line is a parse MISS returned as an error, never a partial record.
+// invariant: the log macros stay TEXTUAL in the global module fragment, so no first-party
+// declaration leaks through it.
+// refs: ADR-3.D4
 namespace insight::tokenization
 {
 
@@ -22,33 +23,33 @@ namespace
         return chr >= '0' && chr <= '9';
     }
 
-    // Cheap layout check matching the first 18 bytes of a logcat line.
-    // Used both by confidence() and as the fast-path gate in parse(); a single
-    // implementation guarantees the two never disagree.
+    // post: true iff the first 18 bytes match the logcat clock layout.
+    // invariant: ONE implementation serves both the confidence score and the parse fast-path gate,
+    // so the two cannot disagree ABOUT THE CLOCK PREFIX.
+    // invariant: that is narrower than the spi's confidence contract — the parse applies four
+    // further checks this predicate does not, so a prefix-valid line can still score and then fail.
     [[nodiscard]] bool has_logcat_prefix(std::string_view line) noexcept
     {
-        // ── Layout constants for "MM-DD HH:MM:SS.mmm" (18 chars) ──────────
         static constexpr std::size_t kMinimumCandidateLength{30};
-        static constexpr std::size_t kMonthSep{2}; // '-'
+        static constexpr std::size_t kMonthSep{2};
         static constexpr std::size_t kDay1{3};
         static constexpr std::size_t kDay2{4};
-        static constexpr std::size_t kDayHourSep{5}; // ' ' between date and time
+        static constexpr std::size_t kDayHourSep{5};
         static constexpr std::size_t kHour1{6};
         static constexpr std::size_t kHour2{7};
-        static constexpr std::size_t kHourMinSep{8}; // ':'
+        static constexpr std::size_t kHourMinSep{8};
         static constexpr std::size_t kMin1{9};
         static constexpr std::size_t kMin2{10};
-        static constexpr std::size_t kMinSecSep{11}; // ':'
+        static constexpr std::size_t kMinSecSep{11};
         static constexpr std::size_t kSec1{12};
         static constexpr std::size_t kSec2{13};
-        static constexpr std::size_t kSecMillisSep{14}; // '.'
+        static constexpr std::size_t kSecMillisSep{14};
         static constexpr std::size_t kMillis1{15};
         static constexpr std::size_t kMillis2{16};
         static constexpr std::size_t kMillis3{17};
 
         if (line.size() < kMinimumCandidateLength)
             return false;
-        // "MM-DD HH:MM:SS.mmm"
         return is_digit(line[0]) && is_digit(line[1]) && line[kMonthSep] == '-' &&
                is_digit(line[kDay1]) && is_digit(line[kDay2]) && line[kDayHourSep] == ' ' &&
                is_digit(line[kHour1]) && is_digit(line[kHour2]) && line[kHourMinSep] == ':' &&
@@ -73,7 +74,9 @@ namespace
             return LogLevel::Error;
         case 'F':
             return LogLevel::Fatal;
-        case 'S': // Silent — mapped to Trace (lowest severity)
+        // invariant: the silent level maps to the LOWEST severity canon has rather than to an
+        // absence, because the producer did declare a level.
+        case 'S':
             return LogLevel::Trace;
         default:
             return LogLevel::Unknown;
@@ -97,7 +100,7 @@ namespace
         }
     }
 
-    // Advance `pos` past any spaces/tabs. Returns false if we ran out of input.
+    // post: false when the input ran out before a non-space byte.
     [[nodiscard]] bool skip_ws(std::string_view line, std::size_t& pos) noexcept
     {
         while (pos < line.size() && (line[pos] == ' ' || line[pos] == '\t'))
@@ -105,8 +108,7 @@ namespace
         return pos < line.size();
     }
 
-    // Consume a run of decimal digits and advance `pos`. Returns false if no
-    // digit was present at the current position.
+    // post: false when no decimal digit was present at the current position.
     [[nodiscard]] bool skip_digits(std::string_view line, std::size_t& pos) noexcept
     {
         const std::size_t start{pos};
@@ -115,48 +117,45 @@ namespace
         return pos > start;
     }
 
-    // Single-pass manual parser for logcat. Returns true on success and fills
-    // `out_level`, `out_tag`, `out_message` with views into `line`. Performs
-    // zero allocations.
+    // post: on success the level, tag and message are views into the caller's line, and nothing is
+    // allocated.
+    // post: FALSE on a malformed line — there is NO regex fallback behind this, so a malformed
+    // line is a parse MISS the caller may discard or route to the catch-all.
     [[nodiscard]] bool parse_fast(std::string_view line, LogLevel& out_level,
                                   std::string_view& out_tag, std::string_view& out_message) noexcept
     {
-        static constexpr std::size_t kTimestampLength{18}; // "MM-DD HH:MM:SS.mmm"
+        static constexpr std::size_t kTimestampLength{18};
         if (!has_logcat_prefix(line)) [[unlikely]]
             return false;
 
         std::size_t pos{kTimestampLength};
-        // PID
         if (!skip_ws(line, pos) || !skip_digits(line, pos))
             return false;
-        // TID
         if (!skip_ws(line, pos) || !skip_digits(line, pos))
             return false;
-        // Level char
         if (!skip_ws(line, pos) || pos >= line.size() || !is_level_char(line[pos]))
             return false;
         const char level_char{line[pos]};
         ++pos;
-        // Mandatory single space between level and tag.
         if (pos >= line.size() || line[pos] != ' ')
             return false;
         ++pos;
 
-        // Tag = up to ':'. Logcat tags do not contain ':'; if we don't find one,
-        // the line is malformed.
+        // invariant: a logcat tag cannot contain a colon, so a missing colon means the line is
+        // malformed rather than that the tag runs to the end.
         const std::size_t tag_start{pos};
         const std::size_t colon{line.find(':', pos)};
         if (colon == std::string_view::npos) [[unlikely]]
             return false;
 
-        // Trim trailing spaces from the tag (logcat right-pads short tags).
+        // invariant: logcat right-pads short tags, so the trailing spaces are the producer's
+        // padding and not part of the name.
         std::size_t tag_end{colon};
         while (tag_end > tag_start && line[tag_end - 1] == ' ')
             --tag_end;
         if (tag_end == tag_start)
             return false;
 
-        // Message = everything after ':' + optional single leading space.
         std::size_t msg_start{colon + 1};
         if (msg_start < line.size() && line[msg_start] == ' ')
             ++msg_start;
@@ -166,10 +165,6 @@ namespace
         out_message = line.substr(msg_start);
         return true;
     }
-
-    // ── RE2 fallback removed ──────────────────────────────────────────────
-    // The fast path handles all well-formed logcat lines. Malformed lines
-    // are a parse miss; callers can discard or route to a catch-all strategy.
 
 } // namespace
 
@@ -187,8 +182,8 @@ std::expected<ParsedLine, std::string> AndroidLogcatStrategy::parse(std::string_
             std::string("AndroidLogcatStrategy: line does not match logcat format"));
     }
 
-    // tag/message are views into `line`, which was arena-stored by the engine
-    // before calling parse() — they are arena-stable already.
+    // invariant: the tag and message view the caller's line, which the engine arena-stored before
+    // calling, so they are already arena-stable.
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
     parsed_line.timestamp = EventTime::parsed(std::nullopt);
