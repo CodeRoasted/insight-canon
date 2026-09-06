@@ -6219,6 +6219,106 @@ equal to the pre-unit baseline. This directory also holds the third corpus-label
 809 does not cover: the LogHub projection pin gate was run explicitly with the pinned corpus mounted
 and passes **1 of 1 on both toolchains**.
 
+## Unit 28 — `core/tests/mask/` (2 files, 526 comment lines, 521 would-be violations) — TWO carried claims went stale under landed repairs, and each one's subject had been consolidated or fixed underneath it
+
+The masking rule golden gate and the stateless-template masker suite — the densest claim material in
+the test tier, and the only unit so far where BOTH readers convicted a carried claim. Baseline
+split: bare 459 · trailing 37 · spacer 24 · ruler 1. After: **460 comment lines, 0 would-be
+violations** — `invariant` 247 · `refs` 17 · 191 continuations · 5 tool forms.
+Repo-level delta **2 175 → 1 654 = exactly 521**. No law block; the next free law integer is
+still 17.
+
+### The stripper cross-check is VACUOUS for the fourth consecutive unit
+
+Removed **521**, kept 5 — all namespace closers and named-parameter forms. No suppression in this
+unit, so the identity degenerates to `removed == violations` and is recorded as vacuous rather than
+quoted as a pass, exactly as in units 25, 26 and 27.
+
+### CONVICTION 1 (reader B) — the hash floor is declared ONCE, and the prose still argued from TWO copies
+
+The constant-pinning block carried a specific structural argument: that the hex-run floor is
+*"declared TWICE, as two independent copies"* — one function-local on the standalone whole-token
+path, one file-scope shared by the composite rule — and that *"a guard on one leaves the other free
+to drift, so both are pinned."*
+
+Checked at the artifact: `mask.cpp` declares `kMinHashLen` **once**, and the source's own comment at
+the declaration says so in as many words — one declaration read by the standalone check and by the
+embedded-identity scanner, with a second note restating it forty lines on. The declaration was
+consolidated and the test's argument was never updated.
+
+**The two pins survive the correction, but their REASON changes, which is exactly why this matters.**
+They no longer guard two copies against drifting apart; they guard two PATHS through one constant, so
+what they now catch is a path that stopped consulting the floor or applied it differently. A reader
+who inherited the old sentence would have concluded the pins were redundant the moment they noticed
+one declaration — and deleting one of them is precisely the wrong move, because the paths are still
+independent.
+
+### CONVICTION 2 (reader A) — the catalog-derivation argument named an instance that has since been REPAIRED
+
+The catalog coverage arms carry the argument that each reads the declared table *"never a list typed
+beside it"*, and the carried prose closed with *"the first shape is live in this very tree"*, naming
+the wrapper-pair arm in the sibling masker suite as a hand-typed list.
+
+That arm now builds its shells by iterating the declared pair catalog, and its own converted text
+says so. So the example was repaired and the sentence pointing at it was not. **The conversion made
+this worse before the reader caught it**: the site name was dropped as apparent detail, leaving
+*"live in this very tree"* with no referent at all — the reader spent effort hunting, answered at
+medium confidence, and named two candidate sites that were its identification rather than the
+file's. A vague true-sounding claim is harder to falsify than a specific false one.
+
+The claim now states the principle and records that the instance it used to name has since been
+repaired to derive from the catalog.
+
+**Both convictions are the `OPS-8.O3` *world moved* class, and both were invisible to every
+mechanical witness** — the code token stream is unchanged, the grammar gate is green, both
+toolchains pass, and the address census sees no address move. Only a reader who opens the artifact
+the prose describes can see either.
+
+### The address census, and a disposition that is a DELETION with evidence
+
+**Outbound: 2 addresses LOST, opened ONE AT A TIME** — the batch disposition is what went wrong in
+unit 22 and it is not repeated.
+
+* `SRC-D-TID-12`, the masking precedence, is what the whole suite exercises. **Restored** as a
+  `refs:` at the digit-leading block, which is the site that obeys it.
+* `SRC-D-TID-11` covers ANSI escape normalization. Its tests **moved out of this file**: the ANSI
+  normalization suite records the move explicitly — *"the three assertions MOVED here and grew"*, and
+  *"the corresponding move is why `test_stateless_template.cpp` no longer tests escapes at all"* —
+  and that file carries the address at its own declaration. So this citation was a signpost to
+  relocated code and is **legitimately deleted**, which is the disposition the census itself names
+  for that case. The census exits 1 on it, and that is expected rather than a failure.
+
+**Inbound: 5 mentions, all opened.** Two cite this directory by file address and both still resolve;
+the golden data file's own header describes the composite routing, which the conversion preserved;
+and the two ANSI-normalization mentions are the evidence for the deletion above rather than a lead
+against it.
+
+### The cold reader (`OPS-8.S8`) — 62 questions, 62 recovered, TWO convictions
+
+Reader A took the golden gate; reader B the masker suite. `GIT COMMANDS RUN: none` and
+`EXCLUDED PATHS SEEN: none` from both.
+
+| reader | questions | recovered | convictions |
+|---|---|---|---|
+| A — the masking rule golden gate, its two limbs and its regeneration guard | 30 | 30 | 1 |
+| B — the stateless-template masker suite | 32 | 32 | 1 |
+
+**Reader A also sharpened a claim rather than merely recovering it.** Asked what the regeneration
+guard prevents, it gave the intended answer and then added the boundary the prose does not state:
+the guard's predicate is *source constant versus golden header*, so a bump made for ANY reason
+unlocks the rewrite — what it enforces is that a bump happened, not that this change is what earned
+it. That is a true and useful narrowing of the guarantee, and it is recorded here rather than
+silently folded into the comment, because it is a statement about the guard's design and not about
+the conversion.
+
+### The behaviour witness
+
+`malf test insight-canon` on **both** toolchains after the two repairs landed: **809 of 809** on
+`linux-clang21-libcxx-release` and **809 of 809** on `linux-gcc16-release`, equal to the pre-unit
+baseline. No suite in this directory carries the `corpus` label, so every one of them runs inside
+that figure — checked at the `CMakeLists`, where the labelled set is three suites and all three live
+elsewhere.
+
 
 
 

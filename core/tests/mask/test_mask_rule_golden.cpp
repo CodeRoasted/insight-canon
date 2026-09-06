@@ -1,79 +1,54 @@
-// test_mask_rule_golden.cpp — the arm ROADMAP N74 asks for: a golden that pins MASKED OUTPUT for a
-// named line population, so a masking-rule change reds WITHOUT a `kCanonicalizationVersion` change.
-//
-// ═══ THE DEFECT THIS EXISTS FOR ════════════════════════════════════════════════════════════════
-// `kCanonicalizationVersion` is the declared identity of the masking rule set. Consumers pin it,
-// `insight-metalog`'s wire vectors carry it, and `insight-eidos`'s sift report gate
-// `static_assert`s on its literal value. Every one of those fires when the VERSION moves and none
-// of them fires when the RULES move — so the bump is enforced only by whoever remembers to make it,
-// and a rule change that silently forgets it is invisible. Measured: applying a new masking arm
-// left `insight-canon` and `insight-eidos` fully green, and THAT GREEN WAS THE FINDING.
-//
-// ═══ WHY THE EXISTING ARMS DID NOT CATCH IT — the shape, not the count ════════════════════════
-// `test_stateless_template.cpp` is not thin: it carries dozens of assertions and many DO pin
-// literal template bytes. But its coverage is RELATIONAL where it is not literal —
-// `EXPECT_EQ(masked(a), masked(b))`, "these two lines share a template" — and a relational
-// assertion is INVARIANT under any rule change that moves both sides the same way. `zlib/1.3` and
-// `zlib/1.2.11` still share a template if `versioned_ref` starts masking the whole token; `built in
-// 6.2s` and `built in 11.9s` still share one if the wildcard spelling changes. The literal pins
-// that do exist are concentrated on the arms most recently REPAIRED (bracket_timestamp, the
-// wrapper shell, the compact-UTC instant, the hash floor) because each was written to close its own
-// incident — nothing derived them from the rule set, so an arm nobody had just repaired had no
-// literal pin at all. That is the hole, and it is a hole in DERIVATION, not in effort.
-//
-// ═══ WHAT THIS FILE PINS, AND THE TWO LIMBS ═══════════════════════════════════════════════════
-// `mask_rules.golden` holds one row per witness: `rule_id | subject_token | input_line | template`.
-// Two limbs, and NEITHER substitutes for the other — the split is stated in `kCompositeRules`'s own
-// comment in mask.cpp, which is where the gap was named before it was closed:
-//
-//   LIMB 1 — a rule's ACCEPTANCE SET widens or narrows in place (a new arm inside a normalizer, a
-//     moved threshold). Every table in mask.cpp stays byte-identical; the masked OUTPUT of some
-//     witness moves. `GoldenTemplatesAreByteIdentical` is that limb.
-//   LIMB 2 — a rule or a catalog entry is ADDED, REMOVED or REORDERED. Output may not move at all
-//     for any existing witness, because the new rule's class has no witness yet. The coverage arms
-//     are that limb: they read the DECLARED catalogs through `rule_catalog::*` and red when the
-//     rule set contains something the population does not.
-//
-// Limb 2 is what stops this file from becoming the defect one level up. A golden over a hand-picked
-// handful pins whatever those lines happen to exercise, and stays green while a new arm ships
-// unwitnessed — which is exactly how the incident above happened at the level of the whole suite.
-//
-// ═══ WHAT IT DOES NOT COVER — stated, not left implicit ═══════════════════════════════════════
-//   * `params`. The golden pins `template_str` only. A masked position contributes both a `<*>` to
-//     the template and its raw token to `params`, so which positions masked is already visible in
-//     the template; params add no sensitivity and would double the file's width.
-//   * `template_id`. It is SHA-256 of `template_str` (canon.api.cppm), so pinning the template
-//     pins the id up to a hash change, and a hash change is not a masking change.
-//   * THE COMPOSED PATH — and this is the boundary the homing call BUYS. The population goes
-//     straight to `stateless_template()`, never through `Tokenizer::process_line`. A golden taken
-//     through the composed pipeline reds on either stage and cannot say WHICH one moved, so this
-//     fixture controls exactly one thing — the token bytes the masker sees — and a red here names
-//     the MASKER. The price is that anything manifesting only THROUGH the composition is invisible
-//     here: format detection selecting a different strategy, a strategy handing the masker a
-//     different `content` slice, a semantic package's rows changing what a line projects to. None
-//     of those is a masking-rule change, and each has its own home — the strategy suites, the
-//     conformance kit, and `insight-metalog`'s committed wire vectors, which DO re-derive through
-//     the full shipped tokenizer. This gate is deliberately the narrow half of that pair.
-//   * `MaskConfig` beyond `mask_ip_addresses`. That is the only knob gating a rule.
-//   * Any rule class whose witness is absent. Limb 2 makes that condition VISIBLE for the declared
-//     catalogs (composite rules, ephemeral roots, wrapper pairs, status keywords, currency
-//     markers); it cannot see a class that no catalog declares.
-//
-// ═══ REGENERATION, AND THE GUARD THAT STOPS IT BEING A RUBBER STAMP ═══════════════════════════
-// `MaskRuleGolden.DISABLED_RegenerateGolden` rewrites the file. It is `DISABLED_` because it is a
-// maintenance ACTION, not a property — gtest prints a "YOU HAVE 1 DISABLED TEST" banner, so it is
-// visible rather than silently skipped, and running it from the same binary the gate runs in is
-// what guarantees the regenerated bytes come from the same compiled masker the gate reads.
-//
-//   <build dir>/core/insight_canon_tests \
-//       --gtest_also_run_disabled_tests --gtest_filter='MaskRuleGolden.DISABLED_RegenerateGolden'
-//
-// THE GUARD: it REFUSES to rewrite a row whose expected value is present and differs, unless
-// `kCanonicalizationVersion` already differs from the version recorded in the golden's header. So
-// the only way to make a moved row green again is to BUMP THE TOKEN FIRST — which is the obligation
-// this whole file exists to enforce, and it means "just regenerate it" cannot be the silent repair.
-// Rows whose expected column is EMPTY are always filled: that is how a new witness is added to the
-// population, and it can never mask a moved row, because a moved row is by definition not empty.
+// invariant: a golden that pins MASKED OUTPUT for a named line population, so a masking-rule change
+// reds WITHOUT the canonicalization version token moving.
+// invariant: THE DEFECT THIS EXISTS FOR — that token is the declared identity of the masking rule
+// set, and consumers pin it, wire vectors carry it and a downstream gate asserts its literal.
+// invariant: every one of those fires when the VERSION moves and NONE fires when the RULES move, so
+// the bump is enforced only by whoever remembers to make it.
+// invariant: MEASURED — applying a new masking arm left this repo and the downstream one fully
+// green, AND THAT GREEN WAS THE FINDING.
+// invariant: WHY THE EXISTING ARMS DID NOT CATCH IT IS THE SHAPE, NOT THE COUNT.
+// invariant: the sibling suite carries dozens of assertions and many pin literal bytes, but its
+// coverage is RELATIONAL where it is not literal.
+// invariant: a relational assertion is INVARIANT under any rule change that moves both sides the
+// same way, so two lines still share a template when the rule that masks them widens.
+// invariant: the literal pins that do exist are concentrated on the arms most recently REPAIRED,
+// each written to close its own incident, so an arm nobody had just repaired had no pin at all.
+// invariant: that is a hole in DERIVATION, not in effort.
+// invariant: the golden holds one row per witness — rule id, subject token, input line, template.
+// invariant: LIMB 1 is a rule's ACCEPTANCE SET widening or narrowing in place, where every table
+// stays byte-identical and the masked OUTPUT of some witness moves.
+// invariant: LIMB 2 is a rule or catalog entry being ADDED, REMOVED or REORDERED, where output may
+// not move at all because the new rule's class has no witness yet.
+// invariant: the coverage arms read the DECLARED catalogs and red when the rule set contains
+// something the population does not, and NEITHER limb substitutes for the other.
+// invariant: LIMB 2 IS WHAT STOPS THIS FILE BECOMING THE DEFECT ONE LEVEL UP — a golden over a
+// hand-picked handful stays green while a new arm ships unwitnessed.
+// invariant: WHAT IT DOES NOT COVER IS STATED, NOT LEFT IMPLICIT.
+// invariant: params are not pinned — a masked position contributes both a wildcard to the
+// template and its raw token to params, so which positions masked is already visible.
+// invariant: the template id is not pinned — it is a digest of the template string, so pinning
+// the template pins the id up to a hash change, which is not a masking change.
+// invariant: THE COMPOSED PATH is not covered, and that boundary is what the homing call BUYS —
+// the population goes straight to the masker and never through the tokenizer.
+// invariant: a golden taken through the composed pipeline reds on either stage and cannot say WHICH
+// one moved, so this fixture controls exactly one thing and a red here names the MASKER.
+// invariant: the price is that anything manifesting only THROUGH the composition is invisible here
+// — detection picking another strategy, a different content slice, a semantic row change.
+// invariant: none of those is a masking-rule change, and each has its own home, including the
+// committed wire vectors downstream that DO re-derive through the full shipped tokenizer.
+// invariant: the only config knob covered is the IP one, because it is the only knob gating a rule.
+// invariant: a rule class whose witness is absent is made VISIBLE by limb 2 for the declared
+// catalogs, but it cannot see a class that no catalog declares.
+// invariant: REGENERATION IS AN ACTION, NOT A PROPERTY, which is why it is a disabled test — the
+// harness prints a disabled-test banner, so it is visible rather than silently skipped.
+// invariant: running it from the same binary the gate runs in is what guarantees the regenerated
+// bytes come from the same compiled masker the gate reads.
+// invariant: THE GUARD — it REFUSES to rewrite a row whose expected value is present and differs,
+// unless the version token already differs from the version recorded in the golden's header.
+// invariant: so the only way to make a moved row green again is to BUMP THE TOKEN FIRST, which
+// means `just regenerate it` cannot be the silent repair.
+// invariant: rows whose expected column is EMPTY are always filled — that is how a new witness
+// joins the population, and it can never mask a moved row, which is by definition not empty.
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -86,39 +61,36 @@ namespace catalog = insight::tokenization::rule_catalog;
 namespace
 {
 
-// The five TOP-LEVEL dispositions of the SRC-D-TID-12 precedence that are not the composite layer.
-// Rule 2 IS the composite layer and is named by `catalog::composite_rule_ids()` instead, so this
-// list plus that catalog is the complete rule-id namespace. It is hand-held because the dispatcher
-// states these as an `if`/disjunction chain rather than a table —
-// `MaskRuleGolden.EveryGoldenRowNamesADeclaredRule` is what keeps a typo here from silently minting
-// a sixth id.
+// invariant: the five TOP-LEVEL dispositions of the masking precedence that are not the composite
+// layer, which is named by its own catalog instead.
+// invariant: this list plus that catalog is the complete rule-id namespace.
+// invariant: it is hand-held because the dispatcher states these as a disjunction chain rather than
+// a table, and a sibling arm is what keeps a typo here from silently minting a sixth id.
+// refs: SRC-D-TID-12
 constexpr std::array<std::string_view, 5> kTopLevelRuleIds{
-    {std::string_view{"status_keep"},    // rule 1 — a short numeric after a status keyword
-     std::string_view{"uuid_or_hash"},   // rule 3 — a standalone UUID or a hex run at the floor
-     std::string_view{"ipv4"},           // rule 4 — the only knob-gated rule
-     std::string_view{"digit_leading"},  // rule 5 — the discriminator the whole model rests on
-     std::string_view{"literal_keep"}}}; // rule 6 — the boundary: what canon must NOT mask
+    {std::string_view{"status_keep"}, std::string_view{"uuid_or_hash"}, std::string_view{"ipv4"},
+     std::string_view{"digit_leading"}, std::string_view{"literal_keep"}}};
 
 struct Row
 {
     std::string rule_id;
-    std::string subject;  // the token under test, a whitespace token of `input`
-    std::string input;    // the line fed to stateless_template
-    std::string expected; // the pinned template_str; empty = "fill me" (regeneration only)
+    // invariant: an EMPTY expected column means fill-me and is honoured only by regeneration.
+    std::string subject;
+    std::string input;
+    std::string expected;
     std::size_t line_no{0};
 };
 
 struct Golden
 {
-    std::string version; // the canonicalization_version recorded in the header
+    std::string version;
     std::vector<Row> rows;
-    // EVERY raw line, in file order. Regeneration walks THIS and substitutes the rebuilt text for
-    // the lines that are witness rows, so the section comments stay where their section is. An
-    // earlier shape kept comments and rows in two separate lists and would have rewritten the file
-    // with every comment hoisted to the top — a regenerator that destroys the document is a
-    // regenerator nobody runs twice.
+    // invariant: regeneration walks EVERY raw line in file order and substitutes rebuilt text only
+    // for witness rows, so the section comments stay where their section is.
+    // invariant: an earlier shape kept comments and rows in two separate lists and would have
+    // rewritten the file with every comment hoisted to the top.
+    // invariant: a regenerator that destroys the document is a regenerator nobody runs twice.
     std::vector<std::string> lines;
-    // lines[i] is a witness row iff row_at[i] is not npos, in which case it indexes `rows`.
     std::vector<std::size_t> row_at;
 };
 
@@ -134,10 +106,9 @@ constexpr std::string_view kFieldSep{" | "};
     return std::string{str.substr(first, last - first + 1)};
 }
 
-// Split on " | ". Exactly 3 or 4 fields; a 3-field row is a witness awaiting its expected value.
-// A field count outside that range is a malformed row and is reported as such rather than guessed
-// at — a `|` inside a witness line would silently shift every column, so the population may not
-// contain one.
+// invariant: exactly 3 or 4 fields, a 3-field row being a witness awaiting its expected value.
+// invariant: a field count outside that range is MALFORMED and is reported rather than guessed at,
+// because a separator inside a witness line would silently shift every column.
 [[nodiscard]] bool split_row(std::string_view text, std::size_t line_no, Row& out, std::string& why)
 {
     std::vector<std::string> fields;
@@ -216,8 +187,8 @@ constexpr std::string_view kFieldSep{" | "};
     return mask_line(content, {});
 }
 
-// The whitespace tokens of `line` — the same split the masker performs, so a token index in one is
-// a token index in the other.
+// invariant: the same split the masker performs, so a token index in one is a token index in the
+// other.
 [[nodiscard]] std::vector<std::string> tokens_of(std::string_view line)
 {
     std::vector<std::string> out;
@@ -236,9 +207,8 @@ constexpr std::string_view kFieldSep{" | "};
     return out;
 }
 
-// Index of `subject` among `line`'s whitespace tokens, or npos. The first occurrence: a witness
-// whose subject appears twice is testing an ambiguous thing, and `SubjectTokenIsPresentExactlyOnce`
-// rejects it rather than picking one.
+// invariant: the FIRST occurrence — a witness whose subject appears twice is testing an ambiguous
+// thing, and a sibling arm rejects it rather than picking one.
 [[nodiscard]] std::size_t subject_index(const Row& row, std::size_t& occurrences)
 {
     const std::vector<std::string> toks{tokens_of(row.input)};
@@ -254,9 +224,10 @@ constexpr std::string_view kFieldSep{" | "};
     return found;
 }
 
-// The row's subject rendered through the masker IN ITS LINE — the masked token at the subject's
-// index, which is what a rule's disposition is actually about. Reading the whole template instead
-// would fold every other token's behaviour into the discriminator.
+// invariant: the masked token AT THE SUBJECT'S INDEX, which is what a rule's disposition is
+// actually about.
+// invariant: reading the whole template instead would fold every other token's behaviour into the
+// discriminator.
 [[nodiscard]] std::string masked_subject(const Row& row, const MaskConfig& config, bool& okay)
 {
     std::size_t occurrences{0};
@@ -265,8 +236,8 @@ constexpr std::string_view kFieldSep{" | "};
     if (!okay)
         return {};
     const std::vector<std::string> masked{tokens_of(mask_line(row.input, config))};
-    // The masker emits exactly one output token per input token (it joins on a single space and a
-    // normalized token never gains one), so the indices correspond.
+    // invariant: the masker emits exactly one output token per input token, joining on a single
+    // space and never gaining one, so the indices correspond.
     if (index >= masked.size())
     {
         okay = false;
@@ -305,7 +276,7 @@ constexpr std::string_view kFieldSep{" | "};
     return out;
 }
 
-// The loaded golden, once. A parse failure is reported by every arm rather than crashing one.
+// invariant: loaded once, and a parse failure is reported by every arm rather than crashing one.
 struct Loaded
 {
     Golden golden;
@@ -323,8 +294,8 @@ const Loaded& loaded()
     return kLoaded;
 }
 
-// Every arm calls this first: an unparsable golden must fail ONCE with the parse error, never as
-// forty confusing coverage failures about a population that was never read.
+// invariant: an unparsable golden must fail ONCE with the parse error, never as forty confusing
+// coverage failures about a population that was never read.
 [[nodiscard]] bool golden_is_readable()
 {
     if (loaded().why.empty())
@@ -335,8 +306,7 @@ const Loaded& loaded()
     return false;
 }
 
-// Which token first differs, so a failure names the moved token instead of handing back two lines
-// to eyeball. Returns npos when the two templates tokenize identically.
+// invariant: a failure names the moved TOKEN instead of handing back two lines to eyeball.
 [[nodiscard]] std::size_t first_differing_token(std::string_view lhs, std::string_view rhs)
 {
     const std::vector<std::string> left{tokens_of(lhs)};
@@ -362,8 +332,6 @@ constexpr std::string_view kRegenCommand{
     "--gtest_filter='MaskRuleGolden.DISABLED_RegenerateGolden'"};
 
 } // namespace
-
-// ═══ LIMB 1 — the masked output itself ════════════════════════════════════════════════════════
 
 TEST(MaskRuleGolden, GoldenTemplatesAreByteIdentical)
 {
@@ -433,8 +401,6 @@ TEST(MaskRuleGolden, GoldenHeaderRecordsTheLiveCanonicalizationVersion)
         << "  golden: " << loaded().golden.version << "\n"
         << "  regenerate with:\n    " << kRegenCommand;
 }
-
-// ═══ LIMB 2 — the population's coverage of the DECLARED rule set ══════════════════════════════
 
 TEST(MaskRuleGolden, EveryDeclaredCompositeRuleHasAWitness)
 {
@@ -513,11 +479,10 @@ TEST(MaskRuleGolden, SubjectTokenIsPresentExactlyOnce)
     }
 }
 
-// ═══ LIMB 2, the top-level rules — each row proves the rule it NAMES is the reason ════════════
-// A composite row is discriminated by `composite_rule_claiming`. The five top-level dispositions
-// have no such table, so each carries its own discriminator, and each is a statement about WHY the
-// token got its disposition rather than merely THAT it did.
-
+// invariant: each top-level row proves the rule it NAMES is the REASON for the disposition, not
+// merely that the disposition happened.
+// invariant: a composite row is discriminated by its catalog lookup; the five top-level
+// dispositions have no such table, so each carries its own discriminator.
 TEST(MaskRuleGolden, StatusKeepRowsAreKeptBecauseOfTheKeywordBeforeThem)
 {
     if (!golden_is_readable())
@@ -529,14 +494,15 @@ TEST(MaskRuleGolden, StatusKeepRowsAreKeptBecauseOfTheKeywordBeforeThem)
         bool okay{false};
         const std::string kept{masked_subject(row, MaskConfig{}, okay)};
         if (!okay)
-            continue; // SubjectTokenIsPresentExactlyOnce owns that failure
+            continue;
         EXPECT_EQ(kept, row.subject)
             << "golden line " << row.line_no << ": a status_keep witness must survive VERBATIM.\n"
             << "  subject: " << row.subject << "\n  masked to: " << kept;
 
-        // NON-VACUITY, and it is the whole arm: replace the preceding token with a non-keyword and
-        // the same value must MASK. Without this leg a row could be green because the value is a
-        // letter-leading word rule 6 would have kept anyway, and rule 1 would sit unwitnessed.
+        // invariant: NON-VACUITY, and it is the whole arm — replace the preceding token with a
+        // non-keyword and the same value must MASK.
+        // invariant: without this leg a row could be green because the value is a letter-leading
+        // word the boundary rule would have kept anyway, leaving the status rule unwitnessed.
         std::size_t occurrences{0};
         const std::size_t index{subject_index(row, occurrences)};
         if (index == 0)
@@ -590,10 +556,12 @@ TEST(MaskRuleGolden, Ipv4RowsMaskOnlyBecauseOfTheKnobbedRule)
             << "golden line " << row.line_no
             << ": an ipv4 witness must mask with mask_ip_addresses ON.\n"
             << "  subject: " << row.subject << "\n  masked to: " << with_knob;
-        // `mask_ip_addresses` gates rule 4 and nothing else, so a subject that still masks with the
-        // knob OFF is being claimed by some OTHER rule and rule 4 is unwitnessed by this row. That
-        // is why every ipv4 witness is OPENER-LED: a bare address is digit-leading, so rule 5 masks
-        // it whatever the knob says, and a bare-address row would silently witness rule 5.
+        // invariant: the IP knob gates its rule and nothing else.
+        // invariant: a subject that still masks with the knob OFF is being claimed by some OTHER
+        // rule and this rule is unwitnessed by that row.
+        // invariant: that is why every IP witness is OPENER-LED.
+        // invariant: a bare address is digit-leading, so the digit-leading rule masks it whatever
+        // the knob says, and a bare-address row would witness it.
         EXPECT_EQ(without_knob, row.subject)
             << "golden line " << row.line_no
             << ": with mask_ip_addresses OFF an ipv4 witness must stay LITERAL — otherwise "
@@ -629,8 +597,10 @@ TEST(MaskRuleGolden, DigitLeadingRowsMaskWithoutAnyOtherRuleReachingThem)
             << ": no composite rule may claim a digit_leading witness — rule 2 runs first, so a "
                "claimed token witnesses rule 2.\n  subject: "
             << row.subject;
-        // Rule 3 also masks to `<*>`, so the row must be out of its reach to name rule 5 honestly.
-        // The floor is read from the catalog rather than written as a second `16` here.
+        // invariant: the hash rule also masks to a wildcard, so the row must be out of its reach to
+        // name the digit-leading rule honestly.
+        // invariant: the floor is read from the catalog rather than written as a second literal
+        // here.
         EXPECT_LT(row.subject.size(), catalog::min_hash_length())
             << "golden line " << row.line_no
             << ": a digit_leading witness at or above the hash floor could be claimed by rule 3 "
@@ -659,8 +629,8 @@ TEST(MaskRuleGolden, UuidOrHashRowsAreOutOfEveryOtherRulesReach)
             << "golden line " << row.line_no
             << ": no composite rule may claim it — rule 2 runs before rule 3.\n  subject: "
             << row.subject;
-        // Rule 5 also masks to `<*>`. A letter-leading subject is out of its reach, so the
-        // disposition can only have come from rule 3.
+        // invariant: the digit-leading rule also masks to a wildcard, so a LETTER-leading subject
+        // is out of its reach and the disposition can only have come from the hash rule.
         EXPECT_FALSE(insight::tokenization::is_digit(row.subject.front()))
             << "golden line " << row.line_no
             << ": a DIGIT-leading uuid_or_hash witness would be masked by rule 5 anyway and names "
@@ -694,12 +664,11 @@ TEST(MaskRuleGolden, LiteralKeepRowsSurviveEveryRule)
     }
 }
 
-// ═══ LIMB 2, the CATALOGS — a new entry with no witness is itself detectable ══════════════════
-// Each arm reads the declared table, never a list typed beside it. This is the difference between
-// "covers the entries I remembered" and "covers the entries that exist", and the first shape is
-// live in this very tree: `Ipv4MasksInsideEveryDeclaredWrapperPair` (test_stateless_template.cpp)
-// names catalog completeness over a hand-typed list a seventh pair would not touch.
-
+// invariant: each catalog arm reads the DECLARED table, never a list typed beside it.
+// invariant: that is the difference between covering the entries someone remembered and covering
+// the entries that EXIST.
+// invariant: the instance this file used to name — the wrapper-pair arm in the sibling masker
+// suite — has since been REPAIRED to build its shells from the catalog.
 TEST(MaskRuleGolden, EveryDeclaredWrapperPairHasAWitness)
 {
     if (!golden_is_readable())
@@ -777,8 +746,6 @@ TEST(MaskRuleGolden, EveryDeclaredEphemeralRootHasAWitness)
     }
 }
 
-// ═══ The regeneration ACTION — DISABLED_ on purpose; see the file header ══════════════════════
-
 TEST(MaskRuleGolden, DISABLED_RegenerateGolden)
 {
     ASSERT_TRUE(loaded().why.empty()) << loaded().why;
@@ -810,9 +777,10 @@ TEST(MaskRuleGolden, DISABLED_RegenerateGolden)
                                actual);
     }
 
-    // THE GUARD. A moved row may only be rewritten AFTER the version token has been bumped, so
-    // regeneration cannot be the silent repair for a rule change that forgot its bump — which is
-    // the entire failure mode this gate was built for.
+    // invariant: THE GUARD — a moved row may only be rewritten AFTER the version token has been
+    // bumped.
+    // invariant: so regeneration cannot be the silent repair for a rule change that forgot its
+    // bump, which is the entire failure mode this gate was built for.
     if (!refused.empty())
     {
         std::string detail;
