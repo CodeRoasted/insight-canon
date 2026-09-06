@@ -3075,6 +3075,45 @@ is what PAYS for excluding the gate, so a false one is not a typo: it is an excl
 coverage that does not exist. Addressee below.
 
 
+### A SECOND reader answered reader A's questionnaire, and the two DISAGREED — the first divergence this programme has measured
+
+Reader A was duplicated by accident: the pilot, believing the lane's reader dead (it was not — see
+the process note at the end of this entry), spawned a second agent on the same 31 questions and the
+same frozen tree. Both answered in full. **That accident bought the first two-reader agreement
+measurement in this run, and it is not a formality: the two disagreed on one question.**
+
+Thirty of thirty-one answers agree, several to the digit — both readers independently returned the
+peel gate's cell-A figures as 21 878 259 equal, 0 mismatches, 0 decline-side violations over
+4 082 logs / 22 490 937 lines, with the same 523 126 / 17 487 / 72 065 partition.
+
+**They split on the two composition helpers in `test_github_outcome.cpp`.** Reader A₁ said swapping
+them at that call site is mechanically a **silent no-op**, and that the MIRROR swap — handing a
+fresh composition where the stream view belongs — is the one that bites. Reader A₂ said the swap is
+a silent no-op *and then* that the token would fail to map, rung 1 would fall through to the console
+tail, and a GHA verdict would silently stop being read. Those cannot both be true, and A₂'s two
+halves contradict each other.
+
+**Resolved at the artifact, not by preferring a reader.** `ComposedSemantics::for_stream` copies the
+UNFILTERED row tables forward into every view it builds (`out.all_outcome_tokens_ =
+all_outcome_tokens_`), and `map_outcome_token_in` re-derives through `for_stream` from those tables.
+So a view of a view yields the identical row set: **A₁ is right, A₂'s second half is false**, and the
+`assert:` this conversion wrote at the site — *"handing it an already-filtered view is a silent
+no-op, which is why these are two named helpers"* — is correct as written. Scored **reader-wrong**,
+not a conviction: the reader contradicted the tree, the tree did not mislead about its own line.
+
+**But the tree DID supply the misreading, one file away, and that is the finding.** The declaration
+comment on `map_outcome_token_in` in `core/api/canon.cppm` packs two opposite failure directions
+into one sentence — *"passing a stream view is a silent no-op rather than an error: a view has
+already been filtered, and a FRESH composition is the doubly-Unspecified view in which every
+concretely-gated row is already dropped"*. The dropping clause describes the **fresh-composition**
+case; A₂ attached it to the **stream-view** case and inverted the conclusion. One reader of two took
+it the wrong way round. That file is UNCONVERTED and is a later unit's subject: **a lead recorded
+for the `core/api/canon.cppm` unit**, where the two directions want two lines rather than one.
+
+A₂ also disclosed a procedural slip of its own, unprompted: one recursive search carried a single
+exclusion glob rather than all five. No excluded path appeared in its results. Both readers, and A₂
+here, disclosed without being caught, which remains the only reason any of this is on the record.
+
 ### Dispositions
 
 Nothing was not-recovered and nothing was wrong, so no claim needed a home above the comment rung
