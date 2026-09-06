@@ -214,7 +214,7 @@ namespace
                                            std::span<const std::string_view> declared)
     {
         std::cerr
-            << "FATAL: insight::semantic::ComposedSemantics::for_channel — unknown IntentChannel \""
+            << "FATAL: insight::semantic::ComposedSemantics::for_stream — unknown IntentChannel \""
             << declared_channel << "\". The composed packages declare: ";
         if (declared.empty())
             std::cerr << "<none>";
