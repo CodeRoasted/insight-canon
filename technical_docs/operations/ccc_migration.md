@@ -1745,7 +1745,8 @@ expands a logging macro.
 
 ## What the third run cost in slot contention, measured
 
-**19 minutes blocked across three waits, for about 7 minutes of slot held**, against three sibling
+**15 minutes 20 seconds blocked across three polling waits (240 s + 240 s + 440 s), for about 8
+minutes of slot held between acquire and release**, against three sibling
 CCC lanes (`insight-eidos`, `insight-metalog`, `coderoast-server`) live on the same global slot. The
 lane acquired only around a `malf test` pair and released immediately with the token each time, which
 is `OPS-8.S1.1` as the pilot amended it and verdict finding 13 as this ledger argued it.
