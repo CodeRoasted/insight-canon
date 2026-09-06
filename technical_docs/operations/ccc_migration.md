@@ -6092,6 +6092,121 @@ baseline's own shape). Plus this directory's **3 of 3** corpus cases on both too
 full slice, and the whole-workspace corpus job at **8 of 8 gates run and passed** — none of which
 the 809 covers, and all of which this unit needed.
 
+## Unit 27 — `core/tests/strategy/` (5 files, 727 comment lines, 723 would-be violations) — a carried claim that went stale under a landed change, and the arm it describes is MEASURABLY VACUOUS
+
+The per-strategy suites for the nineteen format strategies, the compound-key shape suite, the OTEL
+span-unpack suite, the ordinal field-route suite, and the corpus-labelled LogHub projection pin
+gate. Baseline split: bare 606 · ruler 62 · spacer 37 · trailing 18. After: **646 comment lines, 0
+would-be violations** — `invariant` 340 · `refs` 39 · 263 continuations · 4 tool forms.
+Repo-level delta **2 898 → 2 175 = exactly 723**. No law block; the next free law integer is
+still 17.
+
+### The stripper cross-check is VACUOUS for the third consecutive unit
+
+Removed **723**, kept 4 — all namespace closers. No suppression of any kind in this unit, so there
+is no kept violation class to subtract and the identity degenerates to `removed == violations`.
+Recorded as vacuous, exactly as in units 25 and 26. The repo-wide `trailing-nolint` 2 and
+`suppression-without-why` 4 were unchanged by this unit and belong to directories not yet converted.
+
+### CONVICTION — the arm that pins a level scan past a stamp no longer discriminates, and that is a MEASUREMENT rather than a reading
+
+Reader A answered the two questions about `InfersTheLevelPastAStampThatSpendsTheLeadingHead`
+correctly and then reported, at medium confidence and explicitly as an inference, that the constant
+the prose names does not exist: the file says the level word sits *"past the 40-byte leading head, so
+a byte-0 scan cannot reach it in stage 1"*, and stage 1's `kLeadingScanHead{40}` was retired in
+favour of a TOKEN budget, `kLeadingScanTokens{8}`.
+
+**Checked at the artifact, and the reader is right on the constant.** No 40-byte head exists in the
+tree; the measurement tool beside it carries its own note that the constant it quotes is retired.
+Stage 2's 128-byte cue head does still exist, and the strategy's own source already states the
+current mechanism correctly — the stale sentence was carried in the TEST, not in the code it
+exercises.
+
+**Then the sharper question, which the reader did not ask and which reading cannot answer.** If the
+stage-1 budget counts TOKENS and the stamp costs exactly one, the level word sits at token 3 of the
+whole line, so a byte-0 scan reaches it — and the arm's closing claim that *"scanning content instead
+of the post-stamp remainder reds the level assert"* may itself be false. That is a question about
+what the binary does, so it was MEASURED rather than reasoned:
+
+* The mutation was applied at the call site — the post-stamp remainder replaced by the whole line —
+  and the arm stayed **GREEN**.
+* The whole default population stayed green too: **734 of 734**.
+* The mutation was then reverted, and the revert verified bit-for-bit by an empty `git status` and
+  an empty `git diff` on that file.
+
+**So the mechanism the ruling calls load-bearing is today guarded by NOTHING, and the arm that was
+built to guard it stopped discriminating silently when the budget changed from bytes to tokens.**
+This is the `OPS-8.O3` *world moved* class in its most expensive form: not a sentence that reads
+wrong, but a sentence whose falseness concealed a hole in coverage. A reader of the old comment
+would have concluded the mechanism was tested.
+
+The conversion does NOT restate the false claim. The comment now records what the arm was built for,
+what changed under it, the measurement, and the exact repair — a fixture carrying EIGHT non-level
+tokens before the level word, since the walk stops after eight unknown ones, which would leave the
+level unreachable from the line start and still reachable from the remainder. **The repair itself is
+a code change and is out of scope for a comment-only pass; it lands as its own commit.** One residue
+is named rather than hidden: the assertion's own failure TEXT still states the retired 40-byte head,
+and a string literal is code.
+
+### The anchor audit caught a claim that was simply wrong about its own test
+
+Printing every block's resolved anchor beside its first claim, one row read
+`EXPECT_FALSE(result.value().content.empty());` against a claim about *"no known key"*. Opened at the
+artifact: the test is `FallsBackToJSONDumpWhenNoMessageKey` — the fallback is keyed on the MESSAGE
+key, not on any known key, and a sibling test three hundred lines away is the no-known-key case. The
+claim was corrected before placement. `anchor_collide.py` flags nothing here, and this is the fourth
+consecutive unit in which reading that table found something no instrument did.
+
+### METHOD FINDING — mechanical claim-splitting produces ungrammatical fragments, and the budget gate cannot see them
+
+This unit's claims overran the two-line contract-form budget 25 times, so the splits were made
+programmatically at sentence boundaries and re-checked by the gate. **The gate went green on text
+that was not English.** Splitting at `, which ` and `: ` left dangling relative clauses and claims
+opening mid-sentence — *"invariant: is what the ruling asked for"*, *"invariant: is the same door the
+shipping ingest uses"*, *"invariant: with 999 of every 1000 role-less records returning an empty
+marker"*. Ten were repaired by hand after a scan for suspect openings; the same scan run over unit
+28's drafts found one.
+
+**The lesson is about what the grammar gate measures.** It counts lines, tags and budgets — it has no
+opinion on whether a claim is a sentence, so an automated split can satisfy every mechanical witness
+while degrading exactly the thing the conversion exists to preserve. A cold reader would have caught
+these as convictions; catching them before the reader is cheaper, and the check is a one-line scan
+for claims opening with a verb or a conjunction.
+
+### The address census, both legs
+
+**Outbound: ZERO lost across all five files**, exit 0 — 6 addresses unchanged in the compound-key
+suite, 4 in the pin gate, 1 in the ordinal suite. Two ADDED, `ADR-29.D2` in the span-unpack suite and
+`DN-43.D3` in the strategy suite, each a rule the prose had named in words only.
+
+**Inbound: 2 mentions, both opened and both clean.** The tokenizer suite's prose relies on the
+span-unpack suite covering the unpacker in isolation, which the conversion preserved; and a strategy
+source cites this directory's largest file by file address, which still resolves.
+
+### The cold reader (`OPS-8.S8`) — 60 questions, 60 recovered, ONE conviction
+
+Reader A took the strategy and compound-key suites; reader B the pin gate, the span-unpack suite and
+the ordinal suite. `GIT COMMANDS RUN: none` and `EXCLUDED PATHS SEEN: none` from both.
+
+| reader | questions | recovered | convictions |
+|---|---|---|---|
+| A — the nineteen strategies, and compound-key shape resolution | 30 | 30 | 1 |
+| B — the LogHub projection pin gate, span unpack, ordinal fields | 30 | 30 | 0 |
+
+Reader B produced no conviction and went well past its questions, corroborating several claims at
+their implementation sites — the rate-limit constant, the warning-stream cadence that makes the
+counter unrecoverable from logs, and the two peel doors' asymmetry. That is the pattern unit 25
+recorded: the material that convicts is prose making external measurements about the world, and this
+unit's one conviction is exactly such a claim — a named constant in another file.
+
+### The behaviour witness
+
+`malf test insight-canon` on **both** toolchains after the mutation was reverted and the repairs
+landed: **809 of 809** on `linux-clang21-libcxx-release` and **809 of 809** on `linux-gcc16-release`,
+equal to the pre-unit baseline. This directory also holds the third corpus-labelled suite, which the
+809 does not cover: the LogHub projection pin gate was run explicitly with the pinned corpus mounted
+and passes **1 of 1 on both toolchains**.
+
 
 
 

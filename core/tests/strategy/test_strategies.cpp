@@ -1,28 +1,14 @@
-// Unit tests: allow short identifiers and test-specific patterns
-// tests/strategy/test_strategies.cpp
-//
-// Unit tests for the nineteen IFormatStrategy implementations:
-//   SyslogStrategy, JsonStrategy, KVStrategy, CLFStrategy,
-//   Log4jStrategy, SparkHDFSStrategy, BGLStrategy, AndroidLogcatStrategy,
-//   ApacheErrorLogStrategy, WindowsCBSStrategy, HealthAppStrategy,
-//   ProxifierStrategy, HPCStrategy, NginxErrorStrategy, RFC5424Strategy,
-//   IISW3CStrategy, CloudWatchStrategy, SystemdJournalStrategy, RawTextStrategy.
-//
-// Layout: per-strategy TEST_F sections carry the strategy-specific claims (happy-path
-// field extraction, edge cases, per-format confidence shapes). The four cross-strategy
-// claim families that were once copy-pasted per strategy live at the END of the file as
-// value-parameterized suites over one descriptor table (see "Table-driven families").
 
+// invariant: the per-strategy unit suites for the nineteen format strategies.
+// invariant: LAYOUT — each strategy's own section carries its strategy-specific claims.
+// invariant: the four cross-strategy claim families, once copy-pasted per strategy, live at the END
+// as value-parameterized suites over ONE descriptor table.
 #include <gtest/gtest.h>
 
 import insight.canon.test;
 
 using namespace insight;
 using namespace insight::tokenization;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Test data
-// ─────────────────────────────────────────────────────────────────────────────
 
 static constexpr std::string_view kBSDLine =
     "Jan 15 08:03:22 myhost sshd[1234]: Accepted password for alice from "
@@ -51,10 +37,6 @@ static constexpr std::string_view kCombinedLine{
 
 static constexpr std::string_view kCLF5xx{
     R"(10.0.0.1 - - [01/Jan/2024:00:00:01 +0000] "GET /crash HTTP/1.1" 500 0)"};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SyslogStrategy
-// ─────────────────────────────────────────────────────────────────────────────
 
 class SyslogStrategyTest : public ::testing::Test
 {
@@ -122,10 +104,6 @@ TEST_F(SyslogStrategyTest, ConfidenceZeroForCLF)
     EXPECT_EQ(strategy.confidence(kCLFLine), 0.0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// JsonStrategy
-// ─────────────────────────────────────────────────────────────────────────────
-
 class JsonStrategyTest : public ::testing::Test
 {
   protected:
@@ -159,14 +137,17 @@ TEST_F(JsonStrategyTest, FallsBackToJSONDumpWhenNoMessageKey)
 {
     auto result{strategy.parse(kJSONNoMsg, arena)};
     ASSERT_TRUE(result.has_value());
-    // Content should be the re-serialised JSON (non-empty).
+    // invariant: content falls back to the re-serialised JSON when the record carries no MESSAGE
+    // key.
     EXPECT_FALSE(result.value().content.empty());
 }
 
-// ── SRC-D-MSK-3 — nested-`fields` component/level descent ───────────────────────────
-// App loggers (and LogCraft) nest custom fields under "fields":{…}; the top-level
-// component/level lookups miss, so the cube WHERE axis went blind on JSON. When the
-// top-level lookup misses, descend ONE level into "fields" and read {component, level}.
+// invariant: nested-fields component and level descent — app loggers and LogCraft nest custom
+// fields under a `fields` object.
+// invariant: the top-level lookups therefore missed, and the cube's WHERE axis went blind on JSON.
+// invariant: when the top-level lookup misses, descend ONE level and read component and level
+// there.
+// refs: SRC-D-MSK-3
 TEST_F(JsonStrategyTest, NestedFieldsComponentExtracted)
 {
     auto result{strategy.parse(R"({"msg":"User logged in","fields":{"component":"auth"}})", arena)};
@@ -185,7 +166,8 @@ TEST_F(JsonStrategyTest, NestedFieldsLevelAndComponentExtracted)
     EXPECT_EQ(result.value().component, "db");
 }
 
-// A `source` synonym under "fields" resolves too (kComponentKeys: component/source/logger/…).
+// invariant: a `source` synonym under the nested object resolves too, through the same component
+// key vocabulary.
 TEST_F(JsonStrategyTest, NestedFieldsSourceSynonymExtracted)
 {
     auto result{
@@ -194,8 +176,8 @@ TEST_F(JsonStrategyTest, NestedFieldsSourceSynonymExtracted)
     EXPECT_EQ(result.value().component, "worker-pool");
 }
 
-// The descent is a FALLBACK only — a top-level component is authoritative and a nested
-// one must NOT override it (the fallback fires only when the top-level lookup missed).
+// invariant: the descent is a FALLBACK ONLY — a top-level component is authoritative and a nested
+// one must NOT override it, the fallback firing only when the top-level lookup missed.
 TEST_F(JsonStrategyTest, TopLevelComponentWinsOverNested)
 {
     auto result{strategy.parse(
@@ -236,9 +218,9 @@ TEST_F(JsonStrategyTest, LevelErrorParsed)
     EXPECT_EQ(result.value().level, LogLevel::Error);
 }
 
-// ── OTEL/OTLP ingestion (SRC-D-OTEL-1) ───────────────────────────────────────────
-// One OTLP/JSON LogRecord as the LogCraft producer emits it: nested body.stringValue,
-// numeric severityNumber, top-level traceId(32 hex)/spanId(16 hex)/parentSpanId.
+// invariant: one OTLP JSON log record as the LogCraft producer emits it — nested body string
+// value, numeric severity number, and top-level trace, span and parent span ids.
+// refs: SRC-D-OTEL-1
 static constexpr std::string_view kOtelLine{
     R"({"timeUnixNano":"1705312200000000000","observedTimeUnixNano":"1705312200000000000",)"
     R"("severityNumber":17,"severityText":"ERROR","body":{"stringValue":"GET /api/users -> 500"},)"
@@ -251,37 +233,41 @@ TEST_F(JsonStrategyTest, OtelExtractsTraceContextAndBands)
     auto result{strategy.parse(kOtelLine, arena)};
     ASSERT_TRUE(result.has_value());
     const auto& pl{result.value()};
-    // OTLP timeUnixNano → event-time (without it the pipeline never closes a window). 1.7053122e18
-    // ns = 1705312200 s; round-trip through the parsed Timestamp must recover that epoch second.
+    // invariant: the OTLP time field becomes the EVENT TIME, and without it the pipeline never
+    // closes a window.
+    // invariant: the round trip through the parsed timestamp must recover that epoch second.
     ASSERT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(
         std::chrono::duration_cast<std::chrono::seconds>(pl.timestamp->time_since_epoch()).count(),
         1705312200);
-    // severityNumber 17 → band (17-1)/4 = 4 → Error (declared severity wins).
+    // invariant: the declared severity WINS over anything inferred from the body.
     EXPECT_EQ(pl.level, LogLevel::Error);
-    // body.stringValue becomes the content (the masker templates the message, NOT the raw JSON).
+    // invariant: the body's string value becomes the content, so the masker templates the MESSAGE
+    // and never the raw JSON.
     EXPECT_EQ(pl.content, "GET /api/users -> 500");
-    // Trace context consumed; trace_id is the non-zero hash of the OTEL hex.
+    // invariant: the trace context is consumed, and the trace id is the NON-ZERO hash of the OTEL
+    // hex.
     EXPECT_TRUE(pl.trace.present);
     EXPECT_EQ(pl.trace.trace_id, trace_id_from_hex("0123456789abcdeffedcba9876543210"));
     EXPECT_NE(pl.trace.trace_id.value, 0U);
     EXPECT_EQ(pl.trace.span_id, span_id_from_hex("00000000000000ff"));
     EXPECT_TRUE(pl.trace.has_parent);
     EXPECT_EQ(pl.trace.parent_span_id, span_id_from_hex("0000000000000001"));
-    // OR1: the high-card trace ids are DROPPED from the content (never tokenized).
+    // invariant: the high-cardinality trace ids are DROPPED from the content and never tokenized.
     EXPECT_EQ(pl.content.find("0123456789"), std::string_view::npos);
     EXPECT_EQ(pl.content.find("traceId"), std::string_view::npos);
 }
 
 TEST_F(JsonStrategyTest, OtelRootSpanHasNoParent)
 {
-    // No parentSpanId → root span. Still OTEL (severityNumber + traceId present).
+    // invariant: no parent span id means a ROOT span, and the record is still OTEL because the
+    // severity number and trace id are present.
     auto result{strategy.parse(
         R"({"severityNumber":9,"body":{"stringValue":"root step"},"traceId":"aa","spanId":"bb"})",
         arena)};
     ASSERT_TRUE(result.has_value());
     const auto& pl{result.value()};
-    EXPECT_EQ(pl.level, LogLevel::Info); // 9 → band 2 → Info
+    EXPECT_EQ(pl.level, LogLevel::Info);
     EXPECT_TRUE(pl.trace.present);
     EXPECT_FALSE(pl.trace.has_parent);
     EXPECT_EQ(pl.trace.parent_span_id.value, 0U);
@@ -290,16 +276,17 @@ TEST_F(JsonStrategyTest, OtelRootSpanHasNoParent)
 
 TEST_F(JsonStrategyTest, NonOtelJsonHasNoTraceContext)
 {
-    // A plain JSON log carries no trace context — present == false (the byte-identity basis).
+    // invariant: a plain JSON log carries no trace context, which is the byte-identity basis for
+    // everything above.
     auto result{strategy.parse(kJSONLine, arena)};
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result.value().trace.present);
     EXPECT_EQ(result.value().trace.trace_id.value, 0U);
 }
 
-// ── OTEL span ingestion (D-OTEL-10 shape 2 / SRC-D-OTEL-18) ──────────────────────────────────────
-// The canonical flat-span record the lab emits (name / start+end times / status / service.name),
-// distinct from the OTLP log record above. Detected by the span-specific startTimeUnixNano key.
+// invariant: the canonical FLAT-SPAN record the lab emits, distinct from the OTLP log record above
+// and detected by the span-specific start-time key.
+// refs: SRC-D-OTEL-18
 static constexpr std::string_view kSpanLine{
     R"({"traceId":"0123456789abcdeffedcba9876543210","spanId":"00000000000000ff",)"
     R"("parentSpanId":"0000000000000001","name":"checkout","kind":"SPAN_KIND_INTERNAL",)"
@@ -314,34 +301,37 @@ TEST_F(JsonStrategyTest, OtelSpanMapsAllFields)
     ASSERT_TRUE(result.has_value());
     const auto& pl{result.value()};
 
-    // startTimeUnixNano → event time (a span is a POINT event at its start — D-OTEL-10).
+    // invariant: the span's START time is the event time, because a span is a POINT event at its
+    // start.
     ASSERT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(
         std::chrono::duration_cast<std::chrono::seconds>(pl.timestamp->time_since_epoch()).count(),
         1705312200);
-    // name → content (the templated operation, NOT the raw JSON); status UNSET → Info (declared).
+    // invariant: the span NAME becomes the content — the templated operation, not the raw JSON
+    // — and an unset status is a DECLARED level rather than an inferred one.
     EXPECT_EQ(pl.content, "checkout");
     EXPECT_EQ(pl.level, LogLevel::Info);
-    // service.name (from attributes[]) → component (the WHERE tier).
+    // invariant: the service name from the attributes becomes the component, which is the WHERE
+    // tier.
     EXPECT_EQ(pl.component, "api-gateway");
-    // Consumed trace context (same hashing as the log path).
+    // invariant: the trace context is consumed with the SAME hashing as the log path.
     EXPECT_TRUE(pl.trace.present);
     EXPECT_EQ(pl.trace.trace_id, trace_id_from_hex("0123456789abcdeffedcba9876543210"));
     EXPECT_EQ(pl.trace.span_id, span_id_from_hex("00000000000000ff"));
     EXPECT_TRUE(pl.trace.has_parent);
     EXPECT_EQ(pl.trace.parent_span_id, span_id_from_hex("0000000000000001"));
-    // end − start → the span_duration_ns ordinal on the DurationLog2Ns ladder (SRC-D-OTEL-12).
+    // invariant: end minus start becomes the span-duration ordinal on the declared duration ladder.
+    // refs: SRC-D-OTEL-12
     ASSERT_EQ(pl.ordinals.size(), 1U);
     EXPECT_EQ(pl.ordinals[0].field_name, "span_duration_ns");
     EXPECT_EQ(pl.ordinals[0].schedule, OrdinalSchedule::DurationLog2Ns);
-    EXPECT_EQ(pl.ordinals[0].value, 500000); // 1705312200000500000 − 1705312200000000000
-    // OR1: the high-card trace ids never enter the content.
+    EXPECT_EQ(pl.ordinals[0].value, 500000);
     EXPECT_EQ(pl.content.find("0123456789"), std::string_view::npos);
 }
 
 TEST_F(JsonStrategyTest, OtelSpanErrorStatusLiftsLevel)
 {
-    // status STATUS_CODE_ERROR → Error (declared > inferred).
+    // invariant: a declared error status outranks anything inferred.
     auto result{strategy.parse(
         R"({"traceId":"aa","spanId":"bb","name":"db_query","startTimeUnixNano":"1705312200000000000",)"
         R"("endTimeUnixNano":"1705312200000000000","status":{"code":"STATUS_CODE_ERROR"},)"
@@ -352,14 +342,13 @@ TEST_F(JsonStrategyTest, OtelSpanErrorStatusLiftsLevel)
     EXPECT_EQ(pl.level, LogLevel::Error);
     EXPECT_EQ(pl.content, "db_query");
     EXPECT_EQ(pl.component, "db");
-    // Zero-duration span (start == end) → the smallest bin, never negative.
+    // invariant: a zero-duration span lands in the smallest bin and is NEVER negative.
     ASSERT_EQ(pl.ordinals.size(), 1U);
     EXPECT_EQ(pl.ordinals[0].value, 0);
 }
 
 TEST_F(JsonStrategyTest, OtelSpanRootHasNoParent)
 {
-    // No parentSpanId → a root span.
     auto result{strategy.parse(
         R"({"traceId":"aa","spanId":"bb","name":"root","startTimeUnixNano":"1705312200000000000",)"
         R"("endTimeUnixNano":"1705312200000010000","status":{"code":"STATUS_CODE_UNSET"},)"
@@ -380,7 +369,8 @@ TEST_F(JsonStrategyTest, OtelSeverityNumberBands)
         int severity_number;
         LogLevel expected;
     };
-    // (n-1)/4 banding across the 6 levels, with clamps at both ends.
+    // invariant: the severity band is computed as one sixth of the declared number, with CLAMPS at
+    // both ends, and the table drives every band rather than sampling one.
     const std::vector<Case> cases{
         {1, LogLevel::Trace}, {4, LogLevel::Trace},  {5, LogLevel::Debug},  {9, LogLevel::Info},
         {13, LogLevel::Warn}, {17, LogLevel::Error}, {21, LogLevel::Fatal}, {24, LogLevel::Fatal},
@@ -397,10 +387,6 @@ TEST_F(JsonStrategyTest, OtelSeverityNumberBands)
             << " got=" << to_string(result.value().level.value());
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// KVStrategy
-// ─────────────────────────────────────────────────────────────────────────────
 
 class KVStrategyTest : public ::testing::Test
 {
@@ -457,10 +443,6 @@ TEST_F(KVStrategyTest, ConfidenceZeroForJSON)
     EXPECT_LT(strategy.confidence(kJSONLine), 0.5);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CLFStrategy
-// ─────────────────────────────────────────────────────────────────────────────
-
 class CLFStrategyTest : public ::testing::Test
 {
   protected:
@@ -475,9 +457,11 @@ TEST_F(CLFStrategyTest, ParsesCommonLogFormat)
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.level, LogLevel::Info);
-    // DN-43.D8: the client IP is a NODE IDENTITY, so it lands in `host`, and `component` states —
-    // positively — that this layout declares no functional source. Both halves are asserted: an
-    // arm that only checked `component` would pass on a strategy that simply dropped the address.
+    // invariant: the client IP is a NODE IDENTITY so it lands in host, and component states —
+    // POSITIVELY — that this layout declares no functional source.
+    // invariant: BOTH halves are asserted, because an arm that only checked component would pass on
+    // a strategy that simply dropped the address.
+    // refs: DN-43.D8
     EXPECT_EQ(pl.host, "127.0.0.1");
     EXPECT_TRUE(pl.component.empty()) << "component = \"" << pl.component << "\"";
     EXPECT_NE(pl.content.find("GET"), std::string::npos);
@@ -489,7 +473,6 @@ TEST_F(CLFStrategyTest, ParsesCombinedLogFormat)
     auto result{strategy.parse(kCombinedLine, arena)};
     ASSERT_TRUE(result.has_value());
     const auto& pl{result.value()};
-    // 401 Unauthorized → Warn
     EXPECT_EQ(pl.level, LogLevel::Warn);
     EXPECT_NE(pl.content.find("POST"), std::string::npos);
     EXPECT_NE(pl.content.find("401"), std::string::npos);
@@ -552,6 +535,8 @@ TEST_F(CLFStrategyTest, ConfidenceZeroForKVLine)
 
 TEST_F(CLFStrategyTest, Status3xxMapsToInfo)
 {
+    // invariant: a dash is a VALID response body size, meaning no body was sent, so this fixture is
+    // a real shape and not a malformed one.
     auto result{strategy.parse(
         R"(127.0.0.1 - - [15/Jan/2024:10:30:00 +0000] "GET /old-path HTTP/1.1" 301 0)", arena)};
     ASSERT_TRUE(result.has_value());
@@ -560,20 +545,16 @@ TEST_F(CLFStrategyTest, Status3xxMapsToInfo)
 
 TEST_F(CLFStrategyTest, DashBodySizeIsParsed)
 {
-    // "-" is valid for response body size (no body sent, e.g. HEAD or 204).
     auto result{strategy.parse(
         R"(127.0.0.1 - - [15/Jan/2024:10:30:00 +0000] "HEAD /api/ping HTTP/1.1" 204 -)", arena)};
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value().level, LogLevel::Info); // 2xx → Info
+    EXPECT_EQ(result.value().level, LogLevel::Info);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SyslogStrategy — additional edge cases
-// ─────────────────────────────────────────────────────────────────────────────
 
 TEST_F(SyslogStrategyTest, ParsesBSDLineWithSingleDigitDay)
 {
-    // BSD syslog uses space-padded single-digit days: "Jan  1" (two spaces).
+    // invariant: BSD syslog uses SPACE-PADDED single-digit days, which is why this fixture carries
+    // two spaces.
     auto result{strategy.parse("Jan  1 08:03:22 host sshd[1]: service started", arena)};
     ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result.value().timestamp.has_value());
@@ -583,7 +564,8 @@ TEST_F(SyslogStrategyTest, ParsesBSDLineWithSingleDigitDay)
 
 TEST_F(SyslogStrategyTest, TruncatedSyslogReturnsError)
 {
-    // A line that only starts with a month abbreviation but has no host/message.
+    // invariant: a line that only starts with a month abbreviation, with no host and no message,
+    // must not be claimed.
     auto result{strategy.parse("Jan 15", arena)};
     EXPECT_FALSE(result.has_value());
 }
@@ -593,14 +575,11 @@ TEST_F(SyslogStrategyTest, ConfidenceZeroForKVLine)
     EXPECT_EQ(strategy.confidence(kKVLine), 0.0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SyslogStrategy — the CLAIM is the header, not the prefix (DN-43.D1/D3)
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Clause 1. A level word standing where a hostname belongs is the mechanism that produced the
-// published all-INFO window: `(void)sv_take_token` ate `INFO` as a host and the level was never
-// read. The assertion is on `confidence()`, not on `parse()` — the gate is what routes, and a
-// parse-only guard would drop the line instead of re-routing it.
+// invariant: A LEVEL WORD STANDING WHERE A HOSTNAME BELONGS is the mechanism that produced the
+// published all-INFO window — the host take ate the level word and the level was never read.
+// invariant: the assertion is on CONFIDENCE and not on parse, because the gate is what ROUTES and a
+// parse-only guard would DROP the line instead of re-routing it.
+// refs: DN-43.D1, DN-43.D3
 TEST_F(SyslogStrategyTest, ClaimsNothingWhenTheHostSlotHoldsALevelWord)
 {
     for (const std::string_view line :
@@ -614,8 +593,8 @@ TEST_F(SyslogStrategyTest, ClaimsNothingWhenTheHostSlotHoldsALevelWord)
     }
 }
 
-// The opposite direction, and it is what keeps the arm above from being satisfiable by a bare
-// rejection of the whole RFC-3339 shape: a genuine RFC-3339 SYSLOG line still scores.
+// invariant: the opposite direction, and it is what keeps the arm above from being satisfiable by a
+// bare rejection of the whole stamped shape — a genuine stamped SYSLOG line still scores.
 TEST_F(SyslogStrategyTest, StillClaimsARealRfc3339SyslogLine)
 {
     constexpr std::string_view line{"2026-05-31T08:00:01Z web01 nginx[2451]: GET /api/users 200"};
@@ -626,9 +605,10 @@ TEST_F(SyslogStrategyTest, StillClaimsARealRfc3339SyslogLine)
     EXPECT_EQ(result.value().content, "GET /api/users 200");
 }
 
-// Clause 2. The tag search is bounded to ONE token, so a stray colon deeper in the message can no
-// longer terminate it — the defect that made `cache key=session:1021 hit=true` yield the component
-// `cache key=session` and the content `1021 hit=true`.
+// invariant: the tag search is bounded to ONE token, so a stray colon deeper in the message can no
+// longer terminate it.
+// invariant: that defect published a key fragment as the component and the remainder as the
+// content.
 TEST_F(SyslogStrategyTest, TagSearchIsBoundedToOneTokenSoAStrayColonCannotSplitTheMessage)
 {
     constexpr std::string_view line{
@@ -639,16 +619,17 @@ TEST_F(SyslogStrategyTest, TagSearchIsBoundedToOneTokenSoAStrayColonCannotSplitT
     EXPECT_EQ(result.value().content, "cache key=session:1021 hit=true");
 }
 
-// A colon INSIDE the `[…]` pair is not a tag colon: `sshd[12:34]` alone does not qualify.
+// invariant: a colon INSIDE the bracket pair is not a tag colon.
 TEST_F(SyslogStrategyTest, ClaimsNothingWhenTheOnlyColonIsInsideTheBracketPair)
 {
     constexpr std::string_view line{"Jan 15 08:03:22 web01 sshd[12:34] connection closed"};
     EXPECT_EQ(strategy.confidence(line), 0.0);
 }
 
-// DN-43.D5: both branches infer the level FROM THE MESSAGE BODY, in the `inferred` species. The BSD
-// arm is asserted here because it is the one the old suite could not see — its only level assertion
-// used a body with no level and no cue, so it held before and after.
+// invariant: BOTH branches infer the level from the message BODY, in the inferred species.
+// invariant: the BSD arm is asserted here because it is the one the old suite could not see — its
+// only level assertion used a body with no level and no cue, so it held before and after.
+// refs: DN-43.D5
 TEST_F(SyslogStrategyTest, InfersTheLevelFromTheBodyOnBothBranches)
 {
     auto bsd{
@@ -663,10 +644,6 @@ TEST_F(SyslogStrategyTest, InfersTheLevelFromTheBodyOnBothBranches)
     EXPECT_FALSE(rfc.value().level.is_declared());
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Rfc3339TextStrategy — the LAYOUT split (DN-43.D4)
-// ─────────────────────────────────────────────────────────────────────────────
-
 static constexpr std::string_view kRfc3339AppLine{
     "2026-05-31T08:00:01Z INFO request method=GET path=/api/users/1000 status=200"};
 
@@ -677,12 +654,15 @@ class Rfc3339TextStrategyTest : public ::testing::Test
     ArenaAllocator arena{4096};
 };
 
-// The whole slot in one arm, and the name is exact only after DN-43.D12: the stamp is READ (the
-// event time survives — that is what killed bare rejection to raw text) and its BYTES ARE KEPT, so
-// `content` is the whole line. Removing them would be the content-side workaround for an absent
-// declaration ADR-23.D5 forbids. The level is still inferred from the POST-STAMP remainder, which
-// is the assertion that separates this disposition from the one that scans `content` from byte 0
-// and loses the level word to the stamp's share of the leading head.
+// invariant: the whole layout slot in one arm — the stamp is READ, so the event time survives,
+// which is what killed bare rejection to raw text.
+// invariant: its BYTES ARE KEPT too, so content is the whole line.
+// invariant: removing those bytes would be the content-side workaround for an absent declaration
+// that is forbidden.
+// invariant: the level is still inferred from the POST-STAMP remainder.
+// invariant: that is the assertion separating this disposition from one that scans content from
+// byte 0 and loses the level word to the stamp's share of the leading head.
+// refs: ADR-23.D5, DN-43.D4, DN-43.D12
 TEST_F(Rfc3339TextStrategyTest, KeepsTheStampAndProjectsTheWholeRemainder)
 {
     const std::string_view line{kRfc3339AppLine};
@@ -701,17 +681,27 @@ TEST_F(Rfc3339TextStrategyTest, KeepsTheStampAndProjectsTheWholeRemainder)
     EXPECT_TRUE(pl.component.empty()) << "component = \"" << pl.component << "\"";
 }
 
-// The level assertion above is satisfiable by a strategy that scans `content` from byte 0, because
-// `INFO` still lands inside the leading head on THAT line — so on its own it is a can't-FAIL arm
-// for the mechanism DN-43.D12 calls load-bearing. This line is the discriminating one, and it took
-// a mutation run to make it so: the stamp plus a bracketed worker tag put the level word at byte
-// 45, past infer_leading_log_level's 40-byte LEADING head, so a byte-0 scan cannot reach it in
-// stage 1. The level must be NON-ALERTING for the arm to discriminate at all — stage 2's cue scan
-// carries a 128-byte head and the words ERROR/FATAL are themselves failure cues, so an alerting
-// level is recovered from byte 0 anyway and the arm goes green under the very mutation it exists to
-// catch (measured: the first draft of this test passed under it). Bound the scan, never the claim
-// (ADR-20). Both mutations red here: removing the stamp's bytes reds the content assert, scanning
-// `content` instead of the post-stamp remainder reds the level assert.
+// invariant: this arm was built to discriminate a byte-0 level scan from a post-stamp one, and it
+// NO LONGER DOES.
+// invariant: it was written when stage 1 carried a 40-byte RAW-BYTE head, under which the level
+// word at byte 45 of the whole line was unreachable and a byte-0 scan read an Unknown level.
+// invariant: stage 1's budget is now a TOKEN count and the stamp costs it exactly ONE token, so the
+// level word sits at token 3 of the whole line and a byte-0 scan reaches it.
+// invariant: MEASURED 2026-09-07 — replacing the post-stamp remainder with the whole line at the
+// call site left this arm GREEN and the whole default suite green at 734 of 734.
+// invariant: so that mechanism is currently guarded by nothing, and the repair is a fixture with
+// EIGHT non-level tokens before the level word, since the walk stops after eight unknown ones.
+// invariant: the level would then be unreachable from the line start and still reachable from the
+// remainder, which is exactly the difference the arm claims to measure.
+// invariant: what the CONTENT assertion pins is unaffected and still real — content is the whole
+// line, stamp bytes included.
+// invariant: THE LEVEL MUST BE NON-ALERTING for any such arm to discriminate at all.
+// invariant: stage 2's cue scan carries a 128-byte head and the alerting words are themselves
+// failure cues, so an alerting level is recovered from byte 0 anyway.
+// invariant: measured — the first draft of this test passed under the very mutation it exists to
+// catch, which is how the non-alerting requirement was found.
+// invariant: bound the scan, never the claim.
+// refs: ADR-20, DN-43.D12
 TEST_F(Rfc3339TextStrategyTest, InfersTheLevelPastAStampThatSpendsTheLeadingHead)
 {
     static constexpr std::string_view kHeadSpendingLine{
@@ -728,8 +718,8 @@ TEST_F(Rfc3339TextStrategyTest, InfersTheLevelPastAStampThatSpendsTheLeadingHead
     EXPECT_FALSE(pl.level.is_declared());
 }
 
-// DISJOINTNESS, from this side. Without it the sticky latch starves one of the two strategies for
-// the rest of the file.
+// invariant: DISJOINTNESS from this side — without it the sticky latch starves one of the two
+// strategies for the rest of the file.
 TEST_F(Rfc3339TextStrategyTest, ClaimsNothingWhenTheSyslogHeaderIsPresent)
 {
     constexpr std::string_view line{"2026-05-31T08:00:01Z web01 nginx[2451]: GET /api/users 200"};
@@ -744,20 +734,16 @@ TEST_F(Rfc3339TextStrategyTest, ClaimsNothingWithoutAnRfc3339Prefix)
     EXPECT_EQ(strategy.confidence("plain build output, no stamp"), 0.0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// JsonStrategy — additional edge cases
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST_F(JsonStrategyTest, MalformedJSONReturnsError)
 {
-    // Truncated object — simdjson rejects the unterminated document.
+    // invariant: a truncated object is rejected by the parser as an unterminated document.
     auto result{strategy.parse(R"({"level":"INFO","message":"not closed)", arena)};
     EXPECT_FALSE(result.has_value());
 }
 
 TEST_F(JsonStrategyTest, EmptyObjectFallbackDump)
 {
-    // Valid JSON, but no known keys — falls back to j.dump() which is "{}".
+    // invariant: valid JSON carrying no known key falls back to the re-serialised document.
     auto result{strategy.parse("{}", arena)};
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result.value().content.empty());
@@ -765,8 +751,8 @@ TEST_F(JsonStrategyTest, EmptyObjectFallbackDump)
 
 TEST_F(JsonStrategyTest, UTF8ContentPreserved)
 {
-    // UTF-8 text including a multibyte sequence and an emoji should pass through
-    // simdjson and end up verbatim in the content field.
+    // invariant: UTF-8 text including a multibyte sequence and an emoji must survive to the content
+    // field VERBATIM.
     auto result{strategy.parse(R"({"msg":"Connexion \u00e9tablie \ud83d\ude80"})", arena)};
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result.value().content.empty());
@@ -774,24 +760,20 @@ TEST_F(JsonStrategyTest, UTF8ContentPreserved)
 
 TEST_F(JsonStrategyTest, ConfidenceZeroForCLFLine)
 {
-    // CLF lines don't start with '{'.
     EXPECT_EQ(strategy.confidence(kCLFLine), 0.0);
 }
 
 TEST_F(JsonStrategyTest, ConfidenceOneForMinimalJSON)
 {
-    // Any line starting with '{' gets confidence 1.0 — format() handles the
-    // parse failure if the content turns out to be invalid JSON.
+    // invariant: any line opening with a brace scores full confidence, and the parse failure is
+    // handled downstream if the content turns out not to be valid JSON.
     EXPECT_EQ(strategy.confidence(R"({"x":1})"), 1.0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// KVStrategy — additional confidence and value edge cases
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST_F(KVStrategyTest, ConfidenceTwoPairsIsModerate)
 {
-    // 2 KV pairs → 0.70 per implementation (> 0.4, < 0.9).
+    // invariant: two pairs score 0.70 in the shipped implementation, which the bracketing
+    // assertions below do not pin.
     double c{strategy.confidence("level=WARN msg=timeout")};
     EXPECT_GT(c, 0.4);
     EXPECT_LT(c, 0.9);
@@ -799,17 +781,17 @@ TEST_F(KVStrategyTest, ConfidenceTwoPairsIsModerate)
 
 TEST_F(KVStrategyTest, ConfidenceOnePairIsLow)
 {
-    // 1 KV pair → 0.30 per implementation (> 0.0, < 0.5).
+    // invariant: one pair scores 0.30 in the shipped implementation.
     double c{strategy.confidence("key=value")};
     EXPECT_GT(c, 0.0);
     EXPECT_LT(c, 0.5);
 }
 
-// Free text with a lone TRAILING pair is not logfmt: KV must decline it (0
-// confidence) so the raw-text fallback keeps the whole message and infers the
-// leading level. Otherwise KV keeps only "order=42" / "host=db" as content,
-// dropping the human-readable text and fragmenting the template per value —
-// which buried the vanished-success signal in Sift's silent-regression demo.
+// invariant: free text with a lone TRAILING pair is not logfmt and must be DECLINED, so the
+// raw-text fallback keeps the whole message and infers the leading level.
+// invariant: otherwise the strategy keeps only the pairs as content, dropping the human-readable
+// text and fragmenting the template per value.
+// invariant: that buried the vanished-success signal in the silent-regression demo.
 TEST_F(KVStrategyTest, ConfidenceZeroForFreeTextWithTrailingPair)
 {
     EXPECT_EQ(strategy.confidence("INFO checkout completed order=42"), 0.0);
@@ -817,9 +799,10 @@ TEST_F(KVStrategyTest, ConfidenceZeroForFreeTextWithTrailingPair)
     EXPECT_EQ(strategy.confidence("retrying payment gateway attempt=3"), 0.0);
 }
 
-// The flip side: a genuine logfmt line OPENS with a pair (here `ts=`) and must
-// still be claimed by KV at high confidence — the gate keys on the lead token,
-// not on the mere presence of free-text-looking values.
+// invariant: the flip side — a genuine logfmt line OPENS with a pair and must still be claimed at
+// high confidence.
+// invariant: so the gate keys on the LEAD TOKEN and not on the mere presence of free-text-looking
+// values.
 TEST_F(KVStrategyTest, ConfidenceHighWhenLeadingPairPresent)
 {
     EXPECT_GT(strategy.confidence(kKVLine), 0.5);
@@ -830,13 +813,12 @@ TEST_F(KVStrategyTest, QuotedValuePreservesInternalSpaces)
 {
     auto result{strategy.parse(R"(level=ERROR msg="failed to connect to host port 443")", arena)};
     ASSERT_TRUE(result.has_value());
-    // The message content should include the full quoted sentence (minus quotes).
     EXPECT_NE(result.value().content.find("failed to connect"), std::string::npos);
 }
 
 TEST_F(KVStrategyTest, UTF8ValuePreserved)
 {
-    // Accented characters in a quoted KV value must pass through unchanged.
+    // invariant: accented characters in a quoted value must pass through unchanged.
     auto result{strategy.parse(R"(level=INFO msg="connexion \u00e9tablie" component=auth)", arena)};
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result.value().content.empty());
@@ -845,9 +827,8 @@ TEST_F(KVStrategyTest, UTF8ValuePreserved)
 
 TEST_F(KVStrategyTest, MultiLineInputHandled)
 {
-    // A string containing a literal newline: RE2 FindAndConsume stops the
-    // unquoted value at the newline (\s) and resumes on the second "line".
-    // Both pairs must be extracted → parse succeeds.
+    // invariant: on a literal newline the regex stops the unquoted value at the whitespace and
+    // resumes on the second line, so BOTH pairs are extracted and the parse succeeds.
     auto result{strategy.parse("key1=val1\nkey2=val2", arena)};
     ASSERT_TRUE(result.has_value()) << result.error();
     EXPECT_FALSE(result.value().content.empty());
@@ -855,35 +836,25 @@ TEST_F(KVStrategyTest, MultiLineInputHandled)
 
 TEST_F(KVStrategyTest, EmptyValueReturnsError)
 {
-    // "key=" has no value chars — the pattern [^\s,;]+ requires ≥1 character.
-    // 0 pairs → parse must return an error, not crash.
+    // invariant: a key with no value characters yields zero pairs, and the parse must return an
+    // ERROR rather than crash.
     auto result{strategy.parse("key=", arena)};
     EXPECT_FALSE(result.has_value());
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SyslogStrategy — out-of-range day
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST_F(SyslogStrategyTest, InvalidDayLineDoesNotCrash)
 {
-    // "Feb 30" does not exist. The BSD regex still matches (it only checks the
-    // shape of the field, not calendar validity); utc_mktime normalises the
-    // date. Parse must succeed without crashing.
+    // invariant: the BSD regex checks only the SHAPE of the date field and not calendar validity.
+    // invariant: the conversion NORMALISES an out-of-range day, so the parse must succeed without
+    // crashing.
     auto result{strategy.parse("Feb 30 12:00:00 myhost proc[1]: msg after invalid day", arena)};
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().content, "msg after invalid day");
-    // Timestamp should be populated (normalised date).
     EXPECT_TRUE(result.value().timestamp.has_value());
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// JsonStrategy — nested objects and top-level arrays
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST_F(JsonStrategyTest, NestedObjectMessageExtracted)
 {
-    // Deep nesting in other keys must not prevent "msg" from being found.
     auto result{strategy.parse(R"({"outer":{"inner":123},"msg":"nested test"})", arena)};
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().content, "nested test");
@@ -891,22 +862,13 @@ TEST_F(JsonStrategyTest, NestedObjectMessageExtracted)
 
 TEST_F(JsonStrategyTest, TopLevelArrayReturnsError)
 {
-    // A JSON array is valid JSON but is not an object.
-    // json.cpp line 43: !j.is_object() → explicit error.
-    // Confidence is also 0 (first char is '[').
     EXPECT_EQ(strategy.confidence(R"([{"msg":"a"}])"), 0.0);
     auto result{strategy.parse(R"([{"msg":"a"},{"msg":"b"}])", arena)};
     EXPECT_FALSE(result.has_value());
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CLFStrategy — non-standard HTTP verbs
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST_F(CLFStrategyTest, NonStandardVerbPatchConfidence)
 {
-    // kStrongCheck uses [A-Z]+ which matches any uppercase verb — PATCH, PUT,
-    // DELETE, OPTIONS, etc.
     constexpr std::string_view line{
         R"(127.0.0.1 - alice [15/Jan/2024:10:30:00 +0000] "PATCH /api/resource HTTP/1.1" 200 512)"};
     EXPECT_GT(strategy.confidence(line), 0.9);
@@ -918,14 +880,10 @@ TEST_F(CLFStrategyTest, NonStandardVerbPatchParsed)
         R"(127.0.0.1 - alice [15/Jan/2024:10:30:00 +0000] "PATCH /api/resource HTTP/1.1" 200 512)"};
     auto result{strategy.parse(line, arena)};
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value().level, LogLevel::Info); // 200 → Info
+    EXPECT_EQ(result.value().level, LogLevel::Info);
     EXPECT_NE(result.value().content.find("PATCH"), std::string::npos);
     EXPECT_NE(result.value().content.find("/api/resource"), std::string::npos);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Log4jStrategy
-// ─────────────────────────────────────────────────────────────────────────────
 
 static constexpr std::string_view kLog4jHadoopLine =
     "2015-10-18 18:01:47,978 INFO [main] "
@@ -984,14 +942,19 @@ TEST_F(Log4jStrategyTest, ParsesOpenStackLine)
     EXPECT_NE(pl.component.find("nova"), std::string::npos);
 }
 
-// PROJECTION TOTALITY on the branch the ProjectionIsTotal family structurally cannot see: that
-// family feeds each strategy its CANONICAL line, and a canonical line always carries the delimiter.
-// The defect is found by DEGRADING the input, never by mutating the code — a colon-less line drove
-// sv_take_until's no-delimiter branch, which returns the WHOLE remainder, so `component` became the
-// message body (high-card free text on the cube's WHERE axis, published unmasked) and `content`
-// became EMPTY (the SHA-256 prefix of the empty string, the universal collision bucket). DN-43
-// repaired this shape at SyslogStrategy by bounding its tag search and called the no-delimiter
-// branch "unreachable"; it was unreachable only from that caller.
+// invariant: PROJECTION TOTALITY on the branch the table-driven family structurally CANNOT see.
+// invariant: that family feeds each strategy its CANONICAL line, and a canonical line always
+// carries the delimiter.
+// invariant: the defect is found by DEGRADING THE INPUT and never by mutating the code.
+// invariant: a colon-less line drove the no-delimiter branch, which returns the WHOLE remainder, so
+// component became the message body.
+// invariant: high-cardinality free text published unmasked on the cube's WHERE axis — and content
+// became EMPTY.
+// invariant: an empty content templates to the digest prefix of the empty string, which is the
+// universal collision bucket.
+// invariant: the earlier repair bounded the tag search at one strategy and called the no-delimiter
+// branch unreachable; it was unreachable only FROM THAT CALLER.
+// refs: DN-43
 TEST_F(Log4jStrategyTest, ColonlessStandardLineNamesNoComponentAndKeepsEveryByte)
 {
     static constexpr std::string_view kNoColon{
@@ -1026,10 +989,6 @@ TEST_F(Log4jStrategyTest, ConfidenceZeroForJSON)
 {
     EXPECT_EQ(strategy.confidence(kJSONLine), 0.0);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SparkHDFSStrategy
-// ─────────────────────────────────────────────────────────────────────────────
 
 static constexpr std::string_view kSparkLine =
     "17/06/09 20:10:40 INFO executor.CoarseGrainedExecutorBackend: "
@@ -1068,8 +1027,9 @@ TEST_F(SparkHDFSStrategyTest, ParsesHDFSLine)
     EXPECT_NE(pl.content.find("PacketResponder"), std::string::npos);
 }
 
-// Both arms, same degraded input, same defect as the Log4j case above — SparkHDFS is the only
-// strategy carrying the shape twice, so both are driven rather than one and an inference.
+// invariant: both arms take the same degraded input and the same defect as the case above.
+// invariant: this strategy is the only one carrying the shape TWICE, so both are driven rather than
+// one and an inference.
 TEST_F(SparkHDFSStrategyTest, ColonlessLinesNameNoComponentAndKeepEveryByte)
 {
     static constexpr std::string_view kSparkNoColon{"17/06/09 20:10:40 INFO shutting down cleanly"};
@@ -1111,10 +1071,6 @@ TEST_F(SparkHDFSStrategyTest, ConfidenceHighForHDFS)
     EXPECT_GT(strategy.confidence(kHDFSLine), 0.5);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BGLStrategy
-// ─────────────────────────────────────────────────────────────────────────────
-
 static constexpr std::string_view kBGLLine =
     "- 1117838570 2005.06.03 R02-M1-N0-C:J12-U11 2005-06-03-15.42.50.675872 "
     "R02-M1-N0-C:J12-U11 RAS KERNEL INFO instruction cache parity error "
@@ -1138,7 +1094,9 @@ TEST_F(BGLStrategyTest, ParsesBGLLine)
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.level, LogLevel::Info);
-    // F3b: component = the low-card subsystem (the cube dim), host = the node identity.
+    // invariant: component is the low-cardinality SUBSYSTEM, which is the cube dimension, and host
+    // is the node identity.
+    // refs: DN-43.D8
     EXPECT_EQ(pl.component, "KERNEL");
     EXPECT_EQ(pl.host, "R02-M1-N0-C:J12-U11");
     EXPECT_NE(pl.content.find("instruction cache parity error"), std::string::npos);
@@ -1150,15 +1108,17 @@ TEST_F(BGLStrategyTest, ParsesThunderbirdLine)
     ASSERT_TRUE(result.has_value()) << result.error();
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
-    // F3b: component = the daemon ([pid] stripped), host = the node; the message is content.
+    // invariant: component is the daemon with its process id stripped, host is the node, and the
+    // message is the content.
     EXPECT_EQ(pl.component, "crond(pam_unix)");
     EXPECT_EQ(pl.host, "dn228");
     EXPECT_NE(pl.content.find("session closed for user root"), std::string::npos);
 }
 
-// F3b: BGL's FACILITY field is RAS or NULL — a NULL-facility line (DISCOVERY etc.) must still
-// yield the subsystem as component (not fall through to the syslog branch and grab a message
-// fragment). The digit-leading secondary timestamp routes it to the BGL branch.
+// invariant: this grammar's facility field is one of two literals, and a NULL-facility line must
+// STILL yield the subsystem as component.
+// invariant: otherwise it falls through to the syslog branch and grabs a message fragment.
+// invariant: the digit-leading secondary timestamp is what routes it to the right branch.
 TEST_F(BGLStrategyTest, ParsesNullFacilityDiscoveryLine)
 {
     static constexpr std::string_view kNullDiscoveryLine =
@@ -1185,13 +1145,16 @@ TEST_F(BGLStrategyTest, ConfidenceHighForBGL)
     EXPECT_GT(strategy.confidence(kThunderbirdLine), 0.5);
 }
 
-// ── The ALERT-LABEL column (DN-43.D14) ───────────────────────────────────────────────────────
-// LogHub's curators prepended an alert-class column to records BGL's RAS system wrote without one.
-// It is the corpus's ANSWER KEY, so the grammar validates it and no projection field carries it:
-// a labelled line must project identically to its `-` twin, or one event class splits by curation.
-
-// `kBGLLine` with the label column set to an alert class and the declared level raised to FATAL —
-// the exact byte shape of 348 398 of the pinned corpus's 348 460 labelled lines.
+// invariant: the ALERT-LABEL column — LogHub's curators prepended an alert-class column to
+// records the RAS system wrote WITHOUT one.
+// invariant: it is the corpus's ANSWER KEY, so the grammar validates it and NO projection field
+// carries it.
+// invariant: a labelled line must project IDENTICALLY to its unlabelled twin, or one event class
+// splits by curation.
+// invariant: the fixture below is the canonical line with the label column set to an alert class
+// and the declared level raised.
+// invariant: that is the exact byte shape of 348 398 of the pinned corpus's 348 460 labelled lines.
+// refs: DN-43.D14
 static constexpr std::string_view kBGLAlertLine =
     "KERNDTLB 1117838570 2005.06.03 R02-M1-N0-C:J12-U11 2005-06-03-15.42.50.675872 "
     "R02-M1-N0-C:J12-U11 RAS KERNEL FATAL data TLB error interrupt";
@@ -1209,8 +1172,8 @@ TEST_F(BGLStrategyTest, ClaimsAnAlertLabelledLineAndReadsItsDeclaredLevel)
     EXPECT_EQ(pl.content, "data TLB error interrupt");
 }
 
-// The label reaches NO field. Asserted per field rather than on the projection as a whole, so a
-// failure names the field that leaked the oracle.
+// invariant: asserted PER FIELD rather than on the projection as a whole, so a failure NAMES the
+// field that leaked the oracle.
 TEST_F(BGLStrategyTest, TheAlertLabelReachesNoProjectionField)
 {
     auto result{strategy.parse(kBGLAlertLine, arena)};
@@ -1222,9 +1185,10 @@ TEST_F(BGLStrategyTest, TheAlertLabelReachesNoProjectionField)
     EXPECT_EQ(pl.host.find("KERNDTLB"), std::string_view::npos) << "host = " << pl.host;
 }
 
-// The second BGL header shape: `<node>` is `-` and the node is NOT repeated, so `<FACILITY>`
-// arrives one token early. 306 lines of the pinned corpus, today mis-parsed to `level` Unknown
-// with `component` = `FATAL` — the field-shift the predicate now refuses to publish.
+// invariant: the SECOND header shape — the node is a dash and is NOT repeated, so the facility
+// arrives one token early.
+// invariant: 306 lines of the pinned corpus, formerly mis-parsed to an Unknown level with the level
+// word published as the component, which is the field-shift the predicate now refuses.
 TEST_F(BGLStrategyTest, ParsesTheSecondHeaderShapeWithNoRepeatedNode)
 {
     static constexpr std::string_view kNoRepeatedNodeLine =
@@ -1239,9 +1203,10 @@ TEST_F(BGLStrategyTest, ParsesTheSecondHeaderShapeWithNoRepeatedNode)
     EXPECT_EQ(pl.content, "data storage interrupt");
 }
 
-// `<node2>` is itself the literal `NULL` on 89 296 pinned-corpus lines. Probing the second header
-// shape first would read that node as the facility and decline every one of them, so the canonical
-// shape is probed first and this line is the detector for that order.
+// invariant: the repeated node is itself the literal NULL on 89 296 pinned-corpus lines, so probing
+// the second header shape FIRST would read that node as the facility and decline every one of them.
+// invariant: the canonical shape is therefore probed first, and this line is the detector for that
+// ORDER.
 TEST_F(BGLStrategyTest, ParsesARecordWhoseRepeatedNodeIsTheLiteralNull)
 {
     static constexpr std::string_view kNullNodeLine =
@@ -1256,9 +1221,10 @@ TEST_F(BGLStrategyTest, ParsesARecordWhoseRepeatedNodeIsTheLiteralNull)
     EXPECT_EQ(pl.content, "ciodb has been restarted.");
 }
 
-// A record whose `<node2>` holds a spliced message fragment instead of a node: the facility is at
-// neither position, so the parse would be off by several fields. It DECLINES — 10 lines of the
-// pinned corpus — rather than publishing a message fragment on the cube's WHERE axis.
+// invariant: a record whose repeated node holds a spliced message fragment has its facility at
+// NEITHER position, so the parse would be off by several fields.
+// invariant: it DECLINES — 10 lines of the pinned corpus — rather than publishing a message
+// fragment on the cube's WHERE axis.
 TEST_F(BGLStrategyTest, DeclinesARecordWhoseFacilityIsAtNeitherPosition)
 {
     static constexpr std::string_view kSplicedLine =
@@ -1268,26 +1234,27 @@ TEST_F(BGLStrategyTest, DeclinesARecordWhoseFacilityIsAtNeitherPosition)
     EXPECT_FALSE(strategy.parse(kSplicedLine, arena).has_value());
 }
 
-// ── `<date>` IS validated, and NOT where the consumption site suggests (DN-43.D15) ───────────
-// DN-43.D15's rule is general and it is not a BGL exception: a grammar field the parse CONSUMES
-// but does not PUBLISH is validated if and only if its value is what proves the record's FIELD
-// ALIGNMENT — never as byte hygiene. Three of BGL's fields are consumed and unpublished, and they
-// do NOT share a verdict:
-//   * `<FACILITY>` is validated — `starts_with_facility` selects between the two RAS header shapes.
-//   * `<node2>` is NOT — the alignment proof sits on the token BEHIND it, so a record whose
-//     `<node2>` holds a binary blob parses, and DN-43.D15 rules it must keep parsing.
-//   * `<date>` IS validated, by a predicate that is nowhere near where it is consumed. The
-//     consumption site is `(void)sv_take_token(rest)` in `scan_bgl_record` and applies nothing;
-//     the predicate ran already, in the FORMAT GATE `is_bgl_labelled_prefix`, which keys the
-//     BGL/Thunderbird grammar on three opening fields — the label, the digit `<epoch>`, and
-//     `<date>`'s exact dotted `YYYY.MM.DD` shape. That is a discriminator, so it is on the
-//     alignment side of DN-43.D15's criterion, not the hygiene side.
-// These two arms are that contrast, and they exist because a reader who checks the verdict at the
-// consumption site reads `<date>` and `<node2>` as the same case and gets one of them backwards.
+// invariant: THE RULE IS GENERAL AND NOT A GRAMMAR EXCEPTION.
+// invariant: a field the parse CONSUMES but does not PUBLISH is validated if and only if its value
+// proves the record's FIELD ALIGNMENT, never as byte hygiene.
+// invariant: three of this grammar's fields are consumed and unpublished, and they do NOT share a
+// verdict.
+// invariant: the FACILITY is validated, because the predicate selects between the two header
+// shapes.
+// invariant: the REPEATED NODE is NOT, because the alignment proof sits on the token BEHIND it, so
+// a record whose repeated node holds a binary blob parses and must keep parsing.
+// invariant: the DATE is validated, by a predicate nowhere near where it is consumed.
+// invariant: the consumption site applies nothing and the predicate already ran in the FORMAT GATE,
+// which keys the grammar on the label, the digit epoch and the date's exact dotted shape.
+// invariant: that is a DISCRIMINATOR, so it sits on the alignment side of the criterion and not the
+// hygiene side.
+// invariant: these two arms are that contrast, and they exist because a reader who checks the
+// verdict at the CONSUMPTION SITE reads the two fields as the same case and gets one backwards.
+// refs: DN-43.D15
 TEST_F(BGLStrategyTest, TheDateFieldIsValidatedByTheFormatGateNotAtItsConsumptionSite)
 {
-    // The canonical line with the third field replaced. Everything else is byte-identical, so a
-    // decline can only be `<date>`'s.
+    // invariant: the canonical line with the third field replaced and everything else
+    // byte-identical, so a decline can only be the date's.
     const std::array<std::pair<std::string_view, std::string_view>, 2> kRejected{{
         {"printable non-date", "not-a-date"},
         {"the right date, the wrong separator", "2005-06-03"},
@@ -1309,8 +1276,8 @@ TEST_F(BGLStrategyTest, TheDateFieldIsValidatedByTheFormatGateNotAtItsConsumptio
                "grammar has lost one of the three fields it discriminates on\n  line: "
             << line;
     }
-    // The same position, a well-formed value: the control, without which the rows above would pass
-    // a strategy that had simply stopped parsing BGL.
+    // invariant: the same position with a well-formed value — the CONTROL, without which the rows
+    // above would pass a strategy that had simply STOPPED PARSING this grammar.
     static constexpr std::string_view kValidDateLine =
         "- 1117838570 2005.06.03 R02-M1-N0-C:J12-U11 2005-06-03-15.42.50.675872 "
         "R02-M1-N0-C:J12-U11 RAS KERNEL INFO instruction cache parity error corrected";
@@ -1321,13 +1288,19 @@ TEST_F(BGLStrategyTest, TheDateFieldIsValidatedByTheFormatGateNotAtItsConsumptio
         << "level = " << to_string(control.value().level.value());
 }
 
-// The other side of DN-43.D15's partition, on the SAME line and one field over: `<node2>` has no
-// predicate anywhere, so a binary blob in it parses and every published field stays true. Eight
-// lines of the pinned BGL corpus are exactly this, and the ruling turns on their still parsing —
-// declining them would move the blob out of a DROPPED field into `RawTextStrategy`'s whole-line
-// `content`, where it becomes a stable template NAME, and would throw away a DECLARED level.
-// The corpus-scale count is `LogHubProjectionPinGate`'s, which needs the corpus mounted; this arm
-// pins the BEHAVIOUR with no corpus at all, so the ruling is not resting on a gate that skips.
+// invariant: the other side of the partition, on the SAME line and one field over.
+// invariant: the repeated node has no predicate anywhere, so a binary blob in it parses and every
+// published field stays true.
+// invariant: eight lines of the pinned corpus are exactly this, and the ruling turns on their STILL
+// PARSING.
+// invariant: declining them would move the blob out of a DROPPED field into the raw-text strategy's
+// whole-line content, where it becomes a stable template NAME.
+// invariant: it would also throw away a DECLARED level.
+// invariant: the corpus-scale count belongs to the projection pin gate, which needs the corpus
+// mounted.
+// invariant: THIS arm pins the behaviour with NO corpus at all, so the ruling is not resting on a
+// gate that skips.
+// refs: DN-43.D15
 TEST_F(BGLStrategyTest, ARecordWhoseUnvalidatedNode2HoldsABinaryBlobStillParsesAndPublishesTruth)
 {
     static const std::string kBlobNodeLine{
@@ -1349,9 +1322,10 @@ TEST_F(BGLStrategyTest, ARecordWhoseUnvalidatedNode2HoldsABinaryBlobStillParsesA
         << "the blob must reach NO published field; content = " << pl.content;
 }
 
-// A complete header with no message. Legitimate (ADR-16.D9 member (a)): the empty template is the
-// correct identity of a content-less line, and the header fields are still published. 34 470 lines
-// of the pinned corpus.
+// invariant: a complete header with no message is LEGITIMATE — the empty template is the correct
+// identity of a content-less line, and the header fields are still published.
+// invariant: 34 470 lines of the pinned corpus.
+// refs: ADR-16.D9
 TEST_F(BGLStrategyTest, AnEmptyBodyProjectsToEmptyContentWithItsHeaderFieldsSet)
 {
     static constexpr std::string_view kEmptyBodyLine =
@@ -1366,9 +1340,10 @@ TEST_F(BGLStrategyTest, AnEmptyBodyProjectsToEmptyContentWithItsHeaderFieldsSet)
     EXPECT_EQ(pl.level, LogLevel::Fatal) << "level = " << to_string(pl.level.value());
 }
 
-// The Thunderbird branch with NO delimited tag. Nothing is removed: the remainder stays content
-// and `component` is empty. 1 309 pinned-corpus lines used to lose their whole body to
-// `component` here, leaving a template that is the SHA-256 of nothing.
+// invariant: the Thunderbird branch with NO delimited tag removes nothing — the remainder stays
+// content and component is empty.
+// invariant: 1 309 pinned-corpus lines used to lose their whole body to component, leaving a
+// template that is the digest of nothing.
 TEST_F(BGLStrategyTest, AThunderbirdLineWithNoDelimitedTagKeepsItsWholeRemainder)
 {
     static constexpr std::string_view kNoTagLine =
@@ -1381,8 +1356,8 @@ TEST_F(BGLStrategyTest, AThunderbirdLineWithNoDelimitedTagKeepsItsWholeRemainder
     EXPECT_EQ(pl.host, "dn228");
 }
 
-// The one-token bound also refuses a multi-token pseudo-tag: `Server Administrator:` is two
-// tokens, so its colon is not a tag delimiter and the whole remainder stays content.
+// invariant: the one-token bound also refuses a MULTI-TOKEN pseudo-tag, so its colon is not a tag
+// delimiter and the whole remainder stays content.
 TEST_F(BGLStrategyTest, AThunderbirdMultiTokenPseudoTagIsNotATag)
 {
     static constexpr std::string_view kPseudoTagLine =
@@ -1394,10 +1369,6 @@ TEST_F(BGLStrategyTest, AThunderbirdMultiTokenPseudoTagIsNotATag)
     EXPECT_TRUE(pl.component.empty()) << "component = " << pl.component;
     EXPECT_EQ(pl.content, "Server Administrator: Instrumentation Service EventID: 1000");
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// AndroidLogcatStrategy
-// ─────────────────────────────────────────────────────────────────────────────
 
 static constexpr std::string_view kAndroidLine =
     "03-17 16:13:38.859  2227  2227 D TextView: visible is "
@@ -1430,6 +1401,8 @@ TEST_F(AndroidLogcatStrategyTest, ParsesInfoLevel)
 
 TEST_F(AndroidLogcatStrategyTest, ParsesErrorLevel)
 {
+    // invariant: this grammar's facility may carry no dot at all, which is why these fixtures
+    // exist.
     auto result{
         strategy.parse("03-17 16:13:38.811  1702  2395 E System: Uncaught exception", arena)};
     ASSERT_TRUE(result.has_value());
@@ -1446,10 +1419,6 @@ TEST_F(AndroidLogcatStrategyTest, ConfidenceHighForLogcat)
 {
     EXPECT_GT(strategy.confidence(kAndroidLine), 0.5);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ApacheErrorLogStrategy
-// ─────────────────────────────────────────────────────────────────────────────
 
 static constexpr std::string_view kApacheErrorLine =
     "[Sun Dec 04 04:47:44 2005] [notice] workerEnv.init() ok "
@@ -1493,10 +1462,6 @@ TEST_F(ApacheErrorLogStrategyTest, ConfidenceHighForApache)
     EXPECT_GT(strategy.confidence(kApacheErrorLine), 0.5);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// WindowsCBSStrategy
-// ─────────────────────────────────────────────────────────────────────────────
-
 static constexpr std::string_view kWindowsCBSLine =
     "2016-09-28 04:30:30, Info                  CBS    Loaded Servicing Stack "
     "v6.1.7601.23505 with Core: "
@@ -1531,10 +1496,6 @@ TEST_F(WindowsCBSStrategyTest, ConfidenceHighForWindows)
     EXPECT_GT(strategy.confidence(kWindowsCBSLine), 0.5);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HealthAppStrategy
-// ─────────────────────────────────────────────────────────────────────────────
-
 static constexpr std::string_view kHealthAppLine{
     "20171223-22:15:29:606|Step_LSC|30002312|onStandStepChanged 3579"};
 
@@ -1565,10 +1526,6 @@ TEST_F(HealthAppStrategyTest, ConfidenceHighForHealthApp)
 {
     EXPECT_GT(strategy.confidence(kHealthAppLine), 0.5);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ProxifierStrategy
-// ─────────────────────────────────────────────────────────────────────────────
 
 static constexpr std::string_view kProxifierLine =
     "[10.30 16:49:06] chrome.exe - proxy.cse.cuhk.edu.hk:5070 open through "
@@ -1611,10 +1568,6 @@ TEST_F(ProxifierStrategyTest, ConfidenceHighForProxifier)
     EXPECT_GT(strategy.confidence(kProxifierLine), 0.5);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HPCStrategy
-// ─────────────────────────────────────────────────────────────────────────────
-
 static constexpr std::string_view kHPCLine =
     "134681 node-246 unix.hw state_change.unavailable 1077804742 1 "
     R"(Component State Change: Component \042alt0\042 is in the unavailable state (HWID=1973))";
@@ -1649,7 +1602,6 @@ TEST_F(HPCStrategyTest, ConfidenceHighForHPC)
 
 TEST_F(HPCStrategyTest, ParsesNonDottedFacility)
 {
-    // HPC lines where facility has no dot (e.g. "action", "node", "gige")
     auto result{
         strategy.parse("437261 node-10 action start 1096995263 1 boot  (command 3169)", arena)};
     ASSERT_TRUE(result.has_value()) << result.error();
@@ -1661,7 +1613,7 @@ TEST_F(HPCStrategyTest, ParsesNonDottedFacility)
 
 TEST_F(HPCStrategyTest, ParsesNonStandardNodeName)
 {
-    // Node names without dash pattern (e.g. "gige7", "full")
+    // invariant: node names without the dash pattern are still claimed.
     auto result{strategy.parse("44937 gige7 gige temperature 1105776193 1 warning", arena)};
     ASSERT_TRUE(result.has_value()) << result.error();
     EXPECT_EQ(result.value().component, "gige.temperature");
@@ -1671,10 +1623,6 @@ TEST_F(HPCStrategyTest, RejectsTooFewFields)
 {
     EXPECT_FALSE(strategy.parse("134681 node-246 unix.hw", arena).has_value());
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// HealthApp — single-digit hour/second timestamps
-// ─────────────────────────────────────────────────────────────────────────────
 
 TEST_F(HealthAppStrategyTest, ParsesSingleDigitHour)
 {
@@ -1701,10 +1649,6 @@ TEST_F(HealthAppStrategyTest, ConfidenceHighForSingleDigitHour)
     EXPECT_GT(strategy.confidence("20171224-0:32:28:806|HiH_|30002312|msg"), 0.5);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// AndroidLogcat — Silent level
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST_F(AndroidLogcatStrategyTest, ParsesSilentLevel)
 {
     auto result{
@@ -1712,10 +1656,6 @@ TEST_F(AndroidLogcatStrategyTest, ParsesSilentLevel)
     ASSERT_TRUE(result.has_value()) << result.error();
     EXPECT_EQ(result.value().level, LogLevel::Trace);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// NginxErrorStrategy
-// ─────────────────────────────────────────────────────────────────────────────
 
 static constexpr std::string_view kNginxErrorLine =
     "2024/03/27 10:15:23 [error] 12345#0: *99 connect() failed "
@@ -1775,10 +1715,6 @@ TEST_F(NginxErrorStrategyTest, RejectsJSONLine)
     EXPECT_FALSE(strategy.parse(kJSONLine, arena).has_value());
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// RFC5424Strategy
-// ─────────────────────────────────────────────────────────────────────────────
-
 static constexpr std::string_view kRFC5424Line{
     "<134>1 2024-01-15T10:30:00.003Z server sshd 1234 ID47 - Accepted password for alice"};
 
@@ -1808,12 +1744,12 @@ TEST_F(RFC5424StrategyTest, ParsesStandardLine)
 
 TEST_F(RFC5424StrategyTest, SeverityMappedFromPRI)
 {
-    // PRI=134 → facility=16, severity=6 → Info
+    // invariant: the priority field decomposes into a facility and a severity, and it is the
+    // SEVERITY that maps to the level.
     auto r1{strategy.parse(kRFC5424Line, arena)};
     ASSERT_TRUE(r1.has_value());
     EXPECT_EQ(r1.value().level, LogLevel::Info);
 
-    // PRI=132 → severity=4 → Warn
     auto r2{strategy.parse(kRFC5424WarnLine, arena)};
     ASSERT_TRUE(r2.has_value());
     EXPECT_EQ(r2.value().level, LogLevel::Warn);
@@ -1830,10 +1766,6 @@ TEST_F(RFC5424StrategyTest, ConfidenceHighForRFC5424)
 {
     EXPECT_GT(strategy.confidence(kRFC5424Line), 0.9);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// IISW3CStrategy
-// ─────────────────────────────────────────────────────────────────────────────
 
 static constexpr std::string_view kIISW3CLine =
     "2024-01-15 10:30:00 W3SVC1 SERVER01 GET /index.html - 80 - 10.0.0.1 "
@@ -1896,10 +1828,6 @@ TEST_F(IISW3CStrategyTest, ConfidenceZeroForComment)
     EXPECT_EQ(strategy.confidence(kIISComment), 0.0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CloudWatchStrategy
-// ─────────────────────────────────────────────────────────────────────────────
-
 static constexpr std::string_view kCloudWatchLine{
     R"({"timestamp":1705312200000,"message":"User login successful","logGroup":"/aws/lambda/myFunc","logStream":"2024/01/15/[$LATEST]abc123"})"};
 
@@ -1946,10 +1874,6 @@ TEST_F(CloudWatchStrategyTest, ConfidenceZeroForPlainJSON)
     EXPECT_EQ(strategy.confidence(kJSONLine), 0.0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SystemdJournalStrategy
-// ─────────────────────────────────────────────────────────────────────────────
-
 static constexpr std::string_view kSystemdJournalLine{
     R"({"__REALTIME_TIMESTAMP":"1705312200000000","PRIORITY":"6","_COMM":"nginx","MESSAGE":"Worker process started","_PID":"1234","_SYSTEMD_UNIT":"nginx.service"})"};
 
@@ -1989,7 +1913,7 @@ TEST_F(SystemdJournalStrategyTest, FallsBackToSyslogIdentifier)
 {
     auto result{strategy.parse(kSystemdJournalUnit, arena)};
     ASSERT_TRUE(result.has_value());
-    // No _COMM, but has SYSLOG_IDENTIFIER
+    // invariant: with no command field present the syslog identifier supplies the component.
     EXPECT_EQ(result.value().component, "dockerd");
     EXPECT_EQ(result.value().level, LogLevel::Error);
 }
@@ -2009,17 +1933,14 @@ TEST_F(SystemdJournalStrategyTest, ConfidenceZeroForPlainJSON)
     EXPECT_EQ(strategy.confidence(kJSONLine), 0.0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// RawTextStrategy — the last-resort catch-all for unstructured application stdout.
-// Re-homes the canon raw-path invariants of insight-playground 09 T2
-// (RawAppStdout.RawPathTemplatesAndInfersLevels): a bare leading level word is lifted
-// (the dominant-level signal that lets Sift/Eidos rank a raw stream), while the prose
-// body is kept WHOLE — no KV-steal, no fabricated WHERE — so it does not fragment the
-// way the structured KV strategy would. These are single-component canon properties;
-// the raw EMISSION format is a LogCraft formatter concern (proven in logcraft), and the
-// end-to-end seam is contract fixture 09 — neither needs the full replay to prove this.
-// ─────────────────────────────────────────────────────────────────────────────
-
+// invariant: the last-resort catch-all for unstructured application stdout.
+// invariant: a bare LEADING level word is lifted — the dominant-level signal that lets the
+// downstream tiers rank a raw stream.
+// invariant: the prose body is kept WHOLE, with no key-value steal and no fabricated WHERE, so it
+// does not fragment the way the structured strategy would.
+// invariant: HOMED HERE because these are single-component canon properties.
+// invariant: the raw EMISSION format is a LogCraft formatter concern proven in that repo, and the
+// end-to-end seam is a contract fixture, so neither needs the full replay to prove this.
 class RawTextStrategyTest : public ::testing::Test
 {
   protected:
@@ -2029,8 +1950,8 @@ class RawTextStrategyTest : public ::testing::Test
 
 TEST_F(RawTextStrategyTest, InfersLeadingErrorLevel)
 {
-    // The error class surfaces with the level inferred from the bare leading word —
-    // only possible because canon took the raw path (no structured level field).
+    // invariant: the error class surfaces with the level inferred from the bare leading word, which
+    // is only possible because canon took the RAW path and there is no structured level field.
     auto result{strategy.parse("ERROR connection refused to db pool", arena)};
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().level, LogLevel::Error);
@@ -2045,10 +1966,10 @@ TEST_F(RawTextStrategyTest, InfersLeadingInfoLevel)
 
 TEST_F(RawTextStrategyTest, KeepsProseWholeNoKvStealNoWhere)
 {
-    // The checkout prose carries a glued, ever-varying order id (order=ORD-<seq>). The
-    // raw strategy must NOT steal it as a KV field or fabricate a component (the
-    // WHERE-RAW boundary): the whole message stays the content (the masker templates it
-    // downstream), so it does not fragment the way the structured KV strategy would.
+    // invariant: the prose carries a glued, ever-varying order id, and the raw strategy must NOT
+    // steal it as a key-value field or fabricate a component — the WHERE-RAW boundary.
+    // invariant: the whole message stays the content for the masker to template downstream, so it
+    // does not fragment the way the structured strategy would.
     static constexpr std::string_view kProse{"checkout completed for order=ORD-4821 in 12 ms"};
     auto result{strategy.parse(kProse, arena)};
     ASSERT_TRUE(result.has_value());
@@ -2060,51 +1981,43 @@ TEST_F(RawTextStrategyTest, KeepsProseWholeNoKvStealNoWhere)
 
 TEST_F(RawTextStrategyTest, LeadingWhitespaceTrimmedForContinuationGrouping)
 {
-    // Indented continuation lines (e.g. traceback frames) left-trim so they group with
-    // their peers — pure pointer arithmetic, no level word ⇒ the default level.
+    // invariant: indented continuation lines such as traceback frames are LEFT-TRIMMED so they
+    // group with their peers, by pure pointer arithmetic.
+    // invariant: with no level word they take the default level.
     auto result{strategy.parse("    at frame in module", arena)};
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.value().content, "at frame in module");
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Table-driven families — the four cross-strategy claim families, folded from
-// per-strategy copy-pasted TEST_F bodies into value-parameterized suites over one
-// descriptor table. Each row records which families covered its strategy BEFORE
-// the fold; the per-family row sets mirror that historical coverage exactly —
-// the fold does not blanket-extend a family to strategies it never covered.
-//
-//   FormatReturns           — format() reports the row's LogFormat tag (all rows)
-//   RawLinePreserved        — parse(canonical line) echoes raw_line verbatim
-//   ProjectionIsTotal       — parse(canonical line) keeps message bytes in `content` (all rows)
-//   RejectsCLFAndKV         — parse() fails on both the CLF and the KV sample
-//   ConfidenceZeroForSyslog — confidence(BSD syslog sample) == 0.0 (RFC5424's
-//                             identical assert was formerly ConfidenceZeroForBSD)
-//
-// `canonical_line` is now populated on EVERY row, which deliberately extends RawLinePreserved to
-// the six strategies that had no row in it. The rule above bars an ACCIDENTAL blanket-extension
-// during a mechanical fold; this one is chosen, and it is what makes ProjectionIsTotal — the
-// ADR-16.D9 design-time half of the invariant — total over every registered strategy rather than
-// over the two branches DN-43 repairs. Each added line is one an existing per-strategy TEST_F
-// already proves that strategy parses.
-// ─────────────────────────────────────────────────────────────────────────────
-
+// invariant: the four cross-strategy claim families, folded from per-strategy copy-pasted bodies
+// into value-parameterized suites over ONE descriptor table.
+// invariant: each row records which families covered its strategy BEFORE the fold, and the
+// per-family row sets MIRROR that historical coverage exactly.
+// invariant: the fold does not blanket-extend a family to strategies it never covered.
+// invariant: the canonical line is now populated on EVERY row, which deliberately extends the
+// raw-line family to the six strategies that had no row in it.
+// invariant: the rule above bars an ACCIDENTAL blanket-extension during a mechanical fold.
+// invariant: this one is CHOSEN, and it is what makes the projection-totality family total over
+// every registered strategy rather than over the two branches one repair touched.
+// invariant: each added line is one an existing per-strategy case already proves that strategy
+// parses.
+// refs: ADR-16.D9
 struct StrategyCase
 {
-    // Instantiation label: failure output names the strategy ("…/Syslog").
+    // invariant: the instantiation label, so failure output NAMES the strategy.
     const char* name;
     std::unique_ptr<IFormatStrategy> (*make_strategy)();
     LogFormat format;
-    // The canonical happy-path line this strategy CLAIMS — the input for RawLinePreserved and for
-    // ProjectionIsTotal. Populated on every row.
+    // invariant: the canonical happy-path line this strategy CLAIMS, populated on every row.
     std::string_view canonical_line{};
     bool rejects_clf_and_kv{false};
     bool confidence_zero_for_syslog{false};
 };
 
-// gtest param printer: name only — the printout lands in ctest display names via test
-// discovery, so it must stay clean. The failing input LINE is printed by each family's
-// assertion message instead (verbose-on-failure without polluting the test listing).
+// invariant: the parameter printer emits the NAME ONLY, because the printout lands in ctest display
+// names through test discovery and must stay clean.
+// invariant: the failing input LINE is printed by each family's assertion message instead, which is
+// verbose-on-failure without polluting the test listing.
 void PrintTo(const StrategyCase& strategy_case, std::ostream* output_stream)
 {
     *output_stream << strategy_case.name;
@@ -2257,9 +2170,8 @@ strategy_case_name(const ::testing::TestParamInfo<StrategyCase>& param_info)
     return param_info.param.name;
 }
 
-// Shared param fixture: builds the row's strategy through the table factory. Families
-// that parse allocate a local arena in the body — the format/confidence families need
-// none, so the fixture does not carry one.
+// invariant: families that parse allocate a local arena in the body, so the shared fixture does not
+// carry one for the families that need none.
 class StrategyTableTest : public ::testing::TestWithParam<StrategyCase>
 {
   protected:
@@ -2298,11 +2210,16 @@ TEST_P(RawLinePreserved, CanonicalLineEchoedVerbatim)
     EXPECT_EQ(result.value().raw_line, canonical_line) << "strategy=" << GetParam().name;
 }
 
-// ADR-16.D9, the design-time half. `ParsedLine::content` is a TOTAL projection: `content.empty()`
-// implies the line has no message bytes beyond the header the strategy parsed. Checked here for
-// EVERY registered strategy — the invariant is the SPI's, not Syslog's, and the failure it guards
-// against is invisible downstream (an emptied content templates to the SHA-256 prefix of the empty
-// string, a universal collision bucket published as an ordinary identity).
+// invariant: the DESIGN-TIME half of projection totality — a parsed line's content is a TOTAL
+// projection.
+// invariant: so an empty content implies the line has no message bytes beyond the header the
+// strategy parsed.
+// invariant: checked for EVERY registered strategy, because the invariant belongs to the strategy
+// interface and not to any one strategy.
+// invariant: the failure it guards against is INVISIBLE DOWNSTREAM.
+// invariant: an emptied content templates to the digest prefix of the empty string, a universal
+// collision bucket published as an ordinary identity.
+// refs: ADR-16.D9
 TEST_P(ProjectionIsTotal, ClaimedLineKeepsItsMessageBytes)
 {
     ArenaAllocator arena{4096};

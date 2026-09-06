@@ -5,37 +5,31 @@ import insight.canon.test;
 using namespace insight;
 using namespace insight::tokenization;
 
-// Compound-key SHAPE resolution (DN-30) — the canon-grain half of the ECS gap.
-//
-// THE DEFECT, MEASURED BEFORE THE FIX. Canon's role allowlists are flat: `level`, `severity`,
-// `component`, `service`, `message`… An ECS document spells its roles as COMPOUND keys — flat
-// dotted (`log.level`, `service.name`) or nested (`log:{level}`, `service:{name}`) — so none of
-// them matched. A 200-line ECS stream parsed with its message intact and its severity and service
-// silently dropped: every record read as level Unknown with no component. A full production
-// severity inversion of such a stream produced ZERO signal.
-//
-// WHY THIS FILE ASSERTS A SHAPE AND NOT A VOCABULARY — read this before adding a case.
-//
-// The obvious test is `{"log.level":"error"} → Error`. It is nearly worthless: it passes the
-// moment someone appends the literal string "log.level" to the flat allowlist, which fixes ECS
-// and nothing else, and leaves the next compound-key format (`data_stream.dataset`, a GELF or
-// Bunyan namespace, an in-house convention) exactly as broken. A green built that way certifies a
-// spelling, not a capability.
-//
-// So every case below uses a namespace that appears in NO specification and in no allowlist:
-// `zzz`. Nothing can make these pass except a rule that reads the key's STRUCTURE — split the
-// compound key, match its LAST segment against the role names canon already owns. If someone
-// "fixes" this by adding field names, these tests stay red, which is the entire point of them.
-//
-// The ECS spellings themselves are asserted at the END, as the acceptance case — they must pass
-// as a CONSEQUENCE of the shape rule, never as its cause.
-//
-// Determinism: literal inputs, one arena per case, no RNG, no clock, no shared state.
+// invariant: compound-key SHAPE resolution at the canon grain — the half of the ECS gap that is
+// canon's, not the cube's.
+// invariant: THE DEFECT, MEASURED BEFORE THE FIX: canon's role allowlists were flat, so an ECS
+// document spelling its roles as compound keys matched none of them.
+// invariant: a 200-line ECS stream parsed with its message intact and its severity and service
+// silently DROPPED — every record read as level Unknown with no component.
+// invariant: a full production severity inversion of such a stream produced ZERO signal.
+// invariant: THIS FILE ASSERTS A SHAPE AND NOT A VOCABULARY, and that is the reason to read before
+// adding a case.
+// invariant: the obvious case is nearly worthless — it passes the moment someone appends the
+// literal string to the flat allowlist, which fixes ECS and no other compound-key format.
+// invariant: a green built that way certifies a spelling and not a capability.
+// invariant: so every case below uses a namespace that appears in NO specification and in no
+// allowlist, and nothing can make these pass except a rule that reads the key's STRUCTURE.
+// invariant: if someone fixes a red here by adding field names, these tests stay red, which is the
+// entire point of them.
+// invariant: the real ECS spellings are asserted at the END, as the acceptance case — they must
+// pass as a CONSEQUENCE of the shape rule and never as its cause.
+// invariant: determinism — literal inputs, one arena per case, no RNG, no clock, no shared state.
+// refs: DN-30
 namespace
 {
 
-// A JSON record carrying the given role fragment, with a timestamp and message that always
-// resolve — so a failure below is unambiguously the role under test and never a parse failure.
+// invariant: the timestamp and message always resolve, so a failure below is unambiguously the role
+// under test and never a parse failure.
 [[nodiscard]] std::string record_with(std::string_view role_fragment)
 {
     return std::string{R"({"@timestamp":"2026-03-30T10:00:00.000Z",)"} +
@@ -43,8 +37,6 @@ namespace
 }
 
 } // namespace
-
-// ── The LEVEL role, both compound shapes, under a namespace no spec defines ───────────────────
 
 TEST(CompoundKeyShape, FlatDottedKeyResolvesItsLastSegmentToTheLevelRole)
 {
@@ -84,17 +76,16 @@ TEST(CompoundKeyShape, BothCompoundShapesAgreeWithEachOtherAndWithTheFlatSpellin
     const auto plain{strategy.parse(record_with(R"("level":"error")"), arena)};
     ASSERT_TRUE(flat_key.has_value() && nested.has_value() && plain.has_value());
 
-    // Stated as equality between the three shapes rather than as three separate constants: the
-    // property is that the SHAPE does not change the meaning, and an equality cannot drift the way
-    // three hand-written expectations can.
+    // invariant: stated as equality between the shapes rather than as separate constants — the
+    // property is that the SHAPE does not change the meaning.
+    // invariant: an equality cannot drift the way three hand-written expectations can.
     EXPECT_EQ(flat_key->level, plain->level)
         << "the dotted shape disagrees with the plain spelling of the same role";
     EXPECT_EQ(nested->level, plain->level)
         << "the nested shape disagrees with the plain spelling of the same role";
 }
 
-// ── The COMPONENT role — a second role, so the rule cannot be level-special ───────────────────
-
+// invariant: a SECOND role, so the rule cannot be satisfied by anything level-special.
 TEST(CompoundKeyShape, TheShapeRuleAppliesToEveryRoleNotJustLevel)
 {
     JsonStrategy strategy;
@@ -110,12 +101,10 @@ TEST(CompoundKeyShape, TheShapeRuleAppliesToEveryRoleNotJustLevel)
     EXPECT_EQ(nested->component, "payments") << "same, for the nested shape";
 }
 
-// ── The BOUND — one level of descent, and no more ─────────────────────────────────────────────
-//
-// A positive statement of the declared boundary, not a defect (MEM:clean-code-is-a-valid-finding).
-// Unbounded descent would make every JSON document a search space and put an unbounded walk on the
-// hot record path, which is the cost ADR-29.D7 refuses elsewhere for the same reason.
-
+// invariant: a positive statement of the declared descent boundary, not a defect.
+// invariant: unbounded descent would make every JSON document a search space and put an unbounded
+// walk on the hot record path.
+// refs: ADR-29.D7, MEM:clean-code-is-a-valid-finding
 TEST(CompoundKeyShape, DescentIsBoundedAtOneLevelSoDeepNestingIsNotClaimed)
 {
     JsonStrategy strategy;
@@ -143,26 +132,21 @@ TEST(CompoundKeyShape, ADeepDottedKeyIsNotClaimedEither)
            "its producer chose";
 }
 
-// ── CARDINALITY SAFETY on the WHERE axis — an invariant ALREADY IN FORCE ──────────────────────
-//
-// This is not a bet on how compound-namespace resolution gets ruled. `component` is the WHERE tier:
-// it becomes the per-template WHERE label and feeds the cube's WHERE axis. ADR-29.D3 already
-// refuses putting a producer-controlled unbounded value there — that is the argument for not
-// retaining a `trace_id`, and it does not depend on any rule chosen later. So this asserts a
-// constraint that exists TODAY and that whatever lands must not break.
-//
-// THE CONCRETE HAZARD, and it is not hypothetical: `source` is ALREADY a component role word in
-// canon's allowlist (component / source / logger / service / module / logGroup / logStream). So a
-// resolution rule that lets a NAMESPACE carry the role, and then takes the namespace's first string
-// child as the value, reads `"source":{"ip":"10.0.0.7"}` as component = "10.0.0.7". That is
-// deterministic, plausible, and puts one WHERE label per client IP on the axis. The same shape
-// waits under `host.ip`, `user.name`, `url.path`.
-//
-// STATED AS A CARDINALITY PROPERTY, deliberately — not as "the component must not equal an IP".
-// A value-shaped assertion is a spelling test and dies to the first format that carries an
-// unbounded value that does not look like an IP. What actually matters is that the number of
-// distinct WHERE labels must NOT grow with the number of distinct producer-controlled values. That
-// is measurable without naming any field, any format, or any rule.
+// invariant: CARDINALITY SAFETY on the WHERE axis, an invariant ALREADY IN FORCE — not a bet on
+// how compound-namespace resolution is later ruled.
+// invariant: component is the WHERE tier: it becomes the per-template WHERE label and feeds the
+// cube's WHERE axis, where a producer-controlled unbounded value is already refused.
+// invariant: THE HAZARD IS NOT HYPOTHETICAL — `source` is ALREADY a component role word in
+// canon's own allowlist.
+// invariant: so a rule letting a NAMESPACE carry the role and taking its first string child reads a
+// client IP as the component.
+// invariant: that is deterministic, plausible, and puts one WHERE label per client IP on the axis;
+// the same shape waits under `host.ip`, `user.name` and `url.path`.
+// invariant: STATED AS A CARDINALITY PROPERTY DELIBERATELY — a value-shaped assertion is a
+// spelling test and dies to the first unbounded value that does not look like an IP.
+// invariant: what matters is that the number of distinct WHERE labels must NOT grow with the number
+// of distinct producer-controlled values, which is measurable without naming any field.
+// refs: ADR-29.D3
 TEST(CompoundKeyShape, AProducerControlledValueNeverBecomesAWhereLabel)
 {
     constexpr int kDistinctProducerValues{256};
@@ -173,8 +157,9 @@ TEST(CompoundKeyShape, AProducerControlledValueNeverBecomesAWhereLabel)
     std::set<std::string> distinct_components;
     for (int index{0}; index < kDistinctProducerValues; ++index)
     {
-        // Every record is identical except the value under a component-role NAMESPACE. Nothing
-        // here is ECS-specific: it is the shape any compound-namespace rule must survive.
+        // invariant: every record is identical except the value under a component-role NAMESPACE.
+        // invariant: nothing here is ECS-specific — it is the shape any compound-namespace rule
+        // must survive.
         const std::string line{
             std::string{R"({"@timestamp":"2026-03-30T10:00:00.000Z","level":"info",)"} +
             R"("source":{"ip":"10.0.)" + std::to_string(index / 256) + "." +
@@ -198,33 +183,28 @@ TEST(CompoundKeyShape, AProducerControlledValueNeverBecomesAWhereLabel)
            "resolution must not reach a value the producer controls without a bound.";
 }
 
-// ── ACCEPTANCE + THE DECLARED BOUNDARY: real ECS, and the half we deliberately do not read ────
-//
-// FIELD-position resolution SHIPS (`log.level` — the role word is the FIELD). NAMESPACE-position
-// resolution is REFUSED (DN-30.D11), so `service.name` does NOT populate `component`. These arms
-// state that as a BOUNDARY rather than leaving it as a caveat in prose — the same species as the
-// descent bound above, which found a real defect precisely because it was written as a positive
-// statement rather than assumed.
-//
-// WHY REFUSED, so nobody reads these as a gap waiting to be closed. On our vocabularies
-// `service.name` and `source.ip` are STRUCTURALLY IDENTICAL — a role-word namespace plus a field
-// in no vocabulary. The information that would separate them is not present in the instrument, so
-// a rule admitting the first admits the second. Counting children does not rescue it: "exactly one
-// string child" FAILS on LogCraft's OWN emitted ECS (`{"name":…,"type":…}` — two string children)
-// and still ADMITS the trap (`{"ip":…,"port":54321}` — `port` is numeric, so `ip` is the only
-// string). And the struct already drew this line: `component` declares itself low-cardinality and
-// a cube dimension, while `host` exists beside it for node identity, outside the cube. So
-// `source.ip → component` is not a cardinality RISK — it puts a host-class value into the one
+// invariant: ACCEPTANCE plus the DECLARED BOUNDARY — field-position resolution SHIPS, and
+// namespace-position resolution is REFUSED.
+// invariant: stated as a boundary rather than left as a caveat in prose, the same species as the
+// descent bound above, which found a real defect precisely because it was written positively.
+// invariant: WHY REFUSED, so nobody reads these as a gap waiting to be closed.
+// invariant: a role-word namespace plus a field in no vocabulary is STRUCTURALLY IDENTICAL between
+// the safe case and the trap, so a rule admitting one admits the other.
+// invariant: counting children does not rescue it.
+// invariant: `exactly one string child` FAILS on LogCraft's OWN emitted ECS, which carries two, and
+// still ADMITS the trap, whose second child is numeric.
+// invariant: the struct already drew this line: component declares itself low-cardinality and a
+// cube dimension, while host exists beside it for node identity, outside the cube.
+// invariant: so the trap is not a cardinality RISK — it puts a host-class value into the one
 // field that declares it is not one.
-//
-// DN-30.D5's zero-new-field-names clause stands: a red arm is not a licence to add a spelling.
-
+// invariant: a red arm here is not a licence to add a spelling.
+// refs: DN-30.D5, DN-30.D11
 TEST(CompoundKeyShape, EcsFlatLibraryShapeResolvesTheFieldPositionRoleAndDeclinesTheNamespaceOne)
 {
     JsonStrategy strategy;
     ArenaAllocator arena{8192};
 
-    // The form ecs-logging-{java,python,nodejs} emit.
+    // invariant: the form the ecs-logging java, python and nodejs libraries emit.
     const auto parsed{
         strategy.parse(R"({"@timestamp":"2026-03-30T10:00:00.000Z","log.level":"ERROR",)"
                        R"("message":"connection pool exhausted","ecs.version":"8.11.0",)"
@@ -251,10 +231,10 @@ TEST(CompoundKeyShape,
     JsonStrategy strategy;
     ArenaAllocator arena{8192};
 
-    // Byte-faithful to logcraft's own fmt_ecs() emission (log_formatter_cloud.cpp) — the exact
-    // stream the seam arm drives, so this unit case and the seam case cannot drift apart. Note
-    // `service` carries TWO string children (name, type): this record IS the counterexample that
-    // kills the "exactly one string child" escape.
+    // invariant: byte-faithful to logcraft's own ECS emission, which is the exact stream the seam
+    // arm drives, so this unit case and the seam case cannot drift apart.
+    // invariant: `service` carries TWO string children, so this record IS the counterexample that
+    // kills the `exactly one string child` escape.
     const auto parsed{
         strategy.parse(R"({"@timestamp":"2026-03-30T10:00:00.000Z","ecs":{"version":"8.11.0"},)"
                        R"("log":{"level":"error"},"message":"connection pool exhausted",)"
@@ -271,11 +251,11 @@ TEST(CompoundKeyShape,
         << "\" — see the flat-shape arm above; the refusal is the ruling, not an omission.";
 }
 
-// The second acceptance criterion, at the unit grain: an ECS record is UNDERSTOOD, so the L2
-// witness marker must be empty. Before the fix an ECS line yielded a message but no level and no
-// component; the marker measures "no role at all", so this is the durable, vocabulary-free
-// statement that the stream stopped being opaque — and it is the one that runs on a user's real
-// stream rather than on our corpus.
+// invariant: the second acceptance criterion at the unit grain — an ECS record is UNDERSTOOD, so
+// the witness marker for `no role at all` must be empty.
+// invariant: before the fix an ECS line yielded a message but no level and no component, so this is
+// the durable vocabulary-free statement that the stream stopped being opaque.
+// invariant: it is also the one that runs on a user's real stream rather than on our corpus.
 TEST(CompoundKeyShape, AnEcsRecordLeavesNoRoleWitnessMarkerBehind)
 {
     JsonStrategy strategy;
