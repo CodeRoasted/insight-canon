@@ -1195,14 +1195,280 @@ with `--profile linux-gcc16-release`, on the final text of units 8 and 9 togethe
 lines at HEAD to 45, a **54 % reduction** — the lowest of the run after unit 7, and the law block is
 why: 11 of those 45 lines are its frame and prose.
 
+## Unit 10 — `core/src/utils/logger.cpp` (1 of the directory's 3 files, 84 would-be violations) — and the gate defect that stopped the other two
+
+`core/src/utils/` was surveyed as one unit of 3 files, 644 comment lines and 630 would-be
+violations, and it converted as one file. The other two — `failure_lexicon.cpp` (312) and
+`time_utils.cpp` (234) — were read, classed, drafted, placed and gated, and the gated draft came
+back with **13 `refs-prose` violations over 4 registry addresses that resolve**: the CCC checker
+refuses a `SRC-` code carrying a lowercase clause suffix (`SRC-D-OUT-4c`), which
+`registry_grammar_lint` and `LEXICON.md` both admit. That is verdict finding 20 below; it is one
+character in an instrument this lane may not edit, and it is what stopped the unit at one file
+rather than three.
+
+| files | comment lines HEAD → gate | forms written |
+|---|---|---|
+| `logger.cpp` | 86 → 18 | pre 1 · post 3 · invariant 2 · assert 1 · note 1 · refs 3 · 5 continuations · 2 tool |
+
+Per-file baselines, measured with the standalone checker over the `HEAD` blob rather than derived
+from the directory total: `logger.cpp` 86 comment lines / 84 violations (bare 77, spacer 4,
+trailing 3, tool 2) · `failure_lexicon.cpp` 317 / 312 (bare 269, tag-mid-line 3, spacer 5,
+trailing 30, suppression-without-why 5, tool 5) · `time_utils.cpp` 241 / 234 (bare 216, spacer 3,
+ruler 4, trailing 5, suppression-without-why 6, tool 7).
+
+The three `refs:` targets are `ADR-3.D4` (the module/api layering that makes `utils/log_macros.hpp`
+a textual GMF include), `ADR-5.D1` (the stderr ban the state-(B) report has to be reconciled with)
+and `DN-53` (the entry-point survey that measured where an un-initialised process's canon records
+were going).
+
+### Census (`OPS-8.S4`) — and the whole directory's suppressions were measured, not only the converted file's
+
+Over the three files: `NOLINT` directives 14, namespace closers 10, `/*name=*/` 1, `clang-format
+off` 0, `wall-clock:` 0, `SPDX` 0. `logger.cpp` carries **zero** suppressions and 2 namespace
+closers, both of which survive; its census difference is zero. The 15th `NOLINT` token the
+survey counted is the WORD inside a `time_utils.cpp` prose sentence, which is this ledger's
+finding 7 again, on a second file.
+
+### The stripper cross-check (`OPS-8.S5`) held EXACTLY, on a unit with suppressions
+
+`removed == violations − (suppression-without-why + trailing-nolint)` → 619 == 630 − (11 + 0), and
+`kept == tool-forms + those classes` → 25 == 14 + 11. Measured across the three drafts
+(307 + 84 + 228 removed, 10 + 2 + 13 kept). This is the corrected identity of finding 1, and this
+is the first unit of the run where both kept classes are non-empty AND the arithmetic was checked
+before placing anything.
+
+### The 14 suppressions, every one measured — and 4 of them silence nothing
+
+The instrument is `clang-tidy-21` with the flags lifted from
+`core/build-clang21-libcxx-release/compile_commands.json`, `--header-filter` set to match no
+header, run twice per file: once on the tree as it stands and once on a copy with the directive
+TEXT removed and the code kept (`sed 's|//[[:space:]]*NOLINT.*$||'`). The verdict is read off two
+numbers that must agree — the drop in clang-tidy's own `Suppressed … (N NOLINT)` line, and the
+main-file diagnostics that appear.
+
+| file | with | without | own-file suppressions | diagnostics that appear |
+|---|---|---|---|---|
+| `failure_lexicon.cpp` | 10 NOLINT suppressed | 5 | 5 | 5 × `bugprone-exception-escape` |
+| `time_utils.cpp` | 9 NOLINT suppressed | 5 | 4 | `readability-qualified-auto`, `readability-function-cognitive-complexity`, 2 × `bugprone-exception-escape` |
+
+The residual 5 in each *without* column are directives in the headers the TU pulls in, unchanged by
+the strip, which is what makes the difference attributable.
+
+**Four `readability-magic-numbers` directives in `time_utils.cpp` silence nothing, and there are two
+independent proofs.** The documentary one: the single shared `.clang-tidy`
+(`malf/config/.clang-tidy`, symlinked by every C++ repo) carries `- -readability-magic-numbers` in
+its `Checks` list, and its twin `- -cppcoreguidelines-avoid-magic-numbers` beside it. The measured
+one: removing all nine of that file's directives drops the suppression count by 4 and surfaces 4
+diagnostics, none of them a magic-number finding. Two of the four are additionally a
+`NOLINTBEGIN`/`NOLINTEND` pair NESTED inside the file-wide pair for the same check, so they could
+not have silenced anything even had the check been armed.
+
+**The other ten all silence a real diagnostic and all ten are kept**, their FORM repaired to the
+grammar: the why demoted to a `note:` in the last position before the directive, which is finding
+12's shape.
+
+### Stale and false claims deleted, with the evidence and where the search went
+
+* **`logger.cpp`'s include comment named spdlog 1.13.** `insight-canon/core/conanfile.py` requires
+  `spdlog/1.17.0`, and the package the canon build actually resolves
+  (`.conan2/p/b/spdlof7925790774cf`) has `SPDLOG_VER_MINOR 17`. A second spdlog in a different
+  local cache IS 1.13, which is presumably where the number came from, but it is not the one this
+  repo compiles against. The version is deleted rather than corrected: a dependency version in a
+  comment is a mirror of a fact `conanfile.py` owns, and the pin is the place it cannot rot. The
+  structural half of the claim was re-verified against the pinned `spdlog/1.17.0` and KEPT as the surviving `note:` —
+  `stdout_color_sinks.h` declares `stdout_color_sink_mt` AND `stderr_color_sink_mt`, and the
+  package ships no `stderr_color_sinks.h` sibling to narrow the include to.
+* **`logger.cpp`'s file-header comment gave its own path as `core/src/insight/utils/logger.cpp`.**
+  No `core/src/insight/` directory exists in this repo; the file is at `core/src/utils/logger.cpp`.
+  Deleted as a mirror that was also false. `time_utils.cpp` carries the same wrong path in its own
+  header and will lose it when that file converts.
+
+### Interrogation
+
+One fresh agent, 14 questions built from the held R claims, 25 tool uses, 101 k tokens, 4.9 minutes.
+**No git command was run**, and the transcript was checked mechanically rather than by trusting the
+reader's own closing line: zero `tool_use` inputs matching any forbidden path, zero build-directory
+reads, and the one hit on the forbidden-ledger pattern is the exclusion list inside the prompt
+itself. The reader listed `technical_docs/adr/` and opened `005-ops-observability-and-configuration.md`
+from it, which is allowed; it did not open `026`.
+
+**13 of 14 recovered, 0 not recovered, 1 WRONG.** Scored from the per-question evidence, one
+question at a time — the reader wrote no summary line to be misread.
+
+Recovery landed **above** the deleted prose on five of the fourteen, which is the outcome the
+protocol wants:
+
+* Q2 (why state (B) may warn and state (A) may not) came back with the mechanism the old prose only
+  gestured at, plus the measurement it never had: `core/tests/utils/test_logger_fallback_states.cpp`'s
+  red-first recipe says that deleting the `if (initialised())` guard makes the state-(A) child emit
+  **seven** records — *"the regression that would make every unit test in the workspace noisy"*.
+* Q6 (what `quiet_logger` deliberately does not do) recovered all five omissions and added one the
+  prose never carried: it could not have used `shared_sink()` in any case, because that sink is a
+  null `shared_ptr` until `init_logging` runs.
+* Q8 (why the accessor's registry mutex is acceptable) was answered *"the code states no rationale"*
+  and then derived from the tree at a finer grain than the deleted prose: below
+  `SPDLOG_ACTIVE_LEVEL` the `INSIGHT_LOG_*` macros expand to `((void)0)` with the argument never
+  evaluated, canon compiles at `SPDLOG_LEVEL_INFO` outside Debug, so the 81 TRACE/DEBUG sites make
+  no `spdlog::get` call at all in a shipping build and 18 cold INFO/WARN sites remain.
+* Q12 (does the position of the `initialised()` store matter) went past the written `assert:`: a
+  concurrent accessor could see the flag true before the registration loop had run, fire a spurious
+  *"NOT REGISTERED"* warning — and because the memo is once-per-name, **that spurious report
+  permanently suppresses the true one for that name**. It also found that the test suite records
+  having no arm for this window.
+* Q13 (is the written *"a later `init_logging()` still wins"* true) was confirmed at the code with
+  two limits the claim does not carry: records already emitted are not retracted, and a caller that
+  stored the `shared_ptr` before init keeps writing through the quiet logger.
+
+### The line THIS conversion wrote that was WRONG, re-derived at the artifact
+
+**Q10 — `logger_for`'s `post:` claimed the accessors never return null, and that a log macro would
+dereference the result. Both halves are false, and the second names a code path canon does not
+take.** The claim was carried from the deleted prose, which read *"An unresolved name never yields
+null (`SPDLOG_LOGGER_CALL` would dereference it)"* — `OPS-8.O3`'s lesson exactly: a claim moved into
+a tagged line is a claim the conversion now asserts.
+
+Re-derived at three artifacts before the repair:
+
+* **`spdlog::default_logger()` can be null.** `registry::default_logger()` returns `default_logger_`,
+  which is constructed only under `#ifndef SPDLOG_DISABLE_DEFAULT_LOGGER`, is `.reset()` by
+  `registry::drop_all()` and `registry::shutdown()`, and is overwritten by whatever
+  `set_default_logger` is handed. `logger_for` returns it unguarded.
+* **The macro path does not dereference.** `insight::detail::log_message` in `canon.api.cppm` opens
+  with `if (!logger || !logger->should_log(level)) return;`, so a null logger costs a dropped
+  record, never a fault.
+* **`SPDLOG_LOGGER_CALL` is not on canon's path at all.** `core/api/utils/log_macros.hpp` expands
+  `INSIGHT_LOG_*` to `insight::detail::log_message`.
+
+The repaired line, and it is the honest shape: `post: never null on the registered or quiet-logger
+branch; the default-logger branch is null once the host drops it, and log_message() then discards
+the record.` The unit was **re-derived from `HEAD` through the corrected claims script** rather than
+hand-edited — the departure this ledger declared at unit 5 — and its three mechanical witnesses were
+re-taken after the repair.
+
+### A claim in the OLD prose the reader falsified — deleted, never carried, and verified at the artifact
+
+**Q9 — the shared sink does NOT buy coherent interleaving, and that was the prose's stated reason
+for it.** The deleted comment read *"all module loggers write to the SAME sink so output is
+interleaved coherently"*. The reader answered that sharing the instance buys a single-valued output
+CONFIGURATION — one formatter, one colour decision, one target binding, changed in one place for all
+seven — and that it explicitly does **not** buy mutual exclusion on the stream.
+
+Verified at the artifact: in the pinned spdlog (`1.17.0`, `.conan2/p/b/spdlof7925790774cf`),
+`ansicolor_stdout_sink_mt` and `ansicolor_stderr_sink_mt` are both instantiated on
+`details::console_mutex`, whose `mutex()` returns a **function-local static** `std::mutex`. One mutex
+per process, shared by every colour-sink instance — so two separate sinks already serialize against
+each other and records could not interleave mid-line either way. The prose attributed to sink
+sharing a property spdlog provides globally.
+
+**It was held out of the tree rather than carried**, which is why the reader got a clean question and
+not a leading one, and why no line of this conversion has to be withdrawn.
+
+### Dispositions
+
+* **Recovered (13)** — Q1 through Q9 and Q11 through Q14. The prose was redundant; nothing re-homed.
+* **Wrong (1)** — Q10, repaired in the tree before the commit, as above.
+* **Not recovered (0).**
+
+### The pointer sweep (`OPS-8` finding 4's missing step), run and empty
+
+Before deleting, the repo and the doc tier were swept for prose POINTING AT what this unit deletes.
+Two families came back and neither owes a repair. `DN-053` quotes a phrase — *"silent, and
+correct"* — that `logger.cpp` no longer contains at `HEAD`, so the note already records a
+superseded text rather than a live one, and a design note is the planning tier recording an
+argument, not a claim about the current file. `core/tests/utils/test_logger_fallback_states.cpp`
+and `test_logger_registration.cpp` narrate states (A) and (B) and the lost-`kPipelineLogger` defect
+in their own headers; they duplicate nothing this unit deletes and both are units of their own.
+
+### Witnesses
+
+Comment-only: `logger.cpp`'s code token stream is byte-identical to `HEAD`'s, re-taken after the
+reader's repair. Grammar: `malf format --check` over the file — 18 comment lines, **0 would-be
+violations**, post format; over the whole repo, **126 files, 13 297 comment lines, 12 418 would-be
+violations**, 0 misformatted. Addressability: the per-file census (`OPS-8.S7.3b`) reads
+**3 addresses, set unchanged**, exit 0. Lint: `malf lint --all-files` **21 findings** over 56 files
+checked, equal to the standing baseline. Registry: `scripts/registry_grammar_lint.py` reports
+**1 failure and it is NOT this unit's** — see the findings below. Docs: `scripts/docs_lint.py`
+**0 failures** over 325 stable docs and 16 roster sections. Behaviour: `malf test insight-canon`
+**809 of 809** on clang-21 (734 + 32 + 25 + 13 + 5) and **809 of 809** with
+`--profile linux-gcc16-release`, taken in ONE slot acquisition covering unit 10 alone
+(`OPS-8.S7.4`). Count: 86 comment lines at `HEAD` to 18, a **79 % reduction**.
+
+**Two `docs_lint` traps this ledger met, recorded at the step where it bites (`OPS-8.S11`), and the
+second one fired on the paragraph describing the first.** ① A CCC ledger that records a DEPENDENCY
+version trips the unshipped-version arm: a bare three-part version in a stable doc is read as an
+unshipped CodeRoast cut, because every CodeRoast version is 0.x or 1.x and the arm cannot tell a
+third-party 1.x from ours. Backticks do not help. The arm exempts a version preceded by `/` or
+sitting on a line carrying `conan` / `pin` / `pinned`, so the repair is the conan reference form —
+`spdlog/1.17.0` — which is both the honest spelling and the exempt one. ② Reporting a defect found
+in the superproject's short-term planning surface REPRODUCES two more failures, because a stable
+doc may not name that surface at all and may not carry a bare source coordinate: naming the file
+reds the volatile-plan-tier arm, and quoting the offending `path:line` tokens reds the same
+coordinate ban the finding is about. Both are stated here by commit hash and file name instead.
+All three were caught before the push by the step's own instruction to run BOTH lints, and they are
+why that instruction exists.
+
+### Findings for other lanes — none fixed here
+
+* **`SRC-` clause suffixes are refused by the CCC gate** — finding 20 above, with its one-character
+  repair and its 57-occurrence population. **Addressee: the pilot**, for the `malf` lane. This is
+  the item that decides whether `insight-canon` can be finished at all.
+* **`time_utils.cpp` carries dead code: `struct LevelAlias` and its `kLevelAliases` table.** The
+  ten-entry array sits in the file's anonymous namespace and is referenced by nothing — verified by
+  a repo-wide sweep that returns only the declaration itself, and the table is unreachable outside
+  the TU by construction. It is also **out of sync with the function that replaced it**:
+  `parse_log_level`'s switch accepts `failure`, `severe`, `critical` and `crit`, none of which the
+  array holds. **Addressee: the canon source lane** (`ADR-26.D1`, rip dormant plumbing). Not a
+  comment-only change, so not made here.
+* **`core/api/canon.api.cppm` carries two false character counts at its timestamp declarations.**
+  *"Parse Spark-style short-year date+time: `YY/MM/DD HH:MM:SS` (19 chars)"* — that form is 17
+  characters, and `time_constants::kShortYearSlashMinLength` is 17. *"Parse HealthApp compact
+  timestamp: `YYYYMMDD-HH:MM:SS:mmm` (22 chars)"* — that form is 21 characters, and the field
+  widths are variable since `DN-43.O5`, so a fixed count is wrong in kind as well as in value.
+  **Addressee: the `core/api/canon.api.cppm` CCC unit**, which is where those lines convert.
+* **`failure_lexicon.cpp` and two sibling files cite `D-OUT-3`, a deferred decision whose only
+  statement is in the frozen attic.** The live tree carries the name at
+  `core/src/utils/failure_lexicon.cpp`, `core/api/canon.api.cppm` and
+  `core/tests/utils/test_failure_lexicon.cpp`; every text that says what `D-OUT-3` IS sits under
+  `technical_docs/history/`, which the Founder ruled disposable on 2026-09-02. It is not a registry
+  address in any form, so no `refs:` can carry it. **Addressee: the units that convert those two
+  other files.** The claim beside it — that this predicate only anchors an already-matched failure
+  word and so a glyph-only line stays silent — is real, has a test, and rides into the tagged form
+  without the name.
+* **`time_utils.cpp` cites `D-F3b-3`, which resolves nowhere in the live tree.** `F3b` is a
+  `LEXICON.md` term owned by `ADR-19`; the numbered clauses `D-F3b-1`, `-4`, `-5` and `-7` appear
+  only in `technical_docs/history/architecture-v1/`, and `-3` appears nowhere at all. The claim it
+  decorates — BGL emits `FAILURE` as a top RAS severity and `SEVERE` between `ERROR` and `FATAL` —
+  IS owned live, by `DN-43.D14`, which counted 19 213 `SEVERE` and 1 652 unlabelled `FAILURE` lines
+  in `BGL.log`. **Addressee: the `time_utils.cpp` conversion**, once finding 20 unblocks it.
+* **A `registry_grammar_lint` `G15-coord` red is live on `main` and it is NOT this unit's.**
+  `python3 scripts/registry_grammar_lint.py` from the workspace root read **0 failures** when this
+  run started and **1** when it finished. The gate names three bare source coordinates on two
+  adjacent lines of the superproject's short-term planning surface; each is a LogCraft test file
+  followed by a line number — `test_locale_independence_gate.cpp`,
+  `test_shared_memory_sink.cpp` and `test_degenerate_flux_gate.cpp`. That file is clean in the
+  working tree and its newest commit is `0b2e67a4` (*"wip(ccc): a note: naming its own NOLINT arms
+  a second one, and eleven findings from the server run"*, 2026-09-06 02:41), a sibling CCC lane's,
+  landed mid-session. `ADR-6.D13`'s coordinate ban is unconditional at every doc-tier file and the
+  gate says so in its own failure text: raising the ceiling is not a repair, the sites are. Run the
+  gate to see the exact coordinates; they cannot be reproduced here without committing the same
+  defect. **Addressee: the lane that wrote `0b2e67a4`, via the pilot.** This lane did not touch
+  that file and does not repair another lane's planning-tier lines.
+* **`failure_lexicon.cpp` points at a `bugs.md` row that policy has erased.** The comment reads
+  *"See bugs.md 2026-07-09 row"*; `technical_docs/bugs.md` declares in its own preamble that **a
+  fixed row is ERASED, not kept** (2026-07-22, with the drain ceremony) and its oldest surviving row
+  is 2026-07-17. So the pointer cannot resolve and by that register's own rule never will again.
+  **Addressee: the `failure_lexicon.cpp` conversion.**
+
 ---
 
 # The `OPS-8` verdict — third cold reader, first at scale
 
 `insight-canon` is `OPS-8`'s third run and its first large one; findings 14 onward come from the
-third run (units 8-9). Nineteen findings, ordered by what they cost within each run. Items 1, 5
-and 14 are the ones that change the runbook; item 5 needed a Founder ruling before the
-`core/api/` units could be converted at all, and it has one — see the RULED section below.
+third run (units 8-9) and findings 20-21 from the fourth (unit 10). **Twenty-one findings**, ordered
+by what they cost within each run. Items 1, 5, 14 and **20** are the ones that change the runbook;
+item 5 needed a Founder ruling before the `core/api/` units could be converted at all, and it has
+one — see the RULED section below. **Item 20 needs a one-character repair to an instrument outside
+this repo, and until it lands it is what stops this migration.**
 
 ## 1. `OPS-8.S5`'s cross-check equality is FALSE in any unit that has a suppression
 
@@ -1494,6 +1760,62 @@ that unit's cold reader, which recovered each one's new home), and refined a bar
 `DN-43.D11`. So the retroactive answer is **nothing lost across units 1–7**, and the one file that
 moved did so deliberately and said so at the time.
 
+## 20. THE GATE REFUSES A `SRC-` CODE WITH A CLAUSE SUFFIX, AND ITS OWN OWNING ADR ADMITS ONE
+
+`ADR-26.D5` lists `SRC-<code>` among the `refs:` forms and delegates their RESOLUTION to
+`registry_grammar_lint`, saying in terms that the CCC gate checks the FORM and does not
+re-implement resolution (`ADR-6.D14`). The two instruments do not agree on what the form is:
+
+* `scripts/registry_grammar_lint.py`'s citation pattern is
+  `SRC-([A-Z][A-Za-z0-9]*(?:-[A-Z0-9]+)*-\d+[a-z]?)` — a single lowercase clause letter is
+  **explicitly part of the address**, in both the decider and the `rg` sweep beside it.
+* `malf/comment_contract_lint.py`'s is `SRC-[A-Z][A-Z0-9-]*[0-9]` — the code **must end in a
+  digit**.
+
+So `refs: SRC-D-OUT-4c` is a resolvable address that the CCC gate classes `refs-prose` with the
+message *"not an address"*. Reading that message literally makes an operator delete a true,
+resolving citation, which is the prescriptive-instrument failure the memory store already names.
+
+**Measured population, live source only (every `technical_docs/` tree excluded): 57 occurrences
+over 8 distinct codes in 15 files — `insight-canon` 52 over 14 files, `insight-eidos` 5, and zero
+in `insight-metalog`, `logcraft` and `coderoast-server`.** The codes and their counts are
+`SRC-D-OUT-4c` 20 · `SRC-D-OUT-1b` 14 · `SRC-D-OUT-4b` 6 · `SRC-D-OUT-4a` 5 · `SRC-D-OTEL-18a` 5 ·
+`SRC-D-OTEL-4a` 3 · `SRC-D-TID-13b` 2 · `SRC-D-OTEL-18b` 2. (A ninth spelling a first sweep
+returned, ending in `x`, is a metasyntactic placeholder inside `technical_docs/DONE.md` and is not
+a code — re-derived at the artifact before it went into this count.) **It has never fired before
+because no converted `refs:` line anywhere in the workspace carries one** — checked across
+`logcraft`, `insight-canon`, `insight-eidos`, `insight-metalog` and `coderoast-server`.
+
+**What it blocks in this repo, checked file group by file group rather than assumed:**
+`core/src/utils` (2 of 3 files, 13 sites), `core/src/mask` (`SRC-D-TID-13b`), `core/src/strategy`
+(`SRC-D-OTEL-4a`, `-18a`, `-18b`), `core/tools`, `core/api`, and the test tier at
+`core/tests/utils` (4 files) and `core/tests/strategy`. What is left unblocked in the source and
+harness tiers is `proof/`, `benchmarks/src/` and `core/test_package/` — 210 would-be violations
+between them, against the 12 418 the repo still carries.
+
+**The repair is one character** — `SRC-[A-Z][A-Z0-9-]*[0-9]` → `SRC-[A-Z][A-Z0-9-]*[0-9][a-z]?` at
+`malf/comment_contract_lint.py`, matching the pattern `registry_grammar_lint` already ships — plus
+a selftest row carrying a suffixed code, since a structural arm proves the shape and not the
+firing. **It is outside this repo and this lane did not make it.** Addressee: the pilot, for
+Argos or Hephaïstos on the `malf` surface.
+
+## 21. THE SUPPRESSION MEASUREMENT SILENTLY DOES NOTHING WHEN THE COPY LIVES OUTSIDE THE SOURCE TREE
+
+Finding 16 recorded that a suppression in a HEADER cannot be measured through `-p <build dir>` on a
+module TU, and that the failure is a pair of zeros. This is a second face of it and it bites the
+ordinary `.cpp` case. Running `clang-tidy-21` with the compile command's own flags over a copy of
+`time_utils.cpp` placed in the scratchpad produced **no output at all, exit 0** — no diagnostics,
+and not even the `N warnings generated` line — while the identical bytes at their tree path
+produced `88269 warnings generated` and the `Suppressed … (9 NOLINT)` accounting the measurement
+needs.
+
+**The positive control is what separated the two, and it was an UNMODIFIED copy at the foreign
+path**, not a planted defect: same bytes, same flags, silent. So the tell is not "zero findings",
+it is "no accounting line", and an operator who greps for warnings sees a clean file either way.
+The sound instrument is to swap the stripped file into its OWN path, measure, and restore from a
+byte-for-byte backup taken before the swap — `sha256sum` equal on both files, verified here — and
+**never with `git checkout`**, which is finding 15.
+
 ## Departures from `OPS-8` in this run, declared
 
 * **Units 2 and 3 landed in ONE commit**, against `OPS-8.S10`'s one-commit-per-unit. Both are
@@ -1514,6 +1836,15 @@ moved did so deliberately and said so at the time.
   restored with `git checkout`, and the whole unit re-stripped, re-placed, re-formatted and
   re-witnessed. That is stricter than the step, not looser, and it keeps the script the single
   source of the unit's text.
+* **Unit 10 landed ONE FILE of a three-file directory**, against `OPS-8.S2`'s one-unit-per-directory
+  framing. It is the split that step already admits — *"a bigger directory is split by file
+  group"* — but it was forced by verdict finding 20 rather than chosen for reader load, and the
+  two files left behind were carried to the last step before the gate refused them.
+* **The suppression measurement was taken for all three files, including the two that did not
+  land.** It reads `HEAD` bytes through clang-tidy and is valid whether or not the conversion
+  lands, so taking it once is strictly better than making the next lane repeat it — and the four
+  dead `readability-magic-numbers` directives it found are a real finding about the tree as it
+  stands today.
 
 ---
 
@@ -1778,3 +2109,72 @@ catalog and bracket-timestamp masking rules — each written as *"`SRC-D-MSK-n` 
 was 9, 10 and 11; **10 and 11 were NOT consumed and are NOT reserved** — nothing in the tree claims
 them, so the next free integer is 10 and the density check is satisfied. A lane needing one asks the
 pilot.
+
+---
+
+# Where the FOURTH run stands (unit 10, 2026-09-06)
+
+**Ten units converted, the repo still NOT armed, and the run stopped on an instrument defect
+rather than on time or on a design question.** `malf format --check insight-canon` reads
+**13 297 comment lines and 12 418 would-be violations** against the original baseline's 14 489 and
+14 242 — **1 824 violations converted, 12.8 % of the repo**, in nine commits across four runs.
+Arming (`OPS-8.S12`) requires the whole repo at zero and is not reached, so `comment_contract: true`
+is NOT set and the CCC phase still counts this repo rather than failing it.
+
+| unit | surface | violations | comment lines | reader |
+|---|---|---|---|---|
+| 1 | `core/src/arena/` | 37 | 39 → 17 | 10/10 recovered |
+| 2 | `core/src/identity/` | 132 | 136 → 34 | 13/13 recovered |
+| 3 | `core/src/transport/` + `canon.internal.cppm` | 107 | 109 → 40 | 15/15 recovered |
+| 4 | `core/src/tokenizer/` | 112 | 114 → 48 | 14/14 recovered |
+| 5 | `core/src/parse/` | 265 | 273 → 103 | 31/35, **4 wrong** |
+| 6 | `core/src/scan/` | 284 | 287 → 96 | 33/34, **1 wrong** |
+| 7 | `core/src/conformance/` | 313 | 318 → 158 | 30/32, **2 wrong** |
+| 8 | `core/src/compose/` | 395 | 404 → 113 | 35/38, 2 not recovered, **1 wrong** |
+| 9 | `core/api/utils/` + `core/api/det/` | 95 | 97 → 45 | 19/21, 1 not recovered, **1 wrong** |
+| 10 | `core/src/utils/logger.cpp` | 84 | 86 → 18 | 13/14, **1 wrong** |
+| | **total** | **1 824** | **1 863 → 672 (64 %)** | **206/233, 3 not recovered, 10 wrong** |
+
+Forms standing in the repo: `pre` 12 · `post` 50 · `invariant` 112 · `assert` 20 · `note` 99 · `refs` 110 · 154 continuations · 265 tool forms. **4 law blocks**, unchanged — this run minted none, and the
+law-number range issued to it (11 onward) was NOT opened, so nothing in the tree reserves it.
+
+**The fourth run's headline is not a number, it is a blocked road.** Two of the unit's three files
+were converted to the last step and could not land: the CCC gate refuses `SRC-D-OUT-4c` and its
+three siblings as *"not an address"* while `registry_grammar_lint` — the instrument `ADR-26.D5`
+delegates resolution to — resolves all four. 52 of this repo's live-source sites carry such a code,
+spread over `core/src/utils`, `core/src/mask`, `core/src/strategy`, `core/tools`, `core/api` and
+two test directories, so the defect is between this repo and its arming, not beside it. Verdict
+finding 20 carries the two patterns, the population and the one-character repair.
+
+## What remains, and what the next session should take first
+
+Unconverted, by violation count: `core/api/` 2 697 (`canon.api.cppm` 1 193, `canon.spi.cppm` 672,
+`canon.transport.cppm` 322, `canon.compose.cppm` 268, `canon.cppm` 242) · `core/src/strategy` 1 275
+· `core/src/utils` 546 (the two blocked files) · `core/src/mask` 530 · `core/tools` 420 · `proof`
+142 · `benchmarks/src` 53 · `core/test_package` 15 · the test tier 4 682 · the three dialect
+packages 2 058.
+
+**THE NEXT SESSION'S FIRST ACT IS NOT A UNIT.** Verdict finding 20 must be repaired in
+`malf/comment_contract_lint.py` — by the pilot, Argos or a Hephaïstos lane holding the `malf`
+surface — or the next lane will re-derive the same wall. With that one character in place,
+`core/src/utils`'s two remaining files are **already read, classed and drafted**: the claims are
+recorded in this ledger's unit-10 entry, the suppression measurements are complete and the four
+dead `readability-magic-numbers` directives are identified with their evidence.
+
+**Without that repair, what is still convertible in this repo is `proof/` (142), `benchmarks/src/`
+(53) and `core/test_package/` (15) — 210 violations, against the 12 418 the repo still carries.**
+Every other remaining surface cites a suffixed code, checked file group by file group.
+
+**`core/src/mask/` still wants a law-number range AND the finding-20 repair.**
+`canon.detail.mask.cppm` is an interface unit, so every site in it is a declaration position, and it
+carries the statements of at least four source-declared masking codes; it also carries
+`SRC-D-TID-13b`, which the gate refuses today.
+
+**Law numbers: this run consumed NONE, and the reason is worth the next lane's ten seconds.** The
+range issued to it was 11 onward. When it started, the workspace declared 1 through 9 and
+`registry_grammar_lint` reported **nine** `D-LSRC-` declarations with the density check green —
+**10 had been issued to a sibling lane and was declared nowhere in the tree**, so writing 11 would
+have left a gap and reddened the density check, which is checked DENSE. By the end of this run the
+same gate reported **ten** declarations: the sibling landed its block mid-session, and 11 is free
+now. **A lane needing a number asks the pilot AND sweeps the tree for the declared set — an issued
+number and a declared number are not the same fact, and only the second one the gate can see.**
