@@ -475,8 +475,8 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
     // assert: a line the acceptor rejects is handled identically by both arms, so a difference
     // there means they diverge by something other than the peel and no number below answers.
     EXPECT_EQ(unstamped_moved, 0U)
-        << "an UNSTAMPED line templated differently with and without the Jenkins package: arm B is "
-           "then measuring package removal, not the timestamper strip, and the four numbers below "
+        << "a line the bracket acceptor REJECTS templated differently across the arms: they "
+           "differ by something other than the declared peel, so the four numbers below "
            "answer no question about the strip";
 
     // assert: each arm's template count must equal its template-id count — a divergence is a
