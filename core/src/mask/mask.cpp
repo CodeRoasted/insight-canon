@@ -1,47 +1,27 @@
 module insight.canon.detail.mask;
-import insight.canon.internal; // std (via `export import std;` — includes std::memchr)
+import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.detail.scan; // canonical char-class predicates (is_digit / is_alpha)
+import insight.canon.detail.scan;
 
-// mask.cpp — the stateless per-line template masker
-//
-// `stateless_template(content, arena, config)` is the sole identity source: a PURE
-// function of a line's own whitespace-delimited tokens, each classified KEEP / MASK /
-// composite-normalize by its OWN class (no cross-line state, no clustering). The joined
-// masked sequence is the template; its SHA-256 (computed downstream, unchanged) is the
-// run-independent template_id. See ADR-16.D5 (SRC-D-TID-1/SRC-D-TID-2; SRC-D-TID-11, SRC-D-TID-12,
-// SRC-D-TID-13, SRC-D-TID-14).
-//
-// History: this file was the stateful Drain online log-template miner (intern table +
-// SoA cluster store + bucket index + similarity match + absorb_into wildcard learning).
-// That learning made the template — and thus template_id — order-dependent across runs,
-// manufacturing the "phantom pair" false-diff (SRC-D-TID-3). The clustering machinery was
-// RIPPED; only the per-token mask predicates and the masker survive. Token masking
-// (IPv4, hex, digit-leading, UUID/long-hash, composites) uses constexpr hand-written
-// scanners — zero RE2.
-//
-// The composite-normalizer CONTRACTS are declared in `canon.detail.mask.cppm`, beside the
-// exported masker whose observable output they govern — see there (ADR-6.D8 house form).
-
+// invariant: the sole identity source - a pure function of a line's own whitespace-delimited
+// tokens, each classified by its OWN class.
+// refs: ADR-6.D8, ADR-16.D5, SRC-D-TID-1, SRC-D-TID-2, SRC-D-TID-3
+// refs: SRC-D-TID-11, SRC-D-TID-12, SRC-D-TID-13, SRC-D-TID-14
+// note: the composite-normalizer contracts are declared beside the exported masker they govern.
 namespace insight::tokenization
 {
 
 namespace
 {
 
-    // ── Constants ────────────────────────────────────────────────────────────
-
     constexpr std::string_view kWildcard{"<*>"};
 
     constexpr unsigned kDecimalBase{10U};
-    constexpr unsigned kAsciiCaseMask{32U}; // bit that toggles upper/lower case
-    constexpr unsigned kHexLetterCount{6U}; // hex letters a-f / A-F
+    constexpr unsigned kAsciiCaseMask{32U};
+    constexpr unsigned kHexLetterCount{6U};
 
-    // ── Hand-written token-mask predicates ───────────────────────────────────
-    // Pure, byte-only classifiers over a single token (zero RE2). Each masks or
-    // normalizes a structurally high-card token class so logically-identical lines
-    // share a template (ADR-16.D5).
-
+    // invariant: pure, byte-only classifiers over a single token - zero regular-expression engine.
+    // refs: ADR-16.D5
     [[nodiscard]] constexpr bool is_hex_char(char chr) noexcept
     {
         return (static_cast<unsigned>(chr) - '0' < kDecimalBase) ||
@@ -49,7 +29,7 @@ namespace
                 kHexLetterCount);
     }
 
-    // Consumes 1–3 decimal digits from str at pos; returns false if no digit found.
+    // post: consumes one to three decimal digits at `pos`; false when no digit is there.
     [[nodiscard]] constexpr bool consume_ipv4_octet(std::string_view str, std::size_t& pos) noexcept
     {
         if (pos >= str.size() || static_cast<unsigned>(str[pos]) - '0' >= kDecimalBase)
@@ -62,25 +42,19 @@ namespace
         return true;
     }
 
-    // Sentence punctuation that may trail a token in running log text. Disjoint from the
-    // kWrapperPairs closers (canon.detail.scan); the two sets together are what rule 4 tolerates
-    // after the address.
+    // invariant: disjoint from the wrapper-pair closers - together the two sets are what the
+    // address rule tolerates after the address.
     [[nodiscard]] constexpr bool is_trailing_punct(char chr) noexcept
     {
         return chr == ',' || chr == ';' || chr == ':' || chr == '.';
     }
 
-    // The trailing budget the retired grammar already spent: an optional `]` followed by one of
-    // `[,;:.\]]`. Named rather than open-coded twice, and held at 2 so the repair widens WHICH
-    // bytes are tolerated without widening HOW MANY — a longer punctuation run is a different
-    // token, not a wrapped address.
+    // invariant: held at 2 so a repair widens WHICH bytes are tolerated, never HOW MANY - a longer
+    // punctuation run is a different token, not a wrapped address.
     constexpr std::size_t kMaxIpv4TrailBytes{2};
 
-    // IPv4: <open>? \d{1,3}(\.\d{1,3}){3}(:\d*)? <shell-or-sentence-punct>{0,2}
-    // where <open> is any kWrapperPairs opener. A STRICT SUPERSET of the retired
-    // `\[?…\]?[,;:\.\]]?`: every string that grammar accepted, this one accepts (`[` is an opener;
-    // `]` is a closer; `,;:.` are sentence punct; the budget is unchanged at 2), so no token that
-    // masked before can stop masking — a masking repair must never narrow the guarantee it repairs.
+    // invariant: a STRICT SUPERSET of the retired grammar - every string that one accepted, this
+    // one accepts, so no token that masked before can stop masking.
     [[nodiscard]] constexpr bool is_ipv4_token(std::string_view str) noexcept
     {
         if (str.empty())
@@ -112,7 +86,6 @@ namespace
         return pos == str.size();
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
     [[nodiscard]] inline bool is_all_digits(std::string_view str) noexcept
     {
         if (str.empty())
@@ -121,16 +94,9 @@ namespace
                                    { return static_cast<unsigned>(chr) - '0' < kDecimalBase; });
     }
 
-    // Value-aware KEEP of low-cardinality status integers.
-    //
-    // A bare integer is masked to `<*>` (the digit-leading rule), which collapses
-    // `exit code 0` and `exit code 1` into one template — a green→red flip then
-    // vanishes at the template level. To keep such values DISTINCT we KEEP an
-    // integer literal when it immediately follows a status keyword AND is small
-    // (≤ kMaxStatusDigits). Size-gating bounds cardinality (exit codes ≤ 255,
-    // HTTP status ≤ 599 — both ≤ 3 digits); the keyword gate keeps bare counts
-    // ("port 8080", "took 200 ms") masked. The lexicon is a seed and grows on calibration
-    // evidence only — SRC-D-TID-14, contract in canon.api.cppm.
+    // invariant: an integer is KEPT only when it follows a status keyword AND is short, so an exit
+    // code or an HTTP status stays distinct while a bare count stays masked.
+    // refs: SRC-D-TID-14
     constexpr std::size_t kMaxStatusDigits{3};
 
     [[nodiscard]] inline bool equals_ascii_lower(std::string_view tok,
@@ -149,10 +115,8 @@ namespace
         return true;
     }
 
-    // The lexicon as a TABLE rather than a `||` chain, for the reason every other catalog in this
-    // file is a table: a chain cannot be enumerated, so nothing could ask whether the witness
-    // population still covers it, and a fifth keyword would join the rule set unwitnessed. Same
-    // membership, same case-folding, same order — a pure restatement.
+    // invariant: a TABLE and not a chain, because a chain cannot be enumerated and a fifth keyword
+    // would join the rule set unwitnessed.
     inline constexpr std::array<std::string_view, 4> kStatusKeywords{
         {std::string_view{"code"}, std::string_view{"status"}, std::string_view{"exit"},
          std::string_view{"signal"}}};
@@ -163,43 +127,37 @@ namespace
                                    { return equals_ascii_lower(tok, keyword); });
     }
 
-    // ── Ephemeral-root catalog + matcher (SRC-D-MSK-4) ───────────────────────────
-    // A path component sitting DIRECTLY under a declared ephemeral root is a per-run instance by
-    // construction (a conan build dir `.conan2/p/b/insig247e3d1dffc33`, a nix store hash, a random
-    // `/tmp/pw-electron-userdata-Kw9v4a`). study 011 proved NO hex/length rule can separate
-    // ephemeral from content — a 40-char SHA is a pinned dependency in one path and per-run junk in
-    // another, same length/alphabet. The DECIDABLE thing is the ROOT: an enumerable, byte-exact
-    // catalog. It is the single source of truth, consulted as a per-segment PREDICATE from BOTH the
-    // diagnostic-composite segment walk (call site A, below) and the standalone
-    // `normalize_ephemeral_root` (call site B) — adding a root here extends both with no second
-    // edit (the kCurrencyMarkers discipline). Masking-only, no semantics ⇒ canon CORE, not a
-    // dialect package (ADR-17 cl.4: kCanonicalizationVersion IS the core masking generation).
-    // See technical_docs/adr/016-canon-canonicalization-internals.md.
-
+    // invariant: the ROOT is the decidable thing - no length or alphabet rule separates an
+    // ephemeral path component from content.
+    // invariant: ONE catalog, consulted as a per-segment predicate from every call site, so adding
+    // a root extends them all with no second edit.
+    // note: masking only and no semantics, so it is canon CORE and never a dialect package.
+    // refs: ADR-16.D2, ADR-17.D4, SRC-D-MSK-4
     enum class RootAnchor : std::uint8_t
     {
-        TokenStart, // the root's first component is the first component after a leading '/'
-        Floating,   // the root matches at ANY '/' component boundary (a mid-path root)
+        // note: the root's first component is the first component after a leading separator.
+        TokenStart,
+        // note: the root matches at ANY component boundary - a mid-path root.
+        Floating,
     };
     enum class RootScope : std::uint8_t
     {
-        Subtree,  // everything under the root is ephemeral (a namespace of ephemeral trees: /tmp)
-        Instance, // exactly the ONE component under the root is ephemeral; the tail resumes normal
-                  // classification (a content-addressed store whose subtree is stable: conan, nix)
+        // note: everything under the root is ephemeral - a namespace of ephemeral trees.
+        Subtree,
+        // note: exactly the ONE component under the root is ephemeral; the tail resumes normally.
+        Instance,
     };
 
     struct EphemeralRoot
     {
-        std::span<const std::string_view> segments; // the root as ordered path components
+        std::span<const std::string_view> segments;
         RootAnchor anchor;
         RootScope scope;
     };
 
-    // The declared roots, segment-wise (a root is components, never a string containing '/', so it
-    // matches segment-wise). Each backing array has static storage so the spans are
-    // constexpr-valid. `anchor`/`scope` are EXPLICIT, never inferred: a mis-spelled root that
-    // silently floated would over-mask, and over-masking destroys signal irrecoverably (ADR-9) —
-    // the dangerous axes are named on purpose.
+    // invariant: anchor and scope are EXPLICIT, never inferred - a mis-spelled root that silently
+    // floated would over-mask, and over-masking destroys signal irrecoverably.
+    // refs: ADR-9, ADR-16.D2
     inline constexpr std::array<std::string_view, 1> kRootTmp{{std::string_view{"tmp"}}};
     inline constexpr std::array<std::string_view, 2> kRootVarTmp{
         {std::string_view{"var"}, std::string_view{"tmp"}}};
@@ -210,9 +168,8 @@ namespace
     inline constexpr std::array<std::string_view, 2> kRootNixStore{
         {std::string_view{"nix"}, std::string_view{"store"}}};
 
-    // `bazel-out` is deliberately ABSENT: its component is the build CONFIGURATION (`k8-fastbuild`,
-    // `ppc-opt`) — stable per config, carries no hash, and masking it would destroy which-config
-    // signal to fix nothing (canon_ephemeral_root_masking.md §3 M7).
+    // invariant: a root whose component is the build CONFIGURATION is deliberately absent - it is
+    // stable per config, carries no hash, and masking it would destroy signal to fix nothing.
     inline constexpr std::array<EphemeralRoot, 5> kEphemeralRoots{{
         {.segments = kRootTmp, .anchor = RootAnchor::TokenStart, .scope = RootScope::Subtree},
         {.segments = kRootVarTmp, .anchor = RootAnchor::TokenStart, .scope = RootScope::Subtree},
@@ -223,11 +180,11 @@ namespace
         {.segments = kRootNixStore, .anchor = RootAnchor::TokenStart, .scope = RootScope::Instance},
     }};
 
-    inline constexpr std::size_t kMaxRootSegments{3U}; // longest declared root = look-back window
+    // invariant: the longest declared root, so this is the look-back window the matcher needs.
+    inline constexpr std::size_t kMaxRootSegments{3U};
 
-    // One path component seen by a segment walk: its core text, the separator byte immediately
-    // before it ('/' , ':' , or '\0' at token start), and whether it is the first component after a
-    // leading '/' (needed to decide a TokenStart anchor).
+    // post: one component of a segment walk - its core text, the separator byte immediately before
+    // it, and whether it is the first component after a leading separator.
     struct PathComponent
     {
         std::string_view text;
@@ -235,9 +192,10 @@ namespace
         bool at_token_start{false};
     };
 
-    // THE MATCHER (SRC-D-MSK-4 M2). Given the trailing window of up to kMaxRootSegments components
-    // ending at the CURRENT one (window.back()), does a declared root END here, and with what
-    // scope? Longest declared root ending here wins (order-independent). Returns nullopt otherwise.
+    // pre: `window` ends at the CURRENT component and holds at most kMaxRootSegments of them.
+    // post: the scope of the longest declared root ENDING at the current component, else nullopt -
+    // longest wins, so the answer is order-independent.
+    // refs: SRC-D-MSK-4
     [[nodiscard]] inline std::optional<RootScope>
     root_scope_ending_at(std::span<const PathComponent> window) noexcept
     {
@@ -248,15 +206,14 @@ namespace
         for (const EphemeralRoot& root : kEphemeralRoots)
         {
             const std::size_t klen{root.segments.size()};
-            // Hot-path gate (§5 MUST): the current component must be the root's LAST segment — a
-            // size-then-byte string compare that rejects almost every component in ~one length
-            // check. Only a strictly longer match than one already found can win.
+            // assert: the current component must be the root's LAST segment, which rejects almost
+            // every component in about one length compare.
             if (klen > window.size() || klen <= best_len ||
                 window.back().text != root.segments[klen - 1U])
                 continue;
-            const std::size_t first{window.size() - klen}; // window index of the root's 1st comp
+            const std::size_t first{window.size() - klen};
             bool matched{true};
-            for (std::size_t seg{0}; seg + 1U < klen; ++seg) // last segment already matched
+            for (std::size_t seg{0}; seg + 1U < klen; ++seg)
                 if (window[first + seg].text != root.segments[seg])
                 {
                     matched = false;
@@ -264,8 +221,9 @@ namespace
                 }
             if (!matched)
                 continue;
-            // MUST: consecutive AND '/'-separated — every separator from the root's first component
-            // through its last must be '/', so a ':'-coincidence (`foo:tmp:bar`) never matches.
+            // assert: consecutive AND separator-joined - every separator from the root's FIRST
+            // component onward must be the path separator, so a colon coincidence never matches.
+            // refs: ADR-16.D2
             for (std::size_t idx{first}; idx < window.size(); ++idx)
                 if (window[idx].sep_before != '/')
                 {
@@ -282,46 +240,17 @@ namespace
         return best;
     }
 
-    // Composite-token masking, DIAGNOSTIC_COMPOSITE class (SRC-D-MSK-1).
-    //
-    // The fixed masks mask only WHOLE tokens that are digit-leading / IPv4 / hex. A
-    // `:`/`/`-structured diagnostic token is none of those, so every numeric instance
-    // becomes its own template — a dominant cardinality blow-up. Two shapes:
-    //   • a compiler source location `tokenizer.cpp:4500:30:` (path then `:line:col`); and
-    //   • the Chromium/glog/Electron prefix `[6226:0609/094020.430910:ERROR:dbus/bus.cc:408]`
-    //     (PID:DATE/TIME:LEVEL:file.cc:line) — `normalize_source_location` kept the whole
-    //     PID/date/time prefix because it isn't "path-like", so it never collapsed.
-    //
-    // GENERALIZED RULE: split the token on `:` and `/` into sub-segments and classify EACH
-    // independently — a digit-leading sub-segment → `<*>` (mask the instance), a letter-leading
-    // sub-segment → KEEP (the stable class anchor: a filename, a level, a subsystem). Rejoin
-    // with the original separators. This SUBSUMES source-location exactly
-    // (`tokenizer.cpp:4500:30:` → `tokenizer.cpp:<*>:<*>:`, unchanged) and collapses the
-    // Chromium prefix (→ `[<*>:<*>/<*>:ERROR:dbus/bus.cc:<*>]`, byte-identical across PIDs/times).
-    //
-    // SCOPING (keeps the blast radius near genuine diagnostic composites, not all paths):
-    //   • TRIGGER — the token must contain a `:` immediately followed by a digit (the
-    //     source-location/diagnostic signature). A plain numeric path `/foo/12345/bar` (no
-    //     `:digit`) is NOT triggered → handled by the whole-token digit rule, unchanged.
-    //   • ANCHOR — at least one letter-leading sub-segment must exist. A pure-numeric colon
-    //     token (a clock `12:30:45`) has no anchor → falls through to the digit-leading whole-
-    //     token mask (`<*>`), unchanged. Letter-leading keywords (`arm64:v8`) never trigger.
-    //   • STATUS-VALUE CARVE-OUT (per segment) — a digit sub-segment that is a status value
-    //     (≤ kMaxStatusDigits, immediately preceded WITHIN the composite by a status keyword
-    //     segment `exit`/`code`/`signal`/`status`) is KEPT, so `exit:0`→`exit:1` /
-    //     `status:200`→`status:500` stay split (the green→red flip never collapses).
-    //
-    // Pure, byte-only, single-token (a function of the token bytes — I5) → cross-stdlib + MSVC
-    // bit-identical. Returns true and fills `out` only when ≥1 segment was masked AND an anchor
-    // exists; false (leaving the dispatch to fall through) otherwise.
-    // One coherent per-token masking routine: the `:`/`/` segment walk, the letter-KEEP /
-    // digit-MASK / status carve-out classification, and the SRC-D-MSK-4 ephemeral-root instance
-    // masking all share the same left-to-right pass over `out`/prev_core/window — a split fragments
-    // the single scan and its determinism.
+    // post: true, with `out` filled, only when at least one segment masked AND a letter-leading
+    // anchor exists; false otherwise, leaving the dispatch to fall through.
+    // invariant: pure, byte-only and single-token, so the normal form is bit-identical across
+    // standard libraries.
+    // refs: SRC-D-MSK-1, SRC-D-MSK-4
+    // note: one pass does the walk, the classification and the root masking; a split fragments it.
     // NOLINTNEXTLINE(readability-function-cognitive-complexity)
     [[nodiscard]] inline bool normalize_diagnostic_composite(std::string_view tok, std::string& out)
     {
-        // TRIGGER: a ':' immediately followed by a digit (subsumes source-location).
+        // assert: the trigger is a `:` immediately followed by a digit, which subsumes
+        // source-location.
         bool has_colon_digit{false};
         for (std::size_t pos{0}; pos + 1 < tok.size(); ++pos)
             if (tok[pos] == ':' && is_digit(tok[pos + 1]))
@@ -335,15 +264,12 @@ namespace
         out.clear();
         bool masked{false};
         bool has_letter_anchor{false};
-        std::string_view prev_core{}; // the previous segment's core — for the status carve-out
+        std::string_view prev_core{};
         std::size_t seg_start{0};
-        // SRC-D-MSK-4 M3/M4: the ephemeral-root matcher over the SAME catalog as call site B. When
-        // a declared root ends at a component, the NEXT component is a per-run instance and masks
-        // to
-        // <*> regardless of its leading char (overriding the letter-leading KEEP); scope is CLAMPED
-        // to Instance here so the file:line tail is never masked, and classification resumes from
-        // the component after the instance. Root matching uses the FULL segment (`.conan2` keeps
-        // its dot), not the alnum-stripped `core`.
+        // assert: the same catalog as the standalone rule; the component after a declared root is a
+        // per-run instance and masks whatever its leading byte, overriding the letter-leading KEEP.
+        // assert: scope is CLAMPED to Instance here, so a file-and-line tail is never masked.
+        // refs: SRC-D-MSK-4
         bool mask_next{false};
         std::array<PathComponent, kMaxRootSegments> window{};
         std::size_t window_len{0};
@@ -371,7 +297,6 @@ namespace
             [&](std::size_t end)
             {
                 const std::string_view seg{tok.substr(seg_start, end - seg_start)};
-                // core = segment with leading/trailing non-alnum stripped (for classification only)
                 std::size_t lead{0};
                 while (lead < seg.size() && !is_digit(seg[lead]) && !is_alpha(seg[lead]))
                     ++lead;
@@ -384,44 +309,42 @@ namespace
 
                 if (core.empty())
                 {
-                    out.append(seg); // pure punctuation — keep verbatim
+                    out.append(seg);
                     prev_core = {};
-                    // an empty/punct-only component is never a root segment: it neither ends a root
-                    // nor consumes mask_next (a stray `//` leaves the instance to the next real
-                    // component). Leave the window and flags untouched.
+                    // assert: an empty or punctuation-only component is never a root segment - it
+                    // neither ends a root nor consumes the pending instance.
                     return;
                 }
 
                 if (mask_next)
                 {
-                    // this component is the per-run instance directly under a declared root → mask
-                    // it whole (M3), regardless of its leading character.
+                    // assert: this component is the per-run instance directly under a declared
+                    // root.
                     out.append(seg.substr(0, lead));
                     out.append(kWildcard);
                     out.append(seg.substr(trail));
                     masked = true;
                     prev_core = core;
                     push_component(seg, sep_before, at_token_start);
-                    mask_next = root_ends_here(); // resumes normally unless (pathologically) the
-                                                  // instance itself also ends a root
+                    mask_next = root_ends_here();
                     return;
                 }
 
                 if (is_alpha(core.front()))
                 {
-                    out.append(seg); // letter-leading → KEEP (class anchor)
+                    out.append(seg);
                     has_letter_anchor = true;
                 }
                 else if (is_status_keyword(prev_core) && is_all_digits(core) &&
                          core.size() <= kMaxStatusDigits)
                 {
-                    out.append(seg); // exit:0 / status:500 → KEEP (categorical)
+                    out.append(seg);
                 }
                 else
                 {
-                    out.append(seg.substr(0, lead)); // leading punct, e.g. '['
+                    out.append(seg.substr(0, lead));
                     out.append(kWildcard);
-                    out.append(seg.substr(trail)); // trailing punct, e.g. ']'
+                    out.append(seg.substr(trail));
                     masked = true;
                 }
                 prev_core = core;
@@ -432,23 +355,19 @@ namespace
             if (tok[pos] == ':' || tok[pos] == '/')
             {
                 flush_segment(pos);
-                out.push_back(tok[pos]); // the separator, in its original position
+                out.push_back(tok[pos]);
                 seg_start = pos + 1;
             }
-        flush_segment(tok.size()); // the final segment
+        flush_segment(tok.size());
         return masked && has_letter_anchor;
     }
 
-    // EPHEMERAL_ROOT standalone rule (SRC-D-MSK-2, re-expressed for SRC-D-MSK-4 M5). Reached only
-    // for tokens rule #1 did not claim (no ':digit'). Split the path on '/', run the shared matcher
-    // (kEphemeralRoots above), and honor the DECLARED scope: `Subtree` collapses the whole
-    // remainder (`<root>/<*>`, byte-identical to -5 for every existing entry); `Instance` masks the
-    // one component under the root and KEEPS the tail (`<root>/<*>/<tail…>`). Being segment-
-    // anchored (not `starts_with`) is what lets a mid-path Floating root like `.conan2/p/b` match.
-    // NOT a random-string classifier and NOT a general absolute-path masker (`/etc/hosts`,
-    // `/usr/bin/foo` untouched — no declared root). Checked AFTER the diagnostic composite, so a
-    // `/tmp/…:42` source path keeps its `file:line` shape; a `/tmp/…` dir without `:digit` lands
-    // here.
+    // pre: reached only for a token the diagnostic composite did not claim.
+    // post: honours the DECLARED scope - a subtree root collapses the whole remainder, an instance
+    // root masks the one component under it and KEEPS the tail.
+    // invariant: segment-anchored rather than prefix-matched, which is what lets a mid-path
+    // floating root match; it is not a general absolute-path masker.
+    // refs: SRC-D-MSK-2, SRC-D-MSK-4
     [[nodiscard]] inline bool normalize_ephemeral_root(std::string_view tok, std::string& out)
     {
         std::array<PathComponent, kMaxRootSegments> window{};
@@ -466,7 +385,7 @@ namespace
                         }};
 
         std::size_t comp_start{0};
-        std::size_t root_end{std::string_view::npos}; // byte index of the '/' after the root
+        std::size_t root_end{std::string_view::npos};
         RootScope scope{RootScope::Subtree};
         for (std::size_t pos{0}; pos <= tok.size(); ++pos)
             if (pos == tok.size() || tok[pos] == '/')
@@ -488,10 +407,10 @@ namespace
             }
 
         if (root_end == std::string_view::npos)
-            return false; // no declared root in this token
+            return false;
 
-        // Require a non-empty INSTANCE component directly under the root (`<root>/<x>`), so a bare
-        // `/tmp` / `/tmp/` and a `//` are not collapsed (preserves the -5 size guard).
+        // assert: a non-empty instance component directly under the root is required, so a bare
+        // root and a doubled separator are not collapsed.
         if (root_end >= tok.size() || tok[root_end] != '/')
             return false;
         const std::size_t inst_start{root_end + 1U};
@@ -499,34 +418,30 @@ namespace
             return false;
 
         out.clear();
-        out.append(tok.substr(0, root_end)); // `<root…>`
+        out.append(tok.substr(0, root_end));
         out.push_back('/');
         out.append(kWildcard);
         if (scope == RootScope::Instance)
         {
-            // keep the tail after the ONE masked instance component (M5 Instance form)
             std::size_t inst_end{inst_start};
             while (inst_end < tok.size() && tok[inst_end] != '/')
                 ++inst_end;
-            out.append(tok.substr(inst_end)); // `/…tail`, or empty if the instance is last
+            out.append(tok.substr(inst_end));
         }
-        // Subtree: the whole remainder is already the single `<*>` just appended (M5 Subtree form).
         return true;
     }
 
-    // VERSIONED_REF composite: `<name>/<numeric-version>[trailing punct]`.
-    // Conan/cmake/package output ("zlib/3", "boost/1.83.0:") keeps a literal token
-    // per (name,version), so a bumped version is a phantom new template. Normalize
-    // by KEEPing the name and masking the numeric version → `zlib/<*>`, `boost/<*>:`.
-    // Requires: a '/' whose suffix is a numeric (digits/dots) version run, then only
-    // punctuation to end (so paths like "src/foo.cpp" — alpha suffix — are NOT hit).
+    // post: keeps the name and masks the numeric version, so a version bump is not a new template.
+    // pre: a separator whose suffix is a numeric version run, then punctuation only - an alphabetic
+    // suffix is a path segment and is declined.
+    // refs: SRC-D-TID-12
     [[nodiscard]] inline bool normalize_versioned_ref(std::string_view tok, std::string& out)
     {
         const std::size_t slash{tok.rfind('/')};
         if (slash == std::string_view::npos || slash + 1 >= tok.size())
             return false;
         if (!is_digit(tok[slash + 1]))
-            return false; // version must start with a digit
+            return false;
 
         std::size_t cursor{slash + 1};
         bool saw_digit{false};
@@ -537,8 +452,6 @@ namespace
         }
         if (!saw_digit)
             return false;
-        // Anything after the version run must be non-alphanumeric (punctuation),
-        // else this is a path segment ("v1/2x") not a terminal version.
         for (std::size_t pos{cursor}; pos < tok.size(); ++pos)
         {
             const char chr{tok[pos]};
@@ -547,39 +460,24 @@ namespace
         }
 
         out.clear();
-        out.append(tok.substr(0, slash + 1)); // "zlib/"
+        out.append(tok.substr(0, slash + 1));
         out.append("<*>");
-        out.append(tok.substr(cursor)); // trailing punctuation, e.g. ":"
+        out.append(tok.substr(cursor));
         return true;
     }
 
-    // BRACKET_TIMESTAMP composite (SRC-D-MSK-5; bibles/jenkins_dialect.md §4, ADR-23 erratum 2 —
-    // "the bracket is the entire difference"). The WHOLE-token bracketed RFC3339 stamp
-    // `[2026-06-23T15:11:09.020Z]` used to fall through EVERY rule to literal KEEP: the
-    // diagnostic composite declines it (its `:digit` trigger fires but no sub-segment is
-    // letter-leading, so the anchor gate fails), bracket_index declines at the first `-`, and the
-    // digit-leading whole-token mask never sees a `[`-leading byte. On a Jenkins timestamper
-    // stream reaching the masker WITHOUT the dialect declared (the RawText floor, fail-closed)
-    // every stamped line was therefore its own template — measured at 95.9% of the no-collapse
-    // ceiling on the payload-stamped slice (ADR-23), a live ADR-9 precision-first
-    // regression. The TRIGGER is deliberately NARROW (precision-first: claim the stamp class and
-    // nothing adjacent to it): the token is exactly `[` + a COMPLETE RFC3339 full datetime + `]`.
-    // Date-only, time-only, bare-integer (`[42]` stays bracket_index's), word (`[INFO]`,
-    // `[Pipeline]`), version (`[v1.2.3]`) interiors and any trailing punctuation are all
-    // declined. The byte grammar is insight::utils::rfc3339_datetime_length — ONE owner, shared
-    // with the transport peel and stamp-at-head rows, so the shape is never spelled twice; that
-    // grammar's own header holds the full four-consumer census.
-    // Normal form `[<*>]`: the KEEP-class bracket convention its neighbor set — the bracket (the
-    // class) survives, the instance masks. The output-class collision with bracket_index's `[<*>]`
-    // is NAMED AND ACCEPTED: both are masked-instance-inside-brackets, and inventing a second
-    // placeholder vocabulary for one rule is worse than sharing the normal form.
+    // post: the whole token is `[`, one COMPLETE RFC3339 full datetime, `]`, and it masks to a
+    // bracketed wildcard; every other interior and any trailing punctuation is declined.
+    // invariant: the byte grammar has ONE owner and is never spelled twice here.
+    // refs: SRC-D-MSK-5, ADR-23.D1
+    // note: the output-class collision with the bracketed-index normal form is named and accepted.
     [[nodiscard]] inline bool normalize_bracket_timestamp(std::string_view tok, std::string& out)
     {
         if (tok.size() < 3U || tok.front() != '[' || tok.back() != ']')
             return false;
         const std::size_t interior{insight::utils::rfc3339_datetime_length(tok, 1U)};
         if (interior == 0 || 1U + interior + 1U != tok.size())
-            return false; // the interior is not EXACTLY one complete full datetime — declined
+            return false;
         out.clear();
         out.push_back('[');
         out.append(kWildcard);
@@ -587,11 +485,9 @@ namespace
         return true;
     }
 
-    // BRACKET_INDEX composite: `<word>[<short-alpha>?<digits>]<rest>`. Recursion depth,
-    // worker/shard indices ("make[2]:", "thread[15]", pytest-xdist "[gw0]") otherwise
-    // template per index. Normalize the bracketed digit run, KEEPING any short alpha
-    // class-prefix inside the bracket → `make[<*>]:`, `[gw<*>]` (SRC-D-TID-13b generalizes
-    // pure-`[N]` to `[<prefix><N>]`: keep the stable class marker, mask the varying index).
+    // post: normalizes the bracketed digit run and KEEPS a short alphabetic class prefix inside the
+    // bracket - keep the stable class marker, mask the varying index.
+    // refs: SRC-D-TID-13b
     [[nodiscard]] inline bool normalize_bracket_index(std::string_view tok, std::string& out)
     {
         const std::size_t open{tok.find('[')};
@@ -600,7 +496,7 @@ namespace
         std::size_t cursor{open + 1};
         const std::size_t prefix_begin{cursor};
         while (cursor < tok.size() && is_alpha(tok[cursor]))
-            ++cursor; // optional class prefix inside the bracket ("gw", "worker")
+            ++cursor;
         const std::string_view prefix{tok.substr(prefix_begin, cursor - prefix_begin)};
         bool saw_digit{false};
         while (cursor < tok.size() && is_digit(tok[cursor]))
@@ -612,23 +508,20 @@ namespace
             return false;
 
         out.clear();
-        out.append(tok.substr(0, open + 1)); // "make[" / "["
-        out.append(prefix);                  // "" for make[2]; "gw" for [gw0]
+        out.append(tok.substr(0, open + 1));
+        out.append(prefix);
         out.append("<*>");
-        out.append(tok.substr(cursor)); // "]:" and anything after
+        out.append(tok.substr(cursor));
         return true;
     }
 
-    // ── F13 composite-masking (ADR-16.D5; SRC-D-TID-12, SRC-D-TID-13) ────────
-    // Per-line masking is the SOLE generalizer once Drain's learning is retired, so
-    // these classify the high-card SYNTACTIC token classes the fixed masks missed.
-    // Admitted under SRC-D-TID-14 (contract: canon.api.cppm) — all byte-only and
-    // single-token, which is what makes them cross-stdlib identical.
-
-    // SRC-D-TID-12 #5: digit-leading (after an optional sign) ⇒ a number / measurement /
-    // version / timestamp, intrinsically high-card. Subsumes the all-digit mask AND
-    // numbers-with-separators / decimals / number+unit / versions in ONE rule, no unit
-    // lexicon (`512MB`/`6.2s`/`0.25.5-3` mask; `sha256`/`x86` are letter-leading → keep).
+    // invariant: per-line masking is the SOLE generalizer, so these classify the high-cardinality
+    // SYNTACTIC token classes the fixed masks miss.
+    // post: true for a digit-leading token after an optional sign - a number, measurement, version
+    // or timestamp, and intrinsically high-cardinality.
+    // invariant: subsumes the all-digit mask and every separator, decimal, unit-suffixed and
+    // versioned numeric in ONE rule, with no unit lexicon.
+    // refs: ADR-16.D5, SRC-D-TID-12, SRC-D-TID-13, SRC-D-TID-14
     [[nodiscard]] inline bool is_digit_leading(std::string_view tok) noexcept
     {
         std::size_t pos{0};
@@ -637,17 +530,13 @@ namespace
         return pos < tok.size() && is_digit(tok[pos]);
     }
 
-    // The hex-run floor: at or above this length a hex-only run is an instance hash, below it a
-    // word. ONE declaration, read by rule 3's standalone check below AND by the embedded-identity
-    // scanner further down — which each carried their own `16` before, so the floor could be moved
-    // in one and not the other and the two maskers would disagree about the same token. Exposed
-    // through `rule_catalog::min_hash_length()` so a witness can state it sits below the floor
-    // instead of hard-coding a third copy in the test tree.
+    // invariant: ONE declaration of the hex-run floor, read by the standalone check and by the
+    // embedded-identity scanner, so the two maskers cannot disagree about the same token.
     constexpr std::size_t kMinHashLen{16};
 
-    // SRC-D-TID-12 #3: a standalone UUID (8-4-4-4-12 hex-with-dashes) or a hex-only run
-    // ≥ kMinHashLen chars (a git SHA / content hash). The floor keeps short hex-looking
-    // words ("deadbeef", "cafe") literal — only genuinely high-card hashes mask.
+    // post: true for a standalone UUID or a hex-only run at or above the floor.
+    // invariant: the floor is what keeps a short hex-looking word literal.
+    // refs: SRC-D-TID-12
     [[nodiscard]] inline bool is_uuid_or_long_hash(std::string_view tok) noexcept
     {
         constexpr std::size_t kUuidLen{36};
@@ -666,8 +555,9 @@ namespace
         return false;
     }
 
-    // SRC-D-TID-13(a): `#`-counter (`#42`, buildkit `#NN`) → `#<*>` — keep the marker, mask
-    // the index. The digit run must run to end-or-punctuation (so `#main` is not a counter).
+    // post: keeps the counter marker and masks the index; the digit run must reach end or
+    // punctuation, so a marker followed by a word is not a counter.
+    // refs: SRC-D-TID-13
     [[nodiscard]] inline bool normalize_hash_counter(std::string_view tok, std::string& out)
     {
         if (tok.size() < 2U || tok[0] != '#' || !is_digit(tok[1]))
@@ -677,22 +567,21 @@ namespace
             ++cursor;
         for (std::size_t pos{cursor}; pos < tok.size(); ++pos)
             if (is_digit(tok[pos]) || is_alpha(tok[pos]))
-                return false; // `#42abc` is not a clean counter
+                return false;
         out.clear();
         out.append("#<*>");
         out.append(tok.substr(cursor));
         return true;
     }
 
-    // SRC-D-TID-22 currency-marker catalog: FROZEN, DECLARED byte sequences. ASCII `$` only for
-    // now; `€`/`£`/`¥` would be added here as their literal UTF-8 byte strings ("€" etc.) iff a
-    // corpus shows them — byte-exact, NO Unicode property lookup (cross-stdlib determinism +
-    // portability, the SRC-D-TID-9 oracle). Adding a marker here auto-extends both touch points
-    // (the pre-gate + normalize_marker_number) — single source of truth.
+    // invariant: FROZEN, DECLARED byte sequences - byte-exact, with no Unicode property lookup,
+    // which is what keeps the decision identical across standard libraries.
+    // invariant: adding a marker here extends BOTH touch points, so there is one source of truth.
+    // refs: SRC-D-TID-9, SRC-D-TID-22
     inline constexpr std::array<std::string_view, 1> kCurrencyMarkers{std::string_view{"$"}};
 
-    // Length in BYTES of the declared currency marker prefixing `tok` (0 if none). Requires at
-    // least one byte after the marker (the numeric core), so a lone `$` is not a marker.
+    // post: the length in BYTES of the declared marker prefixing `tok`, 0 when there is none.
+    // pre: at least one byte must follow the marker, so a lone marker is not one.
     [[nodiscard]] inline std::size_t marker_prefix_len(std::string_view tok) noexcept
     {
         for (const std::string_view marker : kCurrencyMarkers)
@@ -701,18 +590,11 @@ namespace
         return 0;
     }
 
-    // SRC-D-TID-22: a declared currency MARKER glued to a digit-led numeric core (`$463`, `$1.50`)
-    // →
-    // `$<*>` — keep the marker, mask the high-card amount (the SRC-D-TID-13 `#42 → #<*>`
-    // keep-class/ mask-instance shape). A DECIDABLE numeric: there is no low-card *keyword* of
-    // shape
-    // `<marker><digits>` worth protecting (shell positionals `$1`/`$2` are negligible-in-logs and
-    // lossless to mask), so it joins the SRC-D-TID-12 #5 digit-leading numerics that the first-char
-    // `is_digit_leading` test misses on a leading marker. The core is digits + one optional
-    // `.`-fraction; a trailing alpha/digit after a clean core rejects (`$42abc` is not a counter,
-    // like `#42abc`), trailing punctuation is kept (`$463,` → `$<*>,`). `$HOME` (`$`+letter) has no
-    // digit core → returns false → kept literal. Byte-only, single-token → cross-stdlib
-    // bit-identical.
+    // post: keeps the marker and masks the amount; the core is digits plus one optional fraction, a
+    // trailing alphanumeric rejects, and trailing punctuation is kept.
+    // invariant: a DECIDABLE numeric - no low-cardinality keyword has the shape marker-then-digits,
+    // so it joins the digit-leading numerics the first-byte test misses on a leading marker.
+    // refs: SRC-D-TID-12, SRC-D-TID-22
     [[nodiscard]] inline bool normalize_marker_number(std::string_view tok, std::string& out)
     {
         const std::size_t marker{marker_prefix_len(tok)};
@@ -728,30 +610,24 @@ namespace
             while (cursor < tok.size() && is_digit(tok[cursor]))
                 ++cursor;
             if (cursor == frac)
-                return false; // trailing '.' with no fraction → not a clean number
+                return false;
         }
         for (std::size_t pos{cursor}; pos < tok.size(); ++pos)
             if (is_digit(tok[pos]) || is_alpha(tok[pos]))
-                return false; // `$42abc` is not a clean marker-number
+                return false;
         out.clear();
-        out.append(tok.substr(0, marker)); // keep the marker bytes
+        out.append(tok.substr(0, marker));
         out.append(kWildcard);
-        out.append(tok.substr(cursor)); // keep trailing punctuation
+        out.append(tok.substr(cursor));
         return true;
     }
 
-    // ── The two FIXED-LENGTH embedded-identity grammars ──────────────────────────────
-    // Both are file-local and PRIVATE, both are pure byte scans at a token offset, and both
-    // are free functions rather than lambdas inside their one caller: nested in
-    // `normalize_embedded_identity` they carried its cognitive complexity past the 25 the
-    // doctrine enforces, and hoisting is the root fix where a NOLINT would have been the
-    // paper-over.
+    // note: hoisted out of their one caller: nested, they carried its complexity past the limit.
     constexpr std::size_t kUuidLen{36};
     constexpr std::array<std::size_t, 4> kUuidDashes{8, 13, 18, 23};
-    // kMinHashLen is declared ONCE, above rule 3's `is_uuid_or_long_hash` — the embedded-identity
-    // scanner below reads that same declaration rather than a second copy of the number.
 
-    // A UUID (8-4-4-4-12 hex-with-dashes) starting exactly at `pos`.
+    // invariant: the floor is declared once, above the standalone hex check, and read here.
+    // post: true when a UUID starts exactly at `pos`.
     [[nodiscard]] inline bool uuid_at(std::string_view tok, std::size_t pos) noexcept
     {
         if (pos + kUuidLen > tok.size())
@@ -766,40 +642,20 @@ namespace
         return true;
     }
 
-    // THE COMPACT UTC INSTANT GRAMMAR — file-local and PRIVATE on purpose, and deliberately
-    // NOT delegated to `insight::utils::rfc3339_datetime_length` (canon.api.cppm), the shared
-    // public RFC3339 grammar. That grammar requires COLONS in the time, so admitting this
-    // colon-free profile would mean WIDENING it — and a shared grammar's blast radius is its
-    // CONSUMER SET, which here is four live consumers on three axes: the transport
-    // bracket-peel row and `has_stamp_at_head` (transport.cpp), both of which decide CONTENT
-    // vs TRANSPORT; the `bracket_timestamp` composite above; and two frozen measurement
-    // oracles (test_bracket_peel_equivalence_gate.cpp,
-    // payload_stamp_template_count_measurement_test.cpp) that re-implement the position logic
-    // AROUND it. Widening moves a Jenkins/GitHub content boundary and quietly falsifies
-    // `has_stamp_at_head`'s stated `kMinDatetimeLen{19}` invariant (18 < 19) — none of it
-    // visible to a masking-focused review. This grammar has ONE caller, in this translation
-    // unit, so it earns no public seat: it moves to canon.api.cppm the day a second consumer
-    // OUTSIDE this file needs it, which is the same criterion, byte for byte, that put
-    // `rfc3339_datetime_length` there.
-    //
-    // 18 bytes, no options and no variable-length part:
-    //   DIGIT{4} '-' DIGIT{2} '-' DIGIT{2} 'T' DIGIT{6} 'Z'
-    // ISO-8601 EXTENDED date + BASIC (colon-free) time + MANDATORY `Z`. Each anchor is
-    // load-bearing. `Z` is the RIGHT-HAND anchor: dropping it admits the 17-byte zoneless form
-    // and leaves the token with no literal terminator. No fraction, so the length stays fixed
-    // and the hot path needs no run scan, for zero measured instances. The colon-bearing
-    // extended form is a different owner's grammar and stays out of this one.
+    // invariant: file-local and PRIVATE on purpose - the shared RFC3339 grammar requires colons in
+    // the time, so admitting this colon-free profile would mean WIDENING it.
+    // invariant: 18 bytes with no options and no variable-length part; each anchor is load-bearing,
+    // and the mandatory terminator is what keeps the 17-byte zoneless form out.
+    // note: it earns a public seat the day a second consumer outside this unit needs it.
+    // refs: F-SRC-insight-canon:canon.api.cppm:rfc3339_datetime_length
     constexpr std::size_t kInstantLen{18};
     constexpr std::size_t kInstantDash1{4};
     constexpr std::size_t kInstantDash2{7};
     constexpr std::size_t kInstantTimeMark{10};
     constexpr std::size_t kInstantZulu{17};
 
-    // DELIMITER-GATED ON BOTH SIDES, symmetrically. The byte before the match (when one
-    // exists) and the byte after it (when one exists) must both be non-alphanumeric, so
-    // `12026-06-09T185733Z` does not match from offset 1 and `2026-06-09T185733Zebra` is
-    // declined at the right edge. Both bounds are what make the 18 bytes a whole token rather
-    // than a window slid over a longer name.
+    // invariant: delimiter-gated on BOTH sides - the byte before and the byte after the match, when
+    // each exists, must be non-alphanumeric, so the fixed width is a whole token and not a window.
     [[nodiscard]] inline bool compact_instant_at(std::string_view tok, std::size_t pos) noexcept
     {
         if (pos + kInstantLen > tok.size())
@@ -822,37 +678,21 @@ namespace
         return true;
     }
 
-    // SRC-D-TID-12 #3, reached INSIDE a token: mask a UUID (8-4-4-4-12), a long hex-run
-    // (≥ 16, delimiter-bounded) or a COMPACT UTC INSTANT (`2026-06-09T185733Z`) that is
-    // EMBEDDED in a larger token — temp-dir paths (`/…/_temp/<uuid>/cache.tzst`,
-    // `/…/_temp/<instant>.json`), `git-credentials-<uuid>.config`, `{worker-uuid}`,
-    // `builder-<uuid>` — keeping the surrounding path/structure, masking the identity
-    // instance (the same keep-class/mask-instance pattern as source-location). A UUID is
-    // a UUID whether standalone or in a path; this is the largest re-measured residual
-    // chunk and is squarely a SYNTACTIC class (SRC-D-TID-14), not a varying word.
-    //
-    // The instant arm (-13) is admissible where `is_opaque_identity` (-10, reverted) was not,
-    // and the difference is structural rather than one of degree: this is a CLOSED grammar
-    // pinned by literal bytes at fixed offsets, and every member of its acceptance set is,
-    // by ISO-8601's own semantics, an INSTANCE value — no stable name can inhabit it. A
-    // producer writing `2026-06-09T185733Z` CHOSE an encoding to say "this is an instant";
-    // reading that back is recognition, not inference from shape. The sibling nobody may add
-    // on the same reasoning is an embedded long-DIGIT-run arm: `qtp615117857` (a Jetty thread
-    // name, ephemeral) and `playwright-frontend-coverage-17364829102` (a GitHub run id in an
-    // artifact name, ephemeral) and `QUICKCONTROLS2` (stable, must NOT mask) are the same
-    // shape, and no parameter separates them.
+    // post: masks a UUID, a long hex run or a compact UTC instant EMBEDDED in a larger token,
+    // keeping the surrounding structure.
+    // invariant: a CLOSED grammar pinned by literal bytes at fixed offsets, every member of whose
+    // acceptance set is an instance value by the encoding's own semantics.
+    // refs: SRC-D-TID-12, SRC-D-TID-14
+    // invariant: the reasoning does not extend to an embedded long-DIGIT-run arm - a stable name
+    // and an ephemeral id are the same shape there, and no parameter separates them.
     [[nodiscard]] inline bool normalize_embedded_identity(std::string_view tok, std::string& out)
     {
         out.clear();
         bool masked{false};
         std::size_t pos{0};
-        // The three arms below are DISJOINT BY CONSTRUCTION, and their order is a COST choice,
-        // never a precedence claim — stating it as precedence would be a false comment. A UUID
-        // requires `-` at offset 8 where an instant requires a DIGIT there and `T` at offset 10;
-        // a hex run requires ≥ 16 CONSECUTIVE hex bytes where an instant requires `-` at
-        // offset 4. Both fixed-length probes therefore run before the variable-length run scan
-        // purely because they are cheaper. The DETECTOR for that disjointness is
-        // `StatelessTemplate.EmbeddedIdentityArmsAreDisjoint`, not this paragraph.
+        // assert: the three arms are DISJOINT BY CONSTRUCTION and their order is a COST choice,
+        // never a precedence claim - the fixed-length probes run first because they are cheaper.
+        // refs: F-SRC-insight-canon:test_stateless_template.cpp:EmbeddedIdentityArmsAreDisjoint
         while (pos < tok.size())
         {
             if (uuid_at(tok, pos))
@@ -869,7 +709,6 @@ namespace
                 masked = true;
                 continue;
             }
-            // A maximal hex-only run ≥ kMinHashLen, bounded left by a non-hex char.
             if (is_hex_char(tok[pos]) && (pos == 0 || !is_hex_char(tok[pos - 1])))
             {
                 std::size_t end{pos};
@@ -889,19 +728,9 @@ namespace
         return masked;
     }
 
-    // SRC-D-TID-13 extension (discovered at playground integration — LogCraft's KV-heavy
-    // message templates + the pre-existing KV regression guards in raw_log_fidelity):
-    // `<key>=<digit-leading-value>` → `<key>=<*>` (keep the key, mask the high-card
-    // numeric value). A SYNTACTIC class (SRC-D-TID-14 IN scope), the same keep-class/
-    // mask-instance pattern as the composites above. Without it a `key=<id>` over-splits
-    // per value — and for an ERROR line that REINTRODUCES the singleton false-diff this
-    // whole epic exists to kill (40 distinct `txn=<id>` error singletons → a phantom
-    // new/vanished pair per run). EXCLUDES a status value (`code=0` / `status=500`) so a
-    // green→red flip stays distinct — the KV form of the #1 status-value KEEP carve-out.
-    // A value-WORD (`user=alice`) is NOT masked (value not digit-leading → kept); that
-    // varying word is the unbuilt registry's job (SRC-D-TID-5/SRC-D-TID-14). The CI-revert
-    // re-measure (§8) did not surface this — CI tokens are space-separated, LogCraft wraps in
-    // `key=`.
+    // post: keeps the key and masks a digit-leading value; a status value and a value WORD are both
+    // excluded, so a green-to-red flip stays distinct and a varying word stays literal.
+    // refs: SRC-D-TID-5, SRC-D-TID-14, SRC-D-TID-17
     [[nodiscard]] inline bool normalize_kv_value(std::string_view tok, std::string& out)
     {
         const std::size_t eq_pos{tok.find('=')};
@@ -909,72 +738,58 @@ namespace
             return false;
         const std::string_view key{tok.substr(0, eq_pos)};
         const std::string_view raw_value{tok.substr(eq_pos + 1)};
-        // SRC-D-TID-22: strip a declared currency marker off the value before the digit-leading
-        // gate, so `total=$463 → total=$<*>` (keep key AND marker, mask the amount). marker=0 for a
-        // bare value → `total=463 → total=<*>` unchanged. A non-numeric core (`total=$HOME`) fails
-        // the gate below → kept literal.
+        // assert: a declared currency marker is stripped off the value before the digit-leading
+        // gate, so the key AND the marker are kept while the amount masks.
+        // refs: SRC-D-TID-22
         const std::size_t marker{marker_prefix_len(raw_value)};
         const std::string_view value{raw_value.substr(marker)};
         if (!is_digit_leading(value))
-            return false; // a value-word → kept literal (the registry's job), not masked
-        // Status-value KEEP (KV form): code=0 / status=500 must stay DISTINCT (the green→red flip),
-        // same context+size gate as the space-separated #1 carve-out. (Status values never carry a
-        // currency marker, so the strip above is a no-op for them.)
+            return false;
+        // assert: the status-value KEEP in its key-value form, on the same keyword-and-size gate as
+        // the space-separated carve-out.
         if (is_status_keyword(key) && is_all_digits(value) && value.size() <= kMaxStatusDigits)
             return false;
         out.clear();
         out.append(key);
         out.push_back('=');
-        out.append(raw_value.substr(0, marker)); // keep the marker (empty when none)
+        out.append(raw_value.substr(0, marker));
         out.append(kWildcard);
         return true;
     }
 
-    // ── The composite normalizer catalog (SRC-D-TID-12 step #2) ──────────────────────────
-    // The KEEP-class / mask-instance rules, as a DECLARED array whose ORDER IS THE PRECEDENCE:
-    // tried top-to-bottom, the first rule that claims the token wins (the former `||`
-    // short-circuit, now data). Each rule is a pure `bool(tok, out&)` — fills `out` with the
-    // normalized literal and returns true iff it claims the token. This catalog DEFINES the
-    // composite layer of the ruleset generation named by kCanonicalizationVersion; adding,
-    // reordering, or removing a rule is an output-affecting change that REQUIRES a version bump —
-    // the single enumerable place that rule can be stated (closing the SRC-D-TID-16 "rules changed,
-    // version didn't" gap for the rule set itself). Each entry names its governing ruling + the
-    // generation that introduced it.
-    // THE CATALOG'S SHAPE IS ONE LIMB OF THE OBLIGATION, NOT ALL OF IT. Widening an existing
-    // rule's ACCEPTANCE SET in place — a new arm inside a normalizer, a moved threshold — leaves
-    // this array byte-identical and is output-affecting just the same, so it owes the same bump.
-    // Read only for add/reorder/remove, this comment would license a silent identity change:
-    // `stateless-masks-13` (the compact-UTC arm inside `normalize_embedded_identity`) is exactly
-    // that case, and it never touched a row below.
+    // invariant: the array ORDER IS THE PRECEDENCE - tried top to bottom, the first rule that
+    // claims the token wins.
+    // invariant: this catalog DEFINES the composite layer of the generation the canonicalization
+    // version names, so adding, reordering or removing a rule REQUIRES a version bump.
+    // assert: the catalog's SHAPE is one limb of that obligation and not all of it - widening an
+    // existing rule in place leaves this array byte-identical and owes the same bump.
+    // refs: SRC-D-TID-12, SRC-D-TID-16
     struct CompositeRule
     {
-        std::string_view name; // stable rule id (diagnostics / the canon bible)
-        bool (*normalize)(std::string_view tok, std::string& out); // fills out; true iff claimed
+        std::string_view name;
+        bool (*normalize)(std::string_view tok, std::string& out);
     };
-    // The two bracket rules are ADJACENT, most-specific first, and non-overlapping today
-    // (bracket_timestamp requires a `-` where bracket_index requires `]`) — the ordering is
-    // stated so future drift between them has a rule to violate loudly.
+    // invariant: the two bracket rules are ADJACENT, most specific first, and non-overlapping
+    // today, so future drift between them has a rule to violate loudly.
+    // refs: SRC-D-MSK-1, SRC-D-MSK-2, SRC-D-MSK-5
+    // refs: SRC-D-TID-12, SRC-D-TID-13, SRC-D-TID-13b, SRC-D-TID-17, SRC-D-TID-22
     constexpr std::array<CompositeRule, 9U> kCompositeRules{{
-        {.name = "diagnostic_composite",
-         .normalize = normalize_diagnostic_composite},                     // SRC-D-MSK-1  (-4)
-        {.name = "ephemeral_root", .normalize = normalize_ephemeral_root}, // SRC-D-MSK-2  (-4)
-        {.name = "versioned_ref", .normalize = normalize_versioned_ref},   // SRC-D-TID-12 #2
-        {.name = "bracket_timestamp", .normalize = normalize_bracket_timestamp}, // SRC-D-MSK-5 (-8)
-        {.name = "bracket_index", .normalize = normalize_bracket_index},         // SRC-D-TID-13(b)
-        {.name = "hash_counter", .normalize = normalize_hash_counter},           // SRC-D-TID-13(a)
-        {.name = "marker_number", .normalize = normalize_marker_number}, // SRC-D-TID-22 (-3)
-        {.name = "embedded_identity", .normalize = normalize_embedded_identity}, // SRC-D-TID-12 #3
-        {.name = "kv_value", .normalize = normalize_kv_value},                   // SRC-D-TID-17
+        {.name = "diagnostic_composite", .normalize = normalize_diagnostic_composite},
+        {.name = "ephemeral_root", .normalize = normalize_ephemeral_root},
+        {.name = "versioned_ref", .normalize = normalize_versioned_ref},
+        {.name = "bracket_timestamp", .normalize = normalize_bracket_timestamp},
+        {.name = "bracket_index", .normalize = normalize_bracket_index},
+        {.name = "hash_counter", .normalize = normalize_hash_counter},
+        {.name = "marker_number", .normalize = normalize_marker_number},
+        {.name = "embedded_identity", .normalize = normalize_embedded_identity},
+        {.name = "kv_value", .normalize = normalize_kv_value},
     }};
 
-    // THE composite step, in ONE place. `stateless_template`'s dispatch below and
-    // `rule_catalog::composite_rule_claiming` (the coverage gate's discriminator) both call this,
-    // so the gate cannot be answering a question about a loop the masker no longer runs. The
-    // pre-gate is part of the step, not a caller's precondition: a token carrying no separator and
-    // no declared marker never reaches the catalog at all, so "which rule claims it" is *none* even
-    // where a rule's own predicate would have said yes.
-    // `shape` is passed in because the dispatcher already computed it — recomputing here would put
-    // a second byte-walk of every token back on the hot path this struct exists to keep off it.
+    // invariant: THE composite step, in ONE place - the dispatcher and the coverage gate's
+    // discriminator both call it, so the gate cannot answer about a loop the masker no longer runs.
+    // pre: `shape` is passed in because the dispatcher already computed it; recomputing here would
+    // put a second byte walk of every token back on the hot path.
+    // note: the pre-gate is part of the step: a token with no separator never reaches the catalog.
     [[nodiscard]] inline bool try_composite(std::string_view tok, const TokenShape& shape,
                                             std::string& out, std::string_view* claimed_by)
     {
@@ -1004,51 +819,42 @@ namespace
             if (cursor >= len)
                 break;
             const std::size_t start{cursor};
-            // Scan to the next space with memchr (vectorised in libc) — token bodies
-            // (paths, ids, JSON) are the long runs; bit-identical boundaries to the
-            // byte loop. memchr is never asymptotically worse for the short tokens.
+            // note: memchr scans to the next space with boundaries bit-identical to the byte loop.
             const void* const space{std::memchr(base + cursor, ' ', len - cursor)};
             cursor = space != nullptr
                          ? static_cast<std::size_t>(static_cast<const char*>(space) - base)
                          : len;
-            callback(content.substr(start, cursor - start)); // lvalue: invoked per token
+            callback(content.substr(start, cursor - start));
         }
     }
 
 } // namespace
 
-// ── Stateless per-line template masker (SRC-D-TID-1/SRC-D-TID-2) ──────────────────────────────
-// Per token, EMIT its canonical form by its OWN class — DECIDED per token (no cluster
-// lookup, no cross-line discovery): status-value KEEP → the literal; bare-number / empty
-// / IPv4 / hex / UUID / long-hash → "<*>" (a param); source-location / versioned-ref /
-// bracket-index / #-counter / embedded-identity → the normalized literal (KEPT, NOT a
-// param — it carries its own embedded "<*>"); any other token → the literal. The joined
-// sequence is the template; the SHA-256 of it (computed downstream, unchanged) is the
-// run-independent template_id. Pure: a function of `content`'s bytes only — no float, no
-// map iteration, no state — so it is cross-stdlib bit-identical and order-/stream-
-// independent by construction (SRC-D-TID-9).
+// post: the joined per-token canonical forms; a masked position contributes a param, a kept or
+// normalized position does not.
+// invariant: a function of the content bytes only - no float, no map iteration, no state - so it is
+// bit-identical across standard libraries and independent of order and stream.
+// refs: ADR-16.D5, SRC-D-TID-1, SRC-D-TID-2, SRC-D-TID-9
 StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& out_arena,
                                      const MaskConfig& config)
 {
     std::string tmpl;
     tmpl.reserve(content.size() + kWildcard.size());
-    std::vector<std::string_view> params; // raw tokens at fully-masked positions
-    std::string composite;                // scratch for composite normalization
-    std::string_view prev{};              // raw previous token — context for status KEEP
+    std::vector<std::string_view> params;
+    std::string composite;
+    std::string_view prev{};
     bool first{true};
 
-    // The declared per-token classification in TOTAL precedence (SRC-D-TID-12 §8.2): KEEP
-    // carve-outs win first, then the F13 masks. A masked position contributes a param
-    // (the raw token); a kept/normalized position does not.
+    // assert: the declared per-token classification in TOTAL precedence - the KEEP carve-outs win
+    // first, then the masks.
+    // refs: SRC-D-TID-12
     for_each_token(content,
                    [&](std::string_view tok)
                    {
                        if (!first)
                            tmpl.push_back(' ');
                        first = false;
-                       // One pass over the token's bytes → the shape facts the dispatch below
-                       // reads, replacing the separate is_all_digits / composite-trigger any_of /
-                       // is_digit_leading scans (byte-exact equivalents → identity unchanged).
+                       // note: one byte pass yields the shape facts, replacing three scans.
                        const TokenShape shape{tok};
                        const auto mask{[&]
                                        {
@@ -1056,8 +862,8 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                                            params.push_back(tok);
                                        }};
 
-                       // 1. status-value KEEP (identity): "exit code 0" stays distinct
-                       //    from "exit code 1" — a green→red flip must not collapse.
+                       // assert: the status-value KEEP, so an exit code stays distinct from its
+                       // neighbour.
                        if (shape.all_digits && tok.size() <= kMaxStatusDigits &&
                            is_status_keyword(prev))
                        {
@@ -1065,27 +871,17 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                            prev = tok;
                            return;
                        }
-                       // 2. composite → the normalized literal (KEEP class, mask instance). The
-                       //    declared rule set AND its precedence are kCompositeRules (tried in
-                       //    array order, first claim wins — the former `||` short-circuit, now
-                       //    data). try_composite carries the cheap pre-gate that skips the whole
-                       //    catalog for a token carrying no separator (shape) and no declared
-                       //    currency marker, and is the SAME step the rule-coverage gate's
-                       //    discriminator runs.
+                       // assert: the declared rule set AND its precedence are the catalog, tried in
+                       // array order with the first claim winning.
                        if (try_composite(tok, shape, composite, nullptr))
                        {
                            tmpl.append(composite);
                            prev = tok;
                            return;
                        }
-                       // 3. UUID / long hash → MASK.
-                       // 4. IPv4 → MASK.
-                       // 5. digit-leading numeric (or empty) → MASK. `0x`-hex needs no arm of its
-                       // own:
-                       //    a `0x…` token starts with '0', a digit, so `digit_leading` already
-                       //    carries it. The former rule-5 predicate accepted a STRICT SUBSET of
-                       //    digit_leading and could never be the reason a token masked (DN-027,
-                       //    proven over all inputs).
+                       // assert: a hexadecimal-prefixed token needs no arm: it starts with a digit,
+                       // so the digit-leading test carries it.
+                       // refs: DN-27
                        if (shape.empty || is_uuid_or_long_hash(tok) ||
                            (config.mask_ip_addresses && is_ipv4_token(tok)) || shape.digit_leading)
                        {
@@ -1093,7 +889,6 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                            prev = tok;
                            return;
                        }
-                       // 6. literal KEEP.
                        tmpl.append(tok);
                        prev = tok;
                    });
@@ -1111,10 +906,8 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
     return {.template_str = tmpl_view, .params = params_span};
 }
 
-// ── rule_catalog — the declared catalogs, made enumerable (ROADMAP N74) ───────────────────────
-// Contract in canon.detail.mask.cppm. Every table below is DERIVED from the catalog the masker
-// itself reads, never restated beside it: a parallel list is how a coverage gate ends up green
-// against a rule set that moved.
+// invariant: every table here is DERIVED from the catalog the masker itself reads, never restated
+// beside it - a parallel list is how a coverage gate greens against a moved rule set.
 namespace rule_catalog
 {
 
@@ -1135,8 +928,7 @@ namespace rule_catalog
         std::string scratch;
         std::string_view claimed{};
         const TokenShape shape{token};
-        // The return value is deliberately dropped: `claimed` stays empty exactly when the step
-        // declines, which is the same fact and the one the caller asked for.
+        // note: the return value is dropped: `claimed` stays empty exactly when the step declines.
         (void)try_composite(token, shape, scratch, &claimed);
         return claimed;
     }

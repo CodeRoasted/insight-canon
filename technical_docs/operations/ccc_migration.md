@@ -1926,14 +1926,232 @@ declares **1 through 10, dense, with no gap**, and `registry_grammar_lint` indep
 **This unit consumed none** — every claim found an owner in an existing tagged form or in an ADR
 slot, and nothing in the tree reserves 11.
 
+## Unit 13 — `core/src/mask/` (2 files, 530 would-be violations) — the run's first DECLARING unit, and four law blocks
+
+This is the unit the law-number range exists for. `canon.detail.mask.cppm` is an INTERFACE unit, so
+every site in it is a declaration position (`registry_grammar_lint`'s `src_codes_present` classes a
+declaration by POSITION), and its long "composite-normalizer contracts, DECLARED" block is exactly
+`OPS-8.O5`'s declaring case: the prose beside the code IS the statement of seven source-declared
+codes. Three of those seven turned out to have an addressable owner and became citations; four had
+none and became law blocks.
+
+| files | comment lines HEAD → gate | forms written |
+|---|---|---|
+| `canon.detail.mask.cppm` | 101 → 85 | pre 1 · post 7 · invariant 4 · note 4 · refs 5 · 7 continuations · **4 law blocks** · 2 tool |
+| `mask.cpp` | 434 → 177 | pre 5 · post 17 · invariant 34 · assert 16 · note 14 · refs 30 · 57 continuations · 4 tool |
+
+Per-file baselines measured with the standalone checker over the `HEAD` blob:
+`canon.detail.mask.cppm` 101 comment lines / 99 violations (bare 90, spacer 7, trailing 2, tool 2) ·
+`mask.cpp` 434 / 431 (bare 365, spacer 10, trailing 55, suppression-without-why 1, tool 3).
+
+### Which codes got a block, and which got a citation — the test applied per code
+
+`OPS-8.S9`'s test is that a law block is owed only where the rule has **no addressable owner**, and
+`ADR-29.D6` is the general ruling that makes the question answerable at all: *"The per-rule contracts
+live at their source sites, not here… the comment at the declaring site in `insight-canon`'s
+interface IS the statement."* Each of the seven was checked against the ADR shelf before deciding.
+
+**Refused a block, because a slot already owns the argument:**
+
+* The stateless-masker codes — the masker is stateless, the classification is decided rather than
+  discovered, and the ripped clustering is why. `ADR-16.D5` states all three in its own words (TOTAL,
+  PRECEDENCE-ORDERED, STATELESS; *"the phantom pair … cannot form rather than merely being rare"*;
+  *"Drain was ripped, not tuned"*), and it also carries the accepted cost the fourth code states — a
+  synonym reword reads as a Vanished-plus-New pair. Four codes, one citation.
+* The ephemeral-root codes — the standalone rule and the catalog-plus-matcher. `ADR-16.D2` owns them
+  end to end: *"there is no θ to tune"*, the enumerable root catalog, explicit `anchor`/`scope`,
+  longest-declared-root-wins, the path-separator adjacency requirement, the Instance clamp inside a
+  diagnostic composite, and the accepted precision loss. Two codes, one citation.
+
+**Minted, because nothing in the workspace states the rule:** the four composite-normalizer
+contracts below. Each block sits at the same site the prose did — the interface unit, above the
+exported masker whose observable output the rules govern — so the declaration position is preserved,
+and each names the code it absorbs **spelled in full**, which is what the declaration sweep matches.
+
+| block | subject | absorbs | citers recorded for the pilot's cascade |
+|---|---|---|---|
+| `LSRC-11` | the diagnostic-composite class, which subsumes the source-location rule | the composite code | 9 files: this repo's api, both mask files, `core/tests/mask/test_stateless_template.cpp`, plus a private corpus study, an audit record, a design note, an attic file and a product doc |
+| `LSRC-12` | the bracket-timestamp class — the bracket is the entire difference | the bracket-timestamp code | 10 files: this repo's api (2 sites), both mask files, the mask test, `semantic/jenkins/src/jenkins.cppm` and its payload-stamp measurement test (5 sites), `insight-eidos/sift/tests/report/run_outcome_gates_test.cpp`, an audit record, a design note and an attic file |
+| `LSRC-13` | a class prefix inside a bracket survives the mask | the bracket-prefix code | 6 files: both mask files, this ledger, an audit record, a design note and an attic file — the smallest citer set of the four |
+| `LSRC-14` | a key-value pair masks the value and keeps the key | the key-value code | 6 files: both mask files, `insight-eidos/insight-e2e/tests/diff/reword_phantom_pair_test.cpp`, an audit record, a design note and an attic file |
+
+The lane repoints **no** citer and edits **no** other repo (`OPS-8.O5`): the absorbed token stays
+spelled in each block, every citing site keeps `refs: SRC-<code>` unchanged, and the cross-repo
+repoint is the pilot's single pass once this repo is flat. Every gate is green at every instant on
+that order.
+
+**The law-number range was re-measured before it was consumed.** The pilot issued 11 onward; the
+workspace's DECLARED set was swept first and reads 1 through 10, dense, with `registry_grammar_lint`
+independently reporting ten declarations and the numbering *"checked DENSE"*. 11 through 14 are
+therefore contiguous with no hole, and this unit consumes exactly those four.
+
+### Census (`OPS-8.S4`) and the stripper cross-check (`OPS-8.S5`)
+
+`canon.detail.mask.cppm`: `NOLINT` 0 → 0, namespace closers 2 → 2, every other token 0 → 0.
+`mask.cpp`: `NOLINT` **directives** 1 → 1, namespace closers 3 → 3, `/*name=*/` 0, `clang-format
+off` 0, `wall-clock:` 0, the determinism waiver token 0, `SPDX` 0. The file's second `NOLINT` string
+was the WORD inside a prose sentence explaining why two grammars were hoisted rather than suppressed
+— verdict finding 7's class for the third time in this run — and it went with its prose; the
+replacement `note:` describes the hoist without naming the token, so no second directive is armed.
+
+The cross-check held exactly on both files: `removed == violations − (suppression-without-why +
+trailing-nolint)` → 99 == 99 − 0 and 430 == 431 − 1; `kept == tool-forms + those classes` → 2 == 2 +
+0 and 4 == 3 + 1.
+
+### The one suppression, measured in place
+
+`clang-tidy-21` over `mask.cpp` at its own tree path, with the flags lifted from the release compile
+database and a `sha256sum`-verified backup and restore. **With the directive: 90 457 warnings
+generated, `Suppressed 90 468 warnings (90 457 in non-user code, 11 NOLINT)`, and zero own-file
+diagnostics. With the directive TEXT removed: 10 NOLINT suppressed, and
+`readability-function-cognitive-complexity` appears at `normalize_diagnostic_composite` — cognitive
+complexity 32 against a threshold of 25.** It is load-bearing and was kept, its FORM repaired: the
+why demoted to a `note:` in the last position before the directive, which is verdict finding 12's
+shape.
+
+### The address census (`OPS-8.S7.3b`), and one address restored before the commit
+
+Two **refinements**: `ADR-17` → `ADR-17.D4` (the prose's own pointer was *clause 4*, and that slot
+rules that core grows syntax while a package selects vocabulary — which is why masking-only means
+core) and `ADR-23` → `ADR-23.D1` (the slot that classifies a payload stamp as dialect content, which
+is why such a stream reaches the masker at all). **A THIRD refinement was written and then WITHDRAWN,
+and that is verdict finding 24.** The draft narrowed a bare ADR — cited for *"over-masking destroys
+signal irrecoverably"* — to that ADR's first slot; re-reading the slot shows it is about the
+observability-knob class predicate and says nothing about over-masking, while the sentence the site
+actually obeys is stated in the OTHER ADR the same block already cites. The census reports a
+refinement as an improvement and cannot see that one was a false attribution. The bare form was
+restored.
+Additions: `ADR-16.D2` in both files, the four new law codes, and two form-3 addresses —
+`F-SRC-insight-canon:canon.api.cppm:rfc3339_datetime_length` (the shared datetime grammar the
+bracket-timestamp rule must not duplicate) and
+`F-SRC-insight-canon:test_stateless_template.cpp:EmbeddedIdentityArmsAreDisjoint` (the test the
+source itself names as the DETECTOR for a disjointness the comment may not merely assert).
+
+**One `LOST` line was a real loss and was restored rather than dispositioned.** The census reported
+`ADR-6.D8` dropped from `mask.cpp`; the deleted prose had cited it for the house form that puts a
+code's contract at its declaring site, which is precisely the rule this whole unit obeys. It was
+added back to the header `refs:` line, the line re-measured at 67 bytes, and `OPS-8.S7` steps 2 and 3
+re-run: 0 misformatted, 0 would-be violations, comment-only still holding.
+
+The only remaining `LOST` line is a **spelling normalisation, not a loss**: the prose wrote a design
+note's number zero-padded to three digits, matching its file name, and the converted `refs:` uses the
+unpadded registry form every other converted site in this repo and in LogCraft uses. Both resolve;
+the census compares tokens textually and cannot see that they are one address.
+
+### A stale claim in the OLD prose, deleted with the evidence — and this repo disagreed with itself
+
+The interface unit's declaring prose said the ephemeral-root catalog is *"One catalog, three call
+sites"*. Re-derived at the artifact: the matcher `root_scope_ending_at` has exactly **TWO** call
+sites — one inside the diagnostic-composite segment walk and one inside the standalone rule — and
+`kEphemeralRoots` itself is read by the matcher and by the accessor that merely exposes it. `mask.cpp`
+already said two, in its own words, naming them *call site A* and *call site B*; `ADR-16.D2` says
+*"One matcher, two call sites"*. So the interface unit was the outlier and the count is stale. The
+number is not restated anywhere in the conversion: the surviving `invariant:` says one catalog
+consulted from every call site, which is the load-bearing half and cannot go stale on the next call
+site.
+
+### Attic pointers deleted, under the Founder's disposability ruling
+
+The old prose carried section markers into `technical_docs/history/architecture-v1/`'s ephemeral-root
+masking study — an `M`-numbered clause per behaviour — and one `§3` reference to the same file. That
+tree is the attic: `CLAUDE.md` rules it disposable, its citations best-effort and gated by nothing.
+The markers have no registry form and every sentence carrying one stays complete without it, so they
+are deleted rather than re-homed; the claims they annotated are written as tagged lines from the code.
+The same applies to the study reference beside the deliberately-absent build-configuration root: the
+reason is re-derivable at the catalog and is kept, the pointer is not.
+
+### Interrogation
+
+One fresh agent, 37 questions built from the held R claims, 51 tool uses, 177 k tokens, 9.4 minutes.
+Its exclusion list named this repo's own ledger, LogCraft's, `OPS-8` and the `ADR-26` file. **No git
+command was run**, checked mechanically over the transcript rather than taken from the reader's own
+closing line: 51 `tool_use` blocks, **zero** matching a `git` invocation, and the single hit on the
+build-directory pattern is the reader's own `-not -path './build*'` exclusion.
+
+**37 of 37 recovered, 0 not recovered, 1 line QUALIFIED.** Scored one question at a time from the
+per-question evidence.
+
+**The line the reader convicted, with the three facts.** The question was what importing only the api
+shard buys and what importing a sibling would cost. The reader answered, correctly and from the tree,
+that the property holds for the module INTERFACE only — `mask.cpp` DOES import
+`insight.canon.detail.scan` for its char-class predicates and `TokenShape` — and it named the same
+interface-versus-implementation split at `canon.detail.strategy.cppm`. The line the conversion had
+written was *"a leaf over the contract — it imports the api only, is never re-exported by the facade
+and is never installed"*, whose `it` reads as the domain. The reader answered the underlying question
+right from the tree and thereby contradicted the comment, not the code; the imprecision was inherited
+from the deleted prose, which said the domain is *"independent of scan/strategy/parse"*. Repaired in
+the tree before the commit: the subject is now explicit and the implementation's extra import is
+named.
+
+Recovery landed **above** the deleted prose on eight of the thirty-seven, and three of those went
+past what any comment in this repo says:
+
+* **Q13 (why a catalog of roots rather than a rule over token shape) recovered the refutation with
+  its source.** The prose said only that no length or alphabet rule separates the two classes; the
+  reader found `STU-11` and reported three independent refutations — the classes overlap at every
+  length, the class as filed spans alphabets (nix store hashes are base-32), and any threshold low
+  enough to catch them destroys real content, with a counted instance.
+* **Q9 (why the strict-superset property is worth stating) recovered the rule's ORIGIN**, which the
+  converted comment does not carry: the address rule exists because a published render had leaked a
+  real third-party address, and the superset property is what bounds the repair to one direction.
+* **Q23 (what a bracketed stamp did before the rule) reproduced the law block's whole argument from
+  the code**, walking every normalizer in turn and stating why each declined — which is the strongest
+  evidence available that the block states a rule the tree already implies rather than a new one.
+
+### Two findings the reader produced about the CODE, not about the comments
+
+Both re-derived at the artifact before being recorded; neither is fixed here, because this is a
+comment-only commit.
+
+* **The declared disjointness between the sentence-punctuation set and the wrapper-pair closers is
+  enforced by nothing.** The reader answered the question and then reported that there is no
+  `static_assert` and no test over it — verified: the two sets are declared in different translation
+  units, one file-local and one exported from the scan shard, and only prose ties them. An overlap
+  would let a byte removed from the shell catalog keep being tolerated through the file-local set.
+  **Addressee: Kleio**, for a compile-time assertion or a witness row.
+* **The root matcher requires the path separator BEFORE the root's first component, which is stricter
+  than the rule `ADR-16.D2` states, and it makes a floating root at token start unreachable.**
+  Re-derived at `root_scope_ending_at`: the separator loop runs from the root's first component
+  inclusive, so a component whose `sep_before` is the token-start sentinel fails it. The slot's own
+  words are *"a root's components must be consecutive and `/`-separated"*, which constrains the
+  separators BETWEEN components. So a relative path opening with a floating root's first component
+  declines where the declared rule would admit it. The `assert:` at that site was tightened to say
+  what the code does — *from the root's FIRST component onward* — rather than what the slot says.
+  **Addressee: Daidalos**, as a contract question: is the extra strictness the rule, or the code?
+* **A comment in a file this unit did not touch is stale.** The reader reported that the
+  embedded-identity pin in `core/tests/mask/test_stateless_template.cpp` still speaks of a *separate*
+  copy of the hex floor; there is one declaration today and the embedded scanner reads it.
+  **Addressee: this lane's test-tier unit**, which opens that file.
+
+### Dispositions
+
+* **Recovered (37)** — every question. Nothing re-homed.
+* **Not recovered (0)**, **reader-wrong (0)**, **qualified (1)** — the interface-import line above,
+  repaired in the tree before the commit.
+
+### Witnesses
+
+1. **Comment-only** — both files: *comment-only (code token stream identical to HEAD)*, re-run after
+   the three post-reader repairs.
+2. **Grammar** — `malf format --check insight-canon/core/src/mask`: 2 selected, 2 checked, **0
+   misformatted**, **0 would-be violations**, 262 comment lines, **law 4**. Repo-wide after the unit:
+   126 files, 12 579 comment lines, **11 200 would-be violations**, against 11 730 before it.
+3. **Behaviour** — `malf test insight-canon` on clang-21 and with `--profile linux-gcc16-release`:
+   734 + 32 + 25 + 13 + 5 = **809 of 809 passing on each toolchain**, equal to the baseline. This run
+   covers **unit 13 only**. `malf lint --all-files` in the same slot acquisition: **21 findings over
+   56 files checked**, the standing baseline, unchanged by keeping the unit's one suppression.
+4. **Knowledge** — 37 of 37 recovered, 1 line qualified and repaired. Every disposition above.
+5. **Addressability** — the per-file census against the unit-12 commit: 2 refinements, 10 additions
+   including the four law codes, 1 restored address, and one spelling normalisation.
+
 ---
 
 # The `OPS-8` verdict — third cold reader, first at scale
 
 `insight-canon` is `OPS-8`'s third run and its first large one; findings 14 onward come from the
-third run (units 8-9), findings 20-22 from the fourth (units 10-11) and finding 23 from the fifth
-(unit 12). **Twenty-three findings**, ordered by what they cost within each run. Items 1, 5, 14, **20**
-and **23** are the ones that change the runbook; item 5 needed a Founder ruling before the `core/api/`
+third run (units 8-9), findings 20-22 from the fourth (units 10-11) and findings 23-24 from the
+fifth (units 12-13). **Twenty-four findings**, ordered by what they cost within each run. Items 1, 5,
+14, **20**, **23** and **24** are the ones that change the runbook; item 5 needed a Founder ruling before the `core/api/`
 units could be converted at all, and it has one — see the RULED section below. **Item 20's repair has
 LANDED in the instrument and is confirmed at a real site by unit 12 — it no longer blocks this
 migration, and what it blocked is recorded so the repair's reach can be judged rather than assumed.**
@@ -2338,6 +2556,27 @@ check must REPORT rather than FAIL** — a collision is not automatically a defe
 must be read. The repair is to anchor one line earlier, on the unique `if` above, which also puts
 the claim above the whole statement instead of inside the branch.
 
+## 24. A CENSUS `refined` LINE CAN BE A FALSE ATTRIBUTION, AND THE INSTRUMENT REPORTS IT AS AN IMPROVEMENT
+
+Finding 18 records that the per-file address census reports a REFINEMENT beside its losses and that
+the step should say so. This is the other half, and it runs the opposite way: **a refinement is only
+an improvement if the narrower slot actually STATES the claim at the site**, and nothing in the
+census can check that. `ADR-n` → `ADR-n.Dm` reads as strictly better in the output — the address got
+more specific — while what it may actually be is the conversion inventing an attribution and signing
+it, which is `OPS-8.O5`'s false-attribution class arriving through the door marked *improvement*.
+
+**Measured in unit 13, caught by re-reading the slot rather than by any instrument.** A site's prose
+appealed to a bare ADR for *"over-masking destroys signal irrecoverably"*. The draft narrowed it to
+that ADR's first slot; re-reading that slot shows it is about the observability-knob class predicate
+and says nothing about over-masking, while the sentence the site actually obeys is stated in a
+DIFFERENT ADR the same block already cites. The refinement was withdrawn and the bare ADR — which is
+a legal registry form and names the contract the claim appeals to — was kept.
+
+**The rule that follows: a refinement is a claim like any other and is re-derived at the slot before
+it is written.** Widening `ADR-n` to `ADR-n.Dm` is not a formatting improvement, it is an assertion
+that slot `m` states this rule. Where no slot states it, the bare form is correct and is not a
+weaker citation — it names the subject's owner, which is what the prose meant.
+
 ## Departures from `OPS-8` in this run, declared
 
 * **Units 2 and 3 landed in ONE commit**, against `OPS-8.S10`'s one-commit-per-unit. Both are
@@ -2734,3 +2973,88 @@ have left a gap and reddened the density check, which is checked DENSE. By the e
 same gate reported **ten** declarations: the sibling landed its block mid-session, and 11 is free
 now. **A lane needing a number asks the pilot AND sweeps the tree for the declared set — an issued
 number and a declared number are not the same fact, and only the second one the gate can see.**
+
+---
+
+# Where the FIFTH run stands (units 12-13, 2026-09-06)
+
+**Thirteen units converted, four law blocks minted, the repo still NOT armed.** `malf format --check
+insight-canon` reads **12 579 comment lines and 11 200 would-be violations** against the original
+baseline's 14 489 and 14 242 — **3 042 violations converted, 21.4 % of the repo**, in twelve commits
+across five runs. Arming (`OPS-8.S12`) requires the whole repo at zero and is not reached, so
+`comment_contract: true` is NOT set and the CCC phase still counts this repo rather than failing it.
+
+**Both baselines were re-derived by this run rather than inherited, because the fourth run recorded
+that its repo-wide comment-line figure had never been verified.** The pre-conversion tree was
+extracted at the revision that opened the ledger and re-measured with the standalone checker over
+the same 126-file population: **126 files, 14 489 comment lines, 14 242 would-be violations**, split
+bare 12 279 · `///` 92 · spacer 738 · ruler 217 · trailing 831 · trailing `NOLINT` 30 ·
+suppression-without-why 43 · tag-mid-line 11 · block-prose 1, with 247 tool forms already present —
+identical to the preamble at the top of this file, to the unit. The doubt is resolved: the inherited
+figure was right.
+
+| unit | surface | violations | comment lines | reader |
+|---|---|---|---|---|
+| 1 | `core/src/arena/` | 37 | 39 → 17 | 10/10 recovered |
+| 2 | `core/src/identity/` | 132 | 136 → 34 | 13/13 recovered |
+| 3 | `core/src/transport/` + `canon.internal.cppm` | 107 | 109 → 40 | 15/15 recovered |
+| 4 | `core/src/tokenizer/` | 112 | 114 → 48 | 14/14 recovered |
+| 5 | `core/src/parse/` | 265 | 273 → 103 | 31/35, **4 wrong** |
+| 6 | `core/src/scan/` | 284 | 287 → 96 | 33/34, **1 wrong** |
+| 7 | `core/src/conformance/` | 313 | 318 → 158 | 30/32, **2 wrong** |
+| 8 | `core/src/compose/` | 395 | 404 → 113 | 35/38, 2 not recovered, **1 wrong** |
+| 9 | `core/api/utils/` + `core/api/det/` | 95 | 97 → 45 | 19/21, 1 not recovered, **1 wrong** |
+| 10 | `core/src/utils/logger.cpp` | 84 | 86 → 18 | 13/14, **1 wrong** |
+| 11 | `proof/det_proof.cpp` | 142 | 144 → 65 | 17/18, **1 wrong** |
+| 12 | `core/src/utils/` (2 files) | 546 | 558 → 191 | 36/36 recovered |
+| 13 | `core/src/mask/` | 530 | 535 → 262 | 37/37 recovered, 1 line qualified |
+| | **total** | **3 042** | **3 100 → 1 190 (62 %)** | |
+
+Forms standing in the repo: `pre` 31 · `post` 88 · `invariant` 186 · `assert` 71 · `note` 150 ·
+`refs` 194 · 272 continuations · 275 tool forms · **8 law blocks**, four of them this run's.
+
+**The fourth run's blocked road is open.** Its verdict finding 20 — the CCC gate refusing a `SRC-`
+code with a lowercase clause suffix that `registry_grammar_lint` resolves — was repaired in the
+instrument, and unit 12 is the first real-site confirmation: the two drafts that read 13 `refs-prose`
+violations over four resolvable codes before the repair gate at **0**, unchanged, while a probe
+carrying a `refs:` line of ordinary prose still reports `refs-prose`. The repair narrowed the
+pattern; it did not disarm the arm.
+
+## What the fifth run cost in slot contention, measured
+
+**Two acquisitions, one per unit, 10 minutes 36 seconds of slot held between them (5 min 8 s and
+5 min 28 s), against sibling CCC lanes live on the same global slot.** Each acquisition carried that
+unit's behaviour witness on BOTH toolchains plus a full `malf lint --all-files` over the repo, which
+is what makes one acquisition per unit sufficient. **Total wait: 6 minutes 30 seconds** — 3 seconds
+for the first, where the slot was already FREE, and **6 minutes 27 seconds** for the second, held
+throughout by one sibling lane. Both acquires were taken in the FOREGROUND (`OPS-8.S1.1`); the
+waiting was done by a background poll that only READ `malf slot status` and never attempted an
+acquire, so no stamp was ever written from a detached process.
+
+## What remains, and what the next session should take first
+
+Unconverted, by violation count: `core/api/` 2 697 (`canon.api.cppm` 1 193, `canon.spi.cppm` 672,
+`canon.transport.cppm` 322, `canon.compose.cppm` 268, `canon.cppm` 242) · `core/src/strategy` 1 275 ·
+`core/tools` 420 · `benchmarks/src` 53 · `core/test_package` 15 · the test tier 4 682 · the three
+dialect packages 2 058. The source tier of `core/src/` is now **complete**: every directory under it
+has converted.
+
+**`core/tools/` (420) is the next unit and it is unblocked.** Its blocker was the suffixed-code
+refusal, which is repaired and confirmed. It carries the instrument this run cited from
+`time_utils.cpp`, so a reader on that unit will meet the token-index measurement from the other side.
+
+**`core/src/strategy/` (1 275) is the largest single remaining source surface** and it cites three
+suffixed codes, so it is also unblocked now. At 1 275 violations it is near `OPS-8.S2`'s ~1 500
+comment-line bound and should be split by file group with two readers.
+
+**`core/api/canon.api.cppm` (1 193) is the next DECLARING unit and it wants a law-number range.** It
+declares seven source codes in its own right, and unit 13's experience says the range needed is
+smaller than the code count: of the seven codes `core/src/mask/`'s interface declared, three had an
+addressable owner in the ADR shelf and only four were owed a block. **Ask the pilot for a range
+starting at 15, and re-measure the DECLARED set before consuming it** — an issued number and a
+declared number are not the same fact.
+
+**Law numbers consumed by this run: 11, 12, 13 and 14**, all four in
+`core/src/mask/canon.detail.mask.cppm`. The next free integer is **15**;
+`registry_grammar_lint` reports 14 declarations with the numbering checked DENSE and
+single-declaration checked both ways.
