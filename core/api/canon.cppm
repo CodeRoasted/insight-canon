@@ -1,75 +1,65 @@
-// insight.canon — public facade (ADR-3.D4). Consumers
-// `import insight.canon;` unchanged. Re-exports the public api surface; the
-// insight.canon.detail.{scan,strategy,mask,parse} shards are NOT re-exported (sealed, build-only).
-// Tokenizer lives HERE (not in api): its impl needs LogParser/the masker from the detail shards,
-// which import api — homing it above detail breaks the api↔detail cycle (the ADR-3 facade seam).
-// The Tokenizer decl uses only api types (ArenaAllocator/MaskConfig/CanonicalEvent) + std;
-// tokenizer_engine.cpp (module insight.canon) imports detail.{strategy,mask,parse} in its purview.
+// refs: ADR-3.D4
+// invariant: `import insight.canon;` is the whole public surface: this unit re-exports the api, the
+// composition and the transport vocabulary, and nothing else.
+// invariant: the four `insight.canon.detail.*` shards are sealed and build-only — never
+// re-exported, so no consumer can name one.
+// invariant: the Tokenizer is declared HERE and not in api because its implementation needs the
+// parser and the masker from the detail shards, which themselves import api.
+// note: homing it above detail would close the api-detail cycle this facade seam exists to break
 export module insight.canon;
-import insight.canon.internal; // std (expected/unique_ptr/vector/span/string for the Tokenizer decl)
-export import insight.canon.api; // public surface (types, det_math, arena, ...)
-// compose()/ComposedSemantics (ADR-17) — Tokenizer takes it. The comment sits ABOVE the
-// directive deliberately: as a trailing comment it pushed the line past the column limit, and the
-// formatter then wrapped the MODULE NAME across lines. A wrapped module name is ill-formed by the
-// STANDARD, not by a compiler version: [cpp.pre] spells a pp-import as ONE logical line, so gcc is
-// the conforming reader and clang-21's acceptance is the leniency. First met on gcc-15.3, but no
-// gcc bump can ever retire it — the rule is the language's, not a defect's — and only the ship leg
-// sees it. Keep this line short enough that no formatter has a reason to touch it.
+import insight.canon.internal;
+export import insight.canon.api;
+// refs: ADR-17
+// invariant: the composition surface — `compose()` and `ComposedSemantics`, which the Tokenizer
+// takes by const reference.
+// invariant: a pp-import is ONE logical line by [cpp.pre], so a module name wrapped across physical
+// lines is ill-formed by the STANDARD and no compiler bump can retire it.
+// note: keep this directive short: as a trailing comment the why wrapped the module NAME
 export import insight.canon.compose;
-// The transport vocabulary (ADR-23): IngestDeclaration, the catalogue, and the stream-scoped
-// peel. Re-exported because a CONSUMER declares the stack — it is the caller's provenance, not a
-// package's data. Same short-line discipline as the directive above: a module name wrapped across
-// physical lines is ill-formed by [cpp.pre] on any gcc, and only the ship leg reds on it.
+// refs: ADR-23
+// invariant: the transport vocabulary — `IngestDeclaration`, the catalogue and the stream-scoped
+// peel — is re-exported because a CONSUMER declares the stack: it is the caller's provenance.
+// invariant: same short-line discipline as the directive above, and for the same reason.
 export import insight.canon.transport;
 
-// ──────── from api/insight/tokenization/tokenizer_engine.hpp ────────
 export namespace insight::tokenization
 {
 
-// ── Composed-semantics walkers (ADR-17) ──────────────────────────────────────────────────────────
-// The dialect-recognition mechanisms, homed in the facade (not api) because they consume the
-// composed tables — ComposedSemantics lives in insight.canon.compose, which imports api, so a
-// walker in api would close a cycle. Canon owns the ALGORITHM; the composed rows are the DATA.
-// Byte-for-byte equivalent to the pre-split hardcoded StructuralRoleRegistry / IntentMarkerRegistry
-// / recognize_location.
-
-// ⚠ NO DIALECT COORDINATE, ON ANY OF THEM (ADR-22). `composed` is the RESOLVED STREAM's
-// view — `resolve_stream` filtered the declared dialect and channel into it once, before the first
-// line — so a row that is in the table is a row that fires. Re-introducing a per-line format or
-// dialect argument here would restore the content dependence T4 removed: the argument used to be
-// `LogParser::routed_format()`, the per-line detector winner under a sticky-strategy fast path.
-
-// ⚠⚠ THE PRECONDITION ON `content` IS THE TYPE (ADR-21.D3 — carried by the type, so an
-// unnormalized caller outside canon fails to compile). `NormalizedContent` is producible only by
-// stage 1 (`normalize`, insight.canon.api) followed by a suffix-taking stage 2 — the declared
-// `TransportStack::peel(NormalizedLine)` or the caller's own `undeclared_suffix` — so a caller
-// that has not normalized DOES NOT COMPILE at canon's public boundary. What used to stand here
-// was the same obligation as prose; it was satisfied by one of three consumers and cost 1 077 of
-// 3 193 GitLab markers, silently, across two call sites that both looked correct. The type does
-// NOT prove the RIGHT stage 2 ran (§12.3) — ADR-22's strip divergence stands, and the
-// eidos/canon reconciliation still rides T5.
-
-// Classify a LINE's structural role from the resolved view's role rows (longest-match). None when
-// no row matches.
+// refs: ADR-17, ADR-21.D3, ADR-22, DN-75
+// invariant: canon owns the walker ALGORITHMS and the composed rows are the DATA; they are homed in
+// the facade because `ComposedSemantics` lives in a module that imports api.
+// invariant: NO walker takes a dialect or channel coordinate — `composed` is the RESOLVED
+// stream's view, so a row that is in the table is a row that fires.
+// note: a per-line format or dialect argument would restore the content dependence
+// pre: `content` is a `NormalizedContent`, producible only by stage 1 followed by a suffix-taking
+// stage 2, so a caller that has not normalized DOES NOT COMPILE at this boundary.
+// invariant: the type does NOT prove the RIGHT stage 2 ran: the strip divergence stands and the
+// eidos/canon reconciliation still rides its own gate.
+// note: as prose this obligation was met by 1 of 3 consumers: 1 077 of 3 193 markers lost
+// post: `classify` returns the longest-matching role row's `StructuralRole`, and None when no row
+// of the view matches.
 [[nodiscard]] StructuralRole
 classify(NormalizedContent content, const insight::semantic::ComposedSemantics& composed) noexcept;
 
-// Recognize an intent marker from the resolved view's marker rows (longest-match). The payload is
-// the content after the matched prefix; the alignment class + instance discriminant are derived by
-// canon's canonicalize_intent / discriminant_of. None when no row matches. The returned marker's
-// `name`/`discriminant` VIEW the handed content's bytes (ADR-18) — the caller's storage must
-// outlive them.
+// refs: ADR-18
+// post: `recognize` returns the longest-matching marker row's `IntentMarker`, whose payload is the
+// content after the matched prefix, and None when no row of the view matches.
+// invariant: the alignment class and the instance discriminant are derived by canon from that
+// payload, never declared by a package.
+// invariant: the returned marker's `name` and `discriminant` VIEW the handed content's bytes, so
+// the caller's storage must outlive them.
 [[nodiscard]] IntentMarker recognize(NormalizedContent content,
                                      const insight::semantic::ComposedSemantics& composed) noexcept;
 
-// Phase 1 facade: raw log line → CanonicalEvent.
-// Thread-safety: NOT thread-safe; use one instance per thread / strand.
+// invariant: phase 1 of the pipeline: one raw log line in, one `CanonicalEvent` out.
+// invariant: NOT thread-safe — one instance per thread or per strand.
 class Tokenizer
 {
   public:
-    // No default composition in core (ADR-17): every binary declares its package set and
-    // threads the ComposedSemantics (which the Tokenizer does NOT own — it must outlive the
-    // Tokenizer).
+    // refs: ADR-17
+    // invariant: core ships NO default composition: every binary names its package set and threads
+    // the resulting `ComposedSemantics` in here.
+    // pre: `composed` outlives the Tokenizer, which does not own it.
     explicit Tokenizer(ArenaAllocator& arena, MaskConfig mask_config,
                        const insight::semantic::ComposedSemantics& composed);
     ~Tokenizer();
@@ -79,84 +69,64 @@ class Tokenizer
     Tokenizer(Tokenizer&&) noexcept;
     Tokenizer& operator=(Tokenizer&&) noexcept;
 
+    // refs: ADR-21.D4, F-SRC-insight-canon:test_stable_door_does_not_normalize.cpp
+    // post: `process_line` performs stage 1 itself, so it equals the stable door applied to the
+    // normalized line — the equivalence the two doors are asserted on.
     [[nodiscard]] std::expected<CanonicalEvent, std::string>
     process_line(std::string_view raw_line);
 
-    // THE STABLE DOOR. Two things separate it from process_line, and only one of them is the arena
-    // copy — reading it as "process_line minus a memcpy" is the misreading this declaration exists
-    // to close.
-    //
-    // WHAT IT DOES NOT DO: stage 1. This door performs NO normalization at all, deliberately, and
-    // its answers — the strategy's projection, the level lift, the structural role, the intent
-    // marker — are therefore functions of the caller's PRESENTATION bytes. It exists so the
-    // echoed-source demotion can read the SGR command-echo wrapper that stage 1 destroys, on a
-    // path that holds ONE view and hands it to both the strategy and the detector. The two
-    // preconditions do not compose on that single view: normalize() rewrites an ESC-bearing line
-    // into a scratch buffer the next line reuses, so a normalized view is not stable, and making
-    // it stable costs exactly the copy this door avoids. The plausible wrong fix is named so
-    // nobody rediscovers it: routing this path through process_line restores stage 1 and silently
-    // deletes the echoed-source register. A caller handing presentation-bearing bytes to this door
-    // gets a silently coarser answer, and that is the door's price, not a defect.
-    //
-    // ITS REAL PRECONDITION IS BYTE LIFETIME, NOT NORMALIZATION, and stated as the actual
-    // condition rather than the proxy: every read of the returned CanonicalEvent
-    // happens-before the caller's bytes die or the arena resets, whichever comes first. The event
-    // and every string_view the format strategy sliced from `stable_line` view those bytes; canon
-    // copies none of them. "Valid for the arena's lifetime" is a PROXY for that, and it is only
-    // ever true because today's callers reset the arena in the same call that reads the event —
-    // it is not the condition itself, and a caller that held an event past its line would satisfy
-    // the proxy's words while breaking the door.
-    //
-    // WHY THIS IS PROSE AND NOT A TYPE, which is the question NormalizedContent's existence
-    // invites. Canon PERFORMS stage 1, so canon can attest it, and the mint's friend list is a
-    // real audit surface. Canon cannot know a caller-side lifetime. A token carrying this
-    // precondition would be an attestation the CALLER mints — it would compile whether or not it
-    // were true, and would prove strictly less than NormalizedContent while wearing its shape.
-    // The measurement, not an assumption: the violation class is empty today. All three call sites
-    // are in insight-eidos's pipeline (ingest_stable_line, ingest_stable_line_and_analyze_due_
-    // windows, ingest_peeled_stable_line_and_analyze_due_windows) and all three reset the arena in
-    // the same call, after the last read. Downstream of them every retention is a copy, verified
-    // four frames deep to insight-metalog's TemplateRegistry::intern, whose table_ maps to
-    // std::string. Empty by measurement is not empty by construction, and nothing but this text
-    // holds the difference.
+    // refs: ADR-21.D4, DN-75.D2
+    // invariant: THE STABLE DOOR performs NO stage 1 at all, deliberately, so its answers — the
+    // projection, the level lift, the role, the marker — are functions of the caller's bytes.
+    // invariant: it exists so the echoed-source demotion can read the SGR command-echo wrapper that
+    // stage 1 destroys, on a path that holds ONE view and hands it to strategy and detector alike.
+    // note: routing this through `process_line` restores stage 1, silently killing echoed-source
+    // invariant: the two preconditions do not compose on one view: `normalize` writes into a
+    // scratch buffer the next line reuses, so a normalized view is not stable.
+    // pre: every read of the returned `CanonicalEvent` happens-before the caller's bytes die or the
+    // arena resets, whichever comes first.
+    // invariant: that is the condition itself; "valid for the arena's lifetime" is only a PROXY for
+    // it, and a caller holding an event past its line satisfies the proxy while breaking the door.
+    // invariant: the event and every `string_view` the strategy sliced from `stable_line` view the
+    // caller's bytes; canon copies none of them.
+    // assert: the violation class is empty BY MEASUREMENT, not by construction: all four production
+    // call sites reset the arena in the same call, after the last read.
+    // refs: F-SRC-insight-eidos:insight_pipeline.cpp
+    // invariant: canon PERFORMS stage 1 and can attest it, but cannot know a caller-side lifetime,
+    // so a token carrying this precondition would be an attestation the CALLER mints.
+    // note: it would compile whether or not it were true, and prove strictly less than the type
     [[nodiscard]] std::expected<CanonicalEvent, std::string>
     process_stable_line(std::string_view stable_line);
 
     [[nodiscard]] std::vector<std::expected<CanonicalEvent, std::string>>
     process_batch(std::span<const std::string_view> lines);
 
-    // ── The ACQUISITION-tier record-source unpack (DN-29.D6, L3 of DN-29.D15) ─────────────────
-    // If `raw_line` is recognised as an OTLP span-export DOCUMENT, replace `records` with the N
-    // canonical flat-span records it carries and return true; otherwise return false with
-    // `records` untouched and the caller stays on its ordinary 1:1 path.
-    //
-    // ⚠ FOR THE ENTRY THAT HOLDS THE WHOLE INPUT — a file, a CLI read, a receiver body — and NEVER
-    // for a frame-oriented streaming path. The SHM plane carries a fixed 4096-byte payload while
-    // an export has no declared size, so a document crossing it arrives truncated; document mode
-    // there would put an unbounded object inside a bounded-memory instrument. That is why the
-    // record entry REFUSES a document rather than unpacking one, and why this is a separate,
-    // deliberately over-triggering door rather than a widening of that one.
-    //
-    // It yields RECORDS, not events: window closure resets the caller's arena, so the caller must
-    // be free to tokenize record k only once it is done with k-1. Tokenize each with process_line
-    // — never process_stable_line — because `records` is caller scratch the next document reuses.
+    // refs: DN-29.D6, DN-29.D15
+    // post: true with `records` replaced by the N canonical flat-span records the document carries
+    // when `raw_line` is an OTLP span-export DOCUMENT; false with `records` untouched otherwise.
+    // pre: FOR THE ENTRY THAT HOLDS THE WHOLE INPUT — a file, a CLI read, a receiver body — and
+    // NEVER for a frame-oriented streaming path.
+    // invariant: the SHM plane's line frame carries a bounded payload while an export has no
+    // declared size, so a document crossing it arrives truncated.
+    // note: the record entry REFUSES a document instead, so this is a separate over-triggering door
+    // invariant: it yields RECORDS, not events: window closure resets the caller's arena, so the
+    // caller must be free to tokenize record k only once it is done with k-1.
+    // pre: tokenize each record with `process_line`, never `process_stable_line` — `records` is
+    // caller scratch that the next document reuses.
     [[nodiscard]] static bool unpack_span_document(std::string_view raw_line,
                                                    std::vector<std::string>& records);
 
     [[nodiscard]] std::size_t events_produced() const noexcept;
     [[nodiscard]] std::size_t lines_parsed() const noexcept;
 
-    // The PROJECTION-TOTALITY instrument's counter (ADR-16.D9) for this stream: lines that had
-    // bytes and projected to empty `content`. Until this accessor existed the number left canon
-    // ONLY through a rate-limited WARNING (first, then every 100th, tokenizer_engine.cpp), so the
-    // one way to obtain it was to parse a log stream and multiply — and DN-43.D14 (4) pins the
-    // figure per corpus, which a number read off a warning stream cannot support. Same species as
-    // the two counters above: a monotonic per-stream total, reset by nothing, read after the walk.
-    //
-    // IT IS NOT A DEFECT COUNT, and the distinction is the whole reason DN-43.D14 (4) had to be
-    // written: the population has two members — a genuinely empty body, which is the CORRECT
-    // identity for a content-less line, and a projection bug that moved the body onto a cube
-    // dimension. This counter is the sum. Only a per-strategy expectation separates them.
+    // refs: ADR-16.D9, DN-43.D14
+    // post: the PROJECTION-TOTALITY count for this stream — lines that had bytes and projected to
+    // an empty `content`; a monotonic per-stream total, reset by nothing, read after the walk.
+    // invariant: it is NOT a defect count. The population has two members: a genuinely empty body,
+    // which is the CORRECT identity for a content-less line, and a projection bug.
+    // invariant: this counter is their sum, only a per-strategy expectation separates them, and the
+    // figure is pinned per corpus by a gate that RUNS.
+    // note: before this accessor the number left canon only through a rate-limited warning
     [[nodiscard]] std::size_t empty_projections() const noexcept;
 
   private:
@@ -169,168 +139,140 @@ class Tokenizer
 export namespace insight
 {
 
-// ── Run-outcome recognition + resolution (ADR-17 / insight_run_outcome_model.md §3–§4) ──────────
-// Canon owns the ALGORITHMS (the format-gated token map, the console-tail scan, the SRC-D-OUT-RUN-1
-// precedence resolver); the composed OutcomeTokenRow/OutcomeMarkerRow sets are the DATA. Homed in
-// the facade (they consume ComposedSemantics; the scan drives the sealed LogParser).
-
-// Map a native verdict token through the RESOLVED VIEW's OutcomeTokenRow set. The dialect gate was
-// applied at stream resolution (SRC-II-6 still holds — a Jenkins token is simply not in a GHA
-// stream's view), so an undeclared stream carries no concretely-gated row and nothing resolves:
-// fail-closed on depth. nullopt = no row in this view claims the token (distinct from a row that
-// maps it TO RunOutcome::Unknown, e.g. Jenkins NOT_BUILT).
+// refs: ADR-17.D5, SRC-D-OUT-RUN-1, SRC-II-6
+// invariant: canon owns the run-outcome ALGORITHMS — the token map, the console-tail scan and the
+// precedence resolver; the composed outcome rows are the DATA.
+// post: `map_outcome_token` maps a native verdict token through the RESOLVED VIEW's
+// `OutcomeTokenRow` set, and nullopt means no row in this view claims the token.
+// invariant: the dialect gate was applied once at stream resolution, so an undeclared stream
+// carries no concretely-gated row and nothing resolves — fail-closed on DEPTH.
+// note: nullopt differs from a row that maps the token TO Unknown, as Jenkins NOT_BUILT does
 [[nodiscard]] std::optional<RunOutcome>
 map_outcome_token(std::string_view token,
                   const insight::semantic::ComposedSemantics& composed) noexcept;
 
-// ── A CALLER-DECLARED verdict (DN-32.D6) ────────────────────────────────────────────────────────
-//
-// A verdict supplied by the caller is a PAIR — `(vocabulary, token)` — never a bare string, and the
-// two halves answer different questions that ADR-22.D1's authorship test keeps apart:
-//
-//   * the STREAM's dialect answers *who wrote the bytes*. For a raw cmake/ninja build log the true
-//     answer is "no dialect", and that is a fact, not a gap.
-//   * the SIDE INPUT's vocabulary answers *who supplied the verdict* — a CI Action reading its own
-//     platform's job status.
-//
-// Requiring cmake's bytes to carry GitHub's vocabulary is a category error, and it is what made the
-// engine fail closed on our own dogfood: every `outcome_tokens` row is gated to its owning package,
-// the gate was evaluated against the STREAM's resolved dialect, and a dialect-free build log
-// therefore resolved nothing — *"this stream's resolved vocabulary carries no run-outcome tokens"*
-// — even though the vocabulary needed already existed and already covered the token exactly.
-//
-// ⚠ THIS IS NOT "resolve without a vocabulary". A bare token is NOT self-interpreting: GHA says
-// `failure`, GitLab says `failed`, Jenkins says `FAILURE` and also `UNSTABLE`, which has no
-// universal meaning at all. Resolving a bare string would force a native→canonical spelling list
-// into CORE. Naming the vocabulary keeps the mapping as package data (ADR-17.D1) and core learns
-// nothing.
+// refs: ADR-17.D1, ADR-22.D1, DN-32.D6
+// invariant: a caller-declared verdict is a PAIR — `(vocabulary, token)` — never a bare string,
+// and the two halves answer different questions the authorship test keeps apart.
+// invariant: the STREAM's dialect answers who WROTE the bytes, and "no dialect" is a fact rather
+// than a gap; the SIDE INPUT's vocabulary answers who SUPPLIED the verdict.
+// note: requiring a raw cmake log to carry GitHub's vocabulary is a category error
+// invariant: a bare token is NOT self-interpreting — `failure`, `failed`, `FAILURE`, and
+// `UNSTABLE` has no universal meaning — so resolving one would force a spelling list into CORE.
 struct SideInputVerdict
 {
-    // The producer's own spelling, verbatim — never a pre-resolved RunOutcome. Empty = the caller
-    // declared nothing, which is a CHOICE and asserts nothing (DN-32.D7).
+    // refs: DN-32.D7
+    // invariant: the producer's own spelling, verbatim, never a pre-resolved `RunOutcome`; empty
+    // means the caller declared nothing, which is a CHOICE and asserts nothing.
     std::string_view token;
-    // The name of the package whose `outcome_tokens` interpret that spelling. REQUIRED whenever
-    // `token` is non-empty: the two fields are one declaration, and half of one is a wiring
-    // mistake, not a weak assertion (DN-32.D6). A non-empty token with an empty vocabulary
-    // TERMINATES — it used to resolve nothing in silence, which is precisely how `sift-crawl`
-    // shipped 63 identical-commit pairs' worth of unbounded claims. Declaring NOTHING (both empty)
-    // stays a first-class choice and degrades (DN-32.D7).
+    // refs: DN-32.D6, DN-32.D7
+    // invariant: the name of the package whose `outcome_tokens` interpret that spelling, REQUIRED
+    // whenever `token` is non-empty: the two fields are one declaration.
+    // invariant: a non-empty token beside an empty vocabulary TERMINATES — half a declaration is
+    // a wiring mistake, not a weak assertion.
+    // note: resolving nothing in silence is how the crawl shipped 63 pairs of unbounded claims
+    // invariant: declaring NOTHING — both fields empty — stays a first-class choice and
+    // degrades.
     std::string_view vocabulary;
 };
 
-// Map a native verdict token through a NAMED vocabulary's `outcome_tokens`, INDEPENDENTLY of any
-// stream's resolved dialect. `composed` is the FULL composition (every package's rows), not a
-// stream view — the whole point is that the stream's dialect is not consulted.
-//
-// ⚠ IT DOES NOT REINTRODUCE A PER-LINE GATE INPUT, and that distinction is what makes it safe.
-// The determinism fix ADR-22 records is that a DECLARED ROW's gate must not be a function of
-// CONTENT — the old `LogParser::routed_format()` was the per-line detector winner, so which rows
-// fired depended on the bytes. This gate coordinate is a caller's declaration, fixed before the
-// first line and consulted exactly ONCE per side per diff, never on the hot path. Nothing here
-// walks a line.
-//
-// nullopt = no row in the named vocabulary claims the token (distinct from a row that maps it TO
-// RunOutcome::Unknown, e.g. Jenkins NOT_BUILT). That is the one non-fatal miss, and it stays
-// non-fatal because it is a VALUE error: a legitimate runtime state under correct wiring, which a
-// caller survives by falling through the ladder with a note on the report.
-//
-// TWO shapes TERMINATE, and both are WIRING errors — unreachable from any log byte, identical on
-// the first invocation and the millionth. An UNKNOWN vocabulary NAME, for the same reason and
-// through the same door as an unknown dialect (ADR-22.D5). And an EMPTY vocabulary beside a
-// non-empty token: a caller-declared verdict is a PAIR (DN-32.D6), a bare string does not
-// interpret itself (`failure`/`failed`/`FAILURE`; `UNSTABLE` means nothing on two platforms of
-// three), and returning nullopt for it disarmed every verdict-reading rule in silence for as long
-// as it existed.
-//
-// ⚠ `composed` MUST be the FULL composition, and passing a stream view is a silent no-op rather
-// than an error: a view has already been filtered, and a FRESH composition is the
-// doubly-Unspecified view in which every concretely-gated row is already dropped. The
-// implementation re-derives through `for_stream`, the one ratified evaluation point of the dialect
-// gate, which reads the UNFILTERED tables — so this cannot be "fixed" by walking the view.
-//
-// Not noexcept: `for_stream` allocates. Cold path — once per side per diff, never per line.
+// refs: ADR-22, ADR-22.D5, DN-32.D6
+// post: maps a native verdict token through a NAMED vocabulary's `outcome_tokens`, INDEPENDENTLY of
+// any stream's resolved dialect.
+// pre: `composed` is the FULL composition — every package's rows — and never a stream view.
+// invariant: passing a STREAM VIEW is a silent no-op rather than an error, because a view has
+// already been filtered and re-filtering it removes nothing.
+// invariant: passing a FRESH composition is the doubly-Unspecified view, in which every
+// concretely-gated row is already dropped, so nothing maps.
+// invariant: the body re-derives through `for_stream`, the one ratified evaluation point of the
+// dialect gate, which reads the UNFILTERED tables — so this cannot be fixed by walking the view.
+// invariant: the gate coordinate is a caller's declaration, fixed before the first line and read
+// once per side per diff, so no DECLARED row's gate is ever a function of CONTENT.
+// post: nullopt = no row in the named vocabulary claims the token. That is the one non-fatal miss,
+// and it stays non-fatal because it is a VALUE error under correct wiring.
+// invariant: an UNKNOWN vocabulary NAME and an EMPTY vocabulary beside a non-empty token both
+// TERMINATE: both are WIRING errors, unreachable from any log byte.
+// note: not noexcept — `for_stream` allocates; cold path, once per side per diff, never per line
 [[nodiscard]] std::optional<RunOutcome>
 map_outcome_token_in(std::string_view token, std::string_view vocabulary,
                      const insight::semantic::ComposedSemantics& composed);
 
-// The whole-log console-tail scan (§3.2 — the degenerate "only a console log" source). One
-// parse-only pass (no masking): per line, the resolved view's OutcomeMarkerRow set is walked and
-// the LONGEST matching prefix wins within the line; the LAST such line wins across the log.
-//
-// Longest-prefix-wins is grammar-5 (ADR-17) and it replaces "the last row that matched overwrites"
-// — a walk whose winner was a function of DECLARATION ORDER. GitLab needs
-// `ERROR: Job failed: canceled` (Aborted) to beat `ERROR: Job failed` (Failure), and resolving that
-// by where the rows sit in an array is a silent coupling of a verdict to a package's formatting.
-// `classify` and `recognize` already guarantee longest-match; this makes the third walker agree.
-// Behaviour-preserving for every shipped package that predates it: Jenkins declares one marker row,
-// GHA and test_frameworks declare none, so no stream had two matching rows to order.
-//
-// It no longer LATCHES a dialect. It used to carry two `LogFormat` fields — the first
-// outcome-bearing routed format, and the matched marker line's routed format — whose only job was
-// to gate `map_outcome_token` afterwards. Both were per-line detector outputs, so the resolution a
-// side-input token got depended on the stream's CONTENT; under a declared dialect the vocabulary is
-// fixed before the first line and the fields have nothing left to carry (ADR-22).
+// refs: ADR-17, ADR-17.D5, ADR-22
+// post: the whole-log console-tail scan is ONE parse-only pass with no masking: per line the
+// resolved view's `OutcomeMarkerRow` set is walked.
+// invariant: the LONGEST matching prefix wins within a line and the LAST such line wins across the
+// log.
+// invariant: longest-prefix-wins replaces a walk whose winner was a function of DECLARATION ORDER,
+// so a package's row order can no longer decide a verdict.
+// note: GitLab needs `ERROR: Job failed: canceled` to beat `ERROR: Job failed`
+// invariant: the scan LATCHES no dialect and carries no `LogFormat` at all: the vocabulary is fixed
+// before the first line by the declaration.
 struct RunOutcomeScan
 {
     bool marker_present{false};
-    // The winning RemainderToken row's extracted verdict word, which the resolver maps through the
-    // view's OutcomeTokenRow set. Empty when no marker matched, and empty when the winner was a
-    // PrefixIsVerdict row — that shape has no remainder token by construction, and `verdict` below
-    // carries its answer instead.
+    // invariant: the winning `RemainderToken` row's extracted verdict word, which the resolver maps
+    // through the view's `OutcomeTokenRow` set.
+    // invariant: empty when no marker matched, and empty when the winner was a `PrefixIsVerdict`
+    // row — that shape has no remainder token by construction.
     std::string token;
-    // The winning PrefixIsVerdict row's own RunOutcome (grammar-5, ADR-17). Engaged EXACTLY when
-    // the console tail resolved off the row rather than off a token, so the resolver never has to
-    // ask which shape won — it prefers this and falls back to mapping `token`, and the
-    // "console verdict is not in the composed vocabulary" fail-closed note stays reachable for the
-    // shape that can actually produce it.
+    // refs: ADR-17
+    // invariant: the winning `PrefixIsVerdict` row's own `RunOutcome`, engaged EXACTLY when the
+    // console tail resolved off the row rather than off a token.
+    // invariant: the resolver prefers it and falls back to mapping `token`, so the fail-closed note
+    // stays reachable for the shape that can actually produce it.
     std::optional<RunOutcome> verdict;
 };
 
 [[nodiscard]] RunOutcomeScan scan_run_outcome(std::span<const std::string> lines,
                                               const insight::semantic::ComposedSemantics& composed);
 
-// SRC-D-OUT-RUN-1 — the strict total resolution order, NEVER a reconciliation:
-//   1. the authoritative side-input token, if provided AND it maps in the detected dialect;
-//   2. else the console-tail marker's last match, if present AND it maps;
-//   3. else Unknown.
-// When rung 1 resolves, a present-but-DISAGREEING console tail is NOT consulted (Accumulo #498 —
-// a local/nested/caught outcome, not a competing whole-run verdict): the divergence is surfaced as
-// a kept trace-level log + the `divergent` flag, the authoritative value stands. A token that is
-// provided but does not map is never a silent misclassification: it surfaces in `note`
-// (fail-closed, the SP-3/SP-4 discipline applied to values) and resolution falls down the ladder.
+// refs: ADR-17.D5, SRC-D-OUT-RUN-1
+// invariant: the resolution order is STRICT and TOTAL, never a reconciliation: the authoritative
+// side-input token if it maps, else the console tail's last match if it maps, else Unknown.
+// invariant: when rung 1 resolves, a present-but-DISAGREEING console tail is NOT consulted — it
+// can be a local, nested or caught outcome rather than a competing whole-run verdict.
+// invariant: that divergence is surfaced as a kept trace-level log plus the `divergent` flag, and
+// the authoritative value stands.
+// invariant: a token that is provided but does not map is never a silent misclassification: it
+// surfaces in `note` and resolution falls down the ladder.
+// refs: F-SRC-insight-canon:test_run_outcome.cpp
 struct RunOutcomeResolution
 {
+    // invariant: `console` carries the console candidate's mapped value, and Unknown when there was
+    // none.
+    // invariant: `authoritative` is true exactly when rung 1 resolved; `divergent` is true when
+    // rung 1 resolved AND a mapped console tail disagrees.
+    // invariant: `note` carries the surfaced fail-closed note, and empty means clean.
     RunOutcome outcome{RunOutcome::Unknown};
-    RunOutcome console{
-        RunOutcome::Unknown};  // the console candidate's mapped value (Unknown otherwise)
-    bool authoritative{false}; // rung 1 resolved
-    bool divergent{false};     // rung 1 resolved AND a mapped console tail disagrees
-    std::string note;          // surfaced fail-closed note ("" = clean)
+    RunOutcome console{RunOutcome::Unknown};
+    bool authoritative{false};
+    bool divergent{false};
+    std::string note;
 };
 
-//
-// TWO compositions, and they are not interchangeable (DN-32.D6):
-//   * `stream_view` — the resolved view of the stream being diffed. Rung 2 reads it, and must:
-//     a console marker came out of THESE bytes, so a Jenkins marker may not fire on a GHA stream.
-//   * `vocabularies` — the FULL composition. Rung 1 reads it, and only when the side input NAMES
-//     its vocabulary; the declarer's vocabulary has nothing to do with who wrote the bytes.
-// When the side input names no vocabulary the pair is incomplete and rung 1 falls back to
-// `stream_view`, which resolves exactly what it resolved before and gains nothing it did not.
+// refs: DN-32.D6
+// pre: TWO compositions, and they are not interchangeable: `stream_view` is the resolved view of
+// the stream being diffed, `vocabularies` is the FULL composition.
+// invariant: rung 2 reads `stream_view` and must — a console marker came out of THESE bytes, so a
+// Jenkins marker may not fire on a GHA stream.
+// invariant: rung 1 reads `vocabularies`, and only when the side input NAMES its vocabulary: the
+// declarer's vocabulary has nothing to do with who wrote the bytes.
+// invariant: when the side input names no vocabulary the pair is incomplete and rung 1 falls back
+// to `stream_view`, resolving exactly what it resolved before.
 [[nodiscard]] RunOutcomeResolution
 resolve_run_outcome(SideInputVerdict side_input, const RunOutcomeScan& scan,
                     const insight::semantic::ComposedSemantics& stream_view,
                     const insight::semantic::ComposedSemantics& vocabularies);
 
-// Location recognition (bibles/intent_identity.md §8, SRC-II-8) — the test-file WHERE coordinate,
-// homed in the facade because it walks the composed location rows (ComposedSemantics is in
-// insight.canon.compose). Canon owns the three LocationMatchKind algorithms; the composed rows are
-// the dialect-independent file-naming vocabulary. Returns a view into the content's bytes, or
-// empty. The view is the LOCATION ALONE: a family fixes its end, and the same byte class walked
-// backwards fixes its start, so a producer annotation glued to the path with no separator
-// (`##[error]<path>`, `##[debug]File:<path>`, a wrapping quote or paren) stays OUT of the label —
-// the one deliberate departure from the pre-split hardcoded recognize_location, which sliced from
-// token offset 0. `content` carries the same type-borne ingest precondition as
-// `classify`/`recognize` above.
+// refs: BIB:intent_identity, SRC-II-8
+// post: returns the test-file WHERE coordinate as a view into the content's bytes, or empty when no
+// composed location row matches.
+// invariant: canon owns the three `LocationMatchKind` algorithms; the composed rows are the
+// dialect-independent file-naming vocabulary, which is why this is homed in the facade.
+// invariant: the view is the LOCATION ALONE — a family fixes its end, and the same byte class
+// walked backwards fixes its start.
+// note: an annotation glued to the path with no separator stays OUT of the label
+// pre: `content` carries the same type-borne ingest precondition as `classify` and `recognize`.
 [[nodiscard]] std::string_view
 recognize_location(insight::tokenization::NormalizedContent content,
                    const insight::semantic::ComposedSemantics& composed) noexcept;

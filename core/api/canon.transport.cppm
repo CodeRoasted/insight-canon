@@ -1,174 +1,133 @@
-// insight.canon.transport — the TRANSPORT VOCABULARY (ADR-23). The declared, stream-scoped peel
-// that runs OUTSIDE-IN of everything else: transport → logformat → intent (0031's frozen parse
-// order). Public + installed; the facade `export import`s it, so `import insight.canon;` yields the
-// declaration types alongside Tokenizer.
-//
-// WHY THIS IS NOT A SEMANTIC PACKAGE CONCERN, and why the catalogue does not live in a manifest
-// (ADR-23). 0031's ratified model is a PRODUCT — `TransportStack × LogFormat × dialect intent
-// markers`. The GHA per-line stamp is a property of GitHub's *delivery*, not of the GHA *dialect*;
-// Jenkins Timestamper is a *plugin*, not the Jenkins dialect. Filing transform rows in
-// `SemanticPackageManifest` would re-couple exactly the two factors the model separates, and would
-// make NESTING (docker-inside-GHA — 0031's named beneficiary) inexpressible, since a stack must be
-// able to compose transforms of different origins over any dialect. So the catalogue is canon's
-// own, orthogonal to the packages, and canon owns every transform ALGORITHM exactly as it owns
-// every matcher algorithm.
-//
-// The catalogue is CANON-SHIPPED and closed, not package-extensible: transport transforms are a
-// core vocabulary like the ordinal/OTEL field catalogs, not dialect data. Its version + rows enter
-// EVERY composed `semantic_identity` (§6 — the transform GRAMMAR is identity; the per-run
-// declaration is provenance and goes to MetaLog instead).
+// refs: ADR-23, ADR-23.D3
+// invariant: the TRANSPORT VOCABULARY: the declared, stream-scoped peel that runs OUTSIDE-IN of
+// everything else — transport, then log format, then intent.
+// invariant: public and installed; the facade `export import`s it, so `import insight.canon;`
+// yields the declaration types alongside the Tokenizer.
+// invariant: the catalogue does NOT live in a manifest: the ratified model is a product of
+// transport, format and dialect markers, and a delivery stamp is not a dialect's property.
+// note: filing transform rows in a manifest would re-couple the two factors the model separates
+// invariant: so the catalogue is canon's own and orthogonal to the packages, and canon owns every
+// transform ALGORITHM exactly as it owns every matcher algorithm.
+// invariant: it is CANON-SHIPPED and CLOSED, not package-extensible — a core vocabulary like the
+// ordinal and OTEL field catalogs, never dialect data.
+// invariant: its version and rows enter EVERY composed `semantic_identity`: the transform GRAMMAR
+// is identity, while the per-run declaration is provenance and goes to MetaLog instead.
 module;
 
 export module insight.canon.transport;
-import insight.canon.internal; // std + global C fixed-width types
-import insight.canon.api;      // Timestamp, parse_iso8601
+import insight.canon.internal;
+import insight.canon.api;
 
 export namespace insight::transport
 {
 
-// The catalogue's version — a component of the composed identity, exactly as the semantic grammar
-// version is. A stream analyzed under two different transport vocabularies is not comparable, and
-// the digest must say so.
-//
-// THE BUMP RULE (`ADR-2.D5`, which SHARPENED the over-broad rule this comment first
-// carried):
-//
-//     Bump on a change to what the catalogue SERIALIZES — plus any change to its serialization
-//     SHAPE, even when the bytes happen to coincide.
-//
-// The second half is the token's whole reason to exist (ADR-2): a shape change whose
-// bytes happen not to move is exactly the collision a content hash cannot catch. The first half is
-// why "a new kind" is NOT on the list: `kind` is serialized only as a value ON a row, so an enum
-// member with no row serializes ZERO bytes and changes no behavior — bumping on it would move every
-// golden for nothing. That cannot happen anyway, since a kind never lands without its row (below):
-// "a new kind" and "a new row" always co-fire, and two criteria that always agree are one
-// criterion.
-//
-// LIKE EVERY MONOTONIC TOKEN HERE, THIS IS ASSIGNED AT SHIP AND NEVER RESERVED (ADR-2,
-// NORMATIVE): the value means "the Nth shape", and which change causes the Nth shape is not
-// knowable in advance. `-2` was taken when the SECOND transform landed with its row (T5 5.2:
-// `bracket-rfc3339-line-prefix`, DN-15 — the co-fire the comment above
-// predicted); `-3` was taken when the THIRD transform landed with its row
-// (`utf8-bom-line-prefix`, DN-25 — the same co-fire again); `-4` moves next, at whatever
-// ship makes the fourth shape.
+// refs: ADR-2.D5
+// invariant: the catalogue's version is a component of the composed identity, exactly as the
+// semantic grammar version is: two transport vocabularies are not comparable.
+// invariant: THE BUMP RULE: bump on a change to what the catalogue SERIALIZES, plus any change to
+// its serialization SHAPE even when the bytes happen to coincide.
+// note: a shape change whose bytes do not move is the collision a content hash cannot catch
+// invariant: a new KIND is NOT on the list: a kind is serialized only as a value ON a row, so an
+// enum member with no row serializes zero bytes and changes no behaviour.
+// invariant: a kind never lands without its row anyway, so "a new kind" and "a new row" always
+// co-fire, and two criteria that always agree are one criterion.
+// invariant: like every monotonic token here it is assigned AT SHIP and never reserved: the value
+// means "the Nth shape", and which change causes the Nth shape is not knowable in advance.
 inline constexpr std::string_view kTransportCatalogVersion{"transport-catalog-3"};
 
-// ⚠ NORMATIVE — CATALOGUE ENUM VALUES ARE IDENTITY-BEARING: NEW MEMBERS APPEND
-// (`ADR-2.D7`). A value is never renumbered and never inserted mid-enum. Both enums below serialize
-// as their `uint8_t` VALUE on every row (`compose.cpp`), so inserting a member in the middle shifts
-// the serialized byte of EVERY EXISTING ROW — the digest moves for rows nobody touched, and it
-// moves SILENTLY: the diff is one line, the compiler says nothing, and no reviewer would attribute
-// the golden churn to it. The explicit `= 0` on each first member is the anchor; append after the
-// last.
-
-// ════════════════════════════════════════════════════════════════════════════════════════════════
-// §3 — the closed transform vocabulary. Rows-as-data, NEVER a callable (SRC-SID-2 applied to
-// transport, for SRC-SID-2's reason: a callable is un-hashable and lets the declaration and the
-// behavior diverge silently). Enum-not-tag for the closed sets (ADR-20).
-// ════════════════════════════════════════════════════════════════════════════════════════════════
-
-// Which transform ALGORITHM a row selects and parameterizes.
-//
-// TWO members today, each grown in WITH ITS ALGORITHM, ITS ROW AND ITS GATE (`ADR-2.D7`),
-// as `PayloadExtract` and `LocationMatchKind` grew. ADR-23 listed a wider anticipated
-// vocabulary — FramingLine, AnsiEchoWrap, StreamTag, Truncation, Chunking, Encoding — and **those
-// enum bodies are to be read as a SKETCH, never as a normative closed set**; `ADR-23.D3`'s
-// normative content is the row shape, the rows-as-data rule and the ternary extract routing, all
-// of which shipped intact.
-//
-// The decisive argument is not anti-dormant, it is arithmetic: an enum member with no row
-// serializes zero bytes, so declaring the full set up front either moves no digest (and buys
-// nothing — the members are unreachable) or costs one gratuitous identity bump and golden re-derive
-// for zero capability. Growing in makes the bump CO-FIRE with the row that makes the kind real,
-// which is the irreducible cost either way. It changes no error message either: `find_transform`
-// resolves a declaration by NAME against the rows, so an unused sibling kind would not improve the
-// hard error.
-//
-// Each further member APPENDS (see the identity-bearing note above).
+// refs: ADR-2.D7, ADR-23.D3, SRC-SID-2
+// invariant: NORMATIVE — catalogue enum values are IDENTITY-BEARING: new members APPEND, a value
+// is never renumbered and never inserted mid-enum.
+// invariant: both enums below serialize as their `uint8_t` VALUE on every row, so inserting a
+// member in the middle shifts the serialized byte of EVERY EXISTING ROW.
+// note: the digest then moves for rows nobody touched, and it moves silently
+// invariant: the explicit zero on each first member is the anchor; append after the last.
+// invariant: the transform vocabulary is CLOSED and is rows-as-data, NEVER a callable: a callable
+// is un-hashable and lets the declaration and the behaviour diverge silently.
+// invariant: members grow in WITH their algorithm, their row and their gate, and an anticipated
+// vocabulary is prose rather than an enum body.
+// note: the argument is arithmetic: a member with no row serializes zero bytes
+// invariant: it changes no error message either: a declaration is resolved by NAME against the
+// rows, so an unused sibling kind would not improve the hard error.
 enum class TransportTransformKind : std::uint8_t
 {
-    // A fixed-width timestamp stamped at the head of EVERY line by the delivery layer. The GHA API
-    // per-line RFC 3339 prefix is the shipped member.
+    // invariant: a fixed-width timestamp stamped at the head of EVERY line by the delivery layer.
     LinePrefixTimestamp = 0,
-    // A BRACKETED strict-RFC3339 stamp at the head of every line of a declared stream, VARIABLE
-    // width: `[` + the shared full-datetime grammar (`insight::utils::rfc3339_datetime_length` —
-    // the one owner, bibles/jenkins_dialect.md §4 item 3) + `]`, then the declared separator/
-    // indentation strip. The Jenkins Timestamper plugin's whole-stream scoping is the attested
-    // population (12 of the 113 `jenkins-markers/v2` logs; the scoping split is provenance, and
-    // `ADR-23.O2` is where it is routed), and the row landed exactly where
-    // the earlier refusal said it could not YET land: WITH its algorithm, its row and its gate
-    // (G-T5-PEEL — a real population and a real frozen oracle, the shipped strategy strip frozen
-    // per ADR-8 since this cut deletes it). Admissibility argument:
-    // DN-15. Peel-equivalence is the ONLY obligation this row
-    // carries — the invariance cell stays empty (ADR-23: no world vehicle exists), so declaring
-    // it certifies OUR refactor and nothing about the world.
+    // refs: ADR-8, ADR-23.D6, ADR-23.O2, BIB:jenkins_dialect, DN-15
+    // invariant: a BRACKETED strict-RFC3339 stamp at the head of every line of a declared stream,
+    // VARIABLE width: bracket, the shared datetime grammar, bracket, then the strip.
+    // invariant: that grammar has ONE owner — the shared datetime-length function — and both
+    // the masking rule and this peel delegate their byte grammar to it.
+    // invariant: the whole-stream scoping of the Jenkins Timestamper plugin is the attested
+    // population, 12 of the 113 traces, and the scoping split is provenance.
+    // invariant: peel-equivalence is the ONLY obligation this row carries: the invariance cell
+    // stays empty because no world vehicle exists.
     LinePrefixBracketedTimestamp,
-    // A UTF-8 byte-order mark at the head of a line, `EF BB BF`. A FIXED three-byte prefix
-    // removed ONCE — not a greedy loop and not a `find` anywhere in the line: the BOM is a
-    // delivery artifact of the stream's first bytes, so a second one is content and is left
-    // alone. `prefix_width` is unread (the width is the grammar, not a parameter) and
-    // `strip_leading_space` is false: a space after a BOM is a real content byte.
+    // refs: DN-25
+    // invariant: a UTF-8 byte-order mark at the head of a line: a FIXED three-byte prefix removed
+    // ONCE — not a greedy loop and not a search anywhere in the line.
+    // invariant: the mark is a delivery artifact of the stream's first bytes, so a second one is
+    // content and is left alone.
+    // invariant: `prefix_width` is unread here (the width IS the grammar) and `strip_leading_space`
+    // is false, because a space after a mark is a real content byte.
     LinePrefixByteOrderMark,
 };
 
-// What the peeled bytes YIELD, if anything. 0031's ternary extract routing, now typed: identity
-// NEVER; enrichment MOSTLY (typed fields, dimensions, provenance); discard ONLY by this closed
-// declared catalogue, FAIL-SAFE-KEEP — an unrecognized residual falls to RawText rather than being
+// refs: ADR-2.D7, ADR-23.D3
+// invariant: what the peeled bytes YIELD, if anything — the ternary extract routing: identity
+// NEVER, enrichment MOSTLY, discard ONLY by this closed declared catalogue.
+// invariant: it is FAIL-SAFE-KEEP: an unrecognized residual falls to raw text rather than being
 // dropped.
-//
-// `StreamLabel` from ADR-23's sketch is not shipped: no transform produces one today (same
-// rule as the kinds above, ratified by `ADR-2.D7`). It APPENDS if it ever lands.
+// invariant: a stream-label extract is not shipped, since no transform produces one today; it
+// APPENDS if one ever lands.
 enum class TransportExtract : std::uint8_t
 {
-    None = 0, ///< the peel yields nothing but the shortened line
-    // ⚠ An OBSERVATION time, NEVER an ordering key (ADR-23, and this is NORMATIVE). Because
-    // only TOTAL-scope transforms are transport, a whole-stream stamp necessarily covers lines
-    // written by DIFFERENT clocks — measured on Jenkins: the controller-stamped annotations are
-    // strictly monotone (0 inversions on every one of 12 logs) while the agent-stamped payload
-    // carries 7–701 inversions per log. One declared transform, one prefix form, TWO timelines.
-    // So this value MAY enrich (typed field, dimension, provenance); it may NEVER re-order
-    // anything, may NEVER be asserted monotone, and may NEVER be a replay input (root CLAUDE.md
-    // § Determinism & Replay — no wall-clock dependence in replay logic).
+    // invariant: the peel yields nothing but the shortened line.
+    None = 0,
+    // refs: ADR-23.D5, STU-10
+    // invariant: NORMATIVE: an OBSERVATION time, NEVER an ordering key. Only TOTAL-scope transforms
+    // are transport, so a whole-stream stamp covers DIFFERENT clocks.
+    // assert: measured on Jenkins — the controller-stamped annotations are strictly monotone, 0
+    // inversions on every one of 12 logs, while the agent-stamped payload carries 7 to 701 per log.
+    // invariant: one declared transform, one prefix form, TWO timelines: this value MAY enrich, and
+    // may NEVER re-order anything, be asserted monotone, or be a replay input.
     EventObservationTime,
 };
 
-// One declared transform: a NAME (what a declaration references), the algorithm it selects, the
-// algorithm's parameters, and what it extracts. POD, constexpr-constructible, canonically
-// serializable — the same discipline as the semantic grammar rows.
-//
-// Not every parameter is read by every kind (the `LocationRow` precedent): `prefix_width` is
-// `LinePrefixTimestamp`'s alone — `LinePrefixBracketedTimestamp` is VARIABLE width and its
-// acceptor computes the width from the shared grammar, so its row leaves the field 0 and unread.
+// invariant: ONE declared transform: a NAME a declaration references, the algorithm it selects,
+// that algorithm's parameters, and what it extracts.
+// invariant: POD, constexpr-constructible and canonically serializable — the same discipline as
+// the semantic grammar rows.
+// invariant: not every parameter is read by every kind: `prefix_width` is the fixed-width row's
+// alone, and the bracketed row leaves it zero and unread.
 struct TransportTransformRow
 {
-    std::string_view name; ///< the declaration's reference key; unique within the catalogue
+    // invariant: the declaration's reference key, unique within the catalogue.
+    std::string_view name;
     TransportTransformKind kind;
     TransportExtract extract;
-    // LinePrefixTimestamp: the fixed byte width of the stamp at line head.
+    // invariant: for the fixed-width kind, the byte width of the stamp at line head.
     std::uint32_t prefix_width;
-    // LinePrefixTimestamp: after removing the stamp, also drop the separator space and any
-    // delivery-layer indentation. Load-bearing, not cosmetic — ADR-23 names this as one of the
-    // bundled behaviors a "conceptual" peel silently drops, which is why G1-PEEL must MEASURE
-    // content-neutrality rather than assume it.
+    // refs: ADR-23
+    // invariant: for the fixed-width kind, whether to drop the separator space and any
+    // delivery-layer indentation after removing the stamp.
+    // invariant: load-bearing and not cosmetic: it is one of the bundled behaviours a conceptual
+    // peel silently drops, which is why the gate MEASURES neutrality.
     bool strip_leading_space;
 };
 
-// A per-line RFC 3339 prefix — `YYYY-MM-DDTHH:MM:SS.fffffffZ` + a separator space.
-// TOTAL scope (every line the serving API stamps carries it), so it is admissible transport under
-// ADR-23, and it is the one transform that has BOTH a corpus (22 030 real logs) and an
-// INDEPENDENT oracle to score against — which is what makes it shippable where Timestamper is not.
-// That oracle was `GitHubActionsStrategy`'s peel; T4 deleted the detection, and the oracle is now
-// FROZEN inside G1-PEEL itself (ADR-8), where it still scores this row over 22 490 937 lines.
-//
-// THE NAME IS DELIVERY-SHAPED, NOT ECOSYSTEM-SHAPED, and that is load-bearing twice over.
-// `ADR-23.D3` is the reason the row lives here at all: the catalogue is orthogonal to the packages
-// because this prefix is a property of the *delivery*, not of the GHA *dialect* — so naming the row
-// after an ecosystem would contradict the argument that placed it in core. ADR-17 (SRC-SP-1)
-// independently forbids an ecosystem literal in the core mechanism, and the two together leave
-// exactly one coherent name: the byte grammar it peels. Any serving API that stamps this shape
-// declares this same row. Provenance stays in prose, where a reference belongs; the identifier
-// below still records where the 28-byte width was measured.
-inline constexpr std::uint32_t kGhaApiPrefixWidth{28U}; // "YYYY-MM-DDTHH:MM:SS.fffffffZ"
+// refs: ADR-8, ADR-17, ADR-23.D3, SRC-SP-1
+// invariant: a per-line RFC 3339 prefix plus a separator space, 28 bytes wide.
+// invariant: TOTAL scope — every line the serving API stamps carries it — so it is admissible
+// transport, and it is the one transform with BOTH a corpus and an INDEPENDENT oracle.
+// invariant: that oracle was a dialect strategy's peel; the detection was deleted and the oracle is
+// now FROZEN inside the peel-equivalence gate, which still scores this row.
+// invariant: THE NAME IS DELIVERY-SHAPED, NOT ECOSYSTEM-SHAPED: the catalogue is orthogonal to the
+// packages precisely because this prefix is a property of the DELIVERY.
+// invariant: naming the row after an ecosystem would contradict the argument that placed it in
+// core, and the core mechanism independently forbids an ecosystem literal.
+// note: the two together leave exactly one coherent name: the byte grammar it peels
+inline constexpr std::uint32_t kGhaApiPrefixWidth{28U};
 
 inline constexpr std::array<TransportTransformRow, 3> kTransportCatalogRows{{
     {.name = "api-rfc3339-line-prefix",
@@ -176,33 +135,30 @@ inline constexpr std::array<TransportTransformRow, 3> kTransportCatalogRows{{
      .extract = TransportExtract::EventObservationTime,
      .prefix_width = kGhaApiPrefixWidth,
      .strip_leading_space = true},
-    // The bracketed variable-width form (T5 §2.1). Delivery-shaped name, same argument as the row
-    // above; Jenkins-Timestamper provenance lives HERE in prose, never in the identifier. The
-    // greedy `[ \t]+` strip reproduces the shipped strategy's bundled behavior #3 byte-exactly
-    // because `ADR-23.D6` makes peel-equivalence the obligation this row owes, and the bundled
-    // behaviours 2–4 are the enumeration it is measured against (executed record, routed by
-    // `ADR-23.O2`) — NOT because the strip's merit
-    // is settled: that question stays PARKED, measurement-gated (flaws.md Eqya·9), and this row
-    // does not move shipped canonicalization as a second change in its pass. `prefix_width` unread
-    // (variable width — the acceptor computes it from the shared grammar). The shipped strictness
-    // carve-outs — Proxifier `[10.20.30.40]`, ApacheError `[Mon Oct …]`, bare `[12:34:56]`,
-    // `[Pipeline]`, `[v1.2.3]` — fail the shared grammar by construction (one owner, both
-    // consumers). The blank decline (bundled #4) is already expressed catalogue-side as
-    // `PeeledLine::is_blank` ⇒ DROP.
+    // refs: ADR-23.D6, BIB:jenkins_dialect
+    // invariant: the bracketed variable-width form, delivery-shaped name on the same argument as
+    // the row above; the Timestamper provenance lives in prose, never in the identifier.
+    // invariant: the greedy whitespace strip reproduces the deleted strategy's bundled behaviour
+    // byte-exactly because peel-equivalence is the obligation this row owes.
+    // note: the strip's merit stays parked and measurement-gated, and is not ruled here
+    // invariant: `prefix_width` is unread — the width is variable and the acceptor computes it
+    // from the shared grammar.
+    // invariant: the shipped strictness carve-outs fail the shared grammar by construction; the
+    // blank decline is expressed catalogue-side as a blank peel meaning DROP.
     {.name = "bracket-rfc3339-line-prefix",
      .kind = TransportTransformKind::LinePrefixBracketedTimestamp,
      .extract = TransportExtract::EventObservationTime,
      .prefix_width = 0U,
      .strip_leading_space = true},
-    // The UTF-8 BOM at line head (DN-25). Delivery-shaped name, same argument as the two rows
-    // above: a BOM is a property of how the bytes were DELIVERED, never of an ecosystem, so the
-    // row is named for the byte grammar it peels. It is the first row in this catalogue that
-    // extracts NOTHING — a BOM carries no datum, only noise, so `extract = None` and the peel is
-    // pure removal. `prefix_width` unread (the three bytes ARE the grammar, and carrying the
-    // width as a parameter is what would let a row declare 2 and silently eat a UTF-16 BOM's
-    // first two bytes); `strip_leading_space` FALSE, because `<BOM><space>` has a real content
-    // space and the GHA row's true is what makes that distinction load-bearing rather than
-    // cosmetic.
+    // refs: DN-25
+    // invariant: the UTF-8 mark at line head, delivery-shaped name on the same argument as the two
+    // rows above: a mark is a property of how the bytes were DELIVERED, never of an ecosystem.
+    // invariant: it is the first row in this catalogue that extracts NOTHING — a mark carries no
+    // datum, only noise — so the peel is pure removal.
+    // invariant: `prefix_width` is unread because the three bytes ARE the grammar: carrying a width
+    // is what would let a row declare two and eat half a UTF-16 mark.
+    // invariant: `strip_leading_space` is FALSE, because a mark followed by a space has a real
+    // content space, and the fixed-width row's true is what makes that distinction load-bearing.
     {.name = "utf8-bom-line-prefix",
      .kind = TransportTransformKind::LinePrefixByteOrderMark,
      .extract = TransportExtract::None,
@@ -210,18 +166,18 @@ inline constexpr std::array<TransportTransformRow, 3> kTransportCatalogRows{{
      .strip_leading_space = false},
 }};
 
-// The bytes ONE `LinePrefixBracketedTimestamp` row renders: the fixed lexical form
-// `[YYYY-MM-DDTHH:MM:SS.mmmZ]` plus its single separator space. Published beside the catalogue
-// because a WRITER cannot promise not to allocate without first SIZING its buffer, and the size
-// is `rows × this`. LogCraft's console/file sinks size their end-of-stream trailer buffer at
-// CONSTRUCTION from this constant so `signal_end_of_stream()` is honestly `noexcept`; a caller
-// spelling a round number instead is sufficient by configuration accident — one declared row fits
-// in 32 bytes, two do not — and would reallocate inside a `noexcept` frame the day a second row
-// is declared. A value one surface owns is never re-spelled in another.
+// refs: DN-69.D2
+// invariant: the bytes ONE bracketed-timestamp row renders: the fixed lexical form plus its single
+// separator space.
+// invariant: published beside the catalogue because a WRITER cannot promise not to allocate without
+// first SIZING its buffer, and the size is rows times this.
+// note: one declared row fits in 32 bytes and two do not, so a round number is accidental
+// invariant: a value one surface owns is never re-spelled in another.
 inline constexpr std::size_t kBracketedTimestampPrefixBytes{27U};
 
-// Look a declared name up in the catalogue. Returns nullptr when unknown — the caller decides
-// whether that is a hard error (canon, at declaration resolution) or a query.
+// post: looks a declared name up in the catalogue and returns nullptr when it is unknown.
+// invariant: the CALLER decides whether an unknown name is a hard error, as canon does at
+// declaration resolution, or merely a query.
 [[nodiscard]] constexpr const TransportTransformRow* find_transform(std::string_view name) noexcept
 {
     for (const TransportTransformRow& row : kTransportCatalogRows)
@@ -230,138 +186,116 @@ inline constexpr std::size_t kBracketedTimestampPrefixBytes{27U};
     return nullptr;
 }
 
-// ── The WRITER dual of the catalogue (T5 §2.3) — one owner, no third spelling ──────────────────
-//
-// render_transport_prefix appends the row's line prefix (stamp + the single separator space) to
-// `out` and returns true, or returns false for a row whose kind has NO writer dual. The killed
-// third spelling is the point (bibles/jenkins_dialect.md §4 item 3: spike / strategy / masker →
-// one grammar, one owner): a LogCraft-side bracket renderer would be that spelling returning
-// through the writer door. Canon owns every transform ALGORITHM; LogCraft supplies the stamp
-// value and the plumbing, exactly as it supplies payloads to render_row.
-//
-// * `LinePrefixBracketedTimestamp` renders ONE fixed lexical form — the corpus-attested
-//   millisecond-`Z` spelling `[YYYY-MM-DDTHH:MM:SS.mmmZ]` + one space. Integer/manual formatting
-//   only (no iostream, no locale, no strftime — determinism MUST M8), and ALLOCATION-FREE: the
-//   trailer of a declared wrap is stamped inside the writer's `noexcept` end-of-stream path
-//   (§3.1's high-water-mark rule). NORMATIVE, not an accident — and DISCHARGED, by the
-//   caller-buffer signature below, rather than asked of a caller who has no way to meet it.
-// * `LinePrefixTimestamp` has NO writer dual, deliberately (returns false): the GHA API stamp is
-//   the PLATFORM's, baked into the GHA IntentFormat's own writer (T5 §3.3 — a writer-side ± knob
-//   there would generate only our own ablation and move shipped SRC-SID-3 bytes for nothing). A
-//   declared output wrap naming that row is rejected at declaration time, loudly, via this exact
-//   predicate.
-//
-// Conformance laws (asserted in tests, stated here as the contract):
-//   * `parse_iso8601(<the rendered interior>) == floor<seconds>(stamp)` — the shipped parser
-//     reads whole seconds (fraction skipped by design), so the round-trip law holds at the
-//     parser's grain; the rendered millisecond digits are covered by the byte-exact peel law:
-//   * `peel_raw(render ∥ ℓ).content == strip_ws(ℓ)` and the extracted observation time equals
-//     `floor<seconds>(stamp)` — the peel is the renderer's inverse at the declared strip's
-//     boundary (T5 §2.3's round-trip law, stated at the honest `strip_ws` boundary).
-//
-// Both forms return the no-render answer for a stamp outside the four-digit-year window the fixed
-// form can spell (0000-01-01 … 9999-12-31) — a caller-contract violation surfaced as "not
-// renderable", never a silently wrong prefix.
-//
-// TWO SIGNATURES, ONE ALGORITHM. The span form below IS the algorithm; the `std::string&` form is
-// a wrapper that appends its result. The pair exists because the normative sentence above places a
-// no-allocation obligation on this function's callers, and a `std::string&` signature makes that
-// obligation UNDISCHARGEABLE: the capacity is invisible to the callee and — the half that decides
-// it — invisible to a static analyzer, which sees `basic_string::append`, reaches
-// `__throw_length_error`, and charges the caller's `noexcept` frame. Pre-reserving would make such
-// a caller semantically honest and leave the check red, which is the branch where a suppression
-// becomes tempting; the second signature removes the temptation rather than resisting it.
-//
-// The span form writes into memory the caller already owns and touches no `std::string`, so it is
-// genuinely `noexcept` and a `noexcept` caller can be believed. Returns the bytes written, or
-// 0 for all three refusals — a row with no writer dual, an unrenderable stamp, or a buffer smaller
-// than the row's `kBracketedTimestampPrefixBytes`. On 0 the buffer is UNTOUCHED (the bytes are
-// composed in a stack scratch and copied once), so a partial prefix can never reach a document.
+// refs: BIB:determinism_model, BIB:jenkins_dialect, DN-69.D3, SRC-SID-3
+// invariant: the WRITER dual of the catalogue, and there is no third spelling: canon owns every
+// transform ALGORITHM while the caller supplies the stamp value and the plumbing.
+// post: it appends the row's line prefix — stamp plus the single separator space — or answers
+// with the no-render result for a row whose kind has NO writer dual.
+// invariant: the bracketed row renders ONE fixed lexical form, the corpus-attested
+// millisecond-and-Z spelling plus one space.
+// invariant: integer and manual formatting only — no iostream, no locale, no strftime — because
+// a locale-dependent rendering makes the same input produce different bytes.
+// invariant: NORMATIVE and ALLOCATION-FREE: the trailer of a declared wrap is stamped inside a
+// writer's noexcept end-of-stream path, and the caller-buffer signature DISCHARGES that.
+// invariant: the fixed-width row has NO writer dual, deliberately: that stamp is the PLATFORM's,
+// baked into its own writer, and a declared output wrap naming it is rejected at declaration.
+// assert: the conformance laws are that parsing the rendered interior equals the stamp floored to
+// seconds, the parser reading whole seconds by design.
+// assert: and that peeling the rendered prefix off a line returns that line whitespace-stripped,
+// with the extracted observation time equal to the same floored stamp.
+// invariant: both forms answer no-render for a stamp outside the four-digit-year window the fixed
+// form can spell — a caller-contract violation surfaced, never a silently wrong prefix.
+// invariant: TWO SIGNATURES, ONE ALGORITHM: the span form IS the algorithm and the appending form
+// wraps it, because a string signature makes the no-allocation obligation UNDISCHARGEABLE.
+// note: the capacity is invisible to the callee and to a static analyzer, which charges the caller
+// invariant: pre-reserving would make such a caller honest and leave the check red, which is the
+// branch where a suppression becomes tempting; the second signature removes the temptation.
+// post: the span form writes into memory the caller already owns, touches no string, and returns
+// the bytes written or 0 for each of the three refusals.
+// invariant: on 0 the buffer is UNTOUCHED — the bytes are composed in a stack scratch and copied
+// once — so a partial prefix can never reach a document.
 [[nodiscard]] std::size_t render_transport_prefix(const TransportTransformRow& row,
                                                   insight::Timestamp stamp,
                                                   std::span<char> out) noexcept;
 
-// The appending form: convenience over the span form, for callers with no `noexcept` obligation
-// (canon's own probes, LogCraft's per-record path). NOT noexcept, and the reason is now local to
-// this wrapper rather than delegated to the contract above — `out.append` may grow the caller's
-// buffer, and an allocating function must not wear the keyword (the escape-NOLINT that would
-// preserve it defeats the very tripwire it decorates). Both defined in transport.cpp.
+// invariant: the appending form is convenience over the span form, for callers with no noexcept
+// obligation.
+// invariant: NOT noexcept, and the reason is local to this wrapper: appending may grow the caller's
+// buffer, and an allocating function must not wear the keyword.
+// note: the escape suppression that would preserve it defeats the very tripwire it decorates
 [[nodiscard]] bool render_transport_prefix(const TransportTransformRow& row,
                                            insight::Timestamp stamp, std::string& out);
 
-// ════════════════════════════════════════════════════════════════════════════════════════════════
-// §6 — the per-run, per-stream DECLARATION. Generalizes `IntentChannel` rather than sitting beside
-// it: the channel is the degenerate one-field case of this.
-// ════════════════════════════════════════════════════════════════════════════════════════════════
-
-// FAIL-CLOSED BY DEFAULT is a MUST (ADR-22, unchanged). A default-constructed declaration —
-// empty stack, empty dialect, empty channel — is exactly today's behavior: no peel, no dialect
-// verification, the Unspecified channel view. That is the G1 case, and it is why declaring is
-// purely SUBTRACTIVE: a caller who says nothing loses nothing they had.
-//
-// canon VERIFIES, never infers (ADR-22's split, not reopened): every named transform must be in
-// the catalogue and every named dialect must be composed, or resolution is a HARD ERROR listing the
-// known names. ACQUISITION may infer (0030's CLI peek is deterministic given the bytes); canon may
-// not. An unknown name is a MISTAKE and fails closed; an ABSENT name is a CHOICE and degrades —
-// they must never share a code path.
-//
-// It is PROVENANCE, NOT IDENTITY (0031's hash split, and the whole quotient): this per-run
-// declaration goes to MetaLog; the transform GRAMMAR (the catalogue above) goes to
-// `semantic_identity`. Two runs ±a transform MUST carry the same `semantic_identity`, or
-// transport-invariance is not being built.
+// refs: ADR-22, ADR-22.D4, ADR-22.D5, ADR-23
+// invariant: the per-run, per-stream DECLARATION. It GENERALIZES the intent channel rather than
+// sitting beside it: the channel is the degenerate one-field case of this.
+// invariant: FAIL-CLOSED BY DEFAULT is a MUST. A default-constructed declaration — empty stack,
+// empty dialect, empty channel — is exactly today's behaviour and is the degenerate case.
+// invariant: declaring is purely SUBTRACTIVE: a caller who says nothing loses nothing they had,
+// which is what makes a declaration safe to add to a working pipeline.
+// invariant: canon VERIFIES, never infers: every named transform must be in the catalogue and every
+// named dialect must be composed, or resolution is a HARD ERROR listing the known names.
+// invariant: acquisition MAY infer, canon may not. An unknown name is a MISTAKE and fails closed;
+// an ABSENT name is a CHOICE and degrades; they must never share a code path.
+// invariant: it is PROVENANCE, NOT IDENTITY: this per-run declaration goes to MetaLog while the
+// transform GRAMMAR goes to the composed identity.
+// invariant: two runs differing by one declared transform MUST carry the same `semantic_identity`,
+// or transport-invariance is not being built.
 struct IngestDeclaration
 {
-    // ORDERED, outside-in — the order the delivery layers were applied, so the peel unwinds them
-    // in declaration order. Empty = the degenerate case.
+    // invariant: ORDERED, outside-in — the order the delivery layers were applied, so the peel
+    // unwinds them in declaration order. Empty is the degenerate case.
     std::span<const std::string_view> stack;
-    // The declared dialect (a composed package name). VERIFIED and GATING since T4 (ADR-22):
-    // `resolve_stream` checks it against the composed packages, then filters every dialect-gated
-    // row into the stream's view — so no walker below ever sees a dialect coordinate, and which
-    // declared rows fire stopped being a function of the stream's content. An unknown name is a
-    // named error rather than a silently structure-less analysis, the same posture ADR-22
-    // gives an unknown channel; an ABSENT one withholds every concretely-gated row.
+    // refs: ADR-22
+    // invariant: the declared dialect is a composed package name, VERIFIED and GATING: stream
+    // resolution checks it, then filters every dialect-gated row into the stream's view.
+    // invariant: so no walker below ever sees a dialect coordinate, and which declared rows fire
+    // stopped being a function of the stream's content.
+    // invariant: an unknown name is a named error rather than a silently structure-less analysis;
+    // an ABSENT one withholds every concretely-gated row.
     std::string_view dialect;
-    // Today's IntentChannel (ADR-22), unchanged in meaning. Verified and applied by
-    // `ComposedSemantics::for_channel`.
+    // refs: ADR-22, ADR-22.D4
+    // invariant: the declared intent channel, unchanged in meaning, verified and applied by the
+    // same stream-resolution call as the dialect — there is no separate per-axis door.
     std::string_view channel;
 };
 
-// ════════════════════════════════════════════════════════════════════════════════════════════════
-// §4 — the `transport_context` boundary. The tokenizer NEVER learns the stack existed.
-// ════════════════════════════════════════════════════════════════════════════════════════════════
-
-// What one line's DECLARED peel yielded on the RECOGNITION path. `content` carries the ingest
-// precondition as a TYPE (ADR-21.D3): this peel takes a
-// `NormalizedLine`, so holding a PeeledLine is proof that stage 1 ran and the declared stage 2
-// followed — the currency the content walkers accept.
+// refs: ADR-21.D3, ADR-23.D4
+// invariant: the `transport_context` boundary: the tokenizer NEVER learns the stack existed.
+// invariant: what one line's DECLARED peel yielded on the RECOGNITION path; `content` carries the
+// ingest precondition as a TYPE.
+// invariant: this peel takes a normalized line, so holding one of these is proof that stage 1 ran
+// and the declared stage 2 followed — the currency the content walkers accept.
 struct PeeledLine
 {
-    // The line with every declared transform unwound. Borrows from the NormalizedLine's storage —
-    // the peel only ever SHORTENS, never rewrites, so no allocation and no arena are involved.
+    // invariant: the line with every declared transform unwound. It BORROWS from the normalized
+    // line's storage: the peel only ever SHORTENS, never rewrites, so no allocation and no arena.
     insight::tokenization::NormalizedContent content;
-    // The observation time a `LinePrefixTimestamp` extracted, if the stack declared one and the
-    // line actually carried a parseable stamp. ⚠ Read `TransportExtract::EventObservationTime`
-    // before using it: enrichment only, never an ordering key, never a replay input.
+    // refs: ADR-23.D5
+    // invariant: the observation time a fixed-width stamp extracted, present only when the stack
+    // declared one and the line actually carried a parseable stamp.
+    // invariant: enrichment only — never an ordering key and never a replay input.
     std::optional<insight::Timestamp> observation_time;
 
-    // A line whose entire content was transport (a bare stamp with nothing after it) peels to
-    // EMPTY, and empty means DROP — not an empty template. This is how the shipped GHA strategy's
-    // "timestamp-only line is a blank line: decline it" behavior survives the move to a declared
-    // peel; ADR-23 lists that decline as one of the bundled behaviors content-neutrality
-    // depends on, so it is expressed here rather than lost.
+    // refs: ADR-23
+    // post: a line whose entire content was transport — a bare stamp with nothing after it —
+    // peels to EMPTY, and empty means DROP, not an empty template.
+    // invariant: that is how the shipped strategy's timestamp-only-line decline survives the move
+    // to a declared peel, and it is one of the bundled behaviours content-neutrality depends on.
     [[nodiscard]] constexpr bool is_blank() const noexcept
     {
         return content.bytes().empty();
     }
 };
 
-// What one line's peel yielded on the TOKENIZER-FEEDING path (`peel_raw`). `content` is a plain
-// view of the caller's RAW bytes with the declared transforms unwound — deliberately NOT a
-// `NormalizedContent`, because no stage 1 has run and this struct must not pretend one has. It
-// cannot reach a content walker (the type forbids it); what it CAN do is feed
-// `Tokenizer::process_line`, which performs stage 1 itself and reads the raw bytes beside it
-// (SRC-D-PROV-1: the GHA command-echo SGR wrapper survives ONLY there — pre-normalizing this path
-// is the §5.4 trap and would silently kill the echoed-source demotion).
+// refs: SRC-D-PROV-1
+// invariant: what one line's peel yielded on the TOKENIZER-FEEDING path: a plain view of the
+// caller's RAW bytes with the declared transforms unwound.
+// invariant: deliberately NOT the normalized type, because no stage 1 has run and this struct must
+// not pretend one has — so it cannot reach a content walker.
+// invariant: what it CAN do is feed the raw tokenizer door, which performs stage 1 itself and reads
+// the raw bytes beside it: the command-echo wrapper survives ONLY there.
+// note: pre-normalizing this path would silently kill the echoed-source demotion
 struct RawPeeledLine
 {
     std::string_view content;
@@ -373,55 +307,50 @@ struct RawPeeledLine
     }
 };
 
-// The resolved stack — built ONCE per stream, from the declaration, BEFORE the first line
-// (ADR-23: peeling is stream-scoped). Cheap to hold: a handful of pointers to
-// catalogue-static rows.
-//
-// NORMATIVE, and the reason this type exists at all: LINE IDENTITY IS A PURE FUNCTION OF PEELED
-// CONTENT. SRC-SID-1/SRC-II-1 is preserved BY CONSTRUCTION, not by review — `peel()` hands back a
-// `string_view` and the tokenizer takes a `string_view`, so there is NO parameter anywhere on the
-// identity path through which a declaration could reach an identity. No future edit can make an
-// identity depend on a declaration without first adding such a parameter, which is a visible,
-// reviewable change rather than a silent one. That is strictly stronger than asserting the property
-// in a test, and it is why the stack is never handed to the Tokenizer.
+// refs: ADR-23, SRC-II-1, SRC-SID-1
+// invariant: the resolved stack is built ONCE per stream, from the declaration, BEFORE the first
+// line, and is cheap to hold: a handful of pointers to catalogue-static rows.
+// invariant: NORMATIVE, and the reason this type exists: LINE IDENTITY IS A PURE FUNCTION OF PEELED
+// CONTENT, preserved BY CONSTRUCTION rather than by review.
+// invariant: the peel hands back a view and the tokenizer takes a view, so there is NO parameter
+// anywhere on the identity path through which a declaration could reach an identity.
+// invariant: no future edit can make an identity depend on a declaration without first adding such
+// a parameter, which is a visible reviewable change rather than a silent one.
+// note: that is stronger than asserting the property in a test
 class TransportStack
 {
   public:
-    TransportStack() = default; ///< the degenerate stack: `peel` is the identity function (G1)
+    // invariant: the degenerate stack: the peel is the identity function.
+    TransportStack() = default;
 
-    // Build from resolved catalogue rows, ordered outside-in. Prefer `resolve()` below, which
-    // verifies names; this exists so a caller holding rows can construct directly.
+    // pre: the rows are resolved catalogue rows, ordered outside-in.
+    // note: prefer the resolving free function below, which verifies names
     explicit TransportStack(std::vector<const TransportTransformRow*> ordered_rows) noexcept
         : rows_{std::move(ordered_rows)}
     {
     }
 
-    // Unwind every declared transform, outside-in. Pure, allocation-free, deterministic, and
-    // `noexcept`: a byte function over a borrowed view.
-    //
-    // TOTALITY IS ABOUT APPLICATION, NOT EFFECT (ADR-23 — the bright line against re-admitting
-    // detection). Every declared transform is applied to every line, unconditionally. Its EFFECT on
-    // a given line may be the identity: a `LinePrefixTimestamp` whose declared stamp shape is not
-    // present in these bytes removes nothing. That is the rule's effect being nothing — it is NOT
-    // the transform asking "is this line mine?", which is the per-line inference the declaration
-    // model exists to forbid.
-    //
-    // A WRONG DECLARATION STAYS WRONG, LOUDLY, AND THE DECLARER OWNS IT: declaring this transform
-    // on a payload-stamped stream would also strip applicative log4j prefixes (0031's argument,
-    // attested at 16 250 measured lines). Declaration moves RESPONSIBILITY to the party that owns
-    // the knowledge; it does not make a wrong declaration harmless.
-    //
-    // TWO DOORS, TWO PATHS, TWO RETURN TYPES — the never-in-place refusal made structural
-    // (ADR-21.D2, scoped by ADR-21.D4):
-    //   * `peel(const NormalizedLine&)` — the RECOGNITION path's DECLARED stage 2. Stage 1 first
-    //     (the type carries the proof), then the catalogue rows; the result is the walkers'
-    //     currency. The order is load-bearing: an escape sitting BEFORE the transport prefix is
-    //     invisible to this peel unless the strip ran first.
-    //   * `peel_raw(std::string_view)` — the TOKENIZER-FEEDING path. `process_line` performs
-    //     stage 1 itself and MUST see the raw (ANSI-bearing) bytes beside it (SRC-D-PROV-1's
-    //     echoed-source register survives nowhere else), so this path must NOT pre-normalize.
-    //     Its result carries no stage-1 claim and cannot reach a walker — the types close what
-    //     the old single string_view door left to convention.
+    // refs: ADR-21.D2, ADR-21.D4, ADR-23.D2, SRC-D-PROV-1
+    // post: unwinds every declared transform, outside-in. Pure, allocation-free, deterministic and
+    // noexcept: a byte function over a borrowed view.
+    // invariant: TOTALITY IS ABOUT APPLICATION, NOT EFFECT. Every declared transform is applied to
+    // every line, unconditionally, and its effect on a given line may be the identity.
+    // invariant: that is the rule's effect being nothing; it is NOT the transform asking whether
+    // the line is its own, which is the per-line inference the declaration model forbids.
+    // invariant: A WRONG DECLARATION STAYS WRONG AND THE DECLARER OWNS IT — declaring a prefix
+    // strip over applicative prefixes destroys real content, attested at 16 250 measured lines.
+    // invariant: neither failure is ANNOUNCED, and that is not an oversight: no coordinate is
+    // diagnosed at peel time, and the one loud path fires on an unknown transform NAME alone.
+    // note: a clause promising that wrongness is loud is what licenses not looking
+    // invariant: TWO DOORS, TWO PATHS, TWO RETURN TYPES — the never-in-place refusal made
+    // structural.
+    // invariant: the normalized door is the RECOGNITION path's DECLARED stage 2: stage 1 first, the
+    // type carrying the proof, then the catalogue rows, and the result is the walkers' currency.
+    // invariant: that order is load-bearing — an escape sitting BEFORE the transport prefix is
+    // invisible to this peel unless the strip ran first.
+    // invariant: the raw door is the TOKENIZER-FEEDING path and must NOT pre-normalize, because the
+    // echoed-source register survives nowhere else; its result carries no stage-1 claim.
+    // note: the types close what the old single-view door left to convention
     [[nodiscard]] PeeledLine peel(const insight::tokenization::NormalizedLine& line) const noexcept;
     [[nodiscard]] RawPeeledLine peel_raw(std::string_view line) const noexcept;
 
@@ -435,14 +364,17 @@ class TransportStack
     }
 
   private:
-    // Points at `kTransportCatalogRows` static storage — the rows outlive every stack.
+    // invariant: the rows point at catalogue static storage, which outlives every stack.
     std::vector<const TransportTransformRow*> rows_;
 };
 
-// Resolve a declaration's `stack` against the catalogue. Every name must be known; an unknown name
-// is a HARD ERROR naming the catalogue's vocabulary, symmetric with ADR-22's treatment of an
-// unknown `--channel` (canon fatals with a legible message rather than degrading a typo). An EMPTY
-// stack resolves to the degenerate `TransportStack`, which is not an error — it is the G1 case.
+// refs: ADR-22.D5, ADR-23
+// post: resolves a declaration's stack against the catalogue; every name must be known, and an
+// unknown one is a HARD ERROR naming the catalogue's vocabulary.
+// invariant: that is symmetric with the treatment of an unknown channel — canon fatals with a
+// legible message rather than degrading a typo.
+// invariant: an EMPTY stack resolves to the degenerate stack, which is not an error: it is the
+// degenerate case.
 [[nodiscard]] TransportStack resolve_transport_stack(const IngestDeclaration& declaration);
 
 } // namespace insight::transport

@@ -3583,6 +3583,186 @@ statements and **all eight TRUE** — the second measured negative in a row, aft
 `registry_grammar_lint` 0 failures and `docs_lint` 0 failures, both from the workspace root, both
 immediately before the push.
 
+---
+
+## Unit 20 — `core/api/` facade trio (3 files, 841 comment lines, 832 would-be violations) — the interface tier, where a claim block landed on the WRONG FUNCTION and every witness stayed green
+
+The public facade: `canon.cppm` (the facade and the walker declarations), `canon.compose.cppm`
+(the composition surface) and `canon.transport.cppm` (the transport catalogue and the declared-ingest
+types). They convert together because they cross-reference each other constantly and one reader must
+read all three to answer anything about the facade's shape.
+
+| file | comment lines | violations | split |
+|---|---|---|---|
+| `core/api/canon.cppm` | 244 → 185 | 242 | bare 217, spacer 18, ruler 1, trailing 6 |
+| `core/api/canon.compose.cppm` | 274 → 225 | 268 | bare 232, spacer 21, trailing 15 |
+| `core/api/canon.transport.cppm` | 323 → 253 | 322 | bare 292, `///` 3, spacer 24, trailing 3 |
+| **total** | **841 → 663** | **832** | |
+
+After: **663 comment lines, 0 would-be violations** — `pre` 10 · `post` 26 · `invariant` 244 ·
+`assert` 7 · `note` 39 · `refs` 69 · 259 continuations · 9 tool forms. Repo-level delta
+**8 654 → 7 822 = exactly 832**.
+
+**The residual ratio is 78.6 %, the highest of the run** (unit 19 was 56 %, unit 17 28 %), and it is
+declared rather than let pass. An interface tier is preconditions on public doors, fail-closed
+postures and identity rules — the class the grammar keeps — not narrative. The 64 questions found
+one line that failed to earn its place, and it was wrong rather than redundant.
+
+### A claim block landed on the WRONG FUNCTION, and every mechanical witness stayed green
+
+Three declarations in `canon.compose.cppm` share the code line
+`[[nodiscard]] constexpr std::optional<std::string_view>`, and the placer resolves anchors by TEXT
+from a monotone cursor. Two blocks landed on the wrong one of the three — `first_package_name_dup`'s
+claims on `first_prefix_dup`, and `first_outcome_token_dup`'s on `first_package_name_dup` — and a
+third collision was caught on `process_stable_line`.
+
+**`claims.py` reported 0 anchor errors. The draft gate read 0 violations. The comment-only witness
+passed.** Only reading where each claim actually landed found it. This is `OPS-8.S6.1`'s rule in a
+new shape: the failure is not an anchor that misses, it is an anchor that HITS the wrong one of
+several identical lines, and no count can see it. Repaired by anchoring on each enclosing
+`namespace detail` and by giving the colliding function its own block.
+
+### Census, suppressions and the cross-check
+
+Token census derived from the gates: **every marker has population ZERO**, and this repo's own two
+source-scanning gate scripts strip comments before scanning, so comment deletion cannot reach them.
+**`NOLINT` directives: ZERO** — the single occurrence is the WORD inside prose, so there was nothing
+to measure and no measurement is claimed. Tool forms 9 → 9, all namespace closers.
+
+Stripper cross-check: removed **832**, kept violation classes **zero**, so `832 == 832 − 0`. It held
+**VACUOUSLY, with nothing subtracted**, and that is said rather than counted as a pass.
+
+### The address census, and three `LOST` lines each re-derived at the slot
+
+Outbound exit 1 with three losses, **every one dispositioned and each verified independently at its
+slot before the unit was accepted**:
+* `ADR-3` → `ADR-3.D4` — a REFINEMENT. That slot is *"Named C++23 modules everywhere, native
+  compiler↔stdlib pairing"*, which owns the facade seam and the build-tree-only detail modules.
+* `ADR-2` → `ADR-2.D5` — a REFINEMENT. That slot carries the bump rule and *assigned-at-ship*.
+* `ADR-20` → **WITHDRAWN**, and replaced by `ADR-2.D7` + `ADR-23.D3`. The prose credited
+  *"enum-not-tag for the closed sets"* to the detection-reports ADR; `ADR-2.D7` is literally
+  *"Catalogue enum values are IDENTITY-BEARING: append, never renumber, never insert mid-enum"*.
+  A withdrawal is a decision and belongs in the ledger with its evidence, which is what this is.
+A fourth apparent loss was **restored** on the first pass after the slot was read: it really does
+route the scoping split and the two-clock counts.
+
+Inbound: 137 mention lines, 56 on live surfaces, all read. Four live dependencies rest on prose this
+unit was deleting and are carried verbatim as `invariant:` rather than dropped — most notably the
+sentence *"declaring is purely SUBTRACTIVE: a caller who says nothing loses nothing they had"*,
+which two `insight-eidos` sites and a design note quote directly.
+
+### Nine carried claims deleted as FALSE — two of them are the sharpest kind
+
+The two worth naming in full:
+
+1. **A comment named a member function that does not exist.** `ComposedSemantics::for_channel` was
+   folded into `for_stream`; the name survives in **exactly one place in the entire source tree** —
+   inside the `FATAL:` string that announces the process is about to terminate. A fatal diagnostic
+   is the last thing a reader sees and this one points at nothing. It is a string literal, so it is
+   a finding rather than a repair. **Reader B found it independently**, from the other side and
+   without being told: asked which call verifies the channel, it answered *"`for_stream`, whose
+   message still spells a now-nonexistent `for_channel`"*.
+2. **A comment promised that a wrong transport declaration fails LOUDLY.** `ADR-23.D2` rules the
+   opposite in terms: neither failure is announced, the one loud path fires on an unknown transform
+   NAME and cannot fire on a catalogued name however wrongly declared, and *"a clause promising that
+   wrongness is loud is what licenses not looking."* **Reader B recovered the truth from the code
+   alone**, never having seen the deleted line: an applicative head that happens to be a complete
+   28-byte RFC 3339 datetime IS peeled, real content is destroyed, an observation time is set from
+   application data, and `apply_row` has no diagnostic, no counter and no return channel.
+
+The other seven: a `for_channel`-shaped claim about channel verification; a determinism MUST number
+that names reservoir membership rather than the locale rule; a `ShadowNote` population described as
+*"empty for the current two packages"* where the shipped composition is FOUR and is not empty; the
+same struct's `kind` documented without one of the four values composition actually passes; *"all
+three call sites"* of the stable door where there are FOUR; a `for_stream` cost figure that moves
+with configuration (27 rows at two packages, 41 at the shipped four) dropped in favour of the
+mechanism; and a doc sub-coordinate naming a numbered item in a section that has no numbered items.
+
+### Thirteen carried figures re-derived and KEPT
+
+The direction that leaves nothing behind if it goes wrong, so the record of where the lane looked is
+the point rather than the verdict: 1 077 of 3 193 GitLab markers · 16 250 log4j lines · 0 inversions
+over 12 logs against 7–701 per log · 12 of 113 Jenkins traces · 22 030 annotated logs and
+22 490 937 lines (two DIFFERENT populations, both live-sourced) · 27 bytes with *one row fits 32,
+two do not* · the 28-byte prefix width · three rows against the catalogue version · *no package ships
+a value class* · 63 identical-commit pairs. One softening rather than a deletion: a sibling repo's
+constant is a **default**, so *"a fixed 4096-byte payload"* became *"a bounded payload"*.
+
+### Interrogation — two readers, 64 questions
+
+**63 recovered · 0 not recovered · 1 conviction.** Both transcripts `GIT COMMANDS RUN: none` and
+`EXCLUDED PATHS SEEN: none` — the first unit in this run where neither reader saw even a filename.
+
+**The conviction is a symmetry claim the conversion could not support.** A `note:` said that
+answering either gate predicate with the other *"fails closed one way and fails OPEN the other"*.
+Reader A derived both directions from the two bodies and reported, honestly, that it could only
+reach under-detection one way and over-admission the other — flagging the wording rather than
+asserting against it. Settled here at the artifact:
+`gates_intersect(lhs,rhs) = lhs==rhs || lhs=="" || rhs==""` and
+`dialect_admits(gate,decl) = gate=="" || gate==decl`. Swapping either way is **PERMISSIVE**: a
+concretely-gated row would fire on an undeclared stream one way, and an any-gate duplicate would go
+undetected the other — **and that one is additionally ORDER-DEPENDENT**, so the same manifest set
+gives different answers depending on span order, which is worse than merely permissive. Neither
+direction fails closed. Rewritten to what is true.
+
+**A second line was improved rather than convicted.** The `ShadowNote` claim asserted non-emptiness
+and named one witness; reader A established the exact population — **exactly two**, a marker note
+for Jenkins and an outcome-marker note for GitLab — and found the engine test that pins both by kind
+and by prefix. The line now says that and carries the test's address.
+
+### A finding this unit raised and then WITHDREW, because a reader refuted it
+
+The lane reported that the `ShadowNote` mechanism has **zero test coverage**, having swept
+`core/tests/` and `semantic/*/tests/` and found nothing. Reader A found the coverage: an engine test
+in a SIBLING REPO asserts the population size and pins both notes field by field. **The finding is
+withdrawn.** The defect in it was the sweep's SCOPE — a mechanism declared in `insight-canon` is
+tested where it is composed, which is `insight-eidos` — and a scoped sweep returns hits that read as
+a complete population. That is the third instance in two units of a scope error surviving a re-read,
+after the pilot's own brief; the shape is always the same, and it is never visible from inside the
+result.
+
+### Findings for other lanes — none fixed here
+
+1. **A fatal message names a member function that does not exist.** `ComposedSemantics::for_channel`,
+   in the diagnostic printed immediately before `std::terminate()`. Found by the lane and confirmed
+   independently by a reader; verified here as the only occurrence in the source tree. String
+   literal, so no comment-only commit may carry it. **Addressee: Hephaïstos.**
+2. **A test assertion cites a source file by LINE NUMBER and the pointer was already stale** before
+   this unit moved it again. String literal. **Addressee: Kleio.**
+3. **A design note attributes to one code a sentence that is about another.** It quotes *"the
+   contract is declared HERE, beside the mechanism"* as one code's unambiguous declaration; in the
+   source that clause is the subject of a different code's bullet. **Addressee: Daidalos.**
+4. **Two `insight-canon` census ceilings still over-admit and shrank again** — the bare-code census
+   now reads 9 against a ceiling of 13 and the sigil census 10 against 20. **Addressee: Argos.**
+5. **A measured negative, recorded so it is not re-dispatched.** A design note's standing flag asking
+   whoever owns a source comment to reconcile two welded figures is already DISCHARGED at two
+   `insight-eidos` sites, which name the two populations separately. **Addressee: Daidalos**, to
+   close the flag rather than act on it.
+
+### Witnesses
+
+1. **Comment-only** — all three files *code token stream identical to HEAD*, re-taken after the two
+   repairs.
+2. **Grammar** — draft standalone gate 0 violations; in-tree `malf format --check` over the three
+   paths **0 misformatted, 0 would-be violations**, re-run after the repairs.
+3. **Behaviour** — taken by the pilot after the repairs: `malf test insight-canon` **809 of 809 on
+   clang-21 and 809 of 809 on gcc-16.2**.
+4. **Knowledge** — 63 of 64 recovered, 1 conviction, above.
+5. **Addressability** — outbound: 22 added, three `LOST` all dispositioned and verified at their
+   slots; inbound 137 leads read, four dependencies carried verbatim.
+
+**An operator hazard this unit created and did not suffer, recorded because the next one might.**
+The pilot re-ran `malf format <directory>` in WRITE mode to reflow a repaired line. That directory
+holds two files this unit does not own, both still unconverted — a write-mode format over a
+directory touches every file in it, not the unit's. Nothing moved, because both were already
+correctly formatted, so this was luck rather than discipline. **Scope a write-mode format to the
+unit's paths, never to its directory.**
+
+`registry_grammar_lint` 0 failures and `docs_lint` 0 failures, both from the workspace root, both
+immediately before the push.
+
+
+
 
 
 
