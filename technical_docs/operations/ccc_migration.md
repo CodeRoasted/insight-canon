@@ -3761,6 +3761,229 @@ unit's paths, never to its directory.**
 `registry_grammar_lint` 0 failures and `docs_lint` 0 failures, both from the workspace root, both
 immediately before the push.
 
+---
+
+## Unit 21 — `core/api/canon.spi.cppm` (1 file, 674 comment lines, 672 would-be violations) — the provider SPI, and both convictions were claims about the FILE'S OWN CONSUMERS
+
+The contract an external semantic-package author writes a dialect against. `canon.compose.cppm`
+plain-imports it and the facade deliberately does not re-export it, so it is a separate surface from
+everything unit 20 converted.
+
+| | before | after |
+|---|---|---|
+| comment lines | **674** | **384** (57.0 % residual) |
+| would-be violations | **672** (bare 599 · `///` 6 · spacer 46 · ruler 1 · trailing 18 · trailing-nolint 2) | **0** |
+
+Forms after: `pre` 2 · `post` 15 · `invariant` 157 · `note` 4 · `refs` 59 · 143 continuations ·
+4 tool forms. Repo-level delta **7 822 → 7 150 = exactly 672**, and the comment-line delta closes
+independently at −290.
+
+### The zero-`NOLINT` run ends here, and the suppressions were RE-MEASURED after conversion
+
+Units 16–20 found no directive to measure. This file has two, both NAMED
+(`bugprone-unchecked-optional-access`), both on a check the shared configuration arms — so the
+inventory can only ever license a deletion and each TU had to run twice:
+
+| run | findings |
+|---|---|
+| directives in place | **0** (`Suppressed 2 warnings (2 NOLINT)`) |
+| directive TEXT stripped, code kept | **2** — `unchecked access to optional value` |
+
+The second run is the control and it fired, so neither zero is uninformative. Both are load-bearing
+and both were kept. They were **trailing** — a class the gate keeps but does not admit — so each was
+re-homed as an own-line `NOLINTNEXTLINE` under a `note:` giving the why, directly above the
+suppressed line, with the token never spelled inside the `note:`.
+
+**The step nobody else in this run had to take: the converted file was measured AGAIN** and reads
+`Suppressed 2 warnings (2 NOLINT)`, 0 findings. That is what proves `OPS-8.S5`'s silent-disarm
+hazard did not fire — a re-homed directive that landed one line off its target would still gate
+green, still pass the comment-only witness, and simply stop suppressing.
+
+### `anchor_collide.py` reported ELEVEN collisions, and reading them found a TWELFTH that was real
+
+Four repeated declaration shapes collided — `None = 0,` ×3, `std::string_view dialect_gate{…};` ×6,
+`std::string_view channel_gate{…};` ×2, and `[[nodiscard]] consteval bool` ×4, which is unit 20's
+exact trap. Every one of the eleven was verified by printing the inserted block together with the
+declaration that follows it: all four `consteval` claims sit on their intended predicate, all six
+gate-field claims in their intended struct.
+
+**The twelfth was a defect and the tool did not report it.** One claim anchored a line early and
+resolved onto the `{` opening an enum body — `OPS-8.S6.1`'s "resolves successfully to a `{`" shape —
+and two enum-member anchors were off by one. Zero anchor errors would never have shown any of it.
+Two units in a row have now found a real placement defect that every mechanical witness passes.
+
+### `SRC-` codes — 22 occurrences, 14 distinct, every one a CITATION
+
+Fourth measured negative in a row. **No law number needed or consumed; the next free integer is
+still 16.** Two readings were repaired rather than laundered: one site welded two grounds and now
+carries both codes, and three sites attributing the row-level dialect-gate rule to a code whose
+declaring statement is about the marker lexicon now carry the slot that owns that rule **beside**
+the original code, which is the disposition unit 19 took on the identical attribution.
+
+### Ten carried claims deleted as FALSE
+
+The three worth naming: a header advertising *"the curated scan primitives a dialect strategy
+needs"* where the module exports **not one** byte scanner (packages hand-roll their own or take
+them from the api module); *"all nineteen representation strategies"* where there are **twenty**,
+and the same file says twenty three lines above; and a corpus figure that was **the wrong axis and
+the wrong denominator** — *"144 of 619 traces"* for a console literal, where 163 traces carry it and
+144 is the API-status leg over 627 rows. Also: a claim that a wiring change *"lands with the ADR at
+ratification"* which has already landed, a *"deterministic integer index"* where the code carries a
+pointer, a plan-tier rip-candidate clause in a source comment, an address that is not a slot, four
+bare retired-numbering pointers that resolve to nothing today, two *"format-gated"* readings of a
+field named `dialect_gate`, and every `§n.m` sub-coordinate into specs that exist only on the
+disposable record shelf.
+
+### Thirteen carried claims re-derived and KEPT — and one of them required LEAVING THE REPO
+
+Recorded because a wrongly-condemned true claim leaves nothing behind. Among them: **exactly 95**
+malformed producer-marker occurrences over 21 corpus files, re-derived at the bytes; the
+single-site consumption of the grammar version token; a 3-row catalogue emitting no syslog header;
+and a compile-flag claim that **nearly became a false finding** — the obvious grep returns one line
+and the flag is set on two targets.
+
+**The sharpest is the one a repo-scoped sweep would have condemned.** The file asserts that a
+set-valued fence is checked *"at the COMPOSITION site"*. Inside `insight-canon` that predicate
+appears only in tests, and the owning design note's own title still says the hole is *"currently
+unarmed at the one production site"* — so the repo, and the note, both say the claim is false. It
+**is** armed today, in `insight-eidos`, beside the conflict check. A sweep that stopped at the repo
+boundary would have deleted a true claim on the design note's own authority.
+
+### Interrogation — two readers, 70 questions
+
+**68 recovered · 0 not recovered · 2 convictions.** Both `GIT COMMANDS RUN: none`; one reader saw no
+excluded path, the other disclosed a filename in a directory listing.
+
+**Conviction 1 — a claim about the file's own readers, and it named one too few.** An `invariant:`
+said the vendor-generation coordinate is *"NOT a gate — nothing filters on it, no row carries it,
+and the identity serializer is its only reader."* It has a second: the conformance kit's
+manifest-equivalence check compares it by name, and a package test asserts its cardinality. Verified
+here at both sites. The claim is true of the RUNTIME path and false of the tree, and it is now
+written that way.
+
+**Conviction 2 — a mapping from row members to matcher kinds that omits one edge.** An `invariant:`
+said *"prefixes and extensions serve PrefixAndExtension, suffixes serve SuffixSet"*. The
+`PrefixAndExtension` algorithm reads `row.suffixes` and accepts on `prefix_hit || suffix_hit`, and
+the shipped pytest row depends on it — `app/api/login_test.py` matches only through the suffix arm.
+**Suffixes serve two kinds**, and the line now says so.
+
+Both convictions are the same species and it is worth naming: neither was carried prose about the
+outside world. Both were the conversion asserting **who reads this file's own members**, which is
+the one thing a reader can check directly and the converter cannot check by reading harder.
+
+**One question carried a false premise and one reader corrected it** — it asserted that two of the
+four shipped packages have no `static_assert` in hand-written source; only one does, the package
+whose entire fence set arrives from a build-time projection. The third operator defect of the run.
+
+**A residual the readers surfaced and the tree does not fence**: the empty string is unrepresentable
+as a dialect name because a `consteval` fence forbids an unnamed package, but on the channel axis the
+two guarding predicates are asserted by the generator only when a channel vocabulary is non-empty,
+so a hand-written package could declare `""` as a channel. It could never be selected, because an
+empty declaration means *did not say* — recorded as a lead, flagged by the reader as inferred.
+
+### A finding this unit raised and the pilot WITHDREW
+
+The lane reported that the conformance kit *"emits two different names for one check depending on
+its outcome"*. Measured against the wider population it is the kit's **convention**: every check
+returns an undotted family name on the pass path and `<family>.<subcondition>` on failure, and no
+consumer anywhere keys on either spelling. **The defect in the finding is that its population was
+one check.** Compared against itself the check looks inconsistent; compared against the six beside
+it, it is the rule.
+
+**That is the fourth instance in four units of one error wearing different costumes** — after a
+ledger table whose scope was narrower than its prose, a coverage sweep that stopped at the repo
+boundary, and the pilot's own directory-wide format. **A claim whose SCOPE is narrower than its
+wording never looks wrong from inside its own result**, because a scoped sweep returns hits and hits
+read as a complete population. The guard now written into the lane brief is one sentence: before
+filing a finding that rests on a sweep, state the sweep's scope and ask whether the thing you are
+looking for would live outside it.
+
+### Dispositions
+
+Two convictions, both repaired in the tree before the commit; nothing not-recovered; no law block
+minted.
+
+**A repair that broke the gate and had to be repaired again**, recorded because it is the cheapest
+possible instance of a named hazard: the first fix ran one byte over the 100-byte budget,
+clang-format merged it into the following `refs:` line, and the file went from 0 violations to 2 —
+a tag mid-line plus a bare line, which is `OPS-8.S7.2` shape ① exactly. Caught by re-running the
+gate after the hand edit, which is the step that exists for it.
+
+### Findings for other lanes — none fixed here
+
+1. **A design note attributes a phrase to the wrong symbol** — a hook's description credited to an
+   unrelated struct. The prose survives, so nothing is falsified; only the address is wrong.
+   **Addressee: Daidalos.**
+2. **The same class again in a second note** — a closed-enum statement credited to the wrong enum,
+   in a note about a different axis. **Addressee: Daidalos.**
+3. **A design note's corroborator moved and its figure is stale** — it rests on a sentence this unit
+   deleted, and states a masking token three generations behind the shipped value. The
+   disambiguation it depended on was carried into the tree as an `invariant:` rather than left
+   dangling. **Addressee: Daidalos**, for the figure.
+4. **Two corpus census scripts cite this file by LINE NUMBER**, and the pointer was already stale
+   before this unit moved it. A versioned record rather than a live contract, recorded so it is not
+   rediscovered. **Addressee: Argos.**
+5. **A code carries a reading its declaring statement does not support, at four sites across two
+   packages.** Units 19 and 21 both kept it and both added the owning slot beside it; if the
+   cross-repo cascade reaches that code, these four sites are where the two readings meet.
+   **Addressee: Daidalos, at the cascade rather than now.**
+6. **Two `insight-canon` census ceilings still over-admit**, unchanged by this unit.
+   **Addressee: Argos.**
+
+### Witnesses
+
+1. **Comment-only** — *code token stream identical to HEAD*, re-taken after both conviction repairs
+   and after the budget repair.
+2. **Grammar** — standalone draft gate 0 violations; in-tree `malf format --check` scoped to the
+   file, **0 misformatted, 0 would-be violations**, re-run after every hand edit.
+3. **Behaviour** — taken by the pilot after the repairs: `malf test insight-canon` **809 of 809 on
+   clang-21 and 809 of 809 on gcc-16.2**.
+4. **Knowledge** — 68 of 70, 2 convictions, above.
+5. **Addressability** — outbound: 2 refinements, 11 added, and one apparent `LOST` line that was the
+   same design note re-spelled in its registry form — nothing lost. Inbound 110 leads read.
+
+`registry_grammar_lint` 0 failures and `docs_lint` 0 failures, both from the workspace root, both
+immediately before the push.
+
+### Two things about the tools, measured here
+
+**`anchor_collide.py` refuses any claims script that names its file through a variable** — which is
+how this run's own worked example is written, so every lane copying it inherits the refusal. The
+workaround is a one-line inlining `sed` before the tool runs.
+
+**`OPS-8.S3.4`'s note-immediately-above rule and the trailing-`NOLINT` class interact in a way no
+step spells out.** The stripper KEEPS a trailing directive on its code line, and the only admissible
+re-home is a `NOLINTNEXTLINE` above the suppressed line — so the `note:` and the directive must be
+emitted as ONE claims-script block, or the placer lands the claim between the directive and its
+target and silently disarms it.
+
+### The clang leg CRASHED, and neither the crash nor its clearing is hidden here
+
+The first post-repair behaviour run **failed**: the clang-21 frontend died at exit 135 (SIGBUS) on
+four unrelated translation units — the composition unit and three format strategies — and ninja
+stopped the build. It is recorded because a behaviour witness that had to be re-run is a different
+fact from one that passed.
+
+Diagnosed rather than retried blindly: 624 GB free on the build filesystem, 16 GB memory available,
+exactly one compiler process alive, the build slot still held by this run and **no sibling `malf`
+process**, so it was not two builds sharing the tree. A SIGBUS across several TUs at once is the
+signature of a module BMI being read while it is rewritten; a language server has been mmap-ing this
+tree for days and is the most plausible third party. **The gcc-16.2 leg of the same tree completed
+809 of 809 while the clang leg was down**, which is the strongest single piece of evidence that the
+crash was environmental and not the unit's — the same converted bytes compiled and ran end to end on
+the other toolchain.
+
+Re-run: **809 of 809 on clang-21, zero crash signatures, `all 6 packages done`.** The witness is
+green on both legs and it took two attempts to get there.
+
+**One operator note from the same minutes, because it is this run's own recurring lesson pointed at
+the pilot.** The re-run's shell exit status was **1** while every test passed — the command's last
+statement was a `grep -c` for the ABSENCE of a crash string, and `grep` exits 1 when it matches
+nothing. A success signal inverted by its own final statement is the same defect class as
+`OPS-8.S10`'s `&& echo "(empty)"`: **the verdict was a property of the check, not of the tree.**
+
+
+
 
 
 
