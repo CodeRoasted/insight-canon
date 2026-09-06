@@ -1686,16 +1686,257 @@ this file is almost entirely argument: 12 of its 65 surviving lines are `assert:
   including gitlab. **Addressee: Argos** (the workflow surface). Not repaired here — it is outside
   this repo's source tier and outside a comment-only commit's reach.
 
+## Unit 12 — `core/src/utils/` (the directory's 2 remaining files, 546 would-be violations) — the gate repair confirmed at a real site, and a false attribution that six citers share
+
+`core/src/utils/logger.cpp` converted as unit 10; `failure_lexicon.cpp` and `time_utils.cpp` could
+not land because the CCC gate refused a `SRC-` code carrying a lowercase clause suffix (verdict
+finding 20). That repair landed in `malf` and this unit is its first real-site use: the two drafts,
+which the previous run measured at **13 `refs-prose` violations over 4 codes that resolve**, gate at
+**0 would-be violations** unchanged. The check itself is intact — a probe carrying a `refs:` line of
+plain prose still reports `refs-prose`, so the repair narrowed the pattern rather than disarming the
+arm. With the directory's third file already converted, `malf format --check
+insight-canon/core/src/utils` now reads **0 misformatted, 0 would-be violations** over all three.
+
+| files | comment lines HEAD → gate | forms written |
+|---|---|---|
+| `failure_lexicon.cpp` | 317 → 112 | pre 11 · post 10 · invariant 16 · assert 13 · note 12 · refs 25 · 15 continuations · 10 tool |
+| `time_utils.cpp` | 241 → 79 | pre 2 · post 3 · invariant 11 · assert 10 · note 11 · refs 16 · 17 continuations · 9 tool |
+
+Per-file baselines re-measured with the standalone checker over the `HEAD` blob rather than carried
+from the earlier survey: `failure_lexicon.cpp` 317 comment lines / 312 violations (bare 269,
+tag-mid-line 3, spacer 5, trailing 30, suppression-without-why 5, tool 5) · `time_utils.cpp` 241 /
+234 (bare 216, spacer 3, ruler 4, trailing 5, suppression-without-why 6, tool 7). The three
+`tag-mid-line` sites are verdict finding 8's class again — prose quoting a compiler's own diagnostic
+marker — and all three were deleted with the prose that carried them.
+
+### The stripper cross-check (`OPS-8.S5`) held EXACTLY on both files
+
+`removed == violations − (suppression-without-why + trailing-nolint)` → 307 == 312 − (5 + 0) and
+228 == 234 − (6 + 0). `kept == tool-forms + those classes` → 10 == 5 + 5 and 13 == 7 + 6. Both kept
+classes are non-empty in `time_utils.cpp`, so the identity is not holding vacuously.
+
+### The 14 suppressions, re-measured at their own tree path — and 4 of them silence nothing
+
+Verdict finding 21 says a suppression measured over a copy at a foreign path produces no output at
+all, so each file was measured **in place**: a `sha256sum`-verified backup taken first, the
+directive-TEXT-stripped copy swapped over the tree path, `clang-tidy-21` run with the flags lifted
+from the release compile database, then the backup restored and both digests compared. Three runs
+per file group: as-is, all own-file directives stripped, and — for `time_utils.cpp` — only the four
+`readability-magic-numbers` directives stripped.
+
+| file | as-is | all directives stripped | own-file diagnostics that appear |
+|---|---|---|---|
+| `failure_lexicon.cpp` | 10 NOLINT suppressed | 5 | 5 × `bugprone-exception-escape`, at `preceding_camel_word`, `any_standalone_word`, `take_trimmed_token`, `contains_failure_summary_cue`, `contains_failure_cue` |
+| `time_utils.cpp` | 9 NOLINT suppressed | 5 | `readability-qualified-auto`; `readability-function-cognitive-complexity` at `parse_iso8601` (37 against a threshold of 25); 2 × `bugprone-exception-escape`, at `token_follows` and `infer_leading_log_level` |
+
+The residual 5 in each *stripped* column are directives in headers the translation unit pulls in,
+unchanged by the strip, which is what makes the difference attributable.
+
+**The third run is the decisive control and it is a null result: with ONLY the four
+`readability-magic-numbers` directives removed, `time_utils.cpp` reports 88 269 warnings generated
+and `Suppressed 88 278 warnings (88 269 in non-user code, 9 NOLINT)` — byte-identical to the as-is
+run, and zero own-file diagnostics.** The documentary half agrees: the one shared `.clang-tidy`
+(`malf/config/.clang-tidy`, symlinked by this repo) carries `- -readability-magic-numbers` in its
+`Checks` list. Those four were deleted; the other ten were kept with their FORM repaired, the why
+demoted to a `note:` in the last position before the directive (verdict finding 12's shape). The
+repo-wide lint baseline is unchanged across the unit: `malf lint --all-files` reports
+**21 findings, 56 files checked**, the same 21 the run has carried since unit 1.
+
+### Census (`OPS-8.S4`)
+
+`failure_lexicon.cpp`: `NOLINT` directives 5 → 5, namespace closers 4 → 4, `/*name=*/` 1 → 1,
+`clang-format off` 0, `wall-clock:` 0, the determinism waiver token 0, `SPDX` 0 — **zero
+differences**. `time_utils.cpp`: `NOLINT` directives 9 → 5 (the four decided above), namespace
+closers 4 → 4, everything else 0 → 0. The file's tenth `NOLINT` string is the WORD inside a prose
+sentence, not a directive — verdict finding 7 again, and it went with its prose. No converted
+`note:` or `refs:` line in either file contains a suppression token.
+
+### The address census (`OPS-8.S7.3b`), and two deletions that are the same defect twice
+
+Three **refinements**, which the instrument reports beside losses and which are not losses:
+`ADR-20` → `ADR-20.D3` in both files, `ADR-29` → `ADR-29.D5` in `time_utils.cpp`. Four **additions**,
+each a prose gesture turned into an address: `ADR-16.D8`, `BIB:determinism_model`, `DN-43.D14`, and
+`F-SRC-insight-canon:leading_level_token_index_measure.cpp`.
+
+Two `LOST` lines, both deliberate, both re-derived at the artifact before the deletion:
+
+* **`ADR-9`, in `time_utils.cpp`.** The prose read *"Bounded ⇒ alloc-free hot-path discipline
+  (ADR-9)"*. `ADR-9.D2` says, in its own words, *"The hot path is NOT allocation-free, and this slot
+  said it was"*, and records the measurement that corrected it — `cube_base_`'s keys are plain
+  `std::string` on `std::allocator`, two constructions per event. The comment attributed to a slot a
+  property that slot retracted, so the citation is deleted rather than repointed.
+* **`SRC-D-MSK-4`, in `failure_lexicon.cpp`.** The prose read *"SRC-D-OUT-4b (SRC-D-MSK-4 cut,
+  2026-07-21 ruling)"*. That token's DECLARATION, in `core/src/mask/canon.detail.mask.cppm`, is
+  entirely about the ephemeral-root catalog and its matcher; what put it beside a lexicon rule is
+  `core/api/canon.api.cppm`'s version changelog, which names *the batch* that shipped both — canon
+  bump `-6`, *"canon ephemeral-root masking + the lexicon-context precision fix"*. The rule this site
+  obeys is `SRC-D-OUT-4b`, which is retained. This is `OPS-8.O5`'s false-attribution class, and the
+  finding below shows it is not confined to this one site.
+
+### The line THIS conversion nearly wrote in the wrong place, caught by a check `OPS-8` does not have
+
+`claims_lib.Placer` resolves an anchor by **text equality** scanning forward from a cursor, so two
+identical code lines in one file place a claim on whichever comes first. `time_utils.cpp` ends
+`infer_leading_log_level` with two byte-identical return statements, one under the count-summary
+branch and one under the warning-cue branch. The claim written for the warning-cue branch —
+*"contains_warning_cue has no outcome guard, so the caller applies it here"* — landed under the
+count-summary branch, where it is simply false, and `claims.py` reported **zero anchor errors**. It
+is `OPS-8.S6.1`'s family through a second mechanism: not an anchor resolving to a `{`, but an anchor
+resolving to the wrong one of two identical lines. A 20-line checker that re-derives each anchor and
+reports every one whose code text is not unique in its file found it, plus one benign pair — two
+`static constexpr std::size_t kOutcomeHead{128U};` declarations in `failure_lexicon.cpp`, correct only
+because the two claims are placed in source order and the cursor advances between them. The claim was
+re-anchored one line earlier, above the `if` rather than inside it. Verdict finding 23 below.
+
+### Stale and false claims deleted, with the evidence and where the search went
+
+* **`SRC-D-MSK-4` and `ADR-9`**, both above, each re-derived at the cited slot.
+* **The `F3b D-F3b-3 lexicon` provenance beside BGL's `FAILURE`/`SEVERE` mappings.** Swept
+  workspace-wide with the allowlisted argument form: that token exists in exactly one place,
+  `technical_docs/history/architecture-v1/f3b_dimension_grounding.md` — the attic, which `CLAUDE.md`
+  rules disposable and best-effort. The claim itself is live and owned: `DN-43.D14` rules BGL's level
+  column read as DECLARED and carries the counts (`FAILURE` on 62 labelled lines, 1 652 unlabelled;
+  19 213 `SEVERE`). The two `note:` lines cite `DN-43.D14` instead.
+* **The five restatements of cross-stdlib bit-identity.** `failure_lexicon.cpp` asserted, in five
+  separate blocks, that a predicate is byte-compare-only and therefore bit-identical across standard
+  libraries and on MSVC, each tagged with a bare local ordinal that is not an address. Every one of
+  those functions is DECLARED in `core/api/canon.api.cppm` with the same property stated at the
+  declaration. The definitions no longer restate it; the property is not lost, it is stated once, at
+  the contract. Searched: this repo's `core/api`, `technical_docs/adr/` (ADR-31 owns the content
+  determinism contract), and the bibles.
+* **`time_utils.cpp`'s file-header path.** It gave its own path as a `core/src/insight/utils/`
+  location; no such directory exists in this repo. Unit 10 recorded the same wrong path in
+  `logger.cpp`'s header and predicted this one; deleted as a mirror that was also false.
+* **The token-index measurement paragraph** — 12 corpora, 62 187 513 lines, the per-root residual
+  percentages and Eqya's 2026-09-02 residual ruling — is NOT an unsourced measurement and was not
+  deleted as one. It is carried by `insight-canon/technical_docs/classification.md`, in this repo's
+  own doc tier, and the ruling it feeds is `ADR-16.D7` with `ADR-16.D8` sizing the residual at its own
+  coordinate. Searched by name before deciding: `insight-canon`, `insight-eidos`, `insight-metalog`,
+  `logcraft`, `metalog-spec` and the superproject's `technical_docs/`. The site keeps a `note:` saying
+  the value is a measurement and naming the instrument that produces it.
+
+### Interrogation
+
+One fresh agent, 36 questions built from the held R claims, 41 tool uses, 199 k tokens, 9.2 minutes.
+Its exclusion list named this repo's own ledger, LogCraft's, `OPS-8` and the `ADR-26` file. **No git
+command was run**, and the transcript was checked mechanically rather than by trusting the reader's
+closing line: 41 `tool_use` blocks, **zero** matching a `git` invocation, zero build-directory reads,
+and the six hits on the forbidden-path patterns are all EXCLUSION globs the reader wrote itself
+(`--glob '!**/ccc_migration.md'`), which is the opposite of a violation.
+
+**36 of 36 recovered, 0 not recovered, 0 wrong.** Scored one question at a time from the
+per-question evidence; the reader wrote no summary line to be misread.
+
+**A perfect score is a claim about this unit's SURROUNDINGS as much as about the conversion, and the
+caveat is measured rather than modest.** 13 of the 36 answers cite `core/api/canon.api.cppm` as
+evidence, and that file's contract prose is NOT yet converted — it still states, in full narrative,
+several of the rules this unit reduced to tagged lines. One answer (the membership predicate's
+purpose) rests on it primarily. Those 13 recoveries are re-testable, and must be re-tested, when the
+`core/api/` unit converts. A second reason is not a caveat: `core/tests/utils/` names its tests after
+the claims, and the reader used them as the answer source on twelve questions — which is `ADR-26.D6`
+working exactly as designed.
+
+Recovery landed **above** the deleted prose on four questions, which is the outcome the protocol
+wants:
+
+* **Q30 (which producer needs `failure` and `severe`) corrected the OLD prose, which understated the
+  cost.** The deleted parenthetical said the gap *"lost the level on those lines"*. The reader read
+  `core/src/strategy/bgl.cpp` and found the level validated inside the grammar — `if (level ==
+  LogLevel::Unknown) return std::nullopt` — so without those two mappings a BGL RAS record does not
+  merely lose its level, it **declines the BGL grammar entirely** and falls to the raw-text strategy,
+  losing component, host, event time and template identity. Re-derived at the artifact: the guard is
+  at `bgl.cpp:82`. The conversion did not carry the understatement, so nothing is repaired; the
+  stronger claim is recorded here rather than written into a `note:`, because it is a property of a
+  different file.
+* **Q17 (why the two-token window still shifts on a non-firing token) went past the written
+  `assert:`.** The reader agreed with the line and then bounded it: `token_in_note_message` is a
+  `>=` test against a once-per-line offset, so the note region is a SUFFIX of the line, every later
+  token takes the same early return, and the assignment therefore changes no verdict in the
+  function's current shape — it is what keeps the window sound if the region ever stops being a
+  suffix. Verified at `failure_lexicon.cpp`'s definition of that predicate.
+* **Q14 (what the membership predicate is for) named the two callers the comment only alludes to** —
+  `core/tools/leading_level_token_index_measure.cpp:679` and
+  `core/tests/utils/test_leading_scan_token_budget.cpp:286` — and confirmed **no product path calls
+  it**, which is precisely what the written `post:`/`note:` pair asserts. Re-derived by sweep.
+* **Q13 (what must hold between the two `kOutcomeHead` constants) derived the failure mode the prose
+  never stated**: the two are the two readers of one question, consulted on the same line in
+  opposite directions, so a glyph sitting between two unequal limits is visible to one and invisible
+  to the other and a line can be fail-anchored and pass-demoted at once.
+
+### Dispositions
+
+* **Recovered (36)** — every question. The prose was redundant; nothing re-homed, and no line this
+  conversion wrote was contradicted.
+* **Not recovered (0)**, **reader-wrong (0)**, **convictions (0)**.
+
+### Findings for other lanes — none fixed here
+
+* **One retired code carries three disjoint meanings in this workspace, and six of its citations in
+  canon name a rule it does not state.** The ephemeral-root catalog code declared in
+  `core/src/mask/canon.detail.mask.cppm` is also used, in `core/api/canon.api.cppm`'s version
+  changelog, as the NAME OF A CANON BUMP — the batch that shipped ephemeral-root masking *and* a
+  lexicon-context precision fix in one release. Downstream of that changelog, six canon sites cite
+  the code for the LEXICON half: four in `core/tests/utils/test_failure_lexicon.cpp`, one in
+  `core/tests/utils/test_time_utils.cpp`, and the one this unit deleted from
+  `core/src/utils/failure_lexicon.cpp`. The rule every one of them obeys is the CamelCase-type
+  register rule, which `core/api/canon.api.cppm` declares under its own code. Two further citations,
+  in `insight-eidos/sift/tests/report/run_outcome_gates_test.cpp`, use the BATCH meaning and are
+  coherent with it. This is `OPS-8.O5`'s per-code method producing its second worked example: the
+  false attribution predates the migration, and repointing rather than reading would launder it.
+  **Addressee: the pilot, for the cross-repo cascade** — the five surviving canon sites are in the
+  test tier and will be met by that unit; the eidos pair is another repo's.
+  Checked and NOT a false attribution, so that it is not swept up with them:
+  `core/src/scan/canon.detail.scan.cppm`'s `refs:` to the same code is correct — the invariant beside
+  it is the one-catalog-for-every-reader rule, which is what that code's declaration states.
+* **`core/src/mask/canon.detail.mask.cppm` and `ADR-16.D2` disagree on the ephemeral-root matcher's
+  call-site count** — the source says one catalog, THREE call sites (naming an in-token path and the
+  standalone rule); the ADR slot says *"One matcher, two call sites"*. One of the two is stale and
+  the difference is not cosmetic, since the whole point of the rule is that no second copy exists.
+  Found while surveying the next unit, not re-derived at the code yet. **Addressee: this lane's next
+  unit** (`core/src/mask/`), which opens exactly that site; recorded here so it is not lost if the
+  unit does not land.
+
+### Witnesses
+
+1. **Comment-only** — `code_only_diff.py` on both files: *comment-only (code token stream identical
+   to HEAD)*.
+2. **Grammar** — `malf format --check insight-canon/core/src/utils`: 3 files selected, 3 checked,
+   **0 misformatted**, **0 would-be violations**, 209 comment lines. Repo-wide after the unit:
+   126 files, 12 852 comment lines, **11 730 would-be violations**, against 12 276 before it.
+3. **Behaviour** — `malf test insight-canon` on clang-21 and again with
+   `--profile linux-gcc16-release`, both after the unit was in the tree: `insight_canon` 734,
+   `insight_semantic_github` 32, `insight_semantic_gitlab` 25, `insight_semantic_jenkins` 13,
+   `insight_semantic_test_frameworks` 5 — **809 of 809 passing on each toolchain**, equal to the
+   baseline. This run covers **unit 12 only**; it was taken in the single slot acquisition described
+   below, which also carried the `malf lint` baseline check.
+4. **Knowledge** — 36 of 36 recovered, 0 not recovered, 0 wrong. Every disposition above.
+5. **Addressability** — the per-file census against `f570304`: 3 refinements, 4 additions, 2 losses,
+   both deliberate and both re-derived at the artifact above.
+
+The two doc lints were run from the workspace root immediately before the push:
+`registry_grammar_lint.py` rc=0 and `docs_lint.py` rc=0 (325 stable docs, 0 rotted-pointer and 0
+unshipped-version failures; 16 roster sections over 15 shelves, 0 gaps).
+
+### The law-number range, re-measured rather than trusted
+
+The pilot's brief issued this lane 11 onward. Before consuming it the tree was swept for the
+DECLARED set, because an issued number and a declared number are not the same fact: the workspace
+declares **1 through 10, dense, with no gap**, and `registry_grammar_lint` independently reports
+*"10 `D-LSRC-` declarations … numbering checked DENSE"*. So 11 is genuinely the next free integer.
+**This unit consumed none** — every claim found an owner in an existing tagged form or in an ADR
+slot, and nothing in the tree reserves 11.
+
 ---
 
 # The `OPS-8` verdict — third cold reader, first at scale
 
 `insight-canon` is `OPS-8`'s third run and its first large one; findings 14 onward come from the
-third run (units 8-9) and findings 20-22 from the fourth (units 10-11). **Twenty-two findings**, ordered
-by what they cost within each run. Items 1, 5, 14 and **20** are the ones that change the runbook;
-item 5 needed a Founder ruling before the `core/api/` units could be converted at all, and it has
-one — see the RULED section below. **Item 20 needs a one-character repair to an instrument outside
-this repo, and until it lands it is what stops this migration.**
+third run (units 8-9), findings 20-22 from the fourth (units 10-11) and finding 23 from the fifth
+(unit 12). **Twenty-three findings**, ordered by what they cost within each run. Items 1, 5, 14, **20**
+and **23** are the ones that change the runbook; item 5 needed a Founder ruling before the `core/api/`
+units could be converted at all, and it has one — see the RULED section below. **Item 20's repair has
+LANDED in the instrument and is confirmed at a real site by unit 12 — it no longer blocks this
+migration, and what it blocked is recorded so the repair's reach can be judged rather than assumed.**
 
 ## 1. `OPS-8.S5`'s cross-check equality is FALSE in any unit that has a suppression
 
@@ -2072,6 +2313,30 @@ token that is about to be repaired goes stale the moment it is.
 **Where this bites hardest is a findings-for-other-lanes section**, which is precisely where a CCC
 ledger reports defects it may not fix. Expect it there, and run BOTH lints before every push —
 this run's three instances were caught at that step and nowhere else.
+
+## 23. AN ANCHOR RESOLVED BY TEXT EQUALITY LANDS A CLAIM ON THE WRONG ONE OF TWO IDENTICAL LINES, AND `claims.py` REPORTS ZERO ERRORS
+
+`OPS-8.S6.1` already warns that zero anchor errors is not zero anchor failures, and gives one
+mechanism: a block between a declaration and its brace resolves to the `{`. There is a second, and
+it is worse because the claim lands in a **legal, plausible, wrong** place rather than a merely odd
+one. The worked library resolves an anchor by scanning the draft forward from a cursor for a line
+whose comment-stripped text is EQUAL to the original anchor's. Two identical code lines in one file
+therefore collide, and the claim lands on whichever the cursor reaches first.
+
+**Measured in unit 12.** `time_utils.cpp`'s level-inference function ends with two byte-identical
+return statements under two different `if`s — the count-summary branch and the warning-cue branch.
+The claim written for the second landed under the first, where it names a function that branch does
+not call. Every witness stayed green: comment-only passed, the grammar gate read 0, and `claims.py`
+printed *"71 insertion(s), 0 anchor errors"*.
+
+**The check is twenty lines and it belongs beside `DRY=1`.** For each `B(...)` call, re-derive the
+anchor exactly as the placer does and report every anchor whose text is not unique in its file. Over
+this unit's 71 anchors it found 3: the real one, and a benign pair (`static constexpr std::size_t
+kOutcomeHead{128U};` twice in `failure_lexicon.cpp`) that is correct only because the two claims are
+placed in source order and the cursor advances between them. **That benign pair is the reason the
+check must REPORT rather than FAIL** — a collision is not automatically a defect, it is a site that
+must be read. The repair is to anchor one line earlier, on the unique `if` above, which also puts
+the claim above the whole statement instead of inside the branch.
 
 ## Departures from `OPS-8` in this run, declared
 

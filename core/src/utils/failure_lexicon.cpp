@@ -26,51 +26,30 @@ namespace
         return true;
     }
 
-    // First byte is an ASCII digit ("5", "500", "5ms", "2026-01-15"). Used to detect a numeric/
-    // temporal CHAIN element (so a timestamp's `:SS` seconds, whose neighbour is the `:MM` minutes,
-    // is recognised as part of a chain, not a standalone count).
     [[nodiscard]] bool is_digit_leading_numeric(std::string_view tok) noexcept
     {
         return !tok.empty() && tok.front() >= '0' && tok.front() <= '9';
     }
 
-    // A BARE INTEGER ("1", "5", "500") — every byte an ASCII digit. A genuine failure COUNT is a
-    // bare integer, never "5ms" / "2026-01-15" / a hash; the trimmed token (for_each_token strips
-    // surrounding non-alnum) makes this exact.
+    // pre: `tok` is a trimmed token - for_each_token strips surrounding non-alnum.
     [[nodiscard]] bool is_bare_integer(std::string_view tok) noexcept
     {
         return !tok.empty() &&
                std::ranges::all_of(tok, [](char chr) noexcept { return chr >= '0' && chr <= '9'; });
     }
 
-    // SRC-D-CNT-1 (count register): is a failure word in COUNT register, given its two preceding
-    // tokens? True iff the IMMEDIATELY-preceding token is a bare-integer count ("1 failure", "5
-    // failed", "HTTP 500 error") that is NOT part of a numeric/temporal chain — i.e. the token
-    // before the count is NOT itself digit-leading. The chain guard is load-bearing: a leading ISO
-    // timestamp "2026-…T11:00:01 ERROR" tokenises to …,`00`,`01`,ERROR, so ERROR's predecessor `01`
-    // is a bare integer — but `01`'s predecessor `00` IS digit-leading (the `:MM` minutes), so it
-    // is a timestamp second, not a failure count. One source of truth, shared by is_count_register
-    // (the predicate) and contains_failure_cue / contains_failure_summary_cue (their in-loop prev
-    // pair).
+    // post: true iff `prev` is a bare integer whose own predecessor is not digit-leading.
+    // refs: SRC-D-CNT-1
     [[nodiscard]] bool is_count_preceded(std::string_view prev, std::string_view prev2) noexcept
     {
         return is_bare_integer(prev) && !is_digit_leading_numeric(prev2);
     }
 
-    // Negation segments that INVERT an "…Error"/"…Exception" suffix: the CamelCase
-    // word right before the suffix. "…NotError"/"…NoError" is not an error type — the
-    // textbook false match is a test named "…IsNotError", whose ctest/gtest result
-    // line would otherwise read as a HIGH "New error", i.e. a false regression on a
-    // PASSING test (the cardinal sin). This is a property of the token itself,
-    // independent of the surrounding line.
+    // invariant: negation is a property of the token alone, independent of its line.
     constexpr std::array<std::string_view, 3U> kNegationSegments{"no", "not", "non"};
 
-    // The CamelCase word ending just before `suffix_start`: the maximal lowercase run
-    // ending at suffix_start-1, plus its leading uppercase letter if present. For
-    // "EvidenceNotError" with the "Error" suffix at index 12, this returns "Not".
-    // substr(begin, suffix_start - begin): begin <= suffix_start, and the sole caller
-    // (is_camel_error_type) guards token.size() > suffix.size(), so
-    // suffix_start = token.size() - suffix.size() < token.size() — pos in-bounds, cannot throw.
+    // pre: `suffix_start` <= token.size(), guaranteed by the sole caller is_camel_error_type.
+    // note: that bound makes the substr in-bounds, so the noexcept body has no throw path.
     // NOLINTNEXTLINE(bugprone-exception-escape)
     [[nodiscard]] std::string_view preceding_camel_word(std::string_view token,
                                                         std::size_t suffix_start) noexcept
@@ -83,12 +62,6 @@ namespace
         return token.substr(begin, suffix_start - begin);
     }
 
-    // A CamelCase error-type name: ends in "Error"/"Exception" (exact case) preceded
-    // by an ASCII letter (OperationalError, ValueError, IOError, RuntimeException).
-    // This recovers compound type names a standalone-word match would miss, while
-    // staying immune to a lowercase "error" buried in a path/identifier (which is
-    // never capitalised, so it can never form this suffix). A negated type name
-    // ("…NotError"/"…NoError"/"…NonError") is EXCLUDED — see kNegationSegments.
     [[nodiscard]] bool is_camel_error_type(std::string_view token) noexcept
     {
         constexpr std::array<std::string_view, 2U> kSuffixes{"Error", "Exception"};
@@ -108,31 +81,14 @@ namespace
             });
     }
 
-    // The unified failure lexicon — token forms (base + the inflections that occur in
-    // real CI / app logs), partitioned by BENIGN-COLLISION-PRONENESS (SRC-D-OUT-4, refined by
-    // the Daidalos Q1 ruling — the criterion is collision-proneness, NOT grammatical role):
-    //   • SelfAnchoring — a token that essentially NEVER appears benignly, so it fires bare
-    //     with no surrounding register. Two kinds: inflected outcome verbs whose morphology
-    //     IS the verdict ("build failed", "connection refused"), AND zero-collision failure-
-    //     event nouns ("segfault", "traceback", "unhandled" — "unhandled exception" /
-    //     "unhandled promise rejection" are real failures, lowercase, and register-gating
-    //     them only suppressed recall). No benign use exists to guard against.
-    //   • RegisterAnchored — a token with a real benign sense ("error rate", "crash course",
-    //     "timeout=30", "fatal flaw", "panic button", "fail-safe"). It fires ONLY in verdict
-    //     register (is_verdict_anchored: caps / `:` / bracket / leading ✗ / CamelCase type /
-    //     phrase), exactly as is_camel_error_type distinguishes "ValueError" from a path's
-    //     lowercase "error". A declared partition — NOT reactive per-FP tuning (we do not
-    //     remove "crash"; we say the collision-prone noun needs context).
-    // Plural "errors" is omitted ON PURPOSE so a negation like "no errors found" /
-    // "0 errors" is not read as an error (count-dependent, a numeric-rule concern, not
-    // the lexicon's); CamelCase `…Error`/`…Exception` types are caught structurally by
-    // is_camel_error_type, not enumerated here. (If a bare "Kernel panic - not syncing:"
-    // miss ever surfaces, add a `kernel panic` phrase like segmentation fault — do NOT
-    // promote the collision-prone bare "panic".)
+    // invariant: the partition axis is benign-collision-proneness, never grammatical role.
+    // refs: SRC-D-OUT-4
     enum class FailureRole : unsigned char
     {
-        RegisterAnchored, // benign-collision-prone — fires ONLY when verdict-anchored
-        SelfAnchoring,    // zero benign collision — fires bare (outcome verb or unique noun)
+        // note: a benign-collision-prone word - it fires only when verdict-anchored.
+        RegisterAnchored,
+        // note: zero benign collision - it fires bare, with no surrounding register.
+        SelfAnchoring,
     };
     struct FailureWord
     {
@@ -161,29 +117,20 @@ namespace
     }};
     constexpr std::array<std::string_view, 2U> kWarningWords{"warn", "warning"};
 
-    // One token's verdict against the lexicon. `matched` says the token IS lexicon vocabulary
-    // (whether or not it fired) — the CamelCase error-TYPE check is skipped for those, since a
-    // lexicon word that declined its register must not be re-admitted through the weaker signal.
-    // Extracted from contains_failure_cue's token lambda so each carries one decision; the
-    // lexicon walk still runs exactly once per token.
+    // invariant: `matched` means the token is lexicon vocabulary, whether or not it fired.
+    // note: a matched word that declined its register is never re-admitted as a CamelCase type.
     struct LexiconHit
     {
         bool fired{false};
         bool matched{false};
     };
 
-    // Defined below the register kernels it consults (is_verdict_anchored / is_count_preceded);
-    // declared here so contains_failure_cue's lambda can name it.
     [[nodiscard]] LexiconHit lexicon_hit(std::string_view text, std::string_view token,
                                          std::string_view prev,
                                          std::string_view prev_prev) noexcept;
 
-    // Caps register (SRC-D-OUT-4 anchor #1): the token's raw bytes are ALL-UPPERCASE ASCII
-    // letters, ≥2 of them — the decoration CI/test tooling uses to mark an outcome
-    // (ERROR, FAILED, FATAL, PANIC). A pre-casefold byte fact; the matched token keeps
-    // the source case (for_each_token trims surrounding non-alnum but never folds), so
-    // this reads the raw word. Any lowercase letter disqualifies it; non-letters are
-    // ignored, but a real failure word is all-alpha so this resolves to "all uppercase".
+    // pre: `token` carries its source case - for_each_token trims but never folds.
+    // refs: SRC-D-OUT-4
     [[nodiscard]] bool is_caps_register(std::string_view token) noexcept
     {
         std::size_t letters{0U};
@@ -197,27 +144,15 @@ namespace
         return letters >= 2U;
     }
 
-    // Multi-word cues that are only precision-safe as an ADJACENT token pair. A bare
-    // "segmentation"/"fault" collides with benign uses (image/network segmentation,
-    // page fault), so the crash signal needs the two-token adjacency — and the OS/
-    // shell form "Segmentation fault (core dumped)" carries no level keyword, so the
-    // lexicon is the only thing that flags it.
     using Phrase = std::array<std::string_view, 2U>;
     constexpr std::array<Phrase, 1U> kFailurePhrases{{{"segmentation", "fault"}}};
 
-    // Explicit positive test/CI verdicts (success WORDS). A line that DECLARES a pass
-    // ("… Passed", gtest "[ OK ]", pytest "PASSED") must not be promoted to a failure on
-    // the strength of a CamelCase error-TYPE name alone — a test named
-    // "…RaisesValueError" that PASSED is not a regression. A success WORD overrides ONLY
-    // that weak, name-based signal; it NEVER demotes an explicit failure WORD
-    // ("error"/"failed"/…), because a leading pass WORD would false-demote a genuine
-    // failure summary ("25 passed, 5 failed"). The strong failure WORD is demoted only by
-    // an unambiguous leading pass GLYPH (SRC-D-OUT-1, leading_outcome_is_pass), never a word.
+    // invariant: a success word demotes only the CamelCase-type signal, never a failure word.
+    // refs: SRC-D-OUT-1
     constexpr std::array<std::string_view, 4U> kSuccessVerdicts{"passed", "ok", "success",
                                                                 "succeeded"};
 
-    // Only throw path is for_each_token's substr(begin, ...) with begin <= limit <= text.size()
-    // (see token_scan.hpp); the noexcept body cannot throw.
+    // note: for_each_token's substr is the only throw path and its bound is checked.
     // NOLINTNEXTLINE(bugprone-exception-escape)
     [[nodiscard]] bool any_standalone_word(std::string_view text,
                                            std::span<const std::string_view> words,
@@ -232,31 +167,25 @@ namespace
                               });
     }
 
-    // ── Outcome-aware demotion: a leading PASS GLYPH (SRC-D-OUT-1) ───────────────────────
-    // Per-test PASS glyphs (3-byte UTF-8, lead byte 0xE2) are unambiguous verdicts: they
-    // appear in CI output as a result marker and NOWHERE else, unlike the words
-    // "passed"/"ok" (which double as summary counts, prose, and test names). They are
-    // also INVISIBLE to for_each_token — a standalone glyph is all-non-alnum, so the
-    // tokenizer trims it to an empty token and the verdict is destroyed before any
-    // lexicon sees it — so they are byte-matched directly at a token start.
-    //   ✓ U+2713 · ✔ U+2714 · ✅ U+2705 · √ U+221A (the mocha-on-Windows pass mark)
+    // note: a bare glyph trims to an empty token, so it is byte-matched at a token start.
+    // refs: SRC-D-OUT-1
     using Glyph = std::array<unsigned char, 3U>;
     constexpr std::array<Glyph, 4U> kPassGlyphs{{
-        {0xE2U, 0x9CU, 0x93U}, // ✓ U+2713 CHECK MARK
-        {0xE2U, 0x9CU, 0x94U}, // ✔ U+2714 HEAVY CHECK MARK
-        {0xE2U, 0x9CU, 0x85U}, // ✅ U+2705 WHITE HEAVY CHECK MARK
-        {0xE2U, 0x88U, 0x9AU}, // √ U+221A SQUARE ROOT — mocha's Windows pass mark
+        // note: in order U+2713, U+2714, U+2705, U+221A - the last is mocha's Windows pass mark.
+        {0xE2U, 0x9CU, 0x93U},
+        {0xE2U, 0x9CU, 0x94U},
+        {0xE2U, 0x9CU, 0x85U},
+        {0xE2U, 0x88U, 0x9AU},
     }};
-    // Per-test FAIL glyphs — the SRC-D-OUT-4a set (contract: canon.api.cppm). The ballot-X
-    // family + the ❌ cross-mark emoji, all 3-byte UTF-8; × U+00D7 is the 2-byte one the rule
-    // excludes. ❌ U+274C earned its place on evidence: the 1.6.5 dogfood found ❌-led fail
-    // lines anchoring nothing where ✗-led ones did.
+    // invariant: every entry is 3-byte UTF-8; U+00D7 is two bytes and the rule excludes it.
+    // note: in order U+2715, U+2716, U+2717, U+2718, U+274C - the last is the emoji fail mark.
+    // refs: SRC-D-OUT-4a
     constexpr std::array<Glyph, 5U> kFailGlyphs{{
-        {0xE2U, 0x9CU, 0x95U}, // ✕ U+2715 MULTIPLICATION X
-        {0xE2U, 0x9CU, 0x96U}, // ✖ U+2716 HEAVY MULTIPLICATION X
-        {0xE2U, 0x9CU, 0x97U}, // ✗ U+2717 BALLOT X
-        {0xE2U, 0x9CU, 0x98U}, // ✘ U+2718 HEAVY BALLOT X
-        {0xE2U, 0x9DU, 0x8CU}, // ❌ U+274C CROSS MARK — the emoji fail mark jest/vitest/mocha emit
+        {0xE2U, 0x9CU, 0x95U},
+        {0xE2U, 0x9CU, 0x96U},
+        {0xE2U, 0x9CU, 0x97U},
+        {0xE2U, 0x9CU, 0x98U},
+        {0xE2U, 0x9DU, 0x8CU},
     }};
     [[nodiscard]] bool starts_with_glyph(std::string_view text, std::size_t pos,
                                          std::span<const Glyph> glyphs) noexcept
@@ -277,9 +206,8 @@ namespace
     {
         return starts_with_glyph(text, pos, kFailGlyphs);
     }
-    // Advance past ANSI escapes + token delimiters; returns the next token-start index
-    // (or text.size() if the rest of the line is delimiters). Mirrors for_each_token's
-    // inter-token skip so the two agree on token boundaries.
+    // post: the next token-start index, or text.size() when only delimiters remain.
+    // invariant: mirrors for_each_token's inter-token skip, so both agree on token boundaries.
     [[nodiscard]] std::size_t skip_to_token_start(std::string_view text, std::size_t pos) noexcept
     {
         for (;;)
@@ -293,9 +221,10 @@ namespace
         }
     }
 
-    // The trimmed token starting at `pos` (caller guarantees a non-delimiter, non-ANSI
-    // start); advances `pos` past it. Mirrors for_each_token's token extraction + the
-    // surrounding-non-alnum trim. substr begin <= pos <= size → noexcept body cannot throw.
+    // pre: `pos` is at a non-delimiter, non-ANSI byte of `text`.
+    // post: the trimmed token, with `pos` advanced past its raw span.
+    // invariant: mirrors for_each_token's extraction and its surrounding-non-alnum trim.
+    // note: the substr bound is begin <= pos <= size, so the noexcept body cannot throw.
     // NOLINTNEXTLINE(bugprone-exception-escape)
     [[nodiscard]] std::string_view take_trimmed_token(std::string_view text,
                                                       std::size_t& pos) noexcept
@@ -312,17 +241,10 @@ namespace
         return token;
     }
 
-    // ── SRC-D-OUT-4c — the KIND SLOT: anchor #2 is a POSITION claim, not an adjacency ─────
-    // PREFIX MATERIAL: a token that may PRECEDE the line's kind slot without displacing it. Two
-    // declared, closed classes — the same shape SRC-D-OUT-4's role partition uses, and the reason
-    // this is a rule rather than per-shape tuning:
-    //   1. colon-terminated — the byte past its span is `:` (`ld:`, `src/main.rs:`, `357:`, `14:`)
-    //   2. bracket-enclosed — its span is bounded by `[…]`, `(…)` or `<…>` (`[main]`, `(none)`,
-    //      `<WORKSPACE>`); the closing bracket may itself carry a `:`, which class 1 then covers
-    //      for whatever token follows.
-    // Both read the RAW span — the untrimmed extent take_trimmed_token walked — because the byte
-    // that carries the structure is the one just past it, and the trim can hide it ("foo-:" trims
-    // to "foo", whose next byte is `-`, not `:`).
+    // pre: `raw_begin`/`raw_end` bound the UNTRIMMED span - the trim can hide the byte that carries
+    // the structure.
+    // invariant: the prefix classes are a closed declared set, never per-shape tuning.
+    // refs: SRC-D-OUT-4c
     [[nodiscard]] bool is_prefix_material(std::string_view line, std::size_t raw_begin,
                                           std::size_t raw_end) noexcept
     {
@@ -334,30 +256,11 @@ namespace
                (before == '<' && after == '>');
     }
 
-    // SRC-D-OUT-4c — true iff `token` occupies the line's KIND SLOT: every token preceding it on
-    // the line is prefix material.
-    //
-    // WHY A WALK IS NEEDED AT ALL. `after == ':'` is an adjacency test standing in for a position
-    // claim, and it cannot separate
-    //     error: connection refused   (a verdict)
-    //     error: string               (a struct field declaration)
-    //     err:   &str                 (a named parameter in a code frame)
-    // — all three are byte-identical in the ±1 neighbourhood of the token, so no WIDENING of that
-    // neighbourhood discriminates: the information is positional, not local. SRC-D-NOTE-1 already
-    // validates its own marker BACKWARDS for exactly this reason ("structural rather than
-    // lexical"); this is that same treatment for anchor #2. It also subsumes the compiler-frame
-    // shape for free — `<path>:<line>:<col>:` is not a special case, it IS a run of
-    // colon-terminated tokens.
-    //
-    // WHOLE-LINE, never head-bounded, and that is load-bearing: a register is a claim about a
-    // line's structure and a bounded head is a cost control, so gating the claim on a byte budget
-    // makes it change silently with presentation — the one property of a log line no producer
-    // guarantees (ADR-20). Cost is bounded instead by the walk being SELF-TERMINATING: it stops
-    // at the first non-prefix token, which on prose is token index 1, and it is reached only after
-    // a `:` was already found.
-    //
-    // PRECONDITION: `token` is a sub-view of `line`, as for every register kernel here. A token
-    // never reached is treated as absent and DEMOTES — the conservative direction.
+    // pre: `token` is a sub-view of `line`.
+    // post: true iff every token before `token` is prefix material; a token never reached is
+    // treated as absent, which demotes.
+    // invariant: derived over the WHOLE line - a register is a claim, never a byte budget.
+    // refs: ADR-20.D3, SRC-D-OUT-4c
     [[nodiscard]] bool token_in_kind_slot(std::string_view line, std::string_view token) noexcept
     {
         std::size_t pos{0};
@@ -365,57 +268,44 @@ namespace
         {
             pos = skip_to_token_start(line, pos);
             if (pos >= line.size())
-                return false; // walked off the line without reaching `token`
+                return false;
             const std::size_t raw_begin{pos};
             const std::string_view current{take_trimmed_token(line, pos)};
             if (current.data() == token.data() && current.size() == token.size())
-                return true; // reached it with nothing but prefix material behind it
-            // An empty trimmed token is pure punctuation ("##", "--") and is invisible to
-            // for_each_token, so it is invisible here too — the two must agree on what a token is.
+                return true;
+            // assert: an empty trimmed token is pure punctuation and is invisible to for_each_token
+            // too.
             if (!current.empty() && !is_prefix_material(line, raw_begin, pos))
                 return false;
         }
     }
 
-    // ── SRC-D-OUT-4a — a leading FAIL glyph CONFIRMS a failure word (the ✗-anchor) ────────
-    // Mirror of leading_outcome_is_pass: does the line's FIRST outcome-bearing token mark a
-    // FAIL? Walk the head; the first token that is a ballot-X glyph ⇒ true; a PASS glyph ⇒
-    // false (a pass leads — not a fail line); a failure WORD ⇒ false (it self-handles via
-    // its own role/anchor — this predicate only adds the GLYPH register). End-of-head ⇒
-    // false. Used ONLY to ANCHOR an already-matched failure word, never to create a cue, so
-    // a glyph-only line ("✗ 1920×1080") with no failure word stays silent — provably safe
-    // against the D-OUT-3 ×-risk. Pure byte-compare ⇒ MSVC bit-identical (F5).
+    // post: true iff the first outcome-bearing token in the head is a fail glyph.
+    // invariant: it only ANCHORS an already-matched failure word and never creates a cue, so a
+    // glyph-only line stays silent.
+    // refs: SRC-D-OUT-4a
     [[nodiscard]] bool leading_outcome_is_fail(std::string_view line) noexcept
     {
-        static constexpr std::size_t kOutcomeHead{128U}; // matches leading_outcome_is_pass
+        // invariant: equal to leading_outcome_is_pass's kOutcomeHead - the two heads must agree.
+        static constexpr std::size_t kOutcomeHead{128U};
         const std::size_t limit{line.size() < kOutcomeHead ? line.size() : kOutcomeHead};
         std::size_t pos{0};
         while ((pos = skip_to_token_start(line, pos)) < limit)
         {
-            if (starts_with_fail_glyph(line, pos)) // first outcome token is a fail glyph
+            if (starts_with_fail_glyph(line, pos))
                 return true;
-            if (starts_with_pass_glyph(line, pos)) // a pass leads — not a fail line
+            if (starts_with_pass_glyph(line, pos))
                 return false;
             const std::string_view token{take_trimmed_token(line, pos)};
             for (const FailureWord& entry : kFailureLexicon)
-                if (iequals(token, entry.word)) // a failure word leads — it self-handles
+                if (iequals(token, entry.word))
                     return false;
-            // otherwise a non-outcome token (scope segment / name / number) — continue
         }
-        return false; // no leading fail glyph within the head
+        return false;
     }
 
-    // SRC-D-OUT-4b (SRC-D-MSK-4 cut, 2026-07-21 ruling): a CamelCase error-TYPE token anchors a
-    // failure cue ONLY when it is verdict-anchored — the register/position discriminator, stated
-    // literally. A thrown verdict (`TypeError:`, `[Error]`, CAPS) fires; a type NAMED but not
-    // thrown does not. The prior `|| !leads_with_descriptive_glyph(line)` fallback was a one-entry
-    // denylist built for a single node:test `▶`-suite FP — it fired on every producer shape it
-    // never saw (ctest's `Start NN: FooErrorTest.Bar` here, gtest/pytest next). This IS the check's
-    // own partition criterion (benign-collision-proneness): a CamelCase type ending in `Error` is
-    // maximally collision-prone in a test suite, so it belongs in RegisterAnchored ("fires only in
-    // verdict register"). Recall is protected by POSITION not luck: the caller runs this only on
-    // lines with NO failure word at all (`!matched && …`), and a genuinely thrown error brings
-    // register or a fail glyph that fires via a separate, stronger cue. See bugs.md 2026-07-09 row.
+    // pre: the caller reached this only on a line carrying no failure-lexicon word at all.
+    // refs: SRC-D-OUT-4b
     [[nodiscard]] bool error_type_anchors(std::string_view line, std::string_view token) noexcept
     {
         return detail::is_verdict_anchored(line, token);
@@ -423,32 +313,11 @@ namespace
 
 } // namespace
 
-// The shared outcome predicate (SRC-D-OUT-1b) — declared on the canon-internal detail surface in
-// canon.api.cppm so infer_leading_log_level (a SEPARATE TU) consults the SAME predicate as the
-// cue lexicon, not a TU-local copy. Defined here, with the failure lexicon, reusing the TU-local
-// glyph/scan helpers above (single-responsibility). Does the line's FIRST outcome-bearing token
-// declare a pass? Walk the head left-to-right (ANSI- and scope-prefix-tolerant, tokenising exactly
-// as for_each_token): the first token that is a pass GLYPH ⇒ true (pass leads); the first token
-// that is a failure WORD ⇒ false (failure leads — stop, so a pathological "ERROR … ✓" still fires
-// and the "ERROR teardown failed though setup was ok" guard holds); any other token (scope segment
-// "@cline/core", a name, a number) is skipped. End-of-head ⇒ false. Glyph-gated AND (SRC-D-OUT-2)
-// first-significant-token-word-gated: a leading pass GLYPH demotes anywhere in the head; a pass
-// WORD (passed/ok/success/succeeded) demotes ONLY as the FIRST significant token ("ok 1 - should
-// return error" → demote), so a summary count "25 passed, 5 failed" (a number leads, not "passed")
-// and a prose "passed" mid-line never false-demote a real failure. Pure byte-compare + ASCII
-// case-fold ⇒ cross-stdlib and MSVC bit-identical (F5).
 namespace detail
 {
-    // MEMBERSHIP, not firing — the predicate an INSTRUMENT needs and no product path does. Whether
-    // Stage 2 has an entry for a word at all is the question underneath "the register declined it":
-    // `lexicon_hit` consults `is_verdict_anchored` only AFTER a `kFailureLexicon` match, so a word
-    // the table does not hold is not declined by any register, it is invisible. Exposed here rather
-    // than re-listed at the call site because a measurement that enumerates the eighteen words for
-    // itself measures its own copy of the vocabulary and goes stale silently the day one is added
-    // (`DN-37.D20`). Same table, same `iequals` comparison, one walk — the identical shape
-    // `leading_outcome_is_fail` uses above. Role-blind on purpose: a `SelfAnchoring` word and a
-    // `RegisterAnchored` one are both IN the lexicon, and the role is what the register question
-    // asks NEXT.
+    // post: true iff the token is in kFailureLexicon - membership, never firing, and role-blind.
+    // note: exposed so an instrument never re-lists the vocabulary and goes stale when it grows.
+    // refs: DN-37.D20
     [[nodiscard]] bool is_failure_lexicon_word(std::string_view token) noexcept
     {
         for (const FailureWord& entry : kFailureLexicon)
@@ -457,28 +326,29 @@ namespace detail
         return false;
     }
 
+    // post: true iff a pass glyph leads the head, or a pass word is its first significant token.
+    // invariant: a failure word met first stops the walk and returns false.
+    // refs: SRC-D-OUT-1b, SRC-D-OUT-2
     [[nodiscard]] bool leading_outcome_is_pass(std::string_view line) noexcept
     {
-        static constexpr std::size_t kOutcomeHead{128U}; // generous monorepo scope-prefix bound
+        // invariant: equal to leading_outcome_is_fail's kOutcomeHead - the two heads must agree.
+        static constexpr std::size_t kOutcomeHead{128U};
         const std::size_t limit{line.size() < kOutcomeHead ? line.size() : kOutcomeHead};
         std::size_t pos{0};
         bool first_significant{true};
         while ((pos = skip_to_token_start(line, pos)) < limit)
         {
-            if (starts_with_pass_glyph(line, pos)) // an outcome token is a pass glyph
+            if (starts_with_pass_glyph(line, pos))
                 return true;
             const std::string_view token{take_trimmed_token(line, pos)};
             if (token.empty())
-                continue; // a pure-punctuation token (trimmed to nothing) — not significant
+                continue;
             for (const FailureWord& entry : kFailureLexicon)
-                if (iequals(token, entry.word)) // a failure word leads → not a pass
+                if (iequals(token, entry.word))
                     return false;
-            // SRC-D-OUT-2 — see canon.api.cppm for the contract. WHY THE GUARD IS THE LOOP'S
-            // `first_significant` FLAG and not a position compare: the pass WORD must LEAD, and
-            // "leading" is defined over SIGNIFICANT tokens, so a pure-punctuation prefix is
-            // skipped (above) without consuming the slot. This is also what makes "not ok 1 …"
-            // come out right with no special case — `not` takes the slot, so no demote fires and
-            // the TAP failure survives.
+            // assert: leading is defined over SIGNIFICANT tokens, so punctuation never spends the
+            // slot.
+            // refs: SRC-D-OUT-2
             if (first_significant)
             {
                 for (const std::string_view verdict : kSuccessVerdicts)
@@ -486,48 +356,35 @@ namespace detail
                         return true;
                 first_significant = false;
             }
-            // otherwise a non-outcome token (scope segment / name / number) — continue
         }
-        return false; // no leading outcome token within the head
+        return false;
     }
 
-    // SRC-D-OUT-4 — see canon.api.cppm for the contract. anchor #1 (caps) is a pure token
-    // test; anchors #2 (delimiter) need the surrounding bytes, recovered from `token`'s
-    // position within `line` (precondition: `token` is a sub-view of `line`).
+    // pre: `token` is a sub-view of `line` - anchor #2 reads the bytes around it.
+    // refs: SRC-D-OUT-4
     [[nodiscard]] bool is_verdict_anchored(std::string_view line, std::string_view token) noexcept
     {
-        if (is_caps_register(token)) // anchor #1 — ERROR / FAILED / FATAL …
+        if (is_caps_register(token))
             return true;
         const std::size_t start{static_cast<std::size_t>(token.data() - line.data())};
         const std::size_t end{start + token.size()};
         const char before{start > 0U ? line[start - 1U] : '\0'};
         const char after{end < line.size() ? line[end] : '\0'};
-        // anchor #2 — a verdict colon ("error:") IN THE LINE'S KIND SLOT (SRC-D-OUT-4c), or the
-        // token enclosed in brackets/parens ("[error]", "##[error]", "(FAILED)"): the separators
-        // CI/test runners frame an outcome with. A leading "##" is its own (empty-trimmed) token,
-        // so the byte immediately before "error" is the '[' — bracket-bound. Only the colon half
-        // carries the kind-slot precondition, and the asymmetry is the design: a trailing colon is
-        // a ONE-SIDED adjacency that every `key: value` in every config dump, source frame and
-        // quoted string satisfies, while a bracket pair is already a two-sided enclosure that prose
-        // does not produce by accident.
+        // assert: only the colon anchor carries the kind-slot precondition, and that asymmetry is
+        // the design - a bracket pair is already two-sided, a trailing colon is not.
+        // refs: SRC-D-OUT-4c
         if (after == ':' && token_in_kind_slot(line, token))
             return true;
         if ((before == '[' && after == ']') || (before == '(' && after == ')'))
             return true;
-        // anchor #3 (SRC-D-OUT-4a) — a leading FAIL glyph (✗/✕/✖/✘) marks the line a failed
-        // verdict, confirming this failure word. Line-level, so it applies to every register-
-        // anchored token on a ✗-led line; never creates a cue (no failure word ⇒ never called).
+        // assert: anchor #3 is line-level and never creates a cue - no failure word, never called.
+        // refs: SRC-D-OUT-4a
         return leading_outcome_is_fail(line);
     }
 
-    // SRC-D-CNT-1 — see canon.api.cppm for the contract. true iff `token`'s IMMEDIATELY-PRECEDING
-    // token (under the shared canon tokenization) is a digit-leading numeric — count register
-    // ("1 failure", "5 failed"). PRECONDITION: `token` is a sub-view of `line` (a for_each_token
-    // token). Forward-scans `line` tracking the previous non-empty token until it reaches `token`
-    // (pointer identity, the occurrence not just an equal string); the predecessor's
-    // digit-leading-ness decides. Cold — consulted only once a level word matched. Mirrors
-    // for_each_token's boundaries exactly (ANSI- and delimiter-aware via the shared helpers).
-    // Pure byte/case test, order-independent ⇒ cross-stdlib + MSVC bit-identical (F5).
+    // pre: `token` is a sub-view of `line` - the occurrence, matched by pointer identity.
+    // post: true iff `token`'s immediately preceding token is a digit-leading numeric.
+    // refs: SRC-D-CNT-1
     [[nodiscard]] bool is_count_register(std::string_view line, std::string_view token) noexcept
     {
         std::string_view prev{};
@@ -537,7 +394,7 @@ namespace detail
         {
             pos = skip_to_token_start(line, pos);
             if (pos >= line.size())
-                return false; // token not found (not a valid sub-view) — conservative
+                return false;
             const std::string_view cur{take_trimmed_token(line, pos)};
             if (cur.data() == token.data() && cur.size() == token.size())
                 return is_count_preceded(prev, prev_prev);
@@ -549,28 +406,17 @@ namespace detail
         }
     }
 
-    // SRC-D-NOTE-1 — the note-register kernel's single implementation; see canon.api.cppm for the
-    // contract. Returns the offset of the first byte of a NOTE diagnostic's MESSAGE — one past the
-    // structural `<path>:<line>:<col>: note: ` marker — or npos when the line carries no such
-    // marker. FIRST occurrence wins: it is the line's diagnostic-kind slot, and anything after it
-    // belongs to the note's own claim.
-    //
-    // The shape is validated BACKWARDS from the marker so the scan is one forward find plus a
-    // bounded walk: locate `": note: "`, then require `<digits>` `:` `<digits>` immediately to its
-    // left, itself preceded by the path's own `:`. That is what makes it structural rather than
-    // lexical — `"Note: the deploy failed"` and `"see note: below"` both fail it, and must, or a
-    // labelling fix becomes a detection defect.
-    //
-    // Pure byte walk, alloc-free, noexcept, no case folding (the compilers emit lowercase `note:`;
-    // matching case-insensitively would start admitting prose). F5-bit-identical by construction.
+    // post: the offset of the first message byte past a diagnostic's note marker, else npos.
+    // invariant: the first occurrence wins - it is the line's diagnostic-kind slot.
+    // refs: SRC-D-NOTE-1
     [[nodiscard]] std::size_t note_register_begin(std::string_view line) noexcept
     {
         constexpr std::string_view kNoteMarker{": note: "};
         const std::size_t marker{line.find(kNoteMarker)};
         if (marker == std::string_view::npos)
             return std::string_view::npos;
-        // Walk left over the column digits, then its ':', then the line digits, then the path's
-        // ':'. Every step is required — a missing one means this is not the diagnostic-kind slot.
+        // assert: every step is required - a missing one means this is not the diagnostic-kind
+        // slot.
         std::size_t pos{marker};
         const auto take_digits{
             [line, &pos]() noexcept
@@ -578,7 +424,7 @@ namespace detail
                 const std::size_t end{pos};
                 while (pos > 0U && line[pos - 1U] >= '0' && line[pos - 1U] <= '9')
                     --pos;
-                return end != pos; // at least one digit consumed
+                return end != pos;
             }};
         const auto take_colon{[line, &pos]() noexcept
                               {
@@ -592,10 +438,9 @@ namespace detail
         return marker + kNoteMarker.size();
     }
 
-    // SRC-D-NOTE-1 — the register, expressed over ONE token: is this token inside the note's
-    // message? A thin view on note_register_begin so the per-token predicate and the once-per-line
-    // offset can never drift into two implementations of one property. PRECONDITION: `token` is a
-    // sub-view of `line` (a for_each_token token), as for every register kernel here.
+    // pre: `token` is a sub-view of `line`, and `message_at` came from note_register_begin.
+    // invariant: a thin view on note_register_begin - one property, never two implementations.
+    // refs: SRC-D-NOTE-1
     [[nodiscard]] bool token_in_note_message(std::string_view line, std::string_view token,
                                              std::size_t message_at) noexcept
     {
@@ -603,24 +448,21 @@ namespace detail
                static_cast<std::size_t>(token.data() - line.data()) >= message_at;
     }
 
-    // SRC-D-CNT-1 — the DUAL of contains_failure_cue: true iff the head carries a failure-lexicon
-    // word in COUNT register (immediately preceded by a digit-leading numeric — "1 failure",
-    // "5 failed"): an aggregate SUMMARY, not a per-item verdict. contains_failure_cue treats
-    // such words as non-firing; this reports their presence so infer_leading_log_level caps a
-    // count-summary line at Warn (surfaced, below per-item verdicts — demote, never suppress).
-    // Cold path (only reached when contains_failure_cue is false). Single bounded pass;
-    // alloc-free, noexcept. Pure byte/case test ⇒ cross-stdlib + MSVC bit-identical (F5).
-    // Only throw path is for_each_token's substr (begin <= size); the noexcept body cannot throw.
+    // pre: cold path - reached only once contains_failure_cue has returned false.
+    // post: true iff the head carries a failure word in count register - a summary, not a per-item
+    // verdict.
+    // invariant: the caller demotes such a line to Warn; it is never suppressed.
+    // refs: SRC-D-CNT-1
+    // note: for_each_token's substr is the only throw path and its bound is checked.
     // NOLINTNEXTLINE(bugprone-exception-escape)
     [[nodiscard]] bool contains_failure_summary_cue(std::string_view text,
                                                     std::size_t scan_limit) noexcept
     {
         std::string_view prev{};
         std::string_view prev_prev{};
-        // SRC-D-NOTE-1 applies to the dual as well: a counted failure word inside a note's message
-        // ("note: 5 candidates failed") is still the NOTE's word, and the note asserts nothing.
-        // Without this the demotion would only move the line from Error to Warn, and the ruling's
-        // target level is Unknown.
+        // assert: a counted failure word inside a diagnostic's message is that diagnostic's word,
+        // so it asserts no verdict.
+        // refs: SRC-D-NOTE-1
         const std::size_t note_message_at{note_register_begin(text)};
         return for_each_token(text, scan_limit,
                               [&](std::string_view token) noexcept
@@ -649,17 +491,11 @@ namespace
         {
             if (!iequals(token, entry.word))
                 continue;
-            // SRC-D-CNT-1: a count-register failure word (immediately preceded by a bare-integer
-            // count — "1 failure", "5 failed" — that is not a timestamp chain) is a SUMMARY, not
-            // a per-item verdict, so it does NOT fire as a cue (checked BEFORE the verdict
-            // anchors: a counted noun is a summary even with a trailing colon — "1 failure:").
-            // The line still surfaces, demoted to Warn by the level path; it just stops
-            // outranking the specific verdicts it summarizes (the "25 passed, 5 failed" dual). On
-            // a masked TEMPLATE the digit is `<*>` (not a bare integer) so the metalog salience
-            // path is unaffected.
+            // assert: the count check runs BEFORE the verdict anchors - a counted noun is a summary
+            // even with a trailing colon.
+            // refs: SRC-D-CNT-1
             if (is_count_preceded(prev, prev_prev))
                 return {.fired = false, .matched = true};
-            // zero-collision token self-anchors; collision-prone token needs verdict register
             return {.fired = entry.role == FailureRole::SelfAnchoring ||
                              detail::is_verdict_anchored(text, token),
                     .matched = true};
@@ -668,24 +504,18 @@ namespace
     }
 } // namespace
 
-// Only throw path is for_each_token / any_standalone_word, whose substr has begin <= text.size()
-// (see token_scan.hpp); the noexcept body cannot throw.
+// note: for_each_token and any_standalone_word's substr are the only throw paths, both bounded.
 // NOLINTNEXTLINE(bugprone-exception-escape)
 bool contains_failure_cue(std::string_view text, std::size_t scan_limit) noexcept
 {
-    // One head-bounded pass. The "segmentation fault" phrase, or an OUTCOME verb (a
-    // self-anchoring inflected verdict), is a strong cue (short-circuit true). A TERM
-    // noun fires only in verdict register (SRC-D-OUT-4 is_verdict_anchored) — a bare noun in
-    // prose is not a verdict. A CamelCase error-TYPE name is a WEAKER signal — recorded,
-    // but the scan continues.
+    // assert: a phrase or a self-anchoring verb short-circuits true; a CamelCase type is only
+    // recorded, so the scan continues.
     bool saw_error_type{false};
     std::string_view prev{};
     std::string_view prev_prev{};
-    // SRC-D-NOTE-1 (the fourth register): resolved ONCE per line, not per token — the offset where
-    // a compiler NOTE diagnostic's message begins, or npos. Every cue form below (phrase, lexicon
-    // word, CamelCase error TYPE) is demoted uniformly inside that message, because they are all
-    // the note's own words and a note asserts no verdict. Tokens BEFORE the marker keep their
-    // authority: an `##[error]` wrapper or a CI prefix on the same line is not the note's claim.
+    // assert: resolved once per line; every cue inside the message is demoted, while tokens before
+    // the marker keep their authority.
+    // refs: SRC-D-NOTE-1
     const std::size_t note_message_at{detail::note_register_begin(text)};
     const bool saw_failure_word{for_each_token(
         text, scan_limit,
@@ -693,38 +523,32 @@ bool contains_failure_cue(std::string_view text, std::size_t scan_limit) noexcep
         {
             if (detail::token_in_note_message(text, token, note_message_at))
             {
-                prev_prev =
-                    prev; // the window still shifts: the token exists, it just does not fire
+                // assert: the two-token window still shifts - the token exists, it just does not
+                // fire.
+                prev_prev = prev;
                 prev = token;
                 return false;
             }
             for (const Phrase& phrase : kFailurePhrases)
                 if (iequals(prev, phrase[0]) && iequals(token, phrase[1]))
-                    return true; // phrase completes — a strong cue
+                    return true;
             const LexiconHit hit{lexicon_hit(text, token, prev, prev_prev)};
-            // SRC-D-OUT-4b — see canon.api.cppm for the contract. Cold: reached only
-            // when the lexicon missed, so the extra full-line scan
-            // error_type_anchors costs is paid on non-matching lines only.
+            // assert: cold - reached only when the lexicon missed, so the extra full-line scan is
+            // paid on non-matching lines only.
+            // refs: SRC-D-OUT-4b
             if (!hit.matched && is_camel_error_type(token) && error_type_anchors(text, token))
                 saw_error_type = true;
-            prev_prev = prev; // shift the two-token window for the next adjacency
-            prev = token;     // check (count register needs prev AND prev-prev)
+            prev_prev = prev;
+            prev = token;
             return hit.fired;
         })};
-    // A strong failure WORD fires unconditionally; a weak error-TYPE name (no failure
-    // word) is demoted by any success WORD anywhere — scanned across the WHOLE text, as a
-    // ctest verdict trails a long test name well past the keyword head. The success-word
-    // pass runs ONLY on the rare error-type-without-failure-word line (`||` short-circuit),
-    // so the hot path is unaffected.
+    // assert: the success-word scan covers the WHOLE text, never the head - a ctest verdict trails
+    // a long test name - and it runs only on the error-type-only line.
     const bool result{saw_failure_word ||
                       (saw_error_type && !any_standalone_word(text, kSuccessVerdicts,
                                                               /*scan_limit=*/0U))};
-    // Outcome guard (SRC-D-OUT-1): a line that carries a failure cue but is LED by an
-    // unambiguous pass GLYPH (✓/✔/✅/√) is a passing test whose NAME embeds failure
-    // vocabulary ("✓ marks runs failed …"), not a regression. Only a leading pass GLYPH
-    // demotes a failure WORD; a leading pass WORD ("25 passed, 5 failed") must not, so
-    // words do not. Paid only on the would-be-positive minority (short-circuit), and the
-    // walk stops at the first outcome token.
+    // assert: only a leading pass GLYPH demotes a failure word; a leading pass WORD never does.
+    // refs: SRC-D-OUT-1
     if (result && detail::leading_outcome_is_pass(text))
         return false;
     return result;
