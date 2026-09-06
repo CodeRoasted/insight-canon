@@ -1484,10 +1484,11 @@ void print_usage(std::string_view program_name)
                  "prints counts and prefix shapes only, never a line");
     std::println(stderr,
                  "  <label>.outcomes=<path.tsv>: one `<file path relative to the corpus-dir>\\t"
-                 "<outcome word>` row per file, transcribed verbatim from the corpus manifest "
-                 "(the header names the transcription per corpus); the label must already have "
-                 "its <corpus-dir>. Files with no row count as undeclared; a malformed row is an "
-                 "error.");
+                 "<outcome word>` row per file, transcribed verbatim from that corpus manifest's "
+                 "OWN outcome field and never renamed — `ci_outcome` on the GitHub Actions "
+                 "corpus, `result` on Jenkins, `job_status` on GitLab; the label must already "
+                 "have its <corpus-dir>. Files with no row count as undeclared; a malformed row "
+                 "is an error.");
 }
 } // namespace
 
