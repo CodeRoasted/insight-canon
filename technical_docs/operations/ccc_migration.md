@@ -6319,6 +6319,88 @@ baseline. No suite in this directory carries the `corpus` label, so every one of
 that figure — checked at the `CMakeLists`, where the labelled set is three suites and all three live
 elsewhere.
 
+## Unit 29 — `core/tests/compose/` (5 files, 492 comment lines, 486 would-be violations) — a claim that stated an OBLIGATION as if it were a guarantee, and a reader that narrowed rather than contradicted
+
+The composition contract, the run-outcome mechanisms, the composed-recognition algorithms, the
+transport identity arm and the WHERE wiring — the densest homing-argument material in the repo, and
+the tier where canon proves its algorithms VOCABULARY-FREE. Baseline split: bare 460 · spacer 16 ·
+trailing 9 · tag-mid-line 1. After: **488 comment lines, 0 would-be violations** — `invariant` 267 ·
+`refs` 14 · 201 continuations · 6 tool forms. Repo-level delta **1 654 → 1 168 = exactly 486**. No
+law block; the next free law integer is still 17.
+
+### The stripper cross-check is VACUOUS for the fifth consecutive unit
+
+Removed **486**, kept 6 — all namespace closers. No suppression in this unit, so the identity
+degenerates to `removed == violations` and is recorded as vacuous rather than quoted as a pass.
+Five units running, and the reason is structural: the test tier carries no suppressions at all,
+which is itself the finding — the whole `trailing-nolint` 2 and `suppression-without-why` 4
+population sits outside it.
+
+### CONVICTION — an obligation written in the grammar of a guarantee
+
+The run-outcome suite declares three verdict-prefix rows shortest-first on purpose, so that the
+longest-prefix tie-break is a function of the BYTES rather than of array position, and the carried
+prose closed with *"reversing this array must not change a single expectation below."*
+
+Reader B answered the question correctly and then reported what the sentence does not say: **nothing
+in the file reverses the array.** Checked at the artifact — the constant appears twice, at its
+declaration and at the manifest that consumes it, and the file contains no reversal of any kind. The
+claim is TRUE and it is UNENFORCED, and its grammar is the grammar of a checked property.
+
+**That distinction is the whole point of this migration.** A reader who inherits *"reversing this
+array must not change a single expectation"* reasons that something reversed it; the next edit to
+the array is then made under a protection that does not exist. The claim now states its own status —
+an obligation on whoever edits it, because nothing here re-runs the suite against a reversed array —
+which is strictly more useful than either deleting it or leaving it ambiguous.
+
+### A SECOND, SMALLER CORRECTION from the same reader, and it is the anchor-audit class arriving through prose
+
+Reader B answered the carriage-return anchor question at MEDIUM confidence and said why: the header
+claimed *"the last two arms"* keep the widening from becoming a blanket search-anywhere, and those
+arms are not in that test — they are in the sibling test that follows it. The conversion carried a
+sentence whose internal navigation had gone stale. Repaired to name the sibling arm rather than a
+position within this one.
+
+### The address census, and the one loss the anchor audit did NOT catch
+
+**Outbound: 1 address LOST and restored.** `SRC-II-4` sat on the section banner heading the
+degenerate-composition test, and banners are exactly what this migration deletes. It is now a
+`refs:` at the test that obeys it, and the census returns to exit 0. **This is the case the anchor
+audit cannot see**: the audit reads whether a claim landed at the right anchor, and a deleted
+banner leaves no claim to misplace — only the census compares address SETS, which is why both
+instruments are run.
+
+**Inbound: 8 mentions, all opened, all clean.** Every one is a file address that still resolves;
+none rests on prose this unit changed.
+
+### The cold reader (`OPS-8.S8`) — 62 questions, 62 recovered, ONE conviction
+
+Reader A took the composition contract, the transport identity arm and the WHERE wiring; reader B
+the run-outcome mechanisms and the semantic walkers. `GIT COMMANDS RUN: none` from both. One
+disclosure, reader B: an excluded filename appeared as PROSE inside the auto-injected project
+instructions; no excluded file was listed, matched or opened.
+
+| reader | questions | recovered | convictions |
+|---|---|---|---|
+| A — composition, transport identity, WHERE wiring | 30 | 30 | 0 |
+| B — run outcome, semantic walkers | 32 | 32 | 1 |
+
+**Reader B went past its questions repeatedly and every excursion was checkable.** It recovered the
+measured population behind the carriage-return anchor — a recognizer degrading to zero percent on
+one runner generation while the verdict text is present in every trace — from a study this unit does
+not cite. It recovered the downstream crawl's numbers behind the half-declared verdict. And asked
+what the allocation guard concedes, it named the concession the prose does not: composition itself
+is NOT covered, so a regression that moved work out of a walker and into composition would not be
+caught. That is a true limit of the arm, recorded here rather than folded into the comment, because
+it is a statement about the guard's scope and not about the conversion.
+
+### The behaviour witness
+
+`malf test insight-canon` on **both** toolchains after the two repairs landed: **809 of 809** on
+`linux-clang21-libcxx-release` and **809 of 809** on `linux-gcc16-release`, equal to the pre-unit
+baseline. No suite in this directory carries the `corpus` label, so every one of them runs inside
+that figure.
+
 
 
 

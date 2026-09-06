@@ -1,21 +1,22 @@
-// test_run_outcome.cpp — the grammar-2 run-outcome MECHANISMS over SYNTHETIC manifests
-// (canon core stays semantic-unaware —
-// no dialect literal here; the Jenkins/GHA vocabularies are package data, tested in their packages;
-// the G-OUT-* gate suite is Kleio's homing). What CORE owns and this file guards:
-//   • map_outcome_token — resolved-view lookup, byte-exact; "no row" (nullopt) is distinct from "a
-//   row that
-//     maps to Unknown" (the NOT_BUILT shape).
-//   • the IntentMarkerRow grammar-2 shapes — RemainderToClosingParen strictness + the payload
-//     exclusion set's word-boundary semantics.
-//   • scan_run_outcome — last-match-wins, strict verdict-word remainder (no dialect latch: the
-//     dialect is DECLARED, so the scan carries no LogFormat at all).
-//   • resolve_run_outcome — the SRC-D-OUT-RUN-1 strict ladder: authoritative wins over a
-//   present-but-
-//     divergent console tail (the divergence is FLAGGED, never a tiebreak), unmapped tokens surface
-//     a note and fall down the ladder (fail-closed), absence resolves Unknown.
-//   • find_conflict — a cross-package duplicate outcome token / marker prefix fails the build.
-//   • outcome_regressed — strictly-worse on Success < Unstable < Failure; Aborted/Unknown excluded.
-// Determinism: byte-only walks, integer line index; no RNG/clock/float.
+// invariant: the run-outcome MECHANISMS over SYNTHETIC manifests — canon core stays
+// semantic-unaware, so no real dialect literal appears here.
+// invariant: the real vocabularies are package DATA and are tested in their own packages.
+// invariant: token mapping is a resolved-view lookup, byte-exact, where NO ROW is distinct from a
+// row that MAPS to Unknown.
+// invariant: the marker grammar's paren strictness and the payload exclusion set's word-boundary
+// semantics are core's.
+// invariant: the outcome scan is LAST-MATCH-WINS with a strict verdict-word remainder, and carries
+// no format at all because the dialect is DECLARED.
+// invariant: the resolution ladder is STRICT — an authoritative verdict wins over a
+// present-but-divergent console tail, and the divergence is FLAGGED rather than used as a tiebreak.
+// invariant: an unmapped token surfaces a note and falls down the ladder, which is fail-closed, and
+// absence resolves Unknown.
+// invariant: a cross-package duplicate outcome token or marker prefix FAILS THE BUILD.
+// invariant: regression is strictly-worse on the pass-to-fail axis only, with the aborted and
+// unknown classes excluded.
+// invariant: determinism — byte-only walks and an integer line index, with no RNG, clock or
+// float.
+// refs: SRC-D-OUT-RUN-1
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -44,9 +45,6 @@ using insight::tokenization::ChildOrder;
 using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::recognize;
 
-// The walkers take NormalizedContent (the stage-1 normalization precondition as a type); every
-// probe here is an escape-free literal, so normalize() is the zero-copy fixed point over a shared
-// scratch.
 [[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
 {
     static std::string scratch;
@@ -55,10 +53,10 @@ using insight::tokenization::recognize;
 
 namespace
 {
-// ── A synthetic outcome-bearing dialect, gated on its OWN package name (the
-// gate is a composed package NAME, so canon core stays semantic-unaware and there is still no
-// dialect literal from a real ecosystem here). Mirrors the Jenkins SHAPE: four verdict classes +
-// one token that maps TO Unknown (the NOT_BUILT form) + a console-tail marker. ──
+// invariant: a synthetic outcome-bearing dialect gated on its OWN package name, so the gate is a
+// composed package NAME and core stays free of any real ecosystem literal.
+// invariant: it mirrors a real dialect's SHAPE — four verdict classes, one token mapping TO
+// Unknown, and a console-tail marker.
 constexpr std::string_view kSyntheticDialect{"synthetic_outcome"};
 constexpr std::string_view kOtherDialect{"synthetic_other"};
 constexpr std::string_view kUndeclared{};
@@ -73,8 +71,8 @@ constexpr std::array<OutcomeMarkerRow, 1> kMarkers{{
     {.prefix = "Ended: ", .dialect_gate = kSyntheticDialect},
 }};
 
-// The grammar-2 marker shapes: a paren-delimited container row + a remainder row with an exclusion
-// set (the Jenkins STAGE/STEP forms, expressed synthetically).
+// invariant: a paren-delimited container row plus a remainder row with an exclusion set, expressing
+// a real dialect's two marker forms synthetically.
 constexpr std::array<std::string_view, 3> kStepExcludes{"{", "}", "End of Run"};
 constexpr std::array<IntentMarkerRow, 2> kIntentRows{{
     {.prefix = "[Mark] { (",
@@ -96,31 +94,34 @@ constexpr SemanticPackageManifest kOutcomePkg{.name = "synthetic_outcome",
                                               .outcome_tokens = kTokens,
                                               .outcome_markers = kMarkers};
 
-// A second package duplicating a token under an intersecting gate — the SP-3 conflict fixture.
+// invariant: a second package duplicating a token under an INTERSECTING gate — the conflict
+// fixture.
 constexpr std::array<OutcomeTokenRow, 1> kDupToken{
     {{.token = "GOOD", .outcome = RunOutcome::Failure, .dialect_gate = kSyntheticDialect}}};
 constexpr SemanticPackageManifest kDupPkg{
     .name = "synthetic_dup", .version = "1.0.0", .outcome_tokens = kDupToken};
-// The same token under a NON-intersecting gate is NOT a duplicate (a different dialect naming the
-// same string is legal — the side-input resolves under the ONE dialect the stream declared).
+// invariant: the same token under a NON-intersecting gate is NOT a duplicate — a different
+// dialect naming the same string is legal.
+// invariant: the side input resolves under the ONE dialect the stream declared.
 constexpr std::array<OutcomeTokenRow, 1> kOtherGateToken{
     {{.token = "GOOD", .outcome = RunOutcome::Success, .dialect_gate = kOtherDialect}}};
 constexpr SemanticPackageManifest kOtherGatePkg{
     .name = "synthetic_other", .version = "1.0.0", .outcome_tokens = kOtherGateToken};
 
-// The RESOLVED view of a stream that declared this synthetic dialect — for_stream is the ONE door.
-// Everything below scores against a declared stream, because after T4 an undeclared one carries no
-// concretely-gated row at all.
+// invariant: the resolved view of a stream that DECLARED this dialect, and the stream door is the
+// ONE door.
+// invariant: everything below scores against a declared stream, because an undeclared one carries
+// no concretely-gated row at all.
 [[nodiscard]] ComposedSemantics composed_outcome()
 {
     return compose(std::array{kOutcomePkg}).for_stream(kSyntheticDialect, {});
 }
 
-// ── grammar-5 — a second synthetic dialect exercising the two shapes GitLab forced:
-// a marker payload behind a variable-length numeric field, and terminal lines whose PREFIX carries
-// the verdict with a free-form remainder. Both projections are declared so the round trip is
-// scored here too, at the level that owns the algorithms. Still no real ecosystem literal: canon
-// core stays semantic-unaware. ──
+// invariant: a second synthetic dialect exercising the two shapes a real dialect forced.
+// invariant: a marker payload behind a variable-length numeric field, and terminal lines whose
+// PREFIX carries the verdict with a free-form remainder.
+// invariant: both projections are declared, so the round trip is scored at the level that owns the
+// algorithms, still with no real ecosystem literal.
 constexpr std::string_view kNumericDialect{"synthetic_numeric"};
 
 constexpr std::array<IntentMarkerRow, 1> kNumericRows{{
@@ -138,10 +139,12 @@ constexpr std::array<IntentEmitRow, 1> kNumericEmits{{
      .emit = PayloadEmit::PlaceholderNumericFieldThenPayload},
 }};
 
-// Three prefix-verdict rows, two of which NEST — the longest-prefix tie-break is the property, and
-// the nesting pair is declared SHORTEST-FIRST on purpose: under the pre-grammar-5 walker the last
-// matching row overwrote, so declaration order decided the verdict. Reversing this array must not
-// change a single expectation below.
+// invariant: three prefix-verdict rows, two of which NEST — the longest-prefix tie-break is the
+// property.
+// invariant: the nesting pair is declared SHORTEST-FIRST on purpose, because under the older walker
+// the last matching row overwrote and declaration order decided the verdict.
+// invariant: reversing this array must not change a single expectation below — an OBLIGATION on
+// whoever edits it, because nothing here re-runs the suite against a reversed array.
 constexpr std::array<OutcomeMarkerRow, 3> kVerdictMarkers{{
     {.prefix = "Run finished",
      .dialect_gate = kNumericDialect,
@@ -169,7 +172,6 @@ constexpr SemanticPackageManifest kNumericPkg{.name = "synthetic_numeric",
 }
 } // namespace
 
-// ── SP-3 fail-closed, build-time half: duplicate outcome keys are constexpr-detectable ──
 static_assert(find_conflict(std::array{kOutcomePkg, kDupPkg}).has_conflict,
               "a cross-package duplicate outcome token under intersecting gates must conflict");
 static_assert(find_conflict(std::array{kOutcomePkg, kDupPkg}).kind == "outcome_token",
@@ -177,25 +179,26 @@ static_assert(find_conflict(std::array{kOutcomePkg, kDupPkg}).kind == "outcome_t
 static_assert(!find_conflict(std::array{kOutcomePkg, kOtherGatePkg}).has_conflict,
               "the same token under NON-intersecting gates is two dialects' data, not a conflict");
 
-// ── map_outcome_token: resolved-view lookup, byte-exact; unmapped ≠ mapped-to-Unknown ──
 TEST(RunOutcomeMap, DialectGatedExactMatch)
 {
     const ComposedSemantics composed{composed_outcome()};
     EXPECT_EQ(map_outcome_token("GOOD", composed), RunOutcome::Success);
     EXPECT_EQ(map_outcome_token("SHAKY", composed), RunOutcome::Unstable);
     EXPECT_EQ(map_outcome_token("STOPPED", composed), RunOutcome::Aborted);
-    // A row mapping TO Unknown (the NOT_BUILT shape) still MAPS — engaged optional, value Unknown.
+    // invariant: a row mapping TO Unknown still MAPS — an engaged optional whose value is
+    // Unknown, which is not the same as a miss.
     const auto skipped{map_outcome_token("SKIPPED", composed)};
     ASSERT_TRUE(skipped.has_value()) << "a token mapped to Unknown is a MAPPING, not a miss";
     EXPECT_EQ(*skipped, RunOutcome::Unknown);
-    // No row: disengaged.
     EXPECT_FALSE(map_outcome_token("WEIRD", composed).has_value());
-    // Byte-exact: case matters (native tokens are verbatim dialect strings).
+    // invariant: BYTE-EXACT, so case matters, because native tokens are verbatim dialect strings.
     EXPECT_FALSE(map_outcome_token("good", composed).has_value());
 
-    // SRC-II-6, now STRUCTURAL rather than tested per call: the row is not in another dialect's
-    // view, and not in an UNDECLARED stream's view at all. Both are re-derived from the same
-    // composition, so this is the filter being exercised, not a second copy of it.
+    // invariant: STRUCTURAL rather than tested per call — the row is not in another dialect's
+    // view, and not in an UNDECLARED stream's view at all.
+    // invariant: both are re-derived from the SAME composition, so this exercises the filter rather
+    // than a second copy of it.
+    // refs: SRC-II-6
     const ComposedSemantics all{compose(std::array{kOutcomePkg, kOtherGatePkg})};
     EXPECT_FALSE(map_outcome_token("BAD", all.for_stream(kOtherDialect, {})).has_value())
         << "a dialect's verdict token must not resolve on a stream declaring another dialect";
@@ -203,20 +206,22 @@ TEST(RunOutcomeMap, DialectGatedExactMatch)
         << "an UNDECLARED stream withholds every concretely-gated row (fail-closed on depth)";
 }
 
-// ── grammar-2 marker shapes: RemainderToClosingParen strictness ──
 TEST(RunOutcomeGrammar2, ParenExtractorIsStrict)
 {
     const ComposedSemantics composed{composed_outcome()};
-    // The named-container form: payload is the paren content, verbatim.
+    // invariant: the named-container form takes the paren content VERBATIM as its payload.
     const auto stage{recognize(norm_probe("[Mark] { (Build)"), composed)};
     EXPECT_EQ(stage.kind, IntentMarkerKind::Job);
     EXPECT_EQ(stage.name, "Build");
-    // Nested parens stay inside the payload; only the single final ')' delimits.
+    // invariant: nested parens stay INSIDE the payload — only the single final closing paren
+    // delimits.
     const auto nested{recognize(norm_probe("[Mark] { (Branch: test (lts))"), composed)};
     EXPECT_EQ(nested.kind, IntentMarkerKind::Job);
     EXPECT_EQ(nested.name, "Branch: test (lts)");
-    // No line-final ')' → the paren row does NOT match; the line falls through to the shorter
-    // remainder row, whose payload "{ (Build" is excluded by "{" → no marker at all.
+    // invariant: with no line-final closing paren the paren row does NOT match, and the line falls
+    // through to the shorter remainder row.
+    // invariant: that row's payload is excluded by the exclusion set, so the line claims no marker
+    // at all.
     EXPECT_EQ(recognize(norm_probe("[Mark] { (Build"), composed).kind, IntentMarkerKind::None)
         << "an unterminated paren form must not claim a quantum";
 }
@@ -224,24 +229,24 @@ TEST(RunOutcomeGrammar2, ParenExtractorIsStrict)
 TEST(RunOutcomeGrammar2, PayloadExcludesAreWordBounded)
 {
     const ComposedSemantics composed{composed_outcome()};
-    // An un-named wrapper open/close is scaffold, not a step.
+    // invariant: an UN-NAMED wrapper open or close is scaffold, not a step.
     EXPECT_EQ(recognize(norm_probe("[Mark] {"), composed).kind, IntentMarkerKind::None);
     EXPECT_EQ(recognize(norm_probe("[Mark] }"), composed).kind, IntentMarkerKind::None);
-    // A multi-word exclusion entry matches the whole payload.
+    // invariant: a multi-word exclusion entry matches the WHOLE payload.
     EXPECT_EQ(recognize(norm_probe("[Mark] End of Run"), composed).kind, IntentMarkerKind::None);
-    // First-token semantics: an excluded token followed by trailing content still excludes…
+    // invariant: FIRST-TOKEN semantics — an excluded token followed by trailing content still
+    // excludes.
     EXPECT_EQ(recognize(norm_probe("[Mark] { retries"), composed).kind, IntentMarkerKind::None);
-    // …but the boundary is a WORD boundary: a verb merely PREFIXED by an entry is a real step.
+    // invariant: the boundary is nonetheless a WORD boundary, so a verb merely PREFIXED by an
+    // exclusion entry is a real step.
     const auto step{recognize(norm_probe("[Mark] {}able"), composed)};
     EXPECT_EQ(step.kind, IntentMarkerKind::Step)
         << "exclusion must not over-reach past the boundary";
-    // The ordinary verb form is a step with the verbatim remainder payload.
     const auto verb{recognize(norm_probe("[Mark] compile"), composed)};
     EXPECT_EQ(verb.kind, IntentMarkerKind::Step);
     EXPECT_EQ(verb.name, "compile");
 }
 
-// ── scan_run_outcome: last-match-wins, strict word remainder ──
 TEST(RunOutcomeScanTest, LastMarkerWins)
 {
     const ComposedSemantics composed{composed_outcome()};
@@ -272,7 +277,6 @@ TEST(RunOutcomeScanTest, DegenerateCompositionScansNothing)
     EXPECT_FALSE(scan_run_outcome(lines, core).marker_present);
 }
 
-// ── grammar-5: NumericFieldThenRemainder — skip a variable-length numeric field ──
 TEST(RunOutcomeGrammar5, NumericFieldIsSkippedAndThePayloadIsTheRemainder)
 {
     const ComposedSemantics composed{composed_numeric()};
@@ -282,8 +286,9 @@ TEST(RunOutcomeGrammar5, NumericFieldIsSkippedAndThePayloadIsTheRemainder)
         << "the numeric field must be SKIPPED, not folded into the payload — a per-run epoch "
            "inside "
            "the name is the identity storm this extractor exists to prevent";
-    // Field WIDTH is unconstrained: a width window would mirror the instrument that measured the
-    // corpus, and it is anchoring — not the stamp — that excludes the echoed phantoms.
+    // invariant: field WIDTH is unconstrained — a width window would mirror the instrument that
+    // measured the corpus.
+    // invariant: it is ANCHORING, not the stamp, that excludes the echoed phantoms.
     EXPECT_EQ(recognize(norm_probe("mark:7:short_field"), composed).name, "short_field");
     EXPECT_EQ(recognize(norm_probe("mark:123456789012345678:wide_field"), composed).name,
               "wide_field");
@@ -292,19 +297,17 @@ TEST(RunOutcomeGrammar5, NumericFieldIsSkippedAndThePayloadIsTheRemainder)
 TEST(RunOutcomeGrammar5, NumericFieldShapeFailuresDeclineTheRow)
 {
     const ComposedSemantics composed{composed_numeric()};
-    // The wireshark class: an unexpanded `%s` / `$(date +%s)` where the stamp belongs. DECLINED —
-    // structure present, stamp absent — never mis-parsed into a section named after a shell
-    // expression.
+    // invariant: an unexpanded shell expression where the stamp belongs is DECLINED — the
+    // structure is present and the stamp is absent.
+    // invariant: it is never mis-parsed into a section named after a shell expression.
     EXPECT_EQ(recognize(norm_probe("mark:%s:prepare_executor"), composed).kind,
               IntentMarkerKind::None);
     EXPECT_EQ(recognize(norm_probe("mark:$(date +%s):prepare_executor"), composed).kind,
               IntentMarkerKind::None);
-    // No separator after the digits.
     EXPECT_EQ(recognize(norm_probe("mark:1784657178"), composed).kind, IntentMarkerKind::None);
-    // No digits at all.
     EXPECT_EQ(recognize(norm_probe("mark::prepare_executor"), composed).kind,
               IntentMarkerKind::None);
-    // An empty payload is not a quantum.
+    // invariant: an EMPTY payload is not a quantum.
     EXPECT_EQ(recognize(norm_probe("mark:1784657178:"), composed).kind, IntentMarkerKind::None);
     EXPECT_EQ(recognize(norm_probe("mark:1784657178:\r"), composed).kind, IntentMarkerKind::None);
 }
@@ -312,14 +315,16 @@ TEST(RunOutcomeGrammar5, NumericFieldShapeFailuresDeclineTheRow)
 TEST(RunOutcomeGrammar5, TheCarriageReturnTerminatorAndOptionGroupAreDropped)
 {
     const ComposedSemantics composed{composed_numeric()};
-    // The CR is the producer's marker TERMINATOR (`\r` + an erase-line escape canon's SRC-D-TID-11
-    // ingest strip already removed). Left in, it would ride into every payload and into the
-    // alignment key.
+    // invariant: the carriage return is the producer's marker TERMINATOR, paired with an erase-line
+    // escape that canon's ingest strip has already removed.
+    // invariant: left in, it would ride into every payload and into the alignment key.
+    // refs: SRC-D-TID-11
     EXPECT_EQ(recognize(norm_probe("mark:1784657178:prepare_executor\r"), composed).name,
               "prepare_executor");
-    // TERMINATOR, not a trailing byte to trim: the producer may continue the SAME line with a
-    // human-readable header after the CR. Trimming instead of terminating names the section
-    // `build_tools_section\rTools build` — an alignment key carrying arbitrary prose.
+    // invariant: a TERMINATOR and not a trailing byte to trim — the producer may continue the
+    // SAME line with a human-readable header after it.
+    // invariant: trimming instead of terminating names the section after arbitrary prose, which
+    // makes an alignment key out of it.
     EXPECT_EQ(
         recognize(norm_probe("mark:1784657178:build_tools_section\rTools build"), composed).name,
         "build_tools_section");
@@ -329,16 +334,18 @@ TEST(RunOutcomeGrammar5, TheCarriageReturnTerminatorAndOptionGroupAreDropped)
             .name,
         "log_disk_usage")
         << "the option group is dropped AFTER the CR terminates the payload, not before";
-    // The option group is producer presentation: without the drop, toggling it RENAMES the section.
+    // invariant: the option group is producer PRESENTATION, so without the drop, toggling it
+    // RENAMES the section.
     EXPECT_EQ(recognize(norm_probe("mark:1784657178:build[collapsed=true]\r"), composed).name,
               "build");
     EXPECT_EQ(
         recognize(norm_probe("mark:1784657178:build[hide_duration=true,collapsed=true]"), composed)
             .name,
         "build");
-    // A ']' that closes nothing is content, not a group.
+    // invariant: a closing bracket that closes nothing is CONTENT, not a group.
     EXPECT_EQ(recognize(norm_probe("mark:1784657178:weird]"), composed).name, "weird]");
-    // A group that would consume the WHOLE payload leaves nothing to name → declined.
+    // invariant: a group that would consume the WHOLE payload leaves nothing to name, so it is
+    // declined.
     EXPECT_EQ(recognize(norm_probe("mark:1784657178:[collapsed=true]"), composed).kind,
               IntentMarkerKind::None);
 }
@@ -356,12 +363,11 @@ TEST(RunOutcomeGrammar5, TheEmitDualRoundTripsThroughTheExtractor)
     EXPECT_EQ(back.name, "prepare_executor") << "G2: recognize(render_row(row, p)) must recover p";
 }
 
-// ── grammar-5: PrefixIsVerdict outcome markers + longest-prefix-wins ──
 TEST(RunOutcomeGrammar5, PrefixIsVerdictReadsTheVerdictOffTheRowNotTheRemainder)
 {
     const ComposedSemantics composed{composed_numeric()};
-    // The free-form remainder is exactly what RemainderToken cannot express, and it is the shape a
-    // real terminal failure line has.
+    // invariant: the free-form remainder is exactly what a remainder-token row cannot express, and
+    // it is the shape a real terminal failure line has.
     const std::vector<std::string> failed{"building", "FATAL: Run broke: code 1"};
     const RunOutcomeScan scan{scan_run_outcome(failed, composed)};
     ASSERT_TRUE(scan.marker_present);
@@ -370,25 +376,25 @@ TEST(RunOutcomeGrammar5, PrefixIsVerdictReadsTheVerdictOffTheRowNotTheRemainder)
     EXPECT_TRUE(scan.token.empty()) << "this shape has no remainder token by construction";
     EXPECT_EQ(resolve_run_outcome({}, scan, composed, composed).outcome, RunOutcome::Failure);
 
-    // A bare prefix with NO remainder is still a match (the success form).
+    // invariant: a bare prefix with NO remainder is still a match, which is the success form.
     const std::vector<std::string> ok{"Run finished"};
     EXPECT_EQ(resolve_run_outcome({}, scan_run_outcome(ok, composed), composed, composed).outcome,
               RunOutcome::Success);
 }
 
-// ── The `\r`-anchored outcome line ──────────────────────────────────────────────────────────────
-// Runners predating GitLab 18.9 frame the epilogue with a BARE `\r`, so a `\n`-split line vector
-// carries the terminal verdict MID-ELEMENT. An at-offset-0 test cannot see it, and the miss is
-// silent — the trace reads as having no verdict rather than raising anything. These arms are
-// two-sided: the first was RED before the anchor was widened, the last two are what keeps the
-// widening from being a blanket "search anywhere in the line".
-
+// invariant: older runners frame the epilogue with a BARE carriage return, so a newline-split line
+// vector carries the terminal verdict MID-ELEMENT.
+// invariant: an at-offset-zero test cannot see it, and the miss is SILENT — the trace reads as
+// having no verdict rather than raising anything.
+// invariant: the treatment is two-sided — the arm below was RED before the anchor was widened.
+// invariant: what keeps the widening from becoming a blanket search-anywhere lives in the SIBLING
+// arm that follows this one, not in this test.
 TEST(RunOutcomeGrammar5, AVerdictFramedByABareCarriageReturnIsAnchored)
 {
     const ComposedSemantics composed{composed_numeric()};
-    // One `\n`-line, exactly as a byte-faithful splitter hands it over: the verdict is not at
-    // offset 0, it is behind a lone `\r`. CRLF would MASK this — the `\r` here is deliberately
-    // bare.
+    // invariant: one newline-split line exactly as a byte-faithful splitter hands it over — the
+    // verdict is not at offset 0, it is behind a LONE carriage return.
+    // invariant: a CRLF pair would MASK this, so the byte here is deliberately bare.
     const std::vector<std::string> old_leg{"$ run tests\rFATAL: Run broke: code 1"};
     const RunOutcomeScan scan{scan_run_outcome(old_leg, composed)};
     ASSERT_TRUE(scan.marker_present)
@@ -397,15 +403,17 @@ TEST(RunOutcomeGrammar5, AVerdictFramedByABareCarriageReturnIsAnchored)
     EXPECT_EQ(*scan.verdict, RunOutcome::Failure);
     EXPECT_EQ(resolve_run_outcome({}, scan, composed, composed).outcome, RunOutcome::Failure);
 
-    // The longest-prefix rule composes with the new anchor rather than being bypassed by it.
+    // invariant: the longest-prefix rule COMPOSES with the new anchor rather than being bypassed by
+    // it.
     const std::vector<std::string> aborted{"cleanup\rFATAL: Run broke: stopped"};
     EXPECT_EQ(
         resolve_run_outcome({}, scan_run_outcome(aborted, composed), composed, composed).outcome,
         RunOutcome::Aborted);
 
-    // CRLF is the masking case: a `\n`-splitter has already cut there, leaving the `\r` trailing on
-    // the previous element. That empty trailing segment must anchor nothing, and the verdict must
-    // resolve exactly once off the next element.
+    // invariant: CRLF is the masking case — a newline splitter has already cut there, leaving the
+    // carriage return trailing on the previous element.
+    // invariant: that empty trailing segment must anchor NOTHING, and the verdict must resolve
+    // exactly once off the next element.
     const std::vector<std::string> crlf{"$ run tests\r", "Run finished"};
     EXPECT_EQ(resolve_run_outcome({}, scan_run_outcome(crlf, composed), composed, composed).outcome,
               RunOutcome::Success);
@@ -414,20 +422,21 @@ TEST(RunOutcomeGrammar5, AVerdictFramedByABareCarriageReturnIsAnchored)
 TEST(RunOutcomeGrammar5, TheCarriageReturnAnchorDoesNotBecomeASubstringSearch)
 {
     const ComposedSemantics composed{composed_numeric()};
-    // The widening admits an anchor after `\r` and NOWHERE else. A prefix sitting mid-line with no
-    // delimiter in front of it is prose and must stay unmatched — otherwise the fix would trade a
-    // silent miss for a silent false verdict, which is the worse direction.
+    // invariant: the widening admits an anchor after a carriage return and NOWHERE else.
+    // invariant: a prefix sitting mid-line with no delimiter in front of it is PROSE and must stay
+    // unmatched, or the fix trades a silent miss for a silent false verdict, which is worse.
     const std::vector<std::string> prose{"see also FATAL: Run broke: code 1 in the docs"};
     EXPECT_FALSE(scan_run_outcome(prose, composed).marker_present)
         << "a mid-line prefix with no \\r before it was matched; the anchor became a substring "
            "search. line="
         << prose[0];
 
-    // The anchor is a POSITION, not a second recognizer: whatever a segment resolves to after a
-    // `\r` is exactly what those same bytes resolve to as a line of their own. Asserting the
-    // equivalence rather than a hand-written verdict is what keeps this arm honest — it cannot
-    // drift from the line-start behaviour it is supposed to mirror, including the prefix peel
-    // (timestamp / ANSI / leading space) that `parse_line` applies identically in both positions.
+    // invariant: the anchor is a POSITION, not a second recognizer — whatever a segment resolves
+    // to after a carriage return is what those same bytes resolve to as a line of their own.
+    // invariant: asserting the EQUIVALENCE rather than a hand-written verdict is what keeps this
+    // arm honest, because it cannot drift from the line-start behaviour it mirrors.
+    // invariant: that includes the prefix peel the line parser applies identically in both
+    // positions.
     for (const std::string_view segment : {"FATAL: Run broke: code 1", " FATAL: Run broke",
                                            "Run finished", "not a verdict at all", ""})
     {
@@ -450,16 +459,17 @@ TEST(RunOutcomeGrammar5, TheCarriageReturnAnchorDoesNotBecomeASubstringSearch)
 TEST(RunOutcomeGrammar5, TheCarriageReturnAnchorDoesNotFoldTheByteItAnchorsAfter)
 {
     const ComposedSemantics composed{composed_numeric()};
-    // The `\r` is CONTENT, and anchoring after it must not consume, strip or fold it. The marker
-    // payload extractor treats the same byte as its TERMINATOR, so if the scan had rewritten the
-    // line the recognizer sharing these bytes would see a different string.
+    // invariant: the carriage return is CONTENT, and anchoring after it must not consume, strip or
+    // fold it.
+    // invariant: the marker payload extractor treats the SAME byte as its TERMINATOR, so a scan
+    // that rewrote the line would hand the recognizer sharing these bytes a different string.
     constexpr std::string_view kSectionThenWarning{
         "mark:1784657178:after_script\rWARNING: after_script failed, but job will continue"};
     EXPECT_EQ(recognize(norm_probe(kSectionThenWarning), composed).name, "after_script")
         << "the \\r-anchored scan altered bytes the marker extractor depends on";
 
-    // And that same line carries no verdict: `WARNING: …` is not one of the declared prefixes.
-    // Fusing it with what precedes the `\r` is what would re-manufacture the false positive.
+    // invariant: that same line carries NO verdict, and fusing it with what precedes the carriage
+    // return is what would re-manufacture the false positive.
     const std::vector<std::string> warning{std::string{kSectionThenWarning}};
     EXPECT_FALSE(scan_run_outcome(warning, composed).marker_present)
         << "an after_script WARNING was read as a terminal verdict";
@@ -468,16 +478,16 @@ TEST(RunOutcomeGrammar5, TheCarriageReturnAnchorDoesNotFoldTheByteItAnchorsAfter
 TEST(RunOutcomeGrammar5, LongestPrefixWinsRegardlessOfDeclarationOrder)
 {
     const ComposedSemantics composed{composed_numeric()};
-    // `FATAL: Run broke: stopped` is a strict EXTENSION of `FATAL: Run broke`, and it is declared
-    // AFTER it — so under the pre-grammar-5 "last row that matched overwrites" walk the answer was
-    // a function of where the rows sit in an array. It must now be a function of the bytes.
+    // invariant: the longer prefix is a strict EXTENSION of the shorter and is declared AFTER it,
+    // so under the older last-row-overwrites walk the answer was a function of array position.
+    // invariant: it must now be a function of the BYTES.
     const std::vector<std::string> stopped{"FATAL: Run broke: stopped"};
     const RunOutcomeScan scan{scan_run_outcome(stopped, composed)};
     ASSERT_TRUE(scan.verdict.has_value());
     EXPECT_EQ(*scan.verdict, RunOutcome::Aborted) << "the LONGER prefix must win: a cancellation "
                                                      "announced with the failure prefix is a WRONG "
                                                      "verdict, not a missing one";
-    // And the shorter row still claims everything the longer one does not.
+    // invariant: the shorter row still claims everything the longer one does not.
     const std::vector<std::string> plain{"FATAL: Run broke: code 137"};
     EXPECT_EQ(*scan_run_outcome(plain, composed).verdict, RunOutcome::Failure);
 }
@@ -492,10 +502,10 @@ TEST(RunOutcomeGrammar5, LastVerdictLineStillWinsAcrossLines)
         << "a run has ONE terminal verdict — the LAST one";
 }
 
-// ── resolve_run_outcome: the SRC-D-OUT-RUN-1 strict ladder ──
 TEST(RunOutcomeResolve, AuthoritativeWinsOverPresentDivergentConsole)
 {
-    // The Accumulo #498 SHAPE: authoritative Success vs a present console tail saying Aborted.
+    // invariant: the shape of a real reported case — an authoritative Success against a present
+    // console tail saying Aborted.
     const ComposedSemantics composed{composed_outcome()};
     const std::vector<std::string> lines{"working", "Ended: STOPPED"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
@@ -514,7 +524,8 @@ TEST(RunOutcomeResolve, ConsoleTailIsTheFallback)
     const ComposedSemantics composed{composed_outcome()};
     const std::vector<std::string> lines{"working", "Ended: SHAKY"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
-    // No side-input → rung 2: the console tail recovers the verdict — UNSTABLE stays UNSTABLE.
+    // invariant: with no side input the ladder falls to its second rung, where the console tail
+    // recovers the verdict and an unstable result stays unstable.
     const RunOutcomeResolution res{resolve_run_outcome({.token = ""}, scan, composed, composed)};
     EXPECT_EQ(res.outcome, RunOutcome::Unstable);
     EXPECT_FALSE(res.authoritative);
@@ -534,38 +545,40 @@ TEST(RunOutcomeResolve, UnmappedSideInputSurfacesANoteAndFallsThrough)
     EXPECT_NE(res.note.find("WEIRD"), std::string::npos) << "the note names the offending token";
 }
 
-// ── The HALF-PAIR: a structurally incomplete declaration is a WIRING error and terminates ─────
-//
-// The distinction this arm exists to hold, because the two neighbouring cases have different right
-// answers and collapsing them is what shipped the defect:
-//
-//   ABSENT   (no token, no vocabulary) — a CHOICE. Degrades to Unknown, no note. DN-32.D7.
-//   HALF     (token, no vocabulary)    — a WIRING MISTAKE. **Fatal**, here.
-//   UNMAPPED (token, named, not in it) — a VALUE error. Non-fatal note, ladder continues.
-//
-// The half-pair used to return nullopt "by design". `sift-crawl` then declared exactly that shape
-// on every pair it ever produced: 63 identical-commit pairs, ground truth silence, 60
-// critical/high `regression` rows, and the rule that should have bounded them never ran once. A
-// declaration that resolves nothing while LOOKING like a declaration is the failure mode with no
-// observable.
-//
-// ⚠ THE ARM ASSERTS BOTH THE MESSAGE AND THE DEATH, and that is not belt-and-braces. The
-// measured mutation is exact: degrade the fatal to `return std::nullopt` and the `cerr` line above
-// it survives — so the correct message prints, the process lives, and gtest reports "failed to
-// die" while echoing the full FATAL text. **"It said the right thing" is satisfiable without
-// dying**, and "prints, then continues" is the single most likely accidental refactor of a fatal,
-// because the message and the terminate are two statements and only one of them looks
-// load-bearing.
+// invariant: a structurally incomplete declaration is a WIRING error and TERMINATES.
+// invariant: the three neighbouring cases have different right answers, and collapsing them is what
+// shipped the defect.
+// invariant: ABSENT — no token and no vocabulary — is a CHOICE: it degrades to Unknown with no
+// note.
+// invariant: HALF — a token with no vocabulary — is a WIRING MISTAKE and is fatal here.
+// invariant: UNMAPPED — a token named against a vocabulary it is not in — is a VALUE error: a
+// non-fatal note, and the ladder continues.
+// invariant: the half-pair used to return nothing BY DESIGN, and a downstream crawl then declared
+// exactly that shape on every pair it ever produced.
+// invariant: 63 identical-commit pairs, ground-truth silence, 60 critical or high regression rows,
+// and the rule that should have bounded them never ran once.
+// invariant: A DECLARATION THAT RESOLVES NOTHING WHILE LOOKING LIKE A DECLARATION IS THE FAILURE
+// MODE WITH NO OBSERVABLE.
+// invariant: THE ARM ASSERTS BOTH THE MESSAGE AND THE DEATH, and that is not belt-and-braces.
+// invariant: the measured mutation is exact — degrade the fatal to a plain return and the
+// diagnostic line above it SURVIVES, so the correct message prints and the process lives.
+// invariant: the harness then reports a failure to die while echoing the full text, so IT SAID THE
+// RIGHT THING IS SATISFIABLE WITHOUT DYING.
+// invariant: print-then-continue is the single most likely accidental refactor of a fatal, because
+// the message and the terminate are two statements and only one looks load-bearing.
+// refs: DN-32.D7
 TEST(RunOutcomeResolveDeathTest, AHalfDeclaredVerdictTerminatesNamingTheComposition)
 {
     const ComposedSemantics vocabularies{compose(std::array{kOutcomePkg})};
     const ComposedSemantics composed{vocabularies.for_stream(kSyntheticDialect, {})};
     const std::vector<std::string> lines{"working", "Ended: GOOD"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
-    // A token that WOULD resolve if its vocabulary were named — so the death is caused by the
-    // missing half and by nothing else about the token.
+    // invariant: a token that WOULD resolve if its vocabulary were named, so the death is caused by
+    // the missing half and by nothing else about the token.
     const SideInputVerdict half{.token = "GOOD", .vocabulary = {}};
 
+    // invariant: the message must NAME the composed packages — a fail-closed error the operator
+    // cannot act on is only half the posture.
     EXPECT_DEATH(
         { (void)resolve_run_outcome(half, scan, composed, vocabularies); },
         "declared with NO outcome vocabulary")
@@ -573,8 +586,6 @@ TEST(RunOutcomeResolveDeathTest, AHalfDeclaredVerdictTerminatesNamingTheComposit
            "is half a declaration, not a weak one — and the silent nullopt it used to return is "
            "how 63 crawl pairs went out with every verdict-reading rule disarmed.";
 
-    // The message must NAME the composed packages — a fail-closed error the operator cannot act on
-    // is only half the posture (the transport catalogue's death arm holds the same line).
     EXPECT_DEATH(
         { (void)resolve_run_outcome(half, scan, composed, vocabularies); }, "synthetic_outcome")
         << "the fatal does not list the vocabularies the caller could have named";
@@ -584,10 +595,25 @@ TEST(RunOutcomeResolveDeathTest, AHalfDeclaredVerdictTerminatesNamingTheComposit
            "printed after the damage; it belongs at the one moment it can still be acted on.";
 }
 
-// The ABSENT third state, asserted right beside its fatal sibling so the two cannot be conflated
-// by anyone reading either one. Declaring nothing is not a degenerate half-pair.
+// invariant: the ABSENT third state, asserted right beside its fatal sibling so the two cannot be
+// conflated by anyone reading either one.
+// invariant: declaring NOTHING is not a degenerate half-pair.
 TEST(RunOutcomeResolve, AnAbsentDeclarationDegradesWhereAHalfOneWouldTerminate)
 {
+    // invariant: THIS ARM'S CLAIM WAS INVERTED, and the withdrawn version is recorded rather than
+    // deleted because it was RIGHT about its mechanism and WRONG about its subject.
+    // invariant: it asserted that an undeclared stream cannot resolve a side input, since such a
+    // view carries no concretely-gated outcome row.
+    // invariant: that is true of the CODE, and it described the defect rather than the contract.
+    // invariant: the ruling is that a side input is interpreted by whoever SUPPLIED it, never by
+    // the dialect of whoever wrote the bytes, and this is the case that ruling exists for.
+    // invariant: a crawler holding a platform's own verdict for a raw build log is not missing a
+    // dialect; it is holding a verdict from a declarer the stream never mentions.
+    // invariant: what survives unchanged is the STREAM half — the console-tail marker row IS
+    // dialect-gated, it is absent from this view, and it must stay absent.
+    // invariant: the scan is canon reading the BYTES, and nothing about the side-input rule may
+    // reach it.
+    // refs: DN-32.D6
     const ComposedSemantics vocabularies{compose(std::array{kOutcomePkg})};
     const ComposedSemantics composed{vocabularies.for_stream(kSyntheticDialect, {})};
     const std::vector<std::string> lines{"working", "no epilogue here"};
@@ -605,19 +631,6 @@ TEST(RunOutcomeResolve, AnAbsentDeclarationDegradesWhereAHalfOneWouldTerminate)
 
 TEST(RunOutcomeResolve, ACompletePairResolvesOnAStreamThatDeclaredNoDialect)
 {
-    // ⚠ THIS ARM'S CLAIM WAS INVERTED, and the withdrawn version is recorded rather than deleted
-    // because it was RIGHT about its mechanism and wrong about its subject. It read
-    // *"AnUndeclaredStreamCannotResolveASideInput"* and asserted Unknown + a note: an undeclared
-    // stream's view carries no concretely-gated outcome row, so the token could not resolve. True
-    // of the code, and it described the defect rather than the contract — DN-32.D6 ruled that a
-    // side input is interpreted by whoever SUPPLIED it, never by the dialect of whoever wrote the
-    // bytes, and this is the case that ruling exists for. A crawler holding GitHub's own
-    // `conclusion` for a raw build log is not missing a dialect; it is holding a verdict from a
-    // declarer the stream never mentions.
-    //
-    // What survives unchanged is the STREAM half: the console-tail marker row IS dialect-gated,
-    // it is absent from this view, and it must stay absent — the scan is canon reading the bytes,
-    // and nothing about the side-input rule may reach it.
     const ComposedSemantics vocabularies{compose(std::array{kOutcomePkg})};
     const ComposedSemantics undeclared{vocabularies.for_stream(kUndeclared, {})};
     const std::vector<std::string> lines{"working", "Ended: GOOD"};
@@ -636,6 +649,9 @@ TEST(RunOutcomeResolve, ACompletePairResolvesOnAStreamThatDeclaredNoDialect)
 
 TEST(RunOutcomeResolve, AbsenceIsUnknownWithoutFraming)
 {
+    // invariant: the mapped-to-Unknown shape.
+    // invariant: the token MAPS and its value is Unknown, so the first rung resolves with no
+    // fallback to a stale console tail and no note, because nothing failed.
     const ComposedSemantics composed{composed_outcome()};
     const std::vector<std::string> lines{"no epilogue here"};
     const RunOutcomeResolution res{
@@ -646,8 +662,6 @@ TEST(RunOutcomeResolve, AbsenceIsUnknownWithoutFraming)
 
 TEST(RunOutcomeResolve, MappedToUnknownIsAuthoritative)
 {
-    // The NOT_BUILT shape: the token MAPS, its value is Unknown — rung 1 resolves (no fallback to
-    // a stale console tail), no note (nothing failed).
     const ComposedSemantics composed{composed_outcome()};
     const std::vector<std::string> lines{"Ended: GOOD"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
@@ -659,21 +673,21 @@ TEST(RunOutcomeResolve, MappedToUnknownIsAuthoritative)
     EXPECT_TRUE(res.note.empty());
 }
 
-// ── outcome_regressed: the pass↔fail axis only ──
 TEST(OutcomeRegressed, StrictlyWorseOnTheAxisOnly)
 {
-    // Strictly worse.
+    // invariant: strictly worse on the axis.
     EXPECT_TRUE(outcome_regressed(RunOutcome::Success, RunOutcome::Failure));
     EXPECT_TRUE(outcome_regressed(RunOutcome::Success, RunOutcome::Unstable));
     EXPECT_TRUE(outcome_regressed(RunOutcome::Unstable, RunOutcome::Failure));
-    // Steady or better.
+    // invariant: steady or better is NOT a regression.
     EXPECT_FALSE(outcome_regressed(RunOutcome::Unstable, RunOutcome::Unstable))
         << "steady-flaky is NOT a verdict regression: the axis is pass↔fail, and Unstable→Unstable "
            "did not move along it";
     EXPECT_FALSE(outcome_regressed(RunOutcome::Failure, RunOutcome::Success));
     EXPECT_FALSE(outcome_regressed(RunOutcome::Unstable, RunOutcome::Success));
     EXPECT_FALSE(outcome_regressed(RunOutcome::Failure, RunOutcome::Failure));
-    // Aborted / Unknown are OFF the axis — never a regression in either direction.
+    // invariant: the aborted and unknown classes are OFF the axis and are never a regression in
+    // either direction.
     EXPECT_FALSE(outcome_regressed(RunOutcome::Success, RunOutcome::Aborted));
     EXPECT_FALSE(outcome_regressed(RunOutcome::Aborted, RunOutcome::Failure));
     EXPECT_FALSE(outcome_regressed(RunOutcome::Success, RunOutcome::Unknown));

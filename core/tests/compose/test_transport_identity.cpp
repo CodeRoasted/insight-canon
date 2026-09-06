@@ -1,44 +1,36 @@
-// test_transport_identity.cpp — G1's IDENTITY arm, homed in canon core's compose
-// suite.
-//
-// THE PROPERTY, and why it is the load-bearing half of G1. The transport-envelope contract states
-// it as a MUST:
-//
-//     Two runs ±a transform MUST carry the same `semantic_identity`, or transport-invariance is not
-//     being built.
-//
-// The per-run DECLARATION is PROVENANCE and goes to MetaLog; the transform GRAMMAR (the catalogue)
-// is IDENTITY and enters every composed digest. That quotient is the entire point of the transport
-// vocabulary: it is what lets a stamped stream and an unstamped one be COMPARED. If declaring a
-// transport stack moved `semantic_identity`, every declaration would silently partition the corpus
-// into incomparable halves — and it would do so quietly, since a digest that differs reads as
-// "different ruleset", not as "bug".
-//
-// HOMING (Kleio). UNIT, in `tests/compose/` — not `tests/transport/` and not a corpus gate.
-//   • Not transport's suite: the property is about what `resolve_stream` does to a COMPOSITION, and
-//     `resolve_stream` is compose's (`compose.cpp`). Transport's suite owns the peel's shape.
-//   • Not a corpus gate: real bytes cannot make this property more true. `semantic_identity` is a
-//     hash of the RULESET, computed before the first line is read — it is not a function of any
-//     input bytes at all, so scoring it over 22 000 logs would measure nothing the empty
-//     composition does not already settle, at ~4 orders of magnitude more cost. Homing it on the
-//     corpus because the sibling arms live there would be homing by neighbourhood, not by property.
-//
-// VACUITY — what makes the green mean something. "Two things are equal" is the classic can't-FAIL
-// shape: it stays green if `identity()` returned a constant, or if `resolve_stream` ignored its
-// declaration entirely. Two permanent arms close that:
-//   • `IdentityIsSensitiveToTheRuleset` — a one-byte change to a ROW must MOVE the digest. This is
-//     the opposed arm: no implementation satisfies both it and the invariance arms by accident.
-//   • `DeclarationCoordinatesAreActuallyRead` — an unknown dialect FATALS, proving the declaration
-//     reaches `resolve_stream` rather than being dropped on the floor. An invariance claim about an
-//     argument nobody reads is worthless.
-//
-// Determinism: byte-only. Synthetic manifests authored here, no packages linked (a core test never
-// links the semantic packages — that would invert the dependency arrow), no RNG, no clock, no
-// float.
 
+// invariant: the transport IDENTITY arm, homed in the compose suite, and it is the load-bearing
+// half of the transport gate.
+// invariant: THE PROPERTY IS A MUST — two runs differing only by a declared transform must carry
+// the SAME semantic identity, or transport-invariance is not being built.
+// invariant: the per-run DECLARATION is PROVENANCE and goes downstream; the transform GRAMMAR is
+// IDENTITY and enters every composed digest.
+// invariant: that quotient is the entire point of the transport vocabulary — it is what lets a
+// stamped stream and an unstamped one be COMPARED.
+// invariant: if declaring a transport stack moved the identity, every declaration would silently
+// partition the corpus into incomparable halves.
+// invariant: it would do so QUIETLY, since a digest that differs reads as a different ruleset
+// rather than as a bug.
+// invariant: HOMED as a UNIT test in the compose suite — not in transport's suite, because the
+// property is about what stream resolution does to a COMPOSITION, which is compose's code.
+// invariant: transport's own suite owns the peel's SHAPE.
+// invariant: NOT a corpus gate, because real bytes cannot make this property more true — the
+// identity is a hash of the RULESET, computed before the first line is read.
+// invariant: it is not a function of any input bytes at all, so scoring it over tens of thousands
+// of logs would measure nothing the empty composition does not already settle.
+// invariant: that would cost about four orders of magnitude more, and homing it on the corpus
+// because the sibling arms live there would be homing by NEIGHBOURHOOD rather than by PROPERTY.
+// invariant: VACUITY — two things are equal is the classic can't-FAIL shape, staying green if the
+// identity returned a constant or if stream resolution ignored its declaration entirely.
+// invariant: two permanent arms close that — a one-byte change to a ROW must MOVE the digest, and
+// an unknown dialect must FATAL, proving the declaration is actually read.
+// invariant: no implementation satisfies the opposed arm and the invariance arms by accident, and
+// an invariance claim about an argument nobody reads is worthless.
+// invariant: determinism — byte-only, synthetic manifests authored here, no packages linked
+// because a core test never links them, and no RNG, clock or float.
 #include <gtest/gtest.h>
 
-import insight.canon.test; // facade (compose / resolve_stream / transport) + spi (row grammar)
+import insight.canon.test;
 
 using insight::StructuralRole;
 using insight::semantic::compose;
@@ -55,14 +47,13 @@ namespace
 
 constexpr std::string_view kGhaTransform{"api-rfc3339-line-prefix"};
 
-// The declared stack's backing array — `IngestDeclaration::stack` is a span, so this must outlive
-// every declaration built from it.
+// invariant: the declared stack's backing array must OUTLIVE every declaration built from it,
+// because the declaration's stack field is a span.
 constexpr std::array<std::string_view, 1> kDeclaredGha{{kGhaTransform}};
 
-// ── A synthetic package, and the same package with ONE byte changed ────────────────────────────
-// Core tests compose SYNTHETIC manifests to exercise the algorithms
-// vocabulary-free. `kRolesMutated` differs from `kRoles` in exactly one character of one prefix —
-// the smallest change that must still move the digest.
+// invariant: core tests compose SYNTHETIC manifests to exercise the algorithms vocabulary-free.
+// invariant: the mutated package differs in exactly ONE character of one prefix — the smallest
+// change that must still move the digest.
 constexpr std::array<StructuralRoleRow, 1> kRoles{
     {{.prefix = "<TRANSPORT-A>", .role = StructuralRole::GroupBegin, .dialect_gate = kAnyDialect}}};
 constexpr std::array<StructuralRoleRow, 1> kRolesMutated{
@@ -75,10 +66,6 @@ constexpr SemanticPackageManifest kPackageMutated{
 
 constexpr std::array<SemanticPackageManifest, 1> kPackages{{kPackage}};
 constexpr std::array<SemanticPackageManifest, 1> kPackagesMutated{{kPackageMutated}};
-
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-// The MUST — ±a declared transform leaves semantic_identity untouched
-// ══════════════════════════════════════════════════════════════════════════════════════════════
 
 TEST(TransportIdentity, DeclaringATransportStackDoesNotMoveSemanticIdentity)
 {
@@ -117,9 +104,10 @@ TEST(TransportIdentity, DeclaringATransportStackDoesNotMoveSemanticIdentity)
 
 TEST(TransportIdentity, TheDegenerateCompositionCarriesTheSameInvariance)
 {
-    // The zero-package composition is a defined, runnable state whose identity is the hash of just
-    // the version components. The invariance must hold there too — otherwise it would hold only
-    // when some row happened to dominate the digest.
+    // invariant: the zero-package composition is a defined, runnable state whose identity is the
+    // hash of just the version components.
+    // invariant: the invariance must hold THERE too, or it would hold only when some row happened
+    // to dominate the digest.
     const ComposedSemantics composed{compose({})};
     const auto baseline{composed.identity()};
 
@@ -132,13 +120,10 @@ TEST(TransportIdentity, TheDegenerateCompositionCarriesTheSameInvariance)
         << "  declared : " << with.semantics.identity_hex();
 }
 
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-// The OPPOSED arms — what stops the invariance above from being vacuous
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-
-// If `identity()` were a constant, or the hash ignored row content, every assertion above would
-// stay green while the digest guaranteed nothing. This arm demands the OPPOSITE outcome from the
-// same machinery: one byte of one row must move it.
+// invariant: if the identity were a constant, or the hash ignored row content, every assertion
+// above would stay green while the digest guaranteed nothing.
+// invariant: this arm demands the OPPOSITE outcome from the same machinery — one byte of one row
+// must move it.
 TEST(TransportIdentity, IdentityIsSensitiveToTheRuleset)
 {
     const ComposedSemantics composed{compose(kPackages)};
@@ -151,13 +136,16 @@ TEST(TransportIdentity, IdentityIsSensitiveToTheRuleset)
         << "  '<TRANSPORT-B>' : " << mutated.identity_hex();
 }
 
-// The other half of vacuity: `resolve_stream` must actually READ the declaration. An invariance
-// over an argument that is dropped on the floor proves nothing at all. An unknown dialect fatals
-// (canon VERIFIES a declared coordinate, never infers it), which is observable proof it is read.
+// invariant: the other half of vacuity — stream resolution must actually READ the declaration,
+// since an invariance over an argument that is dropped on the floor proves nothing at all.
+// invariant: an unknown dialect FATALS, because canon VERIFIES a declared coordinate and never
+// infers it, which is observable proof that it is read.
 TEST(TransportIdentityDeathTest, DeclarationCoordinatesAreActuallyRead)
 {
     const ComposedSemantics composed{compose(kPackages)};
 
+    // invariant: the message must NAME the composed vocabulary, or the fail-closed posture is
+    // unactionable.
     EXPECT_DEATH(
         {
             (void)resolve_stream(
@@ -168,7 +156,6 @@ TEST(TransportIdentityDeathTest, DeclarationCoordinatesAreActuallyRead)
         << "an unknown declared dialect must fatal — this is also what proves resolve_stream reads "
            "the declaration at all, which the invariance arms depend on";
 
-    // The message must name the composed vocabulary, or the fail-closed posture is unactionable.
     EXPECT_DEATH(
         {
             (void)resolve_stream(
@@ -177,9 +164,10 @@ TEST(TransportIdentityDeathTest, DeclarationCoordinatesAreActuallyRead)
         },
         "transport_identity_fixture");
 
-    // A KNOWN dialect must NOT fatal: an unknown name is a MISTAKE, an absent one is a CHOICE, and
-    // a correct one is neither. Without this leg the death arm above would also pass against an
-    // implementation that fataled on every dialect.
+    // invariant: a KNOWN dialect must NOT fatal — an unknown name is a MISTAKE, an absent one is
+    // a CHOICE, and a correct one is neither.
+    // invariant: without this leg the death arm above would also pass against an implementation
+    // that fataled on every dialect.
     const ResolvedStream resolved{resolve_stream(
         composed,
         IngestDeclaration{.stack = {}, .dialect = "transport_identity_fixture", .channel = {}})};

@@ -1,19 +1,19 @@
-// test_where_wiring.cpp — MaskConfig.recognize_test_where, the flag-gated identity-derived WHERE on
-// the tokenizer (SRC-II-8 — the WHERE has ONE source, the identity spine). REPLACES the 1.7.4
-// tests/identity/test_where_wiring.cpp, re-homed to core as a SYNTHETIC-composition mechanism test
-// after the SRC-SP-1 fix removed the dialect gate (was `event.format == LogFormat::GitHubActions`;
-// now purely `component.empty()` in `tokenizer_engine.cpp`). The property is
-// now FORMAT-AGNOSTIC, so it is a core Tokenizer property provable with a synthetic location row
-// over a RawText line — no package linked. This test is also the SRC-SP-1 regression guard: a line
-// WITHOUT a native component (RawText here, any future dialect tomorrow) gets the identity-derived
-// WHERE, proving the wiring never re-acquires a dialect literal.
-//
-// DEFAULT-OFF is the load-bearing invariant — the flag off leaves component byte-identical, so the
-// gated block stays additive and the wire version does not move. Determinism: byte-only, no
-// RNG/clock/float.
+// invariant: the flag-gated, identity-derived WHERE on the tokenizer — the WHERE has ONE source,
+// which is the identity spine.
+// invariant: re-homed to core as a SYNTHETIC-composition mechanism test after the fix removed the
+// dialect gate, which used to compare the event's format against one real ecosystem.
+// invariant: the condition is now purely an EMPTY component, so the property is FORMAT-AGNOSTIC and
+// provable with a synthetic location row over a raw-text line, with no package linked.
+// invariant: this test is also the regression guard for that fix.
+// invariant: a line WITHOUT a native component gets the identity-derived WHERE, proving the wiring
+// never re-acquires a dialect literal.
+// invariant: DEFAULT-OFF is the load-bearing invariant — with the flag off the component is
+// byte-identical, so the gated block stays ADDITIVE and the wire version does not move.
+// invariant: determinism — byte-only, with no RNG, clock or float.
+// refs: SRC-II-8, SRC-SP-1
 #include <gtest/gtest.h>
 
-import insight.canon.test; // facade (compose / Tokenizer / recognize_location) + spi (row grammar)
+import insight.canon.test;
 
 using insight::LogFormat;
 using insight::semantic::compose;
@@ -29,9 +29,8 @@ namespace
 {
 constexpr std::size_t kArenaSize{64U * 1024U};
 
-// A synthetic location family (vocabulary-free — NOT any real framework): `<base>.chk.aa`. The
-// composed row drives canon's TestSpecExtension algorithm; the point is the WIRING, not the
-// vocabulary.
+// invariant: a synthetic location family, vocabulary-free and NOT any real framework's, so the
+// composed row drives canon's algorithm and the point is the WIRING and not the vocabulary.
 constexpr std::array<std::string_view, 1> kInfix{".chk."};
 constexpr std::array<std::string_view, 1> kExt{"aa"};
 constexpr std::array<LocationRow, 1> kLocations{{{.kind = LocationMatchKind::TestSpecExtension,
@@ -55,19 +54,21 @@ constexpr SemanticPackageManifest kManifest{.name = "synth_loc",
     return compose(manifests);
 }
 
-// A line with a synthetic test-file token that routes to RawText (no native component) — the
-// empty-component tier the identity-derived WHERE populates. Format-agnostic by construction
-// (RawText, not GitHubActions) — the SRC-SP-1 regression guard.
+// invariant: a line whose synthetic test-file token routes to raw text and carries no native
+// component — the empty-component tier the identity-derived WHERE populates.
+// invariant: FORMAT-AGNOSTIC by construction, which is the regression guard.
+// refs: SRC-SP-1
 constexpr std::string_view kTestLine{"PASS src/auth/login.chk.aa"};
 constexpr std::string_view kNonTestLine{"Syncing repository acme/widget"};
-// The same test-file token with a producer's annotation glued to it, no separator — the shape that
-// put `##[error]fs/rc/rcserver/rcserver_test.go` on a published alert's WHERE. The marker is
-// spelled here as DATA on a probe line, never as a rule: no package is linked, so nothing in this
-// binary knows what `##[error]` means.
+// invariant: the same token with a producer's annotation glued to it and no separator — the shape
+// that put an annotation on a published alert's WHERE.
+// invariant: the marker is spelled here as DATA on a probe line and NEVER as a rule, because no
+// package is linked and nothing in this binary knows what it means.
 constexpr std::string_view kAnnotatedTestLine{"##[error]src/auth/login.chk.aa:104:"};
 } // namespace
 
-// ── Flag ON: the identity-derived test-file WHERE populates the empty component (ANY format) ──
+// invariant: with the flag ON the identity-derived test-file WHERE populates the empty component,
+// under ANY format.
 TEST(WhereWiring, FlagOnPopulatesTestFileWhereOnEmptyComponentLine)
 {
     ArenaAllocator arena{kArenaSize};
@@ -82,12 +83,12 @@ TEST(WhereWiring, FlagOnPopulatesTestFileWhereOnEmptyComponentLine)
         << "identity-derived WHERE not populated; component=\"" << ev.component << '"';
 }
 
-// ── Default-OFF: no WHERE populated — the byte-identical invariant ──
+// invariant: DEFAULT-OFF populates no WHERE, which is the byte-identical invariant.
 TEST(WhereWiring, FlagOffLeavesComponentEmpty)
 {
     ArenaAllocator arena{kArenaSize};
     const ComposedSemantics sc{composed()};
-    Tokenizer tokenizer{arena, MaskConfig{}, sc}; // default → recognize_test_where = false
+    Tokenizer tokenizer{arena, MaskConfig{}, sc};
     const auto result{tokenizer.process_line(kTestLine)};
     ASSERT_TRUE(result.has_value()) << result.error();
     EXPECT_TRUE(result.value().component.empty())
@@ -95,10 +96,11 @@ TEST(WhereWiring, FlagOffLeavesComponentEmpty)
         << result.value().component << '"';
 }
 
-// ── The axis carries the LOCATION alone: a glued producer annotation never enters `component` ──
-// The end-to-end leg of the same property `test_semantic_walkers.cpp` pins on the algorithm: what a
-// consumer reads off the WHERE axis is the path, not the path plus whatever the producer welded to
-// its front.
+// invariant: the axis carries the LOCATION alone, so a glued producer annotation never enters the
+// component.
+// invariant: this is the END-TO-END leg of the property the walker suite pins on the algorithm.
+// invariant: what a consumer reads off the WHERE axis is the path, not the path plus whatever the
+// producer welded to its front.
 TEST(WhereWiring, FlagOnWhereCarriesTheLocationWithoutTheGluedAnnotation)
 {
     ArenaAllocator arena{kArenaSize};
@@ -113,7 +115,7 @@ TEST(WhereWiring, FlagOnWhereCarriesTheLocationWithoutTheGluedAnnotation)
         << insight::to_string(ev.format) << ')';
 }
 
-// ── No false WHERE: a non-test line stays empty even with the flag ON ──
+// invariant: a NON-test line stays empty even with the flag ON, so no false WHERE is manufactured.
 TEST(WhereWiring, FlagOnNonTestLineStaysEmpty)
 {
     ArenaAllocator arena{kArenaSize};
