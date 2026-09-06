@@ -2835,6 +2835,306 @@ and survives the unit, which is why the unit was takeable without a range.
 `registry_grammar_lint` 0 failures and `docs_lint` 0 failures, both from the workspace root, both
 immediately before the push.
 
+---
+
+
+## Unit 17 — `semantic/github/` (11 files, 618 comment lines, 603 would-be violations) — the run's largest package, source and tests in one unit, and the conversion repaired a citation that named the wrong slot
+
+The GitHub-Actions dialect package, converted WHOLE on `OPS-8.S2`'s answer-key ground and on a
+second ground the step also names: the nine test files assert on the rows the module interface and
+`github.dialect.yaml` declare, and four of the test headers carried the same argument as the two
+source headers, so converting `src/` alone would have left an answer key one directory away.
+
+| file | comment lines HEAD → gate | violations | split |
+|---|---|---|---|
+| `src/github.cppm` | 40 → 13 | 39 | bare 34, spacer 5 |
+| `src/github_provenance.cpp` | 45 → 16 | 43 | bare 37, spacer 5, suppression-without-why 1 |
+| `tests/conformance.cpp` | 7 → 4 | 6 | bare 6 |
+| `tests/test_github_declared_ingest.cpp` | 72 → 19 | 71 | bare 64, spacer 5, trailing 2 |
+| `tests/test_github_echoed_source.cpp` | 33 → 6 | 32 | bare 30, trailing 2 |
+| `tests/test_github_manifest_shape.cpp` | 40 → 8 | 39 | bare 34, spacer 5 |
+| `tests/test_github_markers.cpp` | 68 → 18 | 67 | bare 62, spacer 3, trailing 2 |
+| `tests/test_github_outcome.cpp` | 38 → 25 | 35 | bare 35 |
+| `tests/test_github_roles.cpp` | 49 → 14 | 47 | bare 43, spacer 2, trailing 2 |
+| `tests/test_github_round_trip.cpp` | 20 → 8 | 19 | bare 15, trailing 3, suppression-without-why 1 |
+| `tests/test_masked_span_census.cpp` | 206 → 44 | 205 | bare 170, spacer 21, trailing 14 |
+| **total** | **618 → 175** | **603** | |
+
+After: **175 comment lines, 0 would-be violations** — `pre` 3 · `post` 4 · `invariant` 42 ·
+`assert` 18 · `note` 14 · `refs` 23 · 58 continuations · 13 tool forms. Repo-level delta
+**10 633 → 10 030 = exactly 603**, the unit's own count.
+
+### The DERIVED token census (`OPS-8.S4`), and four suppressions, every one measured with a control
+
+The census was derived from the gates rather than read off the step's list: every marker constant
+in the superproject's `scripts/` that is read out of **comment text** — `DETERMINISM-ALLOW`
+(`random_determinism_lint.py`, `wallclock_lint.py`), `LOG-SEAT-ALLOW` (`log_seat_routing_lint.py`),
+`CLOSURE MODEL` (`closure_declaration_lint.py`), `pin-coherence: mirrors` and
+`INV-17-EXEMPT-OBJECT-STORE` (`pin_coherence.py`), plus two this run added by enumerating the
+same directory — `retired-structure-lint: allow` (`retired_structure_lint.py`) and
+`registry-lint: allow` (`registry_grammar_lint.py`) — and `clang-format off`, `wall-clock:`, SPDX
+and the `/*name*/` forms. This repo's own five gate scripts were read too
+(`insight-canon/scripts/*.sh`); none reads a comment-text marker, and the one that reads comments
+at all (`sp1_semantic_unawareness_lint.sh`) scans COMMENT-STRIPPED code and excludes `semantic/`
+by scope. **Every marker has a population of ZERO in these eleven files.** Tool forms present:
+10 namespace closers and 2 `/*failing=*/` parameter names, unchanged 12 → 12.
+
+`NOLINT` before **7**, after **1**, and each of the four sites was measured rather than argued.
+`malf lint` prunes `tests/` by policy in this repo, so the reader of a directive in a test file is
+clangd; `src/` is inside the gate's own scan surface.
+
+**The one that is LOAD-BEARING and was KEPT.** `src/github_provenance.cpp` carries
+`NOLINTNEXTLINE(bugprone-exception-escape)` above `parse_sgr_params`. The check is ARMED in the one
+shared `.clang-tidy` (`bugprone-*`, not disabled), so the check-inventory argument can only ever
+license a DELETION and the TU had to be run twice
+(`clang-tidy-21 -p semantic/github/build-clang21-libcxx-release --checks='-*,bugprone-exception-escape'`,
+in place, directive TEXT replaced and the code untouched):
+
+| run | main-file diagnostics |
+|---|---|
+| with the directive | **0** (`Suppressed … 1 NOLINT`) |
+| with the directive disarmed | **1** — `an exception may be thrown in function 'parse_sgr_params' which should not throw exceptions`, traced through `string_view::substr` → `__throw_out_of_range` |
+
+The run is its own positive control: the check is silent when armed and fires when disarmed, so
+neither reading is a pair of uninformative zeros. The directive stays, re-homed under a `note:`
+that states the why — `params_begin <= cur` holds by construction, so the `substr` cannot throw —
+and that `note:` sits immediately above the directive with nothing between them, which is what the
+gate reads.
+
+**The three that silence NOTHING and were DELETED with the measurement.** `tests/conformance.cpp`,
+`tests/test_github_round_trip.cpp` and `tests/test_github_manifest_shape.cpp` each open a
+`NOLINTBEGIN` region and close it with `NOLINTEND`. All three directives are **BARE** — they name
+no check, so they suppress every armed one and the inventory argument is unavailable. Two of the
+three openers sit MID-LINE inside a bare prose block, so the strip removes the opener with the
+prose and keeps the orphan closer, which is `OPS-8.O3`'s first lesson reproduced twice more. Each
+TU was run in place against the RELEASE database
+(`insight-canon/build-clang21-libcxx-release/compile_commands.json`), with the directive text
+renamed and the code untouched:
+
+| file | with the region | with it disarmed | reachability probe |
+|---|---|---|---|
+| `conformance.cpp` | 0 | 0 | a `const int qq{1};` inserted INSIDE the region: **suppressed armed, reported disarmed** (`readability-identifier-length`) |
+| `test_github_round_trip.cpp` | 0 | 0 | same probe, same result |
+| `test_github_manifest_shape.cpp` | 0 | 0 | same probe, same result |
+
+**The probe is what makes the two zeros carry information, and it is a stronger control than an
+out-of-region one.** A control that fires OUTSIDE the region proves only that the instrument runs;
+a probe INSIDE it proves the region is armed, reachable and being read — so `0 with` and
+`0 without` means *this region has no subject*, not *the measurement could not see it*. All six
+directives are deleted with that evidence, and the orphan-closer problem dissolves rather than
+being re-homed.
+
+### The stripper cross-check (`OPS-8.S5`), held NON-vacuously
+
+Removed 39 + 42 + 6 + 71 + 32 + 39 + 67 + 35 + 47 + 18 + 205 = **601**. The unit's kept violation
+classes are the **2** `suppression-without-why` sites, so the identity is `601 == 603 − 2` and it
+holds **with something actually subtracted** — the shape the step warns is vacuous when a unit has
+no suppression at all. Kept: 15 (13 tool forms + those 2 suppressions), and the 2 were cleared from
+the draft BEFORE the claims script ran, so nothing landed twice and no claim landed between a
+directive and the line it suppresses.
+
+### The address census (`OPS-8.S7.3b`), outbound and inbound
+
+Outbound, **exit 0, nothing lost, six added**. The additions are repairs rather than decoration:
+`F-SRC-insight-canon:test_transport_peel_equivalence_gate.cpp` and
+`F-SRC-insight-canon:test_run_outcome.cpp` replace raw paths that prose carried;
+`BIB:determinism_model` replaces the bare sigil `F5`, which is the RETIRED spelling of the
+determinism model's MUST catalogue (the live bible renames them `M1`–`M9` and the `F5-M` mapping
+survives only in the attic) — the same disposition this repo's earlier units took;
+`ADR-18`, `ADR-18.D4` and `ADR-22` make addresses out of rules the prose named in words.
+
+Two `LOST` lines appeared on the first pass and both were repaired before the unit was gated a
+second time, which is the census doing exactly what it exists for: `ADR-17` (the semantic-package
+ADR) had been refined away to `ADR-17.D1` in both source files, and `ADR-8` (corpus gates, oracles
+and measurement validity) had been dropped when the frozen-gate pointer became an `F-SRC-` file
+address. A file address names WHERE; it does not name the RULE, and the rule is what a later reader
+needs. Both are back, beside the address.
+
+The same prose also pointed at `corpus_backed_gates.md § 5`. That file exists only under the
+superproject's frozen record shelf, so the pointer is best-effort provenance that is owed nothing,
+and `ADR-8` is its live owner — the pointer is deleted and the rule address kept.
+
+Inbound: **255 mentions, every one read as a lead**. Three classes and one finding.
+
+
+* **A citation the conversion REPAIRED rather than carried.** `src/github.cppm` attributed
+  *"the projection is an `.inc` in a hand-written wrapper, never a generated `.cppm`, because a
+  generated module interface unit must be SCANNED before it exists"* to `DN-17.D19`. That slot is
+  *"the determinism MUSTs the schema inherits, the two it adds, and the tool-split
+  recommendation"*; it says nothing about `.inc` versus `.cppm` and nothing about scanning. The
+  argument — with the scanner hazard, the named-modules failure family, and the wrapper's
+  declaration turning a missing hook into a compile error rather than a link error — is owned by
+  **`DN-17.D16`**, the code-tier reference clause. `DN-17.D19` is not deleted: its MUST 7 (*BUILT,
+  never committed*) is the right address for the OTHER half of the same sentence, and it now sits
+  beside that half. Confirmed independently at `STU-15.A5`, which names `DN-17.D16` for the same
+  `static_assert`. **A false attribution is a finding, not a token swap** (`OPS-8.O5`) — and this
+  one was created by prose, not by the conversion, which is why it is recorded here.
+* **Two lines a CLOSED study had already ruled dead, found by the inbound leg.**
+  `technical_docs/studies/015-github-cppm-argument-inventory.md` is Kleio's pre-registered
+  disposition of this file's comment blocks. Its `B04` residue statement rules that the seam's
+  `ProvenanceHook` signature restatement **dies as a mirror** (the projection pins the signature
+  with a `static_assert`) and that the hook's location is carried as DATA
+  (`code_tier.echoed_source.unit`), a better home than the comment it came from. Its `B01` rules
+  the `export import insight.canon.spi` rationale dead by construction. The first draft of this
+  unit had written the first two as an `invariant:` and a `note:`; both were withdrawn on that
+  reading, and the third had already been held. The seam keeps only what the study leaves standing:
+  the compile-error argument, addressed to `DN-17.D16`, and a pointer to the declaration's own
+  `code_tier.echoed_source.why`.
+* **Line coordinates into these files** appear on the superproject's two FROZEN RECORD SHELVES
+  (`technical_docs/history/`, `technical_docs/audits/`). A record states what was true when it was
+  written, so a moved line does not falsify it and no repair is owed — and this ledger may not cite
+  into those shelves either, which is why the point is made in words here rather than pointed at.
+* **`F-SRC-` addresses into these files** stand in five design notes and one study. Every one rests
+  on code (a symbol, a fixture set, a `TEST` name), not on prose this unit deleted, and the address
+  form survives this and every later conversion.
+
+### Three carried claims deleted as FALSE, each measured at the artifact rather than reasoned
+
+1. **`tests/test_masked_span_census.cpp` — *"this SKIPS cleanly when the mount is absent — green in
+   CI and on every clone."*** The code beside it does `FAIL() << kUnmounted;`. The file carries no
+   `GTEST_SKIP` at all, and the CMakeLists records the Founder's ruling of 2026-09-04 that replaced
+   the skip precisely because *"a gtest skip exits 0 and ctest counts a skipping case as passed"*.
+   TRUE when written, falsified by a later ruling — `OPS-8.O3`'s *the world moved* class, which a
+   coherence check cannot find and a *when was this last measured* question does.
+2. **The same file — *"THE INSTRUMENT'S OWN PROOF … runs with no mount, on every clone."*** Measured
+   with `ctest -N`: the package registers 35 cases; `-L corpus` returns **3** and `-LE corpus`
+   returns **32**, and all three `MaskedSpanCensus` cases carry the label, the two mount-free ones
+   included. `malf test` runs `-LE corpus` (`malf/malf`), so those two run only under
+   `malf test --corpus`. The replacement line states the measured truth and nothing more.
+3. **`tests/test_github_outcome.cpp` — *"the shapes the composed FormatDetector routes to
+   GitHubActions (the dialect latch's input)"*** above `gha_console`. This package ships **no format
+   strategy** (`kManifest.strategy == nullptr`, asserted twice inside this very unit), so there is
+   nothing for a detector to route to and no GHA dialect latch; `RunOutcomeScan` (`core/api/canon.cppm`)
+   carries no `LogFormat` member at all. The same file contradicts it forty lines lower. Deleted,
+   and the true statement is the one now carried at the degenerate-console assertion.
+
+### A carried measurement re-derived rather than deleted, and it survived
+
+`tests/test_github_declared_ingest.cpp` carried *"Across the D11 full slice (4 082 logs /
+22 490 937 lines) the `::…::` forms plus `##[notice]` lead a line 41 times in total, and
+`::notice::` occurs NOWHERE AT ALL."* A workspace-wide sweep found no document stating those two
+counts, which is `OPS-8.S9`'s *unsourced measurement is deleted and becomes a finding* shape — and
+that disposition would have been WRONG. The corpus is mounted at a desk, so the figures were
+re-derived at the bytes rather than looked up: **4 082** `*.annotated.log` members, **22 490 937**
+lines, **41** lines whose peeled head is one of the five lifted forms, and **0** occurrences of
+`::notice::` anywhere in the corpus. Every figure matches to the unit. The claim is carried, with
+its coordinate, as the reason this file is the only falsifier for half the level-lift vocabulary.
+The two figures it rests on that ARE documented — 4 082 in
+`core/data/corpora/ci-revert/README.md` and 22 490 937 in
+`core/tests/transport/test_transport_peel_equivalence_gate.cpp` — were checked at those artifacts too.
+
+**What this cost, stated because it is the general lesson**: the *widen the search past the repo
+boundary* rule (`OPS-8.O3`) finds a claim's DOCUMENT. It cannot find a claim whose only source is
+the measurement itself, and the test that saves such a claim is *can I re-derive it today* — which
+here meant running the count, not reading harder.
+
+
+### Interrogation — two readers, 59 questions, and the SECOND was spawned because the first appeared dead
+
+The unit was split across two cold readers on `OPS-8.S8`'s reader-load ground, each able to answer
+from its own subset: **reader A** took the two source files and six tests
+(31 questions), **reader B** took `test_github_declared_ingest.cpp`,
+`test_github_echoed_source.cpp` and `test_masked_span_census.cpp` (28 questions). Both prompts
+carried the unconditional exclusion globs and the disclosure clause.
+
+**59 recovered · 0 not recovered · 0 wrong.** Scored from the per-question evidence, never from a
+reader's summary. Both transcripts: `GIT COMMANDS RUN: none`.
+
+**Both readers disclosed the SAME leak, and it is one an exclusion list cannot close.** Each ran
+`ls technical_docs/adr/` and saw `026-code-doctrine.md` as a **filename** in the listing; neither
+opened it and no line of its content was displayed. A glob exclusion governs recursive SEARCH; a
+directory listing is not a search, so the prompt has no clause that reaches it. The leak is
+harmless — a filename carries no answer — but it is the first measured case of the exclusion
+mechanism having a hole rather than being circumvented, and it is on the record only because both
+prompts carry the disclosure clause.
+
+**One answer looked like a conviction and was not.** Reader A's answer on the two composition
+helpers in `test_github_outcome.cpp` says that swapping them at that call site is a **silent
+no-op**, because `map_outcome_token_in` re-derives its own view through `for_stream` and
+`for_stream` is idempotent. Read against the tree, that is exactly the `assert:` this conversion
+wrote at the site — a recovery, not a contradiction — and the reader then went **past** it,
+establishing that the MIRROR swap does bite: a freshly composed object is already
+`for_stream(kAnyDialect, kAnyChannel)`, so handing it as the STREAM view maps nothing because every
+`dialect_gate: self` row is already filtered out. Recorded as recovered.
+
+**The conversion's own citation repair was independently confirmed.** Reader A, asked what argues
+for the `.inc`-in-a-hand-written-wrapper shape, answered from `DN-17.D16` — the slot this unit
+repointed the claim to — without being told a repoint had happened, and reached the same three
+declared failure sites the slot names. That is the strongest evidence available that the repair
+went to the right owner rather than to a plausible one.
+
+**A finding reader B produced about a file OUTSIDE the unit**, verified here at the artifact before
+being recorded: the corpus-gate registry states in two places that two of `MaskedSpanCensus`'s three
+cases are mount-free and *"run in every CI build"*, and that the bank arm is *"the only skipper"*.
+Both halves are false. `semantic/github/CMakeLists.txt` sets `CORPUS_SUITES "MaskedSpanCensus.*"`
+and applies `LABELS corpus` to that whole filter, so **all three** cases are labelled `corpus`;
+`malf test` runs `-LE corpus`, so none of the three runs in a default build. And the bank arm no
+longer skips at all — the Founder's ruling of 2026-09-04 replaced its `GTEST_SKIP` with a hard
+`FAIL()`, which is the second of this unit's own falsified claims. The registry's coverage sentence
+is what PAYS for excluding the gate, so a false one is not a typo: it is an exclusion argued on
+coverage that does not exist. Addressee below.
+
+
+### Dispositions
+
+Nothing was not-recovered and nothing was wrong, so no claim needed a home above the comment rung
+and **no law block was minted** — this unit consumed no law number. Every `SRC-` code in it is a
+CITATION whose declaring site is elsewhere in `core/` and survives the unit, which is why it was
+takeable without a range.
+
+### Findings for other lanes — none fixed here
+
+1. **The corpus-gate registry argues an exclusion on CI coverage that does not exist.**
+   `scripts/run_corpus_gates.sh` says, in its `MaskedSpanCensus` EXCLUDE record and again in its
+   env-var table, that two of the suite's three cases are mount-free and *"run in every CI build"*,
+   and that the bank arm is *"the only skipper"*. Measured: `semantic/github/CMakeLists.txt` labels
+   the whole `MaskedSpanCensus.*` filter `corpus`, `malf test` runs `-LE corpus`, so **all three
+   are absent from the default run**; and the bank arm FAILS rather than skips since the Founder's
+   ruling of 2026-09-04. Found by a cold reader, re-derived here at both artifacts. This is not a
+   stale sentence: the coverage claim is the argument that pays for the exclusion.
+   **Addressee: Argos** — the corpus-gate registry is his.
+2. **`DN-17.D19` was carrying an argument that is `DN-17.D16`'s**, in `src/github.cppm`. Repaired
+   in this unit at the citing site, as `OPS-8.O5` requires; recorded because the false attribution
+   was in the prose before the conversion and the same misattribution may stand at other citers of
+   that slot. **Addressee: Daidalos** — the design-note shelf is his.
+3. **Half the GitHub level-lift vocabulary has exactly one falsifier in the workspace.** The four
+   `::…::` forms plus `##[notice]` lead a line 41 times across the 4 082-log / 22 490 937-line
+   slice, and `::notice::` occurs **nowhere in the corpus at all** — re-derived at the bytes in this
+   run, not carried from prose. `test_github_declared_ingest.cpp` is therefore the only assertion
+   anywhere for that half, and it is a synthetic one. **Addressee: Kleio** — whether a
+   corpus-unfalsifiable declared row should ship is a test-homing and claim-boundary question, not
+   a comment one.
+
+### Witnesses
+
+1. **Comment-only** — all eleven files *code token stream identical to HEAD*.
+2. **Grammar** — the draft gated standalone at 0 violations with the `--style file:` invocation;
+   in-tree `malf format --check insight-canon/semantic/github` reads 11 selected, 11 checked,
+   **0 misformatted, 0 would-be violations**.
+3. **Behaviour** — taken by the pilot after the unit was placed, not by the lane: `malf test
+   insight-canon` **809 of 809 on clang-21 and 809 of 809 on gcc-16.2**, equal to this run's own
+   baseline (734 + 32 + 25 + 13 + 5 on both toolchains).
+4. **Knowledge** — 59 of 59 across two readers, above.
+5. **Addressability** — outbound exit 0, nothing lost and six added, after two `LOST` lines were
+   repaired on the first pass; inbound 255 leads read.
+
+`registry_grammar_lint` 0 failures and `docs_lint` 0 failures, both from the workspace root,
+both immediately before the push.
+
+### What this unit cost the run in a way `OPS-8` does not yet describe
+
+**A lane cannot await its own cold readers in this harness, and the failure presents as a dead
+reader rather than as an error.** This unit was drafted and gated by a delegated lane which spawned
+both readers itself; their completions were delivered to the PILOT, not to the lane, so the lane
+parked twice reporting that their transcripts held only the launch prompt — while reader B had in
+fact already answered in full. The pilot spawned a duplicate of reader A before discovering that
+the original had also completed. Nothing was lost and the tree stayed frozen throughout, but the
+run spent about thirty-five minutes and one whole redundant interrogation on it. **The step should
+say that the pilot spawns the readers and hands the answers back**, which is also the shape that
+lets the freeze be enforced by the party that owns the tree.
+
+
+
 
 
 ---

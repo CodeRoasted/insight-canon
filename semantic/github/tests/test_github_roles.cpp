@@ -1,15 +1,10 @@
-// test_github_roles.cpp — the GitHub-Actions STRUCTURAL-ROLE vocabulary. Migrated from
-// canon tests/utils/test_structural_role.cpp: the classification MECHANISM
-// (insight::tokenization::classify, longest-match over the composed role rows) is CANON's; the
-// VOCABULARY — `##[group]`/`::group::` → GroupBegin, `##[endgroup]`/`::endgroup::` → GroupEnd,
-// `##[error]`/`::error::` → Terminator — is THIS package's kRoles rows, so the knowledge test homes
-// here. The rows use kAnyDialect (the pre-split UNGATED behavior): a role fires whatever the caller
-// declared. Determinism: byte-only, no RNG/clock/float.
+// invariant: the classification MECHANISM is canon's longest-match algorithm and the VOCABULARY is
+// this package's role rows, so the knowledge test homes with the vocabulary.
 #include <gtest/gtest.h>
 
 import std;
-import insight.canon;           // compose / ComposedSemantics / classify / Tokenizer + enums
-import insight.semantic.github; // kManifest
+import insight.canon;
+import insight.semantic.github;
 
 using insight::StructuralRole;
 using insight::to_string;
@@ -17,9 +12,8 @@ using insight::semantic::ComposedSemantics;
 using insight::tokenization::ArenaAllocator;
 using insight::tokenization::classify;
 
-// The walkers take NormalizedContent — canon's ingest-normalization precondition carried by a type
-// unforgeable outside canon; every probe here is an escape-free literal, so normalize() is the
-// zero-copy fixed point over a shared scratch.
+// pre: `NormalizedContent` is canon's ingest-normalization proof, unforgeable outside canon; every
+// probe here is escape-free, so `normalize` is the zero-copy fixed point.
 [[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
 {
     static std::string scratch;
@@ -30,7 +24,6 @@ using insight::tokenization::Tokenizer;
 
 namespace
 {
-// The RESOLVED view of a stream declaring this dialect.
 [[nodiscard]] ComposedSemantics github_only()
 {
     const std::array manifests{insight::semantic::github::kManifest};
@@ -38,8 +31,6 @@ namespace
                                                             {});
 }
 
-// The same composition with NO dialect declared. Every role row is kAnyDialect, so this view must
-// classify EXACTLY as the declared one — which is the assertion, not an accident.
 [[nodiscard]] ComposedSemantics undeclared_stream()
 {
     const std::array manifests{insight::semantic::github::kManifest};
@@ -47,7 +38,6 @@ namespace
 }
 } // namespace
 
-// ── The announced markers classify to their role ──
 TEST(GithubRoles, RecognizesAnnouncedMarkers)
 {
     const ComposedSemantics gh{github_only()};
@@ -60,10 +50,8 @@ TEST(GithubRoles, RecognizesAnnouncedMarkers)
     EXPECT_EQ(classify(norm_probe("::error::file=x.cpp::boom"), gh), StructuralRole::Terminator);
 }
 
-// ── kAnyDialect: the role rows fire whatever the caller declared (the pre-split ungated behavior)
-// ── This is the key vocabulary property of kRoles (dialect_gate = kAnyDialect): a `##[group]` on a
-// stream that declared nothing at all still classifies. T4 changed the gate's TYPE, never these six
-// rows' VALUE, so this is the assertion that the reading did not narrow with the type.
+// assert: T4 changed the dialect gate's TYPE and never these rows' VALUE, so this is the arm that
+// says the reading did not narrow when the type did.
 TEST(GithubRoles, FireWhateverTheStreamDeclared)
 {
     const ComposedSemantics declared{github_only()};
@@ -79,9 +67,7 @@ TEST(GithubRoles, FireWhateverTheStreamDeclared)
     }
 }
 
-// ── No false role: ordinary content and a bare `error:` prose line announce nothing ──
-// The vocabulary boundary: only the bracketed `##[…]`/`::…::` tokens announce; a plain `error:`
-// message is content, not a role (the Terminator is the ANNOUNCED marker, never the failure WORD).
+// invariant: a Terminator is the ANNOUNCED bracketed marker, never the failure WORD.
 TEST(GithubRoles, NoFalseRoleOnPlainContent)
 {
     const ComposedSemantics gh{github_only()};
@@ -89,20 +75,10 @@ TEST(GithubRoles, NoFalseRoleOnPlainContent)
     EXPECT_EQ(classify(norm_probe("error: undefined reference to foo"), gh), StructuralRole::None);
 }
 
-// ── End-to-end, over the DECLARED path: the caller resolves a stream, peels
-// the transport, and hands only `RawPeeledLine::content` to the Tokenizer, which then tags the role
-// on CanonicalEvent.
-//
-// ⚠ THE PEEL IS THE CALLER'S, and these tests are the smallest place that says so. These same
-// lines once worked because `GitHubActionsStrategy` DETECTED the stamp and stripped it inside
-// `parse()`. That detection is gone; a caller that hands canon a stamped line without declaring
-// `api-rfc3339-line-prefix` gets the stamp in its template and no role — which is not a defect, it
-// is the declaration contract, and `TokenizerSeesTheStampWithoutADeclaration` below pins it.
 namespace
 {
 constexpr std::array<std::string_view, 1> kGhaStack{{"api-rfc3339-line-prefix"}};
 
-// The one call a caller makes at stream open, with GitHub's delivery stamp declared.
 [[nodiscard]] insight::semantic::ResolvedStream gha_stream(const ComposedSemantics& composed)
 {
     return insight::semantic::resolve_stream(
@@ -164,20 +140,11 @@ TEST(GithubRoles, DeclaredPeelThenTokenizerPlainGhaLineHasNoRole)
     EXPECT_EQ(event->structural_role, StructuralRole::None);
 }
 
-// The COST of not declaring, pinned so nobody rediscovers it as a bug. An empty stack's peel is the
-// identity, so the stamp survives into `content` and the line-anchored role rows — which match
-// strictly at offset 0 — cannot fire. This is fail-closed on DEPTH, not on the run: the line still
-// tokenizes, keeps every byte, and masks the stamp instance away.
-//
-// The MECHANISM is asserted, not narrated, and that is the whole point of this arm. It was green
-// for nine canonicalization generations for a reason that was false the day it was written: the
-// stamp did NOT survive into `content` — SyslogStrategy claimed the line, ate the level word as a
-// hostname, moved the message body onto `component` and left `content` EMPTY, and classify("") is
-// None. A role assertion alone cannot tell "the stamp blocks the row" from "the projection was
-// destroyed", so it must be paired with evidence that the bytes are still there. `CanonicalEvent`
-// carries no content, so the seam that proves it is the masker's output: the stamp is one
-// digit-leading whole token, so it reaches the template as a single leading `<*>` and its raw bytes
-// reach `params[0]`. Both would be absent had anything peeled it content-side (DN-43.D12).
+// refs: DN-43.D12
+// assert: an empty stack's peel is the identity, so the stamp survives into `content` and the role
+// rows — which match strictly at offset 0 — cannot fire.
+// invariant: a role assertion ALONE cannot separate `the stamp blocks the row` from `the projection
+// was destroyed`, so it is paired with template and params evidence.
 TEST(GithubRoles, TokenizerSeesTheStampWithoutADeclaration)
 {
     const ComposedSemantics composed{

@@ -1,19 +1,11 @@
-// test_github_echoed_source.cpp — the GitHub-Actions echoed-source CODE TIER (SRC-D-PROV-1).
-// Migrated from canon tests/parse/test_echoed_source.cpp. Two altitudes:
-//   1. RECOGNITION — github::is_echoed_source(raw): the byte-exact command-echo SGR predicate,
-//   relocated
-//      into this package (the `\x1b[36;1m … \x1b[0m` grammar is GHA dialect knowledge).
-//   2. THE GATE — the composed provenance hook, threaded through the PUBLIC Tokenizer
-//   (compose({github})),
-//      demotes an echoed failure line's level to Unknown and sets CanonicalEvent.echoed_source.
-//      This is a composed integration: canon's parser layer consulting THIS package's hook.
-// A red (`31`) coloured REAL error is byte-distinct from the command-echo SGR, so it is never
-// swallowed — the precision face. Determinism: byte-exact state machine, no RNG/clock/float.
+// refs: SRC-D-PROV-1
+// invariant: the `\x1b[36;1m … \x1b[0m` command-echo grammar is GHA dialect knowledge, so the
+// predicate homes in this package and never in canon core.
 #include <gtest/gtest.h>
 
 import std;
-import insight.canon;           // Tokenizer / ArenaAllocator / MaskConfig / LogLevel / compose
-import insight.semantic.github; // is_echoed_source + kManifest
+import insight.canon;
+import insight.semantic.github;
 
 using insight::LogLevel;
 using insight::semantic::ComposedSemantics;
@@ -30,7 +22,6 @@ constexpr std::string_view kGhaTs{"2026-06-09T09:40:20.4309100Z "};
     return std::string{kGhaTs} + std::string{body};
 }
 
-// GitHub's serving API stamps every line it returns; a caller that fetched a job log DECLARES it.
 constexpr std::array<std::string_view, 1> kGhaStack{{"api-rfc3339-line-prefix"}};
 
 [[nodiscard]] ComposedSemantics github_only()
@@ -39,9 +30,6 @@ constexpr std::array<std::string_view, 1> kGhaStack{{"api-rfc3339-line-prefix"}}
     return insight::semantic::compose(manifests);
 }
 
-// The ONE call a caller makes at stream open. The peel runs BEFORE the tokenizer, so the line the
-// provenance hook sees starts at the visible content — which is exactly why the hook's own
-// leading-stamp skip could be RIPPED at T4.
 [[nodiscard]] insight::semantic::ResolvedStream gha_stream(const ComposedSemantics& composed)
 {
     return insight::semantic::resolve_stream(
@@ -52,7 +40,6 @@ constexpr std::array<std::string_view, 1> kGhaStack{{"api-rfc3339-line-prefix"}}
 }
 } // namespace
 
-// ── Recognition (byte-exact SGR, raw line) ──
 TEST(GithubEchoedSource, CommandEchoWrappedLineIsRecognized)
 {
     EXPECT_TRUE(
@@ -91,9 +78,6 @@ TEST(GithubEchoedSource, NonCommandEchoLinesAreNotEchoedSource)
         << "plain (unwrapped) text — the ONLY robust signal is the SGR, absent here";
 }
 
-// ── The gate (composed, public Tokenizer): echoed ⇒ level Unknown + echoed_source set ──
-// The github provenance hook, composed into the tokenizer, demotes an echoed `… failed …` script
-// line so its failure WORD confers no alerting level.
 TEST(GithubEchoedSource, TokenizerDemotesEchoedFailureLevelToUnknown)
 {
     ArenaAllocator arena{256U * 1024U};
@@ -112,13 +96,8 @@ TEST(GithubEchoedSource, TokenizerDemotesEchoedFailureLevelToUnknown)
         << static_cast<int>(echoed->level) << ")";
 }
 
-// ── The demotion outranks the DECLARED level lift, not merely the body inference ──
-// An echoed script line that echoes a workflow command (`echo "##[error]…"`) is still SCRIPT TEXT,
-// so SRC-D-PROV-1 drives it to Unknown. This pins the ORDER of two things that both write
-// `ParsedLine::level` in LogParser: the composed level-lift walk runs FIRST and
-// the echoed-source demotion overwrites it. That was the order when the lift lived inside the GHA
-// strategy's parse(), and the relocation had to preserve it — swap the two and this line comes back
-// Error, alerting on a string that only ever appeared inside a shell command echo.
+// invariant: two writers of `ParsedLine::level` are ordered here — the composed level-lift walk
+// runs FIRST and the echoed-source demotion overwrites it, never the reverse.
 TEST(GithubEchoedSource, EchoedSourceDemotionOutranksTheDeclaredLevelLift)
 {
     ArenaAllocator arena{256U * 1024U};
@@ -135,8 +114,6 @@ TEST(GithubEchoedSource, EchoedSourceDemotionOutranksTheDeclaredLevelLift)
            "(got "
         << insight::to_string(echoed->level) << ")";
 
-    // The disconfirming control: the SAME content UNWRAPPED does lift to Error, so the case above
-    // is a real contest between the lift and the demotion rather than a line the lift ignores.
     const auto plain{tokenizer.process_line(
         stream.transport.peel_raw(gha("##[error]deploy step failed")).content)};
     ASSERT_TRUE(plain.has_value()) << "process_line failed: " << plain.error();
@@ -146,8 +123,6 @@ TEST(GithubEchoedSource, EchoedSourceDemotionOutranksTheDeclaredLevelLift)
         << insight::to_string(plain->level) << ")";
 }
 
-// ── The disconfirming minimal pair: a REAL coloured error keeps Error, echoed_source stays false
-// ──
 TEST(GithubEchoedSource, TokenizerKeepsRealColouredErrorAsError)
 {
     ArenaAllocator arena{256U * 1024U};

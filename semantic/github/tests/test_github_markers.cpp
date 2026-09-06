@@ -1,16 +1,11 @@
-// test_github_markers.cpp — the GitHub-Actions INTENT-MARKER vocabulary. Migrated from
-// canon tests/identity/test_intent_marker.cpp: the recognition MECHANISM
-// (insight::tokenization::recognize over the composed marker rows) is CANON's algorithm; the
-// VOCABULARY it walks — `Complete job name: ` → Job (Unordered), `Run ` → Step (Ordered),
-// format-gated to GitHubActions — is THIS package's kMarkers rows, so the knowledge test homes with
-// the vocabulary. Exercised BLACK-BOX through the public facade (compose → recognize); no detail
-// shard. A diff is a segmentation-contract break, not a retune — fix the rows or the algorithm,
-// never the assertion. Determinism: byte-only recognition, no RNG/clock/float.
+// invariant: the recognition MECHANISM is canon's algorithm and the VOCABULARY it walks is this
+// package's marker rows, so the knowledge test homes with the vocabulary.
+// note: a diff is a segmentation-contract break — fix the rows or the algorithm, never this
 #include <gtest/gtest.h>
 
 import std;
-import insight.canon; // compose / ComposedSemantics / recognize / canonicalize_intent + enums
-import insight.semantic.github; // kManifest
+import insight.canon;
+import insight.semantic.github;
 
 using insight::canonicalize_intent;
 using insight::to_string;
@@ -20,9 +15,8 @@ using insight::tokenization::IntentMarker;
 using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::recognize;
 
-// The walkers take NormalizedContent — canon's ingest-normalization precondition carried by a type
-// unforgeable outside canon; every probe here is an escape-free literal, so normalize() is the
-// zero-copy fixed point over a shared scratch.
+// pre: `NormalizedContent` is canon's ingest-normalization proof, unforgeable outside canon; every
+// probe here is escape-free, so `normalize` is the zero-copy fixed point.
 [[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
 {
     static std::string scratch;
@@ -31,13 +25,8 @@ using insight::tokenization::recognize;
 
 namespace
 {
-// The composition under test: the github package alone, RESOLVED for a stream that declared this
-// dialect and ONE IntentChannel. Both coordinates are REQUIRED here
-// on purpose — GHA is the dialect that actually has two materializations, so "which channel" is
-// part of every recognition question about it, and after T4 "which dialect" is part of every one
-// too. A test that did not say would be asking an ill-posed question. `channel` names a declared
-// channel ("annotated" / "stripped"); kAnyChannel models the caller that declares no channel —
-// concretely-gated rows stay dark.
+// invariant: BOTH coordinates are named on purpose — GHA has two materializations, so which
+// channel is part of every recognition question about it and omitting one asks an ill-posed one.
 [[nodiscard]] ComposedSemantics github_only(std::string_view channel)
 {
     const std::array manifests{insight::semantic::github::kManifest};
@@ -45,7 +34,6 @@ namespace
                                                             channel);
 }
 
-// The same composition on a stream that declared NO dialect — the fail-closed arm.
 [[nodiscard]] ComposedSemantics undeclared_dialect(std::string_view channel)
 {
     const std::array manifests{insight::semantic::github::kManifest};
@@ -74,7 +62,6 @@ namespace
 }
 } // namespace
 
-// ── The two RESET-class banners open their quanta; the payload is the RAW name ──
 TEST(GithubMarkers, RecognizesJobAndStepBanners)
 {
     const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};
@@ -87,23 +74,8 @@ TEST(GithubMarkers, RecognizesJobAndStepBanners)
     EXPECT_EQ(step.name, "actions/checkout@v4") << "raw step payload wrong: " << show(step);
 }
 
-// ── One Step intent, the real channel and our ablation, ONE identity ──
-// The same step banner reads back to the same identity from GHA's real `##[group]Run <cmd>` and
-// from the bare `Run <cmd>` our degrade() ablation produces. Each fires under ITS declared channel
-// and both extract the IDENTICAL payload — which is what makes the channel a materialization detail
-// and never an axis.
-//
-// ⚠ WHAT THIS IS NOT: this is NOT "materialization
-// invariance across two real GHA materializations". The stripped arm is OUR OWN lab ablation
-// (ci_revert_corpus.transform.degrade()), not bytes GitHub ever served. The property asserted here
-// is canon reading our ablation back to the same intent as the real channel — genuinely
-// load-bearing (the template-lattice lift experiment depends on exactly this), but it must never be
-// claimed as invariance across a dialect's real materializations. Naming it so would be the
-// endogamy trap the corpus discipline exists to prevent.
-//
-// It REPLACES the pre-0028 claim that shipping both prefixes UNGATED delivered this: the payload
-// half was true, but ungated recognition of the bare prefix is exactly what minted phantom Steps
-// out of annotated prose. The property is preserved here — by two gated rows, not one ungated pair.
+// invariant: the stripped arm is OUR OWN lab ablation (`ci_revert_corpus.transform.degrade`), never
+// bytes GitHub served, so this is NOT invariance across a dialect's real materializations.
 TEST(GithubMarkers, StepIdentityIsInvariantAcrossTheRealChannelAndOurAblation)
 {
     const ComposedSemantics annotated{github_only(insight::semantic::github::kChannelAnnotated)};
@@ -126,7 +98,6 @@ TEST(GithubMarkers, StepIdentityIsInvariantAcrossTheRealChannelAndOurAblation)
                                           "lattice experiment compares exactly these two arms and "
                                           "would see every step vanished+new";
 
-    // Each channel's OTHER form is not a banner there — the whole point of the coordinate.
     const auto prose{recognize(norm_probe("Run `npm audit` for details."), annotated)};
     EXPECT_EQ(prose.kind, IntentMarkerKind::None)
         << "PHANTOM: bare `Run ` prose opened a Step in the ANNOTATED channel, where the genuine "
@@ -138,18 +109,12 @@ TEST(GithubMarkers, StepIdentityIsInvariantAcrossTheRealChannelAndOurAblation)
         << "the annotated banner fired under the STRIPPED channel, where `##[` cannot occur: "
         << show(wrapped_in_stripped);
 
-    // `::group::Run ` is not a shipped row → it must NOT open a Step (guards against a speculative
-    // row).
+    // assert: `::group::Run ` is not a shipped row, so this guards against a speculative one.
     const auto colon{recognize(norm_probe("::group::Run yarn lint"), annotated)};
     EXPECT_EQ(colon.kind, IntentMarkerKind::None)
         << "::group:: form unexpectedly recognized: " << show(colon);
 }
 
-// ── An UNDECLARED channel fails closed on DEPTH — no phantom, and no structure either ──────
-// The caller that declares nothing gets the kAnyChannel rows (the Job banner) and NONE of the
-// channel-gated
-// Step rows: no dialect step structure, and — critically — no phantom either. Never a concrete
-// default: "both Step rows live at once" IS the defect. Declaring the channel is the path to depth.
 TEST(GithubMarkers, UndeclaredChannelFiresNoStepRowEitherWay)
 {
     const ComposedSemantics undeclared{github_only(insight::semantic::kAnyChannel)};
@@ -167,16 +132,9 @@ TEST(GithubMarkers, UndeclaredChannelFiresNoStepRowEitherWay)
         << "same, for the annotated materialization";
 }
 
-// ── SRC-II-6: DIALECT-gated to this package — the dialect never fires on a stream that did not
-// declare it. The gate is the ONLY difference (proven by the declared sanity
-// line).
-//
-// ⚠ WHAT CHANGED AND WHY IT MATTERS. This test used to loop over `LogFormat` values, passing each
-// as `recognize`'s gate — and in production that argument was `LogParser::routed_format()`, the
-// per-line detector winner under a sticky-strategy fast path. So "does the GHA dialect fire?" was
-// answered by the line's own CONTENT. It is now answered by the stream's DECLARATION, once, before
-// the first line. The undeclared arm is the one that would catch a filter that silently kept
-// everything.
+// refs: SRC-II-6
+// invariant: the dialect gate is the stream's DECLARATION, taken once before the first line, and
+// never the line's own content as a per-line detector's winner once was.
 TEST(GithubMarkers, DialectGatedToTheDeclaringStream)
 {
     const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};
@@ -195,7 +153,7 @@ TEST(GithubMarkers, DialectGatedToTheDeclaringStream)
         << "\" — the dialect declaration is the sole difference";
 }
 
-// ── No false RESET: the step prefix is `Run ` WITH the trailing space; empty opens nothing ──
+// assert: the Step prefix is `Run ` WITH its trailing space, so `Running …` is no banner.
 TEST(GithubMarkers, NoFalseStepOnRunningOrEmpty)
 {
     const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};
@@ -208,10 +166,7 @@ TEST(GithubMarkers, NoFalseStepOnRunningOrEmpty)
         << "empty content opened a quantum: " << show(empty);
 }
 
-// ── child_order is a declared per-level ROW property: job=Unordered, step=Ordered ───────────
-// Migrated from test_instance_discriminant::JobUnorderedStepOrdered — it asserts THIS package's
-// kMarkers child_order data (the level-typed alignment declaration), plus the marker carries its
-// raw discriminant.
+// refs: ADR-18
 TEST(GithubMarkers, JobUnorderedStepOrdered)
 {
     const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};
@@ -223,11 +178,8 @@ TEST(GithubMarkers, JobUnorderedStepOrdered)
     EXPECT_EQ(step.child_order, ChildOrder::Ordered) << "steps are sequential → LCS-matched";
 }
 
-// ── The payoff: the RAW payload this package emits composes with canon's canonicalize_intent into
-// the alignment CLASS — the aggressive canonical mask over the raw marker name, which is what
-// groups siblings. The COLLAPSE is canon's algorithm (pinned in canon's suite);
-// here we pin that THIS package's recognition delivers the raw payload the collapse consumes — the
-// composed contract.
+// invariant: the COLLAPSE is canon's algorithm, pinned in canon's own suite; what is pinned here is
+// that this package's recognition delivers the raw payload the collapse consumes.
 TEST(GithubMarkers, RawPayloadFeedsAlignmentClass)
 {
     const ComposedSemantics gh{github_only(insight::semantic::github::kChannelStripped)};

@@ -5,28 +5,11 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.spi;
 
-// github_provenance.cpp — the GitHub-Actions dialect CODE TIER (ADR-17). What remains is the
-// echoed-source provenance hook and the command-echo SGR grammar it walks. Self-contained: only api
-// + spi + std — never a sealed detail shard.
-//
-// ⚠ THE FORMAT STRATEGY IS GONE (T4 — ADR-23, ADR-22). `GitHubActionsStrategy`
-// DETECTED a per-line RFC 3339 stamp and peeled it. That stamp is a property of GitHub's
-// *delivery*, not of the GHA *dialect* (ADR-23): the format of a GHA job log is `RawText` and
-// always was, and the dialect is the workflow-command VOCABULARY over it (ADR-22). The peel is now
-// DECLARED — `IngestDeclaration{.stack = {"api-rfc3339-line-prefix"}}`, unwound by
-// `TransportStack::peel` before canon sees the line — so nothing here detects anything.
-//
-// The deleted decision function is not lost: it is FROZEN VERBATIM into
-// `core/tests/transport/test_transport_peel_equivalence_gate.cpp` (ADR-8; re-homed to core per
-// corpus_backed_gates.md § 5 — the SUT is core's peel and the oracle is inline), where it still
-// scores the declared peel over 4 082 logs / 22 490 937 lines. That gate is the provenance record;
-// `git log` of this file is not.
-//
-// CONSEQUENCE, stated because it is a real cost and not a tidiness: `kManifest.strategy` is now
-// nullptr, so `ComposedPackage::has_strategy` is FALSE for github while `has_echoed_source` stays
-// true. This package's code tier is one provenance hook — a byte predicate, not a grammar — which
-// is what makes the dialect DATA-ONLY (ADR-22: a generator can only generate from data).
-
+// refs: ADR-17, ADR-22, ADR-23
+// invariant: nothing here DETECTS — the per-line RFC 3339 stamp is GitHub's DELIVERY, declared as
+// `api-rfc3339-line-prefix` and unwound by `TransportStack::peel` before canon sees a line.
+// refs: ADR-8, F-SRC-insight-canon:test_transport_peel_equivalence_gate.cpp
+// note: that frozen gate scores the declared peel over 4 082 logs / 22 490 937 lines
 namespace insight::semantic::github
 {
 namespace
@@ -41,15 +24,15 @@ namespace
         return chr == ' ' || chr == '\t';
     }
 
-    // ── Echoed-source detection (was src/scan/… kCommandEchoSgrParams / is_echoed_source_line) ──
     constexpr unsigned char kEsc{0x1bU};
     inline constexpr std::array<std::string_view, 2> kCommandEchoSgrParams{
         std::string_view{"36;1"}, std::string_view{"1;36"}};
     inline constexpr std::array<std::string_view, 3> kSgrResetParams{
         std::string_view{"0"}, std::string_view{}, std::string_view{"39"}};
 
-    // Parse a CSI `\x1b[<params>m` at `pos`; on success advance `pos` past the final `m` and return
-    // the parameter substring. nullopt when `pos` is not such a sequence. Pure byte walk (F5).
+    // refs: BIB:determinism_model
+    // post: on success `pos` sits past the final `m`; on `nullopt` it is left where it was.
+    // note: the suppression below is load-bearing: `params_begin <= cur`, so `substr` cannot throw
     // NOLINTNEXTLINE(bugprone-exception-escape)
     [[nodiscard]] std::optional<std::string_view> parse_sgr_params(std::string_view line,
                                                                    std::size_t& pos) noexcept
@@ -70,24 +53,11 @@ namespace
 
 } // namespace
 
-// True iff `line` is an echoed-source line (SRC-D-PROV-1): the ENTIRE visible content is a SINGLE
-// SGR-wrapped span — a command-echo SGR (`36;1`/`1;36`), a content run, and a closing reset
-// (`0`/empty/`39`) — with no un-wrapped visible bytes outside the span. Operates on the RAW line
-// (ANSI intact). Byte-exact state machine (F5).
-//
-// ⚠ THE LEADING-STAMP SKIP IS RIPPED (T4 — ADR-23). This predicate used to begin by
-// calling `is_github_actions_prefix` and, on a hit, skipping 28 bytes plus one separator space, so
-// it could recognize an echo on a still-stamped line. That was the fifth of the strategy's bundled
-// behaviors and it was a DETECTION: a per-line content test deciding where the visible content
-// starts. Under a declared stack the caller peels BEFORE canon sees the line, so by the time this
-// runs there is no stamp left to skip; keeping the skip would have preserved a second, undeclared,
-// content-inferred transport strip inside a provenance hook — exactly the shape T4 exists to
-// delete.
-//
-// What that costs, stated rather than hidden: a caller that hands canon RAW GHA API bytes WITHOUT
-// declaring the transform loses echoed-source provenance on those lines (the wrapper is no longer
-// at the head of the line this predicate sees). That is fail-closed on DEPTH and it is the same
-// contract as every other declared coordinate — declaring is the path to depth.
+// refs: SRC-D-PROV-1, BIB:determinism_model
+// pre: `line` carries its ANSI intact and its declared transport already peeled — the SGR wrapper
+// is the only signal and stage 1 would destroy it.
+// post: true iff the whole visible content is ONE command-echo SGR span — open (`36;1`/`1;36`), a
+// content run, a reset (`0`/empty/`39`) — with no visible byte outside it.
 bool is_echoed_source(std::string_view line) noexcept
 {
     std::size_t pos{0};
