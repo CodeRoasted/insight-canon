@@ -3,34 +3,14 @@ module;
 module insight.canon;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.spi; // the composed row types (StructuralRoleRow / IntentMarkerRow / LocationRow)
-import insight.canon.compose; // ComposedSemantics
-
-// semantic_walkers.cpp — the dialect-recognition ALGORITHMS over the composed vocabulary
-// (`ADR-17.D1`). Canon owns these algorithms; the composed rows (from the packages) are the DATA.
-// Homed as a facade impl unit (module insight.canon) because they consume ComposedSemantics, which
-// imports api — so they cannot live in api. Ported byte-for-byte from the pre-split hardcoded
-// StructuralRoleRegistry::classify / IntentMarkerRegistry::recognize / recognize_location so the
-// composed pipeline is byte-identical (G-SP-1). ONE deliberate departure since:
-// `recognize_location` now establishes the location's START as well as its end (`loc_is_path`,
-// below) instead of slicing the token from offset 0. It is confined to the flag-gated
-// `MaskConfig::recognize_test_where` path — default OFF — so no G-SP-1 default path moves. The
-// canonicalization generation moved anyway: `stateless-masks-14` -> `-15` is spent on THIS
-// departure, because the generation names the rules function over the whole config space and a
-// flag-ON producer's serialized `component` differs across it (ledger in canon.api.cppm).
+import insight.canon.spi;
+import insight.canon.compose;
 
 namespace insight
 {
 namespace
 {
-    // NO row-gate predicate here any more (ADR-22). The dialect gate is evaluated ONCE,
-    // at `resolve_stream`, and filtered into the view these walkers receive — so a row that is in
-    // the table is a row that fires, and there is nothing left to test per line. What this removed
-    // is not a compare: it is a DETERMINISM hazard. The old gate argument was
-    // `LogParser::routed_format()`, the per-line detector winner under a sticky-strategy fast path,
-    // so which DECLARED rows fired was a function of content.
 
-    // ── Location matching (ported from location_recognizer.cpp) — the three closed families ──
     [[nodiscard]] constexpr bool loc_is_lower(char chr) noexcept
     {
         return chr >= 'a' && chr <= 'z';
@@ -44,31 +24,7 @@ namespace
         return loc_is_lower(chr) || (chr >= 'A' && chr <= 'Z') || (chr >= '0' && chr <= '9') ||
                chr == '_';
     }
-    // The byte class a LOCATION may be spelled in — the START predicate, the mirror of the
-    // word-boundary test each family already applies at its END. Whitespace tokenization alone
-    // cannot find a location's start: a producer glues its own annotation onto the path with no
-    // separator (`##[error]fs/rc/rcserver/rcserver_test.go`), and a slice taken from token offset 0
-    // published that annotation INSIDE the label.
-    //
-    // AN ALLOWLIST, and deliberately a wide one, because the two failure directions are not
-    // symmetric: a byte wrongly EXCLUDED silently TRUNCATES a real path, while a byte wrongly
-    // INCLUDED leaves a visible prefix. Every byte below was observed INSIDE a real path on the
-    // 4 082-run GitHub-Actions annotated corpus (2.34 GB, 694 484 lines resolving a location):
-    // `@` npm scoped packages (`node_modules/@scope/pkg/x.test.ts` — 33 445 lines, 45x the
-    // population the annotation defect touches), `\` Windows separators, `+` Bazel external repo
-    // names (`external/devinfra+/…`), `~` Windows 8.3 short names (`…\RUNNER~1\…`), `*` GitHub's
-    // secret redaction, which rewrites a path SEGMENT in place (`plugins/***Editor/***` — 129
-    // lines; `***` is the most of that directory chain that is knowable, so dropping it deletes
-    // truth rather than noise). `:` is NOT admitted: it is the `path:line:col` separator, and
-    // admitting it would carry `File:` back into 24 measured `##[debug]File:<path>` labels — at
-    // the price, stated rather than hidden, of a Windows drive letter (11 lines: `C:\a\x.spec.ts`
-    // resolves `\a\x.spec.ts`).
-    //
-    // Semantic-unaware (SRC-SP-1) — no dialect literal, no marker table — and that is a
-    // measurement, not tidiness. The annotation junk is `##[group]` (42 lines), `##[debug]File:`
-    // (24) and `##[error]` (1), so a marker-literal strip would still have left `File:` inside 36 %
-    // of the labels it aimed at, and would not have touched the 597-line punctuation majority
-    // (`(`, `"`, `'`, `[`, a backtick, a JS stack frame's `fn@http://host:port/`).
+    // refs: SRC-SP-1, F-SRC-insight-canon:test_semantic_walkers.cpp
     [[nodiscard]] constexpr bool loc_is_path(char chr) noexcept
     {
         return loc_is_word(chr) || chr == '/' || chr == '\\' || chr == '.' || chr == '-' ||
@@ -85,8 +41,7 @@ namespace
                                    [ext](std::string_view kind) noexcept { return ext == kind; });
     }
 
-    // `.test.<ext>` / `.spec.<ext>` with ext ∈ row.extensions (no dot). Returns end offset one past
-    // the extension, or npos.
+    // post: the end offset one past the extension, or npos.
     [[nodiscard]] std::size_t match_test_spec(std::string_view tok,
                                               const insight::semantic::LocationRow& row) noexcept
     {
@@ -105,9 +60,7 @@ namespace
         return std::string_view::npos;
     }
 
-    // pytest bare module: an extension (row.extensions, e.g. `.py`) whose basename starts_with any
-    // row.prefixes OR ends_with any row.suffixes. Returns end offset one past the extension, or
-    // npos.
+    // post: the end offset one past the extension, or npos.
     [[nodiscard]] std::size_t match_prefix_ext(std::string_view tok,
                                                const insight::semantic::LocationRow& row) noexcept
     {
@@ -118,7 +71,7 @@ namespace
                 continue;
             const std::size_t end{pos + ext.size()};
             if (end != tok.size() && loc_is_word(tok[end]))
-                continue; // the extension is glued to more word chars → not a file end
+                continue;
             const std::size_t slash{tok.rfind('/', pos)};
             const std::size_t base_start{slash == std::string_view::npos ? 0 : slash + 1};
             const std::string_view base{loc_slice(tok, base_start, pos - base_start)};
@@ -134,8 +87,7 @@ namespace
         return std::string_view::npos;
     }
 
-    // go / ruby: any full-file suffix in row.suffixes, word-boundary-terminated. Returns end
-    // offset, or npos.
+    // post: the end offset one past a word-boundary-terminated suffix, or npos.
     [[nodiscard]] std::size_t match_suffix_set(std::string_view tok,
                                                const insight::semantic::LocationRow& row) noexcept
     {
@@ -151,9 +103,7 @@ namespace
         return std::string_view::npos;
     }
 
-    // Walk the composed location rows in canonical order for ONE token; the first family that
-    // claims a test-file wins (declared order == the pre-split family order 1:TestSpec, 2:pytest,
-    // 3:suffix).
+    // post: the first family in declared order that claims the token wins; npos when none does.
     [[nodiscard]] std::size_t
     test_file_end(std::string_view tok,
                   std::span<const insight::semantic::LocationRow> rows) noexcept
@@ -180,6 +130,7 @@ namespace
     }
 } // namespace
 
+// refs: ADR-17.D1
 std::string_view recognize_location(insight::tokenization::NormalizedContent normalized,
                                     const insight::semantic::ComposedSemantics& composed) noexcept
 {
@@ -199,10 +150,6 @@ std::string_view recognize_location(insight::tokenization::NormalizedContent nor
         const std::string_view tok{loc_slice(content, start, cursor - start)};
         if (const std::size_t end{test_file_end(tok, rows)}; end != std::string_view::npos)
         {
-            // The families establish the location's END; this walk establishes its START, over the
-            // same byte class (`loc_is_path`). Taking the token from offset 0 was the defect: the
-            // whitespace that opened the token is a producer's SPACING, not a claim that everything
-            // after it is a path.
             std::size_t begin{end};
             while (begin > 0 && loc_is_path(tok[begin - 1U]))
                 --begin;
@@ -215,13 +162,13 @@ std::string_view recognize_location(insight::tokenization::NormalizedContent nor
 namespace tokenization
 {
 
+    // pre: `composed` is a view already resolved for the stream; no dialect gate is tested here.
+    // post: the row with the longest matching prefix wins; declaration order never decides.
+    // refs: ADR-17.D1, ADR-17.D4, ADR-22.D6
     StructuralRole classify(NormalizedContent normalized,
                             const insight::semantic::ComposedSemantics& composed) noexcept
     {
         const std::string_view content{normalized.bytes()};
-        // Longest-match: the row with the longest matching prefix wins (deterministic,
-        // declaration-order- free). No nesting among today's rows → equivalent to the pre-split
-        // fixed-order chain.
         StructuralRole best{StructuralRole::None};
         std::size_t best_len{0};
         for (const insight::semantic::StructuralRoleRow& row : composed.roles())
@@ -235,29 +182,11 @@ namespace tokenization
 
     namespace
     {
-        // The NumericFieldThenRemainder grammar (grammar-5, ADR-17), over the content past a
-        // matched prefix: a non-empty run of ASCII digits, a single ':', then the payload — which
-        // ENDS AT THE FIRST '\r', and from which a trailing `[…]` option group is then dropped.
-        // nullopt on any shape failure, including an empty payload: a declined row is the whole
-        // point, since the malformed producer marker (`section_start:%s:name`) must not be
-        // mis-parsed into a section named after an unexpanded shell expression.
-        //
-        // THE CR IS A TERMINATOR, NOT A TRAILING BYTE TO TRIM, and the distinction is the whole
-        // measurement. GitLab closes a marker with `\r\x1b[0K` (CR + erase-line) and MAY then
-        // continue the SAME line with the section's human-readable header: `…:build_tools_section
-        // \r\x1b[0KTools build`. Canon's SRC-D-TID-11 ingest strip removes the escape and leaves
-        // the CR, so a rule that merely trimmed a trailing CR would yield the payload
-        // `build_tools_section\rTools build`. Measured on the 482 stamped traces of
-        // marker_corpus_v1: trimming gives 56 distinct names, 36 of them carrying an embedded CR
-        // and arbitrary human prose; terminating at the CR gives 46, every one inside the
-        // producer's declared `[A-Za-z0-9_.-]+` charset. Recognition count is 3193 either way — the
-        // difference is invisible in a recall number and lands entirely in the NAME, which
-        // `compare_skeletons` keys on raw (ADR-18). Those 36 sections would only ever align
-        // against a run whose header prose is byte-identical.
-        //
-        // The option group is taken as the LAST '[' of a ']'-terminated payload, not the first '['
-        // anywhere: a name containing a bracket must not silently lose its tail. The observed name
-        // charset carries no bracket at all, so this is a guard, not a live case.
+        // post: a digit run, one ':', then the payload — which ENDS at the first CR and drops a
+        // trailing option group.
+        // post: nullopt on any shape failure, an empty payload included.
+        // note: the CR TERMINATES the payload; trimming it welds header prose into the name.
+        // refs: ADR-17.D6, SRC-D-TID-11
         [[nodiscard]] constexpr std::optional<std::string_view>
         skip_numeric_field(std::string_view remainder) noexcept
         {
@@ -279,18 +208,14 @@ namespace tokenization
             return remainder;
         }
 
-        // Extract a row's payload from the content past its matched prefix (the closed extractor
-        // algorithms, grammar-2). nullopt = the extractor's own shape requirement failed ⇒ the ROW
-        // does not match at all (RemainderToClosingParen without a line-final ')' — an un-named
-        // `[Pipeline] {` wrapper).
+        // pre: the caller has matched `row.prefix`, so `row.prefix.size() <= content.size()`.
+        // post: nullopt when the extractor's own shape requirement fails, so the ROW does not
+        // match.
+        // note: the in-place trims replace substr, whose throw path would escape this noexcept.
         [[nodiscard]] std::optional<std::string_view>
         extract_payload(std::string_view content,
                         const insight::semantic::IntentMarkerRow& row) noexcept
         {
-            // The caller (`recognize`) only reaches here after `content.starts_with(row.prefix)`,
-            // so `prefix.size() <= content.size()` — `remove_prefix`/`remove_suffix` are the
-            // noexcept in-place equivalents of the `substr` calls whose out-of-range `throw` path
-            // the analyzer cannot rule out inter-procedurally (bugprone-exception-escape).
             std::string_view remainder{content};
             remainder.remove_prefix(row.prefix.size());
             switch (row.extract)
@@ -300,13 +225,11 @@ namespace tokenization
             case insight::semantic::PayloadExtract::RemainderAfterPrefix:
                 return remainder;
             case insight::semantic::PayloadExtract::RemainderToClosingParen:
-                // The content after the prefix up to a REQUIRED line-final ')' (studies/006 STAGE
-                // form
-                // `^\{ \((.+)\)$`): non-empty payload, single trailing delimiter dropped, nested
-                // parens kept.
+                // note: a line-final ')' is REQUIRED; it is dropped, nested parens kept.
+                // refs: STU-6
                 if (remainder.size() < 2U || remainder.back() != ')')
                     return std::nullopt;
-                remainder.remove_suffix(1U); // drop the required line-final ')'
+                remainder.remove_suffix(1U);
                 return remainder;
             case insight::semantic::PayloadExtract::NumericFieldThenRemainder:
                 return skip_numeric_field(remainder);
@@ -314,10 +237,8 @@ namespace tokenization
             return std::nullopt;
         }
 
-        // grammar-2 payload exclusion (ADR-17 / studies/006): an entry excludes when it equals
-        // the payload or is its leading space-delimited token — `stage` excludes `stage` and `node`
-        // excludes `node {`, while `stages` stays a step (word boundary). Matches the spike's
-        // first-token/whole-body semantics.
+        // post: true when an entry equals the payload or is its leading space-delimited token.
+        // refs: ADR-17.D6, STU-6
         [[nodiscard]] bool payload_excluded(std::string_view payload,
                                             const insight::semantic::IntentMarkerRow& row) noexcept
         {
@@ -331,6 +252,10 @@ namespace tokenization
         }
     } // namespace
 
+    // pre: `composed` is a view already resolved for the stream; no dialect gate is tested here.
+    // post: the longest VALID match wins — a row whose extractor fails or whose payload is
+    // excluded falls through.
+    // refs: ADR-17.D1, ADR-17.D4, ADR-22.D6
     IntentMarker recognize(NormalizedContent normalized,
                            const insight::semantic::ComposedSemantics& composed) noexcept
     {
@@ -342,9 +267,6 @@ namespace tokenization
             if (!content.starts_with(row.prefix) ||
                 (best != nullptr && row.prefix.size() <= best->prefix.size()))
                 continue;
-            // A row matches only when its extractor's shape holds AND the payload is not excluded
-            // (grammar-2) — a failed row falls through so a shorter row may still claim the line
-            // (longest VALID match wins, deterministic).
             const std::optional<std::string_view> payload{extract_payload(content, row)};
             if (!payload || payload_excluded(*payload, row))
                 continue;
@@ -353,8 +275,8 @@ namespace tokenization
         }
         if (best == nullptr)
             return {};
-        // The payload is the extractor's capture, verbatim; the class (canonicalize_intent) is
-        // derived downstream, the discriminant here (the ADR-18 raw coordinate).
+        // note: the payload is the extractor's capture verbatim; the class is derived downstream.
+        // refs: ADR-18.D5
         return {.kind = best->kind,
                 .name = best_payload,
                 .discriminant = discriminant_of(best_payload),

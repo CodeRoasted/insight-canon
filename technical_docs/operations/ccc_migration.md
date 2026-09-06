@@ -769,7 +769,7 @@ because the prose carried a non-registry form: `STU-8` (the prose said *"studies
 tier the outcome round-trip law belongs to), and `ADR-26.D5` inside the law block.
 
 **And one measured near-miss that `OPS-8.O5` does not cover — verdict finding 10.** The block was
-first written *"absorbs the retired source-declared code SP-2"*, dropping the prefix because
+first written with the code abbreviated to its family and number, dropping the `SRC-` prefix because
 `ADR-26.D5` retires the form. That reds `registry_grammar_lint`'s `G13-bare` census — a ratcheted
 count of BARE spellings of migrated codes — taking `insight-canon` from 189 sites to 190 and the
 gate from 0 failures to 1. Re-spelled `SRC-SP-2` in full: 189 again, 0 failures, and the source-side
@@ -865,13 +865,214 @@ law numbers as dense. Behaviour: shared with unit 6, see below. Count: 318 comme
 158, a **50 % reduction** — the lowest of the run, and the law blocks are why: 47 of those 158 lines
 are the three frames and their prose.
 
+## Unit 8 — `core/src/compose/` (4 files, 1 266 lines, 395 would-be violations)
+
+The composition unit: `compose()` and `ComposedSemantics::for_stream` (the runtime composition, the
+canonical serialization that produces `semantic_identity`, and the ONE evaluation point of the
+dialect and channel gates), the run-outcome algorithms (`scan_run_outcome`, `resolve_run_outcome`,
+`map_outcome_token_in`), the three dialect walkers (`classify`, `recognize`,
+`recognize_location`) and the level-lift walker. Argumentative prose throughout — four of the
+five rules the file states about the dialect gate are the SAME rule, written four times, which is
+the duplication `refs:` removes.
+
+| files | comment lines HEAD → gate | forms written |
+|---|---|---|
+| `compose.cpp`, `level_lift.cpp`, `outcome.cpp`, `semantic_walkers.cpp` | 404 → 113 | pre 4 · post 22 · invariant 6 · note 22 · refs 38 · 12 continuations · 9 tool |
+
+`refs:` targets: `ADR-3.D4`, `ADR-6.D10`, `ADR-17.D2`, `ADR-17.D3`, `ADR-17.D4`, `ADR-17.D5`,
+`ADR-17.D6`, `ADR-17.D9`, `ADR-18.D4`, `ADR-18.D5`, `ADR-22.D4`, `ADR-22.D5`, `ADR-22.D6`,
+`ADR-23.D4`, `DN-17.D17`, `DN-32.D6`, `DN-32.D7`, `STU-6`, `BIB:determinism_model`,
+`SRC-SP-1`, `SRC-SP-7`, `SRC-SID-2`, `SRC-D-TID-11`, `SRC-D-OUT-RUN-1`,
+`F-SRC-insight-canon:test_semantic_walkers.cpp`, `F-SRC-insight-canon:test_jenkins_outcome.cpp`.
+
+### Zero law blocks, and the five candidates that each found an owner
+
+`OPS-8.S9`'s test — *a law block is owed only where the rule has NO ADDRESSABLE OWNER* — was
+applied to five candidate rules this unit states in prose, and **all five were refused**, each
+because a slot already owns the argument. Recorded because a refusal is the test working, not a
+gap:
+
+| the rule the prose states | its owner | how the site carries it now |
+|---|---|---|
+| the dialect gate is evaluated ONCE, into the view; no per-line code carries the coordinate | `ADR-22.D6` (*"The gate is evaluated once, into the view — the hot path never carries the coordinate"*) | `refs: ADR-22.D6` at each of the four obeying sites, plus a `pre:` at the three walkers |
+| an UNKNOWN declared name is a mistake and terminates; an ABSENT one is a choice and degrades | `ADR-22.D5` (*"an unknown declared value is a hard error … an absent one is a choice that degrades"*, including *"a safety default that must be requested is not a default"*) | `refs: ADR-22.D5` at the three fail-closed sites and at the default view |
+| a new grammar generation APPENDS its section, keeping the preimage a fixed layout per generation | `ADR-17.D9` (*"every grammar generation appends its new sections after the existing ones"*) | `refs: ADR-17.D9` at `serialize_manifest` and at the grammar-6 section |
+| identity is the ruleset's CONTENT, never the C++ spelling of the fields carrying it | `ADR-17.D3` (*"Content, never labels"*) | `refs: ADR-17.D3` plus a `note:` at the channel section |
+| an operator-facing fatal message states the rule and the remedy and names no record | `ADR-6.D10` Form 1 (*"a record identifier is not an action"* — and the citation moves to the source comment beside the throw site) | `note:` + `refs: ADR-6.D10` at `fail_closed` |
+
+**So the run's law-number range is untouched by this unit** and `LSRC-8` remains the highest
+declared number in the workspace at the point this unit landed.
+
+### Census (`OPS-8.S4`), and the per-file address census (`OPS-8.S7.3b`)
+
+Tool forms: namespace closers 9 → 9, `NOLINT` 0 → 0, `/*name=*/` 0, `clang-format off` 0,
+`wall-clock:` 0, `SPDX` 0. **The unit carries no suppression at all**, so `OPS-8.S5`'s cross-check
+holds in its simple form and was measured: removed 395 = 395 would-be violations, kept 9 = 9 tool
+forms.
+
+**Address sets.** Every `SRC-` code survives — `SRC-SP-7`, `SRC-SID-2` (compose.cpp),
+`SRC-D-OUT-RUN-1` (outcome.cpp), `SRC-SP-1`, `SRC-D-TID-11` (semantic_walkers.cpp) — and two of
+them survive only because the address census caught their loss in the first draft: `SRC-SP-1` and
+`SRC-D-TID-11` had gone with the prose that named them, and `ADR-17.D1` with the file header. All
+three were restored at the site that obeys the rule and the unit was re-derived from `HEAD` rather
+than patched. That is the pilot's step earning its keep on its first run here.
+
+What the census still reports as LOST is a **document-level citation refined to a slot** —
+`ADR-17` → `ADR-17.D2/D3/D4/D5/D6/D9`, `ADR-22` → `ADR-22.D4/D5/D6`, `ADR-18` → `ADR-18.D4/D5`,
+`ADR-23` → `ADR-23.D4`. A set diff cannot tell a refinement from a loss; each was checked by hand
+and every one names the slot that owns the claim at that site.
+
+Deliberate ADDITIONS, each because the prose carried a non-registry form or none at all: `STU-6`
+(the prose said *"studies/006"*), `BIB:determinism_model` (it said *"Determinism (F5)"*, and the
+Founder's ruling in `ADR-31` is that F5 gives way to a path to the owning record),
+`F-SRC-insight-canon:test_jenkins_outcome.cpp` (the prose said *"Accumulo #498"*, which is a real
+live witness in that test), `F-SRC-insight-canon:test_semantic_walkers.cpp`, `ADR-6.D10`,
+`ADR-3.D4`, `ADR-18.D4`, `ADR-18.D5`.
+
+**Two ratcheted censuses shrank, both advisory because `insight-canon` is a sibling repo to the
+gate.** `registry_grammar_lint` reports `G13-bare` 15 → 12 sites (this unit deleted three bare
+spellings of migrated codes: one `SP-5` in `compose.cpp` and two `SP-1` in `semantic_walkers.cpp`)
+and `G14-sigil` 20 → 15 (the deleted prose named the gate sigils `G-SP-1`, `G-SP-4`, `G-SP-5`).
+Two further `G13-bare` sites were this ledger's own — the finding-10 passage quoted the wrong
+spelling verbatim while explaining not to write it — and are repaired in this commit, which takes
+the count to 10. **The ceiling still reads 13 and is a superproject edit this lane may not make**:
+a finding for Argos, below.
+
+### Interrogation — and the FIRST reader was DISCARDED because this lane contaminated it
+
+Two readers were spawned. **The first is not the measurement and its answers are not scored**: while
+it was running, this lane swapped a header in and out of the tree to measure a suppression and used
+`git checkout` to restore a file, and the harness pushed *"file changed on disk"* notices carrying
+the PRE-CONVERSION prose of three of the four files into that agent's context. The agent reported it
+itself, unprompted, and named the three questions it could no longer certify. Recorded as verdict
+finding 14; the tree was frozen and a fresh agent re-read the unit.
+
+**The scored reader: 38 questions, 86 tool uses, 248 k tokens, 11.4 minutes. No git command was
+run; the transcript was checked. 35 of 38 recovered, 2 not recovered, 1 wrong.** Scored from the
+per-question evidence rather than any summary line — this reader wrote none.
+
+Three recoveries reached facts the prose never carried:
+
+* Q14 (why the shadow pass uses the FULL sets) came back with a mechanical reason the argument
+  never had: at that point in `compose()` the filtered tables **are still empty** — only the
+  `all_*` sets are populated before `for_stream` runs at the return — so the filtered form would
+  report zero shadows always, not a subset.
+* Q15 (what the default view actually contains) came back with the row inventory: the 6 ungated
+  GitHub/Azure structural-role rows and the 3 dialect-independent location rows, and zero markers,
+  level lifts, outcome tokens and outcome markers.
+* Q27 (why the `\r` widening is not done in the splitter) was recovered from a different package's
+  header and a level-flip test — the GitLab package states that line delimitation *"is delivery,
+  not vocabulary, and belongs to the transport axis"* — an argument the deleted prose gestured at
+  and never named.
+
+### The line THIS conversion wrote that was WRONG, re-derived at the artifact
+
+**The scan arena's invariant over-claimed, and the reader caught it.** The conversion wrote
+*"invariant: the scan arena is reset per segment, so one fixed block bounds the whole scan."* The
+reader's Q21 answer: the reset bounds the live extent, but 64 KiB is an **initial block, not a
+cap** — `ArenaAllocator::allocate` calls `grow_to_fit`, which appends a block of
+`max(2 × previous, size + alignment)`, so a segment larger than the block grows the arena rather
+than failing. Re-read at `core/src/arena/arena_allocator.cpp`: correct, and the growth path is the
+one unit 1 of this run converted. Repaired to *"the arena is reset per segment, so live extent is
+bounded by the longest segment"*, which is the claim the code actually keeps.
+
+### The two claims NOT recovered, and where each was re-homed
+
+1. **Why a new grammar section is APPENDED rather than inserted (Q3).** The reader could not find
+   the property in the tree and said so at medium confidence, arguing — correctly — that nothing
+   parses the preimage, so both an append and a mid-stream insert move every identity equally. The
+   rule and its reason are `ADR-17.D9`'s, and the conversion had cited that slot only at the
+   grammar-6 section, four sections below the serializer the rule governs. Re-homed by adding
+   `ADR-17.D9` to `serialize_manifest`'s own `refs:` — the placement class no gate can check.
+2. **Why `lift_level` has its own translation unit (Q20).** The reader answered *"the code does not
+   say"* and then recovered the real constraints anyway (a different namespace, a smaller import
+   set, no `picosha2` fragment). The deleted prose's own reason was a single-responsibility
+   argument with no invariant attached; what earns a line is its other half, which is a hot-path
+   fact: re-homed as `note: this walk is on the per-line path; composition is not.`
+
+### Stale or false claims in the OLD prose, deleted with the evidence and where the search went
+
+* **`insight_run_outcome_model.md §3–§4` names a document that no longer exists.** It lives only
+  under `technical_docs/history/architecture-v1/`, and `ADR-17.O2` records its subject as folded
+  into `ADR-17`. Searched: the whole workspace by the `CLAUDE.md` recipe — the only live hits are
+  four canon source files and one lint fixture. Replaced by `ADR-17.D5`, which owns the run-outcome
+  precedence. **The other three canon files still carry the dead pointer** (`canon.cppm:172`,
+  `canon.spi.cppm:676`, `canon.api.cppm:753`) and are later units of this same run.
+* **`note_shadows` was described as *"generic over any prefix+gate row via projections"*.** There is
+  no projection parameter: the template takes `std::span<const Row>`, a kind string and the report,
+  and reads `lhs.prefix` / `rhs.dialect_gate` directly. Re-read at the declaration.
+* **A bare `D5` citation** — *"a cross-channel comparison (D5's legal case: BuildId N annotated ↔
+  N+1 stripped)"*. `D5` alone resolves to nothing under any registry form. The claim it names —
+  cross-channel comparison is legal only when the real axis moved — is `ADR-22.D4`'s, which the
+  site now cites. **Two `insight-eidos` sites carry the same bare shape** (`sift.api-config.cppm`,
+  `diff_engine.cpp`); a finding for that lane, below.
+* **`0031's hash split`** — a bare four-digit reference to a retired adr-v1 document.
+  `registry_grammar_lint`'s own G4 note declares the bare four-digit form UNMEASURED rather than
+  zero, so no gate would ever have found it. The claim is `ADR-23.D4`'s and the site cites it.
+* **`ADR-22 + ADR-22`** as a citation, naming one document twice for two different axes. Replaced
+  by `ADR-22.D5`, the slot that owns the fail-closed default.
+
+### Findings for other lanes — none fixed here
+
+1. **`DN-46.D1`'s table row and its action list assert a source comment this unit deletes —
+   Daidalos, through Eqya.** The row records `F-SRC-insight-canon:compose.cpp` as carrying
+   *"which transforms a given STREAM declared rides the MetaLog document's `extensions` container as
+   `fr.coderoast.transport`"*, **verified present**, and the action list closes that surface as
+   *"DONE, verified at source"* on the strength of it. CCC deletes the sentence: it is a claim about
+   a destination, which `LEXICON.md:265` and `ADR-23.D4` both state on the durable tier, and the
+   site now carries `refs: ADR-23.D4`. Nothing is lost; the design note's row is now stale.
+2. **`compose.cpp`'s `kIdentityBytes` is a second, hand-kept copy of `kSemanticIdentityBytes` —
+   Hephaïstos.** `canon.compose.cppm:41` exports `inline constexpr std::size_t
+   kSemanticIdentityBytes{16}` and sizes `identity_` with it; `compose.cpp:16` declares its own
+   file-local `kIdentityBytes{16}` and the digest-copy loop writes `kIdentityBytes` bytes into that
+   array. **No `static_assert` ties them** (swept, zero hits), so raising the local alone overruns
+   the member. `ADR-26.D1` puts a constant that sizes a member inside the type that owns it. A code
+   change; not a comment-only commit's to make.
+3. **Two operator-facing fatal messages in `outcome.cpp` print a record identifier —
+   Hephaïstos.** `map_outcome_token_in`'s two `std::cerr` blocks spell `(DN-32.D6)` inside the text
+   an operator reads, which is exactly `ADR-6.D10` Form 1 — the defect that ruling repaired for four
+   canon messages, reappearing in a fifth and sixth. The `refs: DN-32.D6` comments now sit beside
+   both throw sites, so the citation is already where the ruling puts it and the in-string copies can
+   simply go. A third, weaker instance is the divergence TRACE log, which prints
+   `SRC-D-OUT-RUN-1` — a log line rather than a fail-closed message, and arguably outside the rule.
+   Both cold readers found this independently.
+4. **`canon.cppm`'s *"the ~30-POD-row copy"* is a LEAD, not yet a finding — the `core/api/canon.cppm`
+   unit.** The scored reader counted the shipped four-package composition at 41 unfiltered rows plus
+   ~22 filtered, 3 locations, 2 channels and 4 package records — of the order of 70 PODs, against a
+   figure written when the composition was smaller. Recorded as a lead because this lane did not
+   re-derive the count itself, and the file is a later unit.
+5. **Two `insight-eidos` sites carry the same unresolvable bare `D5` citation — the eidos lane.**
+   `sift/api/sift.api-config.cppm:189` and `sift/src/engine/diff_engine.cpp:2883`, both naming the
+   BuildId-N-annotated legal case. The live address is `ADR-22.D4`.
+6. **Two claims in this unit have no falsifier — Kleio.** The reader established that
+   `test_composition.cpp` cannot detect a swap of `compose()`'s two fences (its unnamed-package
+   fixture is `static_assert`ed conflict-free, so the arm measures only the name fence), and that no
+   committed arm exercises a `NumericFieldThenRemainder` payload carrying **two** bracket groups,
+   which is what distinguishes `rfind('[')` from `find('[')`.
+7. **`registry_grammar_lint`'s `insight-canon` census ceilings are now above the tree — Argos.**
+   `G13-bare` reads 10 against a ceiling of 13 and `G14-sigil` 15 against 20, both after this unit
+   and this commit's ledger repair. Advisory today because a sibling repo's census cannot be a
+   verdict, and a superproject edit either way.
+
+### Witnesses
+
+Comment-only: the code token stream of all four files is identical to `HEAD`'s. Grammar:
+`malf format --check core/src/compose` — 113 comment lines, **0 would-be violations**, post format.
+Registry: `scripts/registry_grammar_lint.py` **0 failures**, 95 of 95 claimed `SRC-` codes still
+declared in source, 1 212 source citations. Lint: `malf lint --all-files` **21 findings**, equal to
+the baseline unit 1 recorded. Behaviour: `malf test insight-canon` **809 of 809** on clang-21 and
+**809 of 809** with `--profile linux-gcc16-release` — one slot acquisition covering this unit's
+final text together with unit 9's (`OPS-8.S7.4`). Count: 404 comment lines at HEAD to 113 as the
+gate counts them, a **72 % reduction**.
+
 ---
 
 # The `OPS-8` verdict — third cold reader, first at scale
 
-`insight-canon` is `OPS-8`'s third run and its first large one. Nine findings, ordered by what
-they cost. Items 1 and 5 are the ones that change the runbook; item 5 needs a Founder ruling
-before the `core/api/` units can be converted at all.
+`insight-canon` is `OPS-8`'s third run and its first large one; findings 14 onward come from the
+third run (units 8-9). Nineteen findings, ordered by what they cost within each run. Items 1, 5
+and 14 are the ones that change the runbook; item 5 needed a Founder ruling before the
+`core/api/` units could be converted at all, and it has one — see the RULED section below.
 
 ## 1. `OPS-8.S5`'s cross-check equality is FALSE in any unit that has a suppression
 
@@ -1037,8 +1238,8 @@ suppressions and 0 with them.
 Measured on this run's first law block. `OPS-8.O5` says a declaring site's law block *"names the
 `SRC-<code>` it absorbs"*, and gives one reason: `registry_grammar_lint`'s `src_codes_present`
 classes a declaration by POSITION, so the block inherits the declaration only if the code is still
-spelled at the site. Written as *"absorbs the retired source-declared code SP-2"* — dropping the
-prefix on the reasonable ground that `ADR-26.D5` retires the form — the block reds a **different**
+spelled at the site. Written with the `SRC-` prefix dropped — on the reasonable ground
+that `ADR-26.D5` retires the form — the block reds a **different**
 arm: `G13-bare` censuses every BARE spelling of a migrated code against a ratcheted per-root
 ceiling, and one new site took `insight-canon` from 189 to 190 and the gate from 0 failures to 1.
 Re-spelled `SRC-SP-2` in full: back to 189, and the source-side declaration count held at 95 of 95.
@@ -1077,6 +1278,91 @@ its time reading prose. This lane acquired only around each `malf build`/`malf t
 released immediately with the token, and still **waited 21 minutes across two blocks** for a slot
 it held for a total of about four. Holding it for the whole run would have cost the other three
 lanes hours. The step should say: acquire per measurement, release immediately, record the token.
+
+## 14. A TREE EDIT DURING AN INTERROGATION CONTAMINATES THE READER, AND NOTHING IN `OPS-8` FORBIDS IT
+
+Measured on unit 8, and it cost a whole reader. While a cold reader was live, this lane did two
+ordinary things: it swapped a header in and out of the tree to measure what a suppression silences,
+and it ran `git checkout -- <file>` to undo that swap. The harness pushed *"file changed on disk"*
+notices into the RUNNING agent's context — notices that quote the changed region — so the reader
+received large blocks of the **pre-conversion** prose of three of the four files it was interrogating.
+It reported this itself, unprompted, and named the three questions it could no longer certify.
+
+`OPS-8.S8` says the reader reads the working tree only, and lists what it may not open. It says
+nothing about the operator, and the operator is the one who can break it: **the unit's files, and
+every file the reader might open, are FROZEN from the moment the reader is spawned until its answers
+are in.** The measurement is unfalsifiable otherwise — a contaminated reader that does not notice
+scores as a clean one, and the recovery rate is the number this whole protocol exists to produce.
+The scored reader here was a second, fresh agent run against a frozen tree.
+
+## 15. `git checkout -- <path>` INSIDE A MEASUREMENT REVERTED A CONVERTED FILE, AND EVERY WITNESS STAYED GREEN
+
+Same episode, the other half. The restore was scoped to a file the measurement had touched — and
+that file was also the unit's own `outcome.cpp`, already converted in the working tree. `git
+checkout` put it back to `HEAD`, silently: the conversion was uncommitted, so nothing was lost from
+git's point of view and no gate could notice. It was caught by re-reading, not by a check.
+`CLAUDE.md` names this hazard for a SIBLING lane's co-occupied path; the lesson generalises to
+oneself, and a CCC lane is exposed to it precisely because measuring a suppression means editing a
+tree file. Cost here: one re-derivation of the unit from the claims script, which is cheap
+**because the script is the single source of the unit's text** — the departure the first run of this
+ledger declared is what made the recovery a re-run rather than a repair.
+
+## 16. A SUPPRESSION IN A HEADER CANNOT BE MEASURED THROUGH `-p <build dir>` ON A MODULE TU, AND THE ZEROS LOOK LIKE AN ANSWER
+
+`OPS-8.S3.4` says to verify a suppression with clang-tidy over a stripped copy, and unit 1 of this
+run did exactly that for a `.cpp`. For a HEADER the obvious route is to lint a translation unit that
+includes it with a `--header-filter` that admits it. Measured on `core/api/utils/log_macros.hpp`
+through `clang-tidy-21 -p core/build-clang21-libcxx-release core/src/compose/outcome.cpp`: **0
+findings with the suppression and 0 without it**, on a header that defines four variadic macros with
+`cppcoreguidelines-macro-usage` explicitly enabled. The run reported *"121049 warnings generated"*
+and displayed none.
+
+The tell is the one this ledger's finding 9 already names in another form: **plant a positive
+control**. A two-line control header defining a plain function-like macro, included from the same TU,
+also produced nothing — so the zeros were the instrument, not the code. The sound instrument is a
+standalone TU that includes the header directly, with the third-party include path lifted out of
+`compile_commands.json`; under it the control fires immediately and the real measurement comes back
+**4 findings silenced** (one per `INSIGHT_LOG_*` macro definition), which is why that region was
+kept and re-homed rather than deleted.
+
+## 17. THE GATE CHECKS THE FORM AND NEVER THE PLACEMENT, SO A CONTRACT FORM INSIDE A BODY PASSES EVERYTHING
+
+`ADR-26.D5` is explicit that `pre:` / `post:` / `invariant:` sit at the **declaration** and that
+`assert:` is the body form — *"the distinction is position … and the gate checks the form, never the
+placement, because checking placement would mean parsing C++ with a second, weaker parser."* The
+consequence for an operator is that the claims script can place a perfectly legal `post:` above a
+`return` in the middle of a function and **every witness stays green**: the grammar gate passes, the
+code-only diff passes, the tests pass, and `wrap_tagged.py` has no opinion.
+
+Five sites in unit 8's first draft were in that shape — four `invariant:` lines inside function
+bodies and one `post:` above a `return` — because the natural anchor for a claim is the line the
+deleted prose sat on, and prose sits where the reasoning happens rather than where the contract is
+declared. Caught by reading the placed draft, and it is a read obligation, not a gate: an
+in-body claim is either moved to the declaration or demoted to `assert:` / `note:`.
+
+## 18. THE PER-FILE ADDRESS CENSUS REPORTS A REFINEMENT AS A LOSS, AND THE STEP SHOULD SAY SO
+
+The pilot's `OPS-8.S7.3b` — diff the DISTINCT set of registry addresses per file, before and after —
+fired correctly on this unit's first draft and caught three real losses (`SRC-SP-1`,
+`SRC-D-TID-11`, `ADR-17.D1`) that every other witness was blind to. It also reported nine addresses
+LOST that were nothing of the kind: a document-level citation replaced by the slot that owns the
+claim (`ADR-17` → `ADR-17.D4`, `ADR-22` → `ADR-22.D6`, `ADR-18` → `ADR-18.D5`, `ADR-23` →
+`ADR-23.D4`). A set diff cannot tell those apart, and an operator who repairs them mechanically
+**restores a weaker citation and calls it a fix** — the prescriptive-instrument failure where the
+finding's text makes the reader undo a true improvement. Every `LOST` line is a lead to read, and a
+refinement is recorded rather than reverted. The same run over units 1–7 (below) shows the shape a
+second time.
+
+## 19. UNITS 1–7 RE-MEASURED UNDER `OPS-8.S7.3b`, RETROACTIVELY: NOTHING LOST
+
+Run at the pilot's instruction over all thirteen files of the first seven units, each against the
+blob at the parent of its own conversion commit. **Twelve files: set unchanged or additions only.
+One file reports four differences and all four are already recorded in this ledger with their
+evidence** — `core/src/scan/canon.detail.scan.cppm` dropped `SRC-D-TID-11`, `SRC-D-PROV-1` and
+`ADR-17` as signposts to code that had been RELOCATED out of the file (both relocations were put to
+that unit's cold reader, which recovered each one's new home), and refined a bare `DN-43` to
+`DN-43.D11`. So the retroactive answer is **nothing lost across units 1–7**, and the one file that
+moved did so deliberately and said so at the time.
 
 ## Departures from `OPS-8` in this run, declared
 
