@@ -1,11 +1,11 @@
-// test_jenkins_markers.cpp — the Jenkins stage/step VOCABULARY (measured on real consoles by the
-// frozen spike, then graduated into grammar-2 rows). What it guards, against those semantics:
-//   STAGE = a NAMED `[Pipeline] { (<name>)` block open (declared stage OR parallel/matrix Branch),
-//           kind=Job (the container level), UNORDERED (branches co-occur like matrix legs);
-//   STEP  = `[Pipeline] <verb>`, kind=Step, ORDERED — excluding the closed structural-token set
-//           (`{`, `}`, `stage`, `node`, `parallel`, `// …`, `End of Pipeline`);
-//   SRC-II-6  = the rows are format-gated to Jenkins and inert elsewhere.
-// Determinism: byte-only recognition over the composed rows; no RNG/clock/float.
+// refs: SRC-II-6, STU-6
+// invariant: this file guards the stage/step VOCABULARY the frozen spike measured on real consoles
+// and graduated into rows — the rows, never canon's walkers.
+// invariant: the guarded semantics are STAGE = a named block open at the container level and
+// UNORDERED, STEP = a verb annotation at the leaf level and Ordered, minus the exclusion set.
+// invariant: the rows are DIALECT-gated to Jenkins and inert on a stream that declared anything
+// else.
+// note: determinism: byte-only recognition over the composed rows; no RNG, clock or float
 #include <gtest/gtest.h>
 
 import std;
@@ -17,10 +17,10 @@ using insight::tokenization::ChildOrder;
 using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::recognize;
 
-// The walkers take NormalizedContent — canon's ingest-normalization precondition carried by a type
-// unforgeable outside canon; every probe here is an escape-free literal (the xtrace probe's `\\e`
-// is TWO prose bytes, not an escape byte, so normalization has nothing to remove), so normalize()
-// is the zero-copy fixed point over a shared scratch.
+// pre: the walkers take NormalizedContent, canon's ingest-normalization precondition carried by a
+// type unforgeable outside canon.
+// invariant: every probe here is an escape-free literal, so normalize() is the zero-copy fixed
+// point over a shared scratch and the probe reaches the walker byte-for-byte.
 [[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
 {
     static std::string scratch;
@@ -29,8 +29,8 @@ using insight::tokenization::recognize;
 
 namespace
 {
-// The RESOLVED view of a stream that declared this dialect — the concretely-gated rows are
-// reachable only through a declaration, never through per-line format detection.
+// invariant: the RESOLVED view of a stream that DECLARED this dialect — the concretely-gated rows
+// are reachable only through a declaration, never through per-line format detection.
 [[nodiscard]] ComposedSemantics jenkins_only()
 {
     const std::array manifests{insight::semantic::jenkins::kManifest};
@@ -38,7 +38,7 @@ namespace
                                                             {});
 }
 
-// The same composition on a stream that declared NO dialect — the fail-closed arm.
+// invariant: the same composition on a stream that declared NO dialect — the fail-closed arm.
 [[nodiscard]] ComposedSemantics undeclared_stream()
 {
     const std::array manifests{insight::semantic::jenkins::kManifest};
@@ -58,37 +58,39 @@ TEST(JenkinsMarkers, NamedBlockOpenIsAStage)
            "their sequence is not a structural fact and must never be diffed as one";
 }
 
+// refs: SRC-II-9
+// invariant: a matrix/parallel leg keeps its axis tuple VERBATIM in the discriminant while
+// downstream canonicalization collapses the class.
+// invariant: that is the guard against the measured phantom vanish/insert storm a masked-away
+// discriminant produces.
 TEST(JenkinsMarkers, ParallelBranchIsAStageWithItsDiscriminant)
 {
     const ComposedSemantics composed{jenkins_only()};
-    // A matrix/parallel leg: the axis tuple stays VERBATIM in the discriminant (SRC-II-9) while
-    // canonicalize_intent (downstream) collapses the class — the guard against the measured
-    // phantom vanish/insert storm a masked-away discriminant produces.
     const auto branch{recognize(norm_probe("[Pipeline] { (Branch: maven (lts))"), composed)};
     EXPECT_EQ(branch.kind, IntentMarkerKind::Job);
     EXPECT_EQ(branch.name, "Branch: maven (lts)") << "nested parens stay inside the payload";
     EXPECT_EQ(branch.discriminant, "(lts)") << "the raw declared coordinate is kept verbatim";
 }
 
+// assert: the declarative engine's synthetic stages are console-visible named blocks, so they are
+// real stages to the recognizer.
+// note: against the platform's flat stage tree that reads as over-granularity: richer, not wrong
 TEST(JenkinsMarkers, DeclarativeSyntheticStageRecognized)
 {
     const ComposedSemantics composed{jenkins_only()};
-    // The declarative engine's synthetic stages are console-visible named blocks — real stages for
-    // the recognizer. Measured against the platform's flat stage tree this reads as
-    // over-granularity: richer, not wrong.
     const auto synthetic{
         recognize(norm_probe("[Pipeline] { (Declarative: Checkout SCM)"), composed)};
     EXPECT_EQ(synthetic.kind, IntentMarkerKind::Job);
     EXPECT_EQ(synthetic.name, "Declarative: Checkout SCM");
 }
 
+// note: the probe line outlives the returned marker — its name is a view into the content
 TEST(JenkinsMarkers, VerbAnnotationIsAStep)
 {
     const ComposedSemantics composed{jenkins_only()};
     for (const std::string_view verb :
          {"sh", "echo", "junit", "checkout", "withEnv", "readMavenPom"})
     {
-        // The line outlives the returned marker (its name is a view into the content).
         const std::string line{std::string{"[Pipeline] "} + std::string{verb}};
         const auto step{recognize(norm_probe(line), composed)};
         EXPECT_EQ(step.kind, IntentMarkerKind::Step) << "verb: " << verb;
@@ -111,11 +113,13 @@ TEST(JenkinsMarkers, StructuralTokensAreScaffoldNotQuanta)
     }
 }
 
-// ── SRC-II-6, now against the DECLARATION rather than against per-line format detection ──
-// The rows are gated to this package's NAME, so a stream that declared no
-// dialect fires nothing. The old form of this test passed a `LogFormat` per call, sourced in
-// production from `LogParser::routed_format()` — the per-line detector winner under a sticky
-// strategy — which made "does the Jenkins dialect fire" a question about the line's own bytes.
+// refs: SRC-II-6, ADR-22
+// assert: the gate is against the DECLARATION, never against per-line format detection: the old
+// form passed a LogFormat per call and made this a question about the line's own bytes.
+// invariant: a stream that declared no dialect fires nothing — failing closed on depth is not
+// optional.
+// assert: the second half is the CONTROL: the same lines DO fire once the stream declares this
+// dialect, so the leg is a real gate rather than a line nothing would have claimed anyway.
 TEST(JenkinsMarkers, DialectGatedToTheDeclaringStream)
 {
     const ComposedSemantics undeclared{undeclared_stream()};
@@ -125,8 +129,6 @@ TEST(JenkinsMarkers, DialectGatedToTheDeclaringStream)
            "depth is not optional";
     EXPECT_EQ(recognize(norm_probe("[Pipeline] sh"), undeclared).kind, IntentMarkerKind::None);
 
-    // The control: the SAME lines DO fire once the stream declares this dialect, so the leg above
-    // is a real gate rather than a line nothing would have claimed anyway.
     const ComposedSemantics declared{jenkins_only()};
     EXPECT_EQ(recognize(norm_probe("[Pipeline] { (Build)"), declared).kind, IntentMarkerKind::Job);
     EXPECT_EQ(recognize(norm_probe("[Pipeline] sh"), declared).kind, IntentMarkerKind::Step);

@@ -3406,6 +3406,185 @@ immediately before the push. `ctest -N` in the package's clang build tree: **28 
 3, `-LE corpus` 25** — so this package's 25-test baseline figure is the `-LE corpus` one, and the
 corpus gate does not run in a default build.
 
+---
+
+## Unit 19 — `semantic/jenkins/` (8 files, 829 comment lines, 820 would-be violations) — 22 corpus figures re-derived and ALL held, and the two convictions were both about the conversion's own framing
+
+The Jenkins dialect package converted WHOLE. `semantic/` is complete with this unit.
+
+| file | comment lines | violations | split |
+|---|---|---|---|
+| `src/jenkins.cppm` | 94 → 84 | 93 | bare 84, spacer 3, trailing 6 |
+| `tests/conformance.cpp` | 7 → 6 | 6 | bare 6 |
+| `tests/payload_stamp_template_count_measurement_test.cpp` | 216 → 102 | 215 | bare 178, spacer 16, trailing 21 |
+| `tests/test_jenkins_bare_null_gate.cpp` | 206 → 68 | 205 | bare 192, spacer 11, trailing 2 |
+| `tests/test_jenkins_markers.cpp` | 30 → 32 | 29 | bare 29 |
+| `tests/test_jenkins_outcome.cpp` | 32 → 30 | 31 | bare 31 |
+| `tests/test_jenkins_package_retrofit_gate.cpp` | 227 → 133 | 225 | bare 198, spacer 9, trailing 18 |
+| `tests/test_jenkins_round_trip.cpp` | 17 → 8 | 16 | bare 13, trailing 3 |
+| **total** | **829 → 463** | **820** | |
+
+After: **463 comment lines, 0 would-be violations** — `pre` 1 · `post` 3 · `invariant` 155 ·
+`assert` 49 · `note` 18 · `refs` 32 · 198 continuations · 7 tool forms. Repo-level delta
+**9 474 → 8 654 = exactly 820**.
+
+**The residual ratio is 56 % (463 of 829), against unit 17's 28 % and unit 18's 37 %, and the lane
+declared it rather than letting it pass.** Three of the eight files are corpus gates whose headers
+are claim-boundary, clause-map and pin-provenance material — the class CCC keeps in tagged form
+rather than deletes. The readers are the test of whether that judgment over-kept, and they found no
+line that failed to earn its place; what they found instead was two lines that were *wrong*.
+
+### Census, suppressions and the cross-check
+
+Token census derived from the gates, and this run added two more markers to the derived list by the
+same method (`registry-lint: dn`, `docs-lint: allow`). **Every marker has population ZERO.** This
+repo's own five gate scripts were read: none reads a comment-text marker.
+
+`NOLINT` **4 → 0**. Two bare `NOLINTBEGIN` regions, both openers mid-line inside a bare prose block
+— the strip removed each opener and kept the orphan closer, for the third and fourth time in this
+run. Both TUs run twice in place: **0 diagnostics armed and 0 disarmed**, with a probe inserted
+INSIDE each region suppressed-armed and reported-disarmed. Both deleted with that evidence. Tool
+forms 9 → 7, both accounted.
+
+Stripper cross-check: removed **820**, kept violation classes **zero**, so `820 == 820 − 0`, exact
+with nothing to subtract.
+
+### The corpus was mounted, 22 carried figures were re-derived at the bytes, and ALL 22 HELD
+
+Nothing was condemned. Unit 18's mirror-error warning was the operative one here, and the record of
+where the lane looked is the point rather than the verdict: 113 traces · 40/10/17/19/27 by depth
+type · 72/28/9/4 by result · 12/19/82 by stamp class · 442 wfapi stage rows · 2 145 steps · 12
+UNSTABLE stages · 12 elided · 524 console stage rows · 0 console-finished-absent · the cross-surface
+cell at 2 with both traces named · all twelve structural cells to the digit · 7 582 ESC-bearing
+lines with ZERO marker-bearing · 6 416 stamped lines and a 6 055 ceiling · and the `±strip`
+account closing as `3 337 + 1 + 0 + 1 = 3 339`.
+
+The sharpest of them is a claim that reads like a mistake and is not: *"a pin derived over the
+67-wfapi axis instead reads 1 292/91 and is WRONG"*. On the 67-tree axis the denominators really do
+read 1 292 and 91 against the stage-bearing axis's 1 223 and 89. A figure quoted across two
+denominators is the defect that claim exists to name, and it is exact.
+
+### Four carried claims deleted as FALSE — every one of them "the world moved"
+
+1. **`src/jenkins.cppm`** claimed the bare-line parse was *"certified by G-T5-BARE's byte-identity
+   over the 82 bare traces"*. The gate's own header disclaims that for 7 of the 82: they were
+   re-emitted on 2026-08-26 and their `pre` side died with the deleted strategy. **Narrowed to the
+   75 pre-cut rows.**
+2. **`payload_stamp_template_count_measurement_test.cpp`** claimed twice that it *"skips cleanly …
+   green in CI and on every clone"*. Both mount-needing cases `FAIL()`, not skip, and `ctest -N`
+   reads **23 cases, `-L corpus` 10, `-LE corpus` 13** — the CMake filter labels the whole suite, so
+   **none of its four cases runs in a default build**, the two mount-free ones included.
+3. **Two clause maps**, in the bare-null gate and the retrofit gate, both saying *"UNSET ⇒ skip;
+   SET-BUT-BROKEN ⇒ hard fail"*. Both states now fail; what differs is the diagnostic. The same
+   class unit 18 found in `gitlab`, twice more here.
+4. **`test_jenkins_markers.cpp`** said `SRC-II-6` means the rows are *format*-gated. The same file
+   retires that wording 107 lines lower. Written as dialect-gated.
+
+### A premise in the PILOT'S OWN BRIEF was false, and the lane measured it rather than acting on it
+
+The brief said `SRC-II-4`'s only source declaration position **in the workspace** is
+`jenkins.cppm`, and that dropping the token would therefore red `G5`. The lane ran the lint's own
+position classification and found **five** such sites, four of them in `insight-eidos`. The
+conversion is unchanged — a citing site keeps its `refs:` either way — but the ground given for it
+was wrong.
+
+**The error has a traceable path and it is a SCOPE error, not a value error.** This ledger's
+seventh-run prose says *"in all of `insight-canon`'s source"*, which is TRUE; its own summary table
+said *"in the workspace"*, which is FALSE; the pilot quoted the table into the brief. Two sentences
+about one fact, disagreeing in scope rather than in value, is exactly the shape that survives a
+re-read — nothing looks wrong until someone measures. Both sites are corrected in this ledger, and
+the correction is recorded rather than silently applied because **a ledger is a lead, not a fact**
+(`MEM:verify-audit-findings-before-destructive-act`), which is the rule the lane applied and the
+pilot did not.
+
+*(Second-order, from the same sweep: the law block at `core/src/conformance/canon.conformance.cppm`
+says its code *"sits at the code's only declaration-position site"*. By the classification that
+sentence invokes there are four more, one per package `conformance.cpp`. True in intent, false by
+its own rule. A finding for that block's owner, not a repair — the file is unit 7's.)*
+
+### Interrogation — two readers, 60 questions, and BOTH convictions were the conversion's framing
+
+**58 recovered · 0 not recovered · 2 convictions.** Both transcripts `GIT COMMANDS RUN: none`;
+reader A saw no excluded path, reader B disclosed seven `build*` DIRECTORY NAMES from one `ls`,
+with nothing under them opened.
+
+**Conviction 1 — `test_jenkins_round_trip.cpp` asserted a literal where it meant a requirement.**
+The header said *"the probe payload is a REAL step verb, never a structural token"*. The test does
+not choose the payload: the conformance kit does, and its `kProbePayload` is the literal `"probe"`,
+which is not a Jenkins step verb. The reader corrected the premise and supplied the true property —
+what matters is that the payload carries no structural token, so the STEP row's exclusion set
+cannot decline it. Rewritten to that.
+
+**Conviction 2 — the measurement file's arms premise described a construction that no longer
+exists.** Its `assert:` said the unstamped-line equality proves *"arm B measures the STRIP and not
+the package removal"*. In the shipped code **both arms run one empty composition**; there is no
+with-package/without-package contrast left, so what the equality actually enforces is that arm A is
+the identity on lines the bracket acceptor rejects. Rewritten to that. **The assertion's own failure
+MESSAGE carries the same stale framing and is a string literal, so no comment-only commit may touch
+it** — it lands in the follow-up commit below.
+
+**A third answer produced a finding rather than a conviction, and it is the sharper one.** Asked
+which defect class the prefix-image triangle cannot see, reader B answered correctly — over-masking,
+because a leaking rule appears on both sides of each identity and cancels — and then reported that
+of the two holders the tree NAMES for that blindness, it could find only one. Verified here: *"the
+collateral leg"* has **no implementation anywhere in source**; its only description sits in a frozen
+record shelf, which under the disposability ruling could be wiped tomorrow. A declared blind spot
+whose second named holder is a name only is a coverage claim resting on nothing. The `note:` is
+replaced by an address to the holder that **does** exist; the missing leg is a finding.
+
+**A scope qualification the readers recorded and this entry keeps:** the measurement file's positive
+control (`CounterCanReportAnExplosion`) composes **with** the Jenkins manifest, while the two corpus
+cases it controls compose an **empty** view. The control still shows the counter can report an
+explosion and can collapse, but it exercises a different composition from the thing it guards.
+
+### Dispositions
+
+Two convictions, both repaired in the tree before the commit. Nothing not-recovered. **No law block
+minted and no law number consumed.** All eight `SRC-` attributions read against their declaring
+statements and **all eight TRUE** — the second measured negative in a row, after unit 18.
+
+### Findings for other lanes — none fixed here
+
+1. **A declared over-masking blind spot names two holders and only one exists.** *"The collateral
+   leg"* is described only on a frozen record shelf and implemented nowhere. The unit's own `note:`
+   is repaired; the same claim also stands in `core/tests/mask/test_stateless_template.cpp`, which
+   is unconverted. Either the leg is owed or the claim is. **Addressee: Kleio.**
+2. **The package's published conan description advertises a code tier the package does not have.**
+   It still names *"the dialect format strategy (timestamper strip, `[Pipeline]` annotations, the
+   `Finished:` epilogue — the code tier)"*, which the module denies in its first three lines. Found
+   by reader A. Repaired in the follow-up commit below, since a recipe is not a comment.
+3. **A design note repeats the pre-narrowing certification claim.** `DN-61` states the bare-class
+   certification without the 2026-08-26 ruling that narrowed it, and two of its figures for this
+   file have just moved. A sweep confirms it is the only live site carrying the un-narrowed wording;
+   the corpus-gate registry already carries the narrowing correctly. **Addressee: Daidalos.**
+4. **A vacuity control is labelled `corpus` alongside the thing it guards**, so neither of the
+   measurement file's two mount-free cases runs on a clean clone. Structurally the same shape as
+   unit 17's finding, here without a false registry sentence behind it. **Addressee: Kleio**, with
+   **Argos** for the label split.
+5. **Two `insight-canon` census ceilings still over-admit** — unchanged by this unit. Unit 18's
+   finding stands. **Addressee: Argos.**
+6. **A measured negative against unit 17's registry finding, again.** All three Jenkins gates are
+   registered `RUN`, none of the three records makes a CI-coverage claim about the default build,
+   and the bare-null record's 75-of-82 narrowing agrees line-for-line with both the gate header and
+   the baseline's own provenance header. The defect unit 17 found does not generalise.
+
+### Witnesses
+
+1. **Comment-only** — all eight files *code token stream identical to HEAD*, re-taken after the two
+   conviction repairs.
+2. **Grammar** — draft standalone gate 0 violations; in-tree `malf format --check` 8 selected, 8
+   checked, **0 misformatted, 0 would-be violations**, re-run after the repairs.
+3. **Behaviour** — taken by the pilot **after** the repairs, not before: `malf test insight-canon`
+   **809 of 809 on clang-21 and 809 of 809 on gcc-16.2**.
+4. **Knowledge** — 58 of 60 recovered, 2 convictions, above.
+5. **Addressability** — outbound exit 0, nothing lost and 20 added, after two `LOST` lines were
+   repaired on the first pass; inbound 80 leads read, 40 of them on frozen shelves owing nothing.
+
+`registry_grammar_lint` 0 failures and `docs_lint` 0 failures, both from the workspace root, both
+immediately before the push.
+
+
+
 
 
 
@@ -4688,12 +4867,18 @@ classes a declaration — so that no session begins a unit it cannot finish:
 | `semantic/test_frameworks/` | 79 | 4 (`SRC-SP-7` ×2, `SRC-SP-2`, `SRC-II-8`) — every one a citation, all three codes declared in `core/` | **takeable, no range needed** |
 | `semantic/github/` | 603 | 3 in tests (`SRC-SP-2`, `SRC-D-PROV-1`, `SRC-SP-7`), 0 in `src/` | citations; `D-PROV-1` declared in `core/api/canon.transport.cppm` |
 | `semantic/gitlab/` | 556 | 6 (`SRC-II-6`, `SRC-D-OUT-RUN-1`, `SRC-SP-7` in the `.cppm`; `SRC-II-6`, `SRC-D-TID-11`, `SRC-SP-2` in tests) | all declared in `core/`; **read each against its statement before converting** |
-| `semantic/jenkins/` | 820 | 8 (5 in the `.cppm`, 3 in tests) | `SRC-II-4`'s ONLY source declaration position in the workspace is `semantic/jenkins/src/jenkins.cppm:146`, and its statement is the intent-identity bible's — a citation, so a `refs:` kept inside the `.cppm` preserves both the address and its position class. The other seven are declared in `core/`. |
+| `semantic/jenkins/` | 820 | 8 (5 in the `.cppm`, 3 in tests) | `SRC-II-4`'s only declaration-position site **inside `insight-canon`** is `semantic/jenkins/src/jenkins.cppm`, and its statement is the intent-identity bible's — a citation, so a `refs:` there preserves both the address and its position class. The other seven are declared in `core/`. **This cell read *"in the workspace"* until unit 19 measured it: there are FIVE such sites, four of them in `insight-eidos`.** |
 | `core/tests/` | 4 682 | 15 sites over 11 files, 14 distinct codes | the test tier is a CITING tier (`OPS-8.O5`); each site's prose must still be read against the code's statement before it is reduced to a `refs:` |
 
 **The sharp one is `semantic/jenkins`**, and it is sharp in a way no gate reports: `SRC-II-4` has
 exactly one declaration-position site in all of `insight-canon`'s source and it is inside that
-package's module interface. Keeping the address in a `refs:` there keeps `registry_grammar_lint`
+package's module interface. **THAT SCOPE IS LOAD-BEARING AND THE TABLE ROW ABOVE LOST IT, WHICH IS
+HOW THE ERROR TRAVELLED — corrected 2026-09-06 by unit 19, which measured five sites workspace-wide
+rather than trusting the figure it had been handed.** The row said *"in the workspace"* where this
+paragraph says *"in `insight-canon`'s source"*, the pilot's brief for unit 19 quoted the row, and
+the lane re-derived it instead of acting on it. A ledger is a lead, not a fact
+(`MEM:verify-audit-findings-before-destructive-act`), and the two sentences disagreeing in SCOPE
+rather than in VALUE is exactly the shape that survives a re-read. Keeping the address in a `refs:` there keeps `registry_grammar_lint`
 green, because a `.cppm` is a declaration position throughout — which is precisely the shape
 `ADR-26.D5` warns about, a code carried into a `refs:` satisfying the gate exactly as the prose did.
 The statement itself is safe: `technical_docs/bibles/intent_identity.md` owns `SRC-II-4`, so the

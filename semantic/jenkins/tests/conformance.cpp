@@ -1,9 +1,9 @@
-// conformance.cpp — instantiate the canon CONFORMANCE KIT (SRC-SP-2) on THIS
-// package's manifest. The kit is package-agnostic and canon-shipped; this file is the ENTIRE
-// per-package instantiation — the ~15-line shape an external package author copies. A failing check
-// prints its own verbose-on-failure diagnostic (which row, actual-vs-expected). Determinism:
-// seedless, single-threaded; the kit's checks are pure functions of the manifest data. NOLINTBEGIN
-// — unit test: short identifiers and string literals are fine.
+// refs: SRC-SP-2, LSRC-5
+// invariant: the canon conformance kit is package-agnostic and canon-shipped, so this file is the
+// ENTIRE per-package instantiation — the shape an external package author copies.
+// invariant: a failing check prints its own verbose-on-failure diagnostic naming the row and the
+// actual-vs-expected values, so this TU adds no diagnosis of its own.
+// note: determinism: seedless, single-threaded, pure functions of the manifest data
 #include <gtest/gtest.h>
 
 import std;
@@ -17,4 +17,3 @@ TEST(JenkinsConformance, PassesTheCanonConformanceKit)
         EXPECT_TRUE(check.passed) << "[" << check.name << "] " << check.detail;
     EXPECT_TRUE(report.all_passed()) << report.summary();
 }
-// NOLINTEND

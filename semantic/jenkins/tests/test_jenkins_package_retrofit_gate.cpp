@@ -1,116 +1,52 @@
-// test_jenkins_package_retrofit_gate.cpp — the Jenkins RECOGNIZER RETROFIT over jenkins-markers/v2.
-// The link the Jenkins audit was missing: nothing in the tree scored the SHIPPED rows against real
-// bytes. Built on the GitLab package-proof precedent, and holding the same rule — the claim word is
-// fixed before the numbers exist, and a stronger word is never borrowed from a weaker oracle.
-//
-// ═══ WHAT IS BEING CLAIMED, IN THESE EXACT WORDS — three oracles, three claim words ═══
-//
-//   * L-T  — FIDELITY OF TRANSCRIPTION, permanently (declared limitation 1): the oracle is the
-//     pinned spike's per-trace output (console stage names, step count, `Finished:` token), and
-//     the spike authored the shipped rows' intent, so agreement here can never become independent
-//     validation. SUT==ORACLE is inherent and IS the claim: exactly the link the audit was
-//     missing — nothing in the tree scored the SHIPPED rows against the corpus.
-//   * L-S1/L-S2 — AGREEMENT WITH THE PLATFORM'S OWN STRUCTURAL RECORD (the wfapi stage tree), a
-//     producer this codebase never authored. Axis: the 64 stage-bearing WorkflowJob trees / 442
-//     stages / 2 145 steps. NEVER averaged with the 113 (different populations).
-//   * L-O  — RECOVERY OF THE PLATFORM'S RECORDED VERDICT from console bytes alone, on all 113.
-//     The authority is declared PER GRAIN, before any number: the REST `result` rules the run
-//     grain, wfapi's run status is a corroborate surface only. Unstable is FIRST-CLASS, pinned 4/4
-//     by name — it is never folded into Failure or Success.
-//   * The frozen external Jenkins depth/outcome claim does NOT widen on a green — a green makes
-//     the existing words AUDITED, which is the entire deliverable.
-//
-// ═══ THE POPULATION AND THE THREE COMMITTED ORACLE FILES (clauses 1/4) ═══
-//   * `RETRO-v2.trace-sidecar.tsv` — the committed projection of the 113 corpus.jsonl records
-//     (sorted by path), emitted by `emit_retrofit_sidecars.py`, which IMPORTS the pinned spike's
-//     `parse` and `depth_type_of` — one classifier, one owner; a C++ re-derivation inside this
-//     gate would agree with itself. Per-row `sha256` is the ATTESTED digest from the frozen
-//     content-anchor manifest (REGISTRY pin ae5f19f1…); bytes are VERIFIED here (clause 4).
-//   * `RETRO-v2.console-stages.tsv` — the frozen instrument's transcription oracle (524 stage
-//     names, console order). `RETRO-v2.wfapi-stages.tsv` — the platform's structural oracle
-//     (442 rows, names + statuses; 12 UNSTABLE stages counted there and asserted NOWHERE —
-//     stage-grain verdicts are not a product surface, declared limitation 4).
-//   * The corpora-side `projection(manifest) == sidecar` equality is the generator's own
-//     `--check` mode (corpora-repo governance) — this binary cannot see the JSON and does not try.
-//
-// ═══ THE INGEST ASSEMBLY THE MARKER LEGS SCORE (clause 8 — the PURIFIED chain, G-T5-RETRO) ═══
-// The legs re-score through the DECLARED chain, expectations frozen byte-for-byte at the pre-cut
-// figures — the migration-gate shape: the pre-state stopped existing when the cut landed, so its
-// figures are frozen into this TU rather than re-derived, and what the gate now certifies is a
-// CHARACTERIZATION pin over the sole surviving implementation. Per `\n`-split line (binary read,
-// `\r` NEVER trimmed — clause 6): the DECLARED transport peel — the stack comes from the
-// sidecar's frozen `stamp_class` column, never from inspection (whole-stream ⇒
-// `bracket-rfc3339-line-prefix`, payload-stamped/bare ⇒ degenerate; parse order transport →
-// logformat → intent; a stamp-only line peels blank and DROPS, bundled #4
-// catalogue-side) → stage 1 `normalize` (skip an all-escape line — the LogParser discipline;
-// measured on this corpus: 7 582 ESC-bearing lines, ZERO of them marker/`Finished:`-bearing, so
-// the seam is declared and inert on these bytes) → the SHIPPED `recognize()` over the composed
-// rows (there is no strategy any more — the rows plus canon's walkers ARE the parser). The
-// outcome leg is the SHIPPED `scan_run_outcome` + `resolve_run_outcome` over the PEELED lines —
-// public, driving the real LogParser (clause 8 satisfied outright).
-//
-// ═══ THE NAMED DELTAS, so a red is attributed rather than hand-waved ═══
-// Two spike-vs-walker semantic deltas are pre-named: (1) exclusion token boundary — spike
-// `body.split()[0]` (any whitespace) vs walker `' '` only; (2) bare `[Pipeline] //` (no trailing
-// space) — spike counts a step, walker excludes. Neither has a known corpus instance; the L-T
-// leg turns "unknown" into "counted". An L-T mismatch NOT attributable to a named delta is the
-// TRANSCRIPTION-DIVERGED event: stop, report to the Founder — pre-named claim retraction, never
-// a bug row.
-//
-// ═══ CLAUSE MAP ═══════════════════════════════
-//   1 committed population, sorted, uncapped     → the trace sidecar
-//   2 UNSET ⇒ skip; SET-BUT-BROKEN ⇒ hard fail   → SetUp()
-//   3 population SIZE selects the pins (113 asserted, not observed); unrecognized ⇒ FAIL
-//   4 bytes verified (sha256 + size) against the ATTESTED digests
-//   5 partitions CLOSE — depth cells sum to 113; wfapi ⟺ WorkflowJob exactly; outcome cells sum
-//     per class; elided (12) segregated in every structural cell, never filtered
-//   6 binary reads, `\n`-split only, `\r` is content
-//   7 red-capability OBSERVED and recorded below
-//   8 the SUT is the shipped symbols — `TransportStack::peel_raw`, `recognize()`,
-//     `scan_run_outcome`, `resolve_run_outcome`, `map_outcome_token`, `normalize`
-//   9 registered as RUN in `scripts/run_corpus_gates.sh` in the same commit as this file
-//
-// ═══ PIN PROVENANCE — two strengths, labelled (the G1-PEEL / GitLab discipline) ═══
-//   CORROBORATED    — the pinned spike's recorded v2 figures (g1_jenkins_v2.py on the frozen
-//                     corpus, 2026-07-30 run banked), reproduced independently from the committed
-//                     TSVs at freeze time AND by this gate's first run.
-//   CHARACTERIZATION — measured here first (2026-07-30), pinned so it cannot move silently
-//                     (the per-cell elided splits; the 2-trace cross-surface cell).
-//
-// ═══ FALSIFIABILITY — OBSERVED 2026-07-30, then recorded (clause 7); every mutation reverted ═══
-//   M-A  `"//"` dropped from kStepExcludes (jenkins.cppm) — the walker counts block-close
-//        annotations as steps: RED — L-T step-count mismatches on 65/113 traces (first row:
-//        builds_apache_org/job_Aries_job_website_build__29.log engine 19 vs oracle 13) and every
-//        L-S2 engine-denominator cell inflated (declarative non-elided 1 481 vs pinned 944).
-//        L-S1 per-trace 0, L-O and the population leg stayed green — the mutation is
-//        step-axis-local, and the legs partition exactly as designed.
-//   M-B  the UNSTABLE token row dropped (jenkins.cppm kOutcomeTokens) — RED on exactly the 4
-//        named traces, all inside L-O: agree cells 71/28/0/9 (Unstable 0 of pinned 4),
-//        unstable_recovered 0/4, each of the four traces printed as a named VOCABULARY error
-//        (`result 'UNSTABLE' does not map in the composed vocabulary`), and the sum-to-113
-//        outcome partition red. L-T/L-S1/L-S2/population all stayed green — nothing else moved.
-//   M-C  the timestamper peel width broken by one byte — SHORT side (`return close`), because
-//        the +1-long side is masked by the strategy's own post-stamp whitespace strip; the `]`
-//        leaks into content: RED — L-T on exactly the 12 whole-stream (ci.jenkins.io) traces,
-//        L-S1 collapses where the skeleton rides the stamp (matrix-pipe non-elided hits 0/64,
-//        elided 27/131; per-trace rows name acceptance-test-harness engine 0 vs oracle 23), and
-//        L-O absent-console grows to 12 (pinned 0) with agree 60/28/3/9 — the epilogue behind a
-//        stamp is unreachable. Three legs red, each naming its axis; population green.
-//   M-D  the STAGE extractor swapped to `RemainderAfterPrefix` (jenkins.cppm kMarkers[0]) —
-//        stage names storm (the G-GL-P5 class from the other side): RED — L-T stage-SEQUENCE
-//        divergences on 64/113 (counts equal, names differ — the `{ (Build)`-shaped remainder),
-//        L-S1 name hits collapse to 0 in all six cells (0/442) with 64 per-trace mismatches.
-//        L-S2/L-O/population green — the axis partition again.
-//
-// Determinism: byte-only — committed-order population, integer counts, no RNG, no clock, no
-// float, no threads. The sha256 is FIPS 180-4 over bytes; pure integer.
-
+// refs: ADR-8, ADR-17, STU-6, BIB:jenkins_dialect
+// invariant: this gate scores the SHIPPED rows against real bytes — the link the Jenkins audit
+// was missing — and the claim word is fixed before the numbers exist, per leg.
+// invariant: the transcription leg claims FIDELITY OF TRANSCRIPTION permanently: the oracle is the
+// pinned spike, which authored the shipped rows' intent, so agreement can never be validation.
+// invariant: the two structural legs claim AGREEMENT WITH THE PLATFORM'S OWN stage tree, a producer
+// this codebase never authored, on the stage-bearing-tree axis and never on the traces.
+// invariant: the outcome leg claims RECOVERY of the platform's recorded verdict from console bytes
+// alone, with the authority declared PER GRAIN before any number.
+// invariant: the REST result rules the run grain and the stage-tree status is a corroborate surface
+// only; Unstable is FIRST-CLASS and is pinned by name.
+// invariant: a green does NOT widen the frozen external depth or outcome claim — it makes the
+// existing words audited, which is the whole deliverable.
+// invariant: the population is the committed sidecar, emitted by a generator that IMPORTS the
+// pinned spike — one classifier, one owner — with per-row digests verified here.
+// invariant: that the sidecar equals the projection of the corpus manifest is the corpora repo's
+// own governance; this binary cannot see that JSON and does not try.
+// invariant: the legs re-score through the DECLARED chain with expectations frozen at the pre-cut
+// figures: the pre-state stopped existing at the cut, so this certifies a characterization pin.
+// invariant: the declared stack comes from the sidecar's frozen stamp class, never from inspection,
+// and the parse order is transport, then log format, then intent.
+// assert: normalization skips an all-escape line, and that seam is inert on these bytes: 7 582
+// escape-bearing lines, ZERO of them carrying a marker or the epilogue.
+// invariant: two spike-versus-walker deltas are pre-named — the exclusion token boundary, and a
+// space-less block-close annotation — and neither has a known corpus instance.
+// invariant: a transcription mismatch NOT attributable to a named delta is the pre-named retraction
+// event: stop and report, never file a bug row.
+// invariant: the partitions CLOSE — the depth cells sum to the population, the stage tree is
+// biconditional with the pipeline job class, and the elided cell is segregated in every cell.
+// invariant: reads are binary, split on newline only, and a carriage return is content.
+// invariant: a pin is labelled CORROBORATED when a recorded closed measurement was reproduced
+// independently, and CHARACTERIZATION when it was measured here first and pinned.
+// assert: red-capability was OBSERVED and every mutation reverted, and each mutation reddened its
+// OWN axis and left the others green — which is what makes the leg partition a measurement.
+// assert: dropping a structural token from the exclusion set reddened the transcription leg on 65
+// of 113 traces and inflated every engine step denominator, with the name legs untouched.
+// assert: dropping the Unstable token row reddened only the outcome leg, on exactly the 4 named
+// traces, and broke the outcome partition's sum.
+// assert: breaking the peel width by one byte reddened three legs at once — transcription on the
+// 12 whole-stream traces, the name cells where the skeleton rides the stamp, and the outcome leg.
+// assert: swapping the stage extractor reddened the transcription and name legs alone — equal
+// counts, different names — and the name hits collapsed to zero in all six cells.
+// note: determinism: committed-order population, integer counts, no RNG, clock, float or thread
 #include <gtest/gtest.h>
 
 import std;
-import insight.canon;             // recognize / scan_run_outcome / resolve_run_outcome / normalize
-import insight.canon.conformance; // marker_probe_for — the L-C tripwire observes the kit's probe
-import insight.semantic.jenkins;  // kManifest + kDialect (the code tier is empty since T5 5.2)
+import insight.canon;
+import insight.canon.conformance;
+import insight.semantic.jenkins;
 
 using insight::map_outcome_token;
 using insight::resolve_run_outcome;
@@ -125,12 +61,11 @@ using insight::tokenization::recognize;
 namespace
 {
 
-// A `const char*`, not a string_view: it is handed to getenv, and string_view::data() carries no
-// null-termination guarantee.
+// note: a `const char*`, not a string_view: it is handed to getenv, which needs the terminator
 constexpr const char* kCorpusVar{"CORPUS_JENKINS_MARKERS_DIR"};
 constexpr std::string_view kTraceSidecar{"RETRO-v2.trace-sidecar.tsv"};
-// The frozen column order (positional reader). Namespace-scope because the pre-cut oracle emitter
-// below reads the same sidecar through the same header check.
+// invariant: the frozen column order for a POSITIONAL reader — a drifted header is a red rather
+// than a guess.
 constexpr std::string_view kTraceHeader{
     "path\tsha256\tbytes\tjob_class\tdepth_type\telided\tresult\twfapi_status"
     "\twfapi_stage_count\twfapi_step_count\tconsole_stage_count\tconsole_step_count"
@@ -141,46 +76,47 @@ constexpr std::string_view kBytesRoot{"data/v2"};
 
 constexpr std::size_t kMaxReportedRows{10};
 
-// ── The pins ──────────────────────────────────────────────────────────────────────────────────
-// CORROBORATED — population (corpus.jsonl + the authoritative recheck labels; the 39/11 split in
-// an earlier design draft was the PRE-recheck labelling — the spike consumes the recheck, so the
-// gate pins the recheck: 40 declarative / 10 scripted, the one TensorFlow flip):
+// invariant: the depth pins are the AUTHORITATIVE recheck labels, which the spike consumes; an
+// earlier design draft's split was the pre-recheck labelling and is not what this gate pins.
+// invariant: the stage tree is biconditional with the pipeline job class — its ABSENCE is the
+// freestyle and classic-matrix floor, never a gap in the corpus.
+// invariant: the unstable stage count is a counted oracle cell asserted nowhere else, because a
+// stage-grain verdict is not a product surface.
 constexpr std::size_t kTraces{113};
 constexpr std::size_t kDeclarative{40};
 constexpr std::size_t kScripted{10};
 constexpr std::size_t kMatrixPipe{17};
 constexpr std::size_t kMatrixClassic{19};
 constexpr std::size_t kFreestyle{27};
-constexpr std::size_t kWorkflowJobs{67}; // wfapi ⟺ WorkflowJob exactly — absence IS the floor
+constexpr std::size_t kWorkflowJobs{67};
 constexpr std::size_t kStageBearingTrees{64};
 constexpr std::size_t kWfapiStageRows{442};
 constexpr std::size_t kWfapiStepSum{2145};
-constexpr std::size_t kUnstableWfapiStages{12}; // counted HERE, asserted nowhere else
+constexpr std::size_t kUnstableWfapiStages{12};
 constexpr std::size_t kElided{12};
 constexpr std::size_t kResultSuccess{72};
 constexpr std::size_t kResultFailure{28};
 constexpr std::size_t kResultAborted{9};
 constexpr std::size_t kResultUnstable{4};
-// CORROBORATED — the stamp-class partition (whole-stream · payload-stamped · bare), now a
-// GENERATED sidecar column: one classifier, one owner — `t0_transport.triage` imported by the
-// generator; declarations in these gates come from the frozen labels, never from inspection.
-// A second partition on a second axis: NEVER cross-quoted with the depth cells.
+// invariant: the stamp-class partition is a GENERATED sidecar column with one classifier and one
+// owner; it is a SECOND axis beside the depth cells and is never cross-quoted with them.
 constexpr std::size_t kWholeStream{12};
 constexpr std::size_t kPayloadStamped{19};
 constexpr std::size_t kBare{82};
-// CHARACTERIZATION — the result-vs-wfapi cross-surface cell, counted under the declared
-// authority map (result rules the run grain, wfapi the stage grain). The prose that preceded this
-// gate said ONE such disagreement; the committed oracle carries TWO (remoting_3_10_x_backup__1 and
-// Nem_controller_PR_826__53) — pinned at the MEASURED value, the prose reported as the suspect.
+// invariant: the cross-surface cell is counted under the declared authority map — the result
+// rules the run grain, the stage tree the stage grain.
+// assert: the prose that preceded this gate said ONE such disagreement and the committed oracle
+// carries TWO, so the pin is the MEASURED value and the prose is the suspect.
 constexpr std::size_t kResultVsWfapiCrossSurface{2};
-// CORROBORATED — L-T: the shipped chain equals the frozen instrument per trace, all 113.
+// invariant: the transcription pin is zero mismatches over all 113 traces, per trace, so
+// compensating errors across traces cannot cancel into a pass.
 constexpr std::size_t kTranscriptionMismatches{0};
 constexpr std::size_t kConsoleStageRows{524};
 constexpr std::size_t kConsoleFinishedAbsent{0};
-// CORROBORATED — L-S1 name-level cells (hits / wfapi names / console names), by depth_type ×
-// elided; the depth sums reproduce the spike's recorded figures exactly (220/220 · 27/27 ·
-// 160/195). Elided is segregated because a mid-log truncation is a ONE-SIGNED confound — it can
-// only depress console recall, never inflate it; the elided cells are CHARACTERIZATION.
+// invariant: a structural cell is hits, oracle denominator and engine denominator, keyed by depth
+// type crossed with elision.
+// invariant: elided is segregated because a mid-log truncation is a ONE-SIGNED confound: it can
+// only depress console recall, never inflate it, so those cells are characterization.
 struct StructuralCell
 {
     std::size_t hits;
@@ -193,35 +129,29 @@ constexpr StructuralCell kS1ScriptedPlain{23, 23, 23};
 constexpr StructuralCell kS1ScriptedElided{4, 4, 4};
 constexpr StructuralCell kS1MatrixPipePlain{64, 64, 86};
 constexpr StructuralCell kS1MatrixPipeElided{96, 131, 173};
-// CORROBORATED — L-S2 step-count cells (Σ min(engine, wfapi) / Σ wfapi / Σ engine); the depth
-// sums reproduce the spike's recorded step recall exactly (declarative+scripted 100%, matrix-pipe
-// 96.3% =
-// (558+833)/(558+887)); the per-elided split is CHARACTERIZATION. Axis discipline: the cells sum
-// over the 64 STAGE-BEARING trees only — the 3 zero-stage wfapi trees (remoting_3_10_x_backup__1
-// with 69 console steps against a 0-step tree, and the two Nem `#49`s with 1 each) are counted
-// in the population, never scored (declared limitation 2); a pin derived over the 67-wfapi axis
-// instead reads 1 292/91 and is WRONG — caught on this gate's own first run.
+// invariant: the step cells sum over the STAGE-BEARING trees only — the zero-stage trees are
+// counted in the population and never scored, which is a declared limitation.
+// assert: a pin derived over the whole stage-tree axis reads 1 292 and 91 where the stage-bearing
+// axis reads 1 223 and 89 — an error caught on this gate's own first run.
 constexpr StructuralCell kS2DeclarativePlain{622, 622, 944};
 constexpr StructuralCell kS2DeclarativeElided{4, 4, 14};
 constexpr StructuralCell kS2ScriptedPlain{61, 61, 89};
 constexpr StructuralCell kS2ScriptedElided{13, 13, 20};
 constexpr StructuralCell kS2MatrixPipePlain{558, 558, 823};
 constexpr StructuralCell kS2MatrixPipeElided{833, 887, 1223};
-// CORROBORATED — L-O (the spike's recorded outcome table, reproduced by the engine's own scan):
-// per API class, the count the console scan recovers IN AGREEMENT; absent-console pinned 0 (v2
-// true-tail capture); exactly ONE console-vs-API divergence — the Accumulo-#498 class's own trace,
-// API SUCCESS with console `Finished: ABORTED`, our rows faithfully reporting the console. That is
-// the console's declared subordination to the authoritative API result, as a counted cell and
-// never a row defect.
+// invariant: per API class, the count the console scan recovers IN AGREEMENT; the absent-console
+// cell is pinned at zero because the corpus captures a true tail.
+// invariant: exactly one console-versus-API divergence is pinned BY NAME — the console's declared
+// subordination to the authoritative result, as a counted cell and never a row defect.
 constexpr std::size_t kAgreeSuccess{71};
 constexpr std::size_t kAgreeFailure{28};
-constexpr std::size_t kAgreeUnstable{4}; // 4/4 by name — RunOutcome::Unstable is FIRST-CLASS
+constexpr std::size_t kAgreeUnstable{4};
 constexpr std::size_t kAgreeAborted{9};
 constexpr std::size_t kConsoleAbsent{0};
 constexpr std::size_t kDivergent{1};
 constexpr std::string_view kDivergentTrace{"builds_apache_org/job_Accumulo_job_2_1__498.log"};
 
-// ── SHA-256 (FIPS 180-4) — frozen, pure integer, single-shot (the GitLab-gate block) ──────────
+// invariant: SHA-256 frozen here as pure integer arithmetic, single-shot.
 constexpr std::array<std::uint32_t, 64> kSha256RoundConstants{
     0x428a2f98U, 0x71374491U, 0xb5c0fbcfU, 0xe9b5dba5U, 0x3956c25bU, 0x59f111f1U, 0x923f82a4U,
     0xab1c5ed5U, 0xd807aa98U, 0x12835b01U, 0x243185beU, 0x550c7dc3U, 0x72be5d74U, 0x80deb1feU,
@@ -317,7 +247,6 @@ constexpr std::array<std::uint32_t, 64> kSha256RoundConstants{
     return out;
 }
 
-// ── The committed-file rows ───────────────────────────────────────────────────────────────────
 struct TraceRow
 {
     std::string path;
@@ -327,13 +256,15 @@ struct TraceRow
     std::string depth_type;
     bool elided{false};
     std::string result;
-    std::string wfapi_status; // "" = no wfapi
+    // invariant: an absent stage count means the trace has no platform tree, and an absent epilogue
+    // token means the frozen instrument found none — both are states, not parse failures.
+    std::string wfapi_status;
     std::optional<std::uint64_t> wfapi_stage_count;
     std::optional<std::uint64_t> wfapi_step_count;
     std::uint64_t console_stage_count{0};
     std::uint64_t console_step_count{0};
-    std::string console_finished; // "" = the instrument found no epilogue
-    std::string stamp_class;      // whole-stream | payload-stamped | bare
+    std::string console_finished;
+    std::string stamp_class;
 };
 
 [[nodiscard]] std::vector<std::string_view> split_tabs(std::string_view line)
@@ -359,14 +290,15 @@ struct TraceRow
     return value;
 }
 
-// ── One trace's engine result through the shipped chain ──────────────────────────────────────
+// invariant: one trace's engine result through the shipped chain: stage names in CONSOLE order, a
+// step count, and the epilogue remainder token, empty when absent.
 struct TraceEngineResult
 {
-    std::vector<std::string> stage_names; // console order
+    std::vector<std::string> stage_names;
     std::size_t steps{0};
     bool outcome_recovered{false};
     RunOutcome outcome{RunOutcome::Unknown};
-    std::string finished_token; // the scan's RemainderToken word ("" when absent)
+    std::string finished_token;
 };
 
 [[nodiscard]] const char* outcome_name(RunOutcome outcome)
@@ -394,10 +326,10 @@ struct TraceEngineResult
                                                             {});
 }
 
-// The DECLARED stacks, per stamp class — declarations come from the frozen sidecar labels, never
-// from inspection. whole-stream ⇒ the bracket row; payload-stamped and bare ⇒ the degenerate
-// stack: a PAYLOAD stamp is dialect content, not a delivery-layer envelope, so it is not
-// declarable as transport, its stamps stay content, and the re-baseline is attributed.
+// invariant: the declared stack per stamp class comes from the frozen sidecar labels, never from
+// inspection: whole-stream takes the bracket row, and the other two the degenerate stack.
+// invariant: a PAYLOAD stamp is dialect content rather than a delivery-layer envelope, so it is not
+// declarable as transport and its stamps stay in content.
 [[nodiscard]] const insight::transport::TransportStack& stack_for(std::string_view stamp_class)
 {
     static const insight::transport::TransportStack degenerate{};
@@ -426,23 +358,21 @@ struct TraceEngineResult
         if (raw_line.empty())
             continue;
 
-        // ── the purified chain: DECLARED transport peel → stage 1 → shipped recognize() ──
-        // (parse order: transport → logformat → intent). A stamp-only line peels to
-        // blank and blank means DROP (PeeledLine::is_blank — the strategy's bundled #4, now
-        // catalogue-side); a line the row's grammar declines peels to itself (totality is
-        // application, not effect: a declared total transform is applied to every line, and its
-        // per-line effect may be the identity — that is not detection).
+        // invariant: a stamp-only line peels blank and blank means DROP; a line the row's grammar
+        // declines peels to ITSELF.
+        // invariant: totality is about APPLICATION, not effect: a declared total transform runs on
+        // every line and its per-line effect may be the identity, which is not detection.
         const insight::transport::RawPeeledLine peeled{stack.peel_raw(raw_line)};
         if (peeled.content.empty())
             continue;
 
-        // The outcome scan receives the PEELED line: `scan_run_outcome` owns its own stage 1
-        // (it drives the real LogParser) and its own `\r` anchoring.
+        // invariant: the outcome scan receives the PEELED line and owns its own normalization and
+        // carriage return anchoring, because it drives the real parser.
         outcome_lines.emplace_back(peeled.content);
 
         const auto normalized{insight::tokenization::normalize(peeled.content, stage1_scratch)};
         if (normalized.bytes().empty())
-            continue; // the line was all escape bytes — the LogParser discipline
+            continue;
         const auto marker{recognize(normalized.undeclared_suffix(0), composed)};
         if (marker.kind == IntentMarkerKind::Job)
             result.stage_names.emplace_back(marker.name);
@@ -455,16 +385,15 @@ struct TraceEngineResult
     if (scan.marker_present)
     {
         result.outcome_recovered = true;
-        result.outcome =
-            resolve_run_outcome({}, scan, composed, composed).outcome; // console bytes ALONE
+        result.outcome = resolve_run_outcome({}, scan, composed, composed).outcome;
     }
     return result;
 }
 
-// ── The corpus-wide score, computed ONCE and shared by the leg tests ─────────────────────────
+// invariant: the corpus-wide score is computed ONCE and shared by the leg tests, so every leg reads
+// one measurement rather than re-running the chain per assertion.
 struct CorpusScore
 {
-    // population
     std::size_t rows{0};
     std::map<std::string, std::size_t> depth_cells;
     std::size_t workflow_jobs{0};
@@ -475,23 +404,20 @@ struct CorpusScore
     std::size_t unstable_wfapi_stages{0};
     std::size_t elided{0};
     std::map<std::string, std::size_t> result_cells;
-    std::map<std::string, std::size_t> stamp_cells; // the second partition, on its own axis
-    std::size_t cross_surface{0}; // result ABORTED ∧ wfapi FAILED — counted, result rules
+    std::map<std::string, std::size_t> stamp_cells;
+    std::size_t cross_surface{0};
     std::size_t console_stage_rows{0};
     std::size_t console_finished_absent{0};
     std::vector<std::string> integrity_errors;
 
-    // L-T
     std::size_t transcription_mismatches{0};
     std::vector<std::string> transcription_rows;
 
-    // L-S1 / L-S2 — cells keyed (depth_type, elided)
     std::map<std::pair<std::string, bool>, StructuralCell> s1_cells;
     std::map<std::pair<std::string, bool>, StructuralCell> s2_cells;
-    std::size_t s1_per_trace_mismatches{0}; // engine hit != oracle-derived hit, per trace
+    std::size_t s1_per_trace_mismatches{0};
     std::vector<std::string> s1_rows;
 
-    // L-O
     std::size_t agree_success{0};
     std::size_t agree_failure{0};
     std::size_t agree_unstable{0};
@@ -499,7 +425,7 @@ struct CorpusScore
     std::size_t console_absent{0};
     std::size_t divergent{0};
     std::vector<std::string> divergent_rows;
-    std::size_t unstable_recovered{0}; // of the 4 named UNSTABLE traces
+    std::size_t unstable_recovered{0};
     std::vector<std::string> unstable_rows;
     std::vector<std::string> vocabulary_errors;
 };
@@ -525,7 +451,8 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
   protected:
     void SetUp() override
     {
-        // Clause 2 — UNSET vs SET-BUT-BROKEN are different states and must not share a verdict.
+        // invariant: an unset corpus variable is a hard FAIL and so is a set-but-broken mount; what
+        // differs between them is the diagnostic, never the verdict.
         const char* const raw{std::getenv(kCorpusVar)};
         if (raw == nullptr || *raw == '\0')
             FAIL() << kCorpusVar
@@ -565,7 +492,8 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
         return std::move(buffer).str();
     }
 
-    // Read one committed TSV; returns data rows (header validated against `expected_header`).
+    // post: the data rows of one committed TSV, with the header validated against the frozen column
+    // order rather than skipped.
     [[nodiscard]] static std::vector<std::vector<std::string>>
     read_tsv(const std::filesystem::path& path, std::string_view expected_header,
              std::vector<std::string>& errors)
@@ -704,7 +632,8 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
             if (row.console_finished.empty())
                 ++corpus.console_finished_absent;
 
-            // clause 4 — bytes verified against the ATTESTED digest, not assumed.
+            // assert: bytes are verified against the ATTESTED digest and size, never assumed —
+            // wrong bytes under a right count is the fabricated-pass shape.
             bool read_ok{true};
             const std::string bytes{read_file(root_ / kBytesRoot / row.path, read_ok)};
             if (!read_ok)
@@ -726,7 +655,9 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
             const TraceEngineResult engine{
                 score_trace(bytes, composed, stack_for(row.stamp_class))};
 
-            // ── L-T: the shipped chain equals the frozen instrument, per trace ──
+            // assert: the shipped chain must equal the frozen instrument on the stage SEQUENCE, the
+            // step count and the epilogue token, per trace.
+            // note: the two oracle files disagreeing on a stage count is generator drift
             const std::vector<std::string> empty_names;
             const auto oracle_names_it{console_names.find(row.path)};
             const std::vector<std::string>& oracle_names{
@@ -758,7 +689,8 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
                     "': the two committed oracle files disagree on the "
                     "console stage count — generator drift");
 
-            // ── L-S1 / L-S2 over the stage-bearing wfapi axis ──
+            // invariant: the structural legs score over the stage-bearing trees only, and the name
+            // leg compares as a MULTISET so a repeated stage name is not silently deduplicated.
             if (row.wfapi_stage_count.has_value() && *row.wfapi_stage_count > 0)
             {
                 const std::vector<std::string>& tree{wfapi_names[row.path]};
@@ -784,7 +716,10 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
                 s2.console += engine.steps;
             }
 
-            // ── L-O over all 113: recover the platform verdict from console bytes alone ──
+            // invariant: the outcome leg spans the whole population and recovers the verdict from
+            // console bytes ALONE — the authoritative side-input is deliberately withheld.
+            // invariant: a result outside the composed vocabulary is a VOCABULARY error rather than
+            // a disagreement, and it makes every cell below suspect.
             const auto api_mapped{map_outcome_token(row.result, composed)};
             if (!api_mapped.has_value())
             {
@@ -842,7 +777,8 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
 
 std::filesystem::path JenkinsRecognizerRetrofitGate::root_{};
 
-// The shared diagnostic block — printed on ANY failure: actual-vs-expected, with the trace named.
+// invariant: the shared diagnostic block is printed on ANY failure — every number with its
+// denominator, and the trace named.
 [[nodiscard]] std::string report(const CorpusScore& corpus)
 {
     const auto cell{[&](const char* name, const std::map<std::string, std::size_t>& cells)
@@ -923,7 +859,8 @@ TEST_F(JenkinsRecognizerRetrofitGate, ThePopulationIsTheCommittedSidecarVerified
 {
     const CorpusScore& corpus{score()};
 
-    // Clause 3 — the population SIZE selects the pins; an unrecognized population FAILS.
+    // invariant: the population SIZE selects the pins, so a re-sliced or re-versioned corpus forces
+    // a DELIBERATE re-pin of every cell instead of silently redefining what this gate measures.
     ASSERT_EQ(corpus.rows, kTraces)
         << "the committed sidecar yielded " << corpus.rows << " trace rows, not " << kTraces
         << ". A re-sliced or re-versioned corpus must force a DELIBERATE re-pin of every cell, "
@@ -934,7 +871,6 @@ TEST_F(JenkinsRecognizerRetrofitGate, ThePopulationIsTheCommittedSidecarVerified
         << " integrity error(s) — attested digests, sizes, or the oracle joins failed."
         << report(corpus);
 
-    // Clause 5 — the depth partition closes into named cells (authoritative recheck labels).
     const auto depth{[&](const char* name)
                      {
                          const auto found{corpus.depth_cells.find(name)};
@@ -953,7 +889,6 @@ TEST_F(JenkinsRecognizerRetrofitGate, ThePopulationIsTheCommittedSidecarVerified
               corpus.rows)
         << report(corpus);
 
-    // wfapi ⟺ WorkflowJob exactly — absence IS the freestyle/matrix-classic floor, not a gap.
     EXPECT_EQ(corpus.workflow_jobs, kWorkflowJobs) << report(corpus);
     EXPECT_EQ(corpus.wfapi_traces, kWorkflowJobs) << report(corpus);
     EXPECT_EQ(corpus.stage_bearing, kStageBearingTrees)
@@ -985,8 +920,6 @@ TEST_F(JenkinsRecognizerRetrofitGate, ThePopulationIsTheCommittedSidecarVerified
            "the oracle is the record, pinned at the measured value."
         << report(corpus);
 
-    // The stamp-class partition (a GENERATED sidecar column — one classifier, one owner). A
-    // second axis beside the depth partition, never cross-quoted; closes to 113.
     const auto stamp{[&](const char* name)
                      {
                          const auto found{corpus.stamp_cells.find(name)};
@@ -1005,12 +938,12 @@ TEST_F(JenkinsRecognizerRetrofitGate, ThePopulationIsTheCommittedSidecarVerified
 TEST_F(JenkinsRecognizerRetrofitGate, LTTranscriptionTheShippedChainEqualsTheFrozenInstrument)
 {
     const CorpusScore& corpus{score()};
-    ASSERT_EQ(corpus.rows, kTraces) << report(corpus); // clause 3 gates every cell below
+    ASSERT_EQ(corpus.rows, kTraces) << report(corpus);
 
-    // ═══ THE TRANSCRIPTION CLAIM — per trace, denominator 113, so compensating errors cannot
-    // cancel. A nonzero count NOT attributable to one of the named deltas above is the pre-named
-    // TRANSCRIPTION-DIVERGED event: stop, report to the Founder — a claim retraction, never a
-    // bug row. ═══
+    // invariant: a nonzero transcription count not attributable to a named delta is the pre-named
+    // retraction event: attribute every row or escalate.
+    // assert: an absent epilogue token in the oracle is an ORACLE regression rather than an engine
+    // finding, which is why that cell is pinned at zero beside it.
     EXPECT_EQ(corpus.transcription_mismatches, kTranscriptionMismatches)
         << "the shipped chain and the frozen instrument disagree on at least one trace's "
            "(stage sequence, step count, Finished token). Attribute every row below to one of the "
@@ -1027,15 +960,12 @@ TEST_F(JenkinsRecognizerRetrofitGate, LS1StageNamesAgreeWithThePlatformTree)
     const CorpusScore& corpus{score()};
     ASSERT_EQ(corpus.rows, kTraces) << report(corpus);
 
-    // Per-trace agreement FIRST (green-BLIND-via-aggregates is the named failure mode): the
-    // engine's per-trace name hits against the platform tree must equal the frozen instrument's
-    // per-trace hits — a compensating-error pass across traces is structurally excluded.
+    // invariant: per-trace agreement is asserted FIRST, because green-blind-via-aggregates is the
+    // named failure mode: a compensating-error pass across traces is structurally excluded.
     EXPECT_EQ(corpus.s1_per_trace_mismatches, 0U) << report(corpus);
 
-    // The cells, by depth_type × elided (elided segregated — one-signed confound).
-    // Axis: 64 stage-bearing trees / 442 wfapi stages. Declarative is the claim carrier;
-    // scripted / matrix-pipe corroborate. Depth sums reproduce the spike's recorded name-level
-    // figures: 220/220 · 27/27 · 160/195.
+    // invariant: the cells are keyed by depth type crossed with elision; declarative is the claim
+    // carrier and the other depths corroborate it, never widen it.
     expect_cell(cell_of(corpus.s1_cells, "declarative", false), kS1DeclarativePlain, "L-S1",
                 "declarative", false, corpus);
     expect_cell(cell_of(corpus.s1_cells, "declarative", true), kS1DeclarativeElided, "L-S1",
@@ -1058,9 +988,9 @@ TEST_F(JenkinsRecognizerRetrofitGate, LS2StepCountsAgreeWithThePlatformTree)
     const CorpusScore& corpus{score()};
     ASSERT_EQ(corpus.rows, kTraces) << report(corpus);
 
-    // Axis: the same 64 trees, 2 145 oracle steps — never averaged with the 113. The elided
-    // cells are segregated so the pin punishes the rows, never the capture (the one-signed
-    // elision confound is visible as the matrix-pipe elided 833/887 recall shortfall).
+    // invariant: the step cells run over the same stage-bearing trees and are never averaged with
+    // the per-trace population — two axes, two denominators.
+    // note: the one-signed elision confound is visible as the matrix-pipe elided recall shortfall
     expect_cell(cell_of(corpus.s2_cells, "declarative", false), kS2DeclarativePlain, "L-S2",
                 "declarative", false, corpus);
     expect_cell(cell_of(corpus.s2_cells, "declarative", true), kS2DeclarativeElided, "L-S2",
@@ -1085,24 +1015,23 @@ TEST_F(JenkinsRecognizerRetrofitGate, LOTheRunOutcomeRecoversThePlatformVerdict)
         << "a verdict left the recorded vocabulary — every cell below is suspect."
         << report(corpus);
 
-    // ═══ Unstable is FIRST-CLASS, pinned 4/4 BY NAME — never recovered as Failure/Success ═══
+    // invariant: Unstable is FIRST-CLASS and pinned BY NAME — it is neither Success nor Failure
+    // and must never collapse into either.
     EXPECT_EQ(corpus.unstable_recovered, kAgreeUnstable)
         << "an UNSTABLE run did not recover as RunOutcome::Unstable — the four-class run-grain "
            "vocabulary folded: Unstable is neither Success nor Failure and must never collapse "
            "into either."
         << report(corpus);
 
-    // The agreement cells, per API class — denominator 113, cells sum per class (clause 5).
     EXPECT_EQ(corpus.agree_success, kAgreeSuccess) << report(corpus);
     EXPECT_EQ(corpus.agree_failure, kAgreeFailure) << report(corpus);
     EXPECT_EQ(corpus.agree_unstable, kAgreeUnstable) << report(corpus);
     EXPECT_EQ(corpus.agree_aborted, kAgreeAborted) << report(corpus);
 
-    // The absent-console cell is PINNED — growth here is red, so it can never quietly swallow
-    // misses (the named can't-FAIL dodge for this leg).
+    // invariant: the absent-console cell is PINNED, so growth in it is red and it can never quietly
+    // swallow misses — the named can't-FAIL dodge for this leg.
     EXPECT_EQ(corpus.console_absent, kConsoleAbsent) << report(corpus);
 
-    // Exactly one console-vs-API divergence, and it is the Accumulo-#498 class's own trace.
     ASSERT_EQ(corpus.divergent, kDivergent)
         << "the divergence cell moved — a new console-vs-API disagreement class, or a recognizer "
            "regression; establish which before any re-pin."
@@ -1111,7 +1040,8 @@ TEST_F(JenkinsRecognizerRetrofitGate, LOTheRunOutcomeRecoversThePlatformVerdict)
         << "the single divergence is pinned BY NAME (API SUCCESS, console Finished: ABORTED)."
         << report(corpus);
 
-    // Clause 5 — the outcome cells sum to the population.
+    // assert: the outcome cells sum to the population, so a trace cannot vanish into a bucket
+    // nobody counted.
     EXPECT_EQ(corpus.agree_success + corpus.agree_failure + corpus.agree_unstable +
                   corpus.agree_aborted + corpus.console_absent + corpus.divergent,
               kTraces)
@@ -1121,25 +1051,16 @@ TEST_F(JenkinsRecognizerRetrofitGate, LOTheRunOutcomeRecoversThePlatformVerdict)
     GTEST_LOG_(INFO) << "Jenkins retrofit gate green" << report(corpus);
 }
 
-// The pre-cut bare-null oracle EMITTER lived here between the FIRST ACT and the identity cut
-// that landed it: it froze the shipped chain's per-trace scores over the 82 bare traces
-// into the committed BARE-v2.baseline.tsv (emitted at e6f5494, provenance in the file's
-// own header) and was DELETED with the cut, exactly as announced — regenerating the oracle now
-// requires re-adding code, which is the loud act the freeze demands. The comparing gate is
-// test_jenkins_bare_null_gate.cpp (G-T5-BARE).
-
 } // namespace
 
-// ═══ L-C — the conformance-probe regression tripwire (synthetic, NO corpus, runs everywhere) ═══
-// The repaired `marker_probe_for` renders the paired writer row, so the STAGE probe is
-// `[Pipeline] { (probe)` and FIRES; the old `prefix + " probe"` form yielded `[Pipeline] { ( probe`
-// — a probe that fires NOWHERE, which made the kit's `dialect_gate.marker_leak` leg vacuous
-// (asserting "did not fire on a foreign stream" about a probe that could not fire anywhere).
-// This leg observes the KIT'S OWN exported probe, so a regression inside the kit is red HERE,
-// outside it — vacuity-by-regression, guarded. A separate suite (not the corpus fixture) so it
-// runs on every clone and every CI leg, corpus or none.
 namespace
 {
+// invariant: this leg observes the KIT'S OWN exported probe, so a regression inside the kit is red
+// HERE, outside it — vacuity-by-regression, guarded.
+// invariant: the repaired probe renders the paired writer row and therefore FIRES; the old form
+// yielded a probe that fired nowhere, which made the kit's own leak leg vacuous.
+// assert: it is a separate suite rather than the corpus fixture, so it runs on every clone and
+// every CI leg, corpus or none.
 TEST(JenkinsRetrofitConformanceTripwire, TheKitsOwnStageProbeFires)
 {
     const auto& manifest{insight::semantic::jenkins::kManifest};

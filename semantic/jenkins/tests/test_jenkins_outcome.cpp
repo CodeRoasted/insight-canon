@@ -1,9 +1,7 @@
-// test_jenkins_outcome.cpp — the Jenkins run-outcome VOCABULARY: the five native `result` strings
-// map into the core four-class RunOutcome, and the console-tail `Finished: <RESULT>` epilogue is
-// recognized through this package's own strategy + marker row over a realistic mini console
-// (timestamper-prefixed AND bare). The LADDER mechanics — authoritative side-input, then the
-// console tail's LAST match, then Unknown — are core's (tests/compose/test_run_outcome.cpp,
-// synthetic manifests); this file guards only the JENKINS DATA and its end-to-end recognizability.
+// refs: ADR-17, SRC-D-OUT-RUN-1
+// invariant: this file guards the JENKINS run-outcome DATA and its end-to-end recognizability,
+// never the resolution ladder — that is core's, over synthetic manifests.
+// refs: F-SRC-insight-canon:test_run_outcome.cpp
 #include <gtest/gtest.h>
 
 import std;
@@ -19,13 +17,11 @@ using insight::semantic::ComposedSemantics;
 
 namespace
 {
-// The RESOLVED view of a stream that declared this dialect — the concretely-gated rows are
-// reachable only through a declaration, never through per-line format detection.
-// The UNFILTERED composition — every package row, no stream view. This is what a
-// caller-declared verdict resolves against (DN-32.D6): the vocabulary answers WHO SUPPLIED
-// the verdict, so it must not be filtered by the dialect of whoever WROTE the bytes.
-// `map_outcome_token_in` re-derives through `for_stream` itself, so handing it an already
-// filtered view is a silent no-op — which is why these are two named helpers, not one.
+// refs: DN-32.D6
+// invariant: the UNFILTERED composition is what a caller-declared verdict resolves against: the
+// vocabulary answers WHO SUPPLIED the verdict, so it must not be filtered by who WROTE the bytes.
+// assert: `map_outcome_token_in` re-derives through `for_stream` itself, so handing it an already
+// filtered view is a silent no-op — which is why these are two named helpers and not one.
 [[nodiscard]] ComposedSemantics jenkins_vocabularies()
 {
     return insight::semantic::compose(std::array{insight::semantic::jenkins::kManifest});
@@ -38,7 +34,7 @@ namespace
                                                             {});
 }
 
-// The same composition on a stream that declared NO dialect — the fail-closed arm.
+// invariant: the same composition on a stream that declared NO dialect — the fail-closed arm.
 [[nodiscard]] ComposedSemantics undeclared_stream()
 {
     const std::array manifests{insight::semantic::jenkins::kManifest};
@@ -46,6 +42,11 @@ namespace
 }
 } // namespace
 
+// refs: SRC-II-6
+// invariant: UNSTABLE is its own class and is never folded into Failure or Success; NOT_BUILT is a
+// MAPPING to Unknown rather than a miss, which is why its arm asserts a value is present.
+// invariant: an unmapped token stays unmapped, and the map is dialect-gated: on a stream that
+// declared no dialect the row is not in the view at all.
 TEST(JenkinsOutcome, TheFiveNativeResultStringsMap)
 {
     const ComposedSemantics composed{jenkins_only()};
@@ -57,21 +58,20 @@ TEST(JenkinsOutcome, TheFiveNativeResultStringsMap)
     const auto not_built{map_outcome_token("NOT_BUILT", composed)};
     ASSERT_TRUE(not_built.has_value()) << "NOT_BUILT is a MAPPING (to Unknown), not a miss";
     EXPECT_EQ(*not_built, RunOutcome::Unknown);
-    // Unmapped stays unmapped (fail-closed upstream), and the map is DIALECT-gated (SRC-II-6): on a
-    // stream that declared no dialect the row is not in the view at all.
     EXPECT_FALSE(map_outcome_token("GREEN", composed).has_value());
     EXPECT_FALSE(map_outcome_token("SUCCESS", undeclared_stream()).has_value())
         << "a dialect's verdict token resolved on an UNDECLARED stream — the gate is fail-open";
 }
 
+// invariant: the whole-stream class declares its stamp as transport, so the caller peels through
+// the declared stack and the scan receives the PEELED lines — the production shape.
+// invariant: a stamp-only line peels blank and DROPS; there is no strategy inside the parser to
+// strip a detection any more.
+// assert: the fail-closed arm scans the SAME console UNDECLARED, stamps still in content, and
+// recovers no verdict marker — an undeclared stamped stream never falls open to detection.
 TEST(JenkinsOutcome, ConsoleTailRecoveredFromADeclaredWholeStreamConsole)
 {
     const ComposedSemantics composed{jenkins_only()};
-    // A ci.jenkins.io-shaped console: timestamper-prefixed skeleton + plain output + the epilogue.
-    // POST-T5-5.2 this is the WHOLE-STREAM class and its stamp is DECLARED transport
-    // (`bracket-rfc3339-line-prefix`): the caller peels through the declared stack and the scan
-    // receives the PEELED lines — the production shape (there is no strategy inside the parser to
-    // strip detections any more; blank peels DROP).
     const std::vector<std::string> raw_lines{
         "[2025-06-25T14:31:12.339Z] [Pipeline] { (Build)",
         "[2025-06-25T14:31:12.501Z] + mvn -B verify",
@@ -97,19 +97,16 @@ TEST(JenkinsOutcome, ConsoleTailRecoveredFromADeclaredWholeStreamConsole)
     EXPECT_EQ(res.outcome, RunOutcome::Unstable)
         << "the degenerate only-a-console-log path preserves the four-class verdict";
 
-    // The FAIL-CLOSED arm: the SAME console
-    // scanned UNDECLARED (raw, stamps in content) recovers NO verdict marker — an undeclared
-    // stamped stream yields nothing, it never falls open to detection.
     const RunOutcomeScan raw_scan{scan_run_outcome(raw_lines, composed)};
     EXPECT_FALSE(raw_scan.marker_present)
         << "a stamped epilogue was recognized WITHOUT the declared peel — detection returned";
 }
 
+// assert: a freestyle console has no `[Pipeline]` skeleton and no stamp, so the epilogue alone
+// carries the verdict — outcome depth is universal to any Jenkins job type.
 TEST(JenkinsOutcome, BareFreestyleEpilogueStillResolves)
 {
     const ComposedSemantics composed{jenkins_only()};
-    // A freestyle console: NO [Pipeline] skeleton, NO timestamper — the epilogue alone latches the
-    // dialect and carries the verdict (outcome depth is universal to any Jenkins job).
     const std::vector<std::string> lines{"checking out sources", "compiling", "Finished: ABORTED"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
     ASSERT_TRUE(scan.marker_present);
@@ -117,14 +114,15 @@ TEST(JenkinsOutcome, BareFreestyleEpilogueStillResolves)
               RunOutcome::Aborted);
 }
 
+// refs: SRC-D-OUT-RUN-1
+// invariant: the ladder is a total PRECEDENCE, never a reconciliation: the authoritative side-input
+// stands, the divergence is flagged, and neither side is a tiebreak.
+// note: a present console verdict can be a nested outcome the whole-run API verdict overrides
+// assert: this is a real present-but-divergent disagreement measured on a real console — API
+// SUCCESS against a console `Finished: ABORTED`.
 TEST(JenkinsOutcome, AuthoritativeSideInputOverridesDivergentConsole)
 {
     const ComposedSemantics composed{jenkins_only()};
-    // The Accumulo #498 live counterexample: API result SUCCESS vs console `Finished: ABORTED` — a
-    // real present-but-divergent disagreement, measured on a real console. The ladder is a total
-    // precedence, never a reconciliation: the authoritative side-input stands and the divergence is
-    // flagged, never a tiebreak (a present console verdict can be a nested/caught outcome the
-    // whole-run API verdict correctly overrides).
     const std::vector<std::string> lines{"[Pipeline] { (ci)", "nested build interrupted",
                                          "Finished: ABORTED"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};

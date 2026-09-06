@@ -1,176 +1,48 @@
-// test_jenkins_bare_null_gate.cpp — G-T5-BARE: the 82 bare Jenkins traces' whole surface, frozen
-// and change-detected against a committed baseline.
-//
-// ═══ THE CLAIM THIS GATE MAKES — NARROWED BY RULING ON 2026-08-26; READ BEFORE THE REST ═══
-// This gate was born as the T5 purification's ABORT WIRE. Its baseline file,
-// `BARE-v2.baseline.tsv`, was emitted from the SHIPPED PRE-CUT chain (JenkinsStrategy live)
-// at insight-canon e6f5494 on 2026-07-30, so a green then meant a genuine before/after null:
-//     "the T5 purification moved NOTHING on the 82 bare traces."
-//
-// IT NO LONGER MEANS THAT, AND THE OLD MEANING CANNOT BE RE-ARMED. Seven of the 82 rows were
-// RE-EMITTED on 2026-08-26 from the CURRENT purified chain, on the Founder's explicit ruling. The
-// "pre" side of those seven is not recomputable — JenkinsStrategy is deleted — so a re-emission
-// can never restore the comparison; it can only re-freeze the current surface as a new baseline.
-// What a green means from that date is exactly and only:
-//     "nothing has moved on the 82 bare traces since 2026-08-26."
-// The purification null itself is now HISTORY: it is witnessed by the attribution record below and
-// by the baseline file's own provenance header, and by nothing else in this file. A later reader
-// must not read the old promise off the new baseline — which is why the narrowing is written here
-// in the instrument rather than left in a plan document.
-//
-// WHAT THIS GATE STILL PROVES, stated positively so the narrowing is not read as a retreat: the
-// bare-class surface is a byte-exact regression fence over the SHIPPED tokenizer, the SHIPPED
-// recognize()/scan_run_outcome assembly and the SHIPPED jenkins manifest, on 82 real third-party
-// traces, at LINE grain, with a per-trace whole-surface sha256 that is strictly stronger than the
-// legible columns (B-B2 below measured that). Nothing about the DESIGN of the T5 cut is claimed
-// by it any more.
-//
-// WHY THE RE-EMISSION WAS LEGITIMATE, since this file's own standing rule is "never re-pin". The
-// rule is intact and unchanged: an UNATTRIBUTED movement is the abort wire, never a re-pin. The
-// 2026-08-26 movement — 7 of 82 traces — was attributed CLOSED by causal experiment (three
-// ship-leg builds each reverting one candidate's hunks in the worktree only: both reverted =>
-// 0/82 and exit 0, so there is no third mechanism and no residue; fb2bfd5 alone => 6/82;
-// f6169f0 alone => 2/82; 6 + 2 − 1 shared = 7) to two insight-canon commits, and BOTH were judged
-// CORRECT defect repairs:
-//   f6169f0 (2026-08-19) — 6 traces. `sv_take_until` -> `sv_take_until_or_none` at three sibling
-//           callers. Before it, a colon-less remainder collapsed the message body onto
-//           `component` and left `content` EMPTY, which templated to the sha256 prefix of the
-//           empty string: an empty-content collision bucket published on the wire as an ordinary
-//           identity, with an unmasked message body on the cube's WHERE axis.
-//   fb2bfd5 (2026-08-18) — 2 traces, one of them shared with the above. `TokenShape::has_separator`
-//           gained the wrapper bytes, so a hex run >= 16 wrapped in ( { < " ' now reaches
-//           `embedded_identity` instead of being kept whole. Before it, a raw third-party 64-hex
-//           container id stayed literal in a template — the same leak class that once put real
-//           addresses into a published render.
-// Neither may be reverted to satisfy a frozen file, so the gate could NOT be made green by fixing
-// code. Attribution CLOSED **plus** every attributed movement judged CORRECT is the condition —
-// and the only condition — under which this baseline moves.
-//
-// ═══ THE RE-BASELINE PROCEDURE — DECLARED, so a third occurrence needs no fresh ruling ═══
-// This gate pins a frozen surface across an OPEN-ENDED code window, so every future CORRECT canon
-// masking or projection repair reds it. It did so twice in one month. An instrument that reds on
-// correct work and has no ruled way to move is a fixture-decay generator, so the way to move it is
-// written down rather than improvised each time:
-//   1. ATTRIBUTE the movement to named commits by CAUSAL EXPERIMENT — revert candidates in the
-//      worktree only — until reverting the named set yields 0 of 82. A partial attribution is the
-//      abort wire: stop there, the pass does not stand.
-//   2. JUDGE each attributed movement: correct repair, or defect? A defect is an engine bug and is
-//      fixed in the engine — never re-baselined. This step is the Founder's or the architect's;
-//      a lane may prepare it and may not conclude it.
-//   3. RE-RUN. On a red the gate prints one `REBASELINE-ROW\t…` line per moved trace, in the
-//      baseline's own tab-separated column order. Those lines ARE the patch: replace exactly those
-//      rows in the baseline and touch nothing else, so `git diff` shows precisely which traces
-//      moved and no more. There is no in-place rewrite mode and there must not be one — a
-//      change-detector that can silently overwrite its own reference is not an instrument.
-//   4. APPEND a dated `# re-emitted:` line to the baseline's provenance header naming the commits,
-//      the verdict and the row count. A baseline that moved must show FROM THE FILE ALONE that it
-//      moved by ruling and not by drift.
-//   5. RE-RUN: 0 of 82 moved. Then prove the gate is still RED-CAPABLE and record the observation
-//      in the falsifiability block below — a baseline that can only agree with itself is not a
-//      gate.
-//
-// THE TEST WAS RENAMED WITH THE CLAIM, 2026-08-26: `ThePurifiedChainMovesNothingOnTheBareClass`
-// -> `TheBareSurfaceIsByteIdenticalToTheCommittedBaseline`. The old name asserted the discharged
-// before/after null in the one string a CI log shows a reader who opens nothing else, which is
-// precisely where a narrowed claim must not survive under its old wording. The SUITE name
-// (`JenkinsBareNullGate`) is unchanged — it is what `scripts/run_corpus_gates.sh` matches.
-//
-// ═══ THE BASELINE IS THE COMMITTED FILE ═══
-// `BARE-v2.baseline.tsv`, beside this TU. 75 of its 82 rows are still the pre-cut emission of
-// 2026-07-30 (by the since-deleted JenkinsBareNullPrecutOracleEmitter, 2-run byte-identical at
-// emit time); 7 are the 2026-08-26 re-emission. The file's own header carries both provenances,
-// and the filename keeps its `precut` token because most of the file still IS that emission —
-// the rename is deferred to the planning drain, where the plan documents citing it can be
-// repointed in the same pass.
-//
-// ═══ WHAT IS COMPARED, PER TRACE (82/82 — whole surface, line grain) ═══
-// The gate recomputes the emitter's EXACT serialization through the purified chain and compares
-// byte-for-byte (digest + every legible column):
-//   section T: one record per `\n`-split segment (EVERY segment, empties included): the
-//              Tokenizer's produced template (escaped \t, \r, \\) or `<declined>` — tokenizer
-//              UNDECLARED over compose({kManifest}): pre-cut that was the shipped detection
-//              world (the strategy claimed `[Pipeline] `/epilogue lines with content unmoved);
-//              post-cut it is the RawText floor. Byte-identity here IS the design's assertion:
-//              "the strategy's bare-line parse really was RawText-equivalent".
-//   section Q: `stages:<'\x1f'-joined>` + `steps:` + `finished:` through the purified assembly
-//              under the DECLARED dialect view (for_stream(jenkins, {}); the bare class declares
-//              the DEGENERATE transport stack — a bare stream has no envelope to peel).
-//   digest  := sha256(section T + '\n' + section Q) — the whole-surface byte compare; the
-//              per-column counts exist so a red names its axis without hexdump archaeology.
-//
-// ═══ CLAUSE MAP ═══════════════════════════════
-//   1 population = the committed baseline rows ∩ the sidecar's frozen `stamp_class` labels,
-//     closure asserted BOTH ways (a baseline row without a bare sidecar row, or the converse, is
-//     red)
-//   2 UNSET ⇒ skip; SET-BUT-BROKEN ⇒ hard fail   3 population SIZE pinned (82)
-//   4 bytes verified against the sidecar's attested sha256 — a drifted or unreadable trace is
-//     reported and SKIPPED rather than aborting the run, so one bad trace cannot hide the other 81
-//     and the `compared == 82` arm has something real to guard (see COVERAGE below)
-//   5 the 82 = the bare cell exactly
-//   6 binary reads, `\n`-split only, `\r` is content   7 observed below   8 SUT = the shipped
-//   Tokenizer / recognize / scan_run_outcome   9 RUN-registered in run_corpus_gates.sh, same
-//   commit as this file
-//
-// ═══ COVERAGE — the `compared == kBare` arm, and why it is not a tautology ═══
-// It was one until 2026-08-26: every in-loop failure path was a fatal `ASSERT` that returned from
-// the test body, so `compared` could only ever equal the already-pinned population size and the
-// arm could not fail. It is now real. A trace that cannot be READ, whose BYTE SIZE disagrees with
-// the sidecar, or whose sha256 disagrees with the attestation is reported by name and SKIPPED —
-// the loop continues — so `compared` genuinely counts traces whose surface was recomputed and
-// compared. The arm therefore asserts the thing its name claims: the whole declared population was
-// actually measured, not merely enumerated. The change also strictly improves the diagnosis of a
-// corpus drift: every drifted trace is named on one run instead of only the first.
-//
-// ═══ FALSIFIABILITY — OBSERVED, then recorded (clause 7); every mutation reverted ═══
-//   B-A   [2026-07-30] the `[Pipeline] ` STEP row un-gated (dialect_gate → kAnyDialect, BOTH
-//         projections so DialectIntent still compiles): G-T5-BARE stayed GREEN (section Q runs
-//         under the jenkins declaration, where the row fires either way; section T never consumes
-//         marker rows), and so did G-T5-RETRO and the conformance kit (its marker legs SKIP
-//         kAnyDialect rows by design). The catcher was the package's own dialect-gating unit test —
-//         `JenkinsMarkers.DialectGatedToTheDeclaringStream` RED (an undeclared stream recovered
-//         Step structure) — plus `JenkinsOutcome` collaterally. SCOPE NOTE, recorded so nobody
-//         later "simplifies" that unit test believing the corpus gates cover gating width: they
-//         run UNDER the declaration and structurally cannot.
-//   B-B   [2026-07-30] the status-KEEP helper narrowed (single-digit tokens escape
-//   `is_all_digits`):
-//         GREEN — the status-keyword + single-digit class has zero instances in the 82 bare traces'
-//         templated surface; recorded as a fact about these bytes, not about the gate.
-//   B-B2  [2026-07-30] the digit-leading whole-token mask disabled (SRC-D-TID-12 #5 trigger forced
-//         false): RED — 74/82 traces DIGEST MOVED, and on every reported row the legible counts
-//         were IDENTICAL (e.g. Accumulo_2_1__496: produced 4114/4114, distinct 2630/2630, digest
-//         moved) — observed proof that the whole-surface digest is STRICTLY stronger than the
-//         count columns, which exist only so a red names its axis.
-//   B-C   [2026-08-26, ON THE RE-EMITTED BASELINE — step 5 of the procedure above, and the reason
-//         step 5 exists]. A baseline re-frozen from the current chain agrees with itself by
-//         construction, so it must be shown to disagree with something before its green is worth
-//         anything. Three mutations, all on the ship leg (linux-gcc16-release), all reverted, and
-//         each leg REBUILT (a stale binary fakes a red, a stale tree fakes a green):
-//   B-C1  SUT-side, manifest grain — `kOutcomeMarkers[0].prefix` in
-//         `insight-canon/semantic/jenkins/src/jenkins.cppm`, "Finished: " -> "Finshed: ": RED,
-//         exit 1, **82 of 82** traces moved, 0 byte-identical, every reported row showing
-//         `finished ''/'<verdict>'` and DIGEST MOVED. The re-emitted baseline detects a one-byte
-//         change in the shipped declaration on every trace in the population.
-//   B-C1a SUT-side, NULL result, and it is a SCOPE fact rather than a gate defect (same species as
-//         B-B). `kOutcomeTokens[0].token`, "SUCCESS" -> "SUCCES": GREEN, 82/82, 0 moved. Section
-//         Q's `finished:` field carries `RunOutcomeScan::token`, which is the REMAINDER after an
-//         outcome MARKER prefix (core/src/compose/outcome.cpp `improve_match`) — the raw verdict
-//         word off the line. The token -> RunOutcome MAPPING table is therefore NOT in this gate's
-//         surface at all, and no amount of corpus would put it there. Recorded so nobody later
-//         reads this gate as covering the outcome vocabulary: `JenkinsOutcome` and
-//         `JenkinsRecognizerRetrofitGate`'s L-O leg are what cover that.
-//   B-C2  COVERAGE-side — the `compared == kBare` arm, which was a can't-FAIL arm until this
-//         commit. One trace's bytes perturbed (one byte XOR 0x20, size preserved) under a
-//         SYMLINK-FARM copy of the corpus so the real corpus is never written:
-//         `ci_codemc_io/job_4drian3d_job_AuthMeVelocity__96.log`. RED, exit 1, the attestation
-//         mismatch reported with both sha256 values, the loop CONTINUING, `compared` = **81** vs
-//         the declared 82, the coverage arm firing and the banner taking its COVERAGE form
-//         ("0 of 81 compared traces moved ... 1 skipped"). Under the pre-2026-08-26 code this run
-//         aborted at the first bad trace and the arm was never reached.
+// refs: ADR-8, BIB:jenkins_dialect
+// invariant: this gate change-detects the whole surface of the 82 bare Jenkins traces against a
+// COMMITTED baseline that sits beside this TU.
+// invariant: the claim was NARROWED by ruling on 2026-08-26 and the old one cannot be re-armed: 7
+// of the 82 rows were re-emitted from the current chain, whose `pre` side is not recomputable.
+// invariant: a green therefore means `nothing has moved on the 82 bare traces since 2026-08-26`,
+// and the purification null it was born to carry is now history the baseline's header witnesses.
+// invariant: what it still proves is a byte-exact regression fence over the SHIPPED tokenizer,
+// recognizer and manifest, on 82 real third-party traces, at line grain.
+// invariant: the standing rule is unchanged — an UNATTRIBUTED movement is the abort wire, never a
+// re-pin — and the 2026-08-26 movement was attributed CLOSED by causal experiment.
+// invariant: both attributed commits were judged CORRECT defect repairs and neither could be
+// reverted to satisfy a frozen file, which is the only condition under which this baseline moves.
+// invariant: the ruled re-baseline procedure is attribute, judge, re-run and apply the emitted
+// patch rows verbatim, append a dated provenance line, then re-run to zero and re-prove red.
+// invariant: there is no in-place rewrite mode and there must not be one — a change detector that
+// can silently overwrite its own reference is not an instrument.
+// invariant: the comparison recomputes the emitter's EXACT serialization — one template record
+// per newline-split segment, empties included, over the UNDECLARED tokenizer.
+// invariant: beside it sits a quanta-and-epilogue section under the DECLARED dialect view, and the
+// compared digest is taken over the two concatenated.
+// invariant: the bare class declares the DEGENERATE transport stack, because a bare stream has no
+// envelope to peel.
+// assert: the digest is strictly STRONGER than the legible columns, and that was observed rather
+// than argued: a mutation moved 74 of 82 digests with every legible count identical.
+// refs: SRC-D-TID-12
+// assert: red-capability was re-observed on the RE-EMITTED baseline, since a baseline re-frozen
+// from the current chain agrees with itself by construction.
+// assert: a one-byte change to the epilogue prefix in the shipped manifest moved 82 of 82 traces;
+// perturbing one trace's bytes under a symlink farm left 81 compared and fired the coverage arm.
+// assert: a NULL result was recorded too and it is a SCOPE fact: breaking an outcome TOKEN spelling
+// left the gate green, because this surface carries the raw verdict word and not the mapping.
+// note: the token-to-outcome mapping is covered by the outcome unit tests and the retrofit gate
+// assert: un-gating the step row also left this gate green — the quanta section runs under the
+// declaration and the template section reads no marker rows — so gating WIDTH is not its subject.
+// invariant: an unset corpus variable is a hard FAIL and so is a set-but-broken mount; what differs
+// between them is the diagnostic, never the verdict.
+// invariant: the population is the committed baseline rows intersected with the sidecar's frozen
+// bare labels, with closure asserted BOTH ways, and the size is pinned rather than observed.
+// invariant: reads are binary, split on newline only, and a carriage return is content.
 #include <gtest/gtest.h>
 
 import std;
-import insight.canon;            // Tokenizer / ArenaAllocator / MaskConfig / compose / recognize
-import insight.semantic.jenkins; // kManifest + kDialect
+import insight.canon;
+import insight.semantic.jenkins;
 
 namespace
 {
@@ -191,7 +63,8 @@ constexpr std::size_t kBare{82};
 constexpr std::size_t kMaxReportedRows{10};
 constexpr std::size_t kArenaBlockBytes{4U * 1024U * 1024U};
 
-// ── SHA-256 (FIPS 180-4) — frozen, pure integer, single-shot (the retrofit-gate block) ────────
+// invariant: SHA-256 frozen here as pure integer arithmetic, single-shot — a gate's digest must
+// not depend on a library the ship leg may replace.
 constexpr std::array<std::uint32_t, 64> kSha256RoundConstants{
     0x428a2f98U, 0x71374491U, 0xb5c0fbcfU, 0xe9b5dba5U, 0x3956c25bU, 0x59f111f1U, 0x923f82a4U,
     0xab1c5ed5U, 0xd807aa98U, 0x12835b01U, 0x243185beU, 0x550c7dc3U, 0x72be5d74U, 0x80deb1feU,
@@ -287,7 +160,7 @@ constexpr std::array<std::uint32_t, 64> kSha256RoundConstants{
     return out;
 }
 
-// The EMITTER's exact field escape (frozen with the baseline: \t, \r, \\).
+// invariant: the emitter's exact field escape, frozen with the baseline.
 [[nodiscard]] std::string escape_oracle_field(std::string_view text)
 {
     std::string out;
@@ -341,9 +214,9 @@ struct RecomputedRow
     std::string surface_sha256;
 };
 
-// The emitter's serialization, recomputed through the PURIFIED chain (the emitter's own spelling,
-// byte for byte — section T undeclared tokenizer, section Q declared-view assembly; the bare
-// class's declared transport stack is DEGENERATE, so no peel step appears).
+// invariant: the emitter's serialization recomputed through the purified chain, byte for byte —
+// the template section undeclared, the quanta section under the declared view.
+// invariant: the bare class's declared transport stack is DEGENERATE, so no peel step appears.
 [[nodiscard]] RecomputedRow recompute(const std::string& bytes,
                                       const ComposedSemantics& undeclared_view,
                                       const ComposedSemantics& declared_view)
@@ -450,14 +323,15 @@ TEST_F(JenkinsBareNullGate, TheBareSurfaceIsByteIdenticalToTheCommittedBaseline)
                              return std::move(buffer).str();
                          }};
 
-    // The committed baseline, found beside this TU (__FILE__-relative — no second env var).
+    // invariant: the committed baseline is found beside this TU, relative to the source file, so
+    // the gate needs no second environment variable.
     const std::filesystem::path oracle_path{std::filesystem::path{__FILE__}.parent_path() /
                                             kOracleFile};
     const std::string oracle_text{read_file(oracle_path)};
-    // `.string()` is load-bearing, not noise: libstdc++ spells `operator<<(ostream&, const path&)`
-    // in terms of `std::quoted`, whose declaration this TU never sees — it takes std through
-    // `import std;` while gtest arrives as a header, so the header template instantiates against a
-    // std that is not in its scope. Streaming the string sidesteps the module/header seam entirely.
+    // invariant: `.string()` is load-bearing: libstdc++ spells the path stream operator through a
+    // header template this TU never sees, so streaming the string sidesteps the module/header seam.
+    // assert: a missing baseline is a checkout defect and never a skip — the file is part of this
+    // repo.
     ASSERT_TRUE(read_ok) << oracle_path.string() << " — the committed baseline is part of this "
                          << "repo; a missing file is a checkout defect, never a skip.";
     std::map<std::string, OracleRow> oracle_rows;
@@ -502,7 +376,6 @@ TEST_F(JenkinsBareNullGate, TheBareSurfaceIsByteIdenticalToTheCommittedBaseline)
     ASSERT_EQ(oracle_rows.size(), kBare)
         << "the committed baseline carries " << oracle_rows.size() << " rows, not " << kBare;
 
-    // The sidecar's bare cell (frozen labels) + attested digests — clause 1 closure BOTH ways.
     struct BareTrace
     {
         std::string path;
@@ -557,11 +430,10 @@ TEST_F(JenkinsBareNullGate, TheBareSurfaceIsByteIdenticalToTheCommittedBaseline)
     {
         read_ok = true;
         const std::string bytes{read_file(root_ / kBytesRoot / trace.path)};
-        // NON-FATAL BY DESIGN (clause 4, and the COVERAGE block at the head of this file). These
-        // three are corpus-integrity failures, not surface movements, and each one used to be a
-        // fatal ASSERT that returned from the test body — which both hid every trace after the
-        // first bad one AND made the `compared == kBare` arm below unable to fail. Reporting and
-        // skipping keeps the run diagnostic and gives that arm a real quantity to guard.
+        // invariant: a trace that is unreadable, or whose size or digest disagrees with the
+        // sidecar, is reported by name and SKIPPED — the loop continues.
+        // invariant: these are corpus-INTEGRITY failures, not surface movements: skipping keeps the
+        // run diagnostic and gives the coverage arm below a real quantity to guard.
         if (!read_ok)
         {
             ++unreadable;
@@ -606,12 +478,10 @@ TEST_F(JenkinsBareNullGate, TheBareSurfaceIsByteIdenticalToTheCommittedBaseline)
                     std::to_string(actual.distinct_templates) + "/" +
                     std::to_string(expected.distinct_templates) +
                     (actual.surface_sha256 != expected.surface_sha256 ? " DIGEST MOVED" : ""));
-            // THE RE-BASELINE PATCH (procedure step 3 at the head of this file). One line per
-            // moved trace, in the baseline's own column order, so a RULED re-emission is a
-            // line-for-line replacement a reader can diff — never a wholesale rewrite, and never
-            // an in-place one. Emitted for EVERY moved trace, not capped like the human-readable
-            // rows above: a patch that silently drops rows is worse than no patch. It carries
-            // counts and a digest only — no corpus content ever reaches this log.
+            // invariant: one patch line per moved trace, in the baseline's own column order, so a
+            // ruled re-emission is a line-for-line replacement a reader can diff.
+            // invariant: emitted for EVERY moved trace, never capped — a patch that drops rows
+            // silently is worse than none. It carries counts and a digest, never corpus content.
             rebaseline_rows.push_back(trace.path + '\t' + std::to_string(actual.stages) + '\t' +
                                       std::to_string(actual.steps) + '\t' + actual.finished + '\t' +
                                       std::to_string(actual.produced_lines) + '\t' +
@@ -637,29 +507,23 @@ TEST_F(JenkinsBareNullGate, TheBareSurfaceIsByteIdenticalToTheCommittedBaseline)
         for (const std::string& row : rebaseline_rows)
             GTEST_LOG_(INFO) << "REBASELINE-ROW\t" << row;
     }
-    // COVERAGE (clause 4). Not a restatement of the population pin above: `compared` counts
-    // traces whose surface was actually RECOMPUTED, and the integrity skips above can lower it.
+    // invariant: coverage is not a restatement of the population pin: this counts traces whose
+    // surface was actually RECOMPUTED, and the integrity skips above can lower it.
     EXPECT_EQ(compared, kBare)
         << "the declared population is " << kBare << " bare traces but only " << compared
         << " were compared — " << unreadable
         << " trace(s) failed the corpus-integrity checks and were skipped (named above). A "
            "partially measured population cannot support this gate's claim: fix the mount or the "
            "attestation, never the pin.";
-    // THE BANNER STATES THE VERDICT IT MEASURED, and this line is the reason the rule is written
-    // here rather than assumed. It was emitted unconditionally, after the abort wire's own
-    // EXPECT_EQ, off a quantity that counts traces REACHED and never traces EQUAL — so on
-    // 2026-08-26 a run that moved 7 of 82 traces printed "G-T5-BARE green: 82/82 ...
-    // byte-identical" four lines above `[  FAILED  ]`, wrong on both halves. This banner is a
-    // CI-log grep surface: `G-T5-BARE green` must be findable on a green run and absent from a red
-    // one.
+    // invariant: the banner is computed from traces EQUAL and never from traces reached, so a green
+    // banner cannot be printed above a failure.
+    // invariant: a COVERAGE red and a MOVEMENT red are different verdicts and must not share a
+    // sentence: a run that skipped traces on integrity has measured nothing about movement.
+    // note: the green banner is a CI-log grep surface and must be absent from a red run
     if (moved == 0U && compared == kBare)
         GTEST_LOG_(INFO) << "G-T5-BARE green: " << compared << "/" << kBare
                          << " bare traces compared, 0 moved — every one byte-identical against "
                             "the committed baseline.";
-    // A COVERAGE red and a MOVEMENT red are different verdicts and must not share a sentence: a
-    // run that skipped traces on corpus integrity has measured nothing about movement, and
-    // telling its reader to "attribute the movement" sends them after a phenomenon that may not
-    // exist. Both counts are always printed; the instruction follows the cause.
     else if (moved != 0U)
         GTEST_LOG_(INFO) << "G-T5-BARE RED (MOVEMENT): " << moved << " of " << compared
                          << " bare traces compared (" << kBare << " expected, " << unreadable
