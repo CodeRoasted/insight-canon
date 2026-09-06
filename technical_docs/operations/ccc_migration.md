@@ -5140,6 +5140,297 @@ the same fact, and this run's unconsumed range is the reason 15 is still free.
 in the token-index instrument points at a header transcription this unit deleted. It is a string
 literal, so no comment-only commit can reach it. See unit 14's findings.
 
+## Unit 22 — `core/api/canon.api.cppm` (1 file, 1 211 comment lines, 1 193 would-be violations) — the repo's largest file, and the generation ledger left the comment tier for a document
+
+The public DATA + API surface: `kCanonicalizationVersion`, template and intent identity, the OTEL
+trace context and its two declared catalogs, the ordinal channel, `EventLevel`, `RunOutcome`,
+`LogFormat`, `StructuralRole`, `det_math`, `CanonicalEvent`, `MaskConfig`, the intent-marker types,
+the failure lexicon's public and detail surfaces, the time parsers, the logging surface, the token
+scanner, the ANSI ingest normalization, and the `NormalizedLine` / `NormalizedContent` seam.
+
+Baseline split: bare 1 051 · trailing 67 · spacer 49 · ruler 12 · `///` 11 · tag-mid-line 2 ·
+suppression-without-why 1. After: **633 comment lines, 0 would-be violations** — `pre` 8 ·
+`post` 48 · `invariant` 236 · `note` 10 · `refs` 65 · 248 continuations · 18 tool forms.
+Repo-level delta **7 150 → 5 957 = exactly 1 193**, the unit's own count.
+
+### The generation ledger is 186 lines of HISTORY that `ADR-2.D9` POINTS AT, so deleting it was not available
+
+The single largest block in the file is the `kCanonicalizationVersion` ledger: one entry per
+canonicalization generation `-1` through `-15`, with the burnt `-10` tombstone and two riders. It is
+class **H** by `OPS-8.S3`, and H gets no entry — which would have deleted it.
+
+**That disposition would have been wrong, and the thing that says so is not in this repo.**
+`ADR-2.D9`'s tombstone clause reads *"the generation ledger keeps a one-line tombstone and the next
+bump skips the burnt value. (The standing instance: `stateless-masks-10`, minted and reverted
+un-released — the ledger beside `kCanonicalizationVersion` carries its tombstone.)"* The ADR states
+the RULE and names this comment as the artifact that obeys it. `LEXICON.md`'s
+`canonicalization_version` row said the same thing in the same words. So the ledger is not history
+the code happens to carry: it is a **cited artifact**, and `OPS-8.S9`'s *not recovered → a home
+above the comment rung* is the row that applies.
+
+**It moved to `insight-canon/technical_docs/canonicalization_generations.md`** — a new file on this
+repo's own doc shelf, with its roster entry in `technical_docs/README.md` (`docs_lint`'s shelf-roster
+arm is what makes that entry mandatory rather than polite). Every generation is carried at its own
+heading with its measurements intact; nothing is compressed and nothing is dropped. Two recurring
+classes that every entry from `-11` onward restated verbatim — *"a CONTENT re-base under ADR-31,
+never a determinism regression"* and the identity-versus-classification split — are stated ONCE in
+the file's *How to read this file* section instead of fifteen times, which is the only editing the
+move did.
+
+The declaration keeps two `invariant:` lines (what the token names, and what a bump does to two
+documents), a `refs:` carrying `ADR-2.D5`, `ADR-2.D9`, `SRC-D-TID-16` and `SRC-D-TID-9`, and a
+single `note:` naming the ledger's new file.
+
+### The law-number question: the answer is ZERO, and the pilot's own lead said otherwise
+
+This unit was scoped as **THE declaring unit** and was issued the range starting at **16**. It
+consumed **none of it**, and the reason is `OPS-8.S9`'s test applied to a lead that pointed the
+other way.
+
+The pre-scoping had found ten codes whose only workspace declaration-position site is this file, of
+which **eight are cited in the doc tier and two are not** — `SRC-D-OTEL-8` and `SRC-D-TID-10` — and
+had recorded those two as *"the strongest candidates for a law block"*. Re-derived here at the
+artifacts, **both have an addressable owner and neither is a declaring site**:
+
+* **`SRC-D-OTEL-8`** — *"canon keeps its own 6-level model and DISCARDS the raw 1-24 number"* — is
+  stated by **`ADR-29`**: *"OTEL's 24-value `severity_number` is consumed, mapped into the
+  **existing** LogLevel model, and the raw 1-24 number is **discarded**."* Same rule, same
+  direction, a live slot.
+* **`SRC-D-TID-10`** — *"colour is presentation, never content"* — is the ingest-normalization
+  boundary **`ADR-21`** owns, and `bibles/canon_ingest_normalization.md` says so in its own header
+  (*"Décisions : ADR-21. Cette carte porte la forme, jamais l'argument."*).
+
+**The lead was not wrong about the SEARCH; it was wrong about what the search proves.** A sweep for
+the CODE returns zero doc-tier files for both, and that is a true measurement — but the test is
+whether a slot **STATES the rule**, not whether it names the code, and a rule that predates its code
+name is invisible to a code sweep. The other eight resolve the same way: `SRC-D-CNT-1`,
+`SRC-D-NOTE-1`, `SRC-D-OUT-1`, `SRC-D-OUT-2` and most of `SRC-D-OUT-4` are stated by **`ADR-20.D5`**,
+the four-register classification model, and `SRC-D-OUT-4c`'s kind slot by
+**`bibles/canon_pipeline.md` § 7**. Every site here is therefore a **CITING** site under `OPS-8.O5`
+and takes a `refs:` unchanged.
+
+**So the range 16 is untouched and remains free**, and the next unit that needs one takes it.
+
+### The one suppression: measured with a control that fires, and DELETED
+
+`NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)` above `log_message`'s parameter pack. The
+check is **ARMED** in the one shared `.clang-tidy` (`cppcoreguidelines-*`, not disabled), so the
+check-inventory argument could only ever license a deletion and the TU had to be run for real —
+`clang-tidy-21 -p core/build-clang21-libcxx-release --checks='-*,cppcoreguidelines-missing-std-forward'`,
+in place, directive TEXT renamed and the code untouched:
+
+| run | main-file diagnostics |
+|---|---|
+| with the directive | **0** |
+| with the directive disarmed | **0** |
+| with the directive disarmed **plus a probe** — `template <typename Probe> inline void qq_probe(Probe&& value) { (void)sizeof(value); }` inserted in the same namespace | **1** — `forwarding reference parameter 'value' is never forwarded inside the function body` |
+
+The probe is what makes the two zeros carry information: the check is armed, live and reading this
+translation unit, so `0 with` and `0 without` means *this directive has no subject*. And the reason
+is on the same screen — `log_message` DOES forward its pack (`fmt::format(format,
+std::forward<Args>(args)...)`), which is exactly what the directive's own trailing text said.
+Deleted with that evidence. Census: `NOLINT` 1 → 0, tool forms 18 → 18 (namespace closers,
+unchanged).
+
+### The stripper cross-check (`OPS-8.S5`), held NON-vacuously
+
+Removed **1 192**, kept 19. The unit's kept violation class is the single `suppression-without-why`,
+so the identity is `1192 == 1193 − 1` and it holds **with something actually subtracted** — the
+shape the step warns is vacuous on a unit with no suppression at all. The kept directive was cleared
+from the draft BEFORE the claims script ran, so nothing landed twice and no claim landed between a
+directive and the line it suppresses.
+
+### FOUR claim blocks landed on the WRONG DECLARATION, and no witness saw any of them
+
+`anchor_collide.py` reported 11 colliding anchors and every one of the 11 resolved correctly — the
+placer's cursor is monotone, so seven consecutive wrapped `[[nodiscard]] std::optional<Timestamp>`
+declarations map one-to-one in order. **The four real defects were in blocks it did not flag**, and
+they were found only by printing every block's resolved anchor beside its first claim and reading
+the table:
+
+| block | landed above | belongs above |
+|---|---|---|
+| the `is_span` claim | `bool present{false};` | `bool is_span{false};` |
+| the structural-role claim | `std::string_view template_str;` | `StructuralRole structural_role{…};` |
+| the discriminant claim | `std::string_view name;` | `std::string_view discriminant;` |
+| the qualified-friend claim | `friend class NormalizedLine;` | `friend class insight::…::LogParserPasskey;` |
+
+All four share one cause and it is `OPS-8.S3.2`'s trailing-comment class seen from the other side:
+`blocks.py` groups a **trailing** comment on a code line together with the free-standing block that
+follows it, so the block's reported line number is the CODE line, and the placer's anchor is then
+that code line rather than the declaration the prose was about. Every one of them gated green, the
+comment-only witness passed, and the address census was clean. A fifth block — the NOTE-register
+commentary at the end of `namespace detail` — resolved onto a bare `}` and was merged into the
+preceding declaration's block instead.
+
+### The address census (`OPS-8.S7.3b`), both legs
+
+**Outbound: 16 LOST, all of them the generation ledger's, and all 16 verified present in the
+relocation target in the same commit** — `ADR-16.D2`, `ADR-16.D6`, `ADR-31`, `DN-43` and its four
+slots, `SRC-D-ECS-1`, `SRC-D-MSK-1` … `-6`, `SRC-D-TID-22`. The census is per FILE and cannot see a
+relocation, so this disposition is recorded rather than reported.
+
+One `LOST` line was a **repair**: the prose spelled `DN-027`, which is not the registry form; the
+`refs:` carries `DN-27`. Four more were restored after the first census pass rather than accepted —
+`ADR-29.O1` (Régime B is not built), `ADR-9` (what makes a monotone-demoting rule admissible), and
+`SRC-D-OUT-4b` / `SRC-D-OUT-4c`, whose claims were present while their addresses were not. Eleven
+addresses were ADDED, every one of them a rule the prose named in words: `ADR-19.D4` for the
+component-versus-host contract (the prose carried the bare, unmigrated `D-F3b-1`, which the `refs:`
+grammar rejects), `ADR-2.D5`, `ADR-21.D1`, `ADR-21.D4`, `DN-54`, `STU-4`, and four `BIB:` addresses.
+
+**Inbound: 234 mentions, three classes and ONE live falsification.**
+
+* The frozen audit shelf carries dozens of `canon.api.cppm:<line>` coordinates. A record states what
+  was true when it was written, so a moved line does not falsify it and no repair is owed.
+* Three benchmark and fuzz entry points say *"the declaration in `canon.api.cppm` owns why this is
+  the only door"* about `init_logging`'s level argument. Still true — that claim is carried.
+* **`technical_docs/LEXICON.md` said *"which also carries the generation ledger — read it there"*,
+  and this unit made that false.** Repaired in this commit, as an address: the row now names the
+  declaration for the VALUE and links `insight-canon`'s generation ledger for the history. This is
+  the class the outbound census structurally cannot see — the citing site carried no address at all.
+
+One further inbound observation, recorded as a **finding rather than repaired**:
+`insight-eidos/insight-e2e/test_contract.md` cites `canon.api.cppm:41` for `LogLevel` and `:166` for
+`StructuralRole`. Both coordinates were **already wrong before this unit** — the v1.10.3 audit says
+so explicitly (*"line is a masking-generation comment; enum at `:539`"*) — and they are wrong
+differently now. Addressee: whoever owns `insight-e2e`'s contract document; the repair is an
+`F-SRC-` address, not a corrected line number.
+
+### The cold reader (`OPS-8.S8`) — two readers over disjoint halves, 62 questions, 58 recovered
+
+Reader A took everything down to and including `insight::det`; reader B took `CanonicalEvent`
+onward. `GIT COMMANDS RUN: none` from both. One disclosure, from reader A: `026-code-doctrine.md`
+appeared as a **filename** in an `ls` of the ADR directory; it was never opened and no line of its
+content printed. Recorded rather than discounted, per the step's own instruction — the two leaks
+this programme knows about are both on the record only because the reader that leaked said so.
+
+| reader | questions | recovered | wrong |
+|---|---|---|---|
+| A — identity, intent, OTEL, ordinals, `EventLevel`, `RunOutcome`, `LogFormat`, `det` | 30 | 29 | 1 |
+| B — `CanonicalEvent`, `MaskConfig`, intent markers, arena, lexicon, time, logging, scan, the normalized seam | 32 | 29 | 3 |
+
+**Three CONVICTIONS and one TREE-MISLEADS, all four repaired before the commit.** Every one was
+re-derived at the artifact first; none was acted on from the reader's verdict alone.
+
+1. **`LogFormat::RawText` — "it must stay immediately before Unknown"** (A, Q28; the reader answered
+   *"the code does not clearly say"* at low confidence, and named what it did find). Verified: the
+   only position-sensitive construct in the workspace is
+   `kFormatSlotCount = static_cast<std::size_t>(LogFormat::Unknown) + 1U`, which sizes an array
+   indexed by the enum, so what the code binds is **`Unknown` LAST**. A sweep for any other ordering
+   comparison or numeric cast on `LogFormat` returns that one site. Inserting a member between
+   `RawText` and `Unknown` is harmless. The adjacency is a convention, written down in `OPS-2`'s
+   dialect-onboarding step as *"append before `RawText`/`Unknown`"*. The carried prose said *"Keep
+   immediately before Unknown"* — already imprecise — and the conversion promoted it to an asserted
+   `invariant:`. Repaired to state the constraint the compiler enforces and to name the convention
+   as a convention, with its address.
+2. **`no_role_witness_key` — "carried here and not on ParsedLine"** (B, Q8; the reader recovered the
+   answer AND flagged the line). Verified: `canon.spi.cppm` declares
+   `ParsedLine::no_role_witness_key` and `tokenizer_engine.cpp` copies it onto the event. The
+   carried prose read *"Carried here, and not LEFT on `ParsedLine`"* — true, because it does not
+   stop there — and **dropping the word *left* inverted it into a claim about the field's
+   existence.** One word of compression turned a true sentence into a false one. Repaired to say
+   the strategy writes it on the intermediate and `make_event` copies it here, which is where the
+   guarantee binds because a consumer never sees the intermediate.
+3. **`arena_poisons_on_reset` — "a lifetime gate downstream must SKIP on false, never pass"**
+   (B, Q16). `OPS-8.O3`'s *the world moved* class: TRUE when written, falsified by the Founder's
+   ruling of 2026-09-04. The eidos arm is now **compile-time gated** on canon's exported
+   `INSIGHT_CANON_ARENA_POISON_AVAILABLE` and `ASSERT_TRUE`s the runtime query inside the `#ifdef`,
+   with its own comment stating why: *"a gtest skip exits 0, so every release build counted this
+   arm as PASSED for a lifetime it could not observe."* The reasoning behind the old line survives
+   and the prescription does not. A coherence check cannot find this; the question that does is
+   *when was this last measured*.
+4. **The `rfc3339_datetime_length` consumer arithmetic contradicts itself** (B, Q28, at medium
+   confidence — *"the exact mapping of 'four' to call sites is inferred"*). One `invariant:` said
+   *"four live consumers on three axes"* and the enumeration beneath it read two TRANSPORT + one
+   MASKING + **two** MEASUREMENT = five. The original prose said *"MEASUREMENT (one, in two
+   spellings)"*, and the conversion dropped the parenthesis. This is `OPS-8.S9`'s **(a)** row — the
+   tree misleads — and it is the serious one, because a reader who trusts the enumeration
+   miscounts the blast radius of any change to that grammar. Repaired to *"ONE MEASUREMENT
+   consumer, in two spellings"*.
+
+### The defect NEITHER reader convicted, found by reading their EVIDENCE against the line
+
+Reader B answered Q13 (why the step-banner marker is dialect-gated) correctly, and cited
+`github.dialect.yaml`: *"9.05 % of 22 030 logs, 7 752 lines, 62 distinct payloads, EVERY ONE
+prose"*. The line it was standing next to said something else — the conversion had written *"the
+residual within-dialect phantom rate is 0.8 % measured"*, carried from the prose with `STU-4`
+beside it. **Reconciling the two figures showed the converted line is false three times over:**
+
+* **0.8 is a percentage-POINT delta, not a rate.** `STU-4`'s T2 row reads *"2955/2979 = 99.2 % →
+  2955/2955 = 100.0 %, **+0.8pp**"* — a precision gain, quoted in the comment as though it were a
+  residual phantom rate. A number without its unit, exactly the class the cold-reader bar names.
+* **The mechanism that delta was attached to is FALSIFIED by the study's own opening line.**
+  `STU-4` begins *"The mechanism claim is false — 'the `##[group]` prefix sheds all 24 content-line
+  phantoms' — **it does not**. The +0.8 pp is bought by the channel gate."*
+* **The current measured residual is ZERO, not 0.8 %.** `STU-4` reports *"155 347 runner banners,
+  0 phantoms, 0 missed, precision = recall = 100 %"*.
+
+And the attribution was wrong besides: the 9.05 % justifies the **channel** gate (in the annotated
+channel the prefix is ordinary prose), while the dialect gate answers a different question (the
+prefix is runner-specific and would misfire in another dialect). The comment named only the dialect
+gate. Repaired: both gates named with their own reasons, the 9.05 % carried with its full
+coordinate, and `F-SRC-insight-canon:github.dialect.yaml` added beside `STU-4`.
+
+**The lesson is about how a reader is read.** `OPS-8.S8` says to score from the per-question
+evidence rather than the summary. This is one step further: the reader's **citations** are a
+measurement even where its verdict is *recovered*. It recovered the right answer from the right
+artifact and never looked at my sentence — so no verdict could have caught this, and only laying
+its evidence beside the converted line did.
+
+### One WATCH ITEM that resolved as fine
+
+Merging the entity-less NOTE-register commentary into `contains_failure_summary_cue`'s block puts
+six claims about a different register above that declaration — legal, gated green, and explicit
+(*"it has NO declaration here on purpose"*), but attached to an entity they are not about. Reader B
+Q24 was written to test exactly that text, and it answered *"Four: verdict, count, echoed-source,
+and note. The note register is the one with no declaration here"* — correct, at high confidence,
+with the right argument. The placement reads. No repair.
+
+### The behaviour witness
+
+`malf test insight-canon` on **both** toolchains after the unit landed: **809 of 809** on
+`linux-clang21-libcxx-release` (734 + 32 + 25 + 13 + 5) and **809 of 809** on `linux-gcc16-release`.
+Equal to the pre-unit baseline. `registry_grammar_lint` exit 0 with zero `FAIL` lines and
+`docs_lint` clean once the new doc is tracked.
+
+### What `registry_grammar_lint` caught that the address census structurally could not
+
+The outbound census reported **16 LOST** addresses and I dispositioned all sixteen in one act —
+*relocated to the new document, verified present there*. Fifteen were right. The sixteenth,
+`SRC-D-TID-22`, reddened `registry_grammar_lint` twice:
+
+    FAIL G5 design_notes/DN-001-documentation-reform.md: SRC-D-TID-22 has no site in the source tree
+    FAIL G5 insight-canon/technical_docs/canonicalization_generations.md: SRC-D-TID-22 is claimed in
+         source with no DECLARATION site
+
+Its ONLY declaration-position site in the workspace was the ledger's `-3` entry inside this
+`.cppm`. Its four other live sites are body-position citations — `core/src/mask/mask.cpp` past line
+40, and two in a test — and a `.cpp` beyond its first 40 lines is a BODY position. **Moving the
+ledger to a document preserved the address and destroyed the POSITION CLASS**, and the census cannot
+see that: it compares address SETS per file and knows nothing about where in a file an address sits.
+Fixed inside this unit by carrying `SRC-D-TID-22` in the `refs:` at the `kCanonicalizationVersion`
+declaration, which is a declaration position throughout a `.cppm` — the same disposition this repo
+took for `SRC-II-4` in unit 19.
+
+**The general lesson is the one `OPS-8.S7.3b` already states and I did not obey: every LOST line is
+a lead.** Leads are per-line, and I answered sixteen of them with one sentence. A bulk disposition
+over a LOST list is not a disposition; it is a hypothesis about the whole list.
+
+### Findings for other lanes
+
+* **`parse_template_id` is silently tolerant of malformed input** (reader A, Q5). It accepts a
+  missing `"h:"` prefix, `hex_nibble` maps every non-hex byte to 0, and a short input leaves the
+  remaining bytes zero — so arbitrary text yields a plausible `TemplateId` with no error and no
+  signal. Contained today only by the fact that its three callers are test files, which is a
+  call-site fact rather than a property of the function. The repair is a code change (an optional
+  return or a hard refusal), never a comment. **Addressee: the `insight-canon` identity lane.**
+* **`insight-eidos/insight-e2e/test_contract.md` cites `canon.api.cppm` by LINE NUMBER** for
+  `LogLevel` and `StructuralRole`. Both coordinates were already wrong before this unit — the
+  v1.10.3 audit says so in as many words — and they are wrong differently now. The repair is an
+  `F-SRC-` address, not a corrected number. **Addressee: whoever owns the `insight-e2e` contract
+  document.**
+
+
 ---
 
 # Where the SEVENTH run stands (unit 15, 2026-09-06) — and the programme moves to one repo at a time

@@ -16,6 +16,7 @@ subsystem's rules change, exactly one doc moves with it.
 | **[formats.md](formats.md)** | Ingest normalization (escape stripping), format detection, and the per-format **field extraction** roster — how a raw line becomes structured fields (`timestamp`, `level`, `component`, `host`, `content`, trace, ordinals). |
 | **[masking.md](masking.md)** | The per-token **masking** rule set that turns `content` into a stable `template_str` / `template_id` — every keep-class / mask-instance rule, every declared marker catalog, and the boundary of what canon deliberately does **not** mask. |
 | **[classification.md](classification.md)** | The **semantic classification** canon emits: log **level** (two-stage inference), the **failure / warning / outcome** lexicon (verdict-register awareness, pass/fail glyphs), and **structural roles**. |
+| **[canonicalization_generations.md](canonicalization_generations.md)** | The **generation ledger**: every value `kCanonicalizationVersion` has held, what each one changed, which serialized fields moved, and why the bump was owed — including the one burnt number. |
 | **[determinism.md](determinism.md)** | The cross-cutting **determinism contract** — why every rule above is byte-exact and order-independent, and what the `canonicalization_version` gate guarantees. |
 
 ## Operations
