@@ -930,9 +930,10 @@ live witness in that test), `F-SRC-insight-canon:test_semantic_walkers.cpp`, `AD
 `ADR-3.D4`, `ADR-18.D4`, `ADR-18.D5`.
 
 **Two ratcheted censuses shrank, both advisory because `insight-canon` is a sibling repo to the
-gate.** `registry_grammar_lint` reports `G13-bare` 15 → 12 sites (this unit deleted three bare
-spellings of migrated codes: one `SP-5` in `compose.cpp` and two `SP-1` in `semantic_walkers.cpp`)
-and `G14-sigil` 20 → 15 (the deleted prose named the gate sigils `G-SP-1`, `G-SP-4`, `G-SP-5`).
+gate.** `registry_grammar_lint` reports `G13-bare` 15 → 12 sites (this unit deleted three
+prefix-less spellings of migrated codes — one in `compose.cpp` and two in `semantic_walkers.cpp`,
+all three of the shipped-package family) and `G14-sigil` 20 → 15 (the deleted prose named three of
+canon's gate sigils, which are gate names rather than citations).
 Two further `G13-bare` sites were this ledger's own — the finding-10 passage quoted the wrong
 spelling verbatim while explaining not to write it — and are repaired in this commit, which takes
 the count to 10. **The ceiling still reads 13 and is a superproject edit this lane may not make**:
@@ -1064,6 +1065,135 @@ the baseline unit 1 recorded. Behaviour: `malf test insight-canon` **809 of 809*
 **809 of 809** with `--profile linux-gcc16-release` — one slot acquisition covering this unit's
 final text together with unit 9's (`OPS-8.S7.4`). Count: 404 comment lines at HEAD to 113 as the
 gate counts them, a **72 % reduction**.
+
+## Unit 9 — `core/api/utils/` + `core/api/det/` (2 files, 346 lines, 95 would-be violations) — and the run's fourth law block
+
+Two installed textual headers, taken as one unit because both are `core/api/` leaves that ship
+outside the module file set and neither is large enough to occupy a reader on its own
+(`OPS-8.S2`'s reader-load test). `log_macros.hpp` is the `INSIGHT_LOG_*` preprocessor layer;
+`det_int128.hpp` is the portable 128-bit integer the deterministic fixed-point core rides on
+gcc, clang and MSVC.
+
+| files | comment lines HEAD → gate | forms written |
+|---|---|---|
+| `log_macros.hpp`, `det_int128.hpp` | 97 → 45 | pre 1 · post 4 · invariant 7 · assert 2 · note 9 · refs 2 · 6 continuations · **law 1** · 3 tool |
+
+`refs:` targets: `ADR-3.D4`, `BIB:determinism_model`,
+`F-SRC-insight-canon:test_det_int128_portable.cpp` (inside the law block).
+
+### `LSRC-9` — the consumer-driven operator set, and why this one IS owed a block
+
+The rule: the portable 128-bit struct's operator set is **consumer-driven**, and adding an operator
+obliges extending the equivalence oracle in the same change. `OPS-8.S9`'s test asks whether a slot
+already owns the argument, and here nothing does — the ADR shelf carries the tri-toolchain ship gate
+(`ADR-3.D4`) and the determinism contract (`BIB:determinism_model`), but neither says anything about
+how this header's member set is chosen or what a new member obliges. The rule's failure mode is what
+makes it a law rather than a `note:`: **native `unsigned __int128` supplies every operator for
+free**, so a missing member compiles on both toolchains anyone builds on and fails only on MSVC,
+where nobody builds daily — the rule governs an edit whose violation is invisible on the leg the
+editor is standing on. Two sites obey it: this header and the oracle test the block names.
+
+The number was issued by the pilot from this lane's range and is the fourth `D-LSRC-` declaration in
+the workspace; `registry_grammar_lint` reads the numbering DENSE and single-declared after it.
+**The cold reader recovered the rule and the obligation in full from the block alone** (Q13, Q21),
+which is the block earning its lines.
+
+### Census (`OPS-8.S4`), and six suppressions measured — four of which silenced nothing
+
+Tool forms: namespace closers 1 → 1, `/*name=*/` 1 → 1, `clang-format off` 0, `wall-clock:` 0,
+`SPDX` 0. `NOLINT`: `log_macros.hpp` 2 → 2, `det_int128.hpp` **4 → 0**, and that difference is a
+decision with a measurement behind it.
+
+**`log_macros.hpp`'s `NOLINTBEGIN`/`NOLINTEND` region silences 4 real findings and was KEPT**, its
+why re-homed as the `note:` directly above the directive (`OPS-8.S3.4`'s adjacency rule — verdict
+finding 12): `cppcoreguidelines-macro-usage` fires once per `INSIGHT_LOG_*` definition. Measured at
+0 findings with the region and 4 without, on a standalone TU — see verdict finding 16 for why the
+obvious instrument returned a false zero.
+
+**`det_int128.hpp`'s four directives were DELETED, and the measurement is the reason.** Two are
+`NOLINT(google-explicit-constructor)`; `google-*` is not in the one shared `.clang-tidy`'s check
+list, so they name a check this workspace never runs. The other two are BARE `// NOLINT` (one
+carrying the prose `// NOLINT: sign-extend`, which names no check at all), and what a bare NOLINT
+suppresses is everything on its line: measured over a forced-portable TU, **26 findings with the four
+directives, 28 without — and the two extra are `readability-identifier-length` on the `v` parameter
+of two `i128` constructors**, not the implicit-conversion check either author intended. Twenty-four
+identical short-identifier findings stand unsuppressed elsewhere in the same struct, so keeping two
+of them silenced would have been incoherent.
+
+**Nothing moved, and that was verified rather than argued**: on the native leg the portable struct is
+behind `#ifdef INSIGHT_DET_HAS_NATIVE_INT128` and is not compiled at all — measured at **0 clang-tidy
+findings in that header on a native TU** — and `malf lint --all-files` reads **21 findings** over the
+repo after this unit, equal to the baseline unit 1 recorded.
+
+### Interrogation
+
+One fresh agent, 21 questions, 29 tool uses, 118 k tokens, 5.2 minutes, against a frozen tree. No
+git command was run; the transcript was checked. **19 of 21 recovered, 1 not recovered, 1 wrong.**
+Scored from the per-question evidence; the reader wrote no summary line.
+
+Two recoveries reached facts the deleted prose never carried: Q7 established from
+`core/CMakeLists.txt`, the repo README and an `insight-eidos` angle-bracket include that the header
+IS installed (the prose asserted it without evidence), and Q20 found that the oracle's `#else`
+branch registers **no test case at all** rather than a `GTEST_SKIP()`, so a platform without a native
+`__int128` shows up as a lower discovered-test count instead of a green line asserting nothing.
+
+### The line THIS conversion wrote that was WRONG, re-derived at the artifact
+
+**The multiply's carry invariant was arithmetic that does not hold.** The conversion carried the old
+prose's claim into `invariant: the carry between columns is threaded as a FULL 64-bit value — a
+column reaches ~2^66.` The reader's Q15 answer refused it and did the arithmetic: with `r[i+j]`
+stored back masked to 32 bits, `acc = r[i+j] + a[i]*b[j] + carry` is bounded by
+`(2^32-1) + (2^32-1)^2 + (2^32-1)`, which is **exactly 2^64 - 1**, so the threaded `carry = acc >> 32`
+never exceeds `2^32 - 1` and a 32-bit carry would compute the same values. Re-derived here
+independently: the bound is exact, with zero headroom. The ~2^66 figure describes the mathematical
+column total, not the variable.
+
+What is actually load-bearing — and what a future editor would break by storing the full `acc` back
+into a limb — is the masking. Repaired to
+`invariant: a limb keeps only 32 bits, so acc = r + a*b + carry never exceeds 2^64 - 1`, with the
+in-loop `assert:` narrowed to match. **The old prose said the same wrong thing and had said it since
+the operator was written**, which is `OPS-8.O3`'s second lesson at its sharpest: the conversion
+asserted a false measurement it inherited, and only the interrogation could catch it.
+
+### The claim NOT recovered, and why it is deleted rather than re-homed
+
+**Why `div_or_mod` is one function with a `bool want_remainder` rather than two (Q17).** The reader
+said the tree gives only the mechanism and then reconstructed the consequence unaided — two loops
+would be a duplicated implementation and a second arithmetic surface the equivalence oracle would
+have to prove separately. The deleted prose's own reason was a **rejected alternative** ("no
+incomplete-type nested struct, no duplicated loop"), and `ADR-26.D5` is explicit that a rejected
+alternative is never a comment: it is a law block if a rule depends on it, a doc paragraph otherwise.
+No rule depends on it, and the reader reached the operative half without help. Deleted, declared here.
+
+### A stale claim in the OLD prose, deleted with the evidence
+
+**The header named the WRONG test as its own equivalence oracle.** It said
+`INSIGHT_DET_FORCE_PORTABLE_INT128` *"forces the struct even on gcc/clang, so a Linux unit test
+(test_det_math.cpp) asserts struct ≡ native bit-for-bit"* — and eight lines later named
+`test_det_int128_portable.cpp` for the same role. A sweep for the macro over `insight-canon` returns
+exactly three sites: line 34 of `test_det_int128_portable.cpp` and two in this header itself.
+`test_det_math.cpp` never defines it and never compares the two representations; it uses native
+`__int128` directly. The surviving citation is the law block's, and it names the file that does the
+work.
+
+### Findings for other lanes — none fixed here
+
+1. **`test_det_int128_portable.cpp`'s own header describes a mechanism it does not use — the test
+   tier's unit of this run.** It says *"include the header TWICE into two namespaces — once native,
+   once forced-portable"*; the file includes the shim once and hand-writes the native view as a pair
+   of aliases. Found by the cold reader, re-derived at the file. It is a later unit of this same
+   migration and is repaired there.
+
+### Witnesses
+
+Comment-only: the code token stream of both files is identical to `HEAD`'s. Grammar:
+`malf format --check` over both directories — 45 comment lines, **0 would-be violations**, post
+format. Lint: `malf lint --all-files` **21 findings**, equal to the baseline. Registry:
+`scripts/registry_grammar_lint.py` **0 failures**, with the new law number accepted as dense and
+single-declared. Behaviour: `malf test insight-canon` **809 of 809** on clang-21 and **809 of 809**
+with `--profile linux-gcc16-release`, on the final text of units 8 and 9 together. Count: 97 comment
+lines at HEAD to 45, a **54 % reduction** — the lowest of the run after unit 7, and the law block is
+why: 11 of those 45 lines are its frame and prose.
 
 ---
 
@@ -1542,7 +1672,7 @@ only around each `malf build`/`malf test` pair and released immediately with the
 lanes (`insight-eidos`, `insight-metalog`, `coderoast-server`) were live on the same slot
 throughout.
 
-## What remains, and what the next lane should take first
+## What remained after the SECOND run (superseded by the third run's section below)
 
 Unconverted, by violation count: `core/api/` 2 697 (`canon.api.cppm` 1 193, `canon.spi.cppm` 672,
 `canon.transport.cppm` 322, `canon.compose.cppm` 268, `canon.cppm` 242) · `core/src/strategy` 1 275
@@ -1561,3 +1691,89 @@ range already issued rather than one that has to stop and ask.
 and dense.** The next free integer is not this lane's to assume — `insight-metalog` was issued 8 in
 the same session, and `registry_grammar_lint` now reports eight declarations. A lane needing one
 asks the pilot.
+
+---
+
+# Where the THIRD run stands (units 8-9, 2026-09-06)
+
+**Nine units converted, the repo still NOT armed.** `malf format --check insight-canon` reads
+**13 366 comment lines and 12 502 would-be violations** against the original baseline's 14 489 and
+14 242 — **1 740 violations converted, 12.2 % of the repo**, in eight commits across three runs.
+Arming (`OPS-8.S12`) requires the whole repo at zero and is not reached, so `comment_contract: true`
+is NOT set and the CCC phase still counts this repo rather than failing it.
+
+| unit | surface | violations | comment lines | reader |
+|---|---|---|---|---|
+| 1 | `core/src/arena/` | 37 | 39 → 17 | 10/10 recovered |
+| 2 | `core/src/identity/` | 132 | 136 → 34 | 13/13 recovered |
+| 3 | `core/src/transport/` + `canon.internal.cppm` | 107 | 109 → 40 | 15/15 recovered |
+| 4 | `core/src/tokenizer/` | 112 | 114 → 48 | 14/14 recovered |
+| 5 | `core/src/parse/` | 265 | 273 → 103 | 31/35, **4 wrong** |
+| 6 | `core/src/scan/` | 284 | 287 → 96 | 33/34, **1 wrong** |
+| 7 | `core/src/conformance/` | 313 | 318 → 158 | 30/32, **2 wrong** |
+| 8 | `core/src/compose/` | 395 | 404 → 113 | 35/38, 2 not recovered, **1 wrong** |
+| 9 | `core/api/utils/` + `core/api/det/` | 95 | 97 → 45 | 19/21, 1 not recovered, **1 wrong** |
+| | **total** | **1 740** | **1 777 → 654 (63 %)** | **193/219, 3 not recovered, 9 wrong** |
+
+Forms standing in the repo: `pre` 11 · `post` 47 · `invariant` 110 · `assert` 19 · `note` 98 ·
+`refs` 107 · 150 continuations · **4 law blocks** · 265 tool forms.
+
+**The third run's headline is that BOTH of its wrong lines were arithmetic or bounds, not prose.**
+Unit 8's was a memory bound (*one fixed block bounds the whole scan*, where the block is an initial
+size and the allocator grows); unit 9's was an integer bound (*the carry needs a full 64 bits*, where
+the exact worst case is `2^64 - 1` with zero headroom and the carry never leaves 32 bits). Neither
+was recoverable by re-reading the prose, because the prose said the same wrong thing; both fell to a
+reader that did the arithmetic. That is a different failure mode from the second run's five
+carried-false-claims, and it argues for putting a NUMERIC claim in front of a reader on purpose.
+
+## The behaviour witness, and exactly which units each run covers
+
+| run | units in the tree | clang-21 | gcc-16.2 |
+|---|---|---|---|
+| baseline | none converted | 809 / 809 | 809 / 809 |
+| after unit 5 | 5 (final), 6 (draft) | 809 / 809 | 809 / 809 |
+| after units 6-7 | 5, 6, 7 — all final | 809 / 809 | 809 / 809 |
+| unit 8, pre-repair | 8 (pre-reader repairs) | 809 / 809 | 809 / 809 |
+| units 8-9, pre-repair | 8 final, 9 pre-reader | 809 / 809 | 809 / 809 |
+| units 8-9, FINAL | 8, 9 — both final | **809 / 809** | **809 / 809** |
+
+Three acquisitions in the third run rather than one per unit (`OPS-8.S7.4`), and the grain is
+recorded rather than assumed. The two repairs between the second and third rows of the third run's
+block are comment-only and witness 1 proves each file's code token stream byte-identical to `HEAD`,
+so a repair can reach behaviour through `__LINE__` and nothing else — and neither repaired file
+expands a logging macro.
+
+## What the third run cost in slot contention, measured
+
+**19 minutes blocked across three waits, for about 7 minutes of slot held**, against three sibling
+CCC lanes (`insight-eidos`, `insight-metalog`, `coderoast-server`) live on the same global slot. The
+lane acquired only around a `malf test` pair and released immediately with the token each time, which
+is `OPS-8.S1.1` as the pilot amended it and verdict finding 13 as this ledger argued it.
+
+## What remains, and what the next session should take first
+
+Unconverted, by violation count: `core/api/` 2 697 (`canon.api.cppm` 1 193, `canon.spi.cppm` 672,
+`canon.transport.cppm` 322, `canon.compose.cppm` 268, `canon.cppm` 242) · `core/src/strategy` 1 275 ·
+`core/src/utils` 630 · `core/src/mask` 530 · `core/tools` 420 · `proof` 142 · `benchmarks/src` 53 ·
+`core/test_package` 15 · the test tier 4 682 · the three dialect packages 2 058.
+
+**`core/src/utils/` is the next unit, and it was surveyed rather than guessed.** 3 files, 1 968
+lines, 644 comment lines, 630 would-be violations (bare 562, trailing 38, spacer 12, ruler 4,
+tag-mid-line 3, suppression-without-why 11). **No declaring site**: every `SRC-` code in it is cited
+past the first-40-line window of a `.cpp`, so `OPS-8.O5`'s citing rule applies and no law number is
+needed — checked file by file rather than assumed. Two costs are known in advance: **15 `NOLINT`
+tokens to measure** one at a time (5 in `failure_lexicon.cpp`, 10 in `time_utils.cpp`), and the
+**three `tag-mid-line` sites** are verdict finding 8's class — prose quoting the compiler's own
+`note:` diagnostic marker, which the gate reads as a mid-line tag. The escape is the tight backtick.
+
+**`core/src/mask/` must NOT be taken without a law-number range, and this was measured.**
+`canon.detail.mask.cppm` is an INTERFACE unit, so every site in it is a declaration position, and it
+carries the statements of at least four source-declared codes — the composite, ephemeral-root,
+catalog and bracket-timestamp masking rules — each written as *"`SRC-D-MSK-n` — <the rule>"*. That is
+`OPS-8.O5`'s declaring case at four-or-more times the size of one law number, and the same shape as
+`core/api/canon.api.cppm`'s seven. Both units want a range issued before they are opened.
+
+**Law numbers consumed by this run: 9, in `core/api/det/det_int128.hpp`.** The range this lane held
+was 9, 10 and 11; **10 and 11 were NOT consumed and are NOT reserved** — nothing in the tree claims
+them, so the next free integer is 10 and the density check is satisfied. A lane needing one asks the
+pilot.
