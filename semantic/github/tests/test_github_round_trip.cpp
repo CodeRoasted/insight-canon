@@ -20,8 +20,8 @@ TEST(GithubRoundTrip, RecognizeRendersBackToDeclaredIntent)
     const auto report{insight::semantic::conformance::round_trip_report(
         insight::semantic::github::kManifest, composed)};
 
-    // assert: the two GHA Step media closing is materialization-invariance on READ equal to
-    // medium-multiplicity on WRITE.
+    // assert: both declared Step media must close, so ONE intent on READ answers TWO declared media
+    // on WRITE — a property of the declaration, never a claim about GitHub's bytes.
     ASSERT_FALSE(report.checks.empty())
         << "no round-trip checks ran — the dialect declared no markers?";
     for (const auto& check : report.checks)

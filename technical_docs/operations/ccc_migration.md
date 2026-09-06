@@ -3176,6 +3176,52 @@ lets the freeze be enforced by the party that owns the tree.
 
 
 
+### Two repairs the interrogation bought, landed in a SECOND commit, and one finding neither reader section records
+
+Both repairs come from answers that were scored **recovered** — a reader can answer a question
+correctly and still show you that a line you wrote is weaker than it should be, and neither of these
+would have been visible from the score alone.
+
+1. **A locator this conversion dropped, and a reader then hunted for.** The header's half-one /
+   half-two split survived, but the prose had also named WHERE half two is measured, and that
+   sentence went with it because a private-corpus harness directory has no registry form and could
+   not become a `refs:`. Asked what the other half is and why it is not here, reader B answered the
+   split correctly, then reported that it had searched `insight-eidos`, found gate 1's instrument
+   and **could not find a half-two instrument anywhere**. That is a locator loss the address census
+   cannot see by construction: what was dropped carried no address, which is exactly why it was
+   dropped. Restored as a `note:` naming the harness directory — a `note:` may hold a path where a
+   `refs:` may not, and a path a reader can follow beats an address that does not exist.
+2. **Two residual lines in one unit collided on one subject.** `test_github_markers.cpp` carries the
+   claim-boundary warning that the stripped channel is our own lab ablation, so an A/B across the
+   pair is **not** materialization-invariance across a dialect's real materializations — and reader A
+   drew that boundary back cleanly and unprompted. But the line this conversion wrote in
+   `test_github_round_trip.cpp` asserted *"materialization-invariance on READ"* about the same two
+   Step media. Both statements are defensible at their own altitudes and the reader was not misled;
+   a later reader with only one of the two files in front of them can be. The round-trip line now
+   states the property without the contested phrase: one intent on read answers two declared media
+   on write, a property of the declaration and not a claim about bytes GitHub served.
+
+**The finding: the census reimplements an exported canon function rather than calling it.**
+`trimmed()` in `test_masked_span_census.cpp` restates canon's intent-name trim, and the residual
+line defends the restatement by pointing at the invariance test that would catch a divergence. Both
+halves are true, and a reader found the position weaker than it needs to be: canon **exports**
+`trimmed_intent_name` from its api module, with a body that trims the same three bytes, and the
+census neither calls it nor compares against it — so the guard is four examples against a fork that
+did not have to exist. Verified at both sites in this run. Deleting the local copy is a code change
+and no comment-only commit may make it. **Addressee: Kleio** — the guard is a test-homing question,
+with Hephaïstos for the call-site change.
+
+**And a correction to this lane's own scoring, because the failure it repeats is already on the
+record.** The lane scored its duplicate reader A **31 of 31**. It is **30 of 31**: that reader's
+answer on the two composition helpers opens with the correct clause and then contradicts it, and
+the lane read the matching first clause as agreement and moved on. `OPS-8.S8` names exactly this —
+score from the per-question evidence, never from the shape of the answer — and this is the second
+time in the programme that a contradiction inside one answer has been skimmed as assent. The
+verdict itself does not move: the disagreement was resolved at the artifact above, the tree's
+`for_stream` copies the unfiltered tables forward into every view it builds, and the `assert:` this
+conversion wrote at the site stands as written.
+
+
 ---
 
 # The `OPS-8` verdict — third cold reader, first at scale

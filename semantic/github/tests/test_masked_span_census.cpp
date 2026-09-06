@@ -1,6 +1,7 @@
 // refs: DN-38.D1, DN-38.D3
 // invariant: this file measures HALF ONE — the rendered BYTES, a pure function of the NAMES. The
 // row COUNT needs the engine and is measured outside this repo.
+// note: half two is the `gd_gate1_over_merge` harness in `coderoast-corpora`, over the same pairs
 // invariant: the population needs the GitHub-Actions marker vocabulary and the function is canon's,
 // so both live in this repo: one build, no seam.
 // assert: `recognize()` is driven rather than the banner grepped — a second rig over one corpus
