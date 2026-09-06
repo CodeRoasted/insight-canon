@@ -5428,6 +5428,210 @@ over a LOST list is not a disposition; it is a hypothesis about the whole list.
   `F-SRC-` address, not a corrected number. **Addressee: whoever owns the `insight-e2e` contract
   document.**
 
+## Unit 23 — `core/src/strategy/` structured group (4 files, 810 comment lines, 782 would-be violations) — the workspace's sixteenth law, and three suppressions that silence nothing
+
+The strategy interface plus the three files that carry canon's JSON and OTEL machinery:
+`canon.detail.strategy.cppm` (222), `json.cpp` (316), `span_unpack.cpp` (123),
+`simdjson_scratch.hpp` (121). Baseline split: bare 615 · spacer 58 · `///` 47 · trailing 31 ·
+ruler 27 · suppression-without-why 4. After: **633 comment lines, 0 would-be violations** —
+`pre` 8 · `post` 48 · `invariant` 217 · `note` 3 · `refs` 53 · 228 continuations · 1 law block ·
+29 tool forms. Repo-level delta **5 957 → 5 175 = exactly 782**, the unit's own count.
+
+### `LSRC-16` is minted, and it is minted because a DESIGN NOTE ordered it in terms
+
+`DN-29.D9` does not merely permit a source-site statement, it requires one: *"The load-bearing
+premise, which MUST be stated at the source site"*, plus *"the denominator — `+4.2 %` is not a
+measurement without the workload it is 4.2 % OF"*, plus *"the pre-registration is LOST and is
+recorded as lost … may never be described as within budget"*. Three obligations, all at one
+declaration, none expressible in a `note:` (one line) or a contract form (two).
+
+**CCC's only admissible multi-line source form is the law block**, so the block is OWED rather than
+preferred — which is exactly `OPS-8.S9`'s test for minting: the rule has no addressable owner that
+STATES it, because `DN-29.D9` states that it must be stated HERE. The block sits at
+`kExportFirstKeys` in `span_unpack.cpp` and carries the rule, the workload the percentages are a
+fraction of, both measured arms with their standard deviations, the accepted-on-judgment label, the
+DATED premise with what it was *not* established by, and the three-layer degradation. The registry
+lint reads **16 `D-LSRC-` declarations, numbering DENSE**. The next free integer is **17**.
+
+The block absorbs no `SRC-` code: the probe's rule never had one.
+
+### The four suppressions — THREE silence nothing, and the measurement found FOUR un-waived warnings
+
+Instrument: `clang-tidy-21 -p core/build-clang21-libcxx-release --checks='-*,<the one check>'`, in
+place, directive TEXT renamed and the code untouched. Both checks are ARMED in the one shared
+`.clang-tidy`, so the inventory argument could only ever license a deletion.
+
+| site | subject | with | without | verdict |
+|---|---|---|---|---|
+| `json.cpp` | `parse_otel_span` | **fires, complexity 71** | fires | **INERT — deleted** |
+| `json.cpp` | `JsonStrategy::parse` | 0 | 0 | **INERT — deleted** |
+| `span_unpack.cpp` | `unpack_otel_spans` | **fires, complexity 26** | fires | **INERT — deleted** |
+| `simdjson_scratch.hpp` | `JsonScratch()` | 0 | **2** | **LOAD-BEARING — kept** |
+
+The check fires throughout, so no zero in that table is an uninformative one.
+
+**TWO OF THE THREE HAD DRIFTED OFF THEIR TARGET, AND THE REPO PREDICTED IT IN WRITING.**
+`NOLINTNEXTLINE` suppresses the NEXT line. At both inert cognitive-complexity sites the directive is
+followed by a further ten-to-fifteen lines of comment before the declaration, so "next line" is a
+comment and the waiver reaches nothing. `insight-canon/.clang-tidy` mandates the other form and
+gives this exact reason: a legitimately-complex routine *"gets a SAME-LINE `// NOLINT(…): <reason>`
+— same-line, so the waiver cannot outlive the code it anchors to by drifting off it."* The third is
+inert differently: its target is genuinely under the bar, so it waives a finding that does not exist.
+
+**FINDING — four functions are over the bar with no live waiver**, measured at HEAD before any
+conversion: `parse_otel_span` **71**, `route_compound_keys` **33**, `append_canonical_span` **28**,
+`unpack_otel_spans` **26**, against a bar of 25. This has been invisible because `readability-*` is
+**not** in `WarningsAsErrors`, so `malf lint` is green over all four. The `.clang-tidy` states the
+disposition and it is not this lane's: *"Handle a finding by TRIAGE, never by raising this number to
+silence it."* **Addressee: the `insight-canon` strategy lane.**
+
+**AND A POLICY CONFLICT THIS UNIT DID NOT HAVE TO RESOLVE, BUT MUST NOT HIDE.** The repo's
+`.clang-tidy` requires the waiver SAME-LINE; `ADR-26.D5` admits only an OWN-LINE `NOLINT…` under a
+`note:`, and classes a trailing comment on a code line as a violation. **The two live policies ask
+for opposite forms**, for reasons that are both good — one against drift, one for the residual-claim
+grammar. Measurement removed the question here: the three cognitive-complexity waivers are deleted
+as inert, and the one that survives is a different check whose own-line form CCC accommodates. **The
+conflict becomes live the moment anyone waives one of the four functions above.**
+**Addressee: Daidalos.**
+
+### An instrument error of my own, recorded because it produced a FALSE CLEAN reading
+
+The header measurement first returned **identical counts armed and disarmed**, which reads exactly
+like *this directive silences nothing* — a deletion. It was the filter:
+`--header-filter=".*simdjson_scratch\.hpp"` inside double quotes never reached clang-tidy as the
+regex intended, so no header diagnostic printed and both runs showed the same summary. Re-run with
+`--header-filter='.*'`, the answer INVERTED: 2 diagnostics without the directive, 0 with.
+**A suppression measurement is only as good as the filter that lets its diagnostics through, and a
+mis-scoped filter fails in the SAFE-LOOKING direction.** `OPS-8.S3.4` already says a measurement
+whose positive control does not fire has not been taken; this is the same failure reached through
+the filter rather than through the control, and the control cannot see it — the control is inside
+the region the filter is hiding.
+
+### The stripper cross-check (`OPS-8.S5`), held NON-vacuously
+
+Removed 222 + 314 + 122 + 120 = **778**, kept 32. The unit's kept violation classes are the four
+`suppression-without-why` sites, so the identity is `778 == 782 − 4` and it holds with something
+actually subtracted. All four were cleared from the draft BEFORE the claims script ran; the one
+load-bearing directive is re-inserted by the script under its own `note:`, so nothing landed twice
+and no claim landed between a directive and the line it suppresses.
+
+### TWO placement defects, both caught by the anchor audit rather than by a gate
+
+The audit is unit 22's: print every block's resolved anchor beside its first claim and read the
+table.
+
+1. **A claim anchored on a bare `};`.** The block describing why `JsonStrategy` declares no role
+   vocabularies is the LAST thing in that class, so its first following code line is the class's
+   own closing brace — and the placer's monotone cursor resolved that to the closing brace of
+   `IISW3CStrategy`, one class earlier. The claim landed inside the wrong class, at indent 0 inside
+   a class body, where `clang-format` then reflowed it into a `tag-mid-line` violation. Re-anchored
+   to `class JsonStrategy` itself, which is what the claim is about.
+2. **A mixed paragraph the ORIGINAL prose had already misplaced.** One comment block opened by
+   describing `parse_otel_span`'s field mapping and closed by describing `store_span_ids` — and it
+   sat above `store_span_ids`. The conversion inherited the misplacement. Split: the span-id claims
+   stay, the mapping moved onto `parse_otel_span`.
+
+The `tag-mid-line` violation from the first is worth naming separately, because it is
+`OPS-8.S7.2` shape ① arriving at the DRAFT gate rather than after the tree format: the standalone
+gate reads post-format text, so it caught the reflow before anything reached the tree.
+
+### The address census (`OPS-8.S7.3b`), both legs
+
+**Outbound: 8 LOST on the first pass, every one restored rather than dispositioned away.**
+`ADR-3.D4` (twice — the textual-GMF include discipline, which the include lines' trailing comments
+carried), `ADR-29`, `DN-29.D6` (twice), `SRC-D-OTEL-11`,
+`MEM:synthetic-gate-vacuity-vs-judgment` and `DN-030`. Only the last is a repair rather than a
+restoration: `DN-030` is not the registry form, and the `refs:` carries `DN-30`. Two added:
+`LSRC-16` and `DN-29.D9`, which is the slot that ordered it.
+
+**This is unit 22's lesson applied.** There, sixteen LOST lines were dispositioned in one act and
+one of the sixteen was wrong. Here every line was opened, and the eight that came back were eight
+separate reads — which is the only reason `MEM:synthetic-gate-vacuity-vs-judgment` survived, since
+nothing else in this unit's tree carries it.
+
+**Inbound: 112 mentions.** Most are FIXTURE DATA rather than citations — `span_unpack.cpp` appears
+inside masked-template test strings and inside the published determinism golden, because a compiler
+warning naming that path is one of the masker's own worked examples. Two real leads and both are
+findings rather than repairs:
+
+* **`DN-43` carries a cascade item that is ALREADY DISCHARGED.** Its *"Cascade owed by this
+  ruling"* section says the `BglRecord` preamble *"says `<node2>` … is validated grammar"*, calls it
+  *"a comment describing a check that does not exist"*, and addresses the repair to whoever next
+  opens the file. The prose had already been corrected before this session — the block this unit
+  stripped opens *"THREE FIELDS ARE CONSUMED AND NOT PUBLISHED, AND THEY DO NOT SHARE A VERDICT —
+  this sentence used to say all three were validated grammar"* — and the conversion carries the
+  corrected rule as three `invariant:` lines naming which field is validated by what. The cascade
+  is closed and the design note still records it as open. **Addressee: Daidalos.**
+* **`DN-29` quotes this unit's comment VERBATIM.** It writes *"`json.cpp:parse_otel_span`'s own
+  comment names its precondition — 'THIS MUST PRECEDE `is_otel_span_line`: that predicate tests only
+  for `startTimeUnixNano`, and a document carries that key inside its spans'"*. The FACT survives as
+  a `pre:` at the same site and the `F-SRC-` address still resolves, so nothing is falsified — but
+  the quotation no longer matches byte-for-byte. The conversion was adjusted to keep naming
+  `is_otel_span_line` explicitly, so the quote stays findable in substance; the stale quotation
+  marks are a provenance nuisance for the note's owner. **Addressee: Daidalos.**
+
+### The cold reader (`OPS-8.S8`) — 60 questions, 60 recovered, ZERO convictions
+
+Reader A took the module interface and the shared scratch header; reader B took the two
+implementation files. `GIT COMMANDS RUN: none` from both.
+
+| reader | questions | recovered | wrong |
+|---|---|---|---|
+| A — `canon.detail.strategy.cppm`, `simdjson_scratch.hpp` | 25 | 25 | 0 |
+| B — `json.cpp`, `span_unpack.cpp` | 35 | 35 | 0 |
+
+**This is the first unit of the run where the interrogation found nothing, and that is reported as
+the measurement it is rather than dressed up.** It is one unit, not a trend: units 22, 20, 21 and 19
+each produced convictions, and the difference here is not obviously the converter — this unit's
+prose was unusually dense in *arguments* (why a probe is O(1), why a field is not validated, why a
+constant is zero) and unusually thin in *carried measurements about the outside world*, which is the
+class `OPS-8.O3` says goes stale. A conversion that carries fewer external facts has fewer chances
+to carry a false one.
+
+Two answers are worth keeping for what they add rather than for what they caught.
+
+* **The reader named the consumer that would break.** Asked what the module's `export import` buys,
+  it did not stop at the invariant: it swept the importers and found that
+  `core/src/tokenizer/tokenizer_engine.cpp` imports this shard and NOT the spi module while naming
+  `ParsedLine`, `EventTime` and `EventLevel`, whereas four other importers take the spi themselves
+  and would survive. The tree carried the rule; the reader supplied the witness.
+* **The reader split its own confidence on a line I had over-compressed.** On the naming-totality
+  claim it answered `high`, then added *"the 'costs nothing at the template grain' half is inferred
+  from `LSRC-12`'s premise, not measured in-tree: medium"*. It was right: the carried prose had
+  said *why* — a bare digit-leading stamp is one whitespace-delimited token that masks to a single
+  leading wildcard — and my conversion kept the consequence and dropped the mechanism, so the reader
+  had to leave the unit to reconstruct it. Repaired before the commit by restoring the because.
+
+**A `recovered` verdict is not the end of the answer.** Unit 22's fifth defect was found by reading
+a reader's CITATIONS against the converted line; this one was found by reading its CONFIDENCE
+against the line. Both are signals the score column does not carry.
+
+### The disclosure, and why it is clean — MEASURED, not assumed
+
+Reader A disclosed that a search for `compound_key_name` printed matching lines from
+`core/build-gcc16-release/CMakeFiles/**/*.ddi.i` — preprocessed copies of two of the unit's own
+files, inside a `build*` directory the prompt puts off-limits. Those artefacts date from the
+unit-22 behaviour witness, i.e. from BEFORE this conversion, so the obvious worry is that they
+carry the pre-conversion prose and are therefore an answer key.
+
+**They do not, and the check is one command:** both `.ddi.i` files contain **zero** comment lines.
+Preprocessing strips comments, so a dependency-scan artefact carries the CODE and nothing else —
+and the code is unchanged by construction in a comment-only unit, so it was already fully available
+to the reader from the source. Contamination: nil.
+
+The `build*` exclusion still earns its place; what this measures is that for this particular
+artefact class it is belt-and-braces rather than load-bearing. And the leak is on the record for
+exactly one reason: the reader volunteered it. That is now the third disclosure this programme has,
+and all three came from the reader rather than from the operator.
+
+### The behaviour witness
+
+`malf test insight-canon` on **both** toolchains after the unit landed: **809 of 809** on
+`linux-clang21-libcxx-release` and **809 of 809** on `linux-gcc16-release` (734 + 32 + 25 + 13 + 5
+on each), equal to the pre-unit baseline. `registry_grammar_lint` exit 0 with sixteen `D-LSRC-`
+declarations and numbering DENSE; `docs_lint` clean.
+
+
 
 ---
 

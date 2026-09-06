@@ -1,15 +1,8 @@
-// Internal helper shared by the JSON-shaped strategies (json, cloudwatch,
-// systemd_journal). Provides:
-//   * a thread-local simdjson::ondemand::parser + padded buffer (zero per-line
-//     allocation in steady state),
-//   * a span-safe loader that copies a std::string_view into the padded buffer
-//     and zeroes the SIMDJSON_PADDING tail,
-//   * a helper to extract the first present string-valued field from a list of
-//     candidate keys via find_field_unordered (no DOM materialisation).
-//
-// All entry points are noexcept; errors are reported by simdjson via the
-// returned status codes the caller already inspects.
 
+// invariant: the internal helper shared by the JSON-shaped strategies — a thread-local parser and
+// padded buffer, a span-safe loader, and field readers that spend no DOM.
+// invariant: every entry point is noexcept; errors are reported through the simdjson status codes
+// the caller already inspects.
 #pragma once
 
 #include <array>
@@ -26,12 +19,12 @@ namespace insight::tokenization
 inline constexpr std::size_t kSimdjsonScratchCacheLine{64};
 inline constexpr std::size_t kSimdjsonScratchInitialCapacity{4096};
 
-// Cache-line aligned to keep the parser away from neighbouring TLS data.
+// invariant: cache-line aligned to keep the parser away from neighbouring thread-local data.
 struct alignas(kSimdjsonScratchCacheLine) JsonScratch
 {
-    // simdjson's ondemand::parser ctor is explicit; provide an explicit
-    // user-defined default ctor so callers can value-initialise the wrapper
-    // and so `thread_local JsonScratch scratch{};` is well-formed.
+    // invariant: simdjson's parser constructor is explicit, so an explicit user-defined default
+    // constructor is what makes a value-initialised thread-local wrapper well-formed.
+    // note: the directive below is measured LOAD-BEARING: 0 findings with it, 2 without.
     // NOLINTNEXTLINE(readability-redundant-member-init)
     JsonScratch() noexcept : parser{}, padded{} {}
     simdjson::ondemand::parser parser;
@@ -44,10 +37,10 @@ struct alignas(kSimdjsonScratchCacheLine) JsonScratch
     return scratch;
 }
 
-// Copy `line` into the thread-local padded buffer, zero the padding region,
-// and return a padded_string_view suitable for ondemand::iterate(). Buffer
-// grows geometrically so allocation count is amortised O(log N) across the
-// process lifetime.
+// post: a padded view over the thread-local buffer, with the padding region zeroed, suitable for an
+// on-demand iterate.
+// invariant: the buffer grows geometrically, so the allocation count is amortised logarithmic
+// across the process lifetime.
 [[nodiscard]] inline simdjson::padded_string_view load_padded(JsonScratch& scratch,
                                                               std::string_view line) noexcept
 {
@@ -67,8 +60,8 @@ struct alignas(kSimdjsonScratchCacheLine) JsonScratch
     return simdjson::padded_string_view(scratch.padded.data(), line.size(), scratch.padded.size());
 }
 
-// Walk `keys` in order; return the first one whose value is a JSON string.
-// Each key is consumed at most once via find_field_unordered (no rewind).
+// post: true iff one of the keys, walked in order, held a JSON STRING value.
+// invariant: each key is consumed at most once through an unordered lookup, so there is no rewind.
 [[nodiscard]] inline bool try_get_string(simdjson::ondemand::object& obj,
                                          std::span<const std::string_view> keys,
                                          std::string_view& out) noexcept
@@ -88,7 +81,7 @@ struct alignas(kSimdjsonScratchCacheLine) JsonScratch
     return false;
 }
 
-// Walk `keys` in order; return the first one whose value is a JSON integer.
+// post: true iff one of the keys, walked in order, held a JSON INTEGER value.
 [[nodiscard]] inline bool try_get_int64(simdjson::ondemand::object& obj,
                                         std::span<const std::string_view> keys,
                                         std::int64_t& out) noexcept
@@ -108,17 +101,14 @@ struct alignas(kSimdjsonScratchCacheLine) JsonScratch
     return false;
 }
 
-// ── Single-value readers that KEEP the caller's default on error (span seams) ──
-// simdjson's `simdjson_result<T>::get(T&)` is `simdjson_warn_unused`, which on gcc/clang expands
-// to `__attribute__((warn_unused_result))` — and a `(void)` cast does NOT silence that (unlike a
-// C++ `[[nodiscard]]`). The span pass-throughs want exactly "read the field if present, else keep
-// the value the caller pre-seeded": an unreadable field is a fail-safe SKIP, not an error to abort
-// on, and the pre-seeded default keeps the emitted record well-formed. These two adapters make that
-// intent explicit and consume the error_code, so the warning dies at the root rather than being
-// masked. Mirrors try_get_string's discipline, for a single already-resolved value.
-
-// Read a string-valued field into `out`; leave `out` untouched when the value is absent / not a
-// string.
+// post: the string value when present; the output is left UNTOUCHED when the value is absent or is
+// not a string.
+// invariant: simdjson's result getter is warn-unused, and a void cast does NOT silence that on gcc
+// or clang, unlike a standard nodiscard.
+// invariant: the span pass-throughs want exactly read the field if present, else keep the value the
+// caller pre-seeded — an unreadable field is a fail-safe SKIP, not an error to abort on.
+// invariant: the pre-seeded default is what keeps the emitted record well-formed, and these
+// adapters consume the error code so the warning dies at the root rather than being masked.
 inline void read_string_or_keep(simdjson::simdjson_result<simdjson::ondemand::value> value,
                                 std::string_view& out) noexcept
 {
@@ -127,9 +117,10 @@ inline void read_string_or_keep(simdjson::simdjson_result<simdjson::ondemand::va
         out = parsed;
 }
 
-// Read a value's raw JSON slice into `out` (quotes/escaping byte-preserved); leave `out` untouched
-// on error. The span-document unpack (span_unpack.cpp) passes fields through verbatim this way, so
-// its JSON-literal defaults (`""`, `"0"`) survive an unreadable field and keep shape-2 well-formed.
+// post: the value's raw JSON slice with quotes and escaping byte-preserved; the output is left
+// UNTOUCHED on error.
+// invariant: that is what lets the export unpack pass fields through verbatim and keep its own
+// JSON-literal defaults when a field is unreadable.
 inline void read_raw_json_or_keep(simdjson::simdjson_result<simdjson::ondemand::value> value,
                                   std::string_view& out) noexcept
 {
@@ -138,11 +129,11 @@ inline void read_raw_json_or_keep(simdjson::simdjson_result<simdjson::ondemand::
         out = raw;
 }
 
-// OTLP body extraction (ADR-29 SRC-D-OTEL-1): the OpenTelemetry Log Data Model
-// nests the message under body.stringValue (`"body":{"stringValue":"…"}`). Returns the
-// stringValue, or false when body is absent / not an object / carries no stringValue. MUST
-// be the LAST field accessed on `obj` — it descends into a child, after which the parent
-// cursor cannot rewind to a sibling (simdjson on-demand).
+// post: the OTLP body string, or false when the body is absent, not an object, or carries no string
+// value.
+// pre: this MUST be the LAST field accessed on the object — it descends into a child, after which
+// the parent cursor cannot rewind to a sibling.
+// refs: ADR-29, SRC-D-OTEL-1
 [[nodiscard]] inline bool try_get_otel_body(simdjson::ondemand::object& obj,
                                             std::string_view& out) noexcept
 {
@@ -162,13 +153,13 @@ inline void read_raw_json_or_keep(simdjson::simdjson_result<simdjson::ondemand::
     return true;
 }
 
-// Nested-object descent (detection_provenance_and_legibility.md SRC-D-MSK-3): app loggers (and
-// LogCraft) nest custom fields under `"fields":{…}`, so a top-level component/level lookup
-// misses. Get the child object at `key` (one level) so the caller can read its scalars with
-// try_get_string. Returns false when `key` is absent / not an object. Like try_get_otel_body,
-// this descends into a CHILD: it MUST be the LAST access on `obj` — after reading the child the
-// parent cursor cannot rewind to a sibling (simdjson on-demand). A nested object also forces the
-// fast byte-scanner to bail (it rejects `{`), so every nested-fields line takes this slow path.
+// post: the child object at the key, one level down, so the caller can read its scalars; false when
+// the key is absent or is not an object.
+// pre: like the body reader, this MUST be the LAST access on the object — after reading the child
+// the parent cursor cannot rewind to a sibling.
+// invariant: a nested object also forces the fast byte scanner to bail, so every nested-fields line
+// takes this slow path.
+// refs: SRC-D-MSK-3
 [[nodiscard]] inline bool get_nested_object(simdjson::ondemand::object& obj, std::string_view key,
                                             simdjson::ondemand::object& out) noexcept
 {
@@ -178,80 +169,67 @@ inline void read_raw_json_or_keep(simdjson::simdjson_result<simdjson::ondemand::
     return field.get_object().get(out) == simdjson::SUCCESS;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Fast-path byte scanner — avoids simdjson for escape-free JSON objects.
-//
-// For the common case where JSON log lines contain only ASCII string values
-// with no escape sequences, this scanner extracts known fields in a single
-// pass at ~3× the speed of simdjson::ondemand. Returns has_result=false on:
-//   • any backslash in any value
-//   • nested objects or arrays
-//   • malformed JSON
-// Callers must fall back to simdjson when has_result is false.
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Scans a quoted JSON string starting at pos (which must point at the opening
-// '"'). Advances pos past the closing '"'. Returns false on escape sequences
-// or unterminated strings; pos is then undefined and the caller should bail.
+// invariant: the fast path avoids simdjson entirely for escape-free JSON objects — a single byte
+// pass over ASCII string values, measured at about three times the on-demand speed.
+// invariant: it bails on any backslash in any value, on nested objects or arrays, and on malformed
+// input, and the caller MUST fall back to simdjson when it does.
+// pre: the string scanner below takes a position pointing at an opening quote.
+// post: it advances the position past the closing quote, and returns false on an escape sequence or
+// an unterminated string, after which the position is undefined.
 [[nodiscard]] inline bool extract_json_str(std::string_view line, std::size_t& pos,
                                            std::string_view& out) noexcept
 {
     if (pos >= line.size() || line[pos] != '"')
         return false;
-    ++pos; // skip opening '"'
+    ++pos;
     const std::size_t start{pos};
     while (pos < line.size())
     {
         const char chr{line[pos]};
         if (chr == '\\')
-            return false; // escape sequence: fall back to simdjson
+            return false;
         if (chr == '"')
         {
             out = line.substr(start, pos - start);
-            ++pos; // skip closing '"'
+            ++pos;
             return true;
         }
         ++pos;
     }
-    return false; // unterminated string
+    return false;
 }
 
-// A numeric field captured during the fast scan: its key + the raw numeric token text. The
-// catalog match + decimal→int64 parse happen in JsonStrategy::parse's module purview (this GMF
-// header cannot see the canon.api ordinal catalog), so the scanner only records candidates.
+// invariant: the catalog match and the decimal-to-int64 parse happen in the strategy's module
+// purview, because this global-module header cannot see the ordinal catalog.
+// invariant: so the scanner only records CANDIDATES.
 struct FastJsonNumericField
 {
     std::string_view key;
-    std::string_view text; // the raw numeric literal (digits / '.' / sign), un-trimmed
+    std::string_view text;
 };
 
-// Bounds the per-line numeric-candidate capture (W1 ordinal field-route). Log JSON carries a
-// handful of numeric fields; beyond this cap extras are ignored (a recognized ordinal past the
-// cap is missed — acceptable for the declared seed set; the slow path has no cap).
+// invariant: log JSON carries a handful of numeric fields, so beyond this cap extras are ignored
+// — a recognized ordinal past the cap is missed, which is accepted for the declared seed set.
+// invariant: the slow path has no cap.
 inline constexpr std::size_t kFastJsonMaxNumericFields{8};
 
-// Output of the fast-path scanner.
 struct FastJsonResult
 {
-    std::string_view timestamp_str; // set when timestamp field is a JSON string
-    std::int64_t timestamp_ms{0};   // set (nonzero) when timestamp is a JSON integer
+    std::string_view timestamp_str;
+    std::int64_t timestamp_ms{0};
     std::string_view level_str;
     std::string_view component_str;
     std::string_view message_str;
-    // Numeric fields seen in the scan (W1 ordinal candidates); matched against the declared
-    // catalog by the caller. `numeric_field_count` ≤ kFastJsonMaxNumericFields.
+    // invariant: the numeric candidates seen in the scan, matched against the declared catalog by
+    // the caller; the count never exceeds the cap.
     std::array<FastJsonNumericField, kFastJsonMaxNumericFields> numeric_fields{};
     std::size_t numeric_field_count{0};
-    bool has_result{false}; // true iff scan completed without errors
+    bool has_result{false};
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers for try_fast_json — each keeps its own complexity budget.
-// ─────────────────────────────────────────────────────────────────────────────
 
 inline constexpr std::int64_t kDecimalBase{10};
 
-// Skip JSON whitespace (space, tab, CR, LF) in-place.
+// post: the position advanced past any JSON whitespace.
 inline void skip_json_ws(std::string_view line, std::size_t& pos) noexcept
 {
     while (pos < line.size() &&
@@ -259,39 +237,36 @@ inline void skip_json_ws(std::string_view line, std::size_t& pos) noexcept
         ++pos;
 }
 
-// SRC-D-ECS-1 shape 1 — resolve a compound key to its LAST SEGMENT. `log.level` → `level`;
-// `a.b.c` → `c`; a key with no dot is returned unchanged, so this is the identity on every
-// ordinary key and needs no caller branch.
-//
-// IT LIVES IN THIS HEADER SO THE TWO KEY-MATCHING SITES SHARE ONE DEFINITION. json.cpp has two
-// paths that classify keys — the escape-free fast scanner below and the simdjson slow path — and
-// parse() RETURNS EARLY on a fast-path hit, so a rule applied only on the slow path is invisible
-// to every flat line. That is exactly the shape a namespaced producer emits, so the rule would
-// have been dead on its main population. Defining it once here is what stops the two paths
-// disagreeing about what a key means.
-// ⚠ THE BOUND IS ONE DOT, and it is shared with the nested shape's one descent. `log.level` →
-// `level`; `a.b.level` resolves to NOTHING and is claimed by no role. Taking the last segment at
-// any depth would have made the dotted spelling read `a.b.level` while the nested spelling
-// `{"a":{"b":{"level":…}}}` refused it — the same logical document read differently depending on
-// which wire form its producer chose. One grammar, one bound, both shapes.
+// post: a compound key resolved to its LAST SEGMENT; a key with no dot is returned unchanged, so
+// this is the IDENTITY on every ordinary key and needs no caller branch.
+// invariant: it lives in this header so the TWO key-matching sites share ONE definition — the
+// escape-free fast scanner and the simdjson slow path both classify keys.
+// invariant: the strategy RETURNS EARLY on a fast-path hit, so a rule applied only on the slow path
+// is invisible to every flat line — exactly the shape a namespaced producer emits.
+// invariant: the rule would therefore have been dead on its main population; defining it once here
+// is what stops the two paths disagreeing about what a key means.
+// invariant: THE BOUND IS ONE DOT, shared with the nested shape's one descent — a two-dot key
+// resolves to NOTHING and is claimed by no role.
+// invariant: taking the last segment at any depth would make the dotted spelling resolve while the
+// equivalent nested spelling refused it — one logical document read two ways.
+// refs: SRC-D-ECS-1
 [[nodiscard]] inline constexpr std::string_view compound_key_name(std::string_view key) noexcept
 {
     const std::size_t dot{key.find('.')};
     if (dot == std::string_view::npos)
-        return key; // ordinary key — the identity, so no caller needs a branch
+        return key;
     const std::string_view tail{key.substr(dot + 1)};
     if (tail.find('.') != std::string_view::npos)
-        return {}; // beyond the bound: matches no role name, which are all non-empty
+        return {};
     return tail;
 }
 
-// Assign a string value to the first matching field in result.
 inline void assign_string_field(FastJsonResult& result, std::string_view raw_key,
                                 std::string_view value) noexcept
 {
-    // The compound SHAPE, applied before any name comparison (SRC-D-ECS-1). No vendor field name
-    // is added to the comparisons below — they are unchanged; only the key handed to them is
-    // resolved first.
+    // invariant: the compound SHAPE is applied BEFORE any name comparison — no vendor field name
+    // is added to the comparisons below, only the key handed to them is resolved first.
+    // refs: SRC-D-ECS-1
     const std::string_view key{compound_key_name(raw_key)};
     const bool no_ts = result.timestamp_str.empty() && result.timestamp_ms == 0;
     if (no_ts && (key == "ts" || key == "timestamp" || key == "@timestamp" || key == "time" ||
@@ -309,7 +284,8 @@ inline void assign_string_field(FastJsonResult& result, std::string_view raw_key
         result.message_str = value;
 }
 
-// Parse an integer millisecond timestamp from a numeric literal into result if applicable.
+// post: an integer millisecond timestamp parsed from a numeric literal, when the key is a timestamp
+// key.
 inline void parse_number_ts(FastJsonResult& result, std::string_view key,
                             std::string_view num) noexcept
 {
@@ -326,8 +302,8 @@ inline void parse_number_ts(FastJsonResult& result, std::string_view key,
     result.timestamp_ms = neg ? -millis : millis;
 }
 
-// Consume one JSON value at pos, dispatching by type.
-// Returns false when the caller should abort (nested objects, arrays, or malformed input).
+// post: one JSON value consumed at the position, dispatched by type; false when the caller should
+// abort on nesting, arrays or malformed input.
 [[nodiscard]] inline bool consume_json_value(std::string_view line, std::size_t& pos,
                                              std::string_view key, FastJsonResult& result) noexcept
 {
@@ -348,7 +324,8 @@ inline void parse_number_ts(FastJsonResult& result, std::string_view key,
             ++pos;
         const std::string_view num_text{line.substr(num_start, pos - num_start)};
         parse_number_ts(result, key, num_text);
-        // Record as a W1 ordinal candidate (matched against the declared catalog by the caller).
+        // invariant: a numeric value is recorded as an ordinal CANDIDATE, matched against the
+        // declared catalog by the caller.
         if (result.numeric_field_count < kFastJsonMaxNumericFields)
             result.numeric_fields[result.numeric_field_count++] =
                 FastJsonNumericField{.key = key, .text = num_text};
@@ -360,14 +337,13 @@ inline void parse_number_ts(FastJsonResult& result, std::string_view key,
     }
     else
     {
-        // Nested object/array or unknown character — bail out; fall back to simdjson.
         return false;
     }
     return true;
 }
 
-// Process one JSON key-value pair starting at pos (must point at opening '"' of key).
-// Returns false when parsing should abort.
+// pre: the position must point at the opening quote of the key.
+// post: one key-value pair consumed; false when parsing should abort.
 [[nodiscard]] inline bool process_json_kv(std::string_view line, std::size_t& pos,
                                           FastJsonResult& result) noexcept
 {
@@ -388,21 +364,15 @@ inline void parse_number_ts(FastJsonResult& result, std::string_view key,
     return consume_json_value(line, pos, key, result);
 }
 
-// Single-pass byte scanner for JSON log objects.
-//
-// Recognises the fields used by JsonStrategy and CloudWatchStrategy:
-//   timestamp / ts / @timestamp / time / datetime  (string or integer epoch ms)
-//   level / severity / loglevel / log_level
-//   component / source / logger / service / module / logGroup / logStream
-//   message / msg / log / text / body
-//
-// Unknown fields are silently skipped. O(N) in line length; no heap allocation.
+// post: the recognized timestamp, level, component and message fields of a JSON log object, with
+// unknown fields silently skipped.
+// invariant: linear in line length with no heap allocation; the recognized field set is the union
+// of what the JSON and CloudWatch strategies read.
 [[nodiscard]] inline FastJsonResult try_fast_json(std::string_view line) noexcept
 {
     FastJsonResult result;
     std::size_t pos{0};
 
-    // Skip leading whitespace; expect '{'
     while (pos < line.size() && (line[pos] == ' ' || line[pos] == '\t'))
         ++pos;
     if (pos >= line.size() || line[pos] != '{')

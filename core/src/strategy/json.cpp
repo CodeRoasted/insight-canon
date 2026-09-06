@@ -1,25 +1,27 @@
 module;
-#include "strategy/simdjson_scratch.hpp" // textual: TU-local simdjson entities (ADR-3.D4 family)
-#include "utils/log_macros.hpp"          // textual macro layer (ADR-3.D4)
+#include "strategy/simdjson_scratch.hpp"
+#include "utils/log_macros.hpp"
 #include <simdjson.h>
 
 module insight.canon.detail.strategy;
 import insight.canon.internal;
 import insight.canon.api;
-import insight.canon.detail.scan; // fast_gates predicates + sv_* scan primitives
+import insight.canon.detail.scan;
 
-// JsonStrategy — parses structured JSON log lines using simdjson on-demand.
-// See detail/simdjson_scratch.hpp for the thread-local zero-alloc scaffolding.
-
+// invariant: structured JSON parsed with simdjson on-demand; the thread-local zero-alloc
+// scaffolding lives in the shared scratch header.
+// invariant: the simdjson entities and the log macros stay TEXTUAL in the global module fragment
+// and are TU-local, so no third-party declaration leaks through the module.
+// refs: ADR-3.D4
 namespace insight::tokenization
 {
 
 namespace
 {
 
-    // ── The four role-name vocabularies (moved off the class, SRC-D-ECS-1) ─────────────────────
-    // These are canon's OWN names for the four roles it reads. They are deliberately NOT a
-    // registry of vendor field names, and SRC-D-ECS-1 below is what keeps them that way.
+    // invariant: these are canon's OWN names for the four roles it reads, and they are deliberately
+    // NOT a registry of vendor field names.
+    // refs: SRC-D-ECS-1
     constexpr std::array<std::string_view, 5> kTimestampKeys{"timestamp", "ts", "@timestamp",
                                                              "time", "datetime"};
     constexpr std::array<std::string_view, 4> kLevelKeys{"level", "severity", "loglevel",
@@ -28,53 +30,28 @@ namespace
     constexpr std::array<std::string_view, 5> kComponentKeys{"component", "source", "logger",
                                                              "service", "module"};
 
-    // ── SRC-D-ECS-1 — canon reads two SHAPES of compound key, and ZERO new field names ─────────
-    //
-    // THE RULE, and the form IS the decision: a compound key is resolved to the name AFTER ITS
-    // SINGLE DOT, and that name is matched against the vocabularies above. `log.level` → `level`.
-    // `"log":{"level":…}` → `level`. Nothing named `log.level` is added anywhere, and nothing may
-    // be.
-    //
-    // WHY NOT A FIELD NAME, NOT EVEN ONE. Adding `"log.level"` to kLevelKeys would read as the
-    // cheaper fix and it is the one that must not happen: it converts a language feature into a
-    // vendor dialect, and canon's core tier is not a dialect (ADR-17.D1 — dialects are semantic
-    // PACKAGES, composed, never core's business). One vendor name is the back door to an ECS
-    // package living in core, and the second name is then unarguable. Learning the SHAPE instead
-    // is convergence-proof: it covers pino, Serilog, Bunyan, GELF and OTLP bodies at once, and it
-    // costs nothing when the next vocabulary appears because there is no list to extend.
-    //
-    // ⚠ THE FIELD POSITION ONLY — the NAMESPACE position is REFUSED, and this is a DECLARED
-    // LIMITATION, not an oversight (DN-30.D11). `log.level` → `level` and `log.logger` → `logger`
-    // resolve because the FIELD segment is a role name. `service.name` does NOT resolve: its role
-    // word is the NAMESPACE (`service`), and canon reads that position for nobody.
-    //
-    // THE REASON IS STRUCTURAL, NOT A TUNING FAILURE. Under every predicate expressible over the
-    // four vocabularies above, `service.name` and `source.ip` are the SAME shape — a role-word
-    // namespace followed by a field that is in no list. The information that would separate them
-    // (`name` denotes an identity, `ip` denotes an address) is not present in the instrument, so
-    // no rule written here can admit one and refuse the other.
-    //
-    // AND THE CONSEQUENCE IS NOT A CARDINALITY RISK — IT IS A CATEGORY ERROR THE STRUCT ALREADY
-    // NAMES. `ParsedLine::component` is declared the LOW-CARD FUNCTIONAL SOURCE and is a cube
-    // dimension; `host` is the high-card node identity and is deliberately HORS-CUBE. Admitting
-    // the namespace position would put `source.ip` — a host-class value — into the field that
-    // declares it is not one, on a cube dimension. `host.ip`, `client.address` and
-    // `service.node.name` are all ordinary ECS, and that counterexample space is UNMEASURED.
-    //
-    // Two escapes were considered and refused, recorded so they are not re-proposed: keying on
-    // "exactly one string child" FAILS on LogCraft's own ECS (`"service":{"name":…,"type":…}` has
-    // two) and ADMITS the trap (`"source":{"ip":…,"port":54321}` has one, `port` being numeric) —
-    // wrong on the target and dangerous on the counterexample.
-    //
-    // REFUSED, NOT UNKNOWN. The reopening condition is a measurement, not an argument: the
-    // DN-29.D16 legibility marker can report, from a real stream, the cardinality a
-    // namespace-carried resolution would place on the WHERE axis. Until that number exists this
-    // stays a boundary — and a red arm is not a licence to add the missing word to a vocabulary.
-    //
-    // BOUNDED AT EXACTLY ONE LEVEL, both shapes. One dot, one descent. Unbounded descent would
-    // make an arbitrarily nested document's `level` field anywhere in the tree a severity claim,
-    // which is a different and much weaker statement than "this producer namespaced its top-level
-    // fields". The bound is what makes the shape a grammar rather than a search.
+    // invariant: canon reads two SHAPES of compound key and ZERO new field names — a key resolves
+    // to the name AFTER ITS SINGLE DOT, matched against the vocabularies above.
+    // invariant: adding a vendor's dotted spelling to a vocabulary is the cheaper-looking fix and
+    // is the one that must not happen — it converts a language feature into a vendor dialect.
+    // invariant: one vendor name is the back door to a schema package living in core, and the
+    // second name is then unarguable; learning the SHAPE instead is convergence-proof.
+    // invariant: the FIELD position only — the NAMESPACE position is REFUSED, and that is a
+    // DECLARED LIMITATION rather than an oversight.
+    // invariant: the reason is structural, not a tuning failure: under every predicate expressible
+    // over these four vocabularies, a service name and a source address are the SAME shape.
+    // invariant: the information that would separate them is not present in the instrument, so no
+    // rule written here can admit one and refuse the other.
+    // invariant: the consequence is a CATEGORY ERROR the struct already names — admitting the
+    // namespace position would put a host-class value on a field that declares it is not one.
+    // invariant: two escapes were considered and REFUSED: keying on exactly one string child fails
+    // on real schemas that have two, and admits the trap where the second child is numeric.
+    // invariant: REFUSED, not unknown — the reopening condition is a MEASUREMENT, and a red arm
+    // is not a licence to add the missing word to a vocabulary.
+    // invariant: BOUNDED at exactly one level in both shapes: one dot, one descent. Unbounded
+    // descent would make a level field anywhere in a tree a severity claim.
+    // invariant: the bound is what makes the shape a GRAMMAR rather than a search.
+    // refs: SRC-D-ECS-1, ADR-17.D1, DN-30.D11
     enum class JsonRole : std::uint8_t
     {
         None,
@@ -93,7 +70,7 @@ namespace
         return false;
     }
 
-    // The role a BARE name carries, or None. Order matches parse()'s own precedence.
+    // post: the role a BARE name carries, or None; the order matches the parse's own precedence.
     [[nodiscard]] constexpr JsonRole role_of(std::string_view name) noexcept
     {
         if (name_in(name, kTimestampKeys))
@@ -107,14 +84,14 @@ namespace
         return JsonRole::None;
     }
 
-    // Shape 1 (`compound_key_name`) is defined in simdjson_scratch.hpp, NOT here: the escape-free
-    // fast scanner classifies keys too, and parse() returns early on a fast-path hit, so the rule
-    // must be the same object at both sites or a flat namespaced line silently keeps the old
-    // behaviour.
-
-    // Fill ONE role from a compound key's resolved name — but only if that role is still MISSING.
-    // The exact-name pass always wins, which is the property that keeps an already-readable line
-    // byte-identical: a compound key can add a role, never move one.
+    // post: fills ONE role from a compound key's resolved name, and ONLY if that role is still
+    // MISSING.
+    // invariant: the exact-name pass always wins, which is the property that keeps an
+    // already-readable line byte-identical — a compound key can ADD a role, never move one.
+    // invariant: the single-dot resolution is defined in the shared scratch header and NOT here,
+    // because the fast scanner classifies keys too and parse RETURNS EARLY on a hit.
+    // invariant: so the rule must be the same object at both sites, or a flat namespaced line
+    // silently keeps the old behaviour.
     void fill_missing_role(JsonRole role, std::string_view value, ParsedLine& parsed_line,
                            ArenaAllocator& arena, bool& recognized_message)
     {
@@ -148,15 +125,13 @@ namespace
         }
     }
 
-    // The compound-key pass (SRC-D-ECS-1). ONE forward walk over the root object: each string
-    // value is offered under its single-dot resolved name (shape 1), and each object value is
-    // descended EXACTLY ONCE with its children offered under their own bare names (shape 2). No key
-    // name is consulted to decide whether to descend — the VALUE's type decides, which is what
-    // makes this a grammar rather than a list.
-    //
-    // It subsumes the hard-coded `"fields"` descent this replaces: that was a single vendor name
-    // (app loggers and LogCraft nest under `fields`) doing by enumeration what shape 2 now does by
-    // structure. Removing it is a name REMOVED from core, not added.
+    // invariant: ONE forward walk over the root object — each string value is offered under its
+    // single-dot resolved name, each object value is descended EXACTLY ONCE.
+    // invariant: no key NAME is consulted to decide whether to descend; the VALUE's type decides,
+    // which is what makes this a grammar rather than a list.
+    // invariant: it SUBSUMES the hard-coded single-vendor descent it replaces, so this is a name
+    // REMOVED from core rather than added.
+    // refs: SRC-D-ECS-1
     void route_compound_keys(simdjson::ondemand::object& root, ParsedLine& parsed_line,
                              ArenaAllocator& arena, bool& recognized_message)
     {
@@ -180,8 +155,8 @@ namespace
                     std::string_view sub_key;
                     if (sub.unescaped_key().get(sub_key) != simdjson::SUCCESS)
                         continue;
-                    // Bare name only: the descent is the one level, so a dotted key INSIDE it
-                    // would be a second level of compounding and is deliberately not read.
+                    // invariant: bare name only — a dotted key inside the descent would be a
+                    // SECOND level of compounding and is deliberately not read.
                     if (const JsonRole role{role_of(sub_key)}; role != JsonRole::None)
                     {
                         std::string_view sub_value;
@@ -204,32 +179,32 @@ namespace
         }
     }
 
-    // Route the declared OTEL field-map (SRC-D-OTEL-4a) over the parsed OTLP object:
-    // severity_number → the LogLevel band (declared > inferred — it runs after the level-string
-    // route, so it overrides), and traceId/spanId/parentSpanId → the consumed trace context.
-    // Returns true iff the record is OTEL (a severityNumber or traceId was present), which the
-    // caller uses to route the message to the nested body.stringValue. Trace ids are hashed to
-    // scalar PODs and never retained as values (OR1). Kept separate so JsonStrategy::parse stays
-    // within its complexity budget.
+    // post: true iff the record is OTEL, which the caller uses to route the message to the nested
+    // OTLP body.
+    // invariant: the severity number runs AFTER the level-string route, so it OVERRIDES it —
+    // declared outranks inferred.
+    // invariant: trace ids are hashed to scalar PODs and never retained as values.
+    // invariant: kept separate so the strategy's own parse stays within its complexity budget.
+    // refs: SRC-D-OTEL-1, SRC-D-OTEL-4a
     [[nodiscard]] bool extract_otel_fields(simdjson::ondemand::object& root,
                                            ParsedLine& parsed_line)
     {
         bool is_otel{false};
         std::string_view scratch_view;
-        // OTLP timeUnixNano → event-time. Not one of the four classified fields, but required so
-        // OTEL inputs carry a timestamp and window like any other format (without it the whole
-        // pipeline never closes a window). A quoted epoch-nanoseconds string per the OTLP/JSON
-        // mapping.
+        // invariant: the OTLP event-time key is not one of the four classified fields but is
+        // required, so OTEL inputs carry a timestamp and window like any other format.
+        // invariant: without it the whole pipeline never closes a window; the value is a QUOTED
+        // epoch-nanoseconds string per the OTLP JSON mapping.
         static constexpr std::string_view kTimeUnixNanoKey{"timeUnixNano"};
         if (try_get_string(root, std::span<const std::string_view>{&kTimeUnixNanoKey, 1},
                            scratch_view))
             if (auto timestamp{utils::parse_unix_nano_timestamp(scratch_view)})
             {
-                // DECLARED (DN-29.D12 rung 1): OTLP `timeUnixNano` is the LOG record's schema
-                // field for when the event happened — not content that resembles a time. This is
-                // the second of exactly two declared-time sites, and it is the one that made
-                // `is_span` unusable as the marker: an OTLP log record carries a declared time
-                // with is_span == false.
+                // invariant: DECLARED — the OTLP key is the LOG record's schema field for when
+                // the event happened, not content that resembles a time.
+                // invariant: one of exactly TWO declared-time sites, and the one that made the span
+                // flag unusable as a marker.
+                // refs: DN-29.D12
                 parsed_line.timestamp = EventTime::declared(*timestamp);
                 is_otel = true;
             }
@@ -270,26 +245,24 @@ namespace
         return is_otel;
     }
 
-    // L2's rate limit (DN-29.D15). First occurrence, then every Nth: an entirely unreadable stream
-    // would otherwise flood the log from the hot path, and the tenth identical line carries nothing
-    // the first did not. Same principle as LogParser's failure warning and the n-gram cap notice.
+    // invariant: first occurrence then every Nth — an unreadable stream would otherwise flood the
+    // log from the hot path, and the tenth identical line adds nothing.
+    // refs: DN-29.D15
     constexpr std::uint64_t kWarnEveryNRoleless{1000};
 
-    // The witness key L2 puts ON the returned value (DN-29.D16). Returns a view into `line` itself
-    // — never into simdjson's padded buffer, which is thread-local scratch the next line
-    // overwrites, and never into a local, which would dangle the moment this returns. `line` is the
-    // bytes LogParser already made arena-stable before calling parse(), so the view outlives the
-    // event.
-    //
-    // The FIRST top-level key is the witness: extracting it is the same O(1) walk the document
-    // probe does (skip whitespace, expect `{`, take the quoted key), it needs no simdjson cursor,
-    // and one key that was genuinely present answers "what arrived?" — which is the question a
-    // reader has. The full key list is the WARN's job, not the value's.
+    // post: a view into the caller's own line — never into the padded scratch buffer, which the
+    // next line overwrites, and never into a local, which would dangle the moment this returns.
+    // invariant: the caller made those bytes arena-stable before calling parse, so the view
+    // outlives the event.
+    // invariant: the FIRST top-level key is the witness — the same O(1) walk the document probe
+    // does, no cursor spent, and one key that was genuinely present answers what arrived.
+    // invariant: the full key list is the diagnostic's job, never the value's.
+    // refs: DN-29.D16
     [[nodiscard]] std::string_view first_top_level_key(std::string_view line) noexcept
     {
-        // Non-empty by construction so the marker is never silently blank on a line that failed to
-        // yield one: an empty marker MEANS "roles were recognized", and a blank here would assert
-        // exactly the opposite of what happened. Static storage, so the view is always valid.
+        // invariant: non-empty by construction, because an EMPTY marker MEANS roles were recognized
+        // — a blank here would assert exactly the opposite of what happened.
+        // invariant: static storage, so the view is always valid.
         static constexpr std::string_view kUnreadable{"<no readable top-level key>"};
         static constexpr std::string_view kWhitespace{" \t\n\r"};
         const std::size_t open{line.find_first_not_of(kWhitespace)};
@@ -301,20 +274,19 @@ namespace
         const std::size_t end{line.find('"', quote + 1)};
         if (end == std::string_view::npos || end == quote + 1)
             return kUnreadable;
-        // Built from the pointer, not `substr`: `substr` throws when its offset exceeds the
-        // size, and a potentially-throwing call inside a `noexcept` body is a `std::terminate`
-        // that only a proof rules out. The proof holds here — `end` came back from a find that
-        // STARTED at `quote + 1` and is not npos, so `quote + 1 <= end < line.size()` — and this
-        // form states it instead of leaving every later reader to re-derive it.
+        // invariant: built from the pointer rather than a substring, because a substring throws
+        // when its offset exceeds the size and a throwing call in a noexcept body terminates.
+        // invariant: the proof holds — the end came back from a non-npos find that STARTED after
+        // the quote — and this form states it rather than leaving it to be re-derived.
         return std::string_view{line.data() + quote + 1, end - quote - 1};
     }
 
-    // Name the object's top-level keys for L2's diagnostic. COLD PATH ONLY — called after the line
-    // is already known to have yielded no role, and behind the rate limit, so a re-walk is free
-    // where it matters and never paid where it does not. Uses its OWN parser rather than the
-    // thread-local scratch, whose cursor is still held by the caller's live document. Output is
-    // bounded in both key count and key length: a diagnostic that can be made arbitrarily large by
-    // its own input is a second defect, not an aid.
+    // invariant: COLD PATH only — called after the line is known to have yielded no role and
+    // behind the rate limit, so the re-walk is never paid where it would matter.
+    // invariant: it uses its OWN parser rather than the thread-local scratch, whose cursor is still
+    // held by the caller's live document.
+    // invariant: output is bounded in BOTH key count and key length — a diagnostic that its own
+    // input can make arbitrarily large is a second defect, not an aid.
     [[nodiscard]] std::string top_level_keys_for_diagnosis(std::string_view line)
     {
         constexpr std::size_t kMaxKeys{8};
@@ -347,32 +319,28 @@ namespace
         return out;
     }
 
-    // Forward decl: parse_otel_span (just below) stores its span_duration_ns ordinal through this,
-    // which is defined further down alongside the other ordinal helpers.
+    // note: a forward declaration; the definition sits below with the other ordinal helpers.
     [[nodiscard]] std::span<const OrdinalObservation>
     store_ordinals(std::span<const OrdinalObservation> observations, ArenaAllocator& arena);
 
-    // True iff the raw line is a flat OTLP/JSON span (D-OTEL-10 shape 2 / SRC-D-OTEL-18) — detected
-    // by the span-specific startTimeUnixNano key (logs carry timeUnixNano). A cheap raw-byte check,
-    // no simdjson cursor spent.
-    //
-    // It does NOT exclude a resourceSpans EXPORT DOCUMENT, and that is not an omission: parse()
-    // refuses one above, before this ever runs, so by the time control arrives here a document is
-    // already impossible. The exclusion used to live here as `&& !line.contains("resourceSpans")`
-    // and was dropped as REDUNDANT, not as expensive — `&&` short-circuits, so on a non-OTEL line
-    // the first scan already returned false and the second one never ran at all. It cost only the
-    // lines that genuinely carry `startTimeUnixNano`. Recorded because the opposite was believed,
-    // and measured false.
-    //
-    // The ordering in parse() is what the removal rests on, and it is load-bearing: this predicate
-    // is true of a document too, because a document carries `startTimeUnixNano` inside its spans.
+    // post: true iff the raw line is a FLAT OTLP span, detected by the span-specific start-time key
+    // where a log record carries the plain one; a cheap raw-byte check, no cursor spent.
+    // invariant: it does NOT exclude an export DOCUMENT, and that is no omission — parse refuses
+    // one above, so a document is already impossible when control arrives.
+    // invariant: the exclusion was dropped as REDUNDANT and not as expensive: the conjunction
+    // short-circuits, so on a non-OTEL line the first scan already returned false.
+    // invariant: recorded because the opposite was believed and measured FALSE — it cost only the
+    // lines that genuinely carry the span key.
+    // invariant: the ordering in parse is what the removal rests on and it is load-bearing, because
+    // this predicate is TRUE of a document too: a document carries the key inside its spans.
     [[nodiscard]] bool is_otel_span_line(std::string_view line) noexcept
     {
         return line.contains(R"("startTimeUnixNano")");
     }
 
-    // Parse an OTLP quoted decimal-ns string → int64. Digit byte-loop (no float, no charconv dep);
-    // stops at the first non-digit. Deterministic, cross-stdlib bit-identical.
+    // post: an OTLP quoted decimal-nanosecond string as an int64, stopping at the first non-digit.
+    // invariant: a digit byte-loop with no float and no charconv dependency, so it is deterministic
+    // and cross-stdlib bit-identical.
     [[nodiscard]] std::int64_t parse_span_nano(std::string_view text) noexcept
     {
         std::int64_t value{0};
@@ -385,17 +353,9 @@ namespace
         return value;
     }
 
-    // Parse a flat OTLP/JSON span (D-OTEL-10 / SRC-D-OTEL-18) in ONE forward pass over the object —
-    // the on-demand idiom that descends into status/attributes inline with no rewind. The §13.1
-    // mapping: name→content (the templated operation), startTimeUnixNano→event time, end−start→the
-    // span_duration_ns ordinal (SRC-D-OTEL-12, integer ns by construction), status.code→level
-    // (ERROR→Error else Info; declared > inferred), service.name (from attributes[])→component (the
-    // WHERE tier), traceId/spanId/parentSpanId→the consumed trace context (OR1). `kind` is an
-    // ABSENT diagnostic field (SRC-D-OTEL-18b — it needs a categorical-field→value_counts channel
-    // canon lacks; not load-bearing for the structural exhibits). O4b Span Links
-    // (SRC-D-OTEL-9): copy the collected linked span_ids into arena-stable storage (mirrors
-    // store_ordinals). Empty in → empty out (no allocation) so a span without links stays
-    // zero-cost.
+    // post: an arena-stable copy of the linked span ids; empty in means empty out with no
+    // allocation, so a span without links stays zero-cost.
+    // refs: SRC-D-OTEL-9
     [[nodiscard]] std::span<const SpanId> store_span_ids(std::span<const SpanId> ids,
                                                          ArenaAllocator& arena)
     {
@@ -408,20 +368,23 @@ namespace
         return std::span<const SpanId>{dst, ids.size()};
     }
 
-    // single-pass OTel span-object field dispatch — the branch count is OTel's field set
-    // (startTimeUnixNano…status/attributes/links); a coherent deterministic parser whose else-if
-    // dispatch is not safely re-expressible as a handler map.
-    // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-    // ── CONFIRM OR DECLINE (DN-29.D17) — returns false when the nomination was wrong ───────────
-    // A cheap probe NOMINATES; the parser it routes to CONFIRMS its own precondition or DECLINES.
-    // `is_otel_span_line` is a raw byte scan and matches `startTimeUnixNano` at ANY DEPTH; this
-    // walk matches at DEPTH 0 ONLY. On an export document the two disagree — the key is real but
-    // nested inside the spans — and a `void` return had no way to say so, so the caller emitted a
-    // confident record for a line it had not parsed.
-    //
-    // Declining is NOT an exclusion rule for documents. A key-name denylist names one intruder and
-    // rots on the next envelope; this enumerates nothing, so it holds for every probe, parser and
-    // format that ever routes here. The rule is "do not emit what you did not parse."
+    // post: FALSE when the nomination was wrong — a cheap probe NOMINATES and the parser it
+    // routes to CONFIRMS its own precondition or DECLINES.
+    // invariant: ONE forward pass over the span object — the on-demand idiom that descends into
+    // status and attributes inline with no rewind.
+    // invariant: the mapping is name to content, start to event time, end minus start to the
+    // duration ordinal, status to level, service name to component, ids to trace context.
+    // invariant: the span KIND is an ABSENT diagnostic field — it needs a categorical channel
+    // canon lacks and is not load-bearing for the structural exhibits.
+    // invariant: the probe is a raw byte scan matching the key at ANY DEPTH; this walk matches at
+    // DEPTH 0 ONLY, so on an export document the two disagree.
+    // invariant: a void return had no way to say so, and the caller then emitted a confident record
+    // for a line it had not parsed.
+    // invariant: declining is NOT an exclusion rule for documents — a key-name denylist names one
+    // intruder and rots on the next envelope, and this enumerates nothing.
+    // invariant: so it holds for every probe, parser and format that ever routes here; the rule is
+    // do not emit what you did not parse.
+    // refs: DN-29.D17, SRC-D-OTEL-12, SRC-D-OTEL-18, SRC-D-OTEL-18b
     [[nodiscard]] bool parse_otel_span(simdjson::ondemand::object& root, ParsedLine& parsed_line,
                                        ArenaAllocator& arena)
     {
@@ -430,8 +393,7 @@ namespace
         std::string_view name_view;
         std::string_view service_name;
         bool is_error{false};
-        std::vector<SpanId>
-            linked; // O4b Span Links (SRC-D-OTEL-9): the declared cross-trace edge targets
+        std::vector<SpanId> linked;
 
         for (auto field : root)
         {
@@ -480,8 +442,7 @@ namespace
                     std::string_view code;
                     if (status_obj.find_field_unordered("code").get_string().get(code) ==
                         simdjson::SUCCESS)
-                        is_error =
-                            code.contains("ERROR"); // STATUS_CODE_ERROR (or the int-2 form's text)
+                        is_error = code.contains("ERROR");
                 }
             }
             else if (key == "attributes")
@@ -509,11 +470,11 @@ namespace
             }
             else if (key == "links")
             {
-                // O4b Span Links (SRC-D-OTEL-9): each link declares a cross-trace edge to another
-                // span. Collect the linked span_ids; metalog resolves them (by span_id, across
-                // traces) into the distilled service topology (component(this) →
-                // component(linked)). The link's trace_id/attributes are consumed-not-retained like
+                // invariant: each link declares a cross-trace edge to another span; metalog
+                // resolves them by span id ACROSS traces into the distilled service topology.
+                // invariant: the link's own trace id and attributes are consumed-not-retained, like
                 // the parent context.
+                // refs: SRC-D-OTEL-9
                 simdjson::ondemand::array links_array;
                 if (field.value().get_array().get(links_array) == simdjson::SUCCESS)
                     for (auto element : links_array)
@@ -529,20 +490,21 @@ namespace
             }
         }
 
-        // THE CONFIRMATION, and it is free: `start_nano` is empty exactly when the key the probe
-        // promised is not at depth 0. Checked BEFORE the mapping below, because applying a mapping
-        // over fields that were never found is how an unparsed line acquires a plausible event
-        // time, an Info level and a content fallback — the confident record this ruling ends.
-        // A span with no declared event time is not a span we parsed (ADR-29.D5's corollary).
+        // invariant: the confirmation is FREE — the start value is empty exactly when the key the
+        // probe promised is not at depth 0.
+        // invariant: checked BEFORE the mapping — applying one over fields that were never found
+        // is how an unparsed line acquires a plausible event time.
+        // invariant: a span with no declared event time is not a span we parsed.
+        // refs: ADR-29.D5
         if (start_nano.empty())
             return false;
 
-        // Apply the mapping. Event time + duration are integer ns (D-OTEL-3, by construction).
-        // SRC-D-OTEL-11: declared causality → the observed DAG
         parsed_line.trace.is_span = true;
-        // DECLARED (DN-29.D12 rung 1): `startTimeUnixNano` is the producer's own statement of
-        // when the span began. Rung 1 is why this must outrank a transport stamp, which a merely
-        // PARSED time does not.
+        // invariant: DECLARED — the producer's own statement of when the span began, which is why
+        // it outranks a transport stamp where a merely PARSED time does not.
+        // invariant: the span flag is set here too: DECLARED causality routes the record to the
+        // observed DAG rather than to the adjacency ring.
+        // refs: DN-29.D12, SRC-D-OTEL-11
         if (const auto declared_start{utils::parse_unix_nano_timestamp(start_nano)})
             parsed_line.timestamp = EventTime::declared(*declared_start);
         else
@@ -553,8 +515,9 @@ namespace
         parsed_line.content =
             arena.store_string(name_view.empty() ? parsed_line.raw_line : name_view);
 
-        // span_duration_ns → the declared DurationLog2Ns ordinal (SRC-D-OTEL-12). end < start (skew
-        // / absent end) → 0-duration (the smallest bin), never negative.
+        // invariant: the duration becomes the declared ordinal; an end before the start yields a
+        // ZERO duration, the smallest bin, and never a negative one.
+        // refs: SRC-D-OTEL-12
         const std::int64_t start_value{parse_span_nano(start_nano)};
         const std::int64_t end_value{parse_span_nano(end_nano)};
         const std::int64_t duration_ns{end_value > start_value ? end_value - start_value : 0};
@@ -566,16 +529,15 @@ namespace
             parsed_line.ordinals = store_ordinals(observation, arena);
         }
 
-        // O4b Span Links (SRC-D-OTEL-9): publish the declared cross-trace edge targets (empty ⇒ no
-        // allocation).
         parsed_line.linked_span_ids = store_span_ids(linked, arena);
         return true;
     }
 
-    // Copy the matched ordinal observations (W1, SRC-D-W1-3) into arena-stable storage and return a
-    // span over them. Empty in → empty out (no allocation) so a non-ordinal line stays zero-cost.
-    // The observations' `field_name` views point at the declared catalog's static keys (stable for
-    // the program lifetime), so only the small POD array is arena-copied.
+    // post: a span over arena-stable copies of the matched observations; empty in means empty out
+    // with no allocation, so a non-ordinal line stays zero-cost.
+    // invariant: the observations' field names view the declared catalog's STATIC keys, stable for
+    // the program lifetime, so only the small POD array is arena-copied.
+    // refs: SRC-D-W1-3
     [[nodiscard]] std::span<const OrdinalObservation>
     store_ordinals(std::span<const OrdinalObservation> observations, ArenaAllocator& arena)
     {
@@ -589,9 +551,11 @@ namespace
         return std::span<const OrdinalObservation>{dst, observations.size()};
     }
 
-    // W1 fast-path field-route (SRC-D-W1-3): match the scanner's numeric candidates against the
-    // declared catalog; each hit → a consumed ordinal observation. The decimal TEXT → int64 (no
-    // float→int).
+    // post: the scanner's numeric candidates matched against the declared catalog, each hit a
+    // consumed ordinal observation.
+    // invariant: the decimal TEXT becomes the int64 — there is no float-to-int anywhere on this
+    // path.
+    // refs: SRC-D-W1-3
     [[nodiscard]] std::span<const OrdinalObservation>
     extract_ordinals_fast(const FastJsonResult& fast, ArenaAllocator& arena)
     {
@@ -616,9 +580,11 @@ namespace
                               arena);
     }
 
-    // W1 slow-path field-route (SRC-D-W1-3): find_field_unordered per declared key (the OTEL-route
-    // pattern); the value's raw decimal TOKEN → int64 (never get_double() — the SRC-D-W1-3 pin).
-    // MUST run before the OTLP body descent below (which spends the on-demand cursor).
+    // post: the same field-route on the slow path, one lookup per declared key.
+    // pre: this MUST run before the OTLP body descent below, which spends the on-demand cursor.
+    // invariant: the value's raw decimal TOKEN becomes the int64, never a double read — that is
+    // the determinism pin.
+    // refs: SRC-D-W1-3
     [[nodiscard]] std::span<const OrdinalObservation>
     extract_ordinals_slow(simdjson::ondemand::object& root, ArenaAllocator& arena)
     {
@@ -639,10 +605,9 @@ namespace
                               arena);
     }
 
-    // The escape-free fast path (no simdjson): a single byte scan. Returns nullopt when the scan
-    // cannot complete (escapes / nesting / malformed) so the caller falls back to full simdjson.
-    // Split out of parse() to keep it within the cognitive-complexity budget (the
-    // extract_otel_fields rule).
+    // post: nullopt when the byte scan cannot complete — an escape, nesting or malformed input
+    // — so the caller falls back to full simdjson.
+    // invariant: split out of parse to keep that function within its complexity budget.
     [[nodiscard]] std::optional<ParsedLine> try_fast_parse(std::string_view line,
                                                            ArenaAllocator& arena)
     {
@@ -664,7 +629,7 @@ namespace
             parsed_line.component = arena.store_string(fast.component_str);
         parsed_line.content = fast.message_str.empty() ? arena.store_string(line)
                                                        : arena.store_string(fast.message_str);
-        parsed_line.ordinals = extract_ordinals_fast(fast, arena); // W1 (SRC-D-W1-3)
+        parsed_line.ordinals = extract_ordinals_fast(fast, arena);
         INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                           "strategy=JSON fast_path component={} level={} has_timestamp={}",
                           parsed_line.component, to_string(parsed_line.level.value()),
@@ -674,39 +639,31 @@ namespace
 
 } // namespace
 
-// the JSON strategy entry — fast-path scan, then guarded simdjson slow path routing to span vs
-// log-record parse; a coherent single-responsibility parser whose early-return error handling is
-// its structure.
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+// invariant: the strategy entry — a fast-path byte scan, then a guarded simdjson slow path
+// routing to the span parse or the log-record parse.
 std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line,
                                                            ArenaAllocator& arena) const
 {
     if (line.empty())
         return std::unexpected(std::string("JsonStrategy: empty line"));
 
-    // ── Fast path ─────────────────────────────────────────────────────────────
-    // For escape-free JSON objects bypass simdjson entirely (try_fast_parse: single-pass byte scan,
-    // no heap alloc); falls back to full simdjson on any anomaly.
+    // invariant: for escape-free JSON objects the fast path bypasses simdjson entirely with a
+    // single-pass byte scan and no heap allocation, falling back on any anomaly.
     if (std::optional<ParsedLine> fast_parsed{try_fast_parse(line, arena)})
         return std::expected<ParsedLine, std::string>{*std::move(fast_parsed)};
-    // ── Slow path: full simdjson (handles escapes, nested objects, etc.) ──────
 
-    // An OTLP `resourceSpans` EXPORT DOCUMENT is REFUSED here, and the refusal is the feature.
-    //
-    // Without it the document falls through to the generic log-record route below and yields ONE
-    // plausible-looking event for an export carrying N spans — no error, no diagnostic. That is
-    // the silent-wrong-answer class ADR-29.D5 names as the one failure this product may not ship,
-    // and a refusal a caller can see is strictly better than a number a caller cannot doubt.
-    //
-    // Refused rather than unpacked because document mode is ACQUISITION-tier, never record-tier:
-    // this entry is frame-oriented (the SHM plane carries a fixed 4096-byte payload) and an export
-    // has no declared size, so unpacking here would put an unbounded object inside a
-    // bounded-memory instrument — the same refusal ADR-29.D3 makes about retaining a `trace_id`.
-    // A collector-shaped acquisition fans the export out and puts flat SPANS on the wire, which is
-    // what ADR-29.D7's "a span enters as a record" already says.
-    //
-    // ⚠ THIS MUST PRECEDE is_otel_span_line: that predicate tests only for `startTimeUnixNano`,
-    // and a document carries that key inside its spans.
+    // invariant: an OTLP export DOCUMENT is REFUSED here, and the refusal is the feature.
+    // invariant: without it the document falls through to the generic log-record route and yields
+    // ONE plausible-looking event for an export carrying N spans, with no error and no diagnostic.
+    // invariant: that is the silent-wrong-answer class this product may not ship, and a refusal a
+    // caller can SEE is strictly better than a number a caller cannot doubt.
+    // invariant: refused rather than unpacked because document mode is ACQUISITION-tier and this
+    // entry is frame-oriented — unpacking would put an unbounded object in a bounded instrument.
+    // invariant: a collector-shaped acquisition fans the export out and puts flat SPANS on the
+    // wire, which is what the enters-as-a-record rule already says.
+    // pre: this MUST precede is_otel_span_line, which tests only for the span key — and a
+    // document carries that key inside its spans.
+    // refs: ADR-29.D3, ADR-29.D5, ADR-29.D7
     if (is_otel_span_document(line))
         return std::unexpected(
             std::string("JsonStrategy: OTLP resourceSpans export DOCUMENT on the record-oriented "
@@ -734,31 +691,32 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
 
-    // Flat OTLP/JSON span (D-OTEL-10 shape 2 / SRC-D-OTEL-18): a distinct shape (name / start+end /
-    // status / service.name), parsed in its own forward pass. Routed on the raw-byte span signal
-    // BEFORE spending the root cursor on the log-record field lookups below.
+    // invariant: a flat span is a DISTINCT shape parsed in its own forward pass, routed on the
+    // raw-byte signal BEFORE spending the root cursor on the log-record lookups below.
+    // refs: SRC-D-OTEL-18
     if (is_otel_span_line(line))
     {
         if (parse_otel_span(root, parsed_line, arena))
             return parsed_line;
 
-        // DECLINED (DN-29.D17): the probe nominated on a raw byte scan, the parser looked at depth
-        // 0 and the promised key was not there. Return the line to the chain instead of emitting a
-        // record we did not parse — the generic path below then recognizes no role and L2 marks it,
-        // which is the whole reason the marker was reachable at all on this input.
-        //
-        // Discard whatever the walk wrote. It matches at depth 0 only, so on an export document it
-        // writes nothing — but a line with a depth-0 `traceId` and no depth-0 `startTimeUnixNano`
-        // would leave a half-populated trace context, and a declined parse must leave NO trace of
-        // itself. Cheap, and it makes the decline total rather than nearly total.
+        // invariant: DECLINED — the probe nominated on a raw byte scan, the parser looked at
+        // depth 0 and the promised key was not there, so the line returns to the chain.
+        // invariant: the generic path then recognizes no role and the marker fires, which is the
+        // whole reason it was reachable on this input at all.
+        // invariant: whatever the walk wrote is DISCARDED — on a document it writes nothing, but
+        // a depth-0 trace id would otherwise leave a half-populated context.
+        // invariant: a declined parse must leave NO trace of itself, which makes the decline total
+        // rather than nearly total.
+        // refs: DN-29.D17
         parsed_line = ParsedLine{};
         parsed_line.raw_line = line;
 
-        // The walk spent the on-demand cursor, which is forward-only and cannot rewind, so the
-        // generic path below needs a fresh one. Re-iterating is a second parse of this line and it
-        // is paid ONLY here — on a line that was mis-nominated, which is rare by construction. The
-        // alternative (pre-checking depth 0 before the walk) costs every genuine span a second
-        // pass to spare the exceptional one.
+        // invariant: the walk spent the on-demand cursor, which is forward-only and cannot rewind,
+        // so the generic path below needs a fresh one.
+        // invariant: re-iterating is a SECOND parse of this line and it is paid ONLY here — on a
+        // line that was mis-nominated, which is rare by construction.
+        // invariant: the alternative of pre-checking depth 0 before the walk costs every genuine
+        // span a second pass to spare the exceptional one.
         if (scratch.parser.iterate(padded).get(doc) != simdjson::SUCCESS ||
             doc.get_object().get(root) != simdjson::SUCCESS)
         {
@@ -771,10 +729,10 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     }
 
     std::string_view scratch_view;
-    // The fourth role probe's own result. The other three are readable off `parsed_line`, but
-    // `content` is set on BOTH branches — a recognized message and the raw-line fallback are
-    // indistinguishable afterwards, and treating the fallback as a role is exactly what would make
-    // L2 below silent on the input it exists for.
+    // invariant: the fourth role probe's own result — the other three are readable off the parsed
+    // line, but content is set on BOTH branches.
+    // invariant: a recognized message and the raw-line fallback are indistinguishable afterwards,
+    // and treating the fallback as a role would silence the marker on its own input.
     bool recognized_message{false};
 
     if (try_get_string(root, kTimestampKeys, scratch_view))
@@ -790,24 +748,28 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     if (try_get_string(root, kComponentKeys, scratch_view))
         parsed_line.component = arena.store_string(scratch_view);
 
-    // ── OTEL/OTLP field-map (ADR-29 SRC-D-OTEL-1, the declared catalog SRC-D-OTEL-4a) ──
-    // severity_number → the LogLevel band (declared > inferred) + the trace context, all
-    // consumed structural metadata; the trace keys are top-level → never tokenized → dropped
-    // from the template by construction (OR1). is_otel routes the message to the nested
-    // OTLP body.stringValue (extract_otel_fields keeps parse() within the complexity budget).
+    // invariant: the severity number becomes the level band and the trace keys become consumed
+    // structural metadata; the trace keys are top-level, so they are never tokenized.
+    // invariant: they are therefore dropped from the template BY CONSTRUCTION rather than by a
+    // rule.
+    // refs: ADR-29, SRC-D-OTEL-1, SRC-D-OTEL-4a
     const bool is_otel{extract_otel_fields(root, parsed_line)};
 
-    // W1 ordinal field-route (SRC-D-W1-3) — MUST precede the body descent below (which spends the
-    // on-demand cursor); find_field_unordered per declared key, like the OTEL route above.
+    // pre: the ordinal route MUST precede the body descent below, which spends the on-demand
+    // cursor.
+    // refs: SRC-D-W1-3
     parsed_line.ordinals = extract_ordinals_slow(root, arena);
 
     if (is_otel)
     {
-        // OTLP message lives under the nested body.stringValue. MUST be the last root access
-        // (it descends into a child). A malformed/absent body → arena-store the whole line.
+        // pre: the body descent MUST be the last root access — it descends into a child, after
+        // which the parent cursor cannot rewind to a sibling.
+        // invariant: a malformed or absent body arena-stores the whole line instead.
         if (std::string_view body_value; try_get_otel_body(root, body_value))
             parsed_line.content = arena.store_string(body_value);
         else
+            // invariant: the fallback arena-stores the ORIGINAL line rather than re-serialising the
+            // document, which would force a heap allocation; the raw bytes are already stable.
             parsed_line.content = arena.store_string(line);
     }
     else
@@ -819,26 +781,19 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
         }
         else
         {
-            // Fallback: arena-store the original line. We avoid re-serialising the
-            // document (which would force a heap allocation); the raw bytes are
-            // already stable when the caller is LogParser.
             parsed_line.content = arena.store_string(line);
         }
 
-        // ── The COMPOUND-KEY pass (SRC-D-ECS-1) — replaces the hard-coded "fields" descent ─────
-        // Runs only when a role is still missing after the exact-name lookups above, so an
-        // already-readable line never reaches it and cannot be changed by it. That is what makes
-        // this additive: it closes a blindness, it does not re-decide anything.
-        //
-        // The predecessor descended into a literally-named `"fields"` object (app loggers and
-        // LogCraft nest there), which read ONE producer's namespacing convention by enumeration.
-        // Shape 2 does it by structure and therefore also covers `log`, `service`, `host`, and
-        // every namespace a producer invents — while shape 1 covers the same producers' flat
-        // dotted spelling. Net effect on core's vocabulary: one name REMOVED, none added.
-        //
-        // A fresh cursor is required and it is not free: the on-demand cursor is forward-only and
-        // the lookups above spent it. Paid ONLY on a line that is still missing a role — which is
-        // exactly the population this exists for, and never on a canon-named line.
+        // invariant: this pass runs ONLY when a role is still missing after the exact-name lookups,
+        // so an already-readable line never reaches it.
+        // invariant: that is what makes it additive — it closes a blindness, it does not
+        // re-decide anything.
+        // invariant: the predecessor descended into ONE literally-named object, which read one
+        // producer's namespacing convention by enumeration; the shape does it by structure.
+        // invariant: net effect on core's vocabulary is one name REMOVED and none added.
+        // invariant: a fresh cursor is required and is not free, and it is paid ONLY on a line
+        // still missing a role — never on a canon-named line.
+        // refs: SRC-D-ECS-1
         if (parsed_line.component.empty() || parsed_line.level == LogLevel::Unknown ||
             !parsed_line.timestamp.has_value() || !recognized_message)
         {
@@ -850,57 +805,46 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
         }
     }
 
-    // ── L2 — the independent backstop against a SILENT wrong answer (DN-29.D15) ─────────────
-    //
-    // L1 above (is_otel_span_document) is a hard refusal, but it can only refuse what it
-    // RECOGNISES, and it recognises via a dated premise about OTLP's top-level key. Nothing in this
-    // repo can re-derive that premise — no opentelemetry-proto is vendored anywhere — so L1 alone
-    // would leave a schema change reading as a clean parse. L2 is the layer that cannot be defeated
-    // by the same change, because it knows nothing about OTLP at all.
-    //
-    // THE PREDICATE IS ALREADY COMPUTED. By this point all four role probes have run, so "this
-    // object yielded no role we understand" costs one integer test. There is no needle, no window
-    // constant and no second pass on the ~100% of lines that yield a role. Naming the keys DOES
-    // cost a re-walk, and it is paid only on the diagnostic path — i.e. only once we already know
-    // the line was not understood.
-    //
-    // WHAT IT GUARANTEES, EXACTLY — the record path never SILENTLY emits a canonical event for
-    // input it understood nothing of. It does NOT promise to recognise a non-canonical export;
-    // it promises not to be silent about one. That is DN-29.D6(b)'s actual requirement (the word
-    // is "silently"), and it holds for a re-ordered resourceSpans, for a resourceLogs envelope,
-    // and for OTLP shapes that do not exist yet.
-    //
-    // A MARKER, NOT A REFUSAL. A role-less JSON object is not necessarily a document — it may be an
-    // application record whose vocabulary we do not read yet, which is the subject DN-030 exists to
-    // improve. Refusing it would convert a reading gap into data loss, and would foreclose reading
-    // it better later. So the line is emitted, analysed, and MARKED.
-    //
-    // THE DISCHARGE IS THIS ASSIGNMENT, NOT THE LOG LINE BELOW. A WARN desilences the console; a
-    // caller consuming parse() would still receive a value indistinguishable from a well-parsed
-    // record, which by DN-30.O1's verb 2 is a precision-first defect rather than a declared
-    // limitation. It is also untestable here — canon has no test-observable log sink, so an arm
-    // written against a log line goes green the day this code is deleted (the can't-FAIL row of
-    // MEM:synthetic-gate-vacuity-vs-judgment).
+    // invariant: the independent backstop against a SILENT wrong answer — the hard refusal above
+    // can only refuse what it RECOGNISES, via a dated premise about the top-level key.
+    // invariant: nothing in this repo can re-derive that premise, so the refusal alone would leave
+    // a schema change reading as a clean parse.
+    // invariant: this layer cannot be defeated by the same change, because it knows nothing about
+    // the schema at all.
+    // invariant: the predicate is ALREADY COMPUTED — all four role probes have run, so this costs
+    // one integer test: no needle, no window constant, no second pass.
+    // invariant: naming the keys DOES cost a re-walk, and it is paid only on the diagnostic path,
+    // once we already know the line was not understood.
+    // invariant: what it guarantees EXACTLY is that the record path never SILENTLY emits an event
+    // for input it understood nothing of.
+    // invariant: it does NOT promise to recognise a non-canonical export; it promises not to be
+    // silent about one, and that holds for shapes that do not exist yet.
+    // invariant: a MARKER, not a refusal — a role-less object may be an application record whose
+    // vocabulary we do not read yet, and refusing it would convert a reading gap into data loss.
+    // invariant: the DISCHARGE is the assignment below, never the log line: a warning desilences
+    // the console while a caller would still receive an indistinguishable value.
+    // invariant: it is also untestable through the log, because canon has no test-observable sink,
+    // so an arm written against a log line goes green the day this code is deleted.
+    // refs: DN-29.D6, DN-29.D15, DN-29.D16, DN-30, DN-30.O1
+    // refs: MEM:synthetic-gate-vacuity-vs-judgment
     if (!is_otel && !parsed_line.timestamp.has_value() && parsed_line.level == LogLevel::Unknown &&
         parsed_line.component.empty() && !recognized_message)
     {
-        // ⚠ UNCONDITIONAL, AND IT MUST STAY ABOVE THE RATE LIMIT BELOW. The marker is set on EVERY
-        // role-less record; the sampling governs ONLY the log emission. Moving this inside the
-        // `if` would leave 999 of every 1000 role-less events carrying an EMPTY marker —
-        // indistinguishable to a consumer from a well-parsed record, which is precisely the
-        // console-desilenced / contract-mute state DN-29.D16 was ruled to end. Two statements about
-        // one condition, and only the console's may be sampled.
+        // invariant: UNCONDITIONAL, and it must stay ABOVE the rate limit below — the marker is
+        // set on EVERY role-less record and the sampling governs ONLY the log emission.
+        // invariant: moving it inside the sampled branch would leave almost every role-less event
+        // carrying an EMPTY marker, indistinguishable from a well-parsed record.
+        // invariant: two statements about one condition, and only the console's may be sampled.
+        // refs: DN-29.D16
         parsed_line.no_role_witness_key = first_top_level_key(line);
 
-        // ERGONOMICS, never the contract, and no test may assert against it. Rate-limited on the
-        // precedent in close_metalog_window_at: the n-gram cap warns once per WINDOW, not once per
-        // drop, because a per-event warn floods from the hot path. Thread-local because `parse` is
-        // const and a strategy instance is per-tokenizer, i.e. per thread.
-        //
-        // CONSEQUENCE OF THE THREAD-LOCAL, so nobody builds on it: "first occurrence" fires once
-        // per WORKER, so diagnostic VOLUME varies with worker count. That is fine for a log and it
-        // is not deterministic content — but it means no test may ever assert on the number of
-        // lines emitted here. Assert on the marker, which is per-record and exact.
+        // invariant: ERGONOMICS, never the contract, and no test may assert against it.
+        // invariant: rate-limited because a per-event warn floods from the hot path; thread-local
+        // because parse is const and a strategy instance is per-tokenizer, so per thread.
+        // invariant: the consequence of the thread-local is that first occurrence fires once per
+        // WORKER, so diagnostic VOLUME varies with worker count.
+        // invariant: that is fine for a log and is not deterministic content, but no test may
+        // assert on the LINE COUNT here — assert on the marker, which is per-record and exact.
         thread_local std::uint64_t roleless_count{0};
         ++roleless_count;
         if (roleless_count == 1 || roleless_count % kWarnEveryNRoleless == 0)
@@ -923,9 +867,9 @@ LogFormat JsonStrategy::format() const noexcept
     return LogFormat::JSON;
 }
 
-// Cheap layout check: first non-space character must be '{'. The actual JSON
-// parse happens once, in parse(); the detector pipeline gates parse() behind
-// this O(1) check, so the line is never traversed twice.
+// post: a cheap layout check — the first non-space character must open an object.
+// invariant: the actual parse happens once, in parse, and the detector gates that call behind this
+// O(1) check, so the line is never traversed twice.
 double JsonStrategy::confidence(std::string_view line) const noexcept
 {
     static constexpr double kJsonObjectConfidence{1.0};
