@@ -5397,11 +5397,9 @@ Equal to the pre-unit baseline. `registry_grammar_lint` exit 0 with zero `FAIL` 
 
 The outbound census reported **16 LOST** addresses and I dispositioned all sixteen in one act —
 *relocated to the new document, verified present there*. Fifteen were right. The sixteenth,
-`SRC-D-TID-22`, reddened `registry_grammar_lint` twice:
-
-    FAIL G5 design_notes/DN-001-documentation-reform.md: SRC-D-TID-22 has no site in the source tree
-    FAIL G5 insight-canon/technical_docs/canonicalization_generations.md: SRC-D-TID-22 is claimed in
-         source with no DECLARATION site
+`SRC-D-TID-22`, reddened `registry_grammar_lint` twice — two `G5` lines, one at `DN-1` and one at
+the new generation-ledger document: *"`SRC-D-TID-22` has no site in the source tree"* and
+*"`SRC-D-TID-22` is claimed in source with no DECLARATION site"*.
 
 Its ONLY declaration-position site in the workspace was the ledger's `-3` entry inside this
 `.cppm`. Its four other live sites are body-position citations — `core/src/mask/mask.cpp` past line
