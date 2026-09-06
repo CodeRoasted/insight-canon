@@ -1,3 +1,4 @@
+comment_contract: true
 packages:
   # Core in core/ (the logcraft/server layout): the repo root is the SHELF (README/LICENSE/
   # workflows/packages.yml/scripts/proof), the tree reads like the architecture —
