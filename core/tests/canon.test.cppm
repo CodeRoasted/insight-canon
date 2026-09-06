@@ -1,8 +1,8 @@
-// insight.canon.test — shared white-box test infrastructure (the logcraft.test pattern: one test
-// module per domain, mirroring the package's own module layout).
-// All test TUs import this instead of spelling out the full import block.
-// Re-exports the complete canon module surface (public facade + the sealed detail shards), so a
-// test TU needs no further imports beyond gtest (textual, third-party).
+// invariant: shared white-box test infrastructure — ONE test module per domain, mirroring the
+// package's own module layout.
+// invariant: every test unit imports THIS instead of spelling out the full import block.
+// invariant: it re-exports the complete module surface, the public facade plus the sealed detail
+// shards, so a test unit needs no further import beyond the harness.
 export module insight.canon.test;
 export import std;
 export import insight.canon;
@@ -10,22 +10,23 @@ export import insight.canon.detail.scan;
 export import insight.canon.detail.strategy;
 export import insight.canon.detail.mask;
 export import insight.canon.detail.parse;
-// The provider contract between core and the vocabulary packages — core tests construct SYNTHETIC
-// manifests / rows to exercise the composition + recognition ALGORITHMS vocabulary-free (the
-// facade does not surface spi; a white-box core test legitimately does). Package suites import spi
-// via their own package module instead.
+// invariant: the PROVIDER CONTRACT between core and the vocabulary packages — core tests build
+// SYNTHETIC manifests and rows to exercise the algorithms VOCABULARY-FREE.
+// invariant: the facade does not surface the provider interface, and a white-box core test
+// legitimately does; package suites import it through their own package module instead.
 export import insight.canon.spi;
-// The package-agnostic conformance kit. It is a PUBLIC module unit (canon ships it installed), not
-// a sealed shard, but a core test that exercises the kit's own algorithms belongs to the same
-// "import this and nothing else" contract as the rest of the surface above.
+// invariant: the conformance kit is a PUBLIC module unit rather than a sealed shard, because canon
+// ships it INSTALLED.
+// invariant: a core test exercising the kit's own algorithms still belongs to the same
+// import-this-and-nothing-else contract as the rest of the surface.
 export import insight.canon.conformance;
 
-// Shared core-test composition helper. A core test whose property is SEMANTIC-UNAWARE
-// (the universal formats tokenize; no dialect rows fire) feeds the Tokenizer a degenerate,
-// zero-package composition — core tests never link the semantic packages (that would invert the
-// dependency arrow). The returned ComposedSemantics MUST outlive the Tokenizer it feeds: bind it to
-// a named local/member declared BEFORE the Tokenizer, never pass the temporary inline (the
-// Tokenizer holds a const-ref).
+// invariant: a core test whose property is SEMANTIC-UNAWARE feeds the tokenizer a DEGENERATE,
+// zero-package composition.
+// invariant: core tests never link the semantic packages, which would invert the dependency arrow.
+// invariant: the returned composition MUST OUTLIVE the tokenizer it feeds.
+// invariant: bind it to a named local declared BEFORE the tokenizer and never pass the temporary
+// inline, because the tokenizer holds a const-ref.
 export namespace insight::test_support
 {
 [[nodiscard]] inline insight::semantic::ComposedSemantics degenerate_composition()

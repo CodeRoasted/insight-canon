@@ -1,33 +1,36 @@
-// test_manifest_equivalence.cpp — the conformance kit's THIRD entry point,
-// `manifest_equivalence_report(lhs, rhs)`: "do these two semantic packages agree, field for field?"
-// (DN-17.D21 §5). The comparator exists to say WHERE two rulesets differ; `semantic_identity`
-// already says THAT they differ, better than any comparator can. So this suite proves the two
-// things a locator can silently fail at, and neither is provable by a green run alone:
-//
-//   • DISCRIMINATION, per manifest MEMBER. Fourteen arms, one per member of
-//     SemanticPackageManifest, each a manifest identical to the subject except in that one member.
-//     Every arm asserts the report goes red, that EXACTLY ONE check fails, and that the failing
-//     check is the one named for the mutated member. Without these arms the suite would be
-//     degenerate-satisfiable: a comparator that returns "equal" unconditionally passes every
-//     equality assertion ever written, and two empty manifests are genuinely equal.
-//   • COVERAGE — that the members compared are the manifest's members, not "the members someone
-//     remembered". Two independent instruments: the comparator binds all fourteen members with a
-//     structured binding (a fifteenth member is a COMPILE error there, not a silently uncompared
-//     one), and every arm here cross-checks against `compose({m}).identity()`, an oracle written in
-//     another file by another hand — `compose.cpp`'s `serialize_manifest`, hashed with SHA-256. An
-//     uncompared member shows up as "the digest moved and the report stayed green", which is loud.
-//
-// The oracle is never the comparator (no SUT==ORACLE): expected check names and expected detail
-// coordinates are written by hand below, and the equality oracle is the digest.
-//
-// The two sides are always INDEPENDENT objects over INDEPENDENT storage — kAlpha and kAlphaTwin are
-// declared from two disjoint sets of arrays with equal content, never one manifest passed twice.
-// A comparator that read one side twice would pass an lhs==rhs suite trivially (can't-FAIL).
-//
-// Determinism: byte-only, no RNG, no clock, no float. Every fixture is constexpr.
+// invariant: the conformance kit's THIRD entry point — do these two semantic packages agree,
+// field for field?
+// invariant: the comparator exists to say WHERE two rulesets differ; the composed identity already
+// says THAT they differ, better than any comparator can.
+// invariant: so this suite proves the two things a LOCATOR can silently fail at, and neither is
+// provable by a green run alone.
+// invariant: DISCRIMINATION, per manifest MEMBER — one arm per member, each a manifest identical
+// to the subject except in that one member.
+// invariant: every arm asserts the report goes RED, that EXACTLY ONE check fails, and that the
+// failing check is the one NAMED for the mutated member.
+// invariant: without these arms the suite would be DEGENERATE-SATISFIABLE — a comparator that
+// returns equal unconditionally passes every equality assertion ever written.
+// invariant: and two empty manifests are genuinely equal, so the equality arm alone proves nothing.
+// invariant: COVERAGE — that the members compared are the MANIFEST'S members and not the members
+// someone remembered, proven by TWO independent instruments.
+// invariant: the comparator binds all members with a structured binding, so an added member is a
+// COMPILE error there rather than a silently uncompared one.
+// invariant: and every arm cross-checks against the composed identity, an oracle written in another
+// file by another hand and hashed independently.
+// invariant: an uncompared member then shows up as the digest moving while the report stays green,
+// which is LOUD.
+// invariant: THE ORACLE IS NEVER THE COMPARATOR — expected check names and expected detail
+// coordinates are written BY HAND, and the equality oracle is the digest.
+// invariant: the two sides are always INDEPENDENT objects over INDEPENDENT storage, never one
+// manifest passed twice.
+// invariant: a comparator that read one side twice would pass an equality suite trivially, which is
+// the can't-FAIL shape.
+// invariant: determinism — byte-only, no RNG, no clock, no float, and every fixture is a compile
+// time constant.
+// refs: DN-17.D21
 #include <gtest/gtest.h>
 
-import insight.canon.test; // facade + spi (the row grammar) + the conformance kit
+import insight.canon.test;
 
 using insight::LogLevel;
 using insight::RunOutcome;
@@ -57,11 +60,10 @@ using insight::tokenization::IntentMarkerKind;
 namespace
 {
 
-// ── The code tier. Two real symbols, not placeholders: the comparator compares PRESENCE, and the
-// identity serializer writes one presence byte, so what these DO is irrelevant to both — but a
-// factory that returned nullptr would be a stub standing where a package's real hook stands, and
-// the suite would be asserting over a shape no package ships. JsonStrategy is a core-owned strategy
-// the test target already links.
+// invariant: TWO REAL SYMBOLS and not placeholders — the comparator compares PRESENCE and the
+// identity serializer writes one presence byte, so what these DO is irrelevant to both.
+// invariant: but a factory returning nothing would be a STUB standing where a package's real hook
+// stands, and the suite would be asserting over a shape no package ships.
 [[nodiscard]] std::unique_ptr<insight::tokenization::IFormatStrategy> make_probe_strategy()
 {
     return std::make_unique<insight::tokenization::JsonStrategy>();
@@ -72,11 +74,10 @@ namespace
     return raw_line.starts_with("+ ");
 }
 
-// ══ Subject: package "alpha", content in EVERY member ══════════════════════════════════════════
-// Every member is non-empty except the two code-tier hooks, which are absent so their mutation arm
-// runs in the absent→present direction (a nullptr subject and a present mutant are two distinguish-
-// able states; two present hooks are not, by construction — see the comparator's contract).
-
+// invariant: the SUBJECT carries content in EVERY member except the two code-tier hooks, which are
+// absent so their mutation arm runs in the absent-to-present direction.
+// invariant: an absent subject and a present mutant are two DISTINGUISHABLE states; two present
+// hooks are not, by construction.
 constexpr std::array<std::string_view, 2> kExcludesA{{"{", "}"}};
 
 constexpr std::array<StructuralRoleRow, 2> kRolesA{
@@ -154,11 +155,12 @@ constexpr SemanticPackageManifest kAlpha{.name = "alpha",
                                          .strategy = nullptr,
                                          .echoed_source = nullptr};
 
-// ══ The TWIN: the same CONTENT, declared over a disjoint set of arrays ══════════════════════════
-// Not `kAlpha` again, and not spans into kAlpha's arrays: the equality arm has to be able to fail.
-// A comparator that compared span POINTERS (or that read one argument twice) would report these two
-// as different (or as equal without looking), and either way the arm below catches it.
-
+// invariant: THE TWIN — the same CONTENT declared over a DISJOINT set of arrays, not the subject
+// again and not spans into the subject's arrays.
+// invariant: the equality arm has to be able to FAIL.
+// invariant: a comparator comparing span POINTERS would report these two as different, and one
+// reading a single argument twice would report equal without looking.
+// invariant: either way the arm below catches it.
 constexpr std::array<std::string_view, 2> kExcludesTwin{{"{", "}"}};
 
 constexpr std::array<StructuralRoleRow, 2> kRolesTwin{
@@ -236,17 +238,16 @@ constexpr SemanticPackageManifest kAlphaTwin{.name = "alpha",
                                              .strategy = nullptr,
                                              .echoed_source = nullptr};
 
-// ══ The fourteen mutations — ONE member each, everything else spliced from the subject ══════════
-
 constexpr std::array<StructuralRoleRow, 2> kRolesMut{
-    // roles[0].role: GroupBegin → GroupEnd. A NON-key field on purpose: a comparator that keyed on
-    // the prefix alone would call these two row sets equal.
+    // invariant: a NON-KEY field on purpose — a comparator keying on the prefix alone would call
+    // these two row sets equal.
     {{.prefix = "<AAA-group>", .role = StructuralRole::GroupEnd, .dialect_gate = "alpha"},
      {.prefix = "<AAA-end>", .role = StructuralRole::GroupEnd, .dialect_gate = "alpha"}}};
 
 constexpr std::array<IntentMarkerRow, 2> kMarkersMut{
-    // markers[1].child_order: Ordered → Unordered. Non-key, and it is the ADR-18 alignment
-    // declaration — the field whose silent divergence would mis-align every comparison downstream.
+    // invariant: non-key again, and it is the ALIGNMENT declaration — the field whose silent
+    // divergence would mis-align every comparison downstream.
+    // refs: ADR-18
     {{.prefix = "<AAA-job> ",
       .kind = IntentMarkerKind::Job,
       .child_order = ChildOrder::Unordered,
@@ -262,7 +263,8 @@ constexpr std::array<IntentMarkerRow, 2> kMarkersMut{
       .payload_excludes = {},
       .channel_gate = "annotated"}}};
 
-// markers, one row SHORT — the length-mismatch arm (an appended/removed row, not a mutated one).
+// invariant: one row SHORT — the LENGTH-MISMATCH arm, an appended or removed row rather than a
+// mutated one.
 constexpr std::array<IntentMarkerRow, 1> kMarkersShort{
     {{.prefix = "<AAA-job> ",
       .kind = IntentMarkerKind::Job,
@@ -272,8 +274,9 @@ constexpr std::array<IntentMarkerRow, 1> kMarkersShort{
       .payload_excludes = kExcludesA,
       .channel_gate = kAnyChannel}}};
 
-// markers, the same SET in the reverse declared ORDER — declared order is ruleset content (the
-// identity serializer walks each span in order), so this must be reported as a difference.
+// invariant: the same row SET in the REVERSE declared order — declared order is ruleset CONTENT,
+// because the identity serializer walks each span in order.
+// invariant: so it must be reported as a difference.
 constexpr std::array<IntentMarkerRow, 2> kMarkersReordered{
     {{.prefix = "<AAA-step> ",
       .kind = IntentMarkerKind::Step,
@@ -291,8 +294,8 @@ constexpr std::array<IntentMarkerRow, 2> kMarkersReordered{
       .channel_gate = kAnyChannel}}};
 
 constexpr std::array<IntentEmitRow, 2> kEmitsMut{
-    // emits[0].emit: PayloadAfterPrefix → PayloadThenClosingParen — the generation shape, the half
-    // that moved no digest at all before grammar-3 wired `emits` into the manifest.
+    // invariant: the GENERATION shape — the half that moved no digest at all before the emit rows
+    // were wired into the manifest.
     {{.prefix = "<AAA-job> ",
       .kind = IntentMarkerKind::Job,
       .child_order = ChildOrder::Unordered,
@@ -307,30 +310,26 @@ constexpr std::array<IntentEmitRow, 2> kEmitsMut{
       .channel_gate = "annotated"}}};
 
 constexpr std::array<LevelLiftRow, 1> kLiftsMut{
-    // level_lifts[0].level: Error → Warning.
     {{.prefix = "<AAA-error>", .level = LogLevel::Warn, .dialect_gate = "alpha"}}};
 
 constexpr std::array<std::string_view, 2> kLocExtMut{{"py", "pyx"}};
-constexpr std::array<LocationRow, 1> kLocationsMut{
-    // locations[0].extensions: the file-naming vocabulary, one entry changed.
-    {{.kind = LocationMatchKind::PrefixAndExtension,
-      .infixes = {},
-      .extensions = kLocExtMut,
-      .prefixes = kLocPrefixA,
-      .suffixes = {}}}};
+constexpr std::array<LocationRow, 1> kLocationsMut{{{.kind = LocationMatchKind::PrefixAndExtension,
+                                                     .infixes = {},
+                                                     .extensions = kLocExtMut,
+                                                     .prefixes = kLocPrefixA,
+                                                     .suffixes = {}}}};
 
 constexpr std::array<ValueClassRow, 1> kValueClassesMut{
-    // value_classes[0].scale: the only int64 field on any row.
+    // invariant: the only integer field on any row.
     {{.key = "alpha.duration_ms", .cls = ValueClass::None, .schedule_id = "", .scale = 1}}};
 
 constexpr std::array<OutcomeTokenRow, 2> kTokensMut{
-    // outcome_tokens[1].outcome: Failure → Cancelled. A verdict MAPPING change — invisible in every
-    // key, and the exact shape of the desk failure this comparator was built to locate.
+    // invariant: a verdict MAPPING change — invisible in every key, and the exact shape of the
+    // desk failure this comparator was built to locate.
     {{.token = "AAA-PASSED", .outcome = RunOutcome::Success, .dialect_gate = "alpha"},
      {.token = "AAA-BROKEN", .outcome = RunOutcome::Aborted, .dialect_gate = "alpha"}}};
 
 constexpr std::array<OutcomeMarkerRow, 1> kOutcomeMarkersMut{
-    // outcome_markers[0].shape: RemainderToken → PrefixIsVerdict.
     {{.prefix = "<AAA-done> ",
       .dialect_gate = "alpha",
       .shape = OutcomeMarkerShape::PrefixIsVerdict,
@@ -339,15 +338,15 @@ constexpr std::array<OutcomeMarkerRow, 1> kOutcomeMarkersMut{
 constexpr std::array<std::string_view, 2> kChannelsMut{{"annotated", "raw"}};
 constexpr std::array<std::string_view, 1> kRevisionsMut{{"v2"}};
 
-// One arm per member. Each mutant is the subject with exactly one member re-pointed, built in the
-// test body from the arrays above: a manifest-shaped mutation HELPER would be a second description
-// of the manifest's shape, and the whole point of these fixtures is that no second description
-// exists to drift out of step with the first.
+// invariant: each mutant is the subject with exactly ONE member re-pointed, built in the test body
+// from the arrays above.
+// invariant: a manifest-shaped mutation HELPER would be a SECOND description of the manifest's
+// shape, and the whole point of these fixtures is that no second description exists to drift.
 struct MutationArm
 {
-    std::string_view label;         // the mutation, in words — printed on failure
-    std::string_view expect_check;  // the ONE check that must go red
-    std::string_view expect_detail; // a coordinate the detail must name
+    std::string_view label;
+    std::string_view expect_check;
+    std::string_view expect_detail;
     SemanticPackageManifest mutant;
 };
 
@@ -357,8 +356,8 @@ struct MutationArm
     return compose(one).identity_hex();
 }
 
-// The failing checks of a report, as "name: detail" lines — the verbose-on-failure surface every
-// assertion below streams, so a red diagnoses itself without a debugger.
+// invariant: the failing checks rendered as name-and-detail lines — the verbose-on-failure
+// surface every assertion streams, so a red DIAGNOSES ITSELF without a debugger.
 [[nodiscard]] std::string failures_of(const Report& report)
 {
     std::string out{report.summary()};
@@ -383,9 +382,9 @@ struct MutationArm
     return names;
 }
 
-// The fourteen members, named by hand — the ORACLE for "one check per manifest member". Written
-// here and not derived from the report, so a comparator that dropped a member cannot also drop the
-// expectation.
+// invariant: the members NAMED BY HAND — the ORACLE for one check per manifest member.
+// invariant: written here and NOT derived from the report, so a comparator that dropped a member
+// cannot also drop the expectation.
 constexpr std::array<std::string_view, 14> kExpectedCheckNames{
     {"equivalence.name", "equivalence.version", "equivalence.roles", "equivalence.markers",
      "equivalence.emits", "equivalence.level_lifts", "equivalence.locations",
@@ -395,11 +394,10 @@ constexpr std::array<std::string_view, 14> kExpectedCheckNames{
 
 } // namespace
 
-// ── The equality arm: two independently declared manifests with equal content ────────────────────
 TEST(ManifestEquivalence, IndependentTwinsAgreeOnEveryMember)
 {
-    // The digest is the independent oracle for "these two really are the same ruleset": if this
-    // fails, the FIXTURES diverged and the comparator is not on trial at all.
+    // invariant: the digest is the INDEPENDENT oracle for these two really being the same ruleset
+    // — if this fails, the FIXTURES diverged and the comparator is not on trial at all.
     ASSERT_EQ(identity_of(kAlpha), identity_of(kAlphaTwin))
         << "the twin fixtures are not content-equal, so the equality arm below proves nothing";
 
@@ -408,7 +406,6 @@ TEST(ManifestEquivalence, IndependentTwinsAgreeOnEveryMember)
     EXPECT_EQ(report.checks.size(), kExpectedCheckNames.size()) << report.summary();
 }
 
-// ── The coverage arm: one check per manifest member, in a fixed order, always ────────────────────
 TEST(ManifestEquivalence, ReportCarriesOneCheckPerManifestMember)
 {
     const Report report{manifest_equivalence_report(kAlpha, kAlphaTwin)};
@@ -422,7 +419,6 @@ TEST(ManifestEquivalence, ReportCarriesOneCheckPerManifestMember)
             << kExpectedCheckNames[idx] << '"';
 }
 
-// ── The discrimination arms: one mutated member each ─────────────────────────────────────────────
 TEST(ManifestEquivalence, EveryManifestMemberDiscriminates)
 {
     SemanticPackageManifest mut_name{kAlpha};
@@ -488,11 +484,12 @@ TEST(ManifestEquivalence, EveryManifestMemberDiscriminates)
     {
         SCOPED_TRACE(std::string{"mutation: "} + std::string{arm.label});
 
-        // The INDEPENDENT oracle (compose.cpp's serialize_manifest + SHA-256, another file, another
-        // author): every manifest member enters the identity preimage, so every arm here must move
-        // the digest. An arm whose digest does NOT move is a broken FIXTURE, not a comparator
-        // finding — and asserting it first is what keeps a silently-inert mutation from reading as
-        // a comparator failure.
+        // invariant: THE INDEPENDENT ORACLE — every manifest member enters the identity preimage,
+        // so every arm here must MOVE the digest.
+        // invariant: an arm whose digest does NOT move is a broken FIXTURE and not a comparator
+        // finding.
+        // invariant: asserting it FIRST is what keeps a silently-inert mutation from reading as a
+        // comparator failure.
         EXPECT_NE(identity_of(arm.mutant), subject_identity)
             << "the mutation did not move semantic_identity — the fixture is inert, so this arm "
                "cannot judge the comparator";
@@ -518,7 +515,6 @@ TEST(ManifestEquivalence, EveryManifestMemberDiscriminates)
     }
 }
 
-// ── Length mismatch: a removed row, not a mutated one ────────────────────────────────────────────
 TEST(ManifestEquivalence, RowCountMismatchNamesBothCountsAndTheUnpairedRow)
 {
     SemanticPackageManifest shorter{kAlpha};
@@ -535,20 +531,21 @@ TEST(ManifestEquivalence, RowCountMismatchNamesBothCountsAndTheUnpairedRow)
     ASSERT_EQ(markers.name, "equivalence.markers");
     EXPECT_NE(markers.detail.find("LHS declares 2 rows, RHS declares 1"), std::string::npos)
         << markers.detail;
-    // The unpaired row must be NAMED: the paired-prefix diff structurally cannot show what was
-    // removed, so a report that only said "2 vs 1" would leave the reader to find it by hand.
+    // invariant: the unpaired row must be NAMED.
+    // invariant: the paired-prefix diff structurally cannot show what was REMOVED, so a report
+    // giving only the two counts would leave the reader to find it by hand.
     EXPECT_NE(markers.detail.find("<AAA-step> "), std::string::npos) << markers.detail;
 }
 
-// ── Declared ORDER is ruleset content ────────────────────────────────────────────────────────────
 TEST(ManifestEquivalence, SameRowSetInADifferentOrderIsNotEquivalent)
 {
     SemanticPackageManifest reordered{kAlpha};
     reordered.markers = kMarkersReordered;
 
-    // The digest agrees, and it is the reason the comparator pairs by index rather than by key:
-    // the serializer walks each span in DECLARED order, so a re-ordered declaration is a different
-    // ruleset and the two must not read as equivalent.
+    // invariant: the digest AGREES that a re-ordering is a difference, and it is the reason the
+    // comparator pairs by INDEX rather than by key.
+    // invariant: the serializer walks each span in DECLARED order, so a re-ordered declaration is a
+    // different ruleset and the two must not read as equivalent.
     ASSERT_NE(identity_of(reordered), identity_of(kAlpha))
         << "the fixture did not move the digest — re-ordering is inert here";
 
@@ -559,11 +556,11 @@ TEST(ManifestEquivalence, SameRowSetInADifferentOrderIsNotEquivalent)
     EXPECT_EQ(failed.front(), "equivalence.markers") << failures_of(report);
 }
 
-// ── The degenerate boundary, stated as a POSITIVE assertion plus its discrimination arm ──────────
-// Two empty manifests ARE equivalent — that is the correct answer, and it is exactly the answer a
-// comparator that does nothing at all would also give. So the boundary is never asserted alone: the
-// second half asserts that an empty manifest and a populated one are NOT equivalent, which the
-// do-nothing comparator fails.
+// invariant: THE DEGENERATE BOUNDARY, stated as a POSITIVE assertion PLUS its discrimination arm.
+// invariant: two empty manifests ARE equivalent — that is the correct answer, and it is exactly
+// the answer a comparator that does nothing at all would also give.
+// invariant: so the boundary is NEVER asserted alone: the second half asserts that an empty
+// manifest and a populated one are NOT equivalent, which the do-nothing comparator fails.
 TEST(ManifestEquivalence, EmptyManifestsAreEquivalentAndStillDiscriminate)
 {
     constexpr SemanticPackageManifest kEmptyLhs{.name = "", .version = ""};
@@ -575,8 +572,7 @@ TEST(ManifestEquivalence, EmptyManifestsAreEquivalentAndStillDiscriminate)
     const Report split_report{manifest_equivalence_report(kEmptyLhs, kAlpha)};
     EXPECT_FALSE(split_report.all_passed())
         << "an empty manifest and a populated one compared EQUAL — the comparator is inert";
-    // Every populated member must be reported: name, version, roles, markers, emits, level_lifts,
-    // locations, value_classes, outcome_tokens, outcome_markers, channels, dialect_revisions. The
-    // two code-tier members are absent on BOTH sides, so they legitimately stay green.
+    // invariant: every POPULATED member must be reported, and the two code-tier members are absent
+    // on BOTH sides so they legitimately stay green.
     EXPECT_EQ(failing_names(split_report).size(), 12U) << failures_of(split_report);
 }

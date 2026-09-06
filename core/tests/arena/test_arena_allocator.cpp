@@ -1,19 +1,11 @@
-// Unit tests: allow short identifiers and test-specific patterns
-// tests/1_tokenization/test_arena_allocator.cpp
-//
-// Unit tests for ArenaAllocator.
-// Coverage: construction, allocation, alignment, store_string,
-//           reset, owns, move semantics, copy-deletion, accessors.
 
+// invariant: unit coverage for the arena allocator — construction, allocation, alignment, string
+// storage, reset, ownership, move semantics, copy deletion and the accessors.
 #include <gtest/gtest.h>
 
 import insight.canon.test;
 
 using insight::tokenization::ArenaAllocator;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Construction
-// ─────────────────────────────────────────────────────────────────────────────
 
 TEST(ArenaAllocator_Construction, ZeroCapacityThrows)
 {
@@ -28,21 +20,17 @@ TEST(ArenaAllocator_Construction, ValidCapacitySucceeds)
 TEST(ArenaAllocator_Construction, InitialStateIsEmpty)
 {
     ArenaAllocator arena{1024};
+    // invariant: the bump pointer must NOT advance for a zero-size request.
     EXPECT_EQ(arena.used(), 0u);
     EXPECT_EQ(arena.capacity(), 1024u);
     EXPECT_EQ(arena.initial_block_size(), 1024u);
     EXPECT_EQ(arena.block_count(), 1u);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Allocation — basic
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST(ArenaAllocator_Allocate, ZeroSizeReturnsNull)
 {
     ArenaAllocator arena{64};
     EXPECT_EQ(arena.allocate(0), nullptr);
-    // Bump pointer must not advance for zero-size requests.
     EXPECT_EQ(arena.used(), 0u);
 }
 
@@ -70,7 +58,7 @@ TEST(ArenaAllocator_Allocate, SequentialAllocationsDoNotOverlap)
     auto* b{static_cast<std::byte*>(arena.allocate(size, 1))};
     ASSERT_NE(a, nullptr);
     ASSERT_NE(b, nullptr);
-    // b must begin at or after the end of a's region.
+    // invariant: a second allocation must begin at or after the end of the first region.
     EXPECT_GE(b, a + size);
 }
 
@@ -96,7 +84,6 @@ TEST(ArenaAllocator_Allocate, OverInitialCapacityGrows)
 TEST(ArenaAllocator_Allocate, PartialFillThenGrowRetainsExistingAllocation)
 {
     ArenaAllocator arena{32};
-    // Consume 24 bytes, leaving 8 bytes free.
     void* first = arena.allocate(24, 1);
     void* second = nullptr;
     EXPECT_NO_THROW(second = arena.allocate(16, 1));
@@ -105,13 +92,9 @@ TEST(ArenaAllocator_Allocate, PartialFillThenGrowRetainsExistingAllocation)
     EXPECT_GT(arena.block_count(), 1u);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Alignment
-// ─────────────────────────────────────────────────────────────────────────────
-
 namespace
 {
-// Returns true when the pointer satisfies the given power-of-two alignment.
+// invariant: true when the pointer satisfies the given power-of-two alignment.
 bool is_aligned(const void* ptr, std::size_t alignment) noexcept
 {
     return (reinterpret_cast<std::uintptr_t>(ptr) & (alignment - 1u)) == 0u;
@@ -121,7 +104,8 @@ bool is_aligned(const void* ptr, std::size_t alignment) noexcept
 TEST(ArenaAllocator_Alignment, AlignOne)
 {
     ArenaAllocator arena{128};
-    // Force a non-aligned offset, then request alignment == 1.
+    // invariant: a non-aligned offset is FORCED first, so an alignment of one is actually exercised
+    // rather than trivially satisfied.
     static_cast<void>(arena.allocate(3, 1));
     void* p = arena.allocate(8, 1);
     ASSERT_NE(p, nullptr);
@@ -131,7 +115,9 @@ TEST(ArenaAllocator_Alignment, AlignOne)
 TEST(ArenaAllocator_Alignment, AlignFour)
 {
     ArenaAllocator arena{128};
-    static_cast<void>(arena.allocate(1, 1)); // offset = 1 (misaligned for 4-byte objects)
+    // invariant: the used count exceeds the byte count because of ALIGNMENT PADDING, which is why
+    // the assertion is guarded on the platform's maximum alignment being greater than one.
+    static_cast<void>(arena.allocate(1, 1));
     void* p = arena.allocate(sizeof(std::uint32_t), 4);
     ASSERT_NE(p, nullptr);
     EXPECT_TRUE(is_aligned(p, 4));
@@ -140,7 +126,7 @@ TEST(ArenaAllocator_Alignment, AlignFour)
 TEST(ArenaAllocator_Alignment, AlignEight)
 {
     ArenaAllocator arena{128};
-    static_cast<void>(arena.allocate(3, 1)); // offset = 3 (misaligned for 8-byte objects)
+    static_cast<void>(arena.allocate(3, 1));
     void* p = arena.allocate(sizeof(std::uint64_t), 8);
     ASSERT_NE(p, nullptr);
     EXPECT_TRUE(is_aligned(p, 8));
@@ -149,7 +135,7 @@ TEST(ArenaAllocator_Alignment, AlignEight)
 TEST(ArenaAllocator_Alignment, AlignSixteen)
 {
     ArenaAllocator arena{256};
-    static_cast<void>(arena.allocate(5, 1)); // offset = 5 (misaligned for 16-byte objects)
+    static_cast<void>(arena.allocate(5, 1));
     void* p = arena.allocate(16, 16);
     ASSERT_NE(p, nullptr);
     EXPECT_TRUE(is_aligned(p, 16));
@@ -167,8 +153,7 @@ TEST(ArenaAllocator_Alignment, AlignCacheLine)
 TEST(ArenaAllocator_Alignment, DefaultAlignmentIsMaxAlignT)
 {
     ArenaAllocator arena{256};
-    static_cast<void>(arena.allocate(1, 1)); // disturb natural alignment
-    // Default alignment argument == alignof(std::max_align_t).
+    static_cast<void>(arena.allocate(1, 1));
     void* p = arena.allocate(sizeof(std::max_align_t));
     ASSERT_NE(p, nullptr);
     EXPECT_TRUE(is_aligned(p, alignof(std::max_align_t)));
@@ -177,25 +162,20 @@ TEST(ArenaAllocator_Alignment, DefaultAlignmentIsMaxAlignT)
 TEST(ArenaAllocator_Alignment, UsedReflectsPaddingBytes)
 {
     ArenaAllocator arena{128};
-    static_cast<void>(arena.allocate(1, 1));                         // used = 1
-    static_cast<void>(arena.allocate(1, alignof(std::max_align_t))); // padding + 1 byte
-    // used > 2 because of alignment padding (unless max_align_t == 1).
+    static_cast<void>(arena.allocate(1, 1));
+    static_cast<void>(arena.allocate(1, alignof(std::max_align_t)));
     if constexpr (alignof(std::max_align_t) > 1)
     {
         EXPECT_GT(arena.used(), 2u);
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// store_string
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST(ArenaAllocator_StoreString, EmptyStringReturnsEmptyView)
 {
     ArenaAllocator arena{64};
     auto sv{arena.store_string({})};
     EXPECT_TRUE(sv.empty());
-    // No bytes should have been consumed.
+    // invariant: an empty string consumes NO bytes.
     EXPECT_EQ(arena.used(), 0u);
 }
 
@@ -220,7 +200,7 @@ TEST(ArenaAllocator_StoreString, MultipleStringsDoNotOverlap)
     ArenaAllocator arena{256};
     auto a{arena.store_string("alpha")};
     auto b{arena.store_string("beta")};
-    // The two views must not share memory.
+    // invariant: the two stored views must NOT share memory.
     if (a.data() < b.data())
     {
         EXPECT_LE(a.data() + a.size(), b.data());
@@ -233,6 +213,8 @@ TEST(ArenaAllocator_StoreString, MultipleStringsDoNotOverlap)
 
 TEST(ArenaAllocator_StoreString, UsedIncreasedByStringLength)
 {
+    // invariant: the stored view must NOT point into the SOURCE string's storage — the arena
+    // copies.
     ArenaAllocator arena{128};
     constexpr std::string_view sv{"hello"};
     static_cast<void>(arena.store_string(sv));
@@ -241,17 +223,12 @@ TEST(ArenaAllocator_StoreString, UsedIncreasedByStringLength)
 
 TEST(ArenaAllocator_StoreString, StoredViewPointsInsideArena)
 {
-    // Verify the view does NOT point into the source string's storage.
     ArenaAllocator arena{128};
     std::string source{"arena copy"};
     auto stored{arena.store_string(source)};
     EXPECT_NE(stored.data(), source.data());
     EXPECT_TRUE(arena.owns(stored.data()));
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// reset()
-// ─────────────────────────────────────────────────────────────────────────────
 
 TEST(ArenaAllocator_Reset, UsedBecomesZero)
 {
@@ -305,10 +282,6 @@ TEST(ArenaAllocator_Reset, RepeatedCyclesRetainCorrectState)
     EXPECT_EQ(arena.capacity(), 16u);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// owns()
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST(ArenaAllocator_Owns, AllocatedPointerIsOwned)
 {
     ArenaAllocator arena{64};
@@ -339,14 +312,10 @@ TEST(ArenaAllocator_Owns, StoredStringDataIsOwned)
 TEST(ArenaAllocator_Owns, PointerPastEndIsNotOwned)
 {
     ArenaAllocator arena{64};
-    // Pointer one byte past the end of the buffer must not be owned.
+    // invariant: a pointer ONE BYTE PAST the end of the buffer must not be owned.
     const std::byte* end = static_cast<const std::byte*>(arena.allocate(64, 1)) + 64;
     EXPECT_FALSE(arena.owns(end));
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Move semantics
-// ─────────────────────────────────────────────────────────────────────────────
 
 TEST(ArenaAllocator_Move, ConstructionTransfersOwnership)
 {
@@ -366,11 +335,17 @@ TEST(ArenaAllocator_Move, ConstructionLeavesSourceEmpty)
     ArenaAllocator src{128};
     static_cast<void>(src.allocate(32));
 
-    ArenaAllocator dst{std::move(src)}; // NOLINT(bugprone-use-after-move)
+    // invariant: reading the moved-from source is THE PROPERTY here and not an accident.
+    // invariant: a moved-from arena must report zero capacity and zero used, which is only
+    // observable BY READING IT.
+    // note: the moved-from construction is deliberate, so its move check is suppressed by intent.
+    // NOLINTNEXTLINE(bugprone-use-after-move)
+    ArenaAllocator dst{std::move(src)};
 
-    // After the move the source must report zero capacity and zero used.
+    // note: the deliberate moved-from read, on the capacity accessor.
     // NOLINTNEXTLINE(clang-analyzer-cplusplus.Move)
     EXPECT_EQ(src.capacity(), 0u);
+    // note: and again on the used accessor, which the same move check would flag.
     // NOLINTNEXTLINE(clang-analyzer-cplusplus.Move)
     EXPECT_EQ(src.used(), 0u);
 }
@@ -393,10 +368,16 @@ TEST(ArenaAllocator_Move, AssignmentLeavesSourceEmpty)
     static_cast<void>(src.allocate(16));
 
     ArenaAllocator dst{64};
-    dst = std::move(src); // NOLINT(bugprone-use-after-move)
+    // invariant: the same deliberate moved-from read, reached through assignment rather than
+    // construction, because the two transfer paths are separate code.
+    // note: the moved-from assignment is deliberate, so its move check is suppressed by intent.
+    // NOLINTNEXTLINE(bugprone-use-after-move)
+    dst = std::move(src);
 
+    // note: the deliberate moved-from read, on the capacity accessor.
     // NOLINTNEXTLINE(clang-analyzer-cplusplus.Move)
     EXPECT_EQ(src.capacity(), 0u);
+    // note: and again on the used accessor, which the same move check would flag.
     // NOLINTNEXTLINE(clang-analyzer-cplusplus.Move)
     EXPECT_EQ(src.used(), 0u);
 }
@@ -413,10 +394,6 @@ TEST(ArenaAllocator_Move, MoveAssignedArenaCanAllocate)
     EXPECT_TRUE(dst.owns(p));
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Copy semantics — compile-time enforcement
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST(ArenaAllocator_CopyDeleted, NotCopyConstructible)
 {
     static_assert(!std::is_copy_constructible_v<ArenaAllocator>,
@@ -428,10 +405,6 @@ TEST(ArenaAllocator_CopyDeleted, NotCopyAssignable)
     static_assert(!std::is_copy_assignable_v<ArenaAllocator>,
                   "ArenaAllocator must not be copy-assignable");
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Accessors
-// ─────────────────────────────────────────────────────────────────────────────
 
 TEST(ArenaAllocator_Accessors, UsedStartsAtZero)
 {
@@ -475,25 +448,25 @@ TEST(ArenaAllocator_Accessors, UsedNeverExceedsCapacity)
     EXPECT_EQ(arena.used(), arena.capacity());
 }
 
-// ── The reset-poison instrument (DN-29.D13) ──────────────────────────────────────────────────
-// These do not test the arena; they test the INSTRUMENT the arena carries, because a detector
-// nobody has seen detect anything is not evidence. Read a released span deliberately — the exact
-// thing a use-after-reset does by accident — and require that the bytes CHANGED.
-//
-// Deliberately NOT written as `poisoned == 0xDD…`: that would pin the fill value, and the value is
-// an implementation choice. The property is "the released bytes no longer read as what was stored",
-// which is what makes a stale `string_view` observable, and it survives a change of poison byte.
-//
-// WHY THE SKIPS BELOW PRINT THEIR REMEDY instead of leaving it in this comment: these two arms used
-// to run on every desk build, and silently stopped. Since malf-toolchain 4b1f32e the dev profile
-// linux-clang21-libcxx-release configures CMAKE_BUILD_TYPE=Release, so the AUTO default
-// (core/CMakeLists.txt — the instrument resolves to `$<CONFIG:Debug>`) is OFF at the desk. A skip
-// that changed meaning under a toolchain repair reads exactly like the skip it always was, so the
-// way out is program OUTPUT at the moment of the block, not a comment the blocked reader is not
-// reading.
-
-// The single spelling of the remedy, so the two skips cannot drift apart. The three routes differ
-// in WHAT THEY BUY and not only in price, which is why the message states both halves.
+// invariant: these do not test the arena — they test the INSTRUMENT the arena carries, because a
+// detector nobody has seen detect anything is not evidence.
+// invariant: a released span is read DELIBERATELY, which is the exact thing a use-after-reset does
+// by accident, and the bytes must have CHANGED.
+// invariant: deliberately NOT written as an equality against a fill value — that would pin the
+// poison byte, and the byte is an implementation choice.
+// invariant: the property is that the released bytes no longer read as what was stored, which is
+// what makes a stale view observable, and it survives a change of poison byte.
+// invariant: WHY THE GATING BELOW PRINTS ITS REMEDY — these two arms used to run on every desk
+// build and SILENTLY STOPPED.
+// invariant: the dev profile now configures a release build, so the instrument's AUTO default is
+// OFF at the desk.
+// invariant: a skip that CHANGED MEANING under a toolchain repair reads exactly like the skip it
+// always was, so the way out is program OUTPUT at the moment of the block.
+// invariant: not a comment the blocked reader is not reading.
+// refs: DN-29.D13
+// invariant: the SINGLE spelling of the remedy, so the two gated blocks cannot drift apart.
+// invariant: the three routes differ in WHAT THEY BUY and not only in price, which is why the
+// message states both halves.
 constexpr const char* kArmTheInstrument{
     "ARM IT — three routes, and they do not buy the same thing. "
     "(1) Reconfigure THIS tree with -DINSIGHT_CANON_ARENA_POISON_MODE=ON: the poison alone, "
@@ -506,9 +479,9 @@ constexpr const char* kArmTheInstrument{
 
 TEST(ArenaAllocator_ResetPoison, InstrumentIsDeclaredAndReadableAtRuntime)
 {
-    // The provenance query must agree with how this TU was compiled. If these ever disagree, a
-    // downstream lifetime gate is being told the wrong thing about the build it is running in,
-    // and its skip/assert decision is unsound — which is worse than having no gate.
+// invariant: the provenance query must AGREE with how this unit was compiled.
+// invariant: if these ever disagree, a downstream lifetime gate is being told the wrong thing about
+// the build it is running in, and its decision is UNSOUND — worse than having no gate.
 #ifdef INSIGHT_CANON_ARENA_POISON
     EXPECT_TRUE(insight::tokenization::arena_poisons_on_reset())
         << "built WITH INSIGHT_CANON_ARENA_POISON but the runtime query denies it — downstream "
@@ -520,24 +493,25 @@ TEST(ArenaAllocator_ResetPoison, InstrumentIsDeclaredAndReadableAtRuntime)
 #endif
 }
 
-// THE TWO CASES BELOW ARE COMPILE-TIME GATED, NOT RUNTIME-SKIPPED (Founder, 2026-09-04). They
-// used to open with `if (!arena_poisons_on_reset()) GTEST_SKIP()`, and the skip was honest about
-// its reason while still being the wrong SHAPE: a gtest skip exits 0 and ctest counts it as
-// passed, so a release build reported two green cases for a subject that cannot exist in it.
-// Whether the instrument is compiled in is a property of THIS TU — `INSIGHT_CANON_ARENA_POISON`
-// is set on this target by the same generator expression as on the library — so the honest
-// expression is not to register the cases at all where they could not run.
-//
-// Nothing is lost by that. `InstrumentIsDeclaredAndReadableAtRuntime` above is UNCONDITIONAL and
-// asserts BOTH directions, so a build whose runtime query disagrees with its own macro still
-// reds — which was the only thing the skipping cases could have caught in an unpoisoned build.
+// invariant: THE TWO CASES BELOW ARE COMPILE-TIME GATED, NOT RUNTIME-SKIPPED.
+// invariant: they used to open with a runtime skip, which was honest about its reason while still
+// being the wrong SHAPE.
+// invariant: a harness skip exits 0 and the runner counts it as PASSED, so a release build reported
+// two green cases for a subject that cannot exist in it.
+// invariant: whether the instrument is compiled in is a property of THIS unit, set on this target
+// by the same generator expression as on the library.
+// invariant: so the honest expression is NOT TO REGISTER the cases at all where they could not run.
+// invariant: nothing is lost by that — the unconditional arm above asserts BOTH directions, so a
+// build whose runtime query disagrees with its own macro still reds.
+// invariant: that was the only thing the skipping cases could have caught in an unpoisoned build.
 #ifdef INSIGHT_CANON_ARENA_POISON
 
 TEST(ArenaAllocator_ResetPoison, ReleasedBytesAreOverwrittenSoAUseAfterResetIsObservable)
 {
-    // A belt, not a gate: inside this #ifdef the instrument MUST be on, and the case above
-    // already pins that. If it is ever false here the two disagree and this fails loudly rather
-    // than measuring a rewind that never poisoned.
+    // invariant: a BELT and not a gate — inside this compilation branch the instrument MUST be
+    // on, and the case above already pins that.
+    // invariant: if it is ever false here the two disagree, and this fails LOUDLY rather than
+    // measuring a rewind that never poisoned.
     ASSERT_TRUE(insight::tokenization::arena_poisons_on_reset())
         << "compiled WITH INSIGHT_CANON_ARENA_POISON but the runtime query denies it. "
         << kArmTheInstrument;
@@ -549,8 +523,9 @@ TEST(ArenaAllocator_ResetPoison, ReleasedBytesAreOverwrittenSoAUseAfterResetIsOb
 
     arena.reset();
 
-    // `held` is now a dangling view into released arena memory. Reading it is the defect under
-    // test, performed on purpose: the instrument's whole job is to make this read WRONG.
+    // invariant: the held view is now DANGLING into released arena memory, and reading it is the
+    // defect under test, performed ON PURPOSE.
+    // invariant: the instrument's whole job is to make this read WRONG.
     EXPECT_NE(held, kStored)
         << "a view into released arena memory still reads its old contents — the reset poison did "
            "NOT fire, so every use-after-reset in the codebase is invisible to every test";
@@ -562,9 +537,10 @@ TEST(ArenaAllocator_ResetPoison, PoisonSpansTheWholeHandedOutExtentNotJustTheFir
         << "compiled WITH INSIGHT_CANON_ARENA_POISON but the runtime query denies it. "
         << kArmTheInstrument;
 
-    // A partial fill would leave later allocations readable and make the instrument's coverage a
-    // function of WHERE in the line the stale view happened to point — a detector that fires
-    // sometimes is worse than none, because its green would then be trusted.
+    // invariant: a PARTIAL fill would leave later allocations readable and make the instrument's
+    // coverage a function of WHERE in the line the stale view happened to point.
+    // invariant: a detector that fires SOMETIMES is worse than none, because its green would then
+    // be trusted.
     ArenaAllocator arena{4096};
     std::vector<std::string_view> views;
     views.reserve(32);
@@ -583,4 +559,4 @@ TEST(ArenaAllocator_ResetPoison, PoisonSpansTheWholeHandedOutExtentNotJustTheFir
     }
 }
 
-#endif // INSIGHT_CANON_ARENA_POISON
+#endif

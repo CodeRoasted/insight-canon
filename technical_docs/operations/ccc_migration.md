@@ -6576,6 +6576,107 @@ generator's own emitter why nine green generations never showed the gap.
 `linux-clang21-libcxx-release` and **809 of 809** on `linux-gcc16-release`. No suite in these two
 directories carries the `corpus` label.
 
+## Unit 32 — `core/tests/{arena,conformance,math,parse}/` + `canon.test.cppm` (6 files, 341 comment lines, 336 would-be violations) — the repo reaches ZERO, the cross-check stops being vacuous, and a file contradicted itself in two places
+
+The last unit. Baseline split: bare 266 · ruler 30 · trailing 19 · spacer 15. After: **297 comment
+lines, 0 would-be violations** — `invariant` 158 · `note` 6 · `refs` 5 · 115 continuations · 13 tool
+forms. Repo-level delta **336 → 0**. No law block; the next free law integer is still 17.
+
+**`insight-canon` now reads ZERO would-be violations over 126 files**, from 14 242 at the start of
+this run.
+
+### THE STRIPPER CROSS-CHECK IS NON-VACUOUS FOR THE FIRST AND ONLY TIME
+
+Removed **330**, kept 13 — and 6 of those kept forms are VIOLATIONS the gate counts. So the identity
+is `330 removed + 6 kept violations = 336`, which is the form `OPS-8.S5` actually asks for and the
+only one this run that could have failed. Seven consecutive units before this were vacuous for a
+structural reason worth recording: **the entire test tier carries suppressions in exactly one
+file**, and it is this one.
+
+### The last suppressions in the repo, MEASURED before being dispositioned
+
+Six directives, all in the arena suite: 2 trailing and 4 own-line without a why. They are INERT
+under this project's own gate, twice over, and the `.clang-tidy` header says both halves itself:
+test translation units are outside the clang-tidy surface **entirely** because `malf lint` prunes
+`tests/`, and `clang-analyzer-*` is disabled in `Checks` — which is the family four of them name.
+
+**They were KEPT rather than deleted, and the reasoning is the disposition.** There is a precedent
+commit that swept whole-file NOLINT blankets on exactly this ground, but a blanket hides everything;
+these are targeted directives on a deliberate read of a moved-from object, which is the property
+those two tests exist to assert. `ADR-26.D5` permits an own-line directive under a `note:`, so the
+two trailing forms moved to own-line, each of the six gained a truthful why, and the claim itself is
+stated as an `invariant:` above the arm. **No note claims they silence a live gate diagnostic** —
+that would be exactly the false claim this migration removes.
+
+One mechanical hazard was caught in advance and is worth the runbook: the placer anchors on CODE
+lines, so inserting a claim above the guarded statement slid it BETWEEN the `NOLINTNEXTLINE` and the
+line it guards, silently breaking the directive. That needed a hand pass; no witness would have
+caught it, because a broken suppression changes no code token and reds no gate.
+
+### CONVICTIONS 1 AND 2 — one file contradicted ITSELF, in two independent places
+
+`test_det_int128_portable.cpp` carried a header describing its own mechanism, and the header was
+wrong twice; both were CARRIED and both were faithfully converted before the readers caught them.
+
+* It said the shim header is **"included TWICE into two namespaces"**. It is included ONCE. The
+  native half is a direct typedef and the portable half is forced by a macro defined before the
+  single include.
+* It said that on a platform with no native wide integer the file **"degrades to a TAUTOLOGY … and
+  still passes"**. That branch registers NOTHING — it is empty.
+
+**The second is the sharper one, because the SAME FILE says the opposite forty lines further down.**
+The block at that branch is the *"NO PLACEHOLDER CASE HERE, deliberately"* statement — a deliberate
+discharge of the no-skip ruling, explaining that a platform without the type has no case to register
+and that the difference shows in the discovered test count. So one file asserted both *"it still
+passes"* and *"there is nothing there"*. This is the unit-26 pattern with both halves inside one
+file, which makes it worse rather than better: no cross-file reading was needed to see it, only a
+reader who opened the branch.
+
+### CONVICTION 3 — an arm named for a near-tie that no longer occurs
+
+`NearTieKVBeatsWeakCLF` carried the claim that its fixture triggers one strategy's WEAK confidence
+and another's HIGH confidence at once, so the higher must win. Checked at the artifact: the
+competing candidate gate requires four distinct bytes and the fixture carries one of them, so that
+strategy is **never scored at all** — the assertion holds by candidate EXCLUSION, not by a
+comparison. And the strategy's confidence is now BINARY, its own note recording that the
+strong-versus-weak distinction *was* a tie-break, in the past tense.
+
+The claim now says what is true, including that the arm's own NAME describes a situation that no
+longer arises. The name was left alone: renaming a test is a code change, and this pass is
+comment-only.
+
+### The address census, both legs
+
+**Outbound: 2 LOST and both restored**, opened one at a time — the ruling that defines the
+comparator's entry point, which sat in the file header, and the alignment declaration named at the
+one mutation whose field is that declaration. Both are now `refs:` at the sites that obey them, and
+the census returns to exit 0. **Inbound: no lead against this unit.**
+
+### The cold reader (`OPS-8.S8`) — 60 questions, 60 recovered, THREE convictions
+
+| reader | questions | recovered | convictions |
+|---|---|---|---|
+| A — the arena instrument, the portable shim, the deterministic math | 30 | 30 | 2 |
+| B — the manifest comparator, the format detector, the test module | 30 | 30 | 1 |
+
+`GIT COMMANDS RUN: none` and `EXCLUDED PATHS SEEN: none` from both. **All three convictions arrived
+as volunteered caveats rather than as wrong answers** — the readers scored 60 of 60 and then said,
+in their own words, that a sentence did not match the code they had just read. That is now the
+run's dominant finding shape and it is the argument for the interrogation: a score cannot contain it.
+
+Reader A also recovered, unprompted, why the poison arms stopped running at the desk — the dev
+profile configures a release build and the instrument's default resolves on the debug
+configuration — and traced it to the toolchain change that made it so, flagging that last step as
+its own inference.
+
+### The behaviour witness
+
+`malf test insight-canon` on **both** toolchains after every repair: **809 of 809** on
+`linux-clang21-libcxx-release` and **809 of 809** on `linux-gcc16-release`. That figure matters more
+here than in any earlier unit, because this is the only unit whose conversion moved a
+clang-tidy directive: a mis-seated `NOLINTNEXTLINE` compiles and tests identically, so the build is
+the witness that the directives still sit on the statements they guard.
+
 
 
 

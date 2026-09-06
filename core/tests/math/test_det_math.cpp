@@ -1,14 +1,13 @@
-// Unit tests for the deterministic math primitive.
-//
-// Two kinds of assertion:
-//   * REFERENCE VECTOR (exact ==): the bit-exact int64 outputs of det_log2_fixed
-//     for a fixed input set. These are the cross-machine determinism pin — if any
-//     compiler/architecture computes a different bit, `==` fails. (The same fixture
-//     is also compiled across the gcc×clang×-O×-ffp-contract matrix.)
-//   * ACCURACY (near): the fixed-point result is close to libm, proving the
-//     primitive is not just deterministic but correct. libm is used ONLY here in
-//     the test oracle, never in the primitive.
 
+// invariant: two kinds of assertion, and the difference is the point.
+// invariant: a REFERENCE VECTOR asserted with exact equality — the bit-exact outputs for a fixed
+// input set, which is the cross-machine determinism pin.
+// invariant: if any compiler or architecture computes a different bit, the equality FAILS, and the
+// same fixture is compiled across the compiler and optimization matrix.
+// invariant: an ACCURACY assertion asserted with a tolerance — the fixed-point result is close to
+// the standard library's, proving the primitive is not merely deterministic but CORRECT.
+// invariant: the standard math library is used ONLY here, in the test oracle, and NEVER in the
+// primitive.
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -17,15 +16,14 @@ namespace
 {
 using namespace insight::det;
 
-// ── reference vector: exact, bit-for-bit (the determinism pin) ────────────────
 struct LogRef
 {
     std::uint64_t x;
-    std::int64_t expected_q; // exact round(log2(x) * 2^40)
+    std::int64_t expected_q;
 };
 
-// Generated once from det_log2_fixed and frozen. Any divergence is a determinism
-// regression, not a tolerance issue — assert with ==.
+// invariant: generated ONCE from the primitive and FROZEN — any divergence is a determinism
+// regression and not a tolerance issue, which is why it is asserted with equality.
 constexpr LogRef kLog2Ref[]{
     {1ULL, 0LL},
     {2ULL, 1099511627776LL},
@@ -56,7 +54,8 @@ TEST(DetMath, Log2ReferenceVectorIsBitExact)
 
 TEST(DetMath, PowersOfTwoAreExactIntegers)
 {
-    // log2(2^n) == n exactly: fraction must be zero, no rounding.
+    // invariant: the logarithm of an exact power of two is exact — the fraction must be zero,
+    // with no rounding.
     for (int n = 0; n <= 40; ++n)
         EXPECT_EQ(det_log2_fixed(std::uint64_t{1} << n), static_cast<std::int64_t>(n) * kOne)
             << "log2(2^" << n << ") not exact";
@@ -64,7 +63,9 @@ TEST(DetMath, PowersOfTwoAreExactIntegers)
 
 TEST(DetMath, ZeroAndOneMapToZero)
 {
-    EXPECT_EQ(det_log2_fixed(0ULL), 0LL); // precondition violation, mapped to 0 (total fn)
+    // invariant: a precondition violation is MAPPED to zero rather than trapping, which makes the
+    // function TOTAL.
+    EXPECT_EQ(det_log2_fixed(0ULL), 0LL);
     EXPECT_EQ(det_log2_fixed(1ULL), 0LL);
 }
 
@@ -93,10 +94,10 @@ TEST(DetMath, LnIsAccurateAgainstLibm)
     }
 }
 
-// ── FixedReducer: exact integer reduction → deterministic entropy ─────────────
 TEST(DetMath, ReducerUniformDistributionEntropyIsExact)
 {
-    // 4 equally-likely values (25 each of 100) → entropy = log2(4) = 2.0 exactly.
+    // invariant: four equally-likely values give an entropy of exactly two bits, so the assertion
+    // is an exact one.
     FixedReducer reducer;
     constexpr std::int64_t total{100};
     const std::int64_t log2_total{det_log2_fixed(static_cast<std::uint64_t>(total))};
@@ -119,8 +120,9 @@ TEST(DetMath, ReducerConstantDistributionEntropyIsZero)
 
 TEST(DetMath, ReducerOrderIndependenceIsExact)
 {
-    // Integer accumulation is associative/exact: summing the same terms in two
-    // different orders must give the BIT-IDENTICAL double (the order-independence guarantee).
+    // invariant: integer accumulation is ASSOCIATIVE and EXACT, so summing the same terms in two
+    // different orders must give the BIT-IDENTICAL result.
+    // invariant: that is the order-independence guarantee.
     const std::uint64_t counts[]{7, 3, 50, 1, 39};
     constexpr std::int64_t total{100};
     const std::int64_t l2n{det_log2_fixed(static_cast<std::uint64_t>(total))};
@@ -134,12 +136,12 @@ TEST(DetMath, ReducerOrderIndependenceIsExact)
     EXPECT_DOUBLE_EQ(forward.normalized_bits(total), reverse.normalized_bits(total));
 }
 
-// ── helpers ───────────────────────────────────────────────────────────────────
+// invariant: the rounding division rounds half AWAY from zero, symmetrically on both signs.
 TEST(DetMath, RoundDivRoundsHalfAwayDeterministically)
 {
-    EXPECT_EQ(round_div(static_cast<__int128>(10), 4), 3);   // 2.5 → 3
-    EXPECT_EQ(round_div(static_cast<__int128>(9), 4), 2);    // 2.25 → 2
-    EXPECT_EQ(round_div(static_cast<__int128>(-10), 4), -3); // -2.5 → -3 (symmetric)
+    EXPECT_EQ(round_div(static_cast<__int128>(10), 4), 3);
+    EXPECT_EQ(round_div(static_cast<__int128>(9), 4), 2);
+    EXPECT_EQ(round_div(static_cast<__int128>(-10), 4), -3);
     EXPECT_EQ(round_div(static_cast<__int128>(0), 7), 0);
 }
 

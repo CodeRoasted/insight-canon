@@ -1,26 +1,29 @@
-// test_det_int128_portable.cpp — the MSVC-equivalence ORACLE for the portable 128-bit shim.
-//
-// det_int128.hpp gives det_math native `__int128` on gcc/clang and a pure-C++ struct on MSVC. The
-// determinism contract is that the two are bit-for-bit identical. We cannot run MSVC here, but we
-// CAN compile the portable struct on Linux (forced) and assert it equals native `__int128` over a
-// wide value sweep — which proves the struct's arithmetic, the only thing that differs on MSVC.
-// (The module wiring is proven separately by the 449 tests + det_public_proof golden.)
-//
-// Mechanism: include the header TWICE into two namespaces — once native, once forced-portable —
-// then drive both through the exact operation set det_math uses (shift, mul, add, compare, 128/64
-// div, signed mul/div) and require equality on every sample. Any divergence here is the divergence
-// MSVC would have produced; catching it on Linux is the point.
-//
-// If this TU is built where the platform has no native __int128 at all, it degrades to a tautology
-// (both halves are the portable struct) and still passes — the gcc/clang CI legs are where it
-// bites. NOLINTBEGIN
 
+// invariant: the cross-compiler equivalence ORACLE for the portable 128-bit shim.
+// invariant: the header gives the math layer a native wide integer on the shipped compilers and a
+// pure struct on the other one.
+// invariant: the determinism contract is that the two are BIT-FOR-BIT identical.
+// invariant: that compiler cannot run here, but the portable struct CAN be compiled here forced,
+// and asserted equal to the native type over a wide value sweep.
+// invariant: that proves the struct's ARITHMETIC, which is the only thing that differs on the other
+// platform; the module wiring is proven separately by the suite and the determinism proof.
+// invariant: MECHANISM — the header is included ONCE, with the force macro defined before it, so
+// the portable struct compiles here under its own namespace alias.
+// invariant: the native half is a direct TYPEDEF rather than a second include, and this prose
+// claimed a double include until 2026-09-07.
+// invariant: both are then driven through the EXACT operation set the math layer uses, and equality
+// is required on every sample.
+// invariant: any divergence here is the divergence the other platform would have produced, and
+// catching it here is the point.
+// invariant: on a platform with no native wide integer there is NO CASE TO REGISTER — that branch
+// is empty, and the block at it says so.
+// invariant: this prose claimed the file degrades to a TAUTOLOGY that still passes, which
+// contradicted that block and was false until 2026-09-07.
 #include <gtest/gtest.h>
 
 #include <array>
 #include <cstdint>
 
-// 1) native view (only meaningful where __int128 exists)
 #if defined(__SIZEOF_INT128__) || defined(__GNUC__) || defined(__clang__)
 #define ORACLE_HAS_NATIVE 1
 namespace nat
@@ -30,17 +33,17 @@ using i128 = __int128;
 } // namespace nat
 #endif
 
-// 2) forced-portable view — include the real shim with the force flag, in its own namespace.
 #define INSIGHT_DET_FORCE_PORTABLE_INT128 1
 #include "det/det_int128.hpp"
-namespace port = insight::det::detail; // port::u128 / port::i128 are the struct
+namespace port = insight::det::detail;
 
 namespace
 {
 
 #ifdef ORACLE_HAS_NATIVE
 
-// Helpers: extract the low/high 64-bit words from each representation, to compare bit-for-bit.
+// invariant: the low and high words are extracted from each representation so the comparison is
+// BIT-FOR-BIT rather than value-level.
 constexpr std::uint64_t lo_of(nat::u128 v) noexcept
 {
     return static_cast<std::uint64_t>(v);
@@ -74,8 +77,8 @@ constexpr std::uint64_t hi_of(port::i128 v) noexcept
     return v.bits.hi;
 }
 
-// A spread of u64 operands: edges, powers of two, primes, and the ≥2^63 region (the value-
-// preservation hazard for the signed-widening of weights).
+// invariant: a spread of operands — edges, powers of two, primes, and the region at or above the
+// signed boundary, which is the value-preservation hazard for the signed widening of weights.
 constexpr std::array<std::uint64_t, 18> kSamples{
     0ULL,         1ULL,         2ULL,         3ULL,
     7ULL,         255ULL,       256ULL,       1000ULL,
@@ -93,7 +96,6 @@ constexpr std::array<std::uint64_t, 18> kSamples{
 
 TEST(DetInt128Portable, UnsignedMulShiftMatchesNative)
 {
-    // The det_log2_fixed kernel: (a << w) >> msb, then m*m >> w, plus the ≥ compare.
     for (auto a : kSamples)
         for (unsigned w : {0U, 1U, 40U, 42U, 63U, 64U, 84U})
         {
@@ -113,9 +115,8 @@ TEST(DetInt128Portable, UnsignedCompareMatchesNative)
             EXPECT_EQ(static_cast<nat::u128>(a) >= static_cast<nat::u128>(b),
                       port::u128{a} >= port::u128{b})
                 << a << " >= " << b;
-            // < : metalog's HLL small-range branch. Also drive the MIXED u128 < u64 form (the
-            // threshold is a u64 that widens through the implicit ctor) — the exact call-site
-            // shape.
+            // invariant: the MIXED comparison form is driven too, where the threshold widens
+            // through the implicit constructor — the exact call-site shape.
             EXPECT_EQ(static_cast<nat::u128>(a) < static_cast<nat::u128>(b),
                       port::u128{a} < port::u128{b})
                 << a << " < " << b;
@@ -132,8 +133,8 @@ TEST(DetInt128Portable, UnsignedAddSubMatchesNative)
                              port::u128{a} + port::u128{b});
             EXPECT_SAME_U128(static_cast<nat::u128>(a) - static_cast<nat::u128>(b),
                              port::u128{a} - port::u128{b});
-            // += : metalog's HLL harmonic-sum accumulator. Must equal the +-then-assign native
-            // does.
+            // invariant: the compound-add accumulator must equal the add-then-assign the native
+            // type does.
             nat::u128 nacc{static_cast<nat::u128>(a)};
             port::u128 pacc{a};
             nacc += static_cast<nat::u128>(b);
@@ -144,7 +145,8 @@ TEST(DetInt128Portable, UnsignedAddSubMatchesNative)
 
 TEST(DetInt128Portable, UnsignedDivMatchesNative)
 {
-    // round_div divides a 128-bit numerator (a*2^64 + b) by a positive den.
+    // invariant: the rounding division takes a 128-bit numerator assembled from two words, divided
+    // by a positive denominator.
     for (auto hi : kSamples)
         for (auto lo : {0ULL, 1ULL, 999ULL, ~0ULL})
             for (auto den : {1ULL, 2ULL, 3ULL, 1000ULL, (1ULL << 40), ~0ULL})
@@ -152,14 +154,13 @@ TEST(DetInt128Portable, UnsignedDivMatchesNative)
                 const nat::u128 n{(static_cast<nat::u128>(hi) << 64) | lo};
                 const port::u128 p{lo, hi};
                 EXPECT_SAME_U128(n / static_cast<nat::u128>(den), p / port::u128{den});
-                EXPECT_SAME_U128(n % static_cast<nat::u128>(den),
-                                 p % port::u128{den}); // serializer's %
+                EXPECT_SAME_U128(n % static_cast<nat::u128>(den), p % port::u128{den});
             }
 }
 
 TEST(DetInt128Portable, UnsignedEqualityMatchesNative)
 {
-    // == / != drive the decimal serializer's `while (magnitude != 0)` loop.
+    // invariant: equality and inequality drive the decimal serializer's magnitude loop.
     for (auto a : kSamples)
         for (auto b : kSamples)
         {
@@ -171,7 +172,6 @@ TEST(DetInt128Portable, UnsignedEqualityMatchesNative)
 
 TEST(DetInt128Portable, SignedMulDivAddMatchesNative)
 {
-    // The det_ln / FixedReducer / round_div signed surface: i64×i64, +=, /, unary -, ≥.
     constexpr std::array<std::int64_t, 12> kS{0,
                                               1,
                                               -1,
@@ -202,23 +202,27 @@ TEST(DetInt128Portable, SignedMulDivAddMatchesNative)
 
 TEST(DetInt128Portable, WeightWideningIsValuePreserving)
 {
-    // The exact hazard fixed in add_weighted_log2: a u64 weight ≥ 2^63 must widen POSITIVE.
+    // invariant: the EXACT hazard the weighted accumulator fixed — a weight at or above the
+    // signed boundary must widen POSITIVE.
     for (auto w : kSamples)
     {
         const nat::i128 n{static_cast<nat::i128>(static_cast<nat::u128>(w))};
         const port::i128 p{static_cast<port::i128>(port::u128{w})};
-        EXPECT_SAME_I128(n, p); // weight w must widen identically (positive) on both
+        EXPECT_SAME_I128(n, p);
         EXPECT_FALSE(p.is_negative()) << "weight " << w << " widened negative";
     }
 }
 
 #else
-// NO PLACEHOLDER CASE HERE, deliberately (Founder, 2026-09-04). This #else used to host a single
-// `GTEST_SKIP() << "no native __int128 to compare against"`, whose only job was to leave a visible
-// mark on a platform the suite cannot cover. That is the false-pass shape: a gtest skip exits 0,
-// so the mark was counted as a passing test. A platform without `__int128` simply has no case to
-// register — the #if above IS the statement, and the per-platform difference stays visible in the
-// discovered test count rather than in a green line that asserted nothing.
+// invariant: NO PLACEHOLDER CASE HERE, deliberately.
+// invariant: this branch used to host a single runtime skip whose only job was to leave a visible
+// mark on a platform the suite cannot cover.
+// invariant: that is the FALSE-PASS shape — a harness skip exits 0, so the mark was counted as a
+// passing test.
+// invariant: a platform without the native type simply has NO CASE to register; the compilation
+// branch above IS the statement.
+// invariant: the per-platform difference stays visible in the DISCOVERED TEST COUNT rather than in
+// a green line that asserted nothing.
 #endif
 
 } // namespace

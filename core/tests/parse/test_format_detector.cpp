@@ -1,9 +1,6 @@
-// Unit tests: allow short identifiers and test-specific patterns
-// tests/1_tokenization/test_format_detector.cpp
-//
-// Unit tests for FormatDetector: strategy registration, single-line detection,
-// and batch-weighted detection.
 
+// invariant: unit coverage for the format detector — strategy registration, single-line detection
+// and batch-weighted detection.
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -11,34 +8,24 @@ import insight.canon.test;
 using namespace insight;
 using namespace insight::tokenization;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Fixture
-// ─────────────────────────────────────────────────────────────────────────────
-
 class FormatDetectorTest : public ::testing::Test
 {
   protected:
-    // Degenerate (zero-package) composition: the detector registers its 18 core
-    // REPRESENTATION-format strategies (the GitHub-Actions DIALECT strategy is no longer
-    // a builtin; it arrives via the composition, so GHA detection is now a github-package property,
-    // tested in that suite).
+    // invariant: the DEGENERATE zero-package composition, so the detector registers only its core
+    // REPRESENTATION-format strategies.
+    // invariant: the dialect strategy is no longer a builtin — it arrives through the
+    // composition, so its detection is that package's property and is tested in that suite.
     FormatDetector detector{insight::test_support::degenerate_composition()};
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Strategy registration
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST_F(FormatDetectorTest, HasNineteenBuiltInRepresentationStrategies)
 {
-    // 19 core representation strategies (dialect strategies register into custom_strategies_, not
-    // here). 18 until DN-43.D4 split the leading-RFC-3339 LAYOUT out of Syslog.
+    // invariant: dialect strategies register into the CUSTOM set and not here.
+    // invariant: the count was one lower until the leading-timestamp LAYOUT was split out of the
+    // syslog strategy.
+    // refs: DN-43.D4
     EXPECT_EQ(detector.strategies().size(), 19u);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Single-line detection
-// ─────────────────────────────────────────────────────────────────────────────
 
 TEST_F(FormatDetectorTest, DetectsJSON)
 {
@@ -61,9 +48,10 @@ TEST_F(FormatDetectorTest, DetectsRFC3339Syslog)
     EXPECT_EQ(s->format(), LogFormat::Syslog);
 }
 
-// DN-43.D3 clause 1: the routing, not just the parse. A level word where a hostname belongs is what
-// made SyslogStrategy claim application lines, and a test that only checked the parse could not
-// tell the gate from the grammar.
+// invariant: the ROUTING, not just the parse — a level word where a hostname belongs is what made
+// the syslog strategy claim application lines.
+// invariant: a test that only checked the PARSE could not tell the gate from the grammar.
+// refs: DN-43.D3
 TEST_F(FormatDetectorTest, RoutesRfc3339AppLineToRfc3339TextNotSyslog)
 {
     auto* s{detector.detect("2026-05-31T08:00:01Z INFO request method=GET path=/api/users/1000")};
@@ -73,8 +61,9 @@ TEST_F(FormatDetectorTest, RoutesRfc3339AppLineToRfc3339TextNotSyslog)
         << "; a level word must never be consumed as a syslog hostname";
 }
 
-// The mirror arm: the predicates are DISJOINT, so the same prefix still reaches Syslog when the
-// header is genuinely there. A test that only had the arm above would pass on a bare rejection.
+// invariant: the MIRROR arm — the predicates are DISJOINT, so the same prefix still reaches the
+// syslog strategy when the header is genuinely there.
+// invariant: a test that only had the arm above would pass on a BARE REJECTION.
 TEST_F(FormatDetectorTest, RoutesRfc3339SyslogLineToSyslogNotRfc3339Text)
 {
     auto* s{detector.detect("2026-05-31T08:00:01Z web01 nginx[2451]: GET /api/users 200")};
@@ -99,7 +88,7 @@ TEST_F(FormatDetectorTest, DetectsKV)
 
 TEST_F(FormatDetectorTest, ReturnsRawTextForGarbageLine)
 {
-    // Non-empty unstructured text is templated as raw, never dropped.
+    // invariant: non-empty unstructured text is templated as RAW and never dropped.
     auto* s{detector.detect("???")};
     ASSERT_NE(s, nullptr);
     EXPECT_EQ(s->format(), LogFormat::RawText);
@@ -107,17 +96,14 @@ TEST_F(FormatDetectorTest, ReturnsRawTextForGarbageLine)
 
 TEST_F(FormatDetectorTest, ReturnsNullForEmptyLine)
 {
-    // Empty / whitespace-only lines stay dropped (the raw fallback skips them).
+    // invariant: empty and whitespace-only lines stay DROPPED — the raw fallback skips them.
     EXPECT_EQ(detector.detect(""), nullptr);
     EXPECT_EQ(detector.detect("   "), nullptr);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Batch detection
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST_F(FormatDetectorTest, BatchDetectsJSON)
 {
+    // invariant: the MAJORITY format wins a batch.
     const std::vector<std::string_view> batch = {
         R"({"msg":"one"})",
         R"({"msg":"two"})",
@@ -148,7 +134,6 @@ TEST_F(FormatDetectorTest, BatchReturnsNullForEmpty)
 
 TEST_F(FormatDetectorTest, BatchHandlesMixedFormats)
 {
-    // Majority JSON (2/3) should win.
     const std::vector<std::string_view> batch = {
         R"({"msg":"json line 1"})",
         "Jan 15 08:03:22 host sshd[1]: syslog line",
@@ -159,15 +144,15 @@ TEST_F(FormatDetectorTest, BatchHandlesMixedFormats)
     EXPECT_EQ(s->format(), LogFormat::JSON);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Confidence resolution — near-tie / ambiguous lines
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST_F(FormatDetectorTest, NearTieKVBeatsWeakCLF)
 {
-    // This line triggers CLF's weak confidence (0.60 — bracket timestamp
-    // present) AND KV's high confidence (0.90 — ≥ 3 pairs).
-    // detect() must return KV because 0.90 > 0.60.
+    // invariant: the arm's NAME describes a near-tie that NO LONGER OCCURS.
+    // invariant: the competing candidate gate needs four distinct bytes and this line carries only
+    // one of them, so that strategy is never scored at all.
+    // invariant: the assertion still holds, by candidate EXCLUSION rather than by a score
+    // comparison.
+    // invariant: that strategy's confidence is now BINARY, and its own note records that the
+    // strong-versus-weak distinction was a tie-break.
     constexpr std::string_view line{
         "level=INFO msg=test component=api [15/Jan/2024:10:30:00 flag=on"};
     auto* s{detector.detect(line)};
@@ -177,16 +162,12 @@ TEST_F(FormatDetectorTest, NearTieKVBeatsWeakCLF)
 
 TEST_F(FormatDetectorTest, JSONAlwaysBeatsSyslogOnObjectLine)
 {
-    // A JSON object starting with '{' gives JSON confidence 1.0; BSD syslog
-    // confidence is at most 0.85. JSON must always win for any valid JSON line.
+    // invariant: a JSON object opening with a brace scores the maximum, which the syslog strategy
+    // cannot reach, so JSON must ALWAYS win for any valid JSON line.
     auto* s{detector.detect(R"({"ts":"2024-01-15T10:30:00Z","level":"INFO","msg":"hi"})")};
     ASSERT_NE(s, nullptr);
     EXPECT_EQ(s->format(), LogFormat::JSON);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// New strategy detection
-// ─────────────────────────────────────────────────────────────────────────────
 
 TEST_F(FormatDetectorTest, DetectsLog4j)
 {
@@ -212,9 +193,11 @@ TEST_F(FormatDetectorTest, DetectsBGL)
     EXPECT_EQ(s->format(), LogFormat::BGL);
 }
 
-// The alert-label column routes exactly as `-` does (DN-43.D14). Before it did not: the candidate
-// list was gated on a leading `-`, so 348 460 lines of the pinned BGL corpus were never offered a
-// BGL probe at all and fell to the raw-text fallback with their declared FATAL unread.
+// invariant: the alert-label column routes EXACTLY as the unlabelled form does.
+// invariant: before it did not — the candidate list was gated on a leading dash, so 348 460 lines
+// of the pinned corpus were never offered a probe at all.
+// invariant: they fell to the raw-text fallback with their DECLARED level unread.
+// refs: DN-43.D14
 TEST_F(FormatDetectorTest, DetectsAnAlertLabelledBGLLine)
 {
     auto* s{detector.detect("KERNDTLB 1117838570 2005.06.03 R02-M1-N0 2005-06-03-15.42.50 "
@@ -223,8 +206,8 @@ TEST_F(FormatDetectorTest, DetectsAnAlertLabelledBGLLine)
     EXPECT_EQ(s->format(), LogFormat::BGL);
 }
 
-// The uppercase arm of the candidate gate must not start claiming BSD syslog: the label alphabet
-// has no lowercase, so a month name fails it at the second byte.
+// invariant: the uppercase arm of the candidate gate must NOT start claiming syslog — the label
+// alphabet has no lowercase, so a month name fails it at the SECOND byte.
 TEST_F(FormatDetectorTest, AnUppercaseLeadingSyslogLineStillRoutesToSyslog)
 {
     auto* s{detector.detect("Jun 14 15:16:01 combo sshd[19939]: authentication failure")};
@@ -261,21 +244,24 @@ TEST_F(FormatDetectorTest, DetectsHealthApp)
     EXPECT_EQ(s->format(), LogFormat::HealthApp);
 }
 
-// DN-43.D16 — a HealthApp head with too few separators is DEMOTED, and demotion keeps the bytes.
-//
-// The two arms below assert `content`, not merely the routed format, because an arm that checks
-// only the format is satisfied by the defective code too: before this rule both lines routed to
-// LogFormat::HealthApp and both published an EMPTY `content`. At one separator the second
-// sv_take_until found no delimiter and returned the whole remainder, so the message body was
-// published as `component` — high-cardinality free text on an identity field. At two separators
-// the process-id skip consumed the body outright and it reached NO projection field at all.
-//
-// The seat matters and it is the ruling: the fix moves the separator count into
-// is_health_app_prefix rather than adding a guard to parse(). A parse()-side decline is a
-// DELETION — LogParser::parse_line increments failed_count_ and returns std::unexpected, so the
-// line yields no event of any kind. A confidence() of 0.0 is a DEMOTION — FormatDetector::detect
-// falls back to RawTextStrategy whenever best_score is 0.0, and RawTextStrategy::parse puts the
-// whole line in `content`. Both arms therefore end on the same assertion: every byte survives.
+// invariant: a head with too few separators is DEMOTED, and demotion keeps the BYTES.
+// invariant: the two arms assert CONTENT and not merely the routed format, because an arm checking
+// only the format is satisfied by the defective code too.
+// invariant: before this rule both lines routed to the same format and both published an EMPTY
+// content.
+// invariant: at one separator the second take found no delimiter and returned the whole remainder,
+// so the message body was published as the component.
+// invariant: high-cardinality free text on an identity field.
+// invariant: at two separators the process-id skip consumed the body outright and it reached NO
+// projection field at all.
+// invariant: THE SEAT MATTERS AND IT IS THE RULING — the fix moves the separator count into the
+// PREFIX PREDICATE rather than adding a guard to the parse.
+// invariant: a parse-side decline is a DELETION: the parser increments its failure count and
+// returns an error, so the line yields no event of any kind.
+// invariant: a zero confidence is a DEMOTION: the detector falls back to the raw-text strategy,
+// which puts the whole line in the content.
+// invariant: both arms therefore end on the SAME assertion — every byte survives.
+// refs: DN-43.D16
 TEST_F(FormatDetectorTest, HealthAppHeadWithTooFewSeparatorsDemotesToRawTextKeepingEveryByte)
 {
     ArenaAllocator arena{4096};
