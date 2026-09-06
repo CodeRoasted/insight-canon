@@ -3480,10 +3480,51 @@ Unconverted, by violation count, and the five figures sum exactly to the 10 780 
 of `core/src/` is complete except `strategy`, and the harness tier is complete except
 `benchmarks/src` and `core/test_package`.**
 
-**`core/src/strategy/` (1 275) is the next unit.** It is the largest single remaining source
-surface, it cites three of the suffixed codes whose gate refusal is repaired and confirmed, and at
-1 275 violations it is near `OPS-8.S2`'s ~1 500 bound — so it is **split by file group with two
-readers**, not converted as one unit.
+**`core/src/strategy/` (1 275) is the next unit, and this run SCOPED it without converting it** —
+the scoping is recorded here so the successor starts from analysis rather than from a directory
+listing. 23 files, 1 353 comment lines. Per-file violations: `json.cpp` 316 · the strategy
+interface 222 · `span_unpack.cpp` 123 · `simdjson_scratch.hpp` 121 · `bgl.cpp` 64 · `syslog.cpp`
+and `kv.cpp` 44 · `clf.cpp` 43 · `android_logcat.cpp` 38 · `log4j.cpp` 32 · `rfc5424.cpp` 26 ·
+`rfc3339_text.cpp` 24 · `health_app.cpp` 21 · `systemd_journal.cpp` and `cloudwatch.cpp` 20 ·
+`iis_w3c.cpp` 19 · `spark_hdfs.cpp` 18 · `raw_text.cpp` 17 · `windows_cbs.cpp` 16 ·
+`apache_error.cpp` 15 · `proxifier.cpp` and `hpc.cpp` 11 · `nginx_error.cpp` 10. They sum to 1 275.
+
+**The natural split is by SUBJECT and it is NOT symmetric.** The structured group — the interface,
+`json.cpp`, `span_unpack.cpp`, `simdjson_scratch.hpp` — is 782 violations over 4 files; the 19
+plaintext dialect strategies are 493. **Three findings decide how that split may actually be
+taken, and all three were measured rather than assumed:**
+
+1. **The structured group is a DECLARING unit, the run's second, and it is larger than unit 13's
+   was.** Five distinct codes sit in **declaration positions** across its four files: the compound-key
+   code (in the interface, and again inside `json.cpp`'s first 40 lines, which is a `.cpp`'s
+   declaration window), the two span-unpack codes in the interface, and two more anywhere in
+   `simdjson_scratch.hpp` because a `.hpp` is a declaration position throughout. Each needs
+   `OPS-8.O5`'s per-code test — does a slot already own the rule, or is a block owed — plus a
+   workspace-wide citer list per minted code for the pilot's cascade.
+2. **At least one law block IS owed there, and the ruling that owes it is explicit.** `DN-29.D9`
+   rules, in terms, that the export probe's soundness premise **"MUST be stated at the source
+   site"**, and that the measured cost may not be quoted without its denominator: *"The source site
+   states the workload and the metric, or the number cannot be quoted anywhere."* CCC deletes source
+   prose and its **only** admissible multi-line source form is the law block, so the block is not a
+   preference here — it is the one form that satisfies both doctrines at once, and it would replace
+   an unaddressable paragraph with an addressed, single-declared, citable one. What it must carry is
+   the ruling's own list: the closed-set-compare rule, the dated premise with its explicit *not
+   established by a vendored schema* clause, what breaks if the wire format grows a sibling field,
+   why the post-parse backstop makes a stale premise survivable, and the cost stated with its
+   workload and labelled **accepted on judgment**, never *within budget*.
+3. **The two groups CANNOT be split naively, because the interface is an answer key for the
+   plaintext group.** The interface carries a per-strategy documentation block for each of the 20
+   representation formats — the grammar plus a worked example line — which is exactly what a
+   plaintext unit would be deleting from the `.cpp` files. Converting the 19 `.cpp` files while
+   leaving those blocks intact leaves the cold reader the answers one file away, which is
+   `OPS-8.S2`'s answer-key ground for keeping a unit together. The plaintext group is otherwise the
+   tractable half: **zero** of its 19 files carries a code in a declaration position, checked file
+   by file over each one's first 40 lines, so it owes no block and no cascade.
+
+**So the split that is sound is: the interface travels with whichever group converts first, and if
+that is the structured group then the plaintext group must be read against an already-converted
+interface.** The reader-load bound is satisfied either way; it is the answer-key ground and the
+declaring-site work, not the line count, that shapes this directory.
 
 **`core/api/canon.api.cppm` (1 193) is the next DECLARING unit and it wants a law-number range
 starting at 15.** It declares seven source codes in its own right. Two runs now say the range needed
