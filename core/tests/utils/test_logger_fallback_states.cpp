@@ -1,187 +1,32 @@
-//
-// test_logger_fallback_states.cpp — the accessor fallback is TWO states, and the whole point of
-// the change under test is that they stopped being the same state.
-//
-//   (A) init_logging() never ran. Nothing is registered, the default logger is all there is, and
-//       falling back is CORRECT. This is the unit-test path of every suite in the workspace, and
-//       it MUST stay silent.
-//   (B) init_logging() ran and the NAME is still unregistered. A programming error — the shape
-//       that hid `kPipelineLogger`'s absence for weeks, because the old fallback degraded to the
-//       default logger identically in both states and nothing at runtime could tell them apart.
-//
-// The sibling suite (test_logger_registration.cpp) pins that each declared name RESOLVES to a
-// logger of its own name. That is the presence check. This suite pins what happens when presence
-// FAILS — the two behaviours the fix introduced — and neither suite can see the other's property:
-// registration is about the normal path, this is about the two degraded ones.
-//
-// WHY NO TEST SEAM. State (B) is reachable through the public spdlog registry alone:
-// `spdlog::drop(name)` after a successful `init_logging()` leaves the facade initialised with that
-// one name missing, which is state (B) exactly. Production code therefore grows no hook, no
-// injectable flag, no `#ifdef TESTING` — the test drives the product through the same registry the
-// product uses.
-//
-// THE ANTI-VACUITY DEVICE — read this before trusting any green here. Two of the three arms assert
-// ZERO records, and a zero is exactly what a sink that never attached, a level that filters the
-// record out, or a WARN elided at compile time would also produce. Each such arm therefore ends by
-// emitting a CANARY through `INSIGHT_LOG_WARN` — the same macro, the same
-// `detail::log_message`, the same level, the same logger object the facade's own report would
-// take — and requires it to land. A silent arm can only pass on a probe that has just demonstrated
-// it can hear. (This is why <utils/log_macros.hpp> is included in a test that logs nothing of its
-// own: the canary must ride the product's macro layer, elision threshold included, not spdlog
-// directly.)
-//
-// ── THE PROCESS-GLOBAL ORDERING HAZARD AND HOW IT IS RESOLVED ────────────────────────────────
-// Three pieces of state in logger.cpp are process-global and ONE-WAY: the `std::call_once` flag,
-// the `initialised()` atomic, and the memo of already-reported names. Consequences, and the
-// answer to each:
-//
-// 1. STATE (A) IS UNREACHABLE ONCE ANY TEST HAS INITIALISED. `call_once` cannot be rewound, so a
-//    plain TEST asserting silence would be asserting it about whatever state the tests that
-//    happened to run earlier left behind — green by accident under ctest (gtest_discover_tests
-//    gives one process per case) and meaningless under a direct `./insight_canon_tests` run. It is
-//    therefore run in a CHILD PROCESS, and the death-test style is set to "threadsafe" as a
-//    LOAD-BEARING choice, not hygiene: the default "fast" style forks, and a fork inherits the
-//    parent's already-true `initialised()` and its already-populated registry, so a forked child
-//    is never in state (A). "threadsafe" re-EXECs the binary with a filter naming only this test,
-//    which is the only way to get a genuinely virgin process out of this binary. The child asserts
-//    its own precondition (no module name registered) and reports through its exit code and
-//    stderr, both of which gtest surfaces on failure.
-//
-// 2. THE DROP IS FULLY REVERSED, AND WITH THE SAME OBJECT. `RegistrationHold` saves the
-//    `shared_ptr` before dropping and re-registers THAT pointer, so the restored logger is the
-//    identical object — same sinks, same level, same pattern. spdlog's `register_logger` only
-//    inserts into the map (it is `initialize_logger`, which this does not call, that would re-clone
-//    the registry formatter), so nothing about the logger is reconstructed approximately. State (B)
-//    thus leaves no trace another suite can observe, and this file is order-independent with
-//    respect to every other suite in the binary.
-//
-// 3. THE MEMO IS THE ONE RESIDUE, AND IT IS THE PROPERTY ITSELF. `report_unregistered_once`
-//    remembers a reported name for the life of the process, so a name can be used by exactly ONE
-//    state-(B) observation per process. That is why both names live in a single TEST rather than
-//    one test each: split across two TESTs they would be order-dependent through the memo, and a
-//    correct implementation could red. The same residue makes this file incompatible with
-//    `--gtest_repeat` on the raw binary (the second repetition of the state-(B) test sees a primed
-//    memo and observes zero warnings). That is the design being pinned, not a flake: ctest re-runs
-//    the PROCESS, so `ctest --repeat` is unaffected.
-//
-// RED-FIRST RECIPE (for the run that carries this suite) — in
-// insight-canon/core/src/utils/logger.cpp:
-//   * delete the `report_unregistered_once(name)` call in `logger_for`
-//       → StateB arm reds: "expected EXACTLY 1 … got 0" for BOTH names.
-//   * drop the `if (initialised())` guard so the report fires unconditionally
-//       → StateA arm reds: child exits 2 with SEVEN records, one per name (the memo still caps the
-//         flood — this mutation removes the state split, not the once-ness). That is the
-//         regression that would make every unit test in the workspace noisy.
-//   * point the WARN at a named logger instead of `spdlog::default_logger()`
-//       → StateB arm reds at 0 records for both names: the only logger guaranteed to exist in a
-//         degraded facade is the default one, and a report the probe cannot hear is a report an
-//         operator cannot either.
-//   * replace the per-name memo with a single `static std::once_flag` (report once GLOBALLY)
-//       → StateB arm reds on the SECOND name only: 1 record for insight.pipeline, 0 for
-//         insight.mask — the "once per name" half, which a single-name test cannot see.
-//   * remove the memo entirely (warn on every call)
-//       → StateB arm reds at 8 records per name, naming the flood the design refuses.
-//   * store `initialised()` FIRST in the call_once lambda instead of last
-//       → no arm reds here (the window is intra-lambda); noted so the run is not read as covering
-//       it.
-//   * make `logger_for` return the named logger without consulting the registry (or delete the
-//     WARN's `kAllLoggers` remediation clause)
-//       → StateB content arms red on the missing substring, with the payload printed.
-//
-// RED-FIRST, THE STREAM ARM — and it did not need a mutation, because HEAD WAS THE MUTATION. The
-// arm was authored and measured against the un-repaired tree on 2026-08-22, before DN-53.D3
-// existed: child exit 5, **700 bytes** of canon module records on stdout (7 records × 100 bytes,
-// one per accessor, all through `spdlog::default_logger()`), in an 803-byte window whose only
-// other content was the control line. Control LANDED, sinkless (none), inaudible (none), 0 bytes
-// before the control line — so exactly ONE condition fired, and it was the named property. Once
-// D3 lands, the mutations that must red it again are:
-//   * point `logger_for`'s state-(A) return back at `spdlog::default_logger()`
-//       → exit 5, the 700 bytes above. This is the whole defect class.
-//   * give state (A) a logger with no sinks of its own
-//       → exit 7 — stdout clean, diagnostics deleted.
-//   * set that logger's level to `err` (or `off`)
-//       → exit 8 — stdout clean, diagnostics filtered. 7 and 8 are the two ways to pass a
-//         stdout-purity gate by making canon mute, and neither is the fix.
-//   * construct the capture AFTER the first registry touch (an instrument mutation, not a product
-//     one) → exit 6 on Windows, and STILL EXIT 0 on POSIX — which is the whole reason the ordering
-//     is stated as load-bearing rather than left to look like hygiene.
-//
-// ── THE THIRD PROPERTY: WHERE STATE (A)'s RECORDS GO — WHICH NOTHING GUARDED ──────────────────
-// The arms above are about the FACADE'S SELF-REPORT: whether `logger_for` complains, and in which
-// state. Neither says a word about where a MODULE'S OWN records land, and that is a different
-// object. In state (A) `logger_for` returns `spdlog::default_logger()`, whose sink is STDOUT at
-// info — so an entry point that links canon and never calls `init_logging` puts every
-// INSIGHT_LOG_* record of every canon module into its own standard output. `DN-53.D1` owns the
-// measurement: of six entry points found writing diagnostics into a machine artifact, FOUR were
-// this shape and passed through no parameter at all — insight-metalog's determinism fixture among
-// them, which returned two sha256 for two runs of one binary on one input, the differing bytes
-// being a wall clock inside a log line.
-//
-// The number of tests guarding stdout purity in this workspace before this arm was ZERO. The one
-// that reads like a guard — insight-eidos/sift/tests/crawl/crawl_pair_marker_test.cpp — asserts
-// that a marker reached CAPTURED STDERR in a given order: a delivery/attribution property. It
-// would stay green if canon resumed writing to stdout, and its workaround DEPENDS on this default
-// existing.
-//
-// So the arm below measures the STREAM, not the logger. Bytes on fd 1 are what a downstream parser
-// and a sha256 actually see, and a stream property survives whatever object `logger_for` is later
-// made to return — where an assertion on the returned logger's sink CLASS would be a mirror of the
-// implementation and would have to be rewritten by the change it is supposed to gate.
-//
-// ⚠ THE CAPTURE OPENS BEFORE THE FIRST SPDLOG CALL IN THE PROCESS, AND THAT ORDER IS LOAD-BEARING.
-// It is the same hazard that produced the 2026-08-17 MSVC red on sift-crawl
-// (`MEM:msvc-port-hazards`; crawl_pair_marker_test.cpp's ⚠⚠ block carries the measurement).
-// spdlog's stdout colour sink binds to its target by a DIFFERENT mechanism per platform: POSIX
-// (`ansicolor_stdout_sink`) holds `FILE* stdout` — a binding BY NAME, so a later `dup2` re-points
-// fd 1 underneath it and the sink follows; Windows (`wincolor_stdout_sink`) caches
-// `::GetStdHandle(STD_OUTPUT_HANDLE)` at CONSTRUCTION — a binding BY VALUE, and `_dup2` closes the
-// handle it cached, after which spdlog DISCARDS `WriteFile`'s failure and the record vanishes with
-// no diagnostic on any stream. That failure points the WRONG WAY here: a Windows leg would read
-// "stdout is clean" while the bytes went to the console. The sink in question is spdlog's DEFAULT
-// logger's, constructed lazily on the first registry touch — so `CaptureStdout()` is the child's
-// FIRST statement, ahead of the precondition loop that touches the registry. Opening the capture
-// first fixes both platforms with no `#ifdef` and no OS code (`_dup2` also updates `SetStdHandle`,
-// measured on MSVC 14.52 by the sift arm).
-//
-// ⚠ THE ANTI-VACUITY CONTROL IS A WRITE THROUGH THE EXACT WRITER UNDER TEST. A byte-empty tail is
-// also what a detached capture, a compile-time-elided macro layer, or a default logger not bound
-// to stdout on this platform would produce — `MEM:synthetic-gate-vacuity`: *a test whose subject
-// is a MEDIUM witnesses each WRITER separately*. A `std::cout` canary would prove the fd is
-// captured and prove NOTHING about a spdlog sink on Windows, which is the leg that fails. So the
-// child first emits one record through `spdlog::default_logger()` — the very object state (A)
-// resolves to — via INSIGHT_LOG_WARN, the product's own macro layer with its elision threshold,
-// and REQUIRES those bytes in the capture; everything measured is the tail AFTER that line. The
-// control keeps its meaning once DN-53.D3 lands: the host's default logger still writes to stdout,
-// so the arm becomes exactly the discriminator the fix is about — the host's default logger is
-// audible on stdout in this same process, and canon's accessors are not.
-//
-// ⚠ AND AN OVER-REACH CONTROL, because silence is the cheapest way to pass a stdout-purity gate.
-// A `logger_for` returning a sinkless logger, or one whose level filtered WARN out, would write
-// zero bytes to stdout and satisfy the property while making canon mute in every un-initialised
-// process — `MEM:synthetic-gate-vacuity` item 17, the fail-safe-is-vacuous direction: ask what a
-// do-nothing mechanism scores. So each returned logger must OWN at least one sink of its own and
-// must ADMIT the WARN, heard by a capture sink attached for the observation and removed after it,
-// with the logger's LEVEL deliberately left untouched — a level that filters is precisely what
-// this must catch. Residual, stated rather than hidden: a sink pointed at some third stream would
-// pass both controls. Nothing proposes that, and the stream this arm owns is stdout.
-//
-// Determinism: no RNG, no threads, no wall clock, no timestamps in any assertion — the capture
-// sink stores raw payloads, never formatted lines. Record ORDER is never asserted (the two names
-// are interleaved on purpose and either may land first); only per-name counts and payload content
-// are. The capture sink is null-mutex because the suite is single-threaded by construction. The
-// state-(A) children are re-execs of this same binary, so they are as deterministic as the parent.
-// The stream arm asserts a COUNT OF BYTES (zero) and never their content: the formatted lines it
-// would otherwise compare carry a wall-clock timestamp, and the only place captured bytes appear
-// is a failure message.
 
-#include <gtest/gtest.h> // textual std-pulling include FIRST (precedes imports)
+// invariant: the accessor fallback is TWO states, and the change under test is that they stopped
+// being the same state.
+// invariant: state A is that init_logging never ran — nothing is registered, falling back is
+// CORRECT, and it is the unit-test path of every suite in the workspace, so it MUST stay silent.
+// invariant: state B is that init_logging ran and the NAME is unregistered — a programming error,
+// and the shape that hid one name for weeks because both states degraded identically.
+// invariant: the sibling registration suite pins that each declared name RESOLVES; this pins what
+// happens when presence FAILS, and neither suite can see the other's property.
+// invariant: NO test seam is needed — dropping a name from the public registry after a successful
+// init IS state B, so production code grows no hook, no flag and no test-only branch.
+// invariant: two of the three arms assert ZERO records, which is also what a detached sink, a
+// filtering level or an elided macro would produce.
+// invariant: so each such arm ends by emitting a CANARY through the product's own macro layer, the
+// same level and the same logger object, and requires it to land.
+// invariant: a silent arm can only pass on a probe that has just demonstrated it can hear.
+// refs: MEM:synthetic-gate-vacuity-vs-judgment
+// invariant: three pieces of state in the implementation are process-global and ONE-WAY — the
+// call-once flag, the initialised atomic, and the memo of already-reported names.
+// invariant: each of the three is answered at the entity that answers it, below.
+// refs: DN-53.D1, DN-53.D3, DN-53.D6
+#include <gtest/gtest.h>
 #include <spdlog/common.h>
 #include <spdlog/details/log_msg.h>
 #include <spdlog/details/null_mutex.h>
 #include <spdlog/logger.h>
 #include <spdlog/sinks/base_sink.h>
-#include <spdlog/spdlog.h> // get / drop / register_logger / default_logger — the PUBLIC registry
-#include <utils/log_macros.hpp> // the canary rides the product's macro layer, elision included
+#include <spdlog/spdlog.h>
+#include <utils/log_macros.hpp>
 
 import insight.canon.test;
 
@@ -189,25 +34,21 @@ namespace
 {
 using namespace insight::logging;
 
-// How many times each accessor is called inside one observation. Any value above one distinguishes
-// "once per offending name" from "once per call"; eight makes a per-call flood unmistakable in the
-// failure message.
+// invariant: any value above one distinguishes once-per-offending-NAME from once-per-CALL, and
+// eight makes a per-call flood unmistakable in the failure message.
 constexpr int kCallsPerAccessor{8};
 
-// The child's verdict channel. Exit codes are named because the parent's failure text quotes the
-// number and a bare integer there is unreadable.
+// invariant: the child's verdict channel — the codes are NAMED because the parent's failure text
+// quotes the number, and a bare integer there is unreadable.
 constexpr int kChildSilent{0};
 constexpr int kChildSpoke{2};
 constexpr int kChildPreconditionViolated{3};
 constexpr int kChildProbeDeaf{4};
 
-// Matched against the child's stderr by the death-test matcher (a regex — kept alphanumeric and
-// hyphenated so it carries no metacharacters).
 constexpr std::string_view kStateASilentMarker{"STATE-A-FACADE-SILENT-OK"};
 
-// ── The state-(A) STREAM arm's own channel ────────────────────────────────────────────────────
-// Codes are disjoint from the self-report arm's above, so a parent failure names ONE property
-// rather than "one of the state-(A) tests".
+// invariant: the stream arm's codes are DISJOINT from the self-report arm's, so a parent failure
+// names ONE property rather than one-of-the-state-A-tests.
 constexpr int kChildStdoutClean{0};
 constexpr int kChildWroteToStdout{5};
 constexpr int kChildStdoutProbeDeaf{6};
@@ -216,30 +57,26 @@ constexpr int kChildRecordInaudible{8};
 
 constexpr std::string_view kStateAStdoutCleanMarker{"STATE-A-STDOUT-CLEAN-OK"};
 
-// The control write's token — emitted through `spdlog::default_logger()`, the exact writer state
-// (A) falls back to. Its bytes must be in the capture or nothing measured below is a measurement.
+// invariant: the control write goes through the exact writer state A falls back to, and its bytes
+// must be in the capture or nothing measured below is a measurement.
 constexpr std::string_view kHostDefaultToken{"kleio-p1-host-default-canary"};
 
-// The measured writes' token. Carries the accessor's index, so a line that leaks onto stdout names
-// which accessor produced it instead of only proving that one did.
+// invariant: the measured token carries the accessor's INDEX, so a line that leaks onto the stream
+// names which accessor produced it instead of only proving that one did.
 constexpr std::string_view kModuleRecordToken{"kleio-p1-module-record"};
 
-// The canary's token. Unique enough that it can never be confused with a facade record.
 constexpr std::string_view kCanaryToken{"kleio-probe-canary"};
 
-// Substrings the state-(B) warning must carry. `kAllLoggers` is an IDENTIFIER, not prose: the
-// remediation clause can be reworded freely, but the symbol it points at cannot change without the
-// symbol itself being renamed — the same reason the n-gram cap suite anchors on `max_ngram_keys`.
-// "NOT REGISTERED" is the state claim an operator greps for; it is the one phrase that must survive
-// a rewrite, because a warning that does not say WHICH of the two fallback states fired is the
-// very ambiguity this change removed.
+// invariant: the remediation anchor is an IDENTIFIER and not prose — the clause can be reworded
+// freely, but the symbol cannot change without the symbol itself being renamed.
+// invariant: the state claim is the phrase an operator greps for, and it must survive a rewrite
+// because a warning that does not say WHICH fallback state fired is the ambiguity this removed.
 constexpr std::string_view kStateClaim{"NOT REGISTERED"};
 constexpr std::string_view kRemediationAnchor{"kAllLoggers"};
 
-// The accessors, hand-enumerated exactly as the sibling registration suite enumerates them and for
-// the same reason: iterating `kAllLoggers` to reach them is impossible (there is no name→accessor
-// map in the product), and the independent list is what keeps a dropped name visible. The
-// static_assert is the compile-time half of that suite's runtime anti-drift arm — an eighth logger
+// invariant: the accessors are hand-enumerated for the same reason the sibling suite enumerates
+// them — there is no name-to-accessor map, so an independent list is what keeps a drop visible.
+// invariant: the static assertion is the compile-time half of that anti-drift arm: an eighth logger
 // cannot be added without this file failing to compile.
 constexpr std::array kAccessors{&arena_logger,    &mask_logger,   &pipeline_logger,
                                 &detector_logger, &parser_logger, &strategy_logger,
@@ -248,9 +85,8 @@ static_assert(kAccessors.size() == kAllLoggers.size(),
               "kAllLoggers gained or lost a name: add or remove the matching accessor above, or "
               "this suite silently stops covering it");
 
-// Records what landed, unformatted — the pattern is a presentation choice and pinning it would
-// hold a property this suite has no business holding (and would drag a timestamp into a
-// deterministic assertion).
+// invariant: records are kept UNFORMATTED — the pattern is a presentation choice, and pinning it
+// would hold a property this suite has no business holding and drag a clock into an assertion.
 class CapturingSink final : public spdlog::sinks::base_sink<spdlog::details::null_mutex>
 {
   public:
@@ -294,10 +130,9 @@ class CapturingSink final : public spdlog::sinks::base_sink<spdlog::details::nul
     return out;
 }
 
-// Renders captured stream bytes readable inside a failure message. The stream may legitimately
-// carry ANSI colour escapes and newlines, and pasting either raw into a diagnostic makes the
-// failure unreadable at best and repaints the reader's terminal at worst — a test that is verbose
-// on failure has to stay LEGIBLE on failure.
+// invariant: the stream may legitimately carry escapes and newlines, and pasting either raw into a
+// diagnostic makes the failure unreadable at best and repaints the reader's terminal at worst.
+// invariant: a test that is verbose on failure has to stay LEGIBLE on failure.
 [[nodiscard]] std::string escape_bytes(std::string_view bytes)
 {
     constexpr std::string_view kHexDigits{"0123456789abcdef"};
@@ -327,13 +162,13 @@ class CapturingSink final : public spdlog::sinks::base_sink<spdlog::details::nul
     return out;
 }
 
-// Attaches a capture sink to ONE logger for ONE observation and restores its sink list exactly.
-//
-// Its job is the OVER-REACH control described at the top: it answers "did the record survive the
-// logger at all", which is the question a stdout-purity assertion cannot ask and which a
-// do-nothing implementation would otherwise pass. The logger's LEVEL is deliberately never
-// touched — a level that filters the record out is one of the two do-nothing shapes this exists to
-// catch, and raising it would hide exactly that.
+// post: a capture sink attached to ONE logger for ONE observation, with its sink list restored
+// exactly.
+// invariant: it is the OVER-REACH control — it answers whether the record survived the logger at
+// all, which a stream-purity assertion cannot ask and a do-nothing implementation would pass.
+// invariant: the logger's LEVEL is deliberately never touched, because a level that filters the
+// record out is one of the two do-nothing shapes this exists to catch.
+// refs: MEM:synthetic-gate-vacuity-vs-judgment
 class AttachedProbe
 {
   public:
@@ -354,8 +189,8 @@ class AttachedProbe
     AttachedProbe(AttachedProbe&&) = delete;
     AttachedProbe& operator=(AttachedProbe&&) = delete;
 
-    // Sinks the logger owned BEFORE this probe attached. Zero means the record reaches nothing but
-    // the probe — audible to this test and lost in production.
+    // invariant: ZERO own sinks means the record reaches nothing but the probe — audible to this
+    // test and lost in production.
     [[nodiscard]] std::size_t own_sink_count() const noexcept
     {
         return saved_sinks_.size();
@@ -382,16 +217,14 @@ class AttachedProbe
     return out;
 }
 
-// Listens on `spdlog::default_logger()` — the object BOTH degraded states resolve to, and the one
-// `report_unregistered_once` writes its warning on. Never on a named logger: in state (A) no named
-// logger exists at all, and in state (B) the name in question has just been dropped, so a probe
-// attached by name would hear nothing in either case and every arm here would be vacuous.
-//
-// Constructed inside each test AFTER that test's `init_logging()` call, never in a fixture SetUp:
-// `init_logging` ends with `spdlog::set_level`, which walks the registry — the default logger
-// included — and would silently undo a level set beforehand. Whether it actually runs (first call
-// in the process) or no-ops (a sibling suite got there first) would then decide the probe's level,
-// making the observation depend on test order. Constructing after removes that entirely.
+// invariant: the probe listens on the DEFAULT logger, the object BOTH degraded states resolve to
+// and the one the report is written on.
+// invariant: never on a named logger — in state A no named logger exists and in state B the name
+// has just been dropped, so a probe attached by name would make every arm vacuous.
+// invariant: constructed INSIDE each test after that test's init call and never in a fixture setup,
+// because init ends by walking the registry and would silently undo a level set before.
+// invariant: whether init actually runs or no-ops would then decide the probe's level, making the
+// observation depend on test ORDER; constructing after removes that entirely.
 class DefaultLoggerProbe
 {
   public:
@@ -403,8 +236,8 @@ class DefaultLoggerProbe
         logger_->set_level(spdlog::level::trace);
     }
 
-    // The default logger is process-wide state shared with every other suite in this binary:
-    // restored exactly, not merely detached.
+    // invariant: the default logger is process-wide state shared with every other suite in this
+    // binary, so it is RESTORED exactly rather than merely detached.
     ~DefaultLoggerProbe()
     {
         logger_->sinks() = saved_sinks_;
@@ -421,8 +254,8 @@ class DefaultLoggerProbe
         return sink_->records();
     }
 
-    // Records whose payload names `name`. The module names are mutually non-containing, so a
-    // record can belong to at most one of them.
+    // invariant: the module names are mutually non-containing, so a record can belong to at most
+    // one of them.
     [[nodiscard]] std::vector<CapturingSink::Record> records_naming(std::string_view name) const
     {
         std::vector<CapturingSink::Record> matched;
@@ -432,9 +265,8 @@ class DefaultLoggerProbe
         return matched;
     }
 
-    // Emits, through the product's own macro layer, a record that MUST be heard. See the
-    // anti-vacuity note at the top: this is what separates "the facade said nothing" from "the
-    // probe could not have heard anything anyway".
+    // invariant: the canary rides the PRODUCT's own macro layer, which is what separates the facade
+    // said nothing from the probe could not have heard anything anyway.
     void emit_canary()
     {
         INSIGHT_LOG_WARN(logger_, "{}", kCanaryToken);
@@ -452,8 +284,12 @@ class DefaultLoggerProbe
     spdlog::level::level_enum saved_level_{spdlog::level::off};
 };
 
-// Unregisters a name and puts the SAME logger object back. See hazard note 2 at the top — the
-// saved `shared_ptr` keeps the logger alive across the drop, so restoration reconstructs nothing.
+// invariant: the drop is FULLY REVERSED and with the SAME object — the shared pointer is saved
+// before dropping and re-registered, so the restored logger has the same sinks and level.
+// invariant: registering only inserts into the map, so nothing about the logger is reconstructed
+// approximately.
+// invariant: state B therefore leaves NO trace another suite can observe, and this file is
+// order-independent with respect to every other suite in the binary.
 class RegistrationHold
 {
   public:
@@ -483,9 +319,9 @@ class RegistrationHold
     std::shared_ptr<spdlog::logger> saved_;
 };
 
-// Sets the death-test style for the duration of one test and restores it. Other suites in this
-// binary (compose, transport) run EXPECT_DEATH under the default style; flipping it globally would
-// silently change how THEY spawn.
+// invariant: the death-test style is set for the duration of ONE test and restored, because other
+// suites in this binary run death tests under the default style.
+// invariant: flipping it globally would silently change how THEY spawn.
 class DeathTestStyleHold
 {
   public:
@@ -517,21 +353,19 @@ void call_every_accessor()
 
 [[noreturn]] void abandon_child(int code, const std::string& reason)
 {
-    // stderr, not stdout: the death-test child's stderr is the pipe the parent reads, and gtest
-    // prints it verbatim under "Actual msg" when the exit code or the marker does not match.
+    // invariant: stderr and not stdout — the child's stderr is the pipe the parent reads, and the
+    // harness prints it verbatim when the exit code or the marker does not match.
     std::cerr << "\n[state-A child] " << reason << "\n";
     std::cerr.flush();
-    // _Exit, not exit: atexit handlers here belong to whatever sanitizer or runtime the build
-    // carries, and one of them turning a correct child into a non-zero exit would read as a
-    // product failure. The child's only job is to report this verdict.
+    // invariant: an immediate exit, not a normal one: the exit handlers here belong to whatever
+    // sanitizer or runtime the build carries, and one of them could turn a correct child non-zero.
+    // invariant: the child's only job is to report this verdict.
     std::_Exit(code);
 }
 
-// The body of the state-(A) observation. Runs in a re-exec'd child (see hazard note 1) where
-// `init_logging()` has never been called by anyone. Deliberately NOT marked [[noreturn]] even
-// though every path exits: the death-test macro emits a "the statement did not exit" abort right
-// after the statement, and telling the compiler that code is unreachable only invites a warning
-// about gtest's own machinery.
+// pre: runs in a re-exec'd child where init_logging has never been called by anyone.
+// invariant: deliberately NOT marked as never-returning even though every path exits — the death
+// macro emits its own abort right after, and marking it invites a warning about that.
 void observe_state_a()
 {
     for (const auto name : kAllLoggers)
@@ -573,21 +407,25 @@ void observe_state_a()
     std::_Exit(kChildSilent);
 }
 
-// The body of the state-(A) STREAM observation. Runs in its OWN re-exec'd child — a second child,
-// not a second assertion inside the first: this arm deliberately EMITS through the accessors,
-// which at HEAD lands seven records on the default logger, and that is precisely what the
-// self-report arm above requires to be empty. One child cannot hold both properties, and merging
-// them would trade a clean attribution for one saved process.
+// pre: runs in its OWN re-exec'd child — a second child, not a second assertion inside the first.
+// invariant: this arm deliberately EMITS through the accessors, which is precisely what the
+// self-report arm requires to be empty, so one child cannot hold both properties.
+// invariant: merging them would trade a clean attribution for one saved process.
 void observe_state_a_stdout()
 {
-    // FIRST STATEMENT, ahead of anything that could touch spdlog. See the ⚠ ordering block at the
-    // top of this file: the registry — and with it the default logger and its stdout sink — must
-    // be constructed INSIDE this capture, or the Windows leg reads a clean stdout while the bytes
-    // go to the console.
+    // pre: the capture MUST be the first statement, ahead of anything that could touch the logging
+    // registry.
+    // invariant: the default logger's stream sink binds to its target by a DIFFERENT mechanism per
+    // platform — by NAME on one, by a handle cached at CONSTRUCTION on the other.
+    // invariant: a redirect after construction is followed on the first and silently discarded on
+    // the second, and that failure points the WRONG WAY: the leg would read a clean stream.
+    // invariant: opening the capture first fixes both platforms with no conditional compilation and
+    // no operating-system code.
+    // refs: MEM:msvc-port-hazards
     testing::internal::CaptureStdout();
 
-    // Evaluated here, ACTED ON after the capture closes: a diagnostic written while fd 1 is
-    // redirected would land in the measurand instead of in the parent's failure text.
+    // invariant: the precondition is EVALUATED here and acted on after the capture closes — a
+    // diagnostic written while the stream is redirected would land in the measurand.
     std::string registered_already;
     for (const auto name : kAllLoggers)
     {
@@ -598,10 +436,10 @@ void observe_state_a_stdout()
         }
     }
 
-    // THE CONTROL WRITE — first bytes in the window, through the exact writer under test.
+    // invariant: the control write is the FIRST bytes in the window, through the exact writer under
+    // test.
     INSIGHT_LOG_WARN(spdlog::default_logger(), "{}", kHostDefaultToken);
 
-    // THE MEASURED WRITES — one record per accessor, through the product's macro layer.
     std::vector<std::size_t> sinkless;
     std::vector<std::size_t> inaudible;
     for (std::size_t index{0}; index < kAccessors.size(); ++index)
@@ -623,15 +461,12 @@ void observe_state_a_stdout()
                                                  : std::string::npos};
     const bool control_complete{control_landed && control_eol != std::string::npos};
 
-    // Bytes before the control LINE — not before the control token, which would count the control
-    // record's own timestamp/level/source-loc header (74 bytes as formatted here) and read as
-    // foreign output. Anything genuinely here belongs to whatever else this process wrote to
-    // stdout; the accessors write strictly after the control, so the measurand is the tail. The
-    // prefix is reported rather than asserted on — attributing a foreign byte to canon would be a
-    // fabricated red — but it is reported in every message, pass or fail, so a green is never read
-    // over a polluted window. Measured 0 here: gtest suppresses its own event forwarding in a
-    // death-test child (`SuppressTestEventsIfInSubprocess`), so the window holds nothing but these
-    // writes.
+    // invariant: the measurand is the tail after the control LINE, not after the control TOKEN —
+    // the token would count the control record's own header and read as foreign output.
+    // invariant: the prefix is REPORTED rather than asserted on, because attributing a foreign byte
+    // to canon would be a fabricated red.
+    // invariant: it is reported in every message, pass or fail, so a green is never read over a
+    // polluted window.
     const std::size_t control_line_start{control_landed ? captured.rfind('\n', control_at)
                                                         : std::string::npos};
     const std::string prefix{(control_landed && control_line_start != std::string::npos)
@@ -709,14 +544,19 @@ void observe_state_a_stdout()
 
 } // namespace
 
-// ── State (B): the name is missing and the facade says so, ONCE, per NAME ─────────────────────
-// The historically offending name is one of the two on purpose: `kPipelineLogger` is the one the
-// impl unit's private copy of the list had lost. The second name is what makes "once per NAME"
-// falsifiable — a global once-flag passes a single-name test and still leaves the second module's
-// absence silent forever.
+// invariant: the historically offending name is one of the two on purpose — it is the one the
+// implementation's private copy of the list had lost.
+// invariant: the SECOND name is what makes once-per-NAME falsifiable: a global once-flag passes a
+// single-name test and still leaves the second module's absence silent forever.
+// invariant: the MEMO is the one residue that survives a test, so a name can be used by exactly ONE
+// state-B observation per process.
+// invariant: that is why both names live in a SINGLE test — split across two they would be
+// order-dependent through the memo, and a CORRECT implementation could red.
+// invariant: the same residue makes this file incompatible with repeating the raw binary, since the
+// second repetition sees a primed memo; the harness re-runs the PROCESS, so it is unaffected.
 TEST(LoggerFallbackStateB, AnUnregisteredNameAfterInitWarnsExactlyOncePerName)
 {
-    init_logging(); // call_once — a no-op if a sibling suite got here first
+    init_logging();
 
     ASSERT_NE(spdlog::get(std::string{kPipelineLogger}), nullptr)
         << "'" << kPipelineLogger
@@ -739,14 +579,14 @@ TEST(LoggerFallbackStateB, AnUnregisteredNameAfterInitWarnsExactlyOncePerName)
         ASSERT_EQ(spdlog::get(std::string{kMaskLogger}), nullptr)
             << "the drop did not unregister '" << kMaskLogger << "'";
 
-        // Interleaved and repeated: the accessors are called from every log site of their module,
-        // which is exactly the flood the once-per-name memo exists to prevent.
+        // invariant: interleaved and repeated, because the accessors are called from every log site
+        // of their module — which is exactly the flood the once-per-name memo exists to prevent.
         for (int call{0}; call < kCallsPerAccessor; ++call)
         {
             (void)pipeline_logger();
             (void)mask_logger();
         }
-    } // registration restored HERE — before any assertion can leave the function
+    }
 
     ASSERT_NE(spdlog::get(std::string{kPipelineLogger}), nullptr)
         << "the hold failed to re-register '" << kPipelineLogger
@@ -757,7 +597,7 @@ TEST(LoggerFallbackStateB, AnUnregisteredNameAfterInitWarnsExactlyOncePerName)
     const std::vector<CapturingSink::Record> pipeline{probe.records_naming(kPipelineLogger)};
     const std::vector<CapturingSink::Record> mask{probe.records_naming(kMaskLogger)};
 
-    // THE LOAD-BEARING COUNT. One per offending name, whatever the call count.
+    // invariant: THE LOAD-BEARING COUNT — one record per offending name, whatever the call count.
     const std::string pipeline_reading{
         pipeline.empty() ? "the missing registration is SILENT again, which is the defect that hid "
                            "this name for weeks"
@@ -778,7 +618,7 @@ TEST(LoggerFallbackStateB, AnUnregisteredNameAfterInitWarnsExactlyOncePerName)
                                << mask.size() << " — " << mask_reading << "\n"
                                << dump(probe.records());
 
-    // Nothing else was said. A generic extra line would be the flood in another costume.
+    // invariant: nothing else was said; a generic extra line would be the flood in another costume.
     EXPECT_EQ(probe.records().size(), 2U)
         << "two unregistered names must produce exactly two records and nothing more\n"
         << dump(probe.records());
@@ -801,9 +641,8 @@ TEST(LoggerFallbackStateB, AnUnregisteredNameAfterInitWarnsExactlyOncePerName)
     }
 }
 
-// ── Normal operation: the facade never reports on itself when every name is present ───────────
-// Not vacuous on its own: the canary requirement below means this arm can only pass on a probe
-// that has just demonstrated it can hear a record of the very level and path the facade would use.
+// invariant: not vacuous on its own — the canary requirement means this arm can only pass on a
+// probe that has just heard a record of the very level and path the facade would use.
 TEST(LoggerFallbackNormalOperation, NoNameIsReportedWhenEveryNameIsRegistered)
 {
     init_logging();
@@ -829,10 +668,16 @@ TEST(LoggerFallbackNormalOperation, NoNameIsReportedWhenEveryNameIsRegistered)
         << dump(observed);
 }
 
-// ── State (A): init_logging() never ran, and the accessors say nothing at all ─────────────────
-// Runs in a re-exec'd child; the suite name ends in "DeathTest" both by gtest convention and to
-// tell a reader at a glance that this one does not observe the parent process. See hazard note 1
-// for why "threadsafe" is the mechanism and not a preference.
+// invariant: state A is UNREACHABLE once any test has initialised, because the call-once flag
+// cannot be rewound — so this runs in a CHILD PROCESS.
+// invariant: a plain test asserting silence would be asserting it about whatever state the tests
+// that happened to run earlier left behind: green by accident, and meaningless run directly.
+// invariant: the threadsafe death-test style is LOAD-BEARING and not hygiene — the default style
+// FORKS, and a fork inherits an already-true initialised flag and a populated registry.
+// invariant: threadsafe re-EXECs the binary filtered to this one test, which is the only way to get
+// a genuinely virgin process out of this binary.
+// invariant: the child asserts its own precondition and reports through its exit code and its
+// standard error, both of which the harness surfaces on failure.
 TEST(LoggerFallbackStateADeathTest, AccessorsStaySilentWhenInitLoggingNeverRan)
 {
     const DeathTestStyleHold style{"threadsafe"};
@@ -847,10 +692,10 @@ TEST(LoggerFallbackStateADeathTest, AccessorsStaySilentWhenInitLoggingNeverRan)
            "own diagnostic is printed above under \"Actual msg\".";
 }
 
-// ── State (A), the STREAM: a module's records never reach stdout ───────────────────────────────
-// The property `DN-53.D6` calls P1, and the one this file did not hold: with init_logging() never
-// called, no canon module logger writes a byte to the process's standard output. A second
-// re-exec'd child, for the reason stated at observe_state_a_stdout().
+// invariant: with init never called, no module logger writes a byte to the process's standard
+// output — the property this file did not previously hold.
+// invariant: a SECOND re-exec'd child, for the reason stated at its observation body.
+// refs: DN-53.D6
 TEST(LoggerFallbackStateADeathTest, NoModuleRecordReachesStdoutWhenInitLoggingNeverRan)
 {
     const DeathTestStyleHold style{"threadsafe"};

@@ -1,59 +1,27 @@
-// Unit tests: allow short identifiers and test-specific patterns
-// tests/utils/test_ingest_normalization_level_flip.cpp
-//
-// THE ONE TO-PASSING FLIP, pinned as a literal (the register half of the same measurement is
-// pinned in tests/utils/test_verdict_register_kind_slot.cpp).
-// The ingest-normalization measurement moved 436 GHA quanta to-FAILING and — on the GitLab
-// control — a single quantum to-PASSING. A to-passing flip is a possible RECALL LOSS: a real
-// failure the change would suppress. It was the only measurement pointing that way, so it was
-// carried as owed rather than assumed benign.
-//
-// RULED BENIGN, and the bytes are the argument (Kleio, 2026-07-29). Measured with the SHIPPED
-// classifier over the 627 traces of marker_corpus_v1 (5 956 626 lines): every to-passing flip is
-// ONE producer shape, nine instances across nine job logs, and the shape is GitLab's own
-// `after_script` warning:
-//
-//   section_end:<epoch>:after_script CR ESC[0K ESC[0;33m
-//   WARNING: after_script failed, but job will continue unaffected: exit code 1 ESC[0;m
-//
-// **The line says, in GitLab's own words, that the failure does not affect the job**, and the
-// producer marks it warning-severity twice over — the literal `WARNING:` token and the ANSI colour
-// `0;33` (yellow). So the RAW reading of `Error` is the wrong one: it fires on `failed` in a line
-// whose whole content is that the failure was inconsequential. Normalization does not suppress a
-// real failure here; it removes a false positive, and the normalized verdict is the one that AGREES
-// with the producer's declared severity.
-//
-// SUPERSEDED ON THE LEVEL CHANNEL, 2026-09-02 (ADR-16.D7, ROADMAP N98). Stage 1's budget is now a
-// TOKEN count (kLeadingScanTokens{8}, time_utils.cpp) and for_each_token treats an escape run as a
-// delimiter, so `WARNING` is token 3 on the RAW bytes as well and the raw line reads Warn with no
-// normalization at all — it read Error only while a 40-byte head let the escape run push the word
-// out of Stage 1's reach. The to-passing flip this file was written to defend therefore has no line
-// left to flip on: stage 1 no longer changes THIS verdict. What stage 1 still changes is the
-// TEMPLATE (tests/tokenizer/test_stable_door_does_not_normalize.cpp, ARM 1) and the byte position
-// of a Stage-2 cue against kKeywordHead{128} (ARM 3 there). The producer-agreement pin below
-// stands — Warn is still the right answer and still the producer's — and the raw side is now pinned
-// at the SAME verdict, the boundary assertion that reds if a byte budget ever returns to Stage 1.
-//
-// ⚠ THE BARE `\r` IS LOAD-BEARING — *a `\r` is CONTENT in CI logs, not a delimiter* — and this row
-// is the cheapest live proof of that rule in the tree. Stage 1
-// removes the escape run and CORRECTLY leaves the `\r`, which keeps `WARNING` a separate token and
-// is why the normalized line reads Warn. Trim that one byte — as a `\r`-stripping read path would —
-// and `after_script` fuses with `WARNING` into `after_scriptWARNING`; the warning token is gone,
-// the classifier falls through to `failed`, and the line reads **Error** again. So a `\r`-folding
-// reader would silently re-manufacture the very false positive this flip removed. Verified by
-// running this row's literal with the `\r` deleted: Warn → Error.
-//
-// ⚠ THE GRAIN DIFFERS FROM THE HEADLINE, and that is not a discrepancy to reconcile away. The
-// measurement counted ONE QUANTUM; this counts NINE LINES. `lines_failed` fires only on UNMATCHED
-// structural nodes, so eight of the nine sit inside matched quanta and never reach the
-// quantum-grain count. Nine lines and one quantum are consistent readings of the same corpus at two
-// grains.
-//
-// WHY A LITERAL AND NOT A CORPUS GATE. Same homing as the 436's follow-up: the property is a
-// single-component claim about one classifier on one known-hazardous input, which is what a fixture
-// is good at — no seam is needed to state it. The corpus was needed to FIND the shape; it is not
-// needed to pin it, and a corpus gate here would buy nothing the literal does not.
 
+// invariant: the ingest-normalization measurement moved 436 quanta to-failing and one quantum
+// to-PASSING on the control dialect.
+// invariant: a to-passing flip is a possible RECALL LOSS — a real failure the change would
+// suppress — so it was carried as owed rather than assumed benign.
+// invariant: RULED BENIGN at the bytes: every to-passing flip is ONE producer shape, nine instances
+// across nine job logs, and it is the dialect's own after-script warning.
+// invariant: the line says in the producer's own words that the failure does not affect the job,
+// and the producer marks it warning-severity twice — the literal token and the colour.
+// invariant: so the RAW reading of Error is the wrong one, and normalization removes a false
+// positive rather than suppressing a real failure.
+// invariant: SUPERSEDED on the level channel — the leading scan's budget is now a TOKEN count and
+// an escape run is a delimiter, so the warning word is in reach on the RAW bytes too.
+// invariant: the flip this file defends therefore has no line left to flip on; what stage 1 still
+// changes is the TEMPLATE and the byte position of a later cue against its own head.
+// invariant: the raw side is now pinned at the SAME verdict, which is the boundary assertion that
+// reds if a byte budget ever returns to stage 1.
+// invariant: THE GRAIN DIFFERS FROM THE HEADLINE and that is not a discrepancy — the measurement
+// counted ONE QUANTUM and this counts NINE LINES.
+// invariant: the failing-line count fires only on UNMATCHED structural nodes, so eight of the nine
+// sit inside matched quanta and never reach the quantum grain.
+// invariant: a literal rather than a corpus gate, because the property is a single-component claim
+// about one classifier on one known-hazardous input.
+// refs: ADR-16.D7, ADR-21
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -63,18 +31,15 @@ using insight::utils::infer_leading_log_level;
 
 namespace
 {
-// The offending line, byte-exact from marker_corpus_v1
-// (gitlab.haskell.org/1Jajen1__ghc/pipeline_105803/job_2092177.log and eight siblings), with the
-// control bytes spelled out. The `\r` after `after_script` is GitLab's own; `\x1b[0K` is the
-// erase-to-end-of-line it emits before a coloured runner message; `\x1b[0;33m` is the yellow that
-// makes this a warning on a terminal.
+// invariant: byte-exact from the marker corpus, with the control bytes spelled out — the carriage
+// return is the producer's own, and the escapes are its erase and its yellow.
 constexpr std::string_view kRawAfterScriptWarning{
     "section_end:1737226867:after_script\r\x1b[0K\x1b[0;33mWARNING: after_script failed, but job "
     "will continue unaffected: exit code 1\x1b[0;m"};
 
-// The same line with ONLY the bare `\r` removed — the byte a `\r`-folding read path would eat. It
-// is a fixture, not a corpus line: no producer emits this, and that is the point. It exists so the
-// clause-6 claim in this file's header is a checked assertion rather than a story.
+// invariant: the same line with ONLY the bare carriage return removed — a FIXTURE, not a corpus
+// line, because no producer emits this, and that is the point.
+// invariant: it exists so the carriage-return clause is a checked assertion rather than a story.
 constexpr std::string_view kRawWithoutCarriageReturn{
     "section_end:1737226867:after_script\x1b[0K\x1b[0;33mWARNING: after_script failed, but job "
     "will continue unaffected: exit code 1\x1b[0;m"};
@@ -91,18 +56,18 @@ TEST(IngestNormalizationLevelFlip, TheAfterScriptWarningReadsWarnOnceNormalized)
     const std::string_view normalized{
         insight::tokenization::normalize(kRawAfterScriptWarning, scratch).bytes()};
 
-    // The RAW line reads Warn too, since the token budget (header): pinned at the SAME verdict and
-    // not merely "not failing", so a classifier that stopped reading levels (Unknown on both byte
-    // strings) still reds here, and so does a byte budget back in Stage 1 (Error: the escape run
-    // pushing WARNING out of a head, the state the flip moved AWAY from).
+    // invariant: the RAW line is pinned at the SAME verdict and not merely at not-failing, so a
+    // classifier that stopped reading levels still reds here.
+    // invariant: so does a byte budget returning to stage 1 — the escape run would push the
+    // warning word out of a head, which is the state the flip moved AWAY from.
     EXPECT_EQ(infer_leading_log_level(kRawAfterScriptWarning), LogLevel::Warn)
         << "raw reads " << to_string(infer_leading_log_level(kRawAfterScriptWarning).value())
         << " — with a token budget the escape runs are delimiters and WARNING is token 3, so the "
            "raw line reads the producer's own severity: Error here is a byte budget back in Stage "
            "1, Unknown a dead classifier";
 
-    // And the NORMALIZED line does not. This is the pin: it agrees with the producer, which marked
-    // the line WARNING in its text and yellow in its colour.
+    // invariant: the NORMALIZED line agrees with the producer, which marked it warning in its text
+    // and yellow in its colour.
     const LogLevel normalized_level{infer_leading_log_level(normalized).value()};
     EXPECT_FALSE(is_failing(normalized_level))
         << "normalized reads " << to_string(normalized_level)
@@ -113,9 +78,14 @@ TEST(IngestNormalizationLevelFlip, TheAfterScriptWarningReadsWarnOnceNormalized)
         << to_string(normalized_level);
 }
 
-// Clause 6, made checkable on the one line that proves it costs something. Delete the bare `\r` —
-// the single byte a `\r`-folding read path eats — and the warning token fuses into its neighbour,
-// the classifier falls through to `failed`, and the false positive comes back.
+// invariant: THE BARE CARRIAGE RETURN IS LOAD-BEARING — it is CONTENT in these logs, not a
+// delimiter, and this row is the cheapest live proof of that rule in the tree.
+// invariant: stage 1 removes the escape run and correctly LEAVES the carriage return, which keeps
+// the warning word a separate token.
+// invariant: delete that one byte and the section name fuses with it, the warning token is gone,
+// the classifier falls through to the failure word, and the line reads Error again.
+// invariant: so a carriage-return-folding reader would silently re-manufacture the very false
+// positive this flip removed.
 TEST(IngestNormalizationLevelFlip, FoldingTheBareCarriageReturnReManufacturesTheFalsePositive)
 {
     std::string scratch;
@@ -128,9 +98,10 @@ TEST(IngestNormalizationLevelFlip, FoldingTheBareCarriageReturnReManufacturesThe
            "WARNING token and this file's clause-6 argument needs re-deriving, not updating";
 }
 
-// Two-sidedness: without this the row above would pass a classifier that had simply stopped
-// reporting failures on normalized content — which is the failure mode that would turn a precision
-// gain into a real recall loss, silently, and is exactly what the to-passing flip was feared to be.
+// invariant: two-sidedness — without this the row above would pass a classifier that had simply
+// stopped reporting failures on normalized content.
+// invariant: that is the failure mode that would turn a precision gain into a real recall loss,
+// silently, and it is exactly what the to-passing flip was feared to be.
 TEST(IngestNormalizationLevelFlip, NormalizationDoesNotDisarmGenuineFailureLines)
 {
     std::string scratch;

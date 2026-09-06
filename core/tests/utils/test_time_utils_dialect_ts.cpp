@@ -1,27 +1,16 @@
-// Unit tests: allow short identifiers and test-specific patterns
-// core/tests/utils/test_time_utils_dialect_ts.cpp
-//
-// Unit tests for the DIALECT timestamp parsers in insight::utils — the eight formats each
-// owned by one strategy (epoch, OTLP unix-nano, HDFS compact, Spark short-year-slash,
-// Apache error, HealthApp, Log4j, Nginx error). The three cross-dialect formats
-// (ISO 8601 / BSD syslog / CLF) and the log-level inference live in test_time_utils.cpp.
-//
-// HOMING (Kleio): pure functions over a string_view. Unit tests in canon, not strategy
-// tests — a strategy test exercises ONE well-formed line and cannot reach the malformed
-// and boundary branches, which is exactly where a timestamp parser silently produces a
-// wrong instant instead of nullopt. Every one of these eight was reachable only through
-// its strategy's happy path before this file.
-//
-// ORACLE (anti-vacuity): expected instants are built from std::chrono::sys_days — the
-// standard library's civil calendar — NOT from the parsers' own utc_mktime helper.
-// Re-using utc_mktime would make SUT == ORACLE and the whole file tautological: a broken
-// leap-year rule would agree with itself. sys_days is an independent implementation.
-//
-// The parsers deliberately gate on a MINIMUM length and read a fixed prefix: they are
-// called on the head of a log line, so trailing content must be ignored, not refused.
-// That looseness is pinned below (…IgnoresTrailingLineContent) because tightening it to
-// an exact-length check would silently break every strategy that relies on it.
 
+// invariant: the eight DIALECT timestamp parsers, each owned by one strategy; the three
+// cross-dialect formats and the level inference live in the sibling file.
+// invariant: HOMED as unit tests rather than strategy tests, because a strategy test exercises ONE
+// well-formed line and cannot reach the malformed and boundary branches.
+// invariant: that is exactly where a timestamp parser silently produces a WRONG instant instead of
+// an absence, and every one of the eight was reachable only through its happy path before.
+// invariant: the ORACLE is the standard library's civil calendar and NOT the parsers' own helper
+// — re-using it would make subject equal oracle and a broken leap rule would agree with itself.
+// invariant: the parsers gate on a MINIMUM length and read a fixed prefix, because they are called
+// on the head of a line, so trailing content must be IGNORED rather than refused.
+// invariant: that looseness is pinned below, because tightening it to an exact-length check would
+// silently break every strategy that relies on it.
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -32,8 +21,6 @@ using namespace insight::utils;
 namespace
 {
 
-/// Seconds-since-epoch of a UTC civil instant, computed by the standard library's civil
-/// calendar. This is the independent oracle — see the ORACLE note above.
 [[nodiscard]] std::int64_t utc_epoch(int year_value, unsigned month_value, unsigned day_value,
                                      int hour_value, int minute_value, int second_value)
 {
@@ -44,14 +31,13 @@ namespace
         .count();
 }
 
-/// Seconds-since-epoch of a parsed Timestamp.
 [[nodiscard]] std::int64_t epoch_of(Timestamp timestamp)
 {
     return static_cast<std::int64_t>(std::chrono::system_clock::to_time_t(timestamp));
 }
 
-/// Assert a parser produced exactly the given UTC civil instant, printing both sides —
-/// a timestamp test that fails with "false is not true" costs a debugger session.
+// invariant: both sides are printed, because a timestamp test that fails with false-is-not-true
+// costs a debugger session.
 #define EXPECT_PARSES_TO(expr, expected_epoch)                                                     \
     do                                                                                             \
     {                                                                                              \
@@ -66,10 +52,6 @@ namespace
 
 } // namespace
 
-// ─────────────────────────────────────────────────────────────────────────────
-// parse_epoch_timestamp — Unix epoch seconds
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST(ParseEpochTimestamp, ValidSecondsParsed)
 {
     EXPECT_PARSES_TO(parse_epoch_timestamp("1117838570"), 1117838570);
@@ -78,10 +60,10 @@ TEST(ParseEpochTimestamp, ValidSecondsParsed)
 
 TEST(ParseEpochTimestamp, MillisecondEpochIsRefusedNotSilentlyReadAsSeconds)
 {
-    // 13 digits is the JavaScript/Java millisecond epoch — the single most common way a
-    // timestamp column arrives wrong. Read as seconds it would place the record in the
-    // year 55000 and silently poison every window boundary derived from it. The 12-digit
-    // cap must refuse it. (12 digits ≈ year 33658, so no real log second is lost.)
+    // invariant: thirteen digits is the MILLISECOND epoch, the commonest way a timestamp column
+    // arrives wrong; read as seconds it would place the record millennia away.
+    // invariant: the twelve-digit cap must refuse it, and twelve digits reaches far enough that no
+    // real log second is lost.
     EXPECT_FALSE(parse_epoch_timestamp("1705312200000").has_value())
         << "a 13-digit millisecond epoch was accepted as SECONDS";
     EXPECT_TRUE(parse_epoch_timestamp("170531220000").has_value())
@@ -95,20 +77,16 @@ TEST(ParseEpochTimestamp, MalformedInputRefused)
     EXPECT_FALSE(parse_epoch_timestamp("abc").has_value());
     EXPECT_FALSE(parse_epoch_timestamp("+1117838570").has_value());
     EXPECT_FALSE(parse_epoch_timestamp(" 1117838570").has_value());
-    // Trailing content: unlike the fixed-layout parsers below, this one consumes the WHOLE
-    // view (from_chars ptr == end), so a partial number is a refusal, not a prefix parse.
+    // invariant: unlike the fixed-layout parsers, this one consumes the WHOLE view, so a partial
+    // number is a REFUSAL rather than a prefix parse.
     EXPECT_FALSE(parse_epoch_timestamp("1117838570.5").has_value());
     EXPECT_FALSE(parse_epoch_timestamp("1117838570x").has_value());
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// parse_unix_nano_timestamp — OTLP timeUnixNano
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST(ParseUnixNanoTimestamp, EpochNanosParsedAsEventTime)
 {
-    // OTLP carries event time in nanoseconds; without it there is no event-time axis and
-    // the ingest yields zero windows (see the OTEL ingestion contract).
+    // invariant: without the nanosecond channel there is no event-time axis and the ingest yields
+    // ZERO windows.
     EXPECT_PARSES_TO(parse_unix_nano_timestamp("1705314600000000000"),
                      utc_epoch(2024, 1, 15, 10, 30, 0));
     EXPECT_PARSES_TO(parse_unix_nano_timestamp("0"), 0);
@@ -116,16 +94,16 @@ TEST(ParseUnixNanoTimestamp, EpochNanosParsedAsEventTime)
 
 TEST(ParseUnixNanoTimestamp, SubSecondNanosTruncateTowardTheSecond)
 {
-    // The integer duration_cast truncates; the OTLP producer emits millisecond-granular
-    // nanos, so window membership stays bit-identical across stdlibs (D-OTEL-3).
+    // invariant: the integer duration cast truncates, and the producer emits millisecond-granular
+    // nanoseconds, so window membership stays bit-identical across standard libraries.
     EXPECT_PARSES_TO(parse_unix_nano_timestamp("1705314600999000000"),
                      utc_epoch(2024, 1, 15, 10, 30, 0));
 }
 
 TEST(ParseUnixNanoTimestamp, OverflowingAndMalformedInputRefused)
 {
-    // 20 digits exceeds int64 nanoseconds (max ≈ 9.2e18) — refused at the LENGTH gate,
-    // before from_chars can overflow.
+    // invariant: twenty digits exceeds the signed range, and it is refused at the LENGTH gate
+    // before the conversion can overflow.
     EXPECT_FALSE(parse_unix_nano_timestamp("12345678901234567890").has_value())
         << "a 20-digit nano value was accepted — the int64 overflow guard is not holding";
     EXPECT_FALSE(parse_unix_nano_timestamp("").has_value());
@@ -133,10 +111,6 @@ TEST(ParseUnixNanoTimestamp, OverflowingAndMalformedInputRefused)
     EXPECT_FALSE(parse_unix_nano_timestamp("1705312200000000000 ").has_value());
     EXPECT_FALSE(parse_unix_nano_timestamp("1.7053122e18").has_value());
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// parse_compact_date_time — HDFS "YYMMDD" + "HHMMSS"
-// ─────────────────────────────────────────────────────────────────────────────
 
 TEST(ParseCompactDateTime, ValidPairParsed)
 {
@@ -146,8 +120,8 @@ TEST(ParseCompactDateTime, ValidPairParsed)
 
 TEST(ParseCompactDateTime, TwoDigitYearPivotsAt70)
 {
-    // The pivot decides a CENTURY. An off-by-one here moves a record 100 years and is
-    // invisible in any happy-path strategy test — both sides of the boundary are pinned.
+    // invariant: the two-digit-year pivot decides a CENTURY — an off-by-one moves a record a
+    // hundred years and is invisible in any happy-path strategy test, so both sides are pinned.
     EXPECT_PARSES_TO(parse_compact_date_time("691231", "235959"),
                      utc_epoch(2069, 12, 31, 23, 59, 59));
     EXPECT_PARSES_TO(parse_compact_date_time("700101", "000000"), utc_epoch(1970, 1, 1, 0, 0, 0));
@@ -155,8 +129,8 @@ TEST(ParseCompactDateTime, TwoDigitYearPivotsAt70)
 
 TEST(ParseCompactDateTime, WidthIsExactOnBothFields)
 {
-    // Unlike the line-prefix parsers, this one receives two ALREADY-SPLIT tokens, so a
-    // wrong width means a wrong split upstream and must refuse rather than guess.
+    // invariant: this parser receives two ALREADY-SPLIT tokens, so a wrong width means a wrong
+    // split upstream and it must refuse rather than guess.
     EXPECT_FALSE(parse_compact_date_time("24015", "103000").has_value());
     EXPECT_FALSE(parse_compact_date_time("2401150", "103000").has_value());
     EXPECT_FALSE(parse_compact_date_time("240115", "10300").has_value());
@@ -165,10 +139,6 @@ TEST(ParseCompactDateTime, WidthIsExactOnBothFields)
     EXPECT_FALSE(parse_compact_date_time("24011a", "103000").has_value());
     EXPECT_FALSE(parse_compact_date_time("240115", "10:000").has_value());
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// parse_short_year_slash — Spark "YY/MM/DD HH:MM:SS"
-// ─────────────────────────────────────────────────────────────────────────────
 
 TEST(ParseShortYearSlash, ValidTimestampParsed)
 {
@@ -185,7 +155,7 @@ TEST(ParseShortYearSlash, TwoDigitYearPivotsAt70)
 
 TEST(ParseShortYearSlash, IgnoresTrailingLineContent)
 {
-    // Called on the head of a Spark log line — the rest of the line must not refuse it.
+    // invariant: called on the HEAD of a line, so the rest of the line must not refuse it.
     EXPECT_PARSES_TO(parse_short_year_slash("24/01/15 10:30:00 INFO Executor: running task"),
                      utc_epoch(2024, 1, 15, 10, 30, 0));
 }
@@ -200,10 +170,6 @@ TEST(ParseShortYearSlash, MalformedSeparatorsAndShortInputRefused)
     EXPECT_FALSE(parse_short_year_slash("2024/01/15 10:30:00").has_value())
         << "a four-digit year shifts every field — this is the nginx format, not Spark's";
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// parse_apache_error_ts — "Sun Dec 04 04:47:44 2005"
-// ─────────────────────────────────────────────────────────────────────────────
 
 TEST(ParseApacheErrorTs, ValidTimestampParsed)
 {
@@ -223,9 +189,8 @@ TEST(ParseApacheErrorTs, MonthNameIsParsedNotPositional)
 
 TEST(ParseApacheErrorTs, WeekdayIsSkippedWithoutValidation)
 {
-    // DECLARED behaviour, pinned so it is a decision rather than an accident: the weekday
-    // is redundant with the date, so it is skipped rather than cross-checked. A log line
-    // with a wrong weekday still yields the right instant.
+    // invariant: DECLARED rather than accidental — the weekday is redundant with the date, so it
+    // is skipped rather than cross-checked and a wrong one still yields the right instant.
     EXPECT_PARSES_TO(parse_apache_error_ts("Xxx Dec 04 04:47:44 2005"),
                      utc_epoch(2005, 12, 4, 4, 47, 44));
 }
@@ -239,10 +204,6 @@ TEST(ParseApacheErrorTs, MalformedInputRefused)
     EXPECT_FALSE(parse_apache_error_ts("Sun Dec 04 04:47:44_2005").has_value());
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// parse_health_app_ts — "YYYYMMDD-HH:MM:SS:mmm" (variable-width hour/second)
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST(ParseHealthAppTs, ValidTimestampParsed)
 {
     EXPECT_PARSES_TO(parse_health_app_ts("20171223-22:15:29:606"),
@@ -251,7 +212,8 @@ TEST(ParseHealthAppTs, ValidTimestampParsed)
 
 TEST(ParseHealthAppTs, SingleDigitHourAndSecondParsed)
 {
-    // The format is genuinely variable-width; a fixed-offset reader would mis-slice these.
+    // invariant: the format is genuinely variable-width, and a fixed-offset reader would mis-slice
+    // these.
     EXPECT_PARSES_TO(parse_health_app_ts("20171223-9:15:29:606"),
                      utc_epoch(2017, 12, 23, 9, 15, 29));
     EXPECT_PARSES_TO(parse_health_app_ts("20171223-22:15:9:606"),
@@ -261,12 +223,12 @@ TEST(ParseHealthAppTs, SingleDigitHourAndSecondParsed)
 
 TEST(ParseHealthAppTs, SingleDigitMinuteParsed)
 {
-    // The MINUTE was read as exactly two digits until DN-43.O5, and that made widening
-    // is_health_app_prefix a half-fix: 187 of the 247 lines of LogHub's HealthApp_2k.log that the
-    // old predicate rejected carry a 1-digit minute, so they would have routed to HealthApp and
-    // still carried NO event time. The old failure was SAFE — std::nullopt, never a wrong instant
-    // — but silent, and it was an inconsistency rather than a decision: the hour and second beside
-    // it were already variable-width.
+    // invariant: the MINUTE was read as exactly two digits, which made widening the claim predicate
+    // a half-fix — 187 of the 247 rejected corpus lines carry a one-digit minute.
+    // invariant: they would have routed to the strategy and still carried NO event time.
+    // invariant: the old failure was SAFE — an absence, never a wrong instant — but silent, and
+    // an inconsistency rather than a decision: the fields beside it were already variable-width.
+    // refs: DN-43.O5
     EXPECT_PARSES_TO(parse_health_app_ts("20171223-22:5:29:606"),
                      utc_epoch(2017, 12, 23, 22, 5, 29));
     EXPECT_PARSES_TO(parse_health_app_ts("20171224-0:0:0:232"), utc_epoch(2017, 12, 24, 0, 0, 0));
@@ -275,9 +237,9 @@ TEST(ParseHealthAppTs, SingleDigitMinuteParsed)
 
 TEST(ParseHealthAppTs, ASignedFieldIsRefusedRatherThanNormalized)
 {
-    // std::from_chars accepts a leading '-' for a signed type, so reading a clock field with a
-    // bare from_chars would take "-5" as minute -5, hand it to utc_mktime and publish a silently
-    // NORMALIZED instant — a WRONG timestamp, not a refused one. Precision-first: refuse.
+    // invariant: the standard conversion accepts a leading sign for a signed type, so reading a
+    // clock field bare would take a negative minute, normalize it and publish a WRONG instant.
+    // invariant: precision-first: refuse.
     EXPECT_FALSE(parse_health_app_ts("20171223--5:15:29:606").has_value()) << "negative hour";
     EXPECT_FALSE(parse_health_app_ts("20171223-22:-5:29:606").has_value()) << "negative minute";
     EXPECT_FALSE(parse_health_app_ts("20171223-22:15:-9:606").has_value()) << "negative second";
@@ -285,8 +247,8 @@ TEST(ParseHealthAppTs, ASignedFieldIsRefusedRatherThanNormalized)
 
 TEST(ParseHealthAppTs, AClockFieldWiderThanTwoDigitsIsRefused)
 {
-    // The accepted language stays equal to what is_health_app_prefix proves (1 or 2 digits per
-    // clock field), so canon's only production caller can hand this function nothing new.
+    // invariant: the accepted language stays EQUAL to what the claim predicate proves, so canon's
+    // only production caller can hand this function nothing new.
     EXPECT_FALSE(parse_health_app_ts("20171223-221:15:29:606").has_value()) << "three-digit hour";
     EXPECT_FALSE(parse_health_app_ts("20171223-22:151:29:606").has_value()) << "three-digit minute";
     EXPECT_FALSE(parse_health_app_ts("20171223-22:15:299:606").has_value()) << "three-digit second";
@@ -294,9 +256,10 @@ TEST(ParseHealthAppTs, AClockFieldWiderThanTwoDigitsIsRefused)
 
 TEST(ParseHealthAppTs, MillisecondsAreConsumedButNotRetained)
 {
-    // The trailing ":mmm" is required as a TERMINATOR for the variable-width second, yet
-    // its value is discarded — Timestamp resolution here is whole seconds. Two lines one
-    // millisecond apart are the same instant, which is what window membership sees.
+    // invariant: the trailing millisecond field is required as a TERMINATOR for the variable-width
+    // second, yet its VALUE is discarded — resolution here is whole seconds.
+    // invariant: two lines one millisecond apart are the same instant, which is what window
+    // membership sees.
     const auto early{parse_health_app_ts("20171223-22:15:29:001")};
     const auto late{parse_health_app_ts("20171223-22:15:29:999")};
     ASSERT_TRUE(early.has_value() && late.has_value());
@@ -306,8 +269,8 @@ TEST(ParseHealthAppTs, MillisecondsAreConsumedButNotRetained)
 
 TEST(ParseHealthAppTs, MissingMillisecondTerminatorRefused)
 {
-    // Without the terminating ':' the second field has no end, so the parser refuses
-    // rather than guessing where it stops.
+    // invariant: without the terminating separator the second field has no end, so the parser
+    // refuses rather than guessing where it stops.
     EXPECT_FALSE(parse_health_app_ts("20171223-22:15:29").has_value());
     EXPECT_FALSE(parse_health_app_ts("20171223-22:15:29.606").has_value()) << "dot, not colon";
 }
@@ -322,14 +285,10 @@ TEST(ParseHealthAppTs, MalformedInputRefused)
     EXPECT_FALSE(parse_health_app_ts("20171223-22:1x:29:606").has_value());
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// parse_log4j_timestamp — "2024-01-15 10:30:00,123" / ".123"
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST(ParseLog4jTimestamp, CommaAndDotSubSecondSeparatorsAreEquivalent)
 {
-    // Log4j emits ',' with the default layout and '.' under a locale-driven one. Both are
-    // the same instant; treating one as malformed would drop half a dialect's lines.
+    // invariant: this dialect emits one sub-second separator under its default layout and the other
+    // under a locale-driven one; both are the same instant, and refusing one drops half a dialect.
     const auto expected{utc_epoch(2024, 1, 15, 10, 30, 0)};
     EXPECT_PARSES_TO(parse_log4j_timestamp("2024-01-15 10:30:00,123"), expected);
     EXPECT_PARSES_TO(parse_log4j_timestamp("2024-01-15 10:30:00.123"), expected);
@@ -351,9 +310,10 @@ TEST(ParseLog4jTimestamp, IgnoresTrailingLineContent)
 
 TEST(ParseLog4jTimestamp, MissingSubSecondSeparatorRefused)
 {
-    // The separator at index 19 is the discriminator against plain ISO-with-space, which
-    // parse_iso8601 owns. Accepting a bare "2024-01-15 10:30:00" here would let two
-    // parsers claim the same line and make dialect detection order-dependent.
+    // invariant: the separator at the fixed index is the DISCRIMINATOR against plain
+    // ISO-with-space, which another parser owns.
+    // invariant: accepting a bare one here would let two parsers claim the same line and make
+    // dialect detection order-dependent.
     EXPECT_FALSE(parse_log4j_timestamp("2024-01-15 10:30:00").has_value());
     EXPECT_FALSE(parse_log4j_timestamp("2024-01-15 10:30:00 123").has_value());
     EXPECT_FALSE(parse_log4j_timestamp("2024-01-15T10:30:00,123").has_value()) << "T, not space";
@@ -367,10 +327,6 @@ TEST(ParseLog4jTimestamp, MalformedInputRefused)
     EXPECT_FALSE(parse_log4j_timestamp("2024-01-15 10-30-00,123").has_value());
     EXPECT_FALSE(parse_log4j_timestamp("20x4-01-15 10:30:00,123").has_value());
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// parse_nginx_error_ts — "YYYY/MM/DD HH:MM:SS"
-// ─────────────────────────────────────────────────────────────────────────────
 
 TEST(ParseNginxErrorTs, ValidTimestampParsed)
 {
@@ -396,15 +352,10 @@ TEST(ParseNginxErrorTs, MalformedInputRefused)
     EXPECT_FALSE(parse_nginx_error_ts("2024/01/15 10:30-00").has_value());
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Cross-parser: leap-day and year-boundary arithmetic
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST(DialectTimestampCalendar, LeapDayAndYearBoundariesAgreeWithTheCivilCalendar)
 {
-    // utc_mktime is hand-rolled (no timegm, for cross-stdlib determinism). These pin its
-    // leap-year rule against std::chrono for the three cases the naive rule gets wrong:
-    // 2024 (÷4, leap), 2000 (÷400, leap), 2100 (÷100 not ÷400, NOT leap).
+    // invariant: the civil-calendar helper is hand-rolled for cross-stdlib determinism, so its
+    // leap-year rule is pinned against the standard library on the three cases naivety gets wrong.
     EXPECT_PARSES_TO(parse_nginx_error_ts("2024/02/29 12:00:00"), utc_epoch(2024, 2, 29, 12, 0, 0));
     EXPECT_PARSES_TO(parse_nginx_error_ts("2000/02/29 12:00:00"), utc_epoch(2000, 2, 29, 12, 0, 0));
     EXPECT_PARSES_TO(parse_nginx_error_ts("2100/03/01 00:00:00"), utc_epoch(2100, 3, 1, 0, 0, 0));

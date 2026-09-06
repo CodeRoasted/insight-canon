@@ -5825,6 +5825,144 @@ than the question.
 `linux-clang21-libcxx-release` and **809 of 809** on `linux-gcc16-release`, equal to the pre-unit
 baseline. The witness covers this unit AND the unit-22 repair, which rode the same tree.
 
+## Unit 25 — `core/tests/utils/` (9 files, 1 048 comment lines, 1 041 would-be violations) — the first test-tier unit, and the `MEM:` address form turns out to have no gate
+
+The largest test directory in the repo, and the run's first test-tier unit. Baseline split: bare
+941 · spacer 57 · ruler 28 · `///` 7 · trailing 7 · tag-mid-line 1. After: **607 comment lines, 0
+would-be violations** —
+`pre` 3 · `post` 4 · `invariant` 293 · `note` 1 · `refs` 36 · 263 continuations · 7 tool forms.
+Repo-level delta **4 682 → 3 641 = exactly 1 041**.
+
+### The stripper cross-check holds VACUOUSLY here, and saying so is the point
+
+Removed **1 041**, kept 7 — and all 7 are namespace closers. This unit carries **no suppression of
+any kind**, so there is no kept violation class to subtract and the identity degenerates to
+`removed == violations`. That is exactly the shape `OPS-8.S5` warns about: *"a cross-check that can
+only pass is not a cross-check."* It is recorded as vacuous rather than quoted as a pass. What
+carries the information in this unit is the repo-level delta, which is an independent count.
+
+### What a TEST-tier claim is, decided once for the whole remaining tier
+
+A test file's comments are the only place the PROPERTY under test is stated in words; the assertion
+states the code and the test name states the subject. So the claims that survive are the four a
+reader cannot get from either: **what this test would catch that no other test catches**, **why a
+fixture value is exactly that value**, **what a deliberately-negative row rules out**, and **where a
+number came from**. Everything that restates the assertion is a mirror and goes.
+
+Two shapes recur across these nine files and both are kept in full, because they are the reason the
+suites are worth anything:
+
+* **Anti-vacuity devices.** Several arms assert ZERO of something, and a zero is also what a
+  detached probe, a filtering level or an elided macro produces. Each such arm carries a control
+  that must fire, and the claim that says so is what stops a later reader deleting the control as
+  redundant.
+* **Two-sidedness.** A demotion row is paired with a row asserting the same predicate still fires,
+  because without it the suite would pass a classifier that had simply stopped classifying —
+  green-BLIND rather than green.
+
+### The RED-FIRST recipe: split per arm rather than re-homed as a document
+
+`test_logger_fallback_states.cpp` carried a 170-line header whose largest section is a **red-first
+recipe** — seven named mutations of the implementation, each with the exact failure it produces
+(*"delete the report call → the state-B arm reds at 0 records for BOTH names"*; *"replace the
+per-name memo with a single global flag → reds on the SECOND name only"*). That is measurement
+evidence, not a mirror, and deleting it loses something real.
+
+It is NOT re-homed to a document. Each mutation is a falsifiability claim about ONE arm, so it is
+stated as an `invariant:` **at that arm**, where the thing it falsifies lives. A document would have
+put the evidence one indirection away from the assertion it is evidence for, and the next edit to
+the arm would not meet it. The same treatment split the header's three **process-global ordering
+hazards** onto the three entities that answer them — the call-once flag onto the state-A arm, the
+registry restoration onto the hold that performs it, and the per-name memo onto the state-B arm that
+the memo constrains.
+
+### The `MEM:` address form has NO GATE, and there are live citations of a slug that names no memory
+
+The outbound census reported `MEM:synthetic-gate-vacuity` lost from `test_logger_fallback_states.cpp`.
+Checked at the memory store: the file is **`synthetic-gate-vacuity-vs-judgment.md`**, so the short
+form names nothing. The `refs:` now carries the full slug and the short one is gone from this unit.
+
+**The general fact is worse than the one site.** A workspace sweep finds **13** live occurrences of
+the short form against 140 of the correct one — and `registry_grammar_lint` is GREEN over all 13.
+Reading the instrument's source, every `MEM:` in it is inside its OWN commentary; there is no leg
+that resolves a memory slug at all. So `MEM:slug` is an admissible `refs:` form under `LEXICON.md`
+that **nothing checks**: a renamed or evicted memory leaves dangling citations in source with no red
+anywhere, which is precisely the failure the `F-SRC-` rename tripwire exists to prevent for files.
+**Addressee: Daidalos** (the address grammar) — this is a gate gap, not a repair this unit can make.
+
+### The address census, both legs
+
+**Outbound: 5 LOST, every one opened separately.** `SRC-D-OUT-1b` (the level-altitude sibling of the
+glyph rule), `ADR-9.D3` (the truncation warning whose loss the registration suite exists to stop),
+`SRC-D-MSK-4` and `SRC-D-OUT-1`, and the memory slug above. Four are restorations and the fifth is a
+form repair. Three added: `ADR-20.D5`, `ADR-21` and `SRC-D-OUT-4b`, each a rule the prose named in
+words.
+
+**Inbound:** the citing sites rest on TEST NAMES and on the shipped predicates, not on this
+directory's prose — which is what `ADR-26.D6` predicts for the test tier, since a test's name is its
+claim and survives the conversion untouched.
+
+### The cold reader (`OPS-8.S8`) — 62 questions, 62 recovered, ZERO convictions
+
+Reader A took the four parsing and classification suites; reader B the five logger, budget and
+register suites. `GIT COMMANDS RUN: none` from both. One disclosure, reader B: an excluded filename
+appeared in an `ls` of the ADR directory; the file was never opened.
+
+| reader | questions | recovered | wrong |
+|---|---|---|---|
+| A — lexicon, time utils, dialect timestamps, event-time provenance | 30 | 30 | 0 |
+| B — logger fallback and registration, scan budget, kind slot, level flip | 32 | 32 | 0 |
+
+**Second unit in a row with no conviction, and the pattern is worth stating rather than celebrated.**
+Units 22, 24, 20, 21 and 19 each produced convictions; units 23 and 25 did not. The difference is
+not obviously the converter: the units that convict carry prose making **external measurements about
+the world** — a phantom rate, a byte budget, two formats being "the same" — and that is exactly the
+class `OPS-8.O3` says goes stale. The units that do not convict carry prose making **arguments about
+the code in front of it** — why this test exists, what a control catches, what a negative row rules
+out — and an argument about the adjacent code does not rot on someone else's change. **A conversion
+that carries fewer external facts has fewer chances to carry a false one.** That is a property of
+the SOURCE MATERIAL, and reading a zero as a verdict on the conversion would be the mistake.
+
+Both readers went past their questions in the way that has now produced a finding in four
+consecutive units:
+
+* **Reader B supplied a mechanism I had smoothed away.** Asked why every diagnostic row carries a
+  failure cue in its BODY, it did not stop at "so the stages disagree" — it named the reason the
+  neutral row fails: a level word like `WARNING` is ITSELF a stage-2 warning cue, so with a benign
+  body both stages answer the same and the verdict cannot name which one produced it.
+* **Reader A flagged an argument the tree does not carry**, and that one is a finding (below).
+
+### FINDING — canon takes OPPOSITE dispositions on a malformed date field, and only one side carries its argument
+
+Reader A answered the leap-day question correctly and then added, at medium confidence, that *"the
+code does not state a further rationale for preferring normalisation to refusal."* Checked at the
+artifacts, and the observation opens onto something sharper than a missing sentence:
+
+* **`parse_iso8601` NORMALISES.** `utc_mktime` range-guards the month, the year and the day-of-month
+  1..31, then computes a day-of-year arithmetically — so `2023-02-29` silently becomes
+  `2023-03-01`, a DIFFERENT INSTANT, published with no signal. The suite pins that behaviour and
+  gives no reason for it; the carried prose gave none either.
+* **`parse_health_app_ts` REFUSES**, and its reason is exactly the hazard the other side accepts:
+  the standard conversion takes a leading sign, so reading a clock field bare would hand
+  `utc_mktime` a negative minute, which it would normalise into a **wrong instant** rather than an
+  absence. *Precision-first: refuse.*
+
+So two parsers in one file take opposite dispositions on one hazard — a malformed date component —
+and the argument exists on only one of them. A window boundary derived from a normalised
+`2023-02-29` is off by a day with nothing anywhere saying so, in a product whose contract is
+precision-first. **This is not a comment repair**: the disposition is a product question, and if
+normalisation is right it needs its argument written down, while if refusal is right it is a code
+change with a corpus cost. **Addressee: the `insight-canon` utils lane, and Eqya for the disposition.**
+
+### The behaviour witness
+
+`malf test insight-canon` on **both** toolchains after the unit landed: **809 of 809** on
+`linux-clang21-libcxx-release` and **809 of 809** on `linux-gcc16-release`, equal to the pre-unit
+baseline. None of this directory's suites carries the `corpus` label, so every one of them runs in
+that default figure — checked at the `CMakeLists`, where the labelled set is exactly three suites
+and all three live elsewhere.
+
+
 
 
 
