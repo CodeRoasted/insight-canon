@@ -1,28 +1,4 @@
-// f13_cardinality_measure — the standing F13 masker-cardinality RE-MEASURE instrument.
-//
-// WHY THIS IS A CLI TOOL AND NOT A TEST (DN-18.D1 § 3.3, Eqya ruling 2026-07-29).
-// This measurement lived as `StatelessTemplate.CardinalityOnCorpus` inside the unit suite,
-// env-gated on CORPUS_DIR. Its population is whatever directory the operator mounts — unnameable by
-// construction, so the same invocation on two machines is not the same measurement, and clause 1 of
-// the corpus-gate contract forbids gating on it. A test whose only assertion is `lines > 0` and
-// whose meaning is a printed report is a measurement instrument wearing a test's clothes; homed
-// here, the population is DECLARED (the report enumerates exactly which files and how many lines
-// were consumed, and where the cap cut) rather than smuggled through an env variable in a
-// deterministic tree.
-//
-// WHAT THE NUMBER IS FOR. Distinct-template count + singleton fraction size the F13 masking rules
-// (ADR-16.D5): re-run after any F13 rule change. The one-time over-split ratio
-// vs the now-ripped Drain was 4.12x → 1.79x at the § 8 gate; that comparison cannot re-run
-// post-rip, and the standing production guard is the K_dim cardinality monitor (D-TID-7), not this
-// tool. A number printed here is citable ONLY next to its population block — that is the whole
-// contract.
-//
-// The pipeline is the production one: Tokenizer::process_line (parse → mask) over a degenerate,
-// zero-package composition — generic corpus masking is semantic-unaware, and the tool must never
-// link the semantic packages (SRC-SP-1 / R1 dependency arrow).
-
-// Textual, not `import std`-provided: `stderr` is a macro whose expansion needs the FILE*
-// declaration visible in this TU, which only the header brings.
+// refs: DN-18.D1, ADR-16.D5, SRC-SP-1
 #include <cstdio>
 
 import std;
@@ -34,12 +10,8 @@ using insight::tokenization::ArenaAllocator;
 using insight::tokenization::MaskConfig;
 using insight::tokenization::Tokenizer;
 
-// Default line budget — the same sizing the test-era instrument used, kept so historical readings
-// stay comparable order-of-magnitude. Overridable via argv[2]; the report states where it cut.
 constexpr std::size_t kDefaultMaxLines{300000};
-// The product is formed AT `std::size_t`, never widened after the fact: `8U * 1024U * 1024U`
-// multiplies in `unsigned int` and only then converts, so the day this constant is raised past
-// 4 GiB it would wrap silently at a number nobody would suspect.
+// note: the product is formed AT std::size_t; an unsigned-int one wraps past 4 GiB.
 constexpr std::size_t kArenaBytes{std::size_t{8} * 1024 * 1024};
 constexpr std::size_t kTopTemplatesShown{15};
 constexpr std::size_t kSingletonSamplesShown{40};
@@ -48,8 +20,6 @@ constexpr std::size_t kTemplatePreviewChars{140};
 constexpr int kExitOk{0};
 constexpr int kExitEmptyPopulation{1};
 constexpr int kExitUsage{2};
-// The run died on a thrown exception — distinct from every code above because it is the only one
-// that can fire after report rows have already been printed: it says the report is partial.
 constexpr int kExitFatal{4};
 
 struct FileConsumption
@@ -69,11 +39,7 @@ void print_usage(std::string_view program_name)
 }
 } // namespace
 
-// A FUNCTION-TRY-BLOCK, and the shape is the point: the body below is a measurement that prints
-// as it goes, so the handler's job is to make a partial report SAY it is partial rather than to
-// let `terminate` end the process with no line at all. The corpus walk, every file read and
-// `std::println` itself can throw. The handlers use `std::fputs` and not `std::println` because a
-// diagnostic that can itself throw would leave this function throwing after all.
+// post: prints a population block; a number from this report is citable only beside it.
 int main(int argc, char** argv)
 try
 {
@@ -107,18 +73,11 @@ try
         return kExitUsage;
     }
 
-    // RECURSIVE, and the depth is not a convenience. A `directory_iterator` walks ONE level, so a
-    // corpus that nests its logs — `<corpus>/samples/logs/*.log`,
-    // `v2/pairs/<pair>/<arm>/console.log` — yielded zero matches and exited kExitEmptyPopulation,
-    // which reads as "nothing to report" rather than "never looked". Measured 2026-09-01:
-    // gcc-buildlog and gitlab-markers both returned an empty population at depth 1 while holding 36
-    // and 895 `*.log` files below it, and a masking measurement over them was silently narrowed to
-    // nothing. A gate with nothing to judge is green for the one reason that disqualifies it.
     std::vector<fs::path> files;
     for (const auto& entry : fs::recursive_directory_iterator{corpus_dir})
         if (entry.is_regular_file() && entry.path().extension() == ".log")
             files.push_back(entry.path());
-    std::ranges::sort(files); // deterministic order for a fixed tree
+    std::ranges::sort(files);
     if (files.empty())
     {
         std::println(stderr, "no *.log files anywhere under {} (walked recursively)",
@@ -126,8 +85,7 @@ try
         return kExitEmptyPopulation;
     }
 
-    // Generic corpus masking is semantic-unaware — a degenerate (zero-package) composition.
-    // `composed` precedes `tokenizer` so it outlives the const-ref the Tokenizer holds.
+    // note: `composed` precedes `tokenizer` so it outlives the const-ref the Tokenizer holds.
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};
     ArenaAllocator arena{kArenaBytes};
     Tokenizer tokenizer{arena, MaskConfig{}, composed};
@@ -153,9 +111,7 @@ try
             }
             if (raw.empty())
                 continue;
-            // The production path: parse → mask, one event per content-bearing line. Unparsed
-            // lines are skipped exactly as the test-era instrument skipped them. The template is
-            // copied out before the per-line arena reset.
+            // assert: `event->template_str` views arena bytes that the reset below frees.
             if (const auto event{tokenizer.process_line(raw)}; event.has_value())
                 ++template_counts[std::string{event->template_str}];
             arena.reset();
@@ -165,7 +121,6 @@ try
         consumed.push_back(std::move(record));
     }
 
-    // ── The population block: what was measured, declared, so the number is citable ──
     std::println("=== Stateless template_id cardinality (F13 re-measure) ===");
     std::println("population       : {} of {} *.log files under {} (recursive, sorted walk)",
                  consumed.size(), files.size(), corpus_dir.string());
@@ -173,11 +128,6 @@ try
                  total_lines >= max_lines ? " (EXHAUSTED — the population below is cap-shaped, "
                                             "not the whole tree)"
                                           : "");
-    // The path RELATIVE TO THE CORPUS ROOT, never the bare filename. Once the walk recurses, a
-    // filename stops identifying a file: a `pairs/<pair>/{baseline,changed}/console.log` layout
-    // prints the same nine characters for dozens of distinct populations, and a population block
-    // that cannot distinguish its own members is not a declaration. Relative rather than absolute
-    // so the block stays readable and does not leak the operator's tree into a citable report.
     for (const auto& record : consumed)
         std::println("  {:>9} lines  {}{}", record.lines_consumed,
                      record.path.lexically_relative(corpus_dir).generic_string(),

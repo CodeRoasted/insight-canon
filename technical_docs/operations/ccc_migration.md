@@ -41,11 +41,15 @@ already present 247. Behaviour baseline the same day, both toolchains **equal**:
 narrative that must be read and classed claim by claim, so the per-unit cost here is the reading,
 not the stripping, and the unit count is set by reader load rather than by line count.
 
-**Law numbering.** This repo declares **zero** law blocks. The workspace's next free number was
-ruled to be LogCraft's start, so a mint here would be a collision only the Founder can resolve;
-every disposition that needed a home above the comment rung found one in an existing tagged form
-or an owning document. The token is not spelled in this file: the registry lint reads a spelled
-`D-LSRC-<digits>` anywhere as a declaration.
+**Law numbering.** This paragraph read *"this repo declares zero law blocks"* until unit 14, and
+it had been false since unit 7: minting was unheld on 2026-09-05 and **this repo now declares
+eight** — three in the conformance interface, one in the portable-128-bit header, four in the mask
+interface. It is corrected here rather than left, because a preamble is what a reader of this file
+takes as the standing state. The rule that has not changed is the allocation one: numbers are
+workspace-global, append-only and checked dense, a lane never picks its own, and a lane holding a
+range takes the next integer above the highest **declared** one rather than the highest issued.
+The token is not spelled in this file: the registry lint reads a spelled `D-LSRC-<digits>` anywhere
+as a declaration, so a law is cited here as `LSRC-n` with its title paraphrased.
 
 ---
 
@@ -2144,14 +2148,290 @@ comment-only commit.
 5. **Addressability** — the per-file census against the unit-12 commit: 2 refinements, 10 additions
    including the four law codes, 1 restored address, and one spelling normalisation.
 
+## Unit 14 — `core/tools/` (2 files, 420 would-be violations) — zero law blocks, and the candidate that found an owner
+
+The harness tier's two standing measurement instruments: `f13_cardinality_measure` (the F13
+masker-cardinality re-measure) and `leading_level_token_index_measure` (the G-L11 instrument whose
+numbers decided Stage 1's token budget). The unit was chosen next because `core/src/`'s source tier
+is complete and this file is the one `core/src/utils/time_utils.cpp` cited when unit 12 converted
+it, so its reader meets the token-index measurement from the other side.
+
+| files | comment lines HEAD → gate | forms written |
+|---|---|---|
+| `f13_cardinality_measure.cpp` | 56 → 6 | post 1 · assert 1 · note 2 · refs 1 · 1 tool |
+| `leading_level_token_index_measure.cpp` | 366 → 74 | pre 2 · post 12 · invariant 17 · assert 3 · note 16 · refs 13 · 7 continuations · 4 tool |
+
+Per-file baselines measured with the standalone checker over the `HEAD` blob, each verified
+byte-identical to `HEAD` by sha256 before it was read: `f13_cardinality_measure.cpp` 56 comment
+lines / 55 violations (bare 51, spacer 3, trailing 1, tool 1) · `leading_level_token_index_measure.cpp`
+366 / 365 (bare 307, spacer 11, trailing 44, suppression-without-why 3, tool 1). The two sum to the
+unit gate's 422 / 420 exactly.
+
+### Zero law blocks, and the one candidate that was refused
+
+`OPS-8.S9`'s test is that a block is owed only where the rule has **no addressable owner**. One
+candidate presented itself and was refused. The instrument's header prose carried a publication
+rule — *the private corpora may be measured here and published as counts, never as bytes* — whose
+only occurrence anywhere in the workspace was that line itself, which is the shape a law block
+exists to fix. It was refused because a slot **does** own it: `ADR-7.D3` rules third-party corpora
+*"PRIVATE-only, forever — never a public Release, never a public repo's git, including any smoke
+slice"*, and the instrument's rule is that ruling applied at this site. `ADR-33` was considered as
+the narrower owner and **rejected**: it governs the publication ACT and its disclosure entries, not
+what an instrument may print, and citing it would have been the false-attribution class arriving
+through the door marked *more specific* (verdict finding 24). So the law-number range issued for
+this run was **not consumed**, and the next free integer is unchanged.
+
+### The DERIVED token census (`OPS-8.S4`), and three tokens the runbook's list does not name
+
+The census was derived from the gates this repo actually runs rather than taken from the written
+list, and the derivation found **three comment tokens read by live superproject gates that
+`OPS-8.S4` does not enumerate**: `LOG-SEAT-ALLOW` (`scripts/log_seat_routing_lint.py`'s opt-out,
+whose scan globs cover `.cpp`/`.cppm` and exclude only tests, benchmarks and build trees — so
+`core/tools/` is inside its surface), a closure-model declaration marker read by
+`scripts/closure_declaration_lint.py`, and a pin-mirror marker read by `scripts/pin_coherence.py`.
+**All three have a population of ZERO in this repo's source**, checked before the strip; they are
+recorded because the population is a fact about today, not a property of the repo.
+
+The repo's own two greppable lints — the semantic-unawareness scrub and the provenance
+one-write-site lint — **strip comments before they scan**, verified in their source, so neither can
+be moved by a comment-only commit; and `core/tools/` is outside both their scan roots anyway.
+
+Counts, before → after: `NOLINT` directives 3 → 3, namespace closers 2 → 2, and every other token
+0 → 0, including the determinism waiver and the three above. **Zero differences, so zero census
+decisions.**
+
+### The stripper cross-check (`OPS-8.S5`), held non-vacuously
+
+`removed == violations − (suppression-without-why + trailing-nolint)` → **417 == 420 − 3**, and
+`kept == tool-forms + those classes` → **5 == 2 + 3**. Per file: 55 == 55 − 0 with 1 == 1 + 0, and
+362 == 365 − 3 with 4 == 1 + 3. This unit carries suppressions, so the flat form the step used to
+publish would have failed here — the equality held for the right reason rather than vacuously.
+
+### The three suppressions, measured in place — every one load-bearing
+
+All three are `NOLINTNEXTLINE(bugprone-exception-escape)` on `first_level_token`,
+`raw_text_remainder` and `rfc3339_text_remainder`. Two independent legs were taken, because a named
+directive admits the check-inventory evidence and the run is what proves it fires.
+
+* **Inventory**: the one shared `.clang-tidy` (symlinked from the toolchain) arms `bugprone-*` and
+  does not disable `bugprone-exception-escape`, so the check is live.
+* **The run**, `clang-tidy-21` against the RELEASE compile database, over the file **at its own tree
+  path** with a sha256-verified backup and restore (verdict finding 21 — a copy at a foreign path
+  produces no output at all). Stripping removed the directive **text** and kept the code (verdict
+  finding 9). **With the directives: 4 own-file findings. Without them: 7** — the same four plus
+  exactly three new `bugprone-exception-escape`, one per directive, each naming its own function.
+
+**The measurement's positive control is the delta itself and it fired**: the three new findings are
+**error** severity, which is the class a warning-only filter silently misses. All three suppressions
+were kept and only their FORM was repaired — the why demoted to a `note:` in the last position
+before the directive, which is verdict finding 12's shape. No `note:` or `refs:` line in either
+converted file spells the directive token, so no second suppression region is armed.
+
+### The address census (`OPS-8.S7.3b`), outbound and inbound
+
+**Outbound: no address lost.** `f13_cardinality_measure.cpp` — 3 addresses, set unchanged.
+`leading_level_token_index_measure.cpp` — **5 additions, zero losses**: `ADR-7.D3` (the publication
+rule's owner, above) and four form-3 addresses that replace prose pointers at their sites — the
+strategy doors the two remainder models are modelled from, the GitLab transport-prefix constant, and
+`infer_leading_log_level`, whose two function-local constants this instrument hand-copies.
+
+**Two of those four addresses were written OVER-SPECIFIED and the registry lint refused them — a
+lane-made false positive, recorded because the reasoning behind it is the reusable part.** Two of
+the four targets have a `test_`-prefixed twin, and a `grep '<basename>$'` over the file list matches
+both, so this lane concluded the bare basenames were ambiguous and prefixed each with a directory
+segment. **The gate refused both**, naming the shorter form in its message: the form-3 suffix is
+**path-segment aligned**, so a file whose last segment is `test_time_utils.cpp` does not have
+`time_utils.cpp` as a suffix at all, and the ambiguity never existed. `grep '<name>$'` compares
+BASENAME SUBSTRINGS and is the wrong instrument for a path-suffix question; the right one is the
+gate, and it was run before the push, which is where this was caught. The lesson generalises past
+this form: an over-specified address fails the same rule as an under-specified one — *one spelling,
+no author discretion* — so "more specific is safer" is false here, and a lane that resolves a suffix
+by hand should confirm it against the instrument rather than against its own regex.
+
+**Inbound: 5 mentions, 4 read, none falsified.** Two are `core/CMakeLists.txt` build wiring naming
+the file paths. `core/tests/mask/test_stateless_template.cpp` records that the F13 measurement moved
+out of the unit tree to this instrument — it states that independently rather than resting on the
+prose this unit deleted, so it stands. `core/tests/utils/test_leading_scan_token_budget.cpp` says
+the instrument *"self-tests the same two rows"* as the budget's pre-registered shapes; that claim is
+about the instrument's BEHAVIOUR, and the rows survive the conversion as code with their `name`
+strings intact, so it stands too. `core/src/utils/time_utils.cpp` cites this file by a form-3
+address, which survives a conversion by construction — and this unit now cites `infer_leading_log_level`
+back, so the two sites point at each other with addresses in both directions.
+
+### A drain's named comment repair, discharged in this pass
+
+`DN-54.O5` — the disposition that graduated `DN-54.D23` into `ADR-16.D8` on 2026-09-02 — records
+that every `DN-54.D23` citation in this instrument is a citation of the ARGUMENT, which still lives
+at that address, and that **one sentence became incomplete rather than wrong**: the prose said R3's
+budget is owned by `ADR-16.D7` while R1's and R2's dispositions had no owner named, which stopped
+being true when the ADR took all three. It names the repair as a comment change owed to *"whatever
+pass next opens that file"*, with **Kleio** as addressee. This is that pass and the repair is
+comment-only, so it is discharged here rather than deferred: the converted `refs:` at the partition
+declares `DN-54.D23, ADR-16.D8, ADR-16.D7, SRC-D-OUT-4c` — the argument, the disposition, the budget
+and the register — and the incomplete sentence is gone with the prose. Nothing outside this repo was
+touched.
+
+### Stale and false claims deleted, with the evidence and where the search went
+
+* **The recursive-walk measurement is deleted and not carried.** The prose justified
+  `recursive_directory_iterator` with *"Measured 2026-09-01: gcc-buildlog and gitlab-markers both
+  returned an empty population at depth 1 while holding 36 and 895 `*.log` files below it"*. The
+  search was widened past the repo boundary — `insight-eidos`, `insight-metalog`, `logcraft`,
+  `coderoast-server`, `coderoast-corpora`, `metalog-spec` and the workspace doc tier were all
+  searched by name. The mechanism is confirmed in the release record (`f13_cardinality_measure`
+  *"walked with `directory_iterator`, one level, so two corpora returned zero files reported as
+  clean"*), but that record sits in `technical_docs/history/`, which the Founder rules disposable and
+  gated by nothing, and **its figure for that corpus is 33, not the 36 the source claimed**. Neither
+  number is re-derivable today: both corpora are pinned assets and neither is materialised on disk
+  (`find` returns zero `*.log` under the gcc corpus tree). `OPS-8.S9`'s row governs — an unsourced
+  measurement is deleted and becomes a finding, never re-homed, because re-asserting it would be the
+  conversion inventing a fact and signing it. The two figures' disagreement is the evidence for
+  deleting rather than carrying.
+* **Two plan-tier pointers deleted.** The prose carried two row identifiers from the workspace's
+  medium-term plan surface. `LEXICON.md`'s shortcut registry declares no form for a row of that
+  surface, so neither is a registry address and neither could enter a `refs:`; `ADR-26.D5` rules in terms that a claim which goes false when the plan
+  changes belongs in the planning tier and never in source. The durable owners of what those rows
+  decided — `ADR-16.D7` for the budget, `ADR-16.D8` for the residual's disposition — are cited at the
+  sites instead.
+* **A disposed source code's pointer deleted.** `f13_cardinality_measure.cpp` named a retired
+  template-identity code for the standing cardinality guard. That code carries no `SRC-` prefix and
+  is not among the 95 migrated codes, so it is not a registry form and is invisible to the bare-code
+  census; the reform note lists it under *already disposed*. Its live occurrences outside the attic
+  are `DN-18`, which states the same sentence in full — and `DN-18.D1` is what the converted file now
+  cites. The claim survives at an address; the unresolvable token does not.
+* **Attic section markers**: none in this unit.
+
+### Interrogation
+
+One fresh agent, 35 questions built from the held R claims, 63 tool uses, 206 k tokens, 11.4
+minutes. Its exclusion list named any file called `ccc_migration.md` in any repo, `OPS-8` and the
+`ADR-26` file. **No git command was run**, checked mechanically over the transcript rather than
+taken from the reader's own closing line: 63 `tool_use` blocks, and the single match on a
+git-shaped token is `-not -path '*/.git/*'` inside a `find` — a path exclusion, not an invocation.
+Zero build-directory reads, and none of the four forbidden documents appears in any tool input.
+
+**32 of 35 recovered, 1 not recovered, 2 CONVICTIONS, 0 reader-wrong.** Scored one question at a
+time from the per-question evidence, never from a summary line.
+
+Recovery landed **above** the deleted prose repeatedly, and three of those went past what any
+comment in this repo says:
+
+* **Why the corpus walk recurses** came back with a sharper failure mode than the prose carried.
+  The deleted text argued from an empty population at depth 1; the reader named the *dangerous*
+  case instead — a root with some logs at the top and more below, where the walk succeeds, the
+  population block names only the shallow files, and the cardinality figures read as the whole
+  corpus's. That is the case the population block exists to make impossible, and it is why the
+  deleted measurement was not needed to carry the claim.
+* **What fixes the file order** was recovered as a consequence of the LINE BUDGET — the cap decides
+  which files are consumed at all, so an unsorted walk would consume different files run to run —
+  and the reader then contrasted it with the sibling instrument's own note that its counts are
+  order-independent because it has no budget. Neither half was in the prose.
+* **Why the lexicon membership test is the product's own** was recovered from the shipped
+  predicate's declaration, which turns out to NAME this instrument as the reason it exists.
+
+### The two lines THIS conversion wrote that the reader convicted, each re-derived at the artifact
+
+Both are convictions in the `DN-72.O8` sense — the reader answered the underlying question
+correctly *from the tree* and thereby contradicted a line the conversion had written, so the tree
+carried the knowledge and the residual line was the weak link.
+
+1. **The publication invariant was FALSE as written, and the prose it came from had gone stale.**
+   The conversion wrote *"no line CONTENT is printed — prefix shapes and counts only, never corpus
+   bytes"*, carried from a header sentence reading *"NOTHING FROM A LINE IS PRINTED"*. The reader
+   answered that the R1/R2/R3 lexeme histograms **are** byte runs lifted from corpus lines, and
+   that the claim therefore holds substantively rather than literally. Re-derived at the artifact:
+   `lexeme_cells` formats the matched word into the report, and the lexeme is a sub-view of the
+   scanned remainder. The old sentence was true when it was written and went stale when the lexeme
+   column was added for the partition; the conversion carried it and signed it. Repaired before the
+   commit to what is true — counts, prefix shape LETTERS and the matched level word, never any
+   other byte of a corpus line — and the level word's domain is closed by `parse_log_level`, which
+   is what keeps the site compatible with `ADR-7.D3`.
+2. **The "only line that moves" claim was FALSE, and this one the lane had not found.** The
+   conversion wrote that the pipeline-level histogram is *"the only report line that MOVES when
+   Stage 1's budget moves"*, again carried from the prose. The reader answered that the model
+   control line and the whole nested block also read the pipeline's verdict, so those move too.
+   Re-derived: the nested classifier stores the pipeline level and derives `promoted`,
+   `promoted_by_word` and `stable` from it, every one of them budget-dependent. Repaired to the
+   half that is useful and true — diff that line across two builds over one root for the
+   count-grain classification delta — with the false exclusivity dropped.
+
+### The claim NOT recovered, and why it is deleted rather than re-homed
+
+**What fixes the default line budget.** The reader swept the repo and the doc tier and answered
+plainly that *nothing in the tree fixes it* — no doc, no slot, no measurement, no citation. The
+deleted prose said only that it was the sizing the test-era instrument used, kept so historical
+readings stay comparable, which is history and not a basis. `OPS-8.S9`'s row governs: an unsourced
+measurement is deleted and becomes a finding, never re-homed, because re-asserting it would be the
+conversion inventing a fact and signing it. What the reader found in its place is the reason the
+absence is survivable and it is in the code, not in prose: the report prints the budget, says
+`EXHAUSTED` and calls the population cap-shaped when the cap bound, marks the truncated file and
+counts the files never reached. The finding is recorded below; nothing was written into the tree.
+
+### Dispositions
+
+* **Recovered (32)** — nothing re-homed.
+* **Not recovered (1)** — the default line budget's basis, deleted and recorded as a finding, per
+  the row above.
+* **Convictions (2)** — both repaired in the tree before the commit, and the whole unit re-derived
+  from `HEAD` through the claims script rather than hand-edited.
+* **Reader-wrong (0)** — no answer was false from the tree, and nothing in the tree misled it.
+
+### Findings for other lanes — none fixed here, all recorded
+
+* **THIS CONVERSION FALSIFIED A RUNTIME USAGE STRING, and it cannot be repaired by a comment-only
+  commit.** `print_usage` tells the operator that the outcomes rows are *"transcribed verbatim from
+  the corpus manifest (the header names the transcription per corpus)"*. The header DID name them —
+  three jq one-liners, one per producer, giving each manifest's own outcome field and root — and
+  this unit deleted them as prose. The pointer now resolves to nothing, and it is a **string
+  literal**, so touching it would break the comment-only witness. The remedy is a code commit and
+  a choice between two shapes: repoint the string at the corpus READMEs (the per-producer field
+  names are documented there and in the shared corpus studies), or re-home the three transcriptions
+  into the owning corpus doc and point the string there. Recorded rather than improvised.
+  **Addressee: the pilot, for the lane holding `insight-canon/**`.**
+* **Two printed stream-tag labels suggest a discriminator the code does not use.** The self-test
+  line prints the two tag kinds as `NNO `/`NNE+` and the report as `NNO `/`NNO+`, which reads as
+  though the stream letter separates a new line from a continuation. It does not: the classifier
+  accepts either letter for both kinds and discriminates on the fourth byte alone. Both are string
+  literals. **Addressee: the pilot, for the lane holding `insight-canon/**`.**
+* **The two instruments handle the format latch differently, and only one says so.** The nested-leg
+  instrument constructs a fresh `Tokenizer` per file because the parser's sticky-strategy latch is
+  per stream; the cardinality instrument constructs ONE for the whole walk, so its latch carries
+  across files and its routing is a function of file order — reproducible only because the walk is
+  sorted. Whether that is deliberate (one homogeneous corpus) or latent is a contract question.
+  **Addressee: Daidalos.**
+* **An ADR slot still spells a call in its pre-fix form.** The slot that ruled Stage 1's budget a
+  token count describes the Stage 1 scan with the retired byte-head constant as the argument. The
+  reader flagged it as possibly deliberate — the slot is describing the defect it replaced — so it
+  is reported rather than asserted as stale. **Addressee: Daidalos.**
+
+### Witnesses
+
+1. **Comment-only** — both files: *comment-only (code token stream identical to HEAD)*, re-run
+   after the two post-reader repairs.
+2. **Grammar** — `malf format --check insight-canon/core/tools`: 2 selected, 2 checked, **0
+   misformatted**, **0 would-be violations**, 81 comment lines, forms `pre` 2 · `post` 13 ·
+   `invariant` 17 · `assert` 4 · `note` 18 · `refs` 14 · 8 continuations · 5 tool.
+3. **Behaviour** — `malf test insight-canon` on clang-21 and with `--profile linux-gcc16-release`:
+   734 + 32 + 25 + 13 + 5 = **809 of 809 passing on each toolchain**, equal to the baseline. This
+   run covers **unit 14 only**. `malf lint --all-files` in the same slot acquisition: **21 findings
+   over 56 files checked**, the standing baseline, unchanged by keeping the unit's three
+   suppressions — and `core/tools/` is inside that population, so those directives have the gate
+   itself as their reader and not only clangd.
+4. **Knowledge** — 32 of 35 recovered, 1 not recovered, 2 convictions repaired pre-commit, 0
+   reader-wrong. Every disposition above.
+5. **Addressability** — the per-file census against `HEAD`: one file's set unchanged, the other 5
+   additions and **zero losses**, outbound; the inbound leg's 5 mentions read one by one, 4 of them
+   prose or wiring and none falsified.
+
 ---
 
 # The `OPS-8` verdict — third cold reader, first at scale
 
 `insight-canon` is `OPS-8`'s third run and its first large one; findings 14 onward come from the
-third run (units 8-9), findings 20-22 from the fourth (units 10-11) and findings 23-24 from the
-fifth (units 12-13). **Twenty-four findings**, ordered by what they cost within each run. Items 1, 5,
-14, **20**, **23** and **24** are the ones that change the runbook; item 5 needed a Founder ruling before the `core/api/`
+third run (units 8-9), findings 20-22 from the fourth (units 10-11), findings 23-24 from the
+fifth (units 12-13) and findings **25-27** from the sixth (unit 14). **Twenty-seven findings**,
+ordered by what they cost within each run. Items 1, 5,
+14, **20**, **23**, **24**, **25** and **26** are the ones that change the runbook; item 5 needed a Founder ruling before the `core/api/`
 units could be converted at all, and it has one — see the RULED section below. **Item 20's repair has
 LANDED in the instrument and is confirmed at a real site by unit 12 — it no longer blocks this
 migration, and what it blocked is recorded so the repair's reach can be judged rather than assumed.**
@@ -2577,6 +2857,72 @@ it is written.** Widening `ADR-n` to `ADR-n.Dm` is not a formatting improvement,
 that slot `m` states this rule. Where no slot states it, the bare form is correct and is not a
 weaker citation — it names the subject's owner, which is what the prose meant.
 
+## 25. `claims_lib.render()` EMITS AN UNTAGGED SPEC VERBATIM, SO A CONTRACT CONTINUATION WRITTEN AS A SECOND LIST ENTRY LANDS AS BARE PROSE — AND NO CCC WITNESS CAN SEE IT
+
+A contract form may carry one untagged continuation, and the natural way to write one in a claims
+script is a second string in the same list:
+
+```
+["invariant: … the word starts inside the", "replaced 40-byte head, on the stripped bytes."]
+```
+
+`render()` matches its `TAGGED` pattern first and, on a miss, returns the spec **verbatim at the
+anchor's indent** — the branch that exists for tool forms and law-block lines. So the second string
+lands as `replaced 40-byte head, on the stripped bytes.` with **no `//`**: a bare prose line in a
+C++ translation unit. Six sites in this unit's first draft.
+
+**Every CCC witness stayed green**, and structurally so rather than by luck: the grammar gate
+inspects COMMENTS, and a line with no `//` is not a comment to it — it is code; `clang-format`
+tokenises rather than parses and passes it through; and the code-token witness had not run yet. The
+gate's own summary is what shows it indirectly, and only if you are counting: the draft read
+`continuation=2` where six were written, because four of the six were not comments at all. Caught by
+READING the placed draft, which is the same read obligation verdict finding 17 already imposes for a
+different reason.
+
+**The rule for a claims script: a continuation is never a second list entry.** Write the whole claim
+as ONE spec string and let `flow()` wrap it — `flow()` prefixes each continuation with `//`, and the
+budget checker then rejects a contract needing a third line, which is the check that entry silently
+bypassed. Whether `render()` should refuse an untagged spec that is neither a tool form nor a
+law-block line is a question for the instrument's owner; the two legitimate verbatim shapes both
+start with a recognisable prefix, so the discrimination is available.
+
+## 26. `anchor_collide.py` REPORTS "0 ANCHORS CHECKED" AS A CLEAN RUN WHEN THE CLAIMS SCRIPT NAMES ITS FILES THROUGH A VARIABLE
+
+The instrument finds its work with `re.findall(r'B\("([^"]+)",\s*(\d+)', script)` — a literal
+double-quoted filename. A claims script that binds its two filenames to constants and calls
+`B(F13, 1, …)` therefore matches **nothing**, and the run prints `0 anchors checked, 0 colliding`
+and **exits 0**. That is the false-CLEAN shape the whole instrument exists to remove, reappearing in
+the instrument itself: a lane that writes an ordinary, readable script gets a green from a check
+that never ran.
+
+Measured here: the same script read `0 anchors checked` with constants and `47 anchors checked, 0
+colliding` once the filenames were inlined. Its ability to fail was then confirmed rather than
+assumed — an anchor pointed at a line the file carries four times reported
+`COLLISION … occurs at [437, 477, 691, 853]` and exited 1. **Two things follow, and the second is the
+general one.** A claims script spells its filenames as literals, because that is the shape the
+committed instrument can read. And a checker whose population is discovered by a regex must PRINT
+that population and be read against what the script actually contains — `0 checked` is not a result,
+it is a refusal wearing one, and `OPS-8.S10`'s *"before trusting any check in this runbook, make it
+fail once"* is what turned it up.
+
+## 27. THE TOKEN CENSUS DERIVED FROM THE REPO'S GATES FINDS THREE MARKERS `OPS-8.S4` DOES NOT LIST, AND THE STEP'S OWN ADVICE IS WHAT FINDS THEM
+
+`OPS-8.S4` says to derive the census from the gates the repo runs and calls its own list a floor.
+Taken literally on `insight-canon` — enumerate `scripts/`, read each instrument's opt-out constant —
+it yields **three markers the list does not name**, all read from COMMENT TEXT by live superproject
+gates: `log_seat_routing_lint.py`'s seat opt-out, `closure_declaration_lint.py`'s closure-model
+declaration, and `pin_coherence.py`'s mirror marker. The first is the sharpest of the three, because
+its scan globs cover `.cpp`/`.cppm` and exclude only tests, benchmarks and build trees — a CCC unit
+under `src/`, `api/` or `tools/` sits squarely inside its surface, and the CCC grammar does not list
+its token, so a strip would delete it exactly as the determinism waiver was deleted.
+
+All three have a population of ZERO in this repo today, so nothing was lost — but zero is a
+measurement, not a property, and the useful finding is the METHOD rather than the tokens: the
+derivation takes about five minutes (`grep` the superproject's `scripts/` for a marker constant, read
+each hit's scan roots) and it is the only leg that can enumerate a token nobody has thought to write
+down. **The three should join the step's floor**; more importantly, the step should say that the
+derivation is run per REPO, because the answer is a property of which gates cover that repo's paths.
+
 ## Departures from `OPS-8` in this run, declared
 
 * **Units 2 and 3 landed in ONE commit**, against `OPS-8.S10`'s one-commit-per-unit. Both are
@@ -2601,6 +2947,20 @@ weaker citation — it names the subject's owner, which is what the prose meant.
   framing. It is the split that step already admits — *"a bigger directory is split by file
   group"* — but it was forced by verdict finding 20 rather than chosen for reader load, and the
   two files left behind were carried to the last step before the gate refused them.
+* **Unit 14's behaviour witness was taken in ONE slot acquisition covering that unit alone**, and
+  the whole unit's three mechanical witnesses were taken BEFORE the reader was spawned, so the
+  suppression measurements — which swap a tree file and restore it — were finished before the tree
+  was frozen. Nothing under the unit was touched between the reader's spawn and its answers, and
+  `git status` over the repo after the build confirmed the build wrote no source file.
+* **Unit 14 discharged a comment repair whose named addressee was another role.** The disposition
+  that graduated the residual's decomposition into its ADR slot records one sentence in this
+  instrument as incomplete and names the repair as owed to *"whatever pass next opens that file"*,
+  with Kleio as addressee. This was that pass, the repair is comment-only and it lands inside the
+  converted `refs:` line, so it was made rather than deferred; nothing outside this repo was
+  touched and no other lane's work was entered.
+* **Unit 14's ledger entry corrected the preamble's law-numbering paragraph**, which had claimed
+  this repo declares zero law blocks since before unit 7 minted the first three. A ledger's
+  preamble is read as the standing state, so a false one is not left for the drain.
 * **The suppression measurement was taken for all three files, including the two that did not
   land.** It reads `HEAD` bytes through clang-tidy and is valid whether or not the conversion
   lands, so taking it once is strictly better than making the next lane repeat it — and the four
@@ -3058,3 +3418,80 @@ declared number are not the same fact.
 `core/src/mask/canon.detail.mask.cppm`. The next free integer is **15**;
 `registry_grammar_lint` reports 14 declarations with the numbering checked DENSE and
 single-declaration checked both ways.
+
+---
+
+# Where the SIXTH run stands (unit 14, 2026-09-06)
+
+**Fourteen units converted, eight law blocks standing, none minted this run, the repo still NOT
+armed.** `malf format --check insight-canon` reads **12 238 comment lines and 10 780 would-be
+violations** against the original baseline's 14 489 and 14 242 — **3 462 violations converted,
+24.3 % of the repo**, in thirteen commits across six runs. The unit's own contribution is exactly
+its measured 420. Arming (`OPS-8.S12`) requires the whole repo at zero and is not reached, so
+`comment_contract: true` is NOT set and the CCC phase still counts this repo rather than failing it.
+
+| unit | surface | violations | comment lines | reader |
+|---|---|---|---|---|
+| 1 | `core/src/arena/` | 37 | 39 → 17 | 10/10 recovered |
+| 2 | `core/src/identity/` | 132 | 136 → 34 | 13/13 recovered |
+| 3 | `core/src/transport/` + `canon.internal.cppm` | 107 | 109 → 40 | 15/15 recovered |
+| 4 | `core/src/tokenizer/` | 112 | 114 → 48 | 14/14 recovered |
+| 5 | `core/src/parse/` | 265 | 273 → 103 | 31/35, **4 wrong** |
+| 6 | `core/src/scan/` | 284 | 287 → 96 | 33/34, **1 wrong** |
+| 7 | `core/src/conformance/` | 313 | 318 → 158 | 30/32, **2 wrong** |
+| 8 | `core/src/compose/` | 395 | 404 → 113 | 35/38, 2 not recovered, **1 wrong** |
+| 9 | `core/api/utils/` + `core/api/det/` | 95 | 97 → 45 | 19/21, 1 not recovered, **1 wrong** |
+| 10 | `core/src/utils/logger.cpp` | 84 | 86 → 18 | 13/14, **1 wrong** |
+| 11 | `proof/det_proof.cpp` | 142 | 144 → 65 | 17/18, **1 wrong** |
+| 12 | `core/src/utils/` (2 files) | 546 | 558 → 191 | 36/36 recovered |
+| 13 | `core/src/mask/` | 530 | 535 → 262 | 37/37 recovered, 1 qualified |
+| 14 | `core/tools/` | 420 | 422 → 81 | 32/35, 1 not recovered, **2 convictions** |
+| | **total** | **3 462** | **3 522 → 1 271 (64 %)** | |
+
+Forms standing in the repo: `pre` 33 · `post` 101 · `invariant` 203 · `assert` 75 · `note` 168 ·
+`refs` 208 · 280 continuations · 278 tool forms · **8 law blocks**, none of them this run's.
+
+**The law-number range issued for this run was not consumed.** Unit 14's one law-block candidate —
+the instrument's publication rule — was refused because `ADR-7.D3` already states it, so the range
+came back unused and the next free integer is unchanged at **15**. That is the outcome `OPS-8.S9`'s
+test is for: minting where a slot owns the argument creates a second declaration of one argument,
+which is the failure the form exists to prevent. Re-measured before the run rather than trusted: a
+workspace sweep found the declared set dense at 1 through 14, and `registry_grammar_lint`
+independently reported 14 declarations with the numbering checked DENSE.
+
+## What the sixth run cost in slot contention, measured
+
+**One acquisition, and the slot was held by three different sibling lanes in succession while this
+lane queued.** The dedicated foreground acquire loop waited **594 seconds** (529 s in a first
+window that timed out without acquiring, then 65 s) before it took the slot; the total elapsed from
+the first refusal was longer, but **11.4 minutes of it overlapped the cold reader and therefore cost
+nothing** — the reading, drafting, stripping, placing and gating all need no slot, which is what
+makes a wave a queue at the witness step and parallel everywhere else. The acquire was taken in the
+FOREGROUND and success was tested on the **exit status**, never by grepping the output for a word
+that appears in the refusal too. The single acquisition carried both toolchains' behaviour witness
+and a full `malf lint --all-files`, and the slot was released with its token immediately after.
+
+## What remains, and what the next session should take first
+
+Unconverted, by violation count, and the five figures sum exactly to the 10 780 the gate reads:
+`core/api/` 2 697 (`canon.api.cppm` 1 193, `canon.spi.cppm` 672, `canon.transport.cppm` 322,
+`canon.compose.cppm` 268, `canon.cppm` 242) · `core/src/strategy` 1 275 · `benchmarks/src` 53 ·
+`core/test_package` 15 · the test tier 4 682 · the three dialect packages 2 058. **The source tier
+of `core/src/` is complete except `strategy`, and the harness tier is complete except
+`benchmarks/src` and `core/test_package`.**
+
+**`core/src/strategy/` (1 275) is the next unit.** It is the largest single remaining source
+surface, it cites three of the suffixed codes whose gate refusal is repaired and confirmed, and at
+1 275 violations it is near `OPS-8.S2`'s ~1 500 bound — so it is **split by file group with two
+readers**, not converted as one unit.
+
+**`core/api/canon.api.cppm` (1 193) is the next DECLARING unit and it wants a law-number range
+starting at 15.** It declares seven source codes in its own right. Two runs now say the range needed
+is smaller than the code count: of the mask interface's seven codes three had an addressable owner
+and four were minted, and of unit 14's one candidate none was. **Ask the pilot for the range, and
+re-measure the DECLARED set before consuming it** — an issued number and a declared number are not
+the same fact, and this run's unconsumed range is the reason 15 is still free.
+
+**One code repair is owed before that api unit converts**, and it is this run's own: `print_usage`
+in the token-index instrument points at a header transcription this unit deleted. It is a string
+literal, so no comment-only commit can reach it. See unit 14's findings.

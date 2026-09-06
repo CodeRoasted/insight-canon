@@ -1,98 +1,6 @@
-// leading_level_token_index_measure — the standing G-L11 instrument (ADR-16.D7, ROADMAP N98).
-//
-// WHAT IT MEASURES. infer_leading_log_level's Stage 1 read the producer's own level word only
-// when that word STARTED within kLeadingScanHead{40} raw bytes, until ROADMAP N98 replaced that
-// byte head with the token budget kLeadingScanTokens{8} (time_utils.cpp) on this instrument's
-// numbers. ADR-16.D7 rules that a budget deciding whether the producer's kind word is read at all
-// is part of the CLAIM and must be counted in significant TOKENS, and that its VALUE is a
-// measurement — the token index at which the leading level word sits, over the corpora, cut with a
-// declared residual — never a judgment. This tool takes that measurement: per corpus root it
-// prints the index distribution, what the replaced 40-byte head reached, and what every candidate
-// token budget gains, loses and leaves against that head — with the residual's classes, so the
-// cut is declared the way kKeywordHead{128} declares its own, and a re-derivation after the
-// landing still reads against the same baseline. Per root it also prints the pipeline's LEVEL
-// histogram: run at two commits over the same roots, the diff of that line is the classification
-// delta at count grain (the G-L2 leg DN-54.D10 owes), which the index histogram — budget-blind by
-// construction — cannot show.
-//
-// THE NESTED-RECORD LEG (ROADMAP N112). Eqya's ruling of 2026-09-02 declares the residual's
-// verdict-shaped part — a CI line wrapping an application/syslog record, the level word at token
-// 8-15 — a residual of Stage 1: that word is the INNER record's level, and reading it as the line's
-// verdict would attribute the inner severity to the outer line. Stage 2 is not bound by that
-// budget: its cue scan (kKeywordHead{128}, a byte budget) promotes a caps or colon-anchored
-// error-class word wherever Stage 1 stopped, so an error-class inner word within 128 bytes is
-// promoted to Error TODAY, through canon's own cue path, unchanged by the token budget. This leg
-// counts that population and joins it to the run's DECLARED outcome — the one verdict this codebase
-// never infers — per root: how many nested residual lines carry an error-class inner word, how many
-// of those start inside the cue head, how many the pipeline promotes, how many of the promotions
-// are ATTRIBUTABLE to the inner word (blank the word's bytes and the verdict drops below Error — a
-// counterfactual through the shipped predicate, never a re-implementation), and, of those, how
-// many sit in a run that passed versus one that failed. The outcome comes from a TSV transcribed
-// VERBATIM from the corpus manifest and given per root as `<label>.outcomes=<path.tsv>`, one
-// `<file path relative to the root>\t<outcome word>` row per file; the bucket rule (passed /
-// failed / unstable / other) lives HERE, in one self-tested function, and a malformed row is an
-// error rather than a skipped row (alert_grain_measure's rule: a reader that drops what it cannot
-// parse reports a partition over the rows it happened to understand). A file with no row is
-// UNDECLARED, never defaulted into a bucket.
-//
-// THE UNREAD POPULATION'S THREE CLASSES, AND R3's DISCHARGE COUNTERS (ADR-16.D8). The leg also
-// partitions the lines it finds UNREAD by which of Stage 2's three conditions failed — past the
-// byte head (R3), absent from the lexicon (R1), or in the lexicon and refused the anchor (R2) —
-// and, for R3 only, reports how many of those words WOULD have satisfied conditions (b) and (c)
-// had the byte head reached them. That last pair is ADR-16.D8's stated discharge condition for the
-// one remedy it does not close outright, and it is report-only: nothing here asserts on it, and no
-// gate may.
-//
-// The transcriptions, for the corpora this leg was first
-// run on (each manifest's own field, no renaming):
-//   GitHub Actions  jq -r 'select(.log_annotated != null)
-//                          | [(.log_annotated | sub("^log_annotated/"; "")), .ci_outcome] | @tsv'
-//                          corpus.jsonl            (root = .../full/log_annotated, ci_outcome = the
-//                                                   workflow run's conclusion)
-//   Jenkins         jq -r '[.log, .result] | @tsv' corpus.jsonl   (root = .../marker/v2, result =
-//                                                   the build's result)
-//   GitLab          jq -r '.artifacts[] | select(.kind == "trace") | [.path, .job_status] | @tsv'
-//                          PROBE-v1.manifest.json  (root = .../marker_corpus/v1, job_status = the
-//                                                   job's status)
-//
-// WHY A CLI TOOL AND NOT A TEST: the f13_cardinality_measure ruling (DN-18.D1 § 3.3). The
-// population is whatever the operator mounts, so the report DECLARES it (files, lines, doors, the
-// model's own control) rather than asserting on it, and no gate may depend on it.
-//
-// THE PREDICATE IS THE SHIPPED ONE, NOT A COPY. for_each_token is the tokenizer Stage 1 scans
-// with and parse_log_level is the vocabulary it matches; both are public, and this tool calls them
-// with scan_limit 0 (the whole remainder) and reports the index of the first hit. The replaced
-// byte head's reach is reproduced without re-implementing its scan: for_each_token visits exactly
-// the tokens whose START lies within a byte limit, so "the first level token starts at byte < 40"
-// IS "the 40-byte head saw a level token".
-//
-// THE DOOR IS MODELLED, AND THE MODEL IS MEASURED. No strategy hands the scanner the line: each
-// hands a REMAINDER (rfc3339_text.cpp scans after the stamp token, raw_text.cpp after a left-trim,
-// syslog.cpp / bgl.cpp after their headers), so a raw-line index over-counts by whatever the door
-// peeled. Every line is routed by the public pipeline (Tokenizer::process_line under a zero-package
-// composition — a core tool may not link the vocabulary packages, SRC-SP-1), and the two doors that
-// carry the CI corpora are modelled byte-for-byte from their source: RawText = trim ' '/'\t'
-// (raw_text.cpp); Rfc3339Text = skip the first [^ \t]+ run and the [ \t]* after it
-// (rfc3339_text.cpp via sv_take_token, whose whitespace set is space and tab). Every other door is
-// reported UNMODELLED, its index taken on the whole stripped line as an UPPER BOUND. The model is
-// checked against the pipeline on every modelled line — infer_leading_log_level(remainder) must
-// equal the event's level — and the disagreement count is printed beside the histogram, so a model
-// that peels the wrong bytes shows up as a number rather than as a silent shift of every other
-// number.
-//
-// The pipeline runs stage 1 (the ANSI strip) before routing, and for_each_token treats an escape
-// run as a delimiter, so the token index is presentation-invariant (ADR-16.D7 — that is what
-// making Stage 1's budget a TOKEN count bought); only the BYTE offset moves. Both offsets are
-// reported: on the stripped bytes (the parse_line door) and on the raw bytes (the parse_stable
-// door, which performs no stage 1 at all — ADR-21.D4, which enumerates the producer doors and
-// states that exemption in full. ADR-16.D7 is NOT its owner and says so in its own words: whether
-// parse_stable should carry two views is "not a consequence of this ruling").
-//
-// NOTHING FROM A LINE IS PRINTED. Prefix SHAPES (one class letter per token) and counts only — the
-// private corpora may be measured here and published as counts, never as bytes.
-
-// Textual, not `import std`-provided: `stderr` is a macro whose expansion needs the FILE*
-// declaration visible in this TU, which only the header brings.
+// refs: ADR-16.D7, ADR-16.D8, ADR-21.D4, DN-18.D1, ADR-7.D3, SRC-SP-1
+// invariant: prints counts, prefix shape LETTERS and the matched level word — never any other
+// byte of a corpus line.
 #include <cstdio>
 
 import std;
@@ -107,35 +15,22 @@ using insight::tokenization::MaskConfig;
 using insight::tokenization::Tokenizer;
 
 constexpr std::size_t kArenaBytes{std::size_t{8} * 1024 * 1024};
-// The byte head the token budget REPLACED, quoted: kLeadingScanHead{40} was function-local to
-// infer_leading_log_level and no longer exists in the tree. It stays the fixed baseline every
-// budget column is read against, so a run after the landing still reports what the landing gained
-// and lost, in the same columns the value was decided on.
+// note: quotes the RETIRED kLeadingScanHead{40}; no such constant is in the tree.
 constexpr std::size_t kReplacedByteHead{40};
-constexpr std::size_t kHistogramWidth{24}; // indices printed one per row up to here, then pooled
+constexpr std::size_t kHistogramWidth{24};
 constexpr std::size_t kPrefixShapeMaxTokens{8};
 constexpr std::size_t kTopShapesShown{6};
 constexpr std::size_t kFormatCount{static_cast<std::size_t>(LogFormat::Unknown) + 1U};
 constexpr std::size_t kLevelCount{static_cast<std::size_t>(LogLevel::Unknown) + 1U};
-// The budgets tabulated for every root, besides the coverage cuts the data itself produces. 7 is
-// the pre-registered expectation (DN-54.D22 / ADR-16.D7: mass at index <= 6) and 8 is the landed
-// value (kLeadingScanTokens, time_utils.cpp — Eqya's ruling of 2026-09-02 on the nested-record
-// residual); the detailed cuts print the residual / gained / lost CLASSES for the candidates a
-// ruling chooses between.
+// refs: DN-54.D22, ADR-16.D7
 constexpr std::array<std::size_t, 10> kCandidateBudgets{2, 3, 4, 5, 6, 7, 8, 10, 12, 16};
 constexpr std::array<std::size_t, 4> kDetailedBudgets{7, 8, 12, 16};
 constexpr std::size_t kPreRegisteredBudget{7};
-// The two constants the nested-record leg reads against, QUOTED from time_utils.cpp — both are
-// function-local to infer_leading_log_level and cannot be linked. Re-derive them before citing the
-// leg: the landed Stage 1 budget (kLeadingScanTokens — the first index this leg's class starts at)
-// and Stage 2's cue head (kKeywordHead — the byte a token must START before to be read by the cue
-// scan, for_each_token's limit semantics).
+// note: hand-copied — both are function-local there, so they can drift in silence.
+// refs: F-SRC-insight-canon:time_utils.cpp:infer_leading_log_level
 constexpr std::size_t kLandedBudget{8};
 constexpr std::size_t kQuotedCueHead{128};
-// The summary table's "N=8" columns are derived as kPreRegisteredBudget + 1; they are the landed
-// value's columns only while this holds.
 static_assert(kLandedBudget == kPreRegisteredBudget + 1);
-// The ruling names the class at token 8-15; the tail (16+) is reported beside it, never pooled.
 constexpr std::size_t kNestedBandEnd{16};
 constexpr std::size_t kNestedBandCount{2};
 constexpr std::array<std::string_view, kNestedBandCount> kNestedBandNames{"index 8-15",
@@ -148,32 +43,21 @@ constexpr int kExitOk{0};
 constexpr int kExitEmptyPopulation{1};
 constexpr int kExitUsage{2};
 constexpr int kExitSelfTestFailed{3};
-// The run died on a thrown exception — the only code that can fire after report rows have been
-// printed: it says the report is partial.
 constexpr int kExitFatal{4};
 
-// ── The register PROXY, and it is a proxy ─────────────────────────────────────────────────────
-// canon's is_verdict_anchored needs the whole-line kind-slot walk; this instrument classifies the
-// level token by its two neighbouring bytes and its case only, so that the residual's rows can be
-// read as verdict-shaped vs prose-shaped. First match wins, in this order.
+// note: a two-neighbouring-bytes PROXY, never canon's is_verdict_anchored kind-slot walk.
 enum class RegisterProxy : std::uint8_t
 {
-    Bracketed,  // [error] / ##[warning] — the byte before the token is '[' and the byte after ']'
-    ColonAfter, // error: — the byte after the token is ':'
-    Caps,       // ERROR — every byte an upper-case letter (two or more)
-    Bare,       // error — anything else: the prose shape
+    Bracketed,
+    ColonAfter,
+    Caps,
+    Bare,
 };
 constexpr std::size_t kProxyCount{4};
 constexpr std::array<std::string_view, kProxyCount> kProxyNames{"bracketed", "colon", "caps",
                                                                 "bare"};
 
-// ── The run's DECLARED outcome — the bucket rule, the one place three producers' vocabularies meet
-// GitHub Actions `ci_outcome` (success · failure · cancelled · skipped), Jenkins `result` (SUCCESS
-// · UNSTABLE · FAILURE · ABORTED), GitLab `job_status` (success · failed · canceled). UNSTABLE is
-// Jenkins' "built, tests failed" and is kept apart from `failed` rather than folded either way;
-// a cancelled, skipped or aborted run is `other` — it ended without a verdict on the work. A word
-// outside this table is `unrecognised` and printed with its spelling, so a producer's new
-// vocabulary shows up as a word rather than as a silent bucket.
+// invariant: a file with no row is Undeclared — never defaulted into a bucket.
 enum class Outcome : std::uint8_t
 {
     Passed,
@@ -181,7 +65,7 @@ enum class Outcome : std::uint8_t
     Unstable,
     Other,
     Unrecognised,
-    Undeclared, // no row for the file — never defaulted into a bucket
+    Undeclared,
 };
 constexpr std::size_t kOutcomeCount{6};
 constexpr std::array<std::string_view, kOutcomeCount> kOutcomeNames{
@@ -200,14 +84,15 @@ constexpr std::array<std::string_view, kOutcomeCount> kOutcomeNames{
     return Outcome::Unrecognised;
 }
 
+// invariant: `word_by_path` keys are the path relative to the root, '/'-separated.
 struct OutcomeTable
 {
-    std::map<std::string, std::string> word_by_path; // path relative to the root, '/'-separated
+    std::map<std::string, std::string> word_by_path;
     std::size_t duplicate_rows{0};
 };
 
-// `<path>\t<word>` per row, transcribed verbatim from the corpus manifest (the header's
-// one-liners). A malformed row is an ERROR, never a skipped row.
+// pre: every row is `<path>\t<word>` — exactly one tab, both fields non-empty.
+// post: a malformed row is returned as an error, never skipped.
 [[nodiscard]] std::expected<OutcomeTable, std::string>
 read_outcome_table(const std::filesystem::path& tsv)
 {
@@ -236,7 +121,6 @@ read_outcome_table(const std::filesystem::path& tsv)
     return table;
 }
 
-// Which remainder rule the routed door hands the scanner — the two modelled doors, or none.
 enum class DoorModel : std::uint8_t
 {
     RawText,
@@ -244,20 +128,15 @@ enum class DoorModel : std::uint8_t
     Unmodelled,
 };
 
+// invariant: `byte_start` is an offset within the SCANNED bytes, never the raw line.
 struct LevelHit
 {
     std::size_t token_index{0};
-    std::size_t byte_start{0}; // of the token within the scanned bytes
+    std::size_t byte_start{0};
     std::size_t token_size{0};
     LogLevel level{LogLevel::Unknown};
     RegisterProxy proxy{RegisterProxy::Bare};
-    // No token follows the level word on the line — the one register in which an UNANCHORED
-    // level word is still authoritative (time_utils.cpp: "the terminal / sole significant
-    // token"), so a bare residual word that is terminal is a verdict a budget decides, and a bare
-    // one that is not falls through to Stage 2 whatever the budget.
     bool terminal{false};
-    // One class letter per prefix token (N digits · D date · Z digit-led ending in Z · P path ·
-    // W letters · M mixed), '+' in the last slot when the prefix is longer than the buffer.
     std::array<char, kPrefixShapeMaxTokens + 1> shape{};
 };
 
@@ -276,7 +155,7 @@ struct LevelHit
 
 [[nodiscard]] char token_shape_class(std::string_view token) noexcept
 {
-    constexpr std::size_t kDateWidth{10}; // YYYY-MM-DD
+    constexpr std::size_t kDateWidth{10};
     if (std::ranges::all_of(token, is_digit))
         return 'N';
     if (token.size() >= kDateWidth && is_digit(token[0]) && is_digit(token[1]) &&
@@ -307,9 +186,8 @@ struct LevelHit
     return RegisterProxy::Bare;
 }
 
-// The predicate under measurement: the first token of `scanned`, under the shared canon
-// tokenisation, that parse_log_level accepts — its index, its byte start, and its class.
-// Only throw path is for_each_token's substr (begin <= size); the noexcept body cannot throw.
+// post: the first token of `scanned` that parse_log_level accepts, with its index.
+// note: for_each_token's substr cannot throw here (begin <= size), so the body is total.
 // NOLINTNEXTLINE(bugprone-exception-escape)
 [[nodiscard]] std::optional<LevelHit> first_level_token(std::string_view scanned) noexcept
 {
@@ -346,14 +224,15 @@ struct LevelHit
     return hit;
 }
 
-// ── The door models, byte-for-byte from the strategies' own source ────────────────────────────
-[[nodiscard]] constexpr bool is_strategy_ws(char chr) noexcept // sv_take_token's whitespace set
+// invariant: matches sv_take_token's whitespace set — space and tab only.
+[[nodiscard]] constexpr bool is_strategy_ws(char chr) noexcept
 {
     return chr == ' ' || chr == '\t';
 }
 
-// raw_text.cpp: "Trim leading ASCII whitespace" — ' ' and '\t' — then scan `content`.
-// substr(pos) with pos <= size cannot throw; the noexcept body is total.
+// invariant: models raw_text.cpp's door — trim leading space and tab, then scan.
+// refs: F-SRC-insight-canon:raw_text.cpp
+// note: substr(pos) with pos <= size cannot throw, so the noexcept body is total.
 // NOLINTNEXTLINE(bugprone-exception-escape)
 [[nodiscard]] std::string_view raw_text_remainder(std::string_view line) noexcept
 {
@@ -363,9 +242,9 @@ struct LevelHit
     return line.substr(start);
 }
 
-// rfc3339_text.cpp: `rest = line; sv_take_token(rest)` — skip leading ws, the stamp token, and
-// the ws after it — then scan `rest`.
-// substr(pos) with pos <= size cannot throw; the noexcept body is total.
+// invariant: models rfc3339_text.cpp's door — skip leading ws, the stamp token, the ws after.
+// refs: F-SRC-insight-canon:rfc3339_text.cpp
+// note: substr(pos) with pos <= size cannot throw, so the noexcept body is total.
 // NOLINTNEXTLINE(bugprone-exception-escape)
 [[nodiscard]] std::string_view rfc3339_text_remainder(std::string_view line) noexcept
 {
@@ -406,15 +285,14 @@ struct LevelHit
     return bytes;
 }
 
-// The GitLab runner's stream tag (`NNO ` / `NNE `, or `NNO+` on a continuation line) that the
-// package door peels together with the stamp (gitlab_strategy.cpp: kTransportPrefixWidth) and the
-// core Rfc3339Text door leaves in place as one extra token. Counted so the package-door index of
-// a stamped GitLab line can be stated as "core-door index − 1" over a measured population.
+// note: counted so a stamped GitLab line's package-door index reads as core-door minus one.
+// invariant: a Continuation tag glues to the next word, so its shift is NOT one token.
+// refs: F-SRC-insight-canon:gitlab_strategy.cpp:kTransportPrefixWidth
 enum class StreamTag : std::uint8_t
 {
     None,
-    NewLine,      // `NNO ` — one extra token under the core door, exactly
-    Continuation, // `NNO+` — the '+' glues the tag to the next word; the shift is not one token
+    NewLine,
+    Continuation,
 };
 [[nodiscard]] StreamTag stream_tag_of(std::string_view remainder) noexcept
 {
@@ -429,16 +307,13 @@ enum class StreamTag : std::uint8_t
     return StreamTag::None;
 }
 
-// ── Aggregates ────────────────────────────────────────────────────────────────────────────────
-// What a residual, a gain or a loss IS: its level words, its register shapes, how many of its
-// level words are terminal, and the shapes of the prefixes in front of them.
 struct Classes
 {
     std::uint64_t lines{0};
     std::array<std::uint64_t, kLevelCount> by_level{};
     std::array<std::uint64_t, kProxyCount> by_proxy{};
     std::uint64_t terminal{0};
-    std::uint64_t bare_terminal{0}; // the sub-class a budget DECIDES: unanchored yet authoritative
+    std::uint64_t bare_terminal{0};
     std::map<std::string, std::uint64_t> shapes;
 
     void add(const LevelHit& hit)
@@ -467,13 +342,13 @@ struct Classes
     }
 };
 
+// invariant: `in_head` and `beyond_head` split on whether the word starts inside the replaced
+// 40-byte head, on the stripped bytes.
 struct IndexStats
 {
-    // By exact token index, split on whether the level word STARTS inside the replaced 40-byte
-    // head on the stripped bytes — the two populations a budget trades against that head.
-    std::vector<Classes> in_head;           // byte start < 40: the byte head read the word
-    std::vector<Classes> beyond_head;       // byte start >= 40: it did not
-    std::vector<std::uint64_t> in_head_raw; // byte start < 40 on the RAW bytes (parse_stable)
+    std::vector<Classes> in_head;
+    std::vector<Classes> beyond_head;
+    std::vector<std::uint64_t> in_head_raw;
     std::uint64_t lines{0};
 
     void record(const LevelHit& hit, bool in_byte_head, bool in_byte_head_raw)
@@ -516,7 +391,7 @@ struct IndexStats
     {
         return std::accumulate(in_head_raw.begin(), in_head_raw.end(), std::uint64_t{0});
     }
-    // Lines the replaced 40-byte head read and a token budget does NOT: index >= budget, byte < 40.
+    // post: read by the replaced 40-byte head and NOT by this budget: index >= budget, byte < 40.
     [[nodiscard]] Classes lost_vs_byte_head(std::size_t budget) const
     {
         Classes lost;
@@ -524,7 +399,7 @@ struct IndexStats
             lost.merge(in_head[index]);
         return lost;
     }
-    // Lines a token budget reads and the replaced 40-byte head did NOT: index < budget, byte >= 40.
+    // post: read by this budget and NOT by the replaced 40-byte head: index < budget, byte >= 40.
     [[nodiscard]] Classes gained_vs_byte_head(std::size_t budget) const
     {
         Classes gained;
@@ -532,7 +407,7 @@ struct IndexStats
             gained.merge(beyond_head[index]);
         return gained;
     }
-    // Lines NO budget of `budget` tokens reads: index >= budget, whichever side of the head.
+    // post: what no budget of this size reads: index >= budget, either side of the head.
     [[nodiscard]] Classes residual_beyond(std::size_t budget) const
     {
         Classes residual;
@@ -543,8 +418,7 @@ struct IndexStats
         }
         return residual;
     }
-    // The smallest budget N whose coverage (index < N) reaches `fraction` of the level-bearing
-    // lines; 0 when the population is empty.
+    // post: the smallest budget whose coverage reaches `fraction`; 0 on an empty population.
     [[nodiscard]] std::size_t budget_covering(double fraction) const noexcept
     {
         if (lines == 0)
@@ -560,17 +434,13 @@ struct IndexStats
     }
 };
 
-// ── The nested-record leg (N112) ──────────────────────────────────────────────────────────────
 [[nodiscard]] constexpr bool is_error_class(LogLevel level) noexcept
 {
     return level == LogLevel::Error || level == LogLevel::Fatal;
 }
 
-// The counterfactual: the same remainder with the inner level word's bytes blanked to spaces (a
-// delimiter run, so every other token keeps its index and its neighbours), through the SHIPPED
-// predicate. A verdict that drops below Error without the word was the word's; one that stays is
-// another cue's — a `failed` in the body, a second anchored word — and the inner word discriminates
-// nothing on that line.
+// post: the SHIPPED verdict for `scanned` with the hit's bytes blanked to spaces.
+// note: spaces are a delimiter run, so every other token keeps its index and neighbours.
 [[nodiscard]] LogLevel level_with_word_blanked(std::string_view scanned, const LevelHit& hit)
 {
     std::string blanked{scanned};
@@ -578,64 +448,42 @@ struct IndexStats
     return insight::utils::infer_leading_log_level(blanked).value();
 }
 
-// One line of the nested-record residual, read at three coordinates: the inner word itself, what
-// the pipeline emitted for the line (the parse_line door), and what the same remainder reads on
-// the raw bytes (the parse_stable door, modelled on the same routing — it performs no stage 1,
-// ADR-21.D4). The token index is identical through both doors, so the byte a CUE starts at is the
-// one thing the strip moves and the two doors part company on kKeywordHead alone — ADR-21.D4's
-// own statement of where that door's price is now paid, and the reason this leg reports both
-// offsets.
+// refs: ADR-21.D4, DN-54.D23
 struct NestedLine
 {
-    LogLevel word{LogLevel::Unknown};         // the inner level word's own class
-    RegisterProxy proxy{RegisterProxy::Bare}; // its register proxy — caps is Stage 2's anchor #1
-    bool in_cue_head{false};                  // the word STARTS inside kQuotedCueHead, stripped
-    bool in_cue_head_raw{false};              // ... on the raw remainder
+    LogLevel word{LogLevel::Unknown};
+    RegisterProxy proxy{RegisterProxy::Bare};
+    bool in_cue_head{false};
+    bool in_cue_head_raw{false};
     LogLevel pipeline{LogLevel::Unknown};
     LogLevel stable{LogLevel::Unknown};
-    bool promoted{false};         // the pipeline emitted Error/Fatal for the line
-    bool promoted_by_word{false}; // ... and blanking the inner word drops it below Error
-    // ── DN-54.D23's column. The matched LEXEME (a view into the scanned remainder — the class
-    // says `error-class`, and `error` / `err` / `severe` / `critical` are four different answers
-    // to the question below), and the two SHIPPED predicates that partition the unread population.
+    bool promoted{false};
+    bool promoted_by_word{false};
     std::string_view lexeme{};
-    // `insight::utils::detail::is_failure_lexicon_word` — Stage 2 HAS AN ENTRY for this word.
-    // The product's table through the product's comparison, never a re-listing here: an
-    // instrument that enumerates the eighteen words for itself measures its own copy of the
-    // vocabulary and goes stale in silence the day one is added (DN-37.D20).
+    // invariant: the product's own predicate, never a re-listing — a local copy goes stale in
+    // silence the day a word is added.
+    // refs: DN-37.D20
     bool in_stage2_lexicon{false};
-    // `insight::utils::detail::is_verdict_anchored` — the REAL kind-slot walk, not this file's
-    // RegisterProxy, which is a two-neighbouring-bytes proxy and says so at its own definition.
-    // Only meaningful once in_stage2_lexicon holds: the kernel is consulted from `lexicon_hit`
-    // and only AFTER a lexicon match, so for a non-member it answers a question nothing asks.
+    // invariant: meaningful only where `in_stage2_lexicon` holds — the kernel is reached only
+    // after a lexicon match.
     bool verdict_anchored{false};
 };
 
-// ── The unread population's THREE disjoint classes (DN-54.D23) ────────────────────────────────
-// A nested error-class word at token index >= kLandedBudget is past Stage 1's budget by
-// construction, so only Stage 2 can read it, and Stage 2 reads it iff (a) it starts inside
-// kKeywordHead raw bytes, (b) it is a kFailureLexicon word, and (c) it is verdict-anchored.
-// Failing each gives one class, and the classes are mutually exclusive BY THE ORDER OF THE TESTS
-// — which is the whole point of the split and the reason the R3 self-test row below uses an
-// IN-LEXICON word: past the byte head, membership never gets asked.
-//
-// WHY THE SPLIT IS NOT COSMETIC: R1 and R2 have DISJOINT remedies with disjoint owners. An R1
-// word never reaches a register at all (`is_verdict_anchored` is consulted only from
-// `lexicon_hit`, after a match), so calling it "declined by the register rule" names an act that
-// never happened. R2 is the register (SRC-D-OUT-4c); R3 is a budget, already owned by ADR-16.D7.
+// invariant: the three classes are disjoint BY THE ORDER OF THE TESTS — head, then lexicon, then
+// anchor.
+// refs: DN-54.D23, ADR-16.D8, ADR-16.D7, SRC-D-OUT-4c
 enum class UnreadClass : std::uint8_t
 {
-    R1,             // in the head, NOT in Stage 2's lexicon — invisible, declined by nothing
-    R2,             // in the head, in the lexicon, still unread — the register rule's population
-    R3,             // starts past the cue head — ADR-16.D7's budget, and it is checked FIRST
-    NotInPopulation // not error-class, or the pipeline did read the line as Error/Fatal
+    R1,
+    R2,
+    R3,
+    NotInPopulation
 };
 constexpr std::size_t kUnreadClassCount{3};
 constexpr std::array<std::string_view, kUnreadClassCount> kUnreadClassNames{
     "R1 not-in-lexicon", "R2 lexicon-declined", "R3 past-cue-head"};
 
-// The population is the UNREAD one: an error-class inner word on a line the pipeline did not
-// classify Error/Fatal. A promoted line is read — whatever read it — and is not a residual.
+// post: NotInPopulation unless the word is error-class and the pipeline did not promote.
 [[nodiscard]] UnreadClass unread_class_of(const NestedLine& line) noexcept
 {
     if (!is_error_class(line.word) || line.promoted)
@@ -645,9 +493,8 @@ constexpr std::array<std::string_view, kUnreadClassCount> kUnreadClassNames{
     return line.in_stage2_lexicon ? UnreadClass::R2 : UnreadClass::R1;
 }
 
-// The histogram KEY only — ASCII-lowercased so `ERROR:` and `error:` are one row. Presentation,
-// never the predicate: `is_failure_lexicon_word` is itself case-insensitive, so the raw token is
-// what gets asked and this fold changes no answer.
+// post: an ASCII-lowercased histogram KEY — presentation, never a predicate input.
+// note: is_failure_lexicon_word is itself case-insensitive, so the fold changes no answer.
 [[nodiscard]] std::string casefold(std::string_view token)
 {
     std::string folded{token};
@@ -661,11 +508,8 @@ constexpr std::array<std::string_view, kUnreadClassCount> kUnreadClassNames{
                                          const LevelHit& hit,
                                          const std::optional<LevelHit>& raw_hit, LogLevel pipeline)
 {
-    // The lexeme is a sub-view of `stripped_scan`, which is also the string Stage 2 is handed
-    // (infer_leading_log_level's `line`) — so it satisfies is_verdict_anchored's precondition
-    // (`token` MUST be a sub-view of `line`: the kernel recovers the surrounding bytes by pointer
-    // arithmetic). Taking it from the hit's own offsets rather than re-tokenising keeps it the
-    // token the scan actually matched.
+    // assert: `lexeme` is a sub-view of `stripped_scan` — is_verdict_anchored recovers the
+    // surrounding bytes by pointer arithmetic.
     const std::string_view lexeme{stripped_scan.substr(hit.byte_start, hit.token_size)};
     NestedLine line{.word = hit.level,
                     .proxy = hit.proxy,
@@ -684,71 +528,42 @@ constexpr std::array<std::string_view, kUnreadClassCount> kUnreadClassNames{
     return line;
 }
 
-// What one band of the class IS, and what Stage 2 does with it — every count keyed to the run's
-// declared outcome where the precision reading needs it.
 struct NestedResidual
 {
     std::uint64_t lines{0};
     std::array<std::uint64_t, kLevelCount> by_word{};
     std::array<std::uint64_t, kOutcomeCount> lines_by_outcome{};
     std::uint64_t error_class{0};
-    std::uint64_t error_in_head{0};     // error-class AND starts inside the cue head (stripped)
-    std::uint64_t error_in_head_raw{0}; // error-class AND starts inside the cue head (raw)
+    std::uint64_t error_in_head{0};
+    std::uint64_t error_in_head_raw{0};
     std::array<std::uint64_t, kLevelCount> pipeline_of_error_in_head{};
-    // The error-in-head population by the inner word's register proxy, promoted and not: caps is
-    // Stage 2's anchor #1 and fires on its own; a colon-anchored word needs the kind slot, which a
-    // nested record's bare outer tokens break (SRC-D-OUT-4c), so `error:` at index >= 8 is the
-    // shape the cue path declines.
+    // refs: SRC-D-OUT-4c
     std::array<std::uint64_t, kProxyCount> promoted_by_proxy{};
     std::array<std::uint64_t, kProxyCount> unpromoted_by_proxy{};
-    std::uint64_t promoted{0};         // error-class, in head, pipeline Error/Fatal
-    std::uint64_t promoted_by_word{0}; // ... attributable to the inner word
-    std::uint64_t stable_promoted{0};  // ... and the raw remainder reads Error/Fatal as well
-    std::uint64_t promoted_beyond_head{
-        0}; // error-class, NOT in head, still Error/Fatal: another cue
-    std::uint64_t promoted_other_word{0}; // a non-error-class inner word, line still Error/Fatal
+    std::uint64_t promoted{0};
+    std::uint64_t promoted_by_word{0};
+    std::uint64_t stable_promoted{0};
+    std::uint64_t promoted_beyond_head{0};
+    std::uint64_t promoted_other_word{0};
     std::array<std::uint64_t, kOutcomeCount> promoted_by_outcome{};
     std::array<std::uint64_t, kOutcomeCount> promoted_by_word_by_outcome{};
-    // The recall side of the same class: an error-class inner word the pipeline did NOT promote —
-    // outside the head, or inside it and declined — by the run's outcome.
     std::array<std::uint64_t, kOutcomeCount> error_unpromoted_by_outcome{};
     std::array<std::uint64_t, kOutcomeCount> files_with_promotion_by_outcome{};
     std::array<std::uint64_t, kOutcomeCount> files_with_word_promotion_by_outcome{};
-    // ── DN-54.D23's partition, over the UNREAD population (error-class inner word, line not
-    // classified Error/Fatal). unread == r1 + r2 + r3 by construction, and the report prints the
-    // identity so a drift is visible rather than inferred.
+    // invariant: unread == r1 + r2 + r3 by construction; the report prints the identity rather than
+    // assuming it.
     std::uint64_t unread{0};
     std::array<std::uint64_t, kUnreadClassCount> by_unread_class{};
     std::array<std::uint64_t, kOutcomeCount> r1_by_outcome{};
     std::array<std::uint64_t, kOutcomeCount> r2_by_outcome{};
     std::array<std::uint64_t, kOutcomeCount> r3_by_outcome{};
-    // Inside R2, the register's OWN answer: how many of the lexicon words Stage 2 left unread were
-    // refused by the kind-slot walk (`is_verdict_anchored` false) versus anchored and still unread
-    // — the latter is a DIFFERENT mechanism (a count register, a NOTE register, a leading pass
-    // glyph) and calling it "the register declined it" would be the same conflation one level down.
     std::uint64_t r2_register_declined{0};
     std::uint64_t r2_anchored_yet_unread{0};
-    // ADR-16.D8's DISCHARGE CONDITION, and it is REPORT-ONLY — no gate, no assertion, no
-    // behaviour. R3 fails condition (a), which is checked FIRST, so the product path never asks
-    // (b) or (c) of an R3 word at all. Asking them here is the counterfactual the ruling names:
-    // if a material share of R3 is in Stage 2's lexicon AND verdict-anchored, then a longer
-    // kKeywordHead would actually READ those words, the byte head is buying something, and its
-    // value returns as a cost question; if it is not, R3 — the last lever this residual has left,
-    // the other two being refused on measurement — closes on measurement too and the limitation is
-    // final. Both fields are already computed per line by classify_nested, so this is two counters
-    // on the same walk, never a second pass.
-    //
-    // THE CONJUNCTION IS THE NUMBER THE CONDITION TURNS ON, and the two components are printed
-    // beside it rather than instead of it. Anchored WITHOUT membership answers a question nothing
-    // asks — `is_verdict_anchored` is reached only from `lexicon_hit`, AFTER a lexicon match — so
-    // quoting r3_anchored alone would re-commit, one class over, exactly the conflation the
-    // R1/R2/R3 split exists to undo.
+    // invariant: report-only — no gate, no assertion and no behaviour turns on these counters.
+    // refs: ADR-16.D8
     std::uint64_t r3_in_stage2_lexicon{0};
     std::uint64_t r3_verdict_anchored{0};
     std::uint64_t r3_in_lexicon_and_anchored{0};
-    // The lexeme histograms. R1's is the one the ruling turns on — its candidate vocabulary is the
-    // closed set `err` / `severe` / `critical` / `crit` — and R2's is printed beside it because
-    // "`error:` is the overwhelmingly common CI spelling" is a claim this run can settle.
     std::map<std::string, std::uint64_t> r1_lexemes;
     std::map<std::string, std::uint64_t> r2_lexemes;
     std::map<std::string, std::uint64_t> r3_lexemes;
@@ -802,8 +617,7 @@ struct NestedResidual
         ++error_class;
         if (!line.promoted)
             ++error_unpromoted_by_outcome[bucket];
-        // The partition is recorded BEFORE the `in_cue_head` early return below: R3 lives on the
-        // far side of it, and counting it after would report the class as empty.
+        // note: recorded BEFORE the early return; R3 lives past it and would read as empty.
         record_unread_class(line, bucket);
         if (line.in_cue_head_raw)
             ++error_in_head_raw;
@@ -831,7 +645,6 @@ struct NestedResidual
     }
 };
 
-// What one FILE contributed to a band, at the file grain the outcome is declared at.
 struct NestedFileFlags
 {
     bool promoted{false};
@@ -842,28 +655,25 @@ struct RootReport
 {
     std::string label;
     std::filesystem::path dir;
-    // N112 — the declared outcome of the run each file belongs to, joined from the root's TSV.
     std::optional<std::filesystem::path> outcomes_path;
     OutcomeTable outcomes;
     std::uint64_t files_joined{0};
-    std::map<std::string, std::uint64_t> outcome_words; // the raw words, as joined, per file
+    std::map<std::string, std::uint64_t> outcome_words;
     std::array<std::uint64_t, kOutcomeCount> files_by_outcome{};
     std::array<NestedResidual, kNestedBandCount> nested{};
     std::size_t files{0};
     std::uint64_t lines{0};
     std::uint64_t nonempty{0};
-    std::uint64_t declined{0}; // the pipeline produced no event (a blank-after-peel line)
+    std::uint64_t declined{0};
     std::array<std::uint64_t, kFormatCount> routed{};
-    // Every routed event's level, declared or inferred, on every door: the one line of this report
-    // that MOVES when Stage 1's budget moves. Diffed between two builds over the same root it is
-    // the count-grain classification delta; the index histogram cannot show it, because the index
-    // of a level word does not depend on whether the pipeline read it.
+    // note: diff it across two builds over one root: the count-grain classification delta.
+    // refs: DN-54.D10
     std::array<std::uint64_t, kLevelCount> pipeline_levels{};
     std::uint64_t modelled{0};
     std::uint64_t unmodelled{0};
     std::uint64_t control_agree{0};
     std::uint64_t control_disagree{0};
-    std::uint64_t control_declared{0}; // a modelled door with a declared level: outside the control
+    std::uint64_t control_declared{0};
     std::array<std::uint64_t, kFormatCount> disagree_by_door{};
     std::uint64_t stream_tag_newline{0};
     std::uint64_t stream_tag_continuation{0};
@@ -876,11 +686,7 @@ struct RootReport
     return whole == 0 ? 0.0 : kPercent * static_cast<double>(part) / static_cast<double>(whole);
 }
 
-// ── The self-test: pre-registered rows the predicate and the door models must reproduce ───────
-// Runs BEFORE the walk and refuses the run on any disagreement: a zero from an instrument that
-// never demonstrated it can see the phenomenon is not a measurement. Rows 2 and 3 are ADR-16.D7's
-// own pre-registered shapes; row 3 is also its "real path, ANSI stripped" witness row, whose level
-// word starts at byte 43 — past the replaced 40-byte head with no escape byte anywhere.
+// refs: ADR-16.D7
 struct SelfTestRow
 {
     std::string_view name;
@@ -893,12 +699,6 @@ struct SelfTestRow
     bool terminal;
 };
 
-// The nested-record leg's own rows: the class predicate, the cue-head edge, the counterfactual's
-// two faces, and the register the cue path declines — each row read through the shipped predicate,
-// as the walk reads a corpus line. Row 3's prefix puts the word at index 8 and byte 162: inside the
-// token residual, outside the byte head. Row 6 is the shape GitLab's whole class takes: a
-// lowercase colon-anchored `error:` at index 9 is error-class for Stage 1's vocabulary and NOT a
-// cue for Stage 2, because the kind slot it needs is broken by the bare outer tokens before it.
 struct NestedSelfTestRow
 {
     std::string_view name;
@@ -908,17 +708,10 @@ struct NestedSelfTestRow
     bool in_cue_head;
     LogLevel inferred;
     bool promoted_by_word;
-    // DN-54.D23's partition, pre-registered per row. Every row carries one — including the rows
-    // that are NOT in the unread population, because "this shape contributes to no class" is a
-    // claim the partition can get wrong just as easily as a misfiled R1.
+    // invariant: every row pre-registers its unread class, including the rows in NO class.
     UnreadClass unread_class;
     bool in_stage2_lexicon;
-    // Condition (c), pre-registered per row because ADR-16.D8's R3 discharge counters now turn on
-    // it: the anchor answer used to be PRINTED beside each row and asserted by nothing, which is
-    // exactly the state a self-test exists to refuse. Rows 3 and 9 are the discharge counters' own
-    // two-sidedness — the same far-past-the-head frame, in-lexicon on both, anchored on the CAPS
-    // one and refused on the lowercase one — so a run in which those counters cannot see the
-    // phenomenon refuses itself instead of reporting a zero.
+    // invariant: the anchor answer is pre-registered per row, never merely printed beside it.
     bool verdict_anchored;
 };
 
@@ -934,7 +727,6 @@ struct NestedSelfTestRow
     static const std::string kFarNested{"[" + std::string(100, 'a') +
                                         "] [runner-7] [job-42] [step-3] [attempt-1] May api-1 "
                                         "kernel: ERROR: worker died"};
-    // The same prefix with a LOWERCASE in-lexicon word: the R3 row's ordering witness.
     static const std::string kFarNestedInLexicon{"[" + std::string(100, 'a') +
                                                  "] [runner-7] [job-42] [step-3] [attempt-1] May "
                                                  "api-1 kernel: error: worker died"};
@@ -947,9 +739,9 @@ struct NestedSelfTestRow
          .in_cue_head = true,
          .inferred = LogLevel::Error,
          .promoted_by_word = true,
-         .unread_class = UnreadClass::NotInPopulation, // the pipeline READ it
+         .unread_class = UnreadClass::NotInPopulation,
          .in_stage2_lexicon = true,
-         .verdict_anchored = true}, // anchor #1: CAPS, no kind slot needed
+         .verdict_anchored = true},
         {.name = "info-class nested word at index 9: the residual, not promoted",
          .scanned = "[2026-05-29 10:00:00] [runner-7] [job-42] May api-1 kernel: INFO: worker "
                     "restarted",
@@ -958,9 +750,9 @@ struct NestedSelfTestRow
          .in_cue_head = true,
          .inferred = LogLevel::Unknown,
          .promoted_by_word = false,
-         .unread_class = UnreadClass::NotInPopulation, // INFO is not error-class
+         .unread_class = UnreadClass::NotInPopulation,
          .in_stage2_lexicon = false,
-         .verdict_anchored = true}, // `INFO` is CAPS — anchored, and still not error-class
+         .verdict_anchored = true},
         {.name = "error-class nested word at index 8 starting past byte 128: outside the cue "
                  "head, not promoted",
          .scanned = kFarNested,
@@ -970,9 +762,6 @@ struct NestedSelfTestRow
          .inferred = LogLevel::Unknown,
          .promoted_by_word = false,
          .unread_class = UnreadClass::R3,
-         // The DISCHARGE row: in the lexicon AND anchored, and unread only because the byte head
-         // is checked first. This is the shape whose SHARE decides whether kKeywordHead is buying
-         // anything, so the counter has a witness it must be able to see.
          .in_stage2_lexicon = true,
          .verdict_anchored = true},
         {.name = "error-class nested word beside a `failed` cue: promoted, NOT by the word",
@@ -983,7 +772,7 @@ struct NestedSelfTestRow
          .in_cue_head = true,
          .inferred = LogLevel::Error,
          .promoted_by_word = false,
-         .unread_class = UnreadClass::NotInPopulation, // read by ANOTHER cue, but read
+         .unread_class = UnreadClass::NotInPopulation,
          .in_stage2_lexicon = true,
          .verdict_anchored = true},
         {.name = "bare nested word at index 10: prose-shaped, outside the class",
@@ -993,12 +782,9 @@ struct NestedSelfTestRow
          .in_cue_head = true,
          .inferred = LogLevel::Unknown,
          .promoted_by_word = false,
-         // A BARE word is not in the nested class at all, so the walk never reaches the partition
-         // for it — even though `error` IS a lexicon word and unread_class_of alone would say R2.
-         // The row pins that COMPOSITION: the membership gate runs first.
          .unread_class = UnreadClass::NotInPopulation,
          .in_stage2_lexicon = true,
-         .verdict_anchored = false}, // bare, mid-prose: no caps, no kind slot, no bracket
+         .verdict_anchored = false},
         {.name = "lowercase colon-anchored `error:` at index 9: in the class, in the head, and "
                  "DECLINED by the cue path (the kind slot is broken by the bare outer tokens)",
          .scanned = "[2026-05-29 10:00:00] [runner-7] [job-42] May api-1 kernel: error: worker "
@@ -1011,10 +797,6 @@ struct NestedSelfTestRow
          .unread_class = UnreadClass::R2,
          .in_stage2_lexicon = true,
          .verdict_anchored = false},
-        // ── DN-54.D23's three rows, one per class of the unread partition ──────────────────────
-        // R2, on a SECOND lexicon word so the class is not pinned by `error` alone: `fatal` is
-        // RegisterAnchored, colon-anchored, and its kind slot is broken by the same bare outer
-        // tokens. In the lexicon, inside the head, unread ⇒ the register rule's population.
         {.name = "R2 — lowercase colon-anchored `fatal:` at index 9: in Stage 2's lexicon, inside "
                  "the cue head, and the kind-slot walk declines it",
          .scanned = "[2026-05-29 10:00:00] [runner-7] [job-42] May api-1 kernel: fatal: disk "
@@ -1027,11 +809,6 @@ struct NestedSelfTestRow
          .unread_class = UnreadClass::R2,
          .in_stage2_lexicon = true,
          .verdict_anchored = false},
-        // R1 — the same position, the same register, the same shape, and a DIFFERENT class,
-        // which is the whole finding: `severe` is error-class for Stage 1 (parse_log_level maps
-        // it to Error) and Stage 2 has no entry for it, so it reaches no register and is declined
-        // by nothing. If this row ever came back R2 the partition would be measuring the proxy
-        // again instead of the predicate.
         {.name = "R1 — lowercase colon-anchored `severe:` at index 9, the same position as the "
                  "R2 row: error-class for Stage 1, ABSENT from Stage 2's lexicon",
          .scanned = "[2026-05-29 10:00:00] [runner-7] [job-42] May api-1 kernel: severe: disk "
@@ -1044,9 +821,6 @@ struct NestedSelfTestRow
          .unread_class = UnreadClass::R1,
          .in_stage2_lexicon = false,
          .verdict_anchored = false},
-        // R3 — an IN-LEXICON word past the cue head. The word is `error`, so if condition (a)
-        // were NOT checked first this row would come back R2; it is the ordering test, and it is
-        // lowercase on purpose so it differs from the caps `ERROR:` row above in register too.
         {.name = "R3 — lowercase `error:` starting past byte 128: in Stage 2's lexicon, but the "
                  "byte head is checked FIRST, so the budget owns it",
          .scanned = kFarNestedInLexicon,
@@ -1056,9 +830,6 @@ struct NestedSelfTestRow
          .inferred = LogLevel::Unknown,
          .promoted_by_word = false,
          .unread_class = UnreadClass::R3,
-         // The discharge row's NEGATIVE side: same frame, same class, same membership, one word's
-         // CASE — and the anchor is refused. Without it the counter could report every R3 word as
-         // anchored and stay green.
          .in_stage2_lexicon = true,
          .verdict_anchored = false},
     }};
@@ -1076,9 +847,7 @@ struct NestedSelfTestRow
         const NestedLine line{
             classify_nested(row.scanned, row.scanned, *hit, hit,
                             insight::utils::infer_leading_log_level(row.scanned).value())};
-        // The COMPOSITION the walk performs, not unread_class_of alone: record_nested_line's
-        // membership gate runs first, so a shape it filters contributes to no class whatever the
-        // partition would say about it in isolation.
+        // assert: the walk's own composition — the membership gate runs before the partition.
         const UnreadClass unread_class{member ? unread_class_of(line)
                                               : UnreadClass::NotInPopulation};
         const bool row_ok{
@@ -1103,7 +872,6 @@ struct NestedSelfTestRow
     return all_ok;
 }
 
-// The bucket rule, row by row: every word the three manifests carry, and one they do not.
 [[nodiscard]] bool run_outcome_rule_self_test()
 {
     constexpr std::array<std::pair<std::string_view, Outcome>, 11> kOutcomeRows{{
@@ -1217,8 +985,6 @@ struct NestedSelfTestRow
                          row.token_index);
     }
 
-    // The door models, and the stamp shift they remove: the same GHA-shaped line is index 3 on
-    // the raw line and index 0 on the Rfc3339Text door's remainder.
     constexpr std::string_view kStamped{"2026-05-27T15:42:03.4000004Z  ERROR boom"};
     const std::string_view rfc_rest{rfc3339_text_remainder(kStamped)};
     const std::optional<LevelHit> raw_hit{first_level_token(kStamped)};
@@ -1235,7 +1001,6 @@ struct NestedSelfTestRow
     all_ok = all_ok && raw_ok;
     std::println(R"(  [{}] RawText door: remainder="{}" (expected "error: x"))",
                  raw_ok ? "ok" : "FAIL", raw_rest);
-    // The stripped-vs-raw byte offset the parse_line / parse_stable doors differ by.
     std::string scratch;
     const std::string_view stripped{
         insight::tokenization::normalize(rows[3].scanned, scratch).bytes()};
@@ -1255,7 +1020,9 @@ struct NestedSelfTestRow
     return all_ok;
 }
 
-// Every leg runs unconditionally, so every row prints before the one verdict.
+// invariant: every leg runs unconditionally and BEFORE the walk; any disagreement refuses the run,
+// and every row prints before the one verdict.
+// note: a zero from an instrument never shown to see the phenomenon is not a measurement.
 [[nodiscard]] bool run_self_test()
 {
     const bool predicate_ok{run_predicate_self_test()};
@@ -1266,10 +1033,6 @@ struct NestedSelfTestRow
     return all_ok;
 }
 
-// ── The walk ──────────────────────────────────────────────────────────────────────────────────
-// The nested-record class, as isolated for the ruling: a verdict-shaped (non-bare) level word at
-// token index >= kLandedBudget on a modelled door. Records the line in its band and raises the
-// file's flags for the file-grain count.
 void record_nested_line(RootReport& report, Outcome file_outcome, std::string_view stripped_scan,
                         std::string_view raw_scan, const LevelHit& hit,
                         const std::optional<LevelHit>& raw_hit, LogLevel pipeline_level,
@@ -1284,16 +1047,12 @@ void record_nested_line(RootReport& report, Outcome file_outcome, std::string_vi
     flags[band].promoted_by_word = flags[band].promoted_by_word || nested.promoted_by_word;
 }
 
-// Returns, per nested band, whether this file carried at least one promoted line, and one the
-// inner word promoted — the file grain of the N112 reading, counted by the caller against the
-// file's outcome.
 [[nodiscard]] std::array<NestedFileFlags, kNestedBandCount>
 measure_file(const std::filesystem::path& file, Outcome file_outcome, RootReport& report,
              ArenaAllocator& arena, const insight::semantic::ComposedSemantics& composed)
 {
     std::array<NestedFileFlags, kNestedBandCount> flags{};
-    // A fresh Tokenizer per file: the format detector's latch is per STREAM in production, and a
-    // corpus file is one stream.
+    // note: a fresh Tokenizer per file — the format latch is per stream, and a file is one.
     Tokenizer tokenizer{arena, MaskConfig{}, composed};
     std::ifstream input{file, std::ios::binary};
     std::string raw;
@@ -1315,7 +1074,8 @@ measure_file(const std::filesystem::path& file, Outcome file_outcome, RootReport
         const LogFormat routed{event->format};
         const LogLevel pipeline_level{event->level};
         const bool declared{event->declared_level};
-        arena.reset(); // every view the event held is dead from here; only values are read below
+        // assert: the reset below kills every view the event held; only values are read after it.
+        arena.reset();
 
         ++report.routed[static_cast<std::size_t>(routed)];
         ++report.pipeline_levels[static_cast<std::size_t>(pipeline_level)];
@@ -1371,7 +1131,6 @@ measure_file(const std::filesystem::path& file, Outcome file_outcome, RootReport
     return flags;
 }
 
-// One root: the sorted recursive walk, the outcome join per file, the file-grain counts.
 void walk_root(RootReport& report, ArenaAllocator& arena,
                const insight::semantic::ComposedSemantics& composed)
 {
@@ -1380,11 +1139,11 @@ void walk_root(RootReport& report, ArenaAllocator& arena,
     for (const auto& entry : fs::recursive_directory_iterator{report.dir})
         if (entry.is_regular_file() && entry.path().extension() == ".log")
             files.push_back(entry.path());
-    std::ranges::sort(files); // deterministic order for a fixed tree (order-independent anyway)
+    // note: sorted for a fixed tree; the counts are order-independent anyway.
+    std::ranges::sort(files);
     report.files = files.size();
     for (const fs::path& file : files)
     {
-        // The join: the file's path relative to its root, '/'-separated, against the TSV.
         Outcome file_outcome{Outcome::Undeclared};
         if (const auto row{
                 report.outcomes.word_by_path.find(fs::relative(file, report.dir).generic_string())};
@@ -1466,8 +1225,6 @@ void print_classes(std::string_view heading, const Classes& classes, std::uint64
     std::println("    prefix shapes  :{}", top.empty() ? " (index 0 — no prefix)" : top);
 }
 
-// Everything a candidate budget N decides, in one block: what stays unread under N, what N reads
-// that the 40-byte head does not, and what the head reads that N would not.
 void print_cut(const IndexStats& stats, std::size_t budget)
 {
     print_classes(std::format("residual beyond N={}", budget), stats.residual_beyond(budget),
@@ -1508,8 +1265,8 @@ void print_budget_table(const IndexStats& stats)
     return cells;
 }
 
-// The lexeme histogram, in the map's own (sorted) order so two runs print identical bytes. `none`
-// rather than an empty tail: an absent histogram and an unprinted one must not read alike.
+// post: cells in the map's own sorted order, so two runs print identical bytes.
+// note: prints `none` rather than an empty tail — absent and unprinted must not read alike.
 [[nodiscard]] std::string lexeme_cells(const std::map<std::string, std::uint64_t>& counts)
 {
     if (counts.empty())
@@ -1520,9 +1277,6 @@ void print_budget_table(const IndexStats& stats)
     return cells;
 }
 
-// DN-54.D23's partition of the UNREAD population, printed per band. The three classes have three
-// disjoint remedies with three different owners, and the record they replace named only two of
-// them — so the identity line (r1 + r2 + r3 == unread) is printed rather than assumed.
 void print_unread_partition(const NestedResidual& nested)
 {
     const std::uint64_t r1{nested.by_unread_class[static_cast<std::size_t>(UnreadClass::R1)]};
@@ -1737,11 +1491,8 @@ void print_usage(std::string_view program_name)
 }
 } // namespace
 
-// A FUNCTION-TRY-BLOCK, as in f13_cardinality_measure: the body prints as it goes, so the
-// handler's job is to make a partial report SAY it is partial. The handlers use std::fputs, not
-// std::println — a diagnostic that can itself throw would leave this function throwing after all.
-// `<label>=<corpus-dir>` roots in order, each optionally followed by its `<label>.outcomes=<tsv>`.
-// The error is the exit code to return, after the reason has been printed.
+// pre: each root is `<label>=<corpus-dir>`, optionally followed by `<label>.outcomes=<tsv>`.
+// post: on failure the error is the exit code to return, after the reason is printed.
 [[nodiscard]] std::expected<std::vector<RootReport>, int>
 parse_arguments(std::span<char*> arguments)
 {
@@ -1844,6 +1595,7 @@ void print_nested_summary(const std::vector<RootReport>& reports)
     }
 }
 
+// post: the report DECLARES its population and asserts nothing; no gate may depend on it.
 int main(int argc, char** argv)
 try
 {
@@ -1865,8 +1617,7 @@ try
                  "constant no longer exists)",
                  kReplacedByteHead);
 
-    // Generic corpus routing is semantic-unaware — a degenerate (zero-package) composition.
-    // `composed` precedes every Tokenizer so it outlives the const-ref each one holds.
+    // note: `composed` precedes every Tokenizer so it outlives the const-ref each one holds.
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};
     ArenaAllocator arena{kArenaBytes};
 
