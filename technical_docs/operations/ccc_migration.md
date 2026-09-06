@@ -6476,6 +6476,106 @@ these suites by name, and both still resolve.
 and **809 of 809** on `linux-gcc16-release`, equal to the pre-unit baseline. No suite in this
 directory carries the `corpus` label.
 
+## Unit 31 — `core/tests/{identity,scan}/` (5 files, 363 comment lines, 358 would-be violations) — a "RED ON PURPOSE" arm that has been GREEN since its fix landed, and a retired predicate the prose said had MOVED
+
+The identity spine's three suites and the two scan suites. Baseline split: bare 278 · trailing 52 ·
+spacer 19 · ruler 8 · tag-mid-line 1. After: **323 comment lines, 0 would-be violations** —
+`invariant` 165 · `refs` 16 · 137 continuations · 5 tool forms. Repo-level delta
+**694 → 336 = exactly 358**. No law block; the next free law integer is still 17.
+
+### CONVICTION 1 — an arm declared RED ON PURPOSE passes, and has since its fix landed
+
+`test_instance_discriminant.cpp` carried a forty-line block headed **RED ON PURPOSE**, stating that
+the discriminant *"today cannot"* separate nine cells of one runner matrix because it keeps only the
+FIRST masked span — *"five cells, one key"* — with the downstream harm and its measured numbers
+attached.
+
+Reader B answered the question correctly and then reported, from the implementation, that the
+function returns the **envelope** — the first span's start to the last span's end — which yields
+nine distinct coordinates, so the arm reads GREEN against the current tree.
+
+**Checked two ways, and the reader is right.** The implementation's own post-condition says
+`envelope of the masked spans, first span's start to last span's end`, carrying `DN-38.D3`. And the
+arm was RUN: `SeparatesCellsSharingAFirstMaskedSpan` **passes**. It could not have been otherwise —
+the suite has been green at 809 of 809 throughout this run, which is by itself a disproof of any
+arm claiming to be red by design.
+
+**This is the most consequential stale claim of the run, and the reason is what it would make a
+reader DO.** Every other conviction here misdescribed a mechanism. This one reports an OPEN DEFECT,
+with a harm model and four-figure measurements behind it, in a function that was fixed. A reader
+arriving at that block would believe the coordinate still collapses five cells to one key — and the
+natural response to that belief is to go and widen a discriminant that is already correct.
+
+The block now states what is true: the arm was PRE-REGISTERED red, it is GREEN since the coordinate
+became the envelope, and it is therefore a REGRESSION GUARD whose red would mean the complement had
+narrowed back towards a single span. The defect, the harm and the measurements are KEPT — they are
+why the arm exists and why the coordinate has the shape it has — but they are now in the past tense
+that the code has earned. One clause was added from the implementation's own invariant and it is the
+kind of bound this migration exists to surface: **the envelope is NOT injective over arbitrary
+strings**; what it separates is names whose spans occupy the same class positions.
+
+### CONVICTION 2 — a predicate the prose said had MOVED was RETIRED, and my conversion made it worse before the reader caught it
+
+`test_fast_gates.cpp` carried a note that the core timestamp primitive stays put while the
+dialect-specific SUBSET *"moved with the dialect strategy into `insight_semantic_github` as a
+package-PRIVATE helper"*, its discipline *"now covered by that package's strategy `confidence()`
+tests"*, naming both the symbol and the covering test.
+
+Reader A answered at MEDIUM confidence and said why: the comment as converted *"names neither the
+symbol nor the package"*, so it had to hunt — and it landed on the GitLab package, which is the
+wrong one. That is the failure my conversion introduced: I genericized a specific claim into a vague
+one, and a vague claim resolves to whatever is nearest.
+
+**Opening the artifact then found the CARRIED claim was false on all three counts.** No such
+package-private helper exists in that package. No such covering test exists. The package has no
+`confidence()` tests at all. The subset was **RETIRED, not relocated**: that 28-byte,
+seven-fraction-digit stamp is now a DECLARED TRANSPORT ROW owned by the catalogue, and the only
+surviving code of that shape is a LOCAL ORACLE inside the transport peel-equivalence gate.
+
+So this is the unit-28 lesson arriving a second time and sharper. **Dropping a symbol name does not
+make prose durable — it makes it unfalsifiable**, and an unfalsifiable claim outlives the false one
+it replaced. The rule that bans bare codenames governs registry addresses; it has never governed
+symbol and package names, and treating it as though it did is how a checkable falsehood becomes an
+uncheckable one. The claim now states the retirement, names where the grammar went, and records that
+the two things the old prose named do not exist.
+
+### The stripper cross-check is VACUOUS for the seventh and LAST time
+
+Removed **358**, kept 5 — all namespace closers. This is the final vacuous one: the repo's entire
+remaining suppression population, 2 trailing directives and 4 without a why, sits in the unit after
+this and makes that unit's cross-check the first of the run that can fail.
+
+### The address census, both legs
+
+**Outbound: ZERO lost**, exit 0 across all five files — 1 address in the normalization suite, 4 in
+the gates suite, 2 in the discriminant suite, 4 in the intent suite, 2 in the template-id suite.
+**Inbound: no other file names any of the five**, so there is no inbound citation to falsify.
+
+### The cold reader (`OPS-8.S8`) — 60 questions, 60 recovered, TWO convictions
+
+| reader | questions | recovered | convictions |
+|---|---|---|---|
+| A — ingest normalization, the fast gates | 30 | 30 | 1 |
+| B — the discriminant, intent identity, template id | 30 | 30 | 1 |
+
+`GIT COMMANDS RUN: none` and `EXCLUDED PATHS SEEN: none` from both.
+
+**Both convictions arrived through a reader's own uncertainty rather than through a wrong answer**,
+and both readers marked the uncertainty themselves — one as an explicit caveat beyond the question
+asked, the other as a MEDIUM confidence with its reason stated. Neither would have surfaced from the
+score alone: the score was 60 of 60.
+
+Reader A also went past its questions usefully, recovering the width census behind the clock-field
+ruling — the eight hour/minute/second width combinations and the three millisecond widths across the
+2 000-line reference sample — from a design note this unit does not cite, and confirming from the
+generator's own emitter why nine green generations never showed the gap.
+
+### The behaviour witness
+
+`malf test insight-canon` on **both** toolchains after the two repairs: **809 of 809** on
+`linux-clang21-libcxx-release` and **809 of 809** on `linux-gcc16-release`. No suite in these two
+directories carries the `corpus` label.
+
 
 
 

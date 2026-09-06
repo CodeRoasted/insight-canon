@@ -1,33 +1,26 @@
-// Unit tests: allow short identifiers and test-specific patterns
-// tests/scan/test_fast_gates.cpp
-//
-// White-box unit tests for the insight.canon.detail.scan shard (the fast_gates
-// predicate layer + the SSE2 sv_* scanning primitives). These gates run before
-// every per-strategy RE2 probe, so a false NEGATIVE silently disables a format
-// strategy and a false POSITIVE re-opens the RE2 cost the gate exists to kill —
-// both invisible to the strategy tests (which feed only well-formed lines).
-// Closes the tests/<domain> mirror gap flagged by the 1.5.2 cascade audit
-// (scan was the one shard without a per-domain suite).
 
+// invariant: WHITE-BOX unit tests for the fast-gate predicate layer and the vectorized scanning
+// primitives.
+// invariant: these gates run BEFORE every per-strategy regex probe, so a false NEGATIVE silently
+// disables a format strategy and a false POSITIVE re-opens the regex cost the gate exists to kill.
+// invariant: both are INVISIBLE to the strategy tests, which feed only well-formed lines.
+// invariant: it closes the per-domain mirror gap a cascade audit flagged — the scan shard was the
+// one without its own suite.
 #include <gtest/gtest.h>
 
 import insight.canon.test;
 
 using namespace insight::tokenization;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Character-class primitives
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST(FastGatesCharClass, DigitBoundaries)
 {
     EXPECT_TRUE(is_digit('0'));
     EXPECT_TRUE(is_digit('9'));
-    EXPECT_FALSE(is_digit('/')); // '0' - 1
-    EXPECT_FALSE(is_digit(':')); // '9' + 1
+    EXPECT_FALSE(is_digit('/'));
+    EXPECT_FALSE(is_digit(':'));
     EXPECT_FALSE(is_digit(' '));
-    // Signed-char trap: a high-bit byte must not wrap into the digit range —
-    // the unsigned-subtraction trick is exactly what this guards.
+    // invariant: the SIGNED-CHAR trap — a high-bit byte must not wrap into the digit range, which
+    // is exactly what the unsigned-subtraction trick guards.
     EXPECT_FALSE(is_digit('\xB0'));
 }
 
@@ -36,13 +29,13 @@ TEST(FastGatesCharClass, AlphaBoundaries)
     EXPECT_TRUE(is_upper('A'));
     EXPECT_TRUE(is_upper('Z'));
     EXPECT_FALSE(is_upper('a'));
-    EXPECT_FALSE(is_upper('@')); // 'A' - 1
-    EXPECT_FALSE(is_upper('[')); // 'Z' + 1
+    EXPECT_FALSE(is_upper('@'));
+    EXPECT_FALSE(is_upper('['));
     EXPECT_TRUE(is_lower('a'));
     EXPECT_TRUE(is_lower('z'));
     EXPECT_FALSE(is_lower('A'));
-    EXPECT_FALSE(is_lower('`')); // 'a' - 1
-    EXPECT_FALSE(is_lower('{')); // 'z' + 1
+    EXPECT_FALSE(is_lower('`'));
+    EXPECT_FALSE(is_lower('{'));
     EXPECT_FALSE(is_upper('\xC4'));
     EXPECT_FALSE(is_lower('\xE4'));
 }
@@ -51,7 +44,8 @@ TEST(FastGatesCharClass, SpaceIsPosixSpaceTabOnly)
 {
     EXPECT_TRUE(is_space(' '));
     EXPECT_TRUE(is_space('\t'));
-    EXPECT_FALSE(is_space('\n')); // the gates see single LINES — '\n' is content
+    // invariant: the gates see single LINES, so a newline is CONTENT and not whitespace.
+    EXPECT_FALSE(is_space('\n'));
     EXPECT_FALSE(is_space('\r'));
     EXPECT_FALSE(is_space('x'));
 }
@@ -59,8 +53,8 @@ TEST(FastGatesCharClass, SpaceIsPosixSpaceTabOnly)
 TEST(FastGatesCharClass, SkipSpacesAndConsumeDigits)
 {
     EXPECT_EQ(skip_spaces("a   b", 1), 4U);
-    EXPECT_EQ(skip_spaces("ab", 1), 1U);  // nothing to skip
-    EXPECT_EQ(skip_spaces("a  ", 1), 3U); // runs to end
+    EXPECT_EQ(skip_spaces("ab", 1), 1U);
+    EXPECT_EQ(skip_spaces("a  ", 1), 3U);
 
     std::size_t pos{0};
     EXPECT_TRUE(consume_digits("123x", pos, 1U, 3U));
@@ -78,11 +72,8 @@ TEST(FastGatesCharClass, SkipSpacesAndConsumeDigits)
     EXPECT_EQ(pos, 0U) << "a failed consume from a non-digit must not advance";
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Format prefix gates — one canonical accept + the discriminating rejects each.
-// Accept lines are drawn from the real formats the strategies parse.
-// ─────────────────────────────────────────────────────────────────────────────
-
+// invariant: one canonical ACCEPT per format plus the discriminating REJECTS, with accept lines
+// drawn from the real formats the strategies parse.
 TEST(FastGatesPrefix, BsdSyslog)
 {
     EXPECT_TRUE(is_bsd_syslog_prefix("Jan 15 08:03:22 host sshd[42]: accepted"));
@@ -91,7 +82,7 @@ TEST(FastGatesPrefix, BsdSyslog)
     EXPECT_FALSE(is_bsd_syslog_prefix("jan 15 08:03:22 lowercase month"));
     EXPECT_FALSE(is_bsd_syslog_prefix("Jan 15 08:03 no seconds"));
     EXPECT_FALSE(is_bsd_syslog_prefix("Jan 15 080322 no colons"));
-    EXPECT_FALSE(is_bsd_syslog_prefix("Jan 15 08:03:2")); // below kBsdMinLen
+    EXPECT_FALSE(is_bsd_syslog_prefix("Jan 15 08:03:2"));
 }
 
 TEST(FastGatesPrefix, IsoDateAndTimeAtOffset)
@@ -104,17 +95,18 @@ TEST(FastGatesPrefix, IsoDateAndTimeAtOffset)
     EXPECT_FALSE(match_time_at("10:15:0", 0));
 }
 
-// The core RFC3339 scan primitive stays here. The GitHub-Actions prefix SUBSET
-// (is_github_actions_prefix, exactly-7-fractional-digits-'Z') moved with the dialect strategy into
-// insight_semantic_github (a package-PRIVATE helper); its boundary discipline is now covered by
-// that package's strategy confidence() tests
-// (test_github_strategy::ConfidenceRespectsGhaPrefixSubset).
+// invariant: the core timestamp scan primitive stays HERE, and the dialect SUBSET — a 28-byte
+// stamp with exactly seven fraction digits — is no longer a canon predicate at all.
+// invariant: it became a DECLARED TRANSPORT ROW, so the grammar is owned by the catalogue and the
+// peel-equivalence gate carries its own local oracle rather than a shared helper.
+// invariant: this prose named a package-private helper and a covering confidence test until
+// 2026-09-07, and NEITHER exists — the subset was retired, not relocated.
 TEST(FastGatesPrefix, Rfc3339Prefix)
 {
     EXPECT_TRUE(is_rfc3339_prefix("2024-04-27T10:15:00Z payload"));
     EXPECT_FALSE(is_rfc3339_prefix("2024-04-27 10:15:00 space separator is not RFC 3339"));
-    // A hi-res fractional 'Z' timestamp (the GHA line shape) is still an RFC 3339 prefix — the
-    // subset relation, asserted at the core-primitive level, independent of any dialect.
+    // invariant: a high-resolution fractional timestamp is STILL a valid prefix — the subset
+    // relation, asserted at the core-primitive level and independent of any dialect.
     EXPECT_TRUE(is_rfc3339_prefix("2024-04-27T10:15:00.1234567Z ##[group]Run actions/checkout"));
 }
 
@@ -174,7 +166,9 @@ TEST(FastGatesPrefix, BglHealthAppHpc)
     EXPECT_FALSE(is_bgl_labelled_prefix("1117838570 2005.06.03 missing the leading label"));
     EXPECT_FALSE(is_bgl_labelled_prefix("- 1117838570 2005-06-03 dashes, not dots"));
 
-    // The alert-label column: `-` or a bounded uppercase class name, and nothing else (DN-43.D14).
+    // invariant: the alert-label column is a dash or a BOUNDED uppercase class name, and nothing
+    // else.
+    // refs: DN-43.D14
     EXPECT_TRUE(is_bgl_labelled_prefix(
         "KERNDTLB 1117838570 2005.06.03 R02-M1-N0-C:J12-U11 RAS KERNEL FATAL"));
     EXPECT_TRUE(
@@ -182,41 +176,46 @@ TEST(FastGatesPrefix, BglHealthAppHpc)
     EXPECT_TRUE(is_bgl_labelled_prefix("R_ID9 1117838570 2005.06.03 R02-M1-N0 RAS APP INFO msg"));
     EXPECT_FALSE(is_bgl_labelled_prefix("kerndtlb 1117838570 2005.06.03 lowercase is not a label"));
     EXPECT_FALSE(is_bgl_labelled_prefix("Kerndtlb 1117838570 2005.06.03 mixed case is not one"));
-    // 17 bytes — one past the bound, so the label does not end at whitespace and the line is not
-    // silently re-read as a 16-byte label plus a junk epoch.
+    // invariant: one byte past the bound, so the label does not end at whitespace and the line is
+    // NOT silently re-read as a shorter label plus a junk epoch.
     EXPECT_FALSE(is_bgl_labelled_prefix("ABCDEFGHIJKLMNOPQ 1117838570 2005.06.03 R02-M1-N0 RAS"));
     EXPECT_TRUE(is_bgl_labelled_prefix("ABCDEFGHIJKLMNOP 1117838570 2005.06.03 R02-M1-N0 RAS"));
 
     EXPECT_TRUE(is_health_app_prefix("20171223-22:15:29:606|Step_LSC|30002312|onStandStepChanged"));
-    // Every line below carries the record's THREE separators, so each arm fails for the reason
-    // its text names and not for its arity (DN-43.D16). Before that rule landed these two read
-    // `...:606|single-digit hour` and `...:66|two millis digits` — one separator each — which
-    // made the second arm's green a statement about pipe count rather than about millisecond
-    // width, the vacuity shape MEM:synthetic-gate-vacuity-vs-judgment names.
+    // invariant: every line below carries the record's THREE separators, so each arm fails for the
+    // reason its text NAMES and not for its arity.
+    // invariant: before that rule landed these two carried ONE separator each, which made the
+    // second arm's green a statement about SEPARATOR COUNT rather than about field width.
+    // refs: DN-43.D16, MEM:synthetic-gate-vacuity-vs-judgment
     EXPECT_TRUE(is_health_app_prefix("20171223-2:15:29:606|c|1|single-digit hour"));
     EXPECT_FALSE(is_health_app_prefix("20171223 22:15:29:606|c|1|space, not dash"));
 
-    // EVERY clock field is variable-width (DN-43.O5). This arm asserted the OPPOSITE until
-    // 2026-09-03 — `EXPECT_FALSE(is_health_app_prefix("20171223-22:15:29:66|two millis digits"))`
-    // PINNED the two-digit-millisecond rejection — and the pin was wrong about the format, not
-    // about the code. LogHub's own HealthApp_2k.log is not zero-padded anywhere: the 2-digit-minute
-    // and 3-digit-millisecond requirements rejected 247 of its 2 000 lines, 12.35 %, which got no
-    // event time and a whole-line raw-text template. The flip is the ruling landing, not a
-    // regression; the reason nine generations of green never showed it is that logcraft's
-    // fmt_health_app zero-pads unconditionally, so every synthetic HealthApp line was padded.
+    // invariant: EVERY clock field is variable-width, and this arm asserted the OPPOSITE until
+    // 2026-09-03 — it PINNED a rejection that was wrong about the FORMAT, not about the code.
+    // invariant: the reference corpus is not zero-padded anywhere.
+    // invariant: the fixed-width requirements rejected 247 of its 2 000 lines, 12.35 %, which got
+    // no event time and a whole-line raw template.
+    // invariant: the flip is the RULING LANDING and not a regression.
+    // invariant: the reason nine generations of green never showed it is that the generator's own
+    // emitter zero-pads UNCONDITIONALLY, so every synthetic line of that format was padded.
+    // refs: DN-43.O5
     EXPECT_TRUE(is_health_app_prefix("20171223-22:15:29:66|c|1|two millisecond digits"));
     EXPECT_TRUE(is_health_app_prefix("20171223-22:15:29:6|c|1|one millisecond digit"));
     EXPECT_TRUE(is_health_app_prefix("20171223-22:1:29:606|c|1|single-digit minute"));
     EXPECT_TRUE(is_health_app_prefix("20171223-2:1:9:6|c|1|every clock field one digit"));
-    // Still bounded above: a field wider than the grammar allows is not a HealthApp head.
+    // invariant: still BOUNDED ABOVE — a field wider than the grammar allows is not a valid head.
     EXPECT_FALSE(is_health_app_prefix("20171223-22:151:29:606|c|1|three-digit minute"));
     EXPECT_FALSE(is_health_app_prefix("20171223-22:15:29:6066|c|1|four millisecond digits"));
 
-    // ARITY IS GRAMMAR (DN-43.D16): the predicate proves all three separators, because the parse
-    // consumes three unconditionally. At one separator the second take swallowed the message body
-    // onto `component` and published an EMPTY `content`; at two, the process-id skip consumed the
-    // body and it reached NO projection field at all. Both now score 0.0 and are demoted to
-    // RawText — which keeps every byte — instead of being parsed into a lie.
+    // invariant: ARITY IS GRAMMAR — the predicate proves all three separators, because the parse
+    // consumes three UNCONDITIONALLY.
+    // invariant: at one separator the second take swallowed the message body onto the component and
+    // published an EMPTY content.
+    // invariant: at two, the process-id skip consumed the body and it reached NO projection field
+    // at all.
+    // invariant: both now score zero and are demoted to raw text, which keeps every byte, instead
+    // of being parsed into a lie.
+    // refs: DN-43.D16
     EXPECT_FALSE(is_health_app_prefix("20171223-22:15:29:606|onStandStepChanged 3579"))
         << "one separator: a four-field record's arity is not proven by its head";
     EXPECT_FALSE(is_health_app_prefix("20171223-22:15:29:606|Step_LSC|onStandStepChanged 3579"))
@@ -251,11 +250,8 @@ TEST(FastGatesKv, CountKvPairSignatures)
     EXPECT_EQ(count_kv_pair_signatures("=x leading equals has no key char", 10U), 0U);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SSE2 sv_* scanning primitives. Inputs longer than one 16-byte SSE block
-// exercise the vector loop; short inputs exercise the scalar tail.
-// ─────────────────────────────────────────────────────────────────────────────
-
+// invariant: inputs longer than one vector block exercise the SIMD loop, and short inputs exercise
+// the scalar tail.
 TEST(FastGatesScan, SvTakeTokenScalarAndSimdPaths)
 {
     std::string_view sv{"alpha  beta\tgamma"};
@@ -265,7 +261,8 @@ TEST(FastGatesScan, SvTakeTokenScalarAndSimdPaths)
     EXPECT_EQ(sv_take_token(sv), "") << "exhausted view yields empty tokens";
     EXPECT_TRUE(sv.empty());
 
-    // > 16 bytes of leading whitespace + a > 16-byte token: both SIMD loops run.
+    // invariant: more than a block of leading whitespace followed by a longer-than-a-block token,
+    // so BOTH vector loops run.
     std::string_view simd{"                    a_token_longer_than_sixteen_bytes tail"};
     EXPECT_EQ(sv_take_token(simd), "a_token_longer_than_sixteen_bytes");
     EXPECT_EQ(simd, "tail") << "view must rest at the next token start";
@@ -317,27 +314,20 @@ TEST(FastGatesScan, SvTakeBracketedAndQuoted)
     EXPECT_EQ(sv_take_quoted(unquoted), "");
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TokenShape — the one-pass per-token byte profile (canon.detail.scan).
-//
-// TokenShape collapses three scans the masker's KEEP/MASK/NORMALIZE dispatch used
-// to run per token (is_all_digits, is_digit_leading, the maybe_composite separator
-// gate) into a single byte walk. Today it is exercised only TRANSITIVELY via the
-// stateless-template masker suite — a refactor of the walk could silently diverge
-// one field from the predicate it replaced and the masker tests might still pass.
-//
-// These lock the primitive DIRECTLY: each field is asserted byte-exact against an
-// INDEPENDENT reference oracle (deliberately spelled out with a different idiom than
-// the production scan — a plain '0'..'9' range instead of the unsigned-subtraction
-// is_digit — so the test is a real cross-check, not a tautology of the code under test).
-// ─────────────────────────────────────────────────────────────────────────────
-
+// invariant: the per-token byte profile collapses THREE scans the masker's dispatch used to run per
+// token into a SINGLE byte walk.
+// invariant: it is otherwise exercised only TRANSITIVELY through the masker suite, so a refactor of
+// the walk could silently diverge one field from the predicate it replaced.
+// invariant: these lock the primitive DIRECTLY — each field asserted byte-exact against an
+// INDEPENDENT reference oracle.
+// invariant: the oracle is deliberately spelled with a DIFFERENT idiom than the production scan, a
+// plain range test instead of the unsigned-subtraction one.
+// invariant: that is what makes it a real CROSS-CHECK rather than a tautology of the code under
+// test.
 namespace
 {
-// Independent reference for each TokenShape field, mirroring the SPEC of the predicate
-// it replaced (not its code). is_all_digits: non-empty AND every byte a digit.
-// is_digit_leading: first byte after an optional +/- sign is a digit. maybe_composite:
-// the token contains a separator from the set : / [ # - = .
+// invariant: an independent reference per field, mirroring the SPEC of the predicate it replaced
+// and NOT its code.
 struct ShapeOracle
 {
     bool empty{};
@@ -356,7 +346,7 @@ struct ShapeOracle
     ShapeOracle ref{};
     ref.empty = tok.empty();
     if (ref.empty)
-        return ref; // empty token: every other field stays false, by spec
+        return ref;
 
     ref.all_digits = true;
     for (const char chr : tok)
@@ -372,34 +362,35 @@ struct ShapeOracle
 
 TEST(FastGatesTokenShape, FieldsAreByteExactWithReplacedPredicates)
 {
-    // Edge cases the handoff calls out, plus the byte-trap rows the scan must survive.
+    // invariant: the edge cases the handoff calls out, plus the byte-trap rows the scan must
+    // survive.
     const std::string_view cases[]{
-        "",      // empty token — early-out branch
-        "+",     // sign only: not empty, not a digit, '+' is NOT in the separator set
-        "-",     // sign only AND a separator ('-' is in the composite set)
-        "5",     // single pure digit
-        "0",     // single zero (boundary of is_digit's unsigned trick)
-        "12345", // pure-digit run → all_digits
-        "+5",    // signed digit-leading, NOT all_digits (sign byte)
-        "-42",   // signed digit-leading
-        "+a",    // sign then non-digit → digit_leading false
-        "-=",    // sign then separator → digit_leading false, has_separator true
-        "a1",    // letter-leading, not all_digits
-        "1a",    // digit-leading, not all_digits
+        "",
+        "+",
+        "-",
+        "5",
+        "0",
+        "12345",
+        "+5",
+        "-42",
+        "+a",
+        "-=",
+        "a1",
+        "1a",
         ":",
         "/",
         "[",
         "#",
-        "=",         // each separator in isolation
-        "10:15:00",  // separators interleaved with digits
-        "512MB",     // digit-leading, not all_digits, no separator
-        "6.2s",      // '.' is NOT a separator in this set
-        "0.25.5-3",  // digit-leading with a '-' separator
-        "user-name", // letter-leading with a '-' separator
-        "v1.2",      // letter-leading, no separator
-        "\xB0\xB0",  // high-bit bytes: not empty, no digits, no separators (signed-char trap)
+        "=",
+        "10:15:00",
+        "512MB",
+        "6.2s",
+        "0.25.5-3",
+        "user-name",
+        "v1.2",
+        "\xB0\xB0",
         "\xFF"
-        "9", // high-bit then digit: all_digits false, digit_leading false
+        "9",
     };
 
     for (const std::string_view tok : cases)
@@ -418,8 +409,9 @@ TEST(FastGatesTokenShape, FieldsAreByteExactWithReplacedPredicates)
 
 TEST(FastGatesTokenShape, SignOnlyTokenIsSeparatorButNotDigitLeading)
 {
-    // The subtle collision the handoff flags: "-" is sign-only (so digit_leading must
-    // be false — there is no digit after the sign) AND it is itself a separator byte.
+    // invariant: the subtle COLLISION the handoff flags.
+    // invariant: a lone sign is sign-only, so digit-leading must be false since there is no digit
+    // after it, AND it is itself a separator byte.
     const TokenShape minus{"-"};
     EXPECT_FALSE(minus.empty);
     EXPECT_FALSE(minus.all_digits);

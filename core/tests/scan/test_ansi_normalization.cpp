@@ -1,48 +1,46 @@
-// tests/scan/test_ansi_normalization.cpp
-//
-// Unit coverage for STAGE 1 — `normalize()`.
-// SRC-D-TID-11 — see canon.api.cppm (normalize()) for the contract.
-// Local: it is now the FACTORY that mints `NormalizedLine` (the out-parameter strip form is
-// REMOVED; the return type carries the proof that stage 1 ran).
-//
-// WHY THIS FILE EXISTS AT ALL. Stage 1's only coverage used to be three assertions inside
-// `tests/mask/test_stateless_template.cpp`, filed under `mask/` because the template-identity path
-// was its only consumer. That is no longer true: the function is public in `insight.canon.api` and
-// carries a NORMATIVE precondition on `recognize()`/`classify()` — every consumer of those two must
-// run it. A newly-public API whose tests live under an unrelated domain is coverage nobody finds,
-// so the three assertions MOVED here and grew. (The corresponding move is why
-// `test_stateless_template.cpp` no longer tests escapes at all.)
-//
-// WHAT A FIXTURE IS GOOD FOR, AND WHAT IT IS NOT. The population-bearing property — *do the two
-// content derivations agree over a real corpus* — cannot be a fixture: a hand-authored set can only
-// encode the shapes its author enumerated, and the shape that caused the ingest-normalization
-// defect was by definition one nobody had. That property is a differential corpus gate elsewhere.
-// What belongs HERE is the complement: NAMED hazards on a single function, which is the one thing a
-// fixture does well. Each test below is a named hazard with a stated consequence.
 
+// invariant: unit coverage for STAGE 1, the ingest normalization, which is now the FACTORY that
+// mints the normalized-line type.
+// invariant: the out-parameter strip form is REMOVED, so the return type carries the proof that
+// stage 1 ran.
+// invariant: WHY THIS FILE EXISTS AT ALL — stage 1's only coverage used to be three assertions
+// inside the masker suite, filed there because template identity was its only consumer.
+// invariant: that is no longer true: the function is PUBLIC and carries a NORMATIVE precondition on
+// the two recognition walkers, so every consumer of those must run it.
+// invariant: a newly-public API whose tests live under an unrelated domain is COVERAGE NOBODY
+// FINDS, so the three assertions moved here and grew.
+// invariant: WHAT A FIXTURE IS GOOD FOR, AND WHAT IT IS NOT — the population-bearing property,
+// whether the two content derivations agree over a real corpus, CANNOT be a fixture.
+// invariant: a hand-authored set can only encode the shapes its author enumerated, and the shape
+// that caused the defect was BY DEFINITION one nobody had.
+// invariant: that property is a differential corpus gate elsewhere; what belongs HERE is the
+// complement — NAMED hazards on a single function, which is the one thing a fixture does well.
+// invariant: each test below is a NAMED hazard with a STATED consequence.
+// refs: SRC-D-TID-11
 #include <gtest/gtest.h>
 
 import insight.canon.test;
 
 using namespace insight::tokenization;
 
-// SRC-D-TID-11 — see canon.api.cppm (normalize()) for the contract.
-// Asserted here: two coloured variants of one
-// line fold to the same colour-free bytes, so they cannot mint two templates.
+// invariant: two coloured variants of one line fold to the same colour-free bytes, so they cannot
+// mint two templates.
+// refs: SRC-D-TID-11
 TEST(AnsiNormalization, EscapesInterleavedWithTokensAreRemoved)
 {
     std::string scratch;
     EXPECT_EQ(normalize("\x1b[31mERROR\x1b[0m: pool down", scratch).bytes(), "ERROR: pool down");
-    // An escape INSIDE a word is the reason a per-token mask cannot reach these and they must die
-    // at ingest: `for_each_token` treats an escape run as a DELIMITER, so un-normalized this is two
+    // invariant: an escape INSIDE a word is why a per-token mask cannot reach these and they must
+    // die at INGEST.
+    // invariant: the token walk treats an escape run as a DELIMITER, so un-normalized this is two
     // tokens and the level word is never seen.
     EXPECT_EQ(normalize("\x1b[31mER\x1b[0mROR: pool down", scratch).bytes(), "ERROR: pool down");
 }
 
-// The fast path now lives INSIDE the factory: a line with no escape byte is a FIXED POINT of the
-// strip, so `normalize()` borrows the caller's line with NO copy and the scratch is untouched.
-// Both halves are asserted — the bytes AND the zero-copy borrow (data pointer identity), because
-// the borrow is what makes the per-line cost of the typed seam a memchr rather than a memcpy.
+// invariant: the fast path lives INSIDE the factory — a line with no escape byte is a FIXED POINT
+// of the strip, so the factory borrows the caller's line with NO copy and the scratch is untouched.
+// invariant: BOTH halves are asserted, the bytes AND the zero-copy borrow through pointer identity,
+// because the borrow is what makes the typed seam's per-line cost a scan and not a copy.
 TEST(AnsiNormalization, AnEscapeFreeLineIsAZeroCopyFixedPoint)
 {
     std::string scratch{"sentinel"};
@@ -56,13 +54,14 @@ TEST(AnsiNormalization, AnEscapeFreeLineIsAZeroCopyFixedPoint)
     EXPECT_EQ(normalize("", scratch).bytes(), "");
 }
 
-// A leading CSI run displaces an anchored prefix off offset 0, and `recognize()`/`classify()` are
-// anchored longest-prefix walks — so the row simply does not fire, with no error and no counter.
-// That is the whole mechanism behind the 1 077 lost GitLab section markers.
-//
-// BOTH forms are asserted because the CLASS is "a leading CSI run", not the byte string `ESC[0K`:
-// the same corpus carries it as `ESC[0;m`, and a stage 1 that handled only the first would be a
-// mirror of one producer with an expiry date nobody would notice.
+// invariant: a LEADING control run displaces an anchored prefix off offset 0, and the two
+// recognition walkers are anchored longest-prefix walks.
+// invariant: so the row simply does not fire, with NO error and NO counter — that is the whole
+// mechanism behind 1 077 lost section markers.
+// invariant: BOTH forms are asserted because the CLASS is a leading control run and not one byte
+// string — the same corpus carries a second spelling.
+// invariant: a stage 1 handling only the first would be a MIRROR of one producer, with an expiry
+// date nobody would notice.
 TEST(AnsiNormalization, ALeadingCsiRunIsRemovedSoAnAnchoredPrefixReachesOffsetZero)
 {
     std::string scratch;
@@ -70,17 +69,17 @@ TEST(AnsiNormalization, ALeadingCsiRunIsRemovedSoAnAnchoredPrefixReachesOffsetZe
               "section_start:1746093602:prepare_executor");
     EXPECT_EQ(normalize("\x1b[0;msection_start:1746093602:prepare_executor", scratch).bytes(),
               "section_start:1746093602:prepare_executor");
-    // Several escapes in one run — the same rule, no special case for "exactly one".
+    // invariant: several escapes in one run take the same rule, with no special case for exactly
+    // one.
     EXPECT_EQ(normalize("\x1b[0K\x1b[36;1msection_start:1:x", scratch).bytes(),
               "section_start:1:x");
 }
 
-// THE PRECISION LEG, and it can genuinely fail. A shell xtrace echoes the SOURCE of a command, so
-// the corpus carries lines whose `\e` is a LITERAL BACKSLASH followed by 'e' — two ordinary
-// characters, not the 0x1b byte. That is prose DESCRIBING an escape and must survive as prose: a
-// stage 1 that also interpreted textual escape notation would mint markers out of scripts that
-// merely mention one. (The recognition half of this property is the GitLab package's, asserted at
-// semantic/gitlab/tests/test_gitlab_markers.cpp.)
+// invariant: THE PRECISION LEG, and it can genuinely fail — a shell trace echoes the SOURCE of a
+// command, so the corpus carries lines whose escape notation is two ORDINARY characters.
+// invariant: that is prose DESCRIBING an escape and must survive as prose.
+// invariant: a stage 1 that also interpreted textual escape notation would mint markers out of
+// scripts that merely MENTION one.
 TEST(AnsiNormalization, LiteralEscapeNotationSurvivesAsProse)
 {
     std::string scratch;
@@ -89,43 +88,45 @@ TEST(AnsiNormalization, LiteralEscapeNotationSurvivesAsProse)
               R"(++ echo -e '\e[0Ksection_start:1746093602:prepare_executor')");
 }
 
-// OSC is the arm the SIBLING grammar in this codebase does not have: `detail::ansi_escape_len`
-// (canon.api.cppm, feeding `for_each_token`) returns 1 for an `ESC ]` and then scans the OSC BODY
-// as content. Measured at 0 occurrences in the scanned head across all four corpora — latent, not
-// live — which is exactly why the arm that DOES handle it needs a test that keeps it honest.
+// invariant: the operating-system-command arm is the one the SIBLING grammar in this codebase does
+// NOT have.
+// invariant: that scanner returns a length of one for such an introducer and then reads the BODY as
+// content.
+// invariant: measured at ZERO occurrences in the scanned head across all four corpora, so it is
+// LATENT rather than live.
+// invariant: that is exactly why the arm that DOES handle it needs a test to keep it honest.
 TEST(AnsiNormalization, OscSequencesAreDroppedWholeAtEitherTerminator)
 {
     std::string scratch;
-    // BEL-terminated. (`\a` = BEL 0x07; a `\x07b` hex-escape would greedily absorb the trailing
-    // 'b'.)
+    // invariant: the bell-terminated form, and the hex escape is written carefully because a bare
+    // one would greedily absorb the following letter.
     EXPECT_EQ(normalize("a\x1b]0;title\ab", scratch).bytes(), "ab");
-    // ST-terminated (ESC \) — the other ECMA-48 terminator, and the one a BEL-only scanner would
-    // run past, swallowing the rest of the line as an OSC body.
+    // invariant: the other standard terminator, and the one a bell-only scanner would run PAST,
+    // swallowing the rest of the line as a command body.
     EXPECT_EQ(normalize("a\x1b]0;title\x1b\\b", scratch).bytes(), "ab");
 }
 
-// A two-byte ESC sequence that is neither CSI nor OSC (charset select, reset, …) is consumed whole.
-// The hazard is off-by-one in either direction: consuming one byte leaves the final byte as content
-// ('B' from `ESC ( B` becoming a token), consuming three eats a byte of real content.
+// invariant: a two-byte escape sequence that is neither of the two families is consumed WHOLE.
+// invariant: the hazard is off-by-one in EITHER direction — consuming one byte leaves the final
+// byte as content, and consuming three eats a byte of real content.
 TEST(AnsiNormalization, ATwoByteEscapeSequenceIsConsumedWhole)
 {
     std::string scratch;
-    // ESC ( is the two-byte sequence; 'B' is the charset designator, kept.
     EXPECT_EQ(normalize("a\x1b(Bb", scratch).bytes(), "aBb");
-    // ESC 7 (save cursor) — nothing follows the designator.
     EXPECT_EQ(normalize("a\x1b"
                         "7b",
                         scratch)
                   .bytes(),
               "ab");
-    // A lone trailing ESC has no sequence to complete and is dropped rather than emitted.
+    // invariant: a LONE TRAILING escape has no sequence to complete and is DROPPED rather than
+    // emitted.
     EXPECT_EQ(normalize("tail\x1b", scratch).bytes(), "tail");
 }
 
-// `LogParser::parse_line` branches on an EMPTY strip result — a line that was nothing but escape
-// bytes yields no event rather than an empty one. That branch is only reachable if the strip can
-// actually return empty for a non-empty input, so the property is load-bearing rather than
-// cosmetic.
+// invariant: the parser branches on an EMPTY strip result, so a line that was nothing but escape
+// bytes yields no event rather than an empty one.
+// invariant: that branch is only REACHABLE if the strip can actually return empty for a non-empty
+// input, so the property is load-bearing rather than cosmetic.
 TEST(AnsiNormalization, ALineOfNothingButEscapeBytesStripsToEmpty)
 {
     std::string scratch;
@@ -134,17 +135,17 @@ TEST(AnsiNormalization, ALineOfNothingButEscapeBytesStripsToEmpty)
         << "expected empty, got: " << std::string{normalized.bytes()};
 }
 
-// The strip is idempotent, and the caller's scratch is REUSED across lines (LogParser holds one
-// `escape_scratch_` for the whole stream; eidos's seam holds one per line loop). A strip that
-// appended instead of clearing would leak the previous line into this one — silently, and only on
-// the second and later ESC-bearing lines of a stream.
+// invariant: the strip is IDEMPOTENT, and the caller's scratch is REUSED across lines — the
+// parser holds one for the whole stream and the downstream seam holds one per line loop.
+// invariant: a strip that APPENDED instead of clearing would leak the previous line into this one,
+// SILENTLY, and only on the second and later escape-bearing lines of a stream.
 TEST(AnsiNormalization, TheScratchIsClearedSoReuseCannotLeakThePreviousLine)
 {
     std::string scratch;
     EXPECT_EQ(normalize("\x1b[31mfirst line\x1b[0m", scratch).bytes(), "first line");
     EXPECT_EQ(normalize("\x1b[32msecond\x1b[0m", scratch).bytes(), "second");
-    // Idempotence: normalizing already-normalized bytes changes nothing (and, being escape-free,
-    // takes the zero-copy fast path).
+    // invariant: IDEMPOTENCE — normalizing already-normalized bytes changes nothing, and being
+    // escape-free it takes the zero-copy fast path.
     std::string again;
     const auto once{normalize("\x1b[31mfirst line\x1b[0m", scratch)};
     EXPECT_EQ(normalize(once.bytes(), again).bytes(), once.bytes());

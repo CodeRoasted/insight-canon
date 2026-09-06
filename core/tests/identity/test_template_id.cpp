@@ -1,8 +1,9 @@
-// test_template_id.cpp — the SRC-D-TIR-1 invariants for canon's TemplateId
-// These are the golden-preserving guards the whole
-// perf refactor rests on: byte-lexicographic order == "h:"+hex order, render/parse
-// round-trip, content determinism, and a working std::hash specialization.
 
+// invariant: the invariants for canon's template-id type — the golden-preserving guards the whole
+// performance refactor rests on.
+// invariant: byte-lexicographic order matching the old rendered-string order, the render and parse
+// round trip, content determinism, and a working hash specialization.
+// refs: SRC-D-TIR-1
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -17,7 +18,7 @@ using insight::TemplateId;
 namespace
 {
 
-// A spread of representative masked templates (the kind the masker emits).
+// invariant: a spread of representative MASKED templates, of the kind the masker actually emits.
 const std::vector<std::string> kSamples{
     "GET <*> -> <*>",
     "user <*> logged in",
@@ -60,9 +61,9 @@ TEST(TemplateIdInvariants, ParseIsInverseOfRender)
     }
 }
 
-// Invariant 1 (the golden-preserver): byte-lexicographic order over `bytes` reproduces
-// the old "h:"+hex string order EXACTLY, so every vector<TemplateId> sort is byte-identical
-// to the old vector<string> sort.
+// invariant: THE GOLDEN-PRESERVER — byte-lexicographic order over the raw bytes reproduces the
+// old rendered-string order EXACTLY.
+// invariant: so every sort of these ids is byte-identical to the old sort of the rendered strings.
 TEST(TemplateIdInvariants, ByteOrderMatchesHexStringOrder)
 {
     for (const auto& lhs : kSamples)
@@ -76,7 +77,8 @@ TEST(TemplateIdInvariants, ByteOrderMatchesHexStringOrder)
         }
 }
 
-// std::hash<TemplateId> must be reachable + usable (the whole point of carrying a POD).
+// invariant: the standard hash specialization must be reachable AND usable, which is the whole
+// point of carrying a plain-data type.
 TEST(TemplateIdInvariants, StdHashUsableInUnorderedContainer)
 {
     std::unordered_map<TemplateId, std::string> by_id;
@@ -87,13 +89,16 @@ TEST(TemplateIdInvariants, StdHashUsableInUnorderedContainer)
         const auto iter{by_id.find(template_id_of(sample))};
         ASSERT_NE(iter, by_id.end()) << "lookup miss for: " << sample;
     }
-    // distinct non-empty samples → distinct ids (no accidental collision in the set)
-    EXPECT_GE(by_id.size(), kSamples.size() - 1U); // -1 tolerates any dup in the literal list
+    // invariant: distinct non-empty samples yield distinct ids, with the bound written to TOLERATE
+    // any duplicate in the literal list rather than to assume there is none.
+    EXPECT_GE(by_id.size(), kSamples.size() - 1U);
 }
 
-// ── NgramId (SRC-D-TIR-4(2)): the scalar key for n-gram SEQUENCES ──
-// Transient (never serialized), so the contract is in-memory keying only: deterministic,
-// order-sensitive, distinct-per-distinct-sequence, and usable in an unordered_map.
+// invariant: the scalar key for n-gram SEQUENCES is TRANSIENT and never serialized, so its contract
+// is in-memory keying only.
+// invariant: deterministic, ORDER-SENSITIVE, distinct per distinct sequence, and usable in a hash
+// container.
+// refs: SRC-D-TIR-4
 namespace
 {
 [[nodiscard]] std::vector<TemplateId> seq(std::initializer_list<std::string_view> templates)
@@ -114,7 +119,8 @@ TEST(NgramIdInvariants, Deterministic)
 
 TEST(NgramIdInvariants, OrderSensitive)
 {
-    // [a,b] and [b,a] are DISTINCT n-grams → distinct ids (transition order is significant).
+    // invariant: a sequence and its reverse are DISTINCT n-grams and take distinct ids, because
+    // transition ORDER is significant.
     const auto forward{seq({"user <*> logged in", "charge order total"})};
     const auto reversed{seq({"charge order total", "user <*> logged in"})};
     EXPECT_NE(ngram_id_of(forward), ngram_id_of(reversed));
@@ -128,7 +134,9 @@ TEST(NgramIdInvariants, DistinctSequencesGiveDistinctIds)
         seq({"the quick brown fox jumps", "a"}),
         seq({"GET <*> -> <*>", "user <*> logged in", "charge order total"}),
         seq({"GET <*> -> <*>", "user <*> logged in"}),
-        seq({}), // empty sequence is well-defined (the basis), distinct from any non-empty
+        // invariant: the EMPTY sequence is well-defined — it is the basis, and it is distinct
+        // from any non-empty one.
+        seq({}),
     };
     std::unordered_map<NgramId, std::size_t> by_id;
     for (std::size_t i{0}; i < sequences.size(); ++i)
