@@ -2658,6 +2658,187 @@ where `ADR-26.D5` puts a `pre:` at a declaration.
 
 ---
 
+## Unit 16 — `semantic/test_frameworks/` (3 files, 82 comment lines, 79 would-be violations) — the run's first package converted WHOLE, source and tests in one unit, and 20 of 20 recovered
+
+The seventh run scoped, stripped and drafted this unit and did not land it. Its scoping was
+recorded here rather than in the disposable scratchpad, and this run **re-derived every figure in
+it at the artifact rather than carrying it**; all three per-file readings matched.
+
+| file | comment lines | violations | split |
+|---|---|---|---|
+| `src/test_frameworks.cppm` | 36 | 35 | bare 26, spacer 1, trailing 8 |
+| `tests/conformance.cpp` | 6 | 5 | bare 5 |
+| `tests/test_location_families.cpp` | 40 | 39 | bare 29, trailing 10 |
+| **total** | **82** | **79** | |
+
+**The interface and both tests converted TOGETHER**, on `OPS-8.S2`'s answer-key ground: the tests
+assert on the very rows the module interface declares, so converting the interface alone would have
+left its reader an answer key one directory away.
+
+After: **42 comment lines, 0 would-be violations** — `pre` 1 · `invariant` 16 · `refs` 8 ·
+15 continuations · 2 tool forms. Repo-level delta **10 712 → 10 633 = exactly 79**, the unit's own
+count.
+
+### The DERIVED token census (`OPS-8.S4`), and the one suppression, measured twice with a control
+
+The census was derived from the gates rather than read off the step's list: every marker constant
+in the superproject's `scripts/` that is read out of **comment text** — `DETERMINISM-ALLOW`
+(`random_determinism_lint.py`, `wallclock_lint.py`), `LOG-SEAT-ALLOW` (`log_seat_routing_lint.py`),
+`CLOSURE MODEL` (`closure_declaration_lint.py`), `pin-coherence: mirrors` and
+`INV-17-EXEMPT-OBJECT-STORE` (`pin_coherence.py`) — plus `clang-format off`, `wall-clock:`, SPDX and
+the `/*name*/` forms. **Every one has a population of ZERO in these three files.**
+
+`NOLINT` before **2**, after **0**, and the decision is measured rather than argued.
+`tests/conformance.cpp` opened a region whose `NOLINTBEGIN` sat **mid-line inside a bare prose
+block** and closed with `NOLINTEND` on its own line — so the strip removed the opener with the prose
+and kept the orphan closer, which is `OPS-8.O3`'s first lesson reproduced exactly. The directive
+**names no check**, so it suppresses every armed one and the check-inventory argument is
+unavailable; the TU was run twice in place against the release database
+(`build-clang21-libcxx-release/compile_commands.json`), with the directive TEXT replaced and the
+code untouched:
+
+| run | main-file diagnostics |
+|---|---|
+| `conformance.cpp` with the directive | **0** |
+| `conformance.cpp` with the directive disarmed | **0** |
+| positive control — `test_location_families.cpp`, no directive anywhere | **4** `readability-identifier-length` |
+
+The control is what makes the two zeros carry information (`OPS-8.S3.4`, and this ledger's own
+finding 16, where a pair of zeros with a silent control meant nothing): the control fires **the very
+check class the deleted prose named** — *"short identifiers … are fine"*. The region silenced
+nothing, so **both directives are deleted with that evidence** and the orphan-closer problem
+dissolves rather than being re-homed. `malf lint` prunes `tests/` by policy in this repo, so the
+suppression's reader was clangd, which runs the same check set.
+
+### The stripper cross-check (`OPS-8.S5`), held non-vacuously
+
+Removed 35 + 5 + 39 = **79**; the unit's kept violation classes are **zero** (no
+`suppression-without-why`, no `trailing-nolint` in the gate's split), so the equality is
+`79 == 79 − 0` and it holds **with nothing subtracted**. Kept forms: 2 namespace closers. This is
+the vacuous shape the step warns about only when a unit HAS suppressions and they cancel; here the
+unit's one suppression was classed **bare** by the gate, not `suppression-without-why`, so the
+identity is exact rather than lucky.
+
+### The address census (`OPS-8.S7.3b`), outbound and inbound
+
+Outbound, exit 0: `test_frameworks.cppm` 2 addresses, set unchanged (`SRC-SP-7`, `ADR-17.D9`);
+`conformance.cpp` 1, set unchanged (`SRC-SP-2`); `test_location_families.cpp` **added**
+`BIB:intent_identity` and `F-SRC-insight-canon:test_semantic_walkers.cpp`. Both additions are
+repairs, not decoration: the old prose carried a bible reference as bare text
+(*"bibles/intent_identity.md §8"*) and a sibling test as a **raw path**, and both are now addresses
+the rename tripwire resolves.
+
+`SRC-SP-2` is **already absorbed** by a law block at `core/src/conformance/canon.conformance.cppm`,
+which is the code's only declaration-position site. Per `OPS-8.O5` a **citing** site keeps
+`refs: SRC-SP-2` unchanged and the lane does not repoint it; that citer belongs on the pilot's
+cross-repo cascade list and is recorded here for it.
+
+Inbound: **61 mentions, every one a lead, none a repair**. Two classes, both benign for a stated
+reason rather than an assumed one:
+* **Ten of the leads are line coordinates into this unit's files that the conversion moved** —
+  seven naming `test_frameworks.cppm` and one naming `test_location_families.cpp`, all of them on
+  the superproject's two FROZEN RECORD SHELVES. That is why they exist at all: the source-coordinate
+  ban is checked on the live doc tier, and `registry_grammar_lint` treats those two directory names
+  as records by construction, which is how the gate reads 0 live `file:line` sites while these
+  stand. A record states what was true when it was written, so a moved line does not falsify it and
+  no repair is owed — and the ledger may not cite into those shelves either, which is the point
+  restated here rather than pointed at.
+* `DN-032`, `DN-066` and `DN-059` cite `F-SRC-insight-canon:test_frameworks.cppm` — the address
+  form, which survives this and every later conversion — and each rests on **code** (`.roles = {}`,
+  the three naming families), not on prose this unit deleted.
+* The `coderoast-web` sift-showcase logs matching `conformance.cpp` are basename collisions inside
+  captured build output, not citations.
+
+### Interrogation
+
+Twenty questions to one `general-purpose` reader, prompt carrying the unconditional exclusion globs
+and the disclosure clause. **`GIT COMMANDS RUN: none`. `EXCLUDED PATHS SEEN: none`.**
+
+**20 recovered · 0 not recovered · 0 wrong.** Scored from the per-question evidence, not from the
+reader's summary line.
+
+Four answers went past what the tree's residual lines assert, each verified here at the artifact
+before being accepted as a recovery:
+* Q7 — the reader found that `all_revisions_named` is **`consteval`** and returns `false` on an
+  empty span, so an empty revision array does not merely lose meaning, **it does not compile**.
+  Verified at `core/api/canon.spi.cppm`.
+* Q2 — `strategy` and `echoed_source` **already default to `nullptr`** in the manifest, so spelling
+  them is a statement rather than a fill-in. Verified at the struct's member defaults.
+* Q19 — the word-boundary termination of the go/ruby suffix set, a claim this conversion
+  **deleted rather than carried**, was recovered whole from `match_suffix_set` / `loc_is_word`,
+  including the exact rejection of `my_test.gogo`.
+* Q15 — that canon excludes `##[error]` / `##[group]` / `##[debug]File:` by a **byte class walked
+  backwards** and never by a marker list was recovered from `loc_is_path` in
+  `core/src/compose/semantic_walkers.cpp`.
+
+**The score's declared limit, predicted by the seventh run and confirmed:** three answers (Q12, Q15,
+Q16) rest partly on `core/tests/compose/test_semantic_walkers.cpp`, which is **unconverted** and
+carries the same subject matter under its own prose. That is a legitimate recovery from the working
+tree and it is recorded as **evidence found OUTSIDE the unit**; a reader after `core/tests/`
+converts would have to recover those three from code alone.
+
+### A measurement this unit took because the reader's confidence was medium, and what it found
+
+The reader answered Q4 — *name one entity in `test_frameworks.cppm` that comes from
+`insight.canon.api`* — with **none**, at `medium` confidence, and rested the import's justification
+on the convention line this conversion wrote. A finding is a lead, not a fact, so it was measured:
+deleting `import insight.canon.api;` and building the repo returns **rc=0**, and a positive control
+(`static_assert(false)` appended to the same file) returns **rc=1 with the error quoted**, so the
+build demonstrably sees edits to that file. The import is therefore **not required to compile** —
+it is a package-shape convention, held identically by `github`, `gitlab` and `jenkins`, which do
+name api entities. Recorded as a finding below; changing it is a code change and no comment-only
+commit may make it.
+
+A second, smaller measurement from the same session: turning `export import insight.canon.spi` into
+a plain `import` also builds clean, because **no in-repo consumer names `SemanticPackageManifest`** —
+`test_location_families.cpp` reaches `kManifest` through CTAD and `conformance.cpp` passes it
+straight to `run()`. That does not falsify the re-export's stated reason, which is about a consumer
+outside this tree and which the reader independently re-derived from `canon.spi.cppm`'s header and
+`canon.cppm`'s deliberate non-re-export of spi; it does mean the re-export has **no in-repo
+witness**.
+
+### Dispositions
+
+Nothing was not-recovered and nothing was wrong, so no claim needed a home above the comment rung
+and **no law block was minted** — this unit consumed no law number. Every `SRC-` code in it
+(`SRC-SP-7`, `SRC-SP-2`, `SRC-II-8`) is a **citation** whose declaring site is elsewhere in `core/`
+and survives the unit, which is why the unit was takeable without a range.
+
+### Findings for other lanes — none fixed here
+
+1. **`import insight.canon.api;` in `semantic/test_frameworks/src/test_frameworks.cppm` names
+   nothing and is not needed to build.** Measured above, with a positive control. Either the
+   four-package uniform import shape is a convention worth stating once in the SPI, or this import
+   is dormant plumbing and is ripped. **Addressee: Daidalos** — the package-shape convention is
+   architecture, not a comment.
+2. **The `export import insight.canon.spi` in that file has no in-repo witness.** Its stated reason
+   concerns an external package author; nothing inside this tree names `SemanticPackageManifest`
+   through this module, so a regression that turned the re-export into a plain import would pass
+   every gate this repo runs. **Addressee: Kleio** — if the external-consumer contract is worth
+   holding, it needs an arm that names the type.
+3. **`SRC-SP-2`'s citer at `semantic/test_frameworks/tests/conformance.cpp` is on the cascade list.**
+   The code is already absorbed by a law block at its declaration-position site; this citer stays
+   `refs: SRC-SP-2` until the pilot's cross-repo repoint pass. **Addressee: the pilot.**
+
+### Witnesses
+
+1. **Comment-only** — all three files *code token stream identical to HEAD*, re-run after the
+   import and control measurements had touched and restored the file.
+2. **Grammar** — draft standalone gate 0 violations (with the `--style file:` invocation, never
+   `malf format --check <scratch dir>`); in-tree `malf format --check` 3 selected, 3 checked,
+   **0 misformatted, 0 would-be violations**.
+3. **Behaviour** — `malf test insight-canon` **809 of 809 on clang-21 and 809 of 809 on gcc-16.2**,
+   equal to this run's own baseline taken before the unit (734 + 32 + 25 + 13 + 5, both toolchains).
+4. **Knowledge** — 20 of 20, above.
+5. **Addressability** — outbound exit 0, no address lost, two added; inbound 61 leads read.
+
+`registry_grammar_lint` 0 failures and `docs_lint` 0 failures, both from the workspace root, both
+immediately before the push.
+
+
+
+---
+
 # The `OPS-8` verdict — third cold reader, first at scale
 
 `insight-canon` is `OPS-8`'s third run and its first large one; findings 14 onward come from the

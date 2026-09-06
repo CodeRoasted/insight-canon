@@ -1,36 +1,33 @@
-// insight.semantic.test_frameworks — test-framework file-location semantic package.
-// VOCABULARY as DATA: the jest/vitest/playwright/pytest/go/ruby test-file naming families, as
-// LocationRows in the closed canon rule grammar. NO code tier — the matching ALGORITHM lives in
-// canon core (recognize_location walks these composed rows via the closed LocationMatchKind
-// families); framework file-naming is CI-dialect-independent, so this is pure data. Composed via
-// insight::semantic::compose().
-//
-// `export import insight.canon.spi` so a consumer importing this module can name
-// SemanticPackageManifest (kManifest's type).
+// invariant: this package ships DATA only: strategy and echoed_source are null, and the matching
+// algorithm is canon's recognize_location over the composed rows.
+// invariant: test-file naming is CI-dialect-independent, so one vocabulary covers jest, vitest,
+// playwright, pytest, go and ruby rather than one set per dialect.
 module;
 
 export module insight.semantic.test_frameworks;
-import insight.canon.internal; // std
-import insight.canon.api; // (grammar rows reference no api enum here, but api is the base import)
+import insight.canon.internal;
+// invariant: api is the base import of every semantic package; this one names no api entity, its
+// rows being file-naming vocabulary rather than log grammar.
+import insight.canon.api;
+// invariant: spi is re-exported so a consumer importing this module can name
+// SemanticPackageManifest, which is kManifest's type.
 export import insight.canon.spi;
 
 namespace insight::semantic::test_frameworks
 {
 
-// ── Family vocabulary (package-static; the LocationRow spans point here — SRC-SP-7 lifetime) ──
-// jest/vitest/playwright/pytest `.test.<ext>` / `.spec.<ext>` with ext ∈ this set.
+// refs: SRC-SP-7
+// invariant: LocationRow holds spans into these arrays, so each keeps package-static constexpr
+// storage for as long as a composed manifest can be read.
 inline constexpr std::array<std::string_view, 2> kTestSpecInfixes{".test.", ".spec."};
 inline constexpr std::array<std::string_view, 7> kTestSpecExtensions{"ts",  "tsx", "js", "jsx",
                                                                      "mjs", "cjs", "py"};
-// pytest bare module: basename `test_*` / `*_test`, extension `.py`.
 inline constexpr std::array<std::string_view, 1> kPytestBasenamePrefixes{"test_"};
 inline constexpr std::array<std::string_view, 1> kPytestBasenameSuffixes{"_test"};
 inline constexpr std::array<std::string_view, 1> kPytestExtensions{".py"};
-// go / ruby: full file suffixes, word-boundary-terminated.
 inline constexpr std::array<std::string_view, 3> kGoRubySuffixes{"_test.go", "_spec.rb",
                                                                  "_test.rb"};
 
-// ── Location rows (§2.2) — one per family, mapping 1:1 to the three LocationMatchKinds ──
 inline constexpr std::array<LocationRow, 3> kLocations{{
     {.kind = LocationMatchKind::TestSpecExtension,
      .infixes = kTestSpecInfixes,
@@ -39,45 +36,43 @@ inline constexpr std::array<LocationRow, 3> kLocations{{
      .suffixes = {}},
     {.kind = LocationMatchKind::PrefixAndExtension,
      .infixes = {},
-     .extensions = kPytestExtensions,      // `.py` — the algorithm anchors on this extension
-     .prefixes = kPytestBasenamePrefixes,  // basename starts_with `test_`
-     .suffixes = kPytestBasenameSuffixes}, // …or basename ends_with `_test`
+     .extensions = kPytestExtensions,
+     .prefixes = kPytestBasenamePrefixes,
+     .suffixes = kPytestBasenameSuffixes},
     {.kind = LocationMatchKind::SuffixSet,
      .infixes = {},
      .extensions = {},
      .prefixes = {},
-     .suffixes = kGoRubySuffixes}, // full-file suffix set
+     .suffixes = kGoRubySuffixes},
 }};
 
-// ── The declared REVISION vocabulary (grammar-6, ADR-17.D9) ──
-// This package has no VENDOR: the test-file naming families are a convention shared across jest /
-// vitest / playwright / pytest / go / ruby, not one supplier's syntax. The coordinate is still
-// declared and still non-empty, because the grammar admits no package that declares no generation
-// at all, and because a reader comparing two digests must be able to see the same field in every
-// manifest. `v1` names OUR first generation of these families; it moves when the FAMILY SET
-// changes shape, which is the only referent this package has for the coordinate.
+// refs: ADR-17.D9
+// invariant: this package has no vendor, so v1 names OUR first generation of these families and
+// moves only when the family SET changes shape.
+// invariant: the coordinate is declared and non-empty in every manifest, so a reader comparing two
+// identity digests finds the same field in each of them.
 export inline constexpr std::array<std::string_view, 1> kDialectRevisions{{"v1"}};
 
-// ── The manifest (§2.5) — the package's single composed contribution ──
-// Ships only location rows (no roles/markers/level-lifts/value-classes, no code tier). version
-// "1.0.0" (SRC-SP-7). name sorts after "github" → github rows precede test_frameworks rows in
-// canonical order.
+// refs: SRC-SP-7
+// invariant: compose orders packages by name, so these rows follow github's in the canonical order
+// that the identity digest is taken over.
 export inline constexpr SemanticPackageManifest kManifest{
     .name = "test_frameworks",
     .version = "1.0.0",
     .roles = {},
     .markers = {},
-    .emits = {}, // no markers ⇒ no intents to generate
+    .emits = {},
     .level_lifts = {},
     .locations = kLocations,
     .value_classes = {},
-    .dialect_revisions = kDialectRevisions, // grammar-6 — the naming-family generation
+    .dialect_revisions = kDialectRevisions,
     .strategy = nullptr,
     .echoed_source = nullptr,
 };
 
-// grammar-6 (ADR-17.D9) — the declared revision vocabulary, checked in the package that declares
-// it. This package ships no dialect gates, so this is its ONLY compile-time declaration check.
+// refs: ADR-17.D9
+// invariant: this package ships no dialect gates, so this is its only compile-time declaration
+// check.
 static_assert(
     insight::semantic::all_revisions_named(kDialectRevisions),
     "test_frameworks: the declared dialect-revision vocabulary must be non-empty, with unique, "
