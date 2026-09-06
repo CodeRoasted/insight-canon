@@ -1,23 +1,21 @@
-// test_normalized_content_doors.cpp — the DOOR CENSUS of the typed ingest precondition
-// (the door census, the pinned-absence traits, plus Eqya's ruling-1 addition).
-//
-// Homed beside the walker tests because the walkers are what the doors guard (flagged for Kleio's
-// confirmation — test homing is hers). Four legs:
-//
-//   1. THE ABSENT CONSTRUCTOR, pinned as negative type traits. An absence is the
-//      one thing no green test observes — expressed here as static_asserts on PUBLIC
-//      constructibility, which run in every build of this TU (stronger than a build-failing
-//      fixture: it cannot be skipped). `std::is_constructible` tests accessibility from a
-//      non-friend context, which is exactly the boundary claim.
-//   2. THE OUTBOUND ACCESSOR EXISTS — NormalizedContent → string_view must remain expressible
-//      (the seam's two byte-readers have no other edit; it must not be hardened away).
-//   3. THE DECLARED PEEL DOOR — TransportStack::peel(NormalizedLine) → PeeledLine carries a
-//      NormalizedContent, observation time and the blank-drop, over the catalogue's shipped row.
-//      (The raw door peel_raw is covered by the transport suite; it mints nothing.)
-//   4. THE FRIEND CENSUS — Eqya's ruling 1: "a friend list is only an audit surface if something
-//      FAILS when it grows." A source census over the two declaring files pins NormalizedContent's
-//      friends at exactly {NormalizedLine, LogParserPasskey} and the passkey's at exactly
-//      {LogParser}. Verbose on failure: prints every friend line it found.
+// invariant: the DOOR CENSUS of the typed ingest precondition — the doors, the pinned-absence
+// traits, and the friend census.
+// invariant: HOMED beside the walker tests because the walkers are what the doors GUARD.
+// invariant: LEG 1 is THE ABSENT CONSTRUCTOR, pinned as NEGATIVE type traits — an absence is the
+// one thing no green test observes.
+// invariant: expressed as static assertions on PUBLIC constructibility, which run in every build of
+// this unit, and that is STRONGER than a build-failing fixture because it cannot be skipped.
+// invariant: the constructibility trait tests accessibility from a NON-FRIEND context, which is
+// exactly the boundary claim.
+// invariant: LEG 2 is THE OUTBOUND ACCESSOR — the typed content must remain convertible to a byte
+// view, because the seam's two byte-readers have no other edit and it must not be hardened away.
+// invariant: LEG 3 is THE DECLARED PEEL DOOR — the typed peel carries typed content, an
+// observation time and the blank-drop, over the catalogue's shipped row.
+// invariant: the raw door is covered by the transport suite, since it MINTS nothing.
+// invariant: LEG 4 is THE FRIEND CENSUS, on the ruling that a friend list is only an audit surface
+// if something FAILS when it grows.
+// invariant: a SOURCE census over the two declaring files pins each type's friends exactly, and it
+// is verbose on failure — it prints every friend line it found.
 #include <gtest/gtest.h>
 
 #include <filesystem>
@@ -32,7 +30,6 @@ using insight::tokenization::normalize;
 using insight::tokenization::NormalizedContent;
 using insight::tokenization::NormalizedLine;
 
-// ── Leg 1: the absent constructor (the whole mechanism) ─────────────────────────────────────────
 static_assert(!std::is_constructible_v<NormalizedContent, std::string_view>,
               "NormalizedContent must NOT be constructible from raw bytes — that single absence "
               "is the completeness theorem's premise");
@@ -42,25 +39,25 @@ static_assert(!std::is_default_constructible_v<NormalizedContent>);
 static_assert(!std::is_constructible_v<NormalizedLine, std::string_view>,
               "NormalizedLine is produced ONLY by normalize()");
 static_assert(!std::is_default_constructible_v<NormalizedLine>);
-// The shape guard — view-sized and trivially copyable — is asserted at the declaration site
-// (canon.api.cppm); re-asserted here so
-// this census file fails closed even if the declaration-site asserts are ever moved.
+// invariant: the SHAPE guard — view-sized and trivially copyable — is asserted at the
+// declaration site and re-asserted here.
+// invariant: so this census file fails closed even if the declaration-site assertions are ever
+// moved.
 static_assert(sizeof(NormalizedContent) == sizeof(std::string_view));
 static_assert(std::is_trivially_copyable_v<NormalizedContent>);
 
-// ── Leg 2: the outbound accessor (outbound weakens nothing; its absence breaks the seam) ────────
 static_assert(
     std::is_same_v<decltype(std::declval<const NormalizedContent&>().bytes()), std::string_view>);
 static_assert(
     std::is_same_v<decltype(std::declval<const NormalizedLine&>().bytes()), std::string_view>);
-// And the inbound direction must NOT exist as a conversion either.
+// invariant: the INBOUND direction must not exist as a CONVERSION either, not only as a
+// constructor.
 static_assert(!std::is_convertible_v<std::string_view, NormalizedContent>);
 static_assert(!std::is_convertible_v<std::string_view, NormalizedLine>);
 
 namespace
 {
 
-// ── Leg 3: the declared peel door ────────────────────────────────────────────────────────────────
 TEST(NormalizedContentDoors, DeclaredPeelYieldsTypedContentAndObservationTime)
 {
     const std::array stack_names{std::string_view{"api-rfc3339-line-prefix"}};
@@ -77,17 +74,16 @@ TEST(NormalizedContentDoors, DeclaredPeelYieldsTypedContentAndObservationTime)
     EXPECT_TRUE(peeled.observation_time.has_value())
         << "the declared LinePrefixTimestamp must extract the observation time";
 
-    // The blank-drop survives the typed door (the bundled decline behavior).
+    // invariant: the blank-drop survives the typed door, which is the bundled decline behaviour.
     const NormalizedLine bare{normalize("2026-04-15T22:20:38.2879579Z ", scratch)};
     EXPECT_TRUE(stack.peel(bare).is_blank());
 
-    // And the two doors agree byte-for-byte — one algorithm, two proofs (a divergence would be
-    // the two-implementations defect the whole contract is about).
+    // invariant: the two doors agree BYTE-FOR-BYTE — one algorithm, two proofs.
+    // invariant: a divergence would be the two-implementations defect the whole contract is about.
     EXPECT_EQ(peeled.content.bytes(), stack.peel_raw(line.bytes()).content)
         << "peel and peel_raw must be the same algorithm over the same bytes";
 }
 
-// ── Leg 4: the friend census ─────────────────────────────────────────────────────────────────────
 [[nodiscard]] std::string read_source(const std::filesystem::path& path)
 {
     std::ifstream input{path, std::ios::binary};
@@ -96,9 +92,10 @@ TEST(NormalizedContentDoors, DeclaredPeelYieldsTypedContentAndObservationTime)
     return buffer.str();
 }
 
-// The friend-declaration lines inside the class body opening at `class <name>` (first definition
-// occurrence). Brace-matched, comment-line-insensitive (a `friend` in a comment does not count —
-// lines are trimmed and must START with `friend`).
+// invariant: the friend lines are taken from inside the class body at its FIRST definition
+// occurrence, brace-matched.
+// invariant: comment-insensitive — a `friend` inside a comment does not count, because lines are
+// trimmed and must START with the keyword.
 [[nodiscard]] std::vector<std::string> friends_of(const std::string& source,
                                                   const std::string& class_name)
 {
@@ -133,8 +130,10 @@ TEST(NormalizedContentDoors, DeclaredPeelYieldsTypedContentAndObservationTime)
     return found;
 }
 
-// __FILE__ anchors the census to the source tree, so it runs wherever the repo is checked out
-// (desk + CI both build from source; there is no installed-only execution of this suite).
+// invariant: the census is anchored to the SOURCE TREE by the compiler's own file macro, so it runs
+// wherever the repo is checked out.
+// invariant: the desk and CI both build from source, and there is no installed-only execution of
+// this suite.
 const std::filesystem::path kThisFile{__FILE__};
 const std::filesystem::path kCoreRoot{kThisFile.parent_path().parent_path().parent_path()};
 
@@ -143,13 +142,14 @@ TEST(NormalizedContentDoors, NormalizedContentHasExactlyTheTwoAuditedFriends)
     const std::string api{read_source(kCoreRoot / "api" / "canon.api.cppm")};
     ASSERT_FALSE(api.empty()) << "could not read canon.api.cppm from " << kCoreRoot;
     const std::vector<std::string> found{friends_of(api, "NormalizedContent")};
-    // The passkey friend is QUALIFIED in source: a qualified friend is a pure reference to the
-    // exported global-module forward declaration, which is what binds it to the ONE sealed entity
-    // (see the note at the declaration, which carries the measurement). The qualification is kept
-    // for that by-construction reason, NOT because a named compiler still needs it: unqualifying
-    // it was re-measured green on gcc-16.2 and clang-21 on 2026-09-03. What that same experiment
-    // found STILL LIVE is the `export` on the forward declaration itself — so this census pins the
-    // spelling, and the declaration's own note pins the export.
+    // invariant: the passkey friend is QUALIFIED in source, and a qualified friend is a pure
+    // reference to the exported global-module forward declaration.
+    // invariant: that is what binds it to the ONE sealed entity, so the qualification is kept for a
+    // by-construction reason and NOT because a named compiler still needs it.
+    // invariant: unqualifying it was RE-MEASURED green on both shipped compilers on 2026-09-03.
+    // invariant: what that same experiment found STILL LIVE is the export on the forward
+    // declaration itself.
+    // invariant: this census pins the SPELLING and the declaration's own note pins the export.
     const std::vector<std::string> expected{"friend class NormalizedLine",
                                             "friend class insight::tokenization::LogParserPasskey"};
     EXPECT_EQ(found, expected)

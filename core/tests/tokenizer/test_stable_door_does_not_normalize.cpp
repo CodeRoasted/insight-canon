@@ -1,133 +1,106 @@
-// test_stable_door_does_not_normalize.cpp — the stable door's EXEMPTION, stated positively.
-//
-// THE PROPERTY. `insight::tokenization::Tokenizer` carries two raw-byte producer doors
-// (ADR-21.D4). `process_line` performs stage-1 ingest normalization — the ANSI/escape strip of
-// `insight::tokenization::normalize` — unconditionally. `process_stable_line` performs NO stage 1
-// at all, deliberately, so the bytes that reach the returned `CanonicalEvent` are the caller's
-// bytes UNCHANGED and every answer downstream of that door (template, level, role, marker) is a
-// function of the caller's PRESENTATION bytes.
-//
-// WHY THIS FILE HAD TO BE WRITTEN, and it is the whole reason the arms take the shape they do.
-// *"We do not do X"* has no failing instance until someone writes one. ADR-21.D4 enumerates the
-// four producer doors and their obligations in PROSE, and says so itself: a gate sees the absent
-// inbound constructor, the friend census and the declared peel door — it sees no facade door at
-// all. Nothing asserted that `process_line` normalizes and `process_stable_line` does not. So the
-// day someone "simplifies" the stable door by routing it through `process_line` — the wrong fix
-// ADR-21.D4 names by hand precisely because it is plausible — every existing canon test stays
-// green: the events still parse, still template, still carry a level. This file is the failing
-// instance that day.
-//
-// ── HOMING (Kleio) ────────────────────────────────────────────────────────────────────────────
-// UNIT, in `insight-canon`, `core/tests/tokenizer/` — the shelf that mirrors `src/tokenizer/`,
-// where both doors are defined (`tokenizer_engine.cpp`).
-//
-// The discriminator is what the FIXTURE must control, and here it is exactly two things: the
-// input BYTES, and WHICH DOOR they enter by. Both are literals and a function call. Nothing else
-// is needed and nothing else may vary — which is why this is not an integration home. A seam test
-// asks LogCraft to emit ANSI-bearing lines and InSight to ingest them; the seam would then supply
-// the bytes, and the arm would be reading a generator's output instead of controlling it. No fact
-// on the far side of any seam enters this property.
-//
-// It is also NOT homed beside `test_normalized_content_doors.cpp` even though the subject is the
-// same ADR slot. That file's SUT is the TYPE `NormalizedContent` — its absent inbound constructor,
-// its friend census, the declared peel door — and its scope is the type's PRODUCERS, so the
-// tokenizer facade is outside it by construction. This file's SUT is the FACADE's two doors. Same
-// ADR, disjoint apparatus; merging them would put a source census and a byte differential in one
-// file and blur which of the two claims a red belongs to.
-//
-// ── WHAT EACH ARM IS FOR ──────────────────────────────────────────────────────────────────────
-//   ARM 1  THE DIFFERENTIAL. One ESC-bearing line, both doors. The stable door's event still
-//          carries the escape bytes; `process_line`'s does not. This is the arm that reds if the
-//          stable door ever starts normalizing.
-//   ARM 2  WHAT THE DIFFERENCE IS. A differential alone says only "the two doors disagree". This
-//          arm names the disagreement as stage 1 exactly: `process_line(raw)` equals
-//          `process_stable_line(normalize(raw))` — the normalized door IS the stable door with
-//          stage 1 in front of it, which is the composition ADR-21.D4 describes.
-//   ARM 3  THE PRICE, at the door grain. ADR-21.D4 records that a caller handing
-//          presentation-bearing bytes to the stable door gets "precisely the silently-coarser
-//          answer ADR-21.D1 names", and calls that the door's price rather than a defect. This arm
-//          makes the price a measured fact on the level channel instead of a sentence — and the
-//          price MOVED on 2026-09-02 (ADR-16.D7, ROADMAP N98). It used to show on the GitLab
-//          `after_script` warning, whose escape run pushed `WARNING` past Stage 1's 40-byte head so
-//          the stable door read a FAILING level and the normalized door Warn; with Stage 1's
-//          budget a TOKEN count the escape runs are delimiters, `WARNING` is token 3 on both byte
-//          strings, and the two doors AGREE on that line — which the arm now pins as a boundary.
-//          Where the price still shows is Stage 2: its cue head kKeywordHead{128} is a raw-byte
-//          budget (a declared COST bound under ADR-16.D7's criterion), so on a line whose failure
-//          cue starts inside 128 stripped bytes and outside 128 raw bytes the stable door reads
-//          no failure and the normalized door reads Error. It asserts the routed format is
-//          IDENTICAL first — otherwise a level split would be attributable to strategy routing
-//          rather than to stage 1.
-//   ARM 4  THE ANTI-VACUITY CONTROL, and without it the three arms above prove less than they
-//          look. On an ESC-FREE line the two doors must agree byte-for-byte on every
-//          content-derived field. That is what makes ARM 1 a statement about STAGE 1 and not about
-//          "the stable door mangles bytes somehow" — a door broken for any unrelated reason
-//          (a missing left-trim, a stray copy, a different strategy) reds HERE, on the input where
-//          stage 1 is the identity.
-//
-// ── FALSIFIABILITY — measured 2026-09-01 on clang-21 (`linux-clang21-libcxx-release`) ─────────
-// Three mutations, each applied, measured and reverted (`sha256sum -c` confirms both touched
-// sources are byte-identical to the state the green run was measured on). The arms PARTITION —
-// no two mutations red the same set — which is what says the four are four properties and not
-// one property written four times.
-//
-//   SD-A  `Tokenizer::process_stable_line` routed through `parser.parse_line` instead of
-//         `parser.parse_stable` — the plausible wrong fix ADR-21.D4 names by hand.
-//         RED 2 of 4: ARM 1 ("THE EXEMPTION IS GONE", stable template printed with no `<ESC>`)
-//         and ARM 3 (stable level Warn, so `is_failing` false and the two doors' levels equal).
-//         ARM 2 and ARM 4 stay GREEN, correctly: with the stable door normalizing, ARM 2's
-//         `stable(normalize(raw))` normalizes an already-normalized line — a fixed point — so
-//         the equality still holds, and ARM 4's input has no escape byte for the mutation to eat.
-//         **ARM 1 is the only arm that catches this mutation on its own**, which is why it is the
-//         one written as a direct byte assertion rather than a comparison.
-//   SD-B  `LogParser::parse_line` given `raw_line` where it takes `normalized.bytes()` — stage 1
-//         deleted at the door that owes it unconditionally.
-//         RED 3 of 4: ARM 1's second half ("process_line let an escape byte through"), ARM 2 on
-//         both its assertions (template AND level diverge), ARM 3's `process_line` half (level
-//         Error where the producer wrote WARNING). ARM 4 GREEN — the control's input is escape
-//         free, so stage 1 is the identity on it under this mutation too.
-//   SD-C  an INSTRUMENT mutation, not a plausible product regression, and it is here because a
-//         control that has never fired is a control armed at zero: `LogParser::parse_stable`
-//         hands the strategy `stable_line.substr(0, size - 1)`, i.e. the stable door diverges by
-//         one byte for a reason that has nothing to do with normalization.
-//         RED 2 of 4: ARM 2 and ARM 4 — and ARM 1 and ARM 3 stay GREEN. That is the whole reason
-//         ARM 4 exists: a stable door broken for a non-stage-1 reason passes the escape test and
-//         is caught only by the control.
-//
-// ── FALSIFIABILITY, RE-MEASURED 2026-09-02 on the new ARM 3 input (Kleio) ────────────────────
-// clang-21 (`linux-clang21-libcxx-release`), insight-canon 3f9b17c plus this header; the same
-// three mutations, each applied, built, run over the WHOLE core binary (702 tests: 699 green and
-// 3 corpus-gated skips at HEAD), reverted, `sha256sum -c` OK on every touched source. The
-// partition is unchanged, and it is the whole suite's rather than this file's: under each
-// mutation the only reds among the 702 are the arms named below — no other test guards these
-// properties.
-//
-//   SD-A  RED 2 of 4: ARM 1 (`carries_escape(stable->template_str)` false) and ARM 3 Part 2 —
-//         the stable door reads Error, its cue head now reaching the stripped `failed` at byte
-//         118, so `is_failing(stable)` reds and then Error == Error reds the inequality. ARM 3
-//         Part 1 stays GREEN (Warn/Warn either way), as do ARM 2 and ARM 4.
-//   SD-B  RED 3 of 4: ARM 1's second half (an escape byte in `process_line`'s template), ARM 2
-//         (the templates diverge) and ARM 3 Part 2 — `process_line` reads Unknown, the raw
-//         `failed` at byte 129 being outside its head, and then Unknown == Unknown reds the
-//         inequality. ARM 3 Part 1 stays GREEN: with the token budget, `process_line` on raw bytes
-//         still reads WARNING at token 3, so Part 1 cannot see this mutation and Part 2 is what
-//         does. ARM 4 GREEN.
-//   SD-C  RED 2 of 4: ARM 2 and ARM 4. ARM 1 and ARM 3 GREEN, both parts — the dropped byte is
-//         the trailing `m` of the reset run on either input, and no level or cue moves.
-//
-// The line grain versus the classifier grain: `test_ingest_normalization_level_flip.cpp` pins that
-// `infer_leading_log_level` reads the `after_script` corpus line as Warn on BOTH byte strings since
-// the token budget (it read Error raw before). That is a claim about the CLASSIFIER. ARM 3 is a
-// claim about which bytes the DOOR puts in front of it, taken on the input where the classifier
-// still answers differently, and neither file can see the other's property — the classifier arm
-// stays green if both doors start normalizing, and this one stays green if the classifier's verdict
-// on either byte string changes, as long as the two verdicts still differ.
-//
-// Determinism: string literals only, one arena and one Tokenizer per door invocation (a shared
-// LogParser latches a sticky strategy, so sharing one would make arm k's routing depend on arm
-// k-1's input), no seed, no RNG, no worker pool, no wall clock, no float. Every assertion is on
-// bytes, an enum or a boolean.
 
+// invariant: the stable door's EXEMPTION, stated POSITIVELY.
+// invariant: the tokenizer carries two raw-byte producer doors — the normalizing one performs
+// stage-1 ingest normalization unconditionally, and the stable one performs NO stage 1 at all.
+// invariant: that is deliberate, so the bytes reaching the returned event are the caller's bytes
+// UNCHANGED.
+// invariant: every answer downstream of that door — template, level, role, marker — is
+// therefore a function of the caller's PRESENTATION bytes.
+// invariant: WHY THIS FILE HAD TO BE WRITTEN, and it is the whole reason the arms take the shape
+// they do: WE DO NOT DO X HAS NO FAILING INSTANCE UNTIL SOMEONE WRITES ONE.
+// invariant: the ruling enumerates the four producer doors and their obligations in PROSE, and says
+// so itself — a gate sees the absent constructor, the friend census and the peel door.
+// invariant: it sees NO facade door at all, and nothing asserted that one door normalizes and the
+// other does not.
+// invariant: so the day someone SIMPLIFIES the stable door by routing it through the normalizing
+// one.
+// invariant: the wrong fix the ruling names by hand precisely because it is plausible — every
+// existing canon test stays GREEN.
+// invariant: the events still parse, still template and still carry a level; this file is the
+// failing instance that day.
+// invariant: HOMED as a UNIT test on the shelf that mirrors the source directory where both doors
+// are defined.
+// invariant: the discriminator is what the FIXTURE must control, and here it is exactly two things
+// — the input BYTES and WHICH DOOR they enter by.
+// invariant: both are literals and a function call, nothing else is needed and nothing else may
+// vary, which is why this is NOT an integration home.
+// invariant: a seam test would ask the generator to emit escape-bearing lines, so the seam would
+// SUPPLY the bytes and the arm would read a generator's output instead of controlling it.
+// invariant: no fact on the far side of any seam enters this property.
+// invariant: it is also NOT homed beside the doors census even though the subject is the same
+// ruling — that file's subject is the TYPE and its scope is the type's PRODUCERS.
+// invariant: the tokenizer facade is outside that file by construction, and this file's subject is
+// the FACADE's two doors.
+// invariant: same ruling, DISJOINT apparatus — merging them would put a source census and a byte
+// differential in one file and blur which claim a red belongs to.
+// invariant: ARM 1 is THE DIFFERENTIAL — one escape-bearing line through both doors, where the
+// stable door's event still carries the escape bytes and the other's does not.
+// invariant: that is the arm that reds if the stable door ever starts normalizing.
+// invariant: ARM 2 is WHAT THE DIFFERENCE IS, because a differential alone says only that the two
+// doors disagree.
+// invariant: it names the disagreement as stage 1 EXACTLY — the normalizing door equals the
+// stable door with stage 1 in front of it, which is the composition the ruling describes.
+// invariant: ARM 3 is THE PRICE at the door grain — the ruling records that a caller handing
+// presentation-bearing bytes to the stable door gets a silently-coarser answer.
+// invariant: it calls that the door's PRICE rather than a defect, and this arm makes the price a
+// MEASURED FACT on the level channel instead of a sentence.
+// invariant: THE PRICE MOVED on 2026-09-02 — it used to show on a corpus warning line whose
+// escape run pushed the level word past stage 1's byte head, splitting the two doors' verdicts.
+// invariant: with stage 1's budget a TOKEN count the escape runs are DELIMITERS, the level word is
+// token 3 on both byte strings, and the two doors AGREE on that line.
+// invariant: the arm now pins that agreement as a BOUNDARY, and where the price still shows is
+// stage 2, whose cue head remains a RAW-BYTE budget.
+// invariant: so on a line whose failure cue starts inside 128 stripped bytes and outside 128 raw
+// bytes, the stable door reads no failure and the normalizing door reads an alerting level.
+// invariant: it asserts the routed format is IDENTICAL first, or a level split would be
+// attributable to strategy routing rather than to stage 1.
+// invariant: ARM 4 is THE ANTI-VACUITY CONTROL, and without it the three arms above prove less than
+// they look.
+// invariant: on an ESCAPE-FREE line the two doors must agree byte-for-byte on every content-derived
+// field.
+// invariant: that is what makes ARM 1 a statement about STAGE 1 rather than about the stable door
+// mangling bytes somehow.
+// invariant: a door broken for any unrelated reason — a missing trim, a stray copy, a different
+// strategy — reds HERE, on the input where stage 1 is the identity.
+// invariant: FALSIFIABILITY was measured on 2026-09-01 with three mutations, each applied, measured
+// and REVERTED, with both touched sources confirmed byte-identical afterwards.
+// invariant: THE ARMS PARTITION — no two mutations red the same set, which is what says the four
+// are four properties and not one property written four times.
+// invariant: routing the stable door through the normalizing parse — the plausible wrong fix the
+// ruling names — reds ARM 1 and ARM 3, and leaves ARM 2 and ARM 4 GREEN, correctly.
+// invariant: with the stable door normalizing, ARM 2 normalizes an already-normalized line, which
+// is a FIXED POINT, so its equality still holds; ARM 4's input has no escape byte to eat.
+// invariant: ARM 1 IS THE ONLY ARM THAT CATCHES THAT MUTATION ON ITS OWN, which is why it is
+// written as a direct byte assertion rather than as a comparison.
+// invariant: deleting stage 1 at the door that owes it unconditionally reds three of the four —
+// ARM 1's second half, ARM 2 on both assertions, and ARM 3's normalizing half.
+// invariant: ARM 4 stays green there too, because its input is escape-free so stage 1 is the
+// identity on it under that mutation as well.
+// invariant: the third mutation is an INSTRUMENT mutation and not a plausible product regression,
+// and it is here because A CONTROL THAT HAS NEVER FIRED IS A CONTROL ARMED AT ZERO.
+// invariant: it makes the stable door diverge by ONE BYTE for a reason having nothing to do with
+// normalization, and it reds ARM 2 and ARM 4 while ARM 1 and ARM 3 stay GREEN.
+// invariant: THAT IS THE WHOLE REASON ARM 4 EXISTS — a stable door broken for a non-stage-1
+// reason passes the escape test and is caught only by the control.
+// invariant: falsifiability was RE-MEASURED on 2026-09-02 against the new ARM 3 input, the same
+// three mutations run over the WHOLE core binary rather than this file alone.
+// invariant: the partition is unchanged and it is the whole SUITE's rather than this file's —
+// under each mutation the only reds among the whole binary are the arms named here.
+// invariant: NO OTHER TEST GUARDS THESE PROPERTIES.
+// invariant: the line grain versus the classifier grain — a sibling arm pins how the CLASSIFIER
+// reads that corpus line on both byte strings since the token budget.
+// invariant: this arm is a claim about which bytes the DOOR puts in front of the classifier, taken
+// on the input where the classifier still answers differently.
+// invariant: neither file can see the other's property.
+// invariant: the classifier arm stays green if BOTH doors start normalizing, and this one stays
+// green if the classifier's verdicts change, as long as they still differ.
+// invariant: determinism — string literals only, and ONE arena and ONE tokenizer per door
+// invocation.
+// invariant: a shared parser latches a sticky strategy, so sharing one would make an arm's routing
+// depend on the previous arm's input.
+// invariant: no seed, no RNG, no worker pool, no wall clock, no float; every assertion is on bytes,
+// an enum or a boolean.
+// refs: ADR-16.D7, ADR-21.D1, ADR-21.D4
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -144,48 +117,48 @@ using insight::tokenization::Tokenizer;
 namespace
 {
 
-// The ESC byte the whole subject turns on, spelled once.
+// invariant: the escape byte the whole subject turns on, spelled ONCE.
 constexpr char kEsc{'\x1b'};
 
-// ── The inputs ────────────────────────────────────────────────────────────────────────────────
-
-// A REAL corpus line, byte-exact from marker_corpus_v1 (the GitLab `after_script` warning; the
-// same literal `tests/utils/test_ingest_normalization_level_flip.cpp` carries, and it is quoted
-// here rather than shared because the two files assert about different subjects and a shared
-// constant would couple them). Three escape runs: the erase-to-end-of-line `ESC[0K`, the yellow
-// `ESC[0;33m`, and the reset `ESC[0;m`. The bare `\r` is GitLab's own and is CONTENT, not a
-// delimiter — stage 1 removes the escape runs and correctly leaves it.
+// invariant: a REAL corpus line, byte-exact from the marker corpus.
+// invariant: a sibling file carries the same literal, and it is QUOTED here rather than shared
+// because the two files assert about different subjects and a shared constant would couple them.
+// invariant: three escape runs — an erase-to-end-of-line, a colour set and a reset.
+// invariant: the bare carriage return is the producer's own and is CONTENT, not a delimiter —
+// stage 1 removes the escape runs and correctly leaves it.
 constexpr std::string_view kAnsiWrapped{
     "section_end:1737226867:after_script\r\x1b[0K\x1b[0;33mWARNING: after_script failed, but job "
     "will continue unaffected: exit code 1\x1b[0;m"};
 
-// The control input: the same SHAPE of line with no escape byte anywhere, so stage 1 is the
-// identity on it (`normalize` returns the input as a fixed point, zero-copy). Everything the two
-// doors do to it must agree.
+// invariant: the CONTROL input — the same SHAPE of line with no escape byte anywhere, so stage 1
+// is the identity on it and normalization returns the input as a zero-copy fixed point.
+// invariant: everything the two doors do to it must AGREE.
 constexpr std::string_view kEscapeFree{
     "section_end:1737226867:after_script WARNING: after_script failed, but job will continue "
     "unaffected: exit code 1"};
 
-// The price input since ADR-16.D7: the same GitLab runner envelope (36 bytes stripped, 47 raw — the
-// `\r` stays, the two escape runs go) in front of a body with NO level word among its first eight
-// tokens and one failure cue, placed so the cue starts at stripped byte 118 and raw byte 129 —
-// inside Stage 2's 128-byte cue head on the normalized door, outside it on the stable one. A
-// fixture, not a corpus line: no producer emits this exact body, and the arm asserts both offsets
-// before reading a level, so a wrong count here reds as a fixture error rather than as a door.
+// invariant: the PRICE input since the budget ruling — the same runner envelope in front of a
+// body with NO level word among its first eight tokens and ONE failure cue.
+// invariant: the cue is placed so it starts at stripped byte 118 and raw byte 129 — inside stage
+// 2's cue head on the normalizing door and outside it on the stable one.
+// invariant: a FIXTURE and not a corpus line, since no producer emits this exact body.
+// invariant: the arm asserts BOTH offsets before reading a level, so a wrong count here reds as a
+// FIXTURE error rather than as a door.
+// refs: ADR-16.D7
 constexpr std::string_view kCueAtTheHeadEdge{
     "section_end:1737226867:after_script\r\x1b[0K\x1b[0;33muploading artifacts for job 2092177 to "
     "the coordinator after three retry attempts failed: coordinator returned 502\x1b[0;m"};
-// Stage 2's cue head, QUOTED from time_utils.cpp (kKeywordHead is function-local there and cannot
-// be linked): the premise assertions in ARM 3 red if it moves, which is the coupling wanted.
+// invariant: stage 2's cue head is QUOTED here because the constant is function-local in its own
+// translation unit and cannot be linked.
+// invariant: the premise assertions in ARM 3 red if it moves, which is the coupling wanted.
 constexpr std::size_t kCueHeadBytes{128};
 
-// ── The fixture ───────────────────────────────────────────────────────────────────────────────
-
-// One arena + one composition + one Tokenizer. Declaration order is load-bearing: the Tokenizer
-// holds a const ref to `composed`, which must therefore be declared before it and outlive it.
-// The composition is the degenerate zero-package one — core tests never link the semantic
-// packages, and no dialect row is needed here: the universal RawText strategy and canon's own
-// leading-level inference carry every arm below.
+// invariant: ONE arena, ONE composition and ONE tokenizer, and declaration ORDER is load-bearing
+// — the tokenizer holds a const ref to the composition, which must outlive it.
+// invariant: the composition is the degenerate zero-package one, because core tests never link the
+// semantic packages and no dialect row is needed here.
+// invariant: the universal raw-text strategy and canon's own leading-level inference carry every
+// arm below.
 struct Door
 {
     static constexpr std::size_t kArenaSize{1U << 20U};
@@ -194,11 +167,10 @@ struct Door
     Tokenizer tokenizer{arena, MaskConfig{}, composed};
 };
 
-// ── Verbose-on-failure support ────────────────────────────────────────────────────────────────
-
-// Render bytes with the control characters SPELLED OUT. A failure message that prints a raw ESC
-// into a terminal reports the escape sequence to the terminal instead of to the reader, and the
-// one byte the whole file is about is then the one byte the diagnostic cannot show.
+// invariant: control characters are SPELLED OUT in failure output — a message that prints a raw
+// escape into a terminal reports the sequence to the TERMINAL instead of to the reader.
+// invariant: the one byte the whole file is about would then be the one byte the diagnostic cannot
+// show.
 [[nodiscard]] std::string visible(std::string_view bytes)
 {
     std::string out;
@@ -232,13 +204,13 @@ struct Door
     return bytes.find(kEsc) != std::string_view::npos;
 }
 
-// A failing verdict, in canon's own terms: the two levels that make a line an alerting one.
+// invariant: a failing verdict in canon's own terms — the two levels that make a line an alerting
+// one.
 [[nodiscard]] bool is_failing(LogLevel level)
 {
     return level == LogLevel::Error || level == LogLevel::Fatal;
 }
 
-// One line of actual-vs-expected context every arm can append.
 [[nodiscard]] std::string describe(std::string_view door, const CanonicalEvent& event)
 {
     return std::string{door} + ": format=" + std::string{to_string(event.format)} +
@@ -249,9 +221,8 @@ struct Door
 
 } // namespace
 
-// ── ARM 1 — THE DIFFERENTIAL ──────────────────────────────────────────────────────────────────
-// The one arm that reds the day the stable door starts normalizing.
-
+// invariant: ARM 1, THE DIFFERENTIAL — the one arm that reds the day the stable door starts
+// normalizing.
 TEST(StableDoorDoesNotNormalize, TheStableDoorKeepsTheEscapeBytesAndProcessLineDoesNot)
 {
     Door stable_door;
@@ -265,9 +236,11 @@ TEST(StableDoorDoesNotNormalize, TheStableDoorKeepsTheEscapeBytesAndProcessLineD
     ASSERT_TRUE(normalized.has_value()) << "process_line declined the line: " << normalized.error()
                                         << " — input: \"" << visible(kAnsiWrapped) << '"';
 
-    // The positive half: the caller's bytes reached the event UNCHANGED. `template_str` is the
-    // masker's product over the strategy's `content`, and the masker keeps every byte it does not
-    // mask, so an escape run present in the caller's line is present here iff no stage 1 ran.
+    // invariant: the POSITIVE half — the caller's bytes reached the event UNCHANGED.
+    // invariant: the template is the masker's product over the strategy's content, and the masker
+    // keeps every byte it does not mask.
+    // invariant: so an escape run present in the caller's line is present here if and only if no
+    // stage 1 ran.
     EXPECT_TRUE(carries_escape(stable->template_str))
         << "THE EXEMPTION IS GONE: the stable door's event carries NO escape byte, so stage 1 ran "
            "on a path ADR-21.D4 specifies over the bytes AS SUPPLIED. If this door was routed "
@@ -275,7 +248,8 @@ TEST(StableDoorDoesNotNormalize, TheStableDoorKeepsTheEscapeBytesAndProcessLineD
            "that holds a single view — that is the wrong fix ADR-21.D4 names.\n  input : \""
         << visible(kAnsiWrapped) << "\"\n  " << describe("stable", *stable);
 
-    // The other half: `process_line` DOES normalize, so the differential is a differential.
+    // invariant: the OTHER half — the normalizing door DOES normalize, which is what makes the
+    // differential a differential.
     EXPECT_FALSE(carries_escape(normalized->template_str))
         << "process_line let an escape byte through to the event. Stage 1 is unconditional at "
            "that door (ADR-21.D4: 'This door IS the guarantee'), so this is the normalized door "
@@ -288,13 +262,12 @@ TEST(StableDoorDoesNotNormalize, TheStableDoorKeepsTheEscapeBytesAndProcessLineD
         << describe("stable      ", *stable) << "\n  " << describe("process_line", *normalized);
 }
 
-// ── ARM 2 — WHAT THE DIFFERENCE IS ────────────────────────────────────────────────────────────
-// A differential says the doors disagree. This names the disagreement as stage 1 exactly.
-
+// invariant: ARM 2 — a differential says the doors disagree, and this NAMES the disagreement as
+// stage 1 exactly.
 TEST(StableDoorDoesNotNormalize, ProcessLineIsTheStableDoorWithStageOneInFrontOfIt)
 {
-    // The normalized view must outlive every read of the event that views it: `normalize` writes
-    // an ESC-bearing line into this scratch buffer, and the stable door copies nothing.
+    // invariant: the normalized view must OUTLIVE every read of the event that views it —
+    // normalization writes into this scratch buffer and the stable door copies nothing.
     std::string scratch;
     const std::string_view stage_one_output{normalize(kAnsiWrapped, scratch).bytes()};
 
@@ -314,10 +287,11 @@ TEST(StableDoorDoesNotNormalize, ProcessLineIsTheStableDoorWithStageOneInFrontOf
     ASSERT_TRUE(through_stable_door.has_value())
         << "process_stable_line declined the pre-normalized line: " << through_stable_door.error();
 
-    // The composition, stated as an equality. It reds in BOTH directions: if the stable door
-    // starts normalizing, its side of this equation normalizes twice and the two stop matching on
-    // any line where stage 1 is not idempotent-at-the-byte-level; if process_line stops
-    // normalizing, its side keeps the escape runs and the two diverge immediately.
+    // invariant: the composition stated as an EQUALITY, and it reds in BOTH directions.
+    // invariant: if the stable door starts normalizing, its side normalizes twice and the two stop
+    // matching on any line where stage 1 is not idempotent at the byte level.
+    // invariant: if the other door stops normalizing, its side keeps the escape runs and the two
+    // diverge immediately.
     EXPECT_EQ(through_process_line->template_str, through_stable_door->template_str)
         << "process_line is specified as stage 1 followed by the same parse the stable door "
            "performs. The two are no longer the same composition.\n  "
@@ -331,16 +305,16 @@ TEST(StableDoorDoesNotNormalize, ProcessLineIsTheStableDoorWithStageOneInFrontOf
         << describe("stable(normalize(raw))     ", *through_stable_door);
 }
 
-// ── ARM 3 — THE PRICE, AT THE DOOR GRAIN ──────────────────────────────────────────────────────
-// ADR-21.D4 records the exemption's cost so it is "never quoted as costless". This measures it —
-// where it still is — and pins the line it left.
-
+// invariant: ARM 3 — the ruling records the exemption's cost so it is never quoted as costless,
+// and this MEASURES it where it still is, and pins the line it left.
+// refs: ADR-21.D4
 TEST(StableDoorDoesNotNormalize, ThePresentationBytesReachTheLevelVerdictThroughTheStableDoor)
 {
-    // Part 1 — THE BOUNDARY: the corpus line the price USED to show on. Since Stage 1's budget
-    // counts tokens (ADR-16.D7) the escape runs are delimiters, `WARNING` is token 3 on both byte
-    // strings, and the two doors agree on the producer's own severity. A split here is a byte
-    // budget back in Stage 1, not the exemption doing its work.
+    // invariant: PART 1 IS THE BOUNDARY — the corpus line the price USED to show on.
+    // invariant: since stage 1's budget counts TOKENS the escape runs are delimiters, the level
+    // word is token 3 on both byte strings, and the two doors agree on the producer's own severity.
+    // invariant: a split HERE is a byte budget back in stage 1, not the exemption doing its work.
+    // refs: ADR-16.D7
     {
         Door stable_door;
         Door normalizing_door;
@@ -366,10 +340,10 @@ TEST(StableDoorDoesNotNormalize, ThePresentationBytesReachTheLevelVerdictThrough
             << describe("process_line", *normalized);
     }
 
-    // Part 2 — THE PRICE, where it still shows. Stage 2's cue head is a raw-byte budget
-    // (kKeywordHead{128}, a declared cost bound), so an escape run in front of a cue spends it:
-    // `failed` is inside the head once stripped and outside it raw. Premises asserted first, so a
-    // miscounted fixture reds as a fixture and not as a door.
+    // invariant: PART 2 IS THE PRICE, where it still shows — stage 2's cue head is a RAW-BYTE
+    // budget, so an escape run in front of a cue SPENDS it.
+    // invariant: the cue is inside the head once stripped and outside it raw, and the premises are
+    // asserted FIRST so a miscounted fixture reds as a fixture and not as a door.
     {
         std::string scratch;
         const std::string_view stripped{normalize(kCueAtTheHeadEdge, scratch).bytes()};
@@ -393,10 +367,11 @@ TEST(StableDoorDoesNotNormalize, ThePresentationBytesReachTheLevelVerdictThrough
         ASSERT_TRUE(stable.has_value()) << "process_stable_line declined: " << stable.error();
         ASSERT_TRUE(normalized.has_value()) << "process_line declined: " << normalized.error();
 
-        // ASSERTED FIRST, because it is what makes the level split attributable. Two doors that
-        // routed to DIFFERENT strategies would disagree about the level for a reason that has
-        // nothing to do with stage 1, and the arm below would then be reading a routing difference
-        // while claiming a normalization one.
+        // invariant: ASSERTED FIRST, because it is what makes the level split ATTRIBUTABLE.
+        // invariant: two doors that routed to DIFFERENT strategies would disagree about the level
+        // for a reason having nothing to do with stage 1.
+        // invariant: the arm below would then be reading a routing difference while claiming a
+        // normalization one.
         ASSERT_EQ(stable->format, normalized->format)
             << "the two doors routed this line to different strategies, so nothing below is a "
                "statement about stage 1.\n  "
@@ -416,10 +391,11 @@ TEST(StableDoorDoesNotNormalize, ThePresentationBytesReachTheLevelVerdictThrough
                "inside the head.\n  "
             << describe("process_line", *normalized);
 
-        // The pair, as one statement: this is the door's PRICE. A caller that hands
-        // presentation-bearing bytes to the stable door gets the silently-coarser answer, and the
-        // difference is a whole alerting level — on Stage 2's byte-bounded cue head now, the one
-        // budget ADR-16.D7 leaves in raw bytes.
+        // invariant: the pair as ONE statement — this is the door's PRICE.
+        // invariant: a caller handing presentation-bearing bytes to the stable door gets the
+        // silently-coarser answer, and the difference is a WHOLE alerting level.
+        // invariant: it now shows on stage 2's byte-bounded cue head, the one budget the ruling
+        // leaves in raw bytes.
         EXPECT_NE(stable->level, normalized->level)
             << "both doors read this line as " << to_string(stable->level)
             << ". They agree, so the exemption now costs nothing on the one input chosen because "
@@ -430,9 +406,8 @@ TEST(StableDoorDoesNotNormalize, ThePresentationBytesReachTheLevelVerdictThrough
     }
 }
 
-// ── ARM 4 — THE ANTI-VACUITY CONTROL ──────────────────────────────────────────────────────────
-// On an ESC-free line stage 1 is the identity, so the two doors must be indistinguishable.
-
+// invariant: ARM 4 — on an escape-free line stage 1 is the IDENTITY, so the two doors must be
+// INDISTINGUISHABLE.
 TEST(StableDoorDoesNotNormalize, OnAnEscapeFreeLineTheTwoDoorsAgreeByteForByte)
 {
     Door stable_door;
@@ -444,9 +419,9 @@ TEST(StableDoorDoesNotNormalize, OnAnEscapeFreeLineTheTwoDoorsAgreeByteForByte)
     ASSERT_TRUE(stable.has_value()) << "process_stable_line declined: " << stable.error();
     ASSERT_TRUE(normalized.has_value()) << "process_line declined: " << normalized.error();
 
-    // Every content-derived field, not just the template: a door that agreed on the template
-    // while disagreeing on the level or the routed format would still be broken, and this is the
-    // input on which nothing may differ.
+    // invariant: EVERY content-derived field, not just the template — a door that agreed on the
+    // template while disagreeing on the level or the routed format would still be broken.
+    // invariant: this is the input on which NOTHING may differ.
     EXPECT_EQ(stable->template_str, normalized->template_str)
         << "the two doors disagree on a line stage 1 does not touch (`normalize` returns an "
            "escape-free input as a zero-copy fixed point), so the difference ARM 1 measures is "

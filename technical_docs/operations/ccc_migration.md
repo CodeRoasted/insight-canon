@@ -6401,6 +6401,81 @@ it is a statement about the guard's scope and not about the conversion.
 baseline. No suite in this directory carries the `corpus` label, so every one of them runs inside
 that figure.
 
+## Unit 30 — `core/tests/tokenizer/` (4 files, 478 comment lines, 474 would-be violations) — the first unit of this run with ZERO convictions, and the reason is a property of the material
+
+The two producer doors, the typed ingest precondition's door census, the declared-time copy and the
+end-to-end pipeline suite. Baseline split: bare 409 · ruler 34 · spacer 26 · trailing 5. After:
+**408 comment lines, 0 would-be violations** — `invariant` 220 · `refs` 15 · 169 continuations · 4
+tool forms. Repo-level delta **1 168 → 694 = exactly 474**. No law block; the next free law integer
+is still 17.
+
+### The stripper cross-check is VACUOUS for the sixth consecutive unit
+
+Removed **474**, kept 4 — all namespace closers. Six units running, and the pattern is now a
+finding in its own right: **the whole test tier carries no suppression at all except one file**, and
+that file is in the unit after this one. Until then the identity `removed == violations` cannot fail,
+and it is recorded as vacuous rather than quoted.
+
+### ZERO CONVICTIONS, and the material explains it
+
+| reader | questions | recovered | convictions |
+|---|---|---|---|
+| A — the two producer doors, the typed door census | 30 | 30 | 0 |
+| B — the pipeline suite, the declared-time copy | 30 | 30 | 0 |
+
+`GIT COMMANDS RUN: none` and `EXCLUDED PATHS SEEN: none` from both. This is the first unit of the
+run with no conviction from either reader, and it is worth saying WHY rather than celebrating it.
+Unit 25 recorded the pattern and this unit confirms it: **the prose that convicts makes external
+measurements about the world** — a constant in another file, a count over a corpus, a claim about
+what some other test guards — and that is exactly the class `OPS-8.O3` says goes stale. The prose
+that does not convict makes **arguments about the code in front of it**, and an argument about the
+adjacent code does not rot on someone else's change.
+
+The stable-door file is almost entirely the second kind. Its 200-line header is a homing argument, a
+per-arm purpose statement and a falsifiability record — all of it about four arms sitting directly
+below it. **The one external fact it carries, stage 2's cue head, it QUOTES rather than links, and
+the file says why**: the constant is function-local in its own translation unit and cannot be
+referenced, so the arm restates the value and its premise assertions red if the real budget ever
+moves. That is a carried external fact with a tripwire attached, which is the shape that does not go
+stale.
+
+### Both readers went past their questions, and both excursions were checkable
+
+**Reader A** recovered why the shape guard is asserted in TWO places and gave the reason the prose
+only implies: the declaration-site copy gives the earliest possible failure, before any caller is
+recompiled, while the census copy survives the loss of the first. Neither is redundant.
+
+**Reader B** answered the empty-projection question and then named the property that makes it
+dangerous, flagging the addition as its own inference at MEDIUM confidence: the digest of the empty
+string is a well-formed, plausible-looking identity, identical for every line of every file, so the
+collapse **looks like data rather than like a fault**. That is the sharpest one-line statement of
+that hazard anywhere in this ledger, and the reader marked it as its own.
+
+### The anchor audit found a misplacement no instrument reports
+
+Printing every block's resolved anchor beside its first claim, one row read
+`TEST_F(TokenizerTest, ShortGarbageLineParsesAsRawText)` against a claim about a **retired
+cluster-count accessor**. The note sat above a section ruler; rulers are exactly what this migration
+deletes, so the claim resolved past it and landed on the next test — an unrelated garbage-line arm.
+It is now attached to the accessor test it explains. `anchor_collide.py` reports no collision here,
+and the grammar gate counts forms; **only reading the resolved-anchor table finds this class**, and
+this is the fifth consecutive unit in which it has.
+
+### The address census, both legs
+
+**Outbound: ZERO lost**, exit 0 — 4 addresses unchanged in the declared-time suite, 4 in the stable
+door suite, 0 in the door census. One ADDED, `DN-43.D6` in the pipeline suite, a rule its prose had
+named in words only.
+
+**Inbound: 2 mentions, both opened and clean** — both are file addresses from source sites that cite
+these suites by name, and both still resolve.
+
+### The behaviour witness
+
+`malf test insight-canon` on **both** toolchains: **809 of 809** on `linux-clang21-libcxx-release`
+and **809 of 809** on `linux-gcc16-release`, equal to the pre-unit baseline. No suite in this
+directory carries the `corpus` label.
+
 
 
 

@@ -1,12 +1,8 @@
-// Unit tests: allow short identifiers and test-specific patterns
-// tests/1_tokenization/test_tokenizer.cpp
-//
-// Integration tests for the full Phase 1 pipeline:
-//   raw log line → Tokenizer → CanonicalEvent
-//
-// Tests validate end-to-end correctness for all four log formats, event
-// identity, template grouping, param extraction, and batch processing.
 
+// invariant: the full ingest pipeline end to end — a raw log line through the tokenizer to a
+// canonical event.
+// invariant: it covers end-to-end correctness for the universal formats, event identity, template
+// grouping, param extraction and batch processing.
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -14,33 +10,27 @@ import insight.canon.test;
 using namespace insight;
 using namespace insight::tokenization;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Fixture: a fresh arena + tokenizer per test
-// ─────────────────────────────────────────────────────────────────────────────
-
 class TokenizerTest : public ::testing::Test
 {
   protected:
-    static constexpr std::size_t kArenaSize{1u << 20}; // 1 MiB
+    static constexpr std::size_t kArenaSize{1u << 20};
 
     ArenaAllocator arena{kArenaSize};
-    // Semantic-unaware: the universal formats tokenize with a degenerate (zero-package)
-    // composition. `composed` is declared BEFORE `tokenizer` so it outlives the const-ref the
-    // Tokenizer holds.
+    // invariant: SEMANTIC-UNAWARE — the universal formats tokenize with a degenerate zero-package
+    // composition.
+    // invariant: the composition is declared BEFORE the tokenizer so it outlives the const-ref the
+    // tokenizer holds.
     insight::semantic::ComposedSemantics composed{insight::test_support::degenerate_composition()};
     Tokenizer tokenizer{arena, MaskConfig{}, composed};
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Basic pipeline correctness per format
-// ─────────────────────────────────────────────────────────────────────────────
-
-// The level assertion here used to read `Unknown` under the comment "BSD syslog has no inline
-// level", on a body carrying neither a level word nor a lexicon cue — so it held BOTH before and
-// after the branch started reading levels at all: a can't-FAIL arm, and nine generations of green
-// said nothing about this path. The comment was also false as a general claim, which is why the
-// repair is a line whose body DOES carry a level rather than a re-assertion of the old one
-// (DN-43.D5).
+// invariant: the level assertion here USED to read Unknown, on a body carrying neither a level word
+// nor a lexicon cue.
+// invariant: so it held BOTH before and after the branch started reading levels at all — a
+// can't-FAIL arm, and nine generations of green said nothing about this path.
+// invariant: the prose it carried was also FALSE as a general claim, which is why the repair is a
+// line whose body DOES carry a level rather than a re-assertion of the old one.
+// refs: DN-43.D5
 TEST_F(TokenizerTest, ProcessesBSDSyslogLine)
 {
     constexpr std::string_view line{
@@ -54,8 +44,9 @@ TEST_F(TokenizerTest, ProcessesBSDSyslogLine)
     EXPECT_FALSE(ev.template_str.empty());
 }
 
-// A BSD body with no level and no cue still yields no level — the boundary the arm above needs to
-// stay honest. Split out so each arm can fail for exactly one reason.
+// invariant: a body with no level and no cue still yields NO level — the boundary the arm above
+// needs to stay honest.
+// invariant: split out so each arm can fail for exactly ONE reason.
 TEST_F(TokenizerTest, ProcessesBSDSyslogLineWithNoLevelInItsBody)
 {
     constexpr std::string_view line{"Jan 15 08:03:22 myhost sshd[1]: Accepted password for alice"};
@@ -87,20 +78,18 @@ TEST_F(TokenizerTest, ProcessesKVLine)
     EXPECT_EQ(ev.component, "cache");
 }
 
-// The cube-dimension precondition for the kv (logfmt) flow path: a kv line carrying
-// `level=` + `component=<service>` + a benign prose `msg=` tokenizes to a CLEAN
-// (level, component, role) tuple — component = the declared service (non-empty),
-// role None (the message announces no structural marker), and level taken verbatim
-// from the `level=` field (across the Info/Error band). The cube axes (insight::cube
-// kNumDims=3) read exactly these three CanonicalEvent fields, so this is their
-// canon-level guarantee.
-//
-// Re-homed from the former e2e do-operator substrate precondition (28-31's
-// `KvCanonPopulatesFlowCubeDimsCleanly`): that test asserted the
-// same tuple on LIVE LogCraft-generated kv flow records, but the wiring it guards is
-// a single-component canon property — proven here on hand-built kv lines, decoupled
-// from the generator. The do-axis collapse claim itself stays in the playground
-// do-operator contract fixtures (28-31), which rely on this precondition.
+// invariant: the cube-dimension precondition for the key-value flow path — such a line tokenizes
+// to a CLEAN level, component and role tuple.
+// invariant: the component is the declared service and non-empty, the role is None because the
+// message announces no structural marker, and the level is taken verbatim from its field.
+// invariant: the cube's axes read exactly these three event fields, so this is their canon-level
+// guarantee.
+// invariant: RE-HOMED from a former end-to-end substrate precondition that asserted the same tuple
+// on LIVE generated records.
+// invariant: the wiring it guards is a SINGLE-COMPONENT canon property, so it is proven here on
+// hand-built lines, decoupled from the generator.
+// invariant: the collapse claim itself stays in the contract fixtures, which rely on this
+// precondition.
 TEST_F(TokenizerTest, KvFlowRecordsPopulateCubeDimsCleanly)
 {
     struct KvCase
@@ -109,8 +98,8 @@ TEST_F(TokenizerTest, KvFlowRecordsPopulateCubeDimsCleanly)
         LogLevel level;
         std::string_view component;
     };
-    // Representative benign flow records — the declared services across the Info/Error
-    // band, plain prose messages (no announced ##[...] / ::...:: structural marker).
+    // invariant: representative BENIGN flow records — the declared services across the level
+    // band, with plain prose messages announcing no structural marker.
     const KvCase cases[]{
         {R"(level=info component=gateway msg="accept settle request")", LogLevel::Info, "gateway"},
         {R"(level=info component=payments msg="settle order total")", LogLevel::Info, "payments"},
@@ -143,23 +132,25 @@ TEST_F(TokenizerTest, ProcessesCLFLine)
     ASSERT_TRUE(result.has_value());
     const auto& ev{result.value()};
     EXPECT_EQ(ev.level, LogLevel::Info);
-    // DN-43.D8 — and this is the seam that matters: `component` reaches the cube's WHERE axis
-    // UNMASKED, so a client IP left there was published raw while the same octets in `content`
-    // were masked. It is a host, it goes in `host`, and it stays off the axis.
+    // invariant: THE SEAM THAT MATTERS.
+    // invariant: the component reaches the cube's WHERE axis UNMASKED, so a client address left
+    // there was published RAW while the same octets in the content were masked.
+    // invariant: it is a HOST, it goes in the host field, and it stays OFF the axis.
+    // refs: DN-43.D8
     EXPECT_EQ(ev.host, "192.168.1.5");
     EXPECT_TRUE(ev.component.empty()) << "component = \"" << ev.component << "\"";
     EXPECT_NE(ev.template_str.find("GET"), std::string::npos);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The leading-RFC-3339 application stream, end to end (DN-43.D4/D6)
-// ─────────────────────────────────────────────────────────────────────────────
-
-// The through-pipeline property, and it is homed HERE rather than on the strategy because the
-// defect it guards is a JOINT one: the routing, the projection and the level inference have to hold
-// together for the identity that reaches the wire to be right. Three assertions, and the timestamp
-// one is not decoration — without it this passes on the rejected alternative (a bare rejection to
-// RawTextStrategy, which sets no event time and would lose the clock MetaLog windows on).
+// invariant: the through-pipeline property, homed HERE rather than on the strategy because the
+// defect it guards is a JOINT one.
+// invariant: the routing, the projection and the level inference all have to hold together for the
+// identity that reaches the wire to be right.
+// invariant: the timestamp assertion is NOT decoration — without it this passes on the rejected
+// alternative, a bare rejection to raw text.
+// invariant: that alternative sets no event time and would lose the clock the downstream windows
+// are built on.
+// refs: DN-43.D4, DN-43.D6
 TEST_F(TokenizerTest, Rfc3339ApplicationLinesTemplateDistinctlyAndKeepTheirStamp)
 {
     static constexpr std::array kLines{
@@ -181,30 +172,28 @@ TEST_F(TokenizerTest, Rfc3339ApplicationLinesTemplateDistinctlyAndKeepTheirStamp
         ASSERT_TRUE(result.has_value()) << "line " << i << ": " << kLines[i];
         const auto& ev{result.value()};
 
-        // 1. The projection is total: the whole remainder is content, so each line templates to its
-        //    own structure. The defect published ONE template for the whole file — the SHA-256
-        //    prefix of the empty string.
+        // invariant: the projection is TOTAL — the whole remainder is content, so each line
+        // templates to its own structure.
+        // invariant: the defect published ONE template for the whole file, the digest prefix of the
+        // empty string.
         EXPECT_FALSE(ev.template_str.empty()) << "line " << i << ": " << kLines[i];
         templates.insert(std::string{ev.template_str});
 
-        // 2. The level is read, and it is what the body says — not a uniform default.
+        // invariant: the level is READ and is what the body says, not a uniform default.
         EXPECT_EQ(ev.level, kExpected[i]) << "line " << i << " level=" << to_string(ev.level)
                                           << " expected=" << to_string(kExpected[i]);
 
-        // 3. The event time SURVIVES the split. A missing timestamp lands as the epoch.
+        // invariant: the event time SURVIVES the split, and a missing timestamp lands as the epoch.
         EXPECT_NE(ev.timestamp, Timestamp{}) << "line " << i << " lost its event time";
 
-        // The layout names no functional source; inventing one would be a fabricated cube axis.
+        // invariant: the layout names no functional source, and inventing one would be a FABRICATED
+        // cube axis.
         EXPECT_TRUE(ev.component.empty())
             << "line " << i << " component=\"" << ev.component << "\"";
     }
     EXPECT_EQ(templates.size(), kLines.size())
         << "distinct templates=" << templates.size() << " lines=" << kLines.size();
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Event identity
-// ─────────────────────────────────────────────────────────────────────────────
 
 TEST_F(TokenizerTest, EventIDMonotonicallyIncreases)
 {
@@ -225,26 +214,24 @@ TEST_F(TokenizerTest, EventsProducedCounterIncrements)
     EXPECT_EQ(tokenizer.events_produced(), 2u);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Template grouping
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST_F(TokenizerTest, SameStructuredLinesSameTemplateID)
 {
     auto r1{tokenizer.process_line(R"({"msg":"User alice connected"})")};
     auto r2{tokenizer.process_line(R"({"msg":"User alice connected"})")};
     ASSERT_TRUE(r1.has_value() && r2.has_value());
-    // Identity is the content-deterministic template_str (the downstream SHA-256 of it
-    // is template_id). Same line → same template_str, statelessly.
+    // invariant: identity is the content-deterministic template string, whose digest is the
+    // template id, so the same line yields the same template STATELESSLY.
     EXPECT_EQ(r1.value().template_str, r2.value().template_str);
 }
 
-// ── The alert label must not enter template identity (DN-43.D14) ─────────────────────────────
-// The load-bearing property of claiming the labelled shape. LogHub's alert-class column is the
-// corpus's ANSWER KEY: an identity that varied with it would split ONE event class — `RAS KERNEL
-// FATAL data TLB error interrupt`, flagged on 348 398 pinned-corpus lines and unflagged on
-// 506 797 — 42 ways by curation rather than by structure. Asserted at the pipeline grain, because
-// template identity is what the wire carries and a per-field strategy assertion cannot see it.
+// invariant: the alert label must NOT enter template identity — the load-bearing property of
+// claiming the labelled shape.
+// invariant: the alert-class column is the corpus's ANSWER KEY, so an identity that varied with it
+// would split ONE event class by CURATION rather than by structure.
+// invariant: that class is flagged on 348 398 pinned-corpus lines and unflagged on 506 797.
+// invariant: asserted at the PIPELINE grain, because template identity is what the wire carries and
+// a per-field strategy assertion cannot see it.
+// refs: DN-43.D14
 TEST_F(TokenizerTest, AnAlertLabelledBGLLineHasTheSameTemplateAsItsUnlabelledTwin)
 {
     constexpr std::string_view kLabelled{
@@ -262,7 +249,7 @@ TEST_F(TokenizerTest, AnAlertLabelledBGLLineHasTheSameTemplateAsItsUnlabelledTwi
         << " | twin = " << twin.value().template_str;
     EXPECT_EQ(template_id_of(labelled.value().template_str),
               template_id_of(twin.value().template_str));
-    // And the twin pair agrees on every projected field, not just on identity.
+    // invariant: the twin pair agrees on every projected field, not just on identity.
     EXPECT_EQ(labelled.value().component, twin.value().component);
     EXPECT_EQ(labelled.value().level, twin.value().level);
     EXPECT_TRUE(labelled.value().declared_level)
@@ -271,38 +258,34 @@ TEST_F(TokenizerTest, AnAlertLabelledBGLLineHasTheSameTemplateAsItsUnlabelledTwi
 
 TEST_F(TokenizerTest, VariablePartBecomesWildcardInTemplate)
 {
-    // The IPv4 token is masked to "<*>" per-line (stateless); the kept literal "User"
-    // anchors the template. (The names alice/bob are letter-leading words → KEPT, not
-    // masked — the SRC-D-TID-14 boundary; only syntactic high-card classes mask.)
+    // invariant: the address token masks per-line and statelessly, while the kept literal anchors
+    // the template.
+    // invariant: letter-leading names are KEPT rather than masked — only syntactic
+    // high-cardinality classes mask.
+    // refs: SRC-D-TID-14
     auto r{tokenizer.process_line(R"({"msg":"User bob logged in from 10.0.0.2"})")};
     ASSERT_TRUE(r.has_value());
     EXPECT_NE(r.value().template_str.find("User"), std::string::npos);
-    EXPECT_NE(r.value().template_str.find("<*>"), std::string::npos); // the IP masked
+    EXPECT_NE(r.value().template_str.find("<*>"), std::string::npos);
 }
 
 TEST_F(TokenizerTest, DifferentFormatLinesDifferentTemplates)
 {
-    // Two lines with different content → different masked templates.
     auto rSyslog{tokenizer.process_line("Jan 15 08:03:22 host proc[1]: kernel startup completed")};
     auto rJSON{
         tokenizer.process_line(R"({"level":"INFO","message":"database connection established"})")};
     ASSERT_TRUE(rSyslog.has_value() && rJSON.has_value());
-    // The two lines go through different strategies → different content → different templates.
+    // invariant: the two lines go through DIFFERENT strategies, so they have different content and
+    // therefore different templates.
     EXPECT_NE(rSyslog.value().template_str, rJSON.value().template_str);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Params
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST_F(TokenizerTest, ParamsExtractedAfterTemplateStabilises)
 {
-    // Three identical-structure lines; after the second, wildcards appear.
     static_cast<void>(tokenizer.process_line(R"({"msg":"Retry attempt 1 of 3"})"));
     static_cast<void>(tokenizer.process_line(R"({"msg":"Retry attempt 2 of 3"})"));
     auto r{tokenizer.process_line(R"({"msg":"Retry attempt 5 of 10"})")};
     ASSERT_TRUE(r.has_value());
-    // Should have at least one param (the variable numeric fields).
     EXPECT_GE(r.value().params.size(), 1u);
 }
 
@@ -315,13 +298,10 @@ TEST_F(TokenizerTest, ParamsAreArenaOwned)
         EXPECT_TRUE(arena.owns(sv.data()));
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Batch processing
-// ─────────────────────────────────────────────────────────────────────────────
-
-// NOT "one result per line" — see BatchUnpacksAnOtelSpanDocumentIntoOneResultPerSpan below. A
-// batch of ordinary lines is 1:1; an OTLP `resourceSpans` document is 1→N. Naming this test for
-// the 1:1 case alone once made it read as a guarantee AGAINST the fan-out.
+// invariant: NOT one result per line — a batch of ordinary lines is one-to-one, but an OTLP
+// export document is one-to-many.
+// invariant: naming this test for the one-to-one case ALONE once made it read as a guarantee
+// AGAINST the fan-out.
 TEST_F(TokenizerTest, BatchReturnsOneResultPerNonDocumentLine)
 {
     const std::vector<std::string_view> lines = {
@@ -333,23 +313,20 @@ TEST_F(TokenizerTest, BatchReturnsOneResultPerNonDocumentLine)
     EXPECT_EQ(results.size(), lines.size());
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Batch record-source fan-out (SRC-D-OTEL-18): ONE line, N results
-// ─────────────────────────────────────────────────────────────────────────────
-//
-// An OTLP `resourceSpans` export is ONE input line carrying N spans, and process_batch unpacks it
-// into N canonical records before tokenizing each 1:1. test_span_unpack.cpp covers the unpacker in
-// isolation; this covers the SEAM — that process_batch actually routes a document through it.
-//
-// Without this, deleting the `is_otel_span_document` branch from process_batch left every test
-// green: the unpack tests never call process_batch, and the batch tests never feed it a document.
-// Worse, the surviving guard was named "one result per line", so a green suite actively endorsed
-// the deletion.
-
+// invariant: an OTLP export is ONE input line carrying N spans, and the batch entry unpacks it into
+// N canonical records before tokenizing each one-to-one.
+// invariant: the span-unpack suite covers the unpacker in ISOLATION; this covers the SEAM, that the
+// batch entry actually routes a document through it.
+// invariant: without this, deleting the document branch from the batch entry left every test GREEN
+// — the unpack tests never call the batch entry and the batch tests never fed it a document.
+// invariant: worse, the surviving guard was NAMED for one result per line, so a green suite
+// actively ENDORSED the deletion.
+// refs: SRC-D-OTEL-18
 namespace
 {
-// Two spans under one resource — the same shape as the span-unpack fixture, kept local so this
-// test states its own premise. Span 2 carries the int-form kind/status a real collector emits.
+// invariant: two spans under one resource, the same shape as the span-unpack fixture, kept LOCAL so
+// this test states its own premise.
+// invariant: the second span carries the int-form kind and status a real collector emits.
 constexpr std::string_view kSpanDocument{
     R"({"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"checkout-svc"}}]},)"
     R"("scopeSpans":[{"spans":[)"
@@ -371,16 +348,16 @@ TEST_F(TokenizerTest, BatchUnpacksAnOtelSpanDocumentIntoOneResultPerSpan)
         << " result(s) — process_batch is not routing the document through unpack_otel_spans, so "
            "an entire OTLP export collapses to a single event (or none)";
 
-    // The COUNT alone is not the contract: two copies of one span would also be 2. Each result
-    // must be the span it came from.
+    // invariant: the COUNT alone is not the contract — two copies of one span would also be two.
+    // invariant: each result must be the span it CAME FROM.
     ASSERT_TRUE(results[0].has_value()) << "span 0: " << results[0].error();
     ASSERT_TRUE(results[1].has_value()) << "span 1: " << results[1].error();
     EXPECT_EQ(results[0]->template_str, "checkout");
     EXPECT_EQ(results[1]->template_str, "db_query");
     EXPECT_EQ(results[0]->component, "checkout-svc") << "resource service.name must be injected";
     EXPECT_EQ(results[1]->component, "checkout-svc");
-    // Span 2's status arrives in INT form; a collapsed fan-out that re-emitted span 0 twice would
-    // report Info here.
+    // invariant: the second span's status arrives in INT form, so a collapsed fan-out that
+    // re-emitted the first span twice would report the wrong level here.
     EXPECT_EQ(results[1]->level, LogLevel::Error);
 
     EXPECT_EQ(tokenizer.events_produced(), 2U)
@@ -389,9 +366,10 @@ TEST_F(TokenizerTest, BatchUnpacksAnOtelSpanDocumentIntoOneResultPerSpan)
 
 TEST_F(TokenizerTest, BatchFanOutKeepsSurroundingLinesInPlace)
 {
-    // The fan-out is spliced IN POSITION, not appended. A branch that pushed the unpacked spans
-    // after the rest of the batch would still return 4 results and still pass a count-only check —
-    // while silently reordering every downstream event id.
+    // invariant: the fan-out is spliced IN POSITION, not appended.
+    // invariant: a branch that pushed the unpacked spans after the rest of the batch would still
+    // return the right COUNT and still pass a count-only check.
+    // invariant: while silently reordering every downstream event id.
     const std::vector<std::string_view> lines{
         R"({"msg":"before"})",
         kSpanDocument,
@@ -410,19 +388,16 @@ TEST_F(TokenizerTest, BatchFanOutKeepsSurroundingLinesInPlace)
     EXPECT_EQ(results[3]->template_str, "after");
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The record entry REFUSES a document (DN-29.D6)
-// ─────────────────────────────────────────────────────────────────────────────
-//
-// process_line is the record-oriented entry — the one every live consumer uses (the SHM consumer
-// loop, the MCP sidecar, sift). Document mode is acquisition-tier and does not live there, so the
-// question is what process_line does when a document arrives anyway.
-//
-// It used to answer it silently and wrongly: `is_otel_span_line` excluded documents, so an export
-// carrying N spans fell through to the generic log-record route and produced ONE plausible event.
-// Nothing distinguished that event from a real one. This is the paired assertion to the fan-out
-// tests above — the same input, the two entries, two DIFFERENT and both-correct answers.
-
+// invariant: the RECORD entry REFUSES a document, and that entry is the one every live consumer
+// uses.
+// invariant: document mode is ACQUISITION-tier and does not live there, so the question is what the
+// record entry does when a document arrives anyway.
+// invariant: it used to answer SILENTLY AND WRONGLY — the span predicate excluded documents, so
+// an export carrying N spans fell through to the generic route and produced ONE plausible event.
+// invariant: nothing distinguished that event from a real one.
+// invariant: this is the PAIRED assertion to the fan-out tests above — the same input, the two
+// entries, two DIFFERENT and both-correct answers.
+// refs: DN-29.D6
 TEST_F(TokenizerTest, RecordEntryRefusesASpanDocumentInsteadOfCollapsingIt)
 {
     const auto result{tokenizer.process_line(kSpanDocument)};
@@ -441,8 +416,10 @@ TEST_F(TokenizerTest, RecordEntryRefusesASpanDocumentInsteadOfCollapsingIt)
 
 TEST_F(TokenizerTest, RecordEntryStillAcceptsAFlatSpan)
 {
-    // The control arm: refusing the DOCUMENT must not refuse the shape the wire actually carries.
-    // A refusal that also swallowed flat spans would pass the test above and delete the feature.
+    // invariant: the CONTROL arm — refusing the DOCUMENT must not refuse the shape the wire
+    // actually carries.
+    // invariant: a refusal that also swallowed flat spans would pass the test above and DELETE the
+    // feature.
     const auto result{tokenizer.process_line(
         R"({"traceId":"aabb","spanId":"0001","name":"checkout","kind":"SPAN_KIND_SERVER",)"
         R"("startTimeUnixNano":"1000","endTimeUnixNano":"1500","status":{"code":"STATUS_CODE_UNSET"},)"
@@ -468,7 +445,7 @@ TEST_F(TokenizerTest, BatchErrorLineDoeNotCountAsProduced)
 {
     const std::vector<std::string_view> lines = {
         R"({"msg":"valid"})",
-        "", // empty → error
+        "",
         R"({"msg":"also valid"})",
     };
     auto results{tokenizer.process_batch(lines)};
@@ -479,10 +456,6 @@ TEST_F(TokenizerTest, BatchErrorLineDoeNotCountAsProduced)
     EXPECT_EQ(tokenizer.events_produced(), 2u);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Error handling
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST_F(TokenizerTest, EmptyLineReturnsError)
 {
     auto result{tokenizer.process_line("")};
@@ -490,27 +463,20 @@ TEST_F(TokenizerTest, EmptyLineReturnsError)
     EXPECT_EQ(tokenizer.events_produced(), 0u);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Accessor delegation
-// ─────────────────────────────────────────────────────────────────────────────
-
+// invariant: the cluster-count accessor was RETIRED with the clustering it reported — the
+// stateless masker has no cluster state.
+// refs: SRC-D-TID-3
 TEST_F(TokenizerTest, ReportsParsedLineCount)
 {
     static_cast<void>(tokenizer.process_line(R"({"msg":"test"})"));
     EXPECT_GE(tokenizer.lines_parsed(), 1u);
 }
 
-// (ReportsClusterCount retired — the stateless masker has no cluster state; cluster_count()
-//  was removed with the Drain clustering — SRC-D-TID-3.)
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Edge cases / robustness
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST_F(TokenizerTest, ShortGarbageLineParsesAsRawText)
 {
-    // "xyz" matches no structured strategy, so the raw-text fallback templates
-    // it rather than dropping it (the wedge ingests unstructured CI logs).
+    // invariant: a short garbage line matches no structured strategy, so the raw-text fallback
+    // templates it rather than DROPPING it.
+    // invariant: that is what lets the wedge ingest unstructured CI logs.
     auto result{tokenizer.process_line("xyz")};
     ASSERT_TRUE(result.has_value());
     const auto& ev{result.value()};
@@ -526,28 +492,20 @@ TEST_F(TokenizerTest, WhitespaceOnlyLineReturnsError)
 
 TEST_F(TokenizerTest, UTF8ContentEndToEnd)
 {
-    // UTF-8 in a JSON message field should flow through without corruption
-    // and not cause any crash.
+    // invariant: multi-byte text in a message field must flow through the parser and the masker
+    // without corruption and without a crash.
     auto result{tokenizer.process_line(
         R"({"level":"INFO","message":"connexion \u00e9tablie avec succ\u00e8s"})")};
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result.value().template_str.empty());
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Batch with all four formats
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST_F(TokenizerTest, BatchAllFourFormatsAllSucceed)
 {
     const std::vector<std::string_view> lines = {
-        // Syslog (BSD)
         "Jan 15 08:03:22 myhost sshd[1]: Accepted password for user",
-        // JSON
         R"({"level":"INFO","component":"api","message":"request served"})",
-        // KV
         "level=WARN component=cache msg=eviction_triggered",
-        // CLF
         R"(10.0.0.1 - - [15/Jan/2024:10:30:00 +0000] "GET /status HTTP/1.1" 200 64)",
     };
     auto results{tokenizer.process_batch(lines)};
@@ -560,19 +518,15 @@ TEST_F(TokenizerTest, BatchAllFourFormatsAllSucceed)
     EXPECT_EQ(tokenizer.events_produced(), 4u);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Interleaving errors must not corrupt template IDs
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST_F(TokenizerTest, InterleaveErrorsDoNotCorruptTemplateIds)
 {
-    // Process a valid line, an error, then another structurally identical valid
-    // line. The third line's template_str must equal the first's (same structure) —
-    // the intervening error does not perturb the stateless masker.
+    // invariant: a valid line, an error, then a structurally identical valid line — the third
+    // line's template must equal the first's.
+    // invariant: the intervening error does not perturb the STATELESS masker.
     auto r1{tokenizer.process_line(R"({"msg":"worker job started"})")};
     ASSERT_TRUE(r1.has_value());
 
-    auto rErr{tokenizer.process_line("")}; // forced error
+    auto rErr{tokenizer.process_line("")};
     EXPECT_FALSE(rErr.has_value());
 
     auto r3{tokenizer.process_line(R"({"msg":"worker job started"})")};
@@ -580,18 +534,16 @@ TEST_F(TokenizerTest, InterleaveErrorsDoNotCorruptTemplateIds)
     EXPECT_EQ(r1.value().template_str, r3.value().template_str);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// JSON message containing KV-like content (nested format)
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST_F(TokenizerTest, JSONWithKVContentMaskedStatelessly)
 {
-    // The JSON strategy extracts the message; the stateless masker classifies each KV
-    // token by its OWN content. A `key=value` pair is a single letter-leading token →
-    // KEPT literal (the SRC-D-TID-14 boundary: a varying value-WORD is not a syntactic
-    // high-card class; masking it needs the unbuilt SemanticClassRegistry). So two
-    // lines differing only in a KV value-word are DISTINCT templates — the accepted
-    // stateless over-split, NOT Drain's old cross-line wildcard.
+    // invariant: the strategy extracts the message and the masker classifies each token by its OWN
+    // content.
+    // invariant: a key-value pair is a single letter-leading token and is KEPT literal, because a
+    // varying value-WORD is not a syntactic high-cardinality class.
+    // invariant: masking it needs the unbuilt semantic class registry, so two lines differing only
+    // in a value-word are DISTINCT templates.
+    // invariant: that is the accepted stateless OVER-SPLIT, and NOT the old cross-line wildcard.
+    // refs: SRC-D-TID-14
     auto ra{tokenizer.process_line(R"({"msg":"action=login user=alice status=ok"})")};
     auto rb{tokenizer.process_line(R"({"msg":"action=login user=bob status=ok"})")};
     ASSERT_TRUE(ra.has_value() && rb.has_value());
@@ -599,23 +551,18 @@ TEST_F(TokenizerTest, JSONWithKVContentMaskedStatelessly)
     EXPECT_NE(ra.value().template_str, rb.value().template_str)
         << "a varying KV value-word stays literal (no cross-line wildcard): "
         << ra.value().template_str << " vs " << rb.value().template_str;
-    // A digit-leading value as its own token still masks per-line.
+    // invariant: a digit-leading value as its own token still masks per-line.
     auto rn{tokenizer.process_line(R"({"msg":"served 500 status=ok"})")};
     ASSERT_TRUE(rn.has_value());
-    EXPECT_NE(rn.value().template_str.find("<*>"), std::string::npos); // "500" masked
+    EXPECT_NE(rn.value().template_str.find("<*>"), std::string::npos);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Param extraction for variable (digit-leading) positions
-// ─────────────────────────────────────────────────────────────────────────────
 
 TEST_F(TokenizerTest, HighVolumeTemplateStabilisesParams)
 {
-    // Send 8 lines in the pattern "fetched NNN rows returned" with varying NNN.
-    // The numeric position is a VARIABLE count (not a status value), so it masks
-    // to <*> per-line and a param is extracted. (A status value behind code/status/
-    // exit/signal would instead be KEPT distinct; see the StatusValueKeptDistinct
-    // masker test. "rows" is not a status keyword, so masking applies.)
+    // invariant: the numeric position is a VARIABLE count and not a status value, so it masks
+    // per-line and a param is extracted.
+    // invariant: a status value behind a status keyword would instead be KEPT distinct, and the
+    // noun here is not a status keyword.
     const std::vector<std::string_view> lines = {
         R"({"msg":"fetched 200 rows returned"})", R"({"msg":"fetched 201 rows returned"})",
         R"({"msg":"fetched 400 rows returned"})", R"({"msg":"fetched 404 rows returned"})",
@@ -625,8 +572,6 @@ TEST_F(TokenizerTest, HighVolumeTemplateStabilisesParams)
     auto results{tokenizer.process_batch(lines)};
     ASSERT_EQ(results.size(), 8u);
 
-    // After stabilisation the results should have a non-empty param for the
-    // variable-count position.
     bool any_param_found{false};
     for (auto& r : results)
     {
@@ -639,17 +584,10 @@ TEST_F(TokenizerTest, HighVolumeTemplateStabilisesParams)
     EXPECT_TRUE(any_param_found);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Unicode extremes — non-Latin scripts and emoji
-// ─────────────────────────────────────────────────────────────────────────────
-
 TEST_F(TokenizerTest, NonLatinUnicodeEndToEnd)
 {
-    // Arabic, Cyrillic and CJK codepoints are valid UTF-8 and must pass through
-    // simdjson and the masker without corruption or crash.
-    // \u062a\u0633\u062c\u064a\u0644  = Arabic "tasjiil" (registration)
-    // \u0432\u0445\u043e\u0434        = Cyrillic "vkhod" (login)
-    // \u767b\u5f55                    = CJK "denglu" (login)
+    // invariant: non-Latin codepoints are valid multi-byte text and must pass through the parser
+    // and the masker without corruption or crash.
     auto r1{tokenizer.process_line(
         R"({"level":"INFO","message":"\u062a\u0633\u062c\u064a\u0644 \u0645\u0633\u062a\u062e\u062f\u0645"})")};
     ASSERT_TRUE(r1.has_value());
@@ -667,16 +605,14 @@ TEST_F(TokenizerTest, NonLatinUnicodeEndToEnd)
 
 TEST_F(TokenizerTest, EmojiContentEndToEnd)
 {
-    // Emoji codepoints (encoded as JSON \uXXXX surrogate pairs or direct
-    // UTF-8) must survive simdjson → the masker without crashing.
-    // \ud83d\ude80 = U+1F680 ROCKET (surrogate pair)
-    // \u2705      = U+2705  WHITE HEAVY CHECK MARK
+    // invariant: emoji codepoints, whether encoded as surrogate pairs or directly, must survive the
+    // parser and the masker without crashing.
     auto r1{tokenizer.process_line(
         R"({"level":"INFO","message":"deploy \ud83d\ude80 succeeded \u2705"})")};
     ASSERT_TRUE(r1.has_value());
     EXPECT_FALSE(r1.value().template_str.empty());
 
-    // Two structurally identical emoji lines must receive the same template.
+    // invariant: two structurally identical emoji lines must receive the SAME template.
     auto r2{tokenizer.process_line(
         R"({"level":"INFO","message":"deploy \ud83d\ude80 succeeded \u2705"})")};
     ASSERT_TRUE(r2.has_value());
