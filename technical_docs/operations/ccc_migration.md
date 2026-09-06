@@ -3221,6 +3221,193 @@ verdict itself does not move: the disagreement was resolved at the artifact abov
 `for_stream` copies the unfiltered tables forward into every view it builds, and the `assert:` this
 conversion wrote at the site stands as written.
 
+---
+
+## Unit 18 — `semantic/gitlab/` (8 files, 565 comment lines, 556 would-be violations) — the corpus was mounted, so five carried figures were re-derived at the bytes and three were wrong
+
+The GitLab dialect package converted WHOLE, same ground as unit 17: the tests assert on the rows
+the module interface declares, and four of them carry the same argument as the two source headers.
+Unlike `github`, this package ships a real code tier (`src/gitlab_strategy.cpp`), so its parsing
+claims are contracts rather than history.
+
+| file | comment lines | violations | split |
+|---|---|---|---|
+| `src/gitlab.cppm` | 120 → 45 | 119 | bare 103, spacer 11, trailing 5 |
+| `src/gitlab_strategy.cpp` | 81 → 37 | 79 | bare 64, spacer 4, trailing 11 |
+| `tests/conformance.cpp` | 7 → 4 | 6 | bare 6 |
+| `tests/test_gitlab_markers.cpp` | 43 → 21 | 42 | bare 42 |
+| `tests/test_gitlab_outcome.cpp` | 42 → 21 | 41 | bare 41 |
+| `tests/test_gitlab_package_corpus_proof_gate.cpp` | 235 → 65 | 234 | bare 198, spacer 9, trailing 27 |
+| `tests/test_gitlab_round_trip.cpp` | 19 → 8 | 18 | bare 15, trailing 3 |
+| `tests/test_gitlab_strategy.cpp` | 18 → 7 | 17 | bare 15, trailing 2 |
+| **total** | **565 → 208** | **556** | |
+
+After: **208 comment lines, 0 would-be violations** — `pre` 3 · `post` 4 · `invariant` 49 ·
+`assert` 24 · `note` 22 · `refs` 20 · 79 continuations · 7 tool forms. 122 tagged specs over 61
+blocks. Repo-level delta **10 030 → 9 474 = exactly 556**.
+
+### The DERIVED token census, and both suppressions measured with an IN-REGION probe
+
+Census derived from the gates: `DETERMINISM-ALLOW`, `LOG-SEAT-ALLOW`, `CLOSURE MODEL`,
+`pin-coherence: mirrors`, `INV-17-EXEMPT-OBJECT-STORE`, `retired-structure-lint: allow`,
+`registry-lint: allow`, plus `clang-format off`, `wall-clock:`, SPDX and the `/*name*/` forms.
+**Every one has population ZERO**, `src/` included — so the `DETERMINISM-ALLOW` risk a parsing hot
+path raises did not materialise, which is a measurement rather than an assumption.
+
+`NOLINT` 4 → 0. Two `NOLINTBEGIN`/`NOLINTEND` regions, both **BARE**, both openers mid-line inside
+a bare prose block — so the strip removed the opener and kept the orphan closer, twice. Each TU run
+twice in place against the release database, directive TEXT renamed and code untouched: **0
+diagnostics with the region and 0 without**, in both files. The two zeros carry information because
+a probe INSERTED INSIDE each region is suppressed when armed and reported when disarmed
+(`readability-identifier-length` at `conformance.cpp:15:15` and `test_gitlab_round_trip.cpp:19:15`).
+Both regions deleted with that evidence. The lane verified for itself that `malf lint` cannot reach
+these files — `MALF_LINT_EXCLUDE_EXTRA` prunes `tests/` under its own law block — so the reader of a
+directive here is clangd.
+
+Tool forms 9 → 7, both accounted: 7 namespace closers unchanged, the 2 `NOLINTEND` lines deleted
+with the measurement above.
+
+### The stripper cross-check, exact with nothing to subtract
+
+Removed 556; kept violation classes **zero** (the gate's split carries no `suppression-without-why`
+and no `trailing-nolint`), so `556 == 556 − 0`. Exact rather than lucky: this unit's two
+suppressions are classed **bare** by the gate, not `suppression-without-why`.
+
+### Every `SRC-` attribution read against its declaring site — all six TRUE
+
+A measured negative, stated because unit 17 found the opposite. `SRC-II-6` (twice),
+`SRC-D-OUT-RUN-1`, `SRC-SP-7`, `SRC-SP-2` and `SRC-D-TID-11` were each read at their declaration-
+position sites in `core/` and each citer means what the code says. No false attribution. Per
+`OPS-8.O5` every citing site keeps `refs: SRC-<code>` unchanged; the `SRC-SP-2` citer joins the
+pilot's cross-repo cascade list, as unit 16's did.
+
+### The address census, and the inbound leg repairing two claims that rested on deleted prose
+
+Outbound **exit 0, nothing lost, 13 added** — every addition turning a rule the prose named in
+words into an address: `ADR-18.D4`, `ADR-22.D6`, `ADR-22.D8`, `ADR-23.D1`, `STU-12`, `DN-43.D8`,
+`ADR-17`, `SRC-D-OUT-RUN-1`, `ADR-8`.
+
+Inbound **143 mentions, all read, two repaired** — the leg doing exactly what it exists for, since
+neither is reachable from the outbound census by construction:
+1. A design note quotes this package's interface for the rule that the `+` continuation class
+   *"belongs to the transport axis, never here"* — a claim this conversion had held OUT of the tree.
+   It is now written at the interface head with the address the note itself names as the rule's owner.
+2. A second design note rests on GitLab's `parsed.component = {}` being *"correct and stays"* under
+   a named slot. The trailing comment that said so is gone; the seat now carries that address plus
+   the invariant that empty is a positive statement.
+
+### Five carried figures re-derived AT THE CORPUS — three false, two survived
+
+The GitLab corpus is mounted at this desk, so every figure was measured at the bytes rather than
+looked up. That is `OPS-8.O3`'s *can I re-derive this today* applied where the search-widening rule
+cannot reach: a claim whose only source is the measurement has no document to find.
+
+**Three convictions:**
+1. *"92.9 % of starts at depth 1"* → **91.9 %** (3 938 of 4 285). Not a rounding: the archived depth
+   table's own cells sum to 3 938, so the prose disagreed with its own source.
+2. *"303 of 4 285 starts"* for the nesting limitation → **347**. 303 is the depth-2 ROW
+   (14 + 11 + 278); depth 3 adds 44 more (15 + 0 + 29). The figure understated the declared
+   limitation by 44 starts. **This one propagated outside the repo — see below.**
+3. *"a trailing `\r` survives on 5.05 % of non-marker stamped lines"* → not reproducible under any
+   of the three readings of its own population (4.996 % / 4.962 % / 4.934 %). The line now carries
+   the measured **4.96 % (170 735 of 3 440 982)** with its coordinate.
+
+**Two that SURVIVED, and the lane's first read had judged them false** — the mirror error, caught
+before it cost anything: *"7.7 % of the stamped traces carry 17.7 % of the loss"* is exact
+(37/482 = 7.68 %, and those 37 carry 191 of 1 077 = 17.73 %), and the 3 446 260 stamped lines at
+exactly one width, 32 bytes, hold with no other width anywhere. A wrongly-condemned true claim
+leaves nothing behind for a reader to catch, which is why that direction is the expensive one.
+
+**And two comments falsified by a ruling made in the commit that falsified them.** `e1de97d`
+(2026-09-04) replaced this file's `GTEST_SKIP` with `FAIL()` on the Founder's order and did not
+touch the two comments describing it: a clause map reading *"2 UNSET ⇒ skip; SET-BUT-BROKEN ⇒ hard
+fail"* and a `SetUp` comment insisting the two states *"must not share a verdict"*. Both states now
+fail; what differs is the diagnostic. `OPS-8.O3`'s *the world moved* class, twice in one file.
+
+**One apparent contradiction resolved rather than condemned:** a test said **95** malformed-stamp
+markers where the corpus gate said **60**. Both are true at different grains — 95 counts
+`section_start` and `section_end`, 60 counts `section_start` alone, over the same 21 traces. The
+test's subject is a `section_start` decline, so its line now carries **60 with its population
+named**. The defect was a missing coordinate, never a wrong value.
+
+### Interrogation — two readers, 60 questions
+
+Reader A took the two sources plus `conformance.cpp`, `test_gitlab_strategy.cpp` and
+`test_gitlab_round_trip.cpp` (30 questions); reader B took the three heavier tests (30 questions).
+Both prompts carried the unconditional exclusion globs and the disclosure clause; both spawned by
+the pilot, not the lane, under the protocol unit 17 forced.
+
+**60 recovered · 0 not recovered · 0 wrong.** Both transcripts `GIT COMMANDS RUN: none`.
+Reader A reported the same name-only leak units 16 and 17 saw (an excluded filename appearing in a
+directory listing, never opened); reader B reported `EXCLUDED PATHS SEEN: none`.
+
+**One question carried a FALSE PREMISE and the reader refused it.** It asserted that *two* of the
+three outcome-marker prefixes are prefixes of the third's; only one is. The reader corrected the
+premise and then answered the real question — longest valid prefix wins within a line, last match
+wins across lines — and went on to establish what the tree does not say anywhere: resolving by
+declaration order instead would send `ERROR: Job failed: canceled` to `Failure` rather than
+`Aborted` on 17 of 25 cancelled jobs, and since `Aborted` SUPPRESSES vanished-quantum alarms where
+`Failure` does not, the mis-resolution would manufacture false regressions rather than merely lose
+a verdict. **An operator defect in the questionnaire, recorded as such**, and the second time this
+run has spent a question confirming something other than what it meant to ask.
+
+**Reader A found the third conviction's blast radius, which no witness in this protocol reaches.**
+Asked where a section's quantum ends, it noted in passing that the interface now says *"347 of
+4 285"* while the shipped limitations document still said *"303 of 4 285 (7.1%)"* — same
+denominators, different numerator. The conversion had corrected the source and thereby put the
+source and a live product claim in contradiction. Re-derived at the archived table
+(3 938 + 303 + 44 = 4 285) and repaired in the superproject in its own commit: the product
+limitation and the design note that quotes it now read **347 of 4 285 (8.1%)**. The direction is
+conservative — the declared limitation gets larger. Two further sites carry the old figure and were
+deliberately left: both sit on frozen record shelves.
+
+### Dispositions
+
+Nothing was not-recovered and nothing was wrong, so no claim needed a home above the comment rung
+and **no law block was minted** — this unit consumed no law number.
+
+### Findings for other lanes — none fixed here
+
+1. **The corpus oracle's six unread columns name an obligation nothing in the tree discharges.**
+   The committed delta file has eleven columns; this gate reads five and its comment assigns the
+   other six — the eidos-side pre/post marker counts and the per-trace lost/gained deltas — to a
+   two-path gate in `insight_sift_tests`. Found by reader B and verified here with a positive
+   control: those column names occur in exactly three places workspace-wide (this gate, the corpus
+   generator script, and the TSV itself), and no such gate exists. Either the gate is owed or the
+   columns are. **Addressee: Kleio.**
+2. **A design note names an unplaced repair for a file this unit opened.** `DN-64.O5` records an
+   `R4.1` comment repair owed to this package's strategy, noting no row opens that file. This unit
+   IS that opening, and the repair could not be acted on: `R4.1` appears on no live plan surface, so
+   its content is unrecoverable from the live tier. Either the slot states what the repair is, or the
+   pointer is dropped as drained. **Addressee: Daidalos.**
+3. **Two `insight-canon` census ceilings now over-admit** — the bare-code census reads 10 against a
+   ceiling of 13 and the sigil census 11 against 20, both shrunk by this unit converting bare `SRC-`
+   prose into `refs:` form. The lint asks for the ceilings to be banked. **Addressee: Argos.**
+4. **Discharged rather than open, recorded so it is not re-dispatched**: a sibling repo's ledger
+   records two form-3 address defects owed to this lane in this repo's token-index instrument. At
+   HEAD both already read correctly and `registry_grammar_lint` reports 0 failures. Nothing owed.
+5. **A measured negative for unit 17's Argos finding**: the corpus-gate registry's record for THIS
+   gate is clean — it registers it `RUN`, makes no CI-coverage claim about the default build, and
+   the header clause it rides on is true. The defect unit 17 found does not generalise.
+
+### Witnesses
+
+1. **Comment-only** — all eight files *code token stream identical to HEAD*.
+2. **Grammar** — draft standalone gate 0 violations with the `--style file:` invocation; in-tree
+   `malf format --check` 8 selected, 8 checked, **0 misformatted, 0 would-be violations**.
+3. **Behaviour** — taken by the pilot: `malf test insight-canon` **809 of 809 on clang-21 and 809
+   of 809 on gcc-16.2**, equal to this run's baseline.
+4. **Knowledge** — 60 of 60 across two readers, above.
+5. **Addressability** — outbound exit 0, nothing lost and 13 added; inbound 143 leads read, 2
+   repaired.
+
+`registry_grammar_lint` 0 failures and `docs_lint` 0 failures, both from the workspace root, both
+immediately before the push. `ctest -N` in the package's clang build tree: **28 cases, `-L corpus`
+3, `-LE corpus` 25** — so this package's 25-test baseline figure is the `-LE corpus` one, and the
+corpus gate does not run in a default build.
+
+
+
 
 ---
 

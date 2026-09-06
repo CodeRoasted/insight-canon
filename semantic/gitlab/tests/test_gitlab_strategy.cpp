@@ -1,25 +1,20 @@
-// test_gitlab_strategy.cpp — the GitLab dialect CODE TIER: the line-selective
-// format strategy. What it guards: the strategy claims EXACTLY the dialect-marked shapes (a line
-// carrying the 32-byte runner transport prefix, a bare `section_start:` marker, the terminal
-// verdict line), PEELS the prefix and parses its timestamp as the event time, and stays silent on
-// every other line AND on the RFC3339-prefixed look-alikes (a GHA line, a Syslog line) — the
-// anti-phantom guard the strict fixed-width shape buys. Determinism: byte-only parse, no
-// RNG/clock/float.
+// invariant: the strategy claims EXACTLY the dialect-marked shapes, peels the 32-byte prefix,
+// parses its head as the event time, and stays silent on every other line.
+// note: including the RFC3339-prefixed look-alikes a strict fixed-width shape rejects
 #include <gtest/gtest.h>
 
 import std;
-import insight.canon;           // ArenaAllocator / LogFormat / compose
-import insight.semantic.gitlab; // make_strategy + (via export import spi) IFormatStrategy
+import insight.canon;
+import insight.semantic.gitlab;
 
 using insight::LogFormat;
 using insight::tokenization::ArenaAllocator;
 
 namespace
 {
-// Verbatim from marker_corpus_v1 (code.videolan.org/esphynox__vlc job_2728336), with the ANSI
-// escapes canon's ingest strip has already removed
-// (SRC-D-TID-11 — see canon.api.cppm (normalize()) for the contract.)
-// — which is what a strategy actually sees.
+// refs: SRC-D-TID-11
+// pre: every fixture is verbatim from marker_corpus_v1 with the ANSI escapes canon's ingest strip
+// has already removed — which is what a strategy actually sees.
 constexpr std::string_view kStamped{"2026-07-21T18:06:18.101984Z 00O section_start:1784657178:"
                                     "prepare_executor\r"};
 constexpr std::string_view kStampedContinuation{
@@ -29,8 +24,6 @@ constexpr std::string_view kStampedPlain{"2026-07-21T18:15:01.294229Z 00O Job su
 constexpr std::string_view kBareSection{"section_start:1784657178:prepare_executor\r"};
 constexpr std::string_view kBareVerdict{"ERROR: Job failed: exit code 1"};
 
-// NOT GitLab. The first two both open with an RFC3339 token, which is exactly why the shape check
-// has to be strict.
 constexpr std::string_view kGhaLine{"2026-05-27T15:26:41.7842152Z Run yarn lint"};
 constexpr std::string_view kSyslogish{"2026-07-21T18:06:18.101984Z host app: started"};
 constexpr std::string_view kJenkinsLine{"[2025-06-25T14:31:12.339Z] [Pipeline] sh"};
@@ -108,8 +101,6 @@ TEST(GitLabStrategy, APrefixOnlyLineIsDeclinedAsBlank)
 {
     const auto strategy{insight::semantic::gitlab::make_strategy()};
     ArenaAllocator arena{4096};
-    // A stamped blank line. Declining it keeps an empty "" template out of the tokenizer — the
-    // GHA/Jenkins strategy discipline.
     const auto parsed{strategy->parse("2026-07-21T18:06:18.101984Z 00O ", arena)};
     EXPECT_FALSE(parsed.has_value());
 }

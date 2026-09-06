@@ -5,27 +5,12 @@ import insight.canon.internal;
 import insight.canon.api;
 import insight.canon.spi;
 
-// gitlab_strategy.cpp — the GitLab CI dialect CODE TIER (ADR-17): the format strategy. Like
-// Jenkins and unlike GHA, a GitLab trace has no single uniform line shape across runner
-// generations, so the strategy is LINE-SELECTIVE — it claims exactly the shapes this dialect marks,
-// and everything else falls through (typically to RawText):
-//   1. a line carrying the runner's fixed-width transport prefix
-//      `<RFC3339-with-6-digit-fraction>Z <NN><O|E><' '|'+'>` — 32 bytes, PEELED, and its timestamp
-//      parsed as the event time;
-//   2. a line-anchored `section_start:` marker (the bare, un-stamped form older runners emit);
-//   3. the terminal verdict line, recognized by walking THIS package's kOutcomeMarkers data so the
-//      knowledge lives in one place (the row) — the Jenkins-strategy discipline.
-//
-// THE 32-BYTE PREFIX IS PEELED HERE, NOT DECLARED, AND ADR-23.D1 OWNS THAT RULING. Scope is total,
-// so the prefix is transport — but it is a COMPOSITE whose continuation flag ('+' in the diagram
-// below) encodes line DELIMITATION, which is neither extractable nor inert, so ADR-23.D1 HOLDS the
-// catalogue row rather than admitting it — this peel is the price that slot names. The transform
-// kind which would retire the peel is catalogue growth under ADR-23.D3, and ADR-23.D1 states the
-// single condition that lands it. Peeling in the strategy is where Jenkins's timestamper peel is.
-//
-// Determinism: pure byte walks, no locale, no float (F5). The peel is a fixed offset, so it cannot
-// depend on content.
-
+// refs: ADR-17, ADR-23.D1, ADR-23.D3
+// invariant: LINE-SELECTIVE — it claims a stamped line, a line-anchored `section_start:`, and the
+// terminal verdict line; everything else falls through, typically to RawText.
+// invariant: the 32-byte prefix is PEELED here and NOT declared: its continuation flag encodes line
+// DELIMITATION, so ADR-23.D1 holds the catalogue row and this peel is that slot's price.
+// note: determinism — pure byte walks, no locale, no float; the peel is a fixed offset
 namespace insight::semantic::gitlab
 {
 namespace
@@ -36,37 +21,20 @@ namespace
         return static_cast<unsigned>(chr) - '0' < 10U;
     }
 
-    // ── The runner transport prefix ──
-    // `2026-07-21T18:06:18.101984Z 00O section_start:…`
-    //  └──────── 27 bytes ────────┘│└┬┘│
-    //                              │ │ └─ separator: ' ' on a new logical line, '+' on a
-    //                              │ │    continuation of the previous one
-    //                              │ └─── stream tag: two digits + 'O' (stdout) or 'E' (stderr)
-    //                              └───── separator space
-    //
-    // MEASURED on marker_corpus_v1: 3 446 260 stamped lines, prefix width 32 bytes, with no other
-    // width anywhere and exactly ONE distinct width within each of the 482 stamped traces. The
-    // fraction is always 6 digits and the zone always 'Z'; the '+' continuation flag occupies the
-    // same column the separator space otherwise holds, which is why both forms land on 32.
-    //
-    // The shape check is STRICT, and strictness is the anti-phantom guard: a Syslog or GHA line
-    // also opens with an RFC3339 token, and only the fixed fraction width plus the stream tag tell
-    // them apart. A producer emitting some other fraction width is DECLINED — the line falls
-    // through to RawText and yields no marker, which is a fail-closed miss rather than a wrong
-    // answer, and it is the same fixed-width property a declared row would assert (ADR-23.D1).
-    constexpr std::size_t kTimestampWidth{27U}; // YYYY-MM-DDTHH:MM:SS.ffffffZ
+    // assert: the prefix is `<RFC3339 with 6-digit fraction>Z <NN><O|E><' '|'+'>` and its width is
+    // FIXED at 32 bytes — measured over 3 446 260 stamped lines with no other width anywhere.
+    // note: the '+' continuation flag sits in the column the separator space otherwise holds
+    constexpr std::size_t kTimestampWidth{27U};
     constexpr std::size_t kFractionDigits{6U};
-    constexpr std::size_t kSeparatorWidth{1U}; // the space between timestamp and stream tag
-    constexpr std::size_t kStreamTagWidth{3U}; // NN + (O|E)
-    constexpr std::size_t kContinuationFlagWidth{
-        1U}; // ' ' (new logical line) or '+' (continuation)
+    constexpr std::size_t kSeparatorWidth{1U};
+    constexpr std::size_t kStreamTagWidth{3U};
+    constexpr std::size_t kContinuationFlagWidth{1U};
     constexpr std::size_t kTransportPrefixWidth{kTimestampWidth + kSeparatorWidth +
                                                 kStreamTagWidth + kContinuationFlagWidth};
     static_assert(kTransportPrefixWidth == 32U,
                   "the measured GitLab runner prefix is 32 bytes; a change here changes what is "
                   "peeled off every line of every stamped trace");
 
-    // Are `count` bytes from `pos` all ASCII digits?
     [[nodiscard]] constexpr bool digits_at(std::string_view line, std::size_t pos,
                                            std::size_t count) noexcept
     {
@@ -76,10 +44,12 @@ namespace
         return true;
     }
 
-    // Does `line` open with the runner transport prefix? Byte-exact, position by position — no
-    // parsing, no allocation, no dependence on anything past byte 32. The PUNCTUATION is tested
-    // first: it is the cheapest discriminator and it rejects almost every non-GitLab line in a
-    // handful of compares, which matters because this runs per line, twice (confidence + parse).
+    // pre: `line` may be any line; the check is byte-exact position by position, with no parsing,
+    // no allocation and no dependence on anything past byte 32.
+    // invariant: the PUNCTUATION is tested first — the cheapest discriminator, and this runs per
+    // line twice (confidence, then parse).
+    // assert: strictness IS the anti-phantom guard: a Syslog or GHA line opens with RFC3339 too,
+    // and only the fixed fraction width plus the stream tag tell them apart.
     [[nodiscard]] constexpr bool has_transport_prefix(std::string_view line) noexcept
     {
         if (line.size() < kTransportPrefixWidth)
@@ -87,28 +57,23 @@ namespace
         if (line[4] != '-' || line[7] != '-' || line[10] != 'T' || line[13] != ':' ||
             line[16] != ':' || line[19] != '.' || line[26] != 'Z' || line[27] != ' ')
             return false;
-        // The stream tag: two digits + O|E, then the continuation flag. The 'E' stderr signal is
-        // DECLARED and NOT READ — mapping a stream to a LogLevel is a semantic claim no study
-        // earned, and a stderr line is routinely informational. The level continues to come from
-        // infer_leading_log_level, exactly as Jenkins does.
+        // invariant: the `E` stderr signal is DECLARED and NOT READ — mapping a stream to a
+        // LogLevel is a semantic claim no study earned.
+        // note: a stderr line is routinely informational; the level still comes from the level scan
         if (line[30] != 'O' && line[30] != 'E')
             return false;
         if (line[31] != ' ' && line[31] != '+')
             return false;
-        return digits_at(line, 0U, 4U) &&                              // YYYY
-               digits_at(line, 5U, 2U) && digits_at(line, 8U, 2U) &&   // MM DD
-               digits_at(line, 11U, 2U) && digits_at(line, 14U, 2U) && // HH MM
-               digits_at(line, 17U, 2U) &&                             // SS
-               digits_at(line, 20U, kFractionDigits) &&                // .ffffff
-               digits_at(line, 28U, 2U);                               // the stream-tag number
+        return digits_at(line, 0U, 4U) && digits_at(line, 5U, 2U) && digits_at(line, 8U, 2U) &&
+               digits_at(line, 11U, 2U) && digits_at(line, 14U, 2U) && digits_at(line, 17U, 2U) &&
+               digits_at(line, 20U, kFractionDigits) && digits_at(line, 28U, 2U);
     }
 
     constexpr std::string_view kSectionPrefix{"section_start:"};
 
-    // Every outcome-marker row this package ships carries the verdict in its PREFIX with a
-    // free-form remainder, so prefix-matching IS the row's match predicate and this walk is
-    // complete. The static_assert is what keeps that true: adding a RemainderToken row without
-    // teaching this function the word-remainder rule would silently make the strategy over-claim.
+    // assert: every outcome row this package ships carries the verdict in its PREFIX, so
+    // prefix-matching IS the row's match predicate and this walk is complete.
+    // note: the static_assert keeps it true: a RemainderToken row would need a word check here
     static_assert(
         std::ranges::all_of(kOutcomeMarkers, [](const OutcomeMarkerRow& row) noexcept
                             { return row.shape == OutcomeMarkerShape::PrefixIsVerdict; }),
@@ -121,17 +86,14 @@ namespace
                                    { return content.starts_with(row.prefix); });
     }
 
-    // Does the strategy claim this line? A stamped line is claimed REGARDLESS of its content — the
-    // peel itself is the dialect knowledge, and it is what exposes every marker underneath it. The
-    // two bare forms cover the un-stamped runner generation, where the marker and the verdict line
-    // are the only GitLab-marked shapes a trace has.
+    // invariant: a STAMPED line is claimed regardless of its content — the peel itself is the
+    // dialect knowledge, and it is what exposes every marker underneath it.
     [[nodiscard]] constexpr bool claims(std::string_view line) noexcept
     {
         return has_transport_prefix(line) || line.starts_with(kSectionPrefix) ||
                is_terminal_verdict(line);
     }
 
-    // ── The dialect format strategy ──
     class GitLabStrategy final : public insight::tokenization::IFormatStrategy
     {
       public:
@@ -147,8 +109,8 @@ namespace
             {
                 timestamp = insight::utils::parse_iso8601(line.substr(0, kTimestampWidth));
                 content = line.substr(kTransportPrefixWidth);
-                // A prefix-only line is a blank line: decline it (make_event drops it, never an
-                // empty "" template) — the GHA/Jenkins strategy discipline.
+                // post: a prefix-only line is a blank line and is DECLINED, so no empty "" template
+                // reaches the tokenizer — the GHA/Jenkins strategy discipline.
                 if (content.empty())
                     return std::unexpected(
                         std::string("GitLabStrategy: blank line (transport prefix only)"));
@@ -157,15 +119,16 @@ namespace
             insight::tokenization::ParsedLine parsed;
             parsed.raw_line = line;
             parsed.timestamp = insight::tokenization::EventTime::parsed(timestamp);
-            // No level-lift rows: the body is console output, so the level comes from the same
-            // leading-level / failure-cue inference RawTextStrategy uses (byte-identical fallback).
+            // invariant: no level-lift rows, so the level comes from the same leading-level /
+            // failure-cue inference RawTextStrategy uses — byte-identical to that fallback.
             parsed.level = insight::utils::infer_leading_log_level(content);
-            parsed.component = {}; // GitLab trace lines carry no component / tag
-            // The content is stored VERBATIM after the peel, CR included. A trailing '\r' survives
-            // on 5.05% of non-marker stamped lines (measured, marker_corpus_v1) and it is CONTENT
-            // there — an in-place progress redraw, not a delimiter. Normalizing it away would be a
-            // template-collapse claim this package has not measured; the marker payload's CR
-            // terminator is the extractor's business and is handled in the row grammar.
+            // refs: DN-43.D8
+            // invariant: EMPTY is a positive statement that this layout declares no functional
+            // source — a GitLab trace line carries no component or tag.
+            parsed.component = {};
+            // post: content is stored VERBATIM after the peel, CR included — a trailing `\r`
+            // survives on 4.96 % of non-marker stamped lines and is CONTENT there, not a delimiter.
+            // note: measured 170 735 of 3 440 982; normalizing it away is an unmeasured claim
             parsed.content = arena.store_string(content);
             return std::expected<insight::tokenization::ParsedLine, std::string>{parsed};
         }
@@ -177,9 +140,8 @@ namespace
 
         [[nodiscard]] double confidence(std::string_view line) const noexcept override
         {
-            // Mirrors the GHA/Jenkins dialect confidence: decisive on a dialect-marked line
-            // (outranks the heuristic representation candidates), silent otherwise (the line falls
-            // through).
+            // invariant: decisive on a dialect-marked line so it outranks the heuristic candidates,
+            // and silent otherwise so the line falls through — the GHA/Jenkins shape.
             static constexpr double kGitLabConfidence{0.92};
             static constexpr double kNoConfidence{0.0};
             return claims(line) ? kGitLabConfidence : kNoConfidence;

@@ -1,17 +1,7 @@
-// test_gitlab_markers.cpp — the GitLab section VOCABULARY (measured on real traces, then graduated
-// into grammar-5 rows). What it guards:
-//   SECTION = a line-anchored `section_start:<unix-ts>:<name>[<options>]` open, kind=Step (a GitLab
-//             trace IS one job; its phases are steps under an implicit job), ORDERED (one runner,
-//             one job, one phase at a time — a transposition IS a signal);
-//   the payload is the NAME only — the epoch is skipped, the CR TERMINATES it, the option group is
-//             dropped;
-//   the malformed producer marker (`%s` / `$(date +%s)`) is DECLINED, never mis-parsed;
-//   the ECHOED marker is rejected by POSITION — the xtrace form carries a fully-valid stamp, so a
-//             stamp-shape guard would let it through and only anchoring does not;
-//   `section_end:` is NOT a row;
-//   SRC-II-6 = the rows are dialect-gated to gitlab and inert elsewhere.
-// Every byte form here was taken from marker_corpus_v1, not invented. Determinism: byte-only
-// recognition over the composed rows; no RNG/clock/float.
+// refs: SRC-II-6, STU-12
+// invariant: every byte form here is verbatim from marker_corpus_v1, never invented — the
+// vocabulary was measured on real traces and then graduated into rows.
+// note: determinism — byte-only recognition over the composed rows, no RNG, clock or float
 #include <gtest/gtest.h>
 
 import std;
@@ -23,10 +13,8 @@ using insight::tokenization::ChildOrder;
 using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::recognize;
 
-// The walkers take NormalizedContent — canon's ingest-normalization precondition carried by a type
-// unforgeable outside canon; every probe here is an escape-free literal (the xtrace probe's `\\e`
-// is TWO prose bytes, not an escape byte, so normalization has nothing to remove), so normalize()
-// is the zero-copy fixed point over a shared scratch.
+// pre: the walkers take `NormalizedContent`, a precondition carried by a type unforgeable outside
+// canon; every probe here is escape-free, so `normalize` is the zero-copy fixed point.
 [[nodiscard]] static insight::tokenization::NormalizedContent norm_probe(std::string_view probe)
 {
     static std::string scratch;
@@ -35,8 +23,8 @@ using insight::tokenization::recognize;
 
 namespace
 {
-// The RESOLVED view of a stream that declared this dialect — the concretely-gated rows are
-// reachable only through a declaration, never through per-line format detection.
+// invariant: a concretely-gated row is reachable only through a DECLARATION of this dialect, never
+// through per-line format detection — which is why the fail-closed arm is a second helper.
 [[nodiscard]] ComposedSemantics gitlab_only()
 {
     const std::array manifests{insight::semantic::gitlab::kManifest};
@@ -44,7 +32,6 @@ namespace
                                                             {});
 }
 
-// The same composition on a stream that declared NO dialect — the fail-closed arm.
 [[nodiscard]] ComposedSemantics undeclared_stream()
 {
     const std::array manifests{insight::semantic::gitlab::kManifest};
@@ -68,9 +55,8 @@ TEST(GitLabMarkers, SectionStartIsAnOrderedStep)
 TEST(GitLabMarkers, TheEpochIsSkippedNotFoldedIntoTheName)
 {
     const ComposedSemantics composed{gitlab_only()};
-    // The whole reason the extractor exists: `IntentMarker::name` is the raw payload
-    // `compare_skeletons` keys on. Two runs of the same phase carry different epochs and
-    // must still carry the SAME name.
+    // invariant: `IntentMarker::name` is the raw payload `compare_skeletons` keys on, so two runs
+    // of one phase carry different epochs and must still carry the SAME name.
     EXPECT_EQ(recognize(norm_probe("section_start:1784657178:get_sources"), composed).name,
               "get_sources");
     EXPECT_EQ(recognize(norm_probe("section_start:1784999999:get_sources"), composed).name,
@@ -80,12 +66,11 @@ TEST(GitLabMarkers, TheEpochIsSkippedNotFoldedIntoTheName)
 TEST(GitLabMarkers, TheCarriageReturnTerminatesTheNameAndTheOptionGroupIsDropped)
 {
     const ComposedSemantics composed{gitlab_only()};
-    // The bytes canon sees after the transport peel and the SRC-D-TID-11 escape strip: GitLab
-    // closes the marker with `\r\x1b[0K`, the escape dies, the CR survives.
+    // refs: SRC-D-TID-11
+    // assert: GitLab closes a marker with `\r` plus an erase-line escape — the escape dies at
+    // ingest normalization and the CR survives, so the CR is what terminates the name.
     EXPECT_EQ(recognize(norm_probe("section_start:1784657178:prepare_executor\r"), composed).name,
               "prepare_executor");
-    // …and the producer may continue the SAME line with the section's human-readable header. Both
-    // forms are verbatim from marker_corpus_v1.
     EXPECT_EQ(
         recognize(norm_probe("section_start:1784657178:build_tools_section\rTools build"), composed)
             .name,
@@ -107,14 +92,13 @@ TEST(GitLabMarkers, TheCarriageReturnTerminatesTheNameAndTheOptionGroupIsDropped
 TEST(GitLabMarkers, TheMalformedProducerMarkerIsDeclinedNotMisParsed)
 {
     const ComposedSemantics composed{gitlab_only()};
-    // The wireshark class, carried as a DECLARED limitation rather than filtered: 95 markers in
-    // marker_corpus_v1 carry an unexpanded `%s` / `$(date +%s)` where the stamp belongs. Structure
-    // present, stamp absent — and a section must NOT end up named after a shell expression.
+    // invariant: the wireshark class is a DECLARED limitation, not a filter: 60 `section_start:`
+    // occurrences across 21 traces carry an unexpanded `%s` where the stamp belongs.
+    // note: structure present, stamp absent: a section must not be named after a shell expression
     EXPECT_EQ(recognize(norm_probe("section_start:%s:build"), composed).kind,
               IntentMarkerKind::None);
     EXPECT_EQ(recognize(norm_probe("section_start:$(date +%s):build"), composed).kind,
               IntentMarkerKind::None);
-    // An empty name is not a quantum either.
     EXPECT_EQ(recognize(norm_probe("section_start:1784657178:"), composed).kind,
               IntentMarkerKind::None);
     EXPECT_EQ(recognize(norm_probe("section_start:1784657178:\rheader only"), composed).kind,
@@ -124,18 +108,14 @@ TEST(GitLabMarkers, TheMalformedProducerMarkerIsDeclinedNotMisParsed)
 TEST(GitLabMarkers, TheEchoedMarkerIsRejectedByPositionNotByTheStamp)
 {
     const ComposedSemantics composed{gitlab_only()};
-    // bash `set -x` xtrace echoes the script's own marker with a FULLY EXPANDED, strictly-VALID
-    // stamp — so a stamp-shape guard does not reject it and only anchoring does. `recognize`
-    // matches with starts_with, so the guard is free. (The `\e` here is a literal two-character
-    // sequence in the echoed text, not an escape byte — canon's ingest strip has nothing to
-    // remove.)
+    // assert: bash `set -x` echoes the script's own marker with a fully expanded, strictly VALID
+    // stamp, so a stamp-shape guard admits it and only ANCHORING rejects it.
     EXPECT_EQ(recognize(norm_probe("++ echo -e '\\e[0Ksection_start:1784657178:build\\r\\e[0K'"),
                         composed)
                   .kind,
               IntentMarkerKind::None)
         << "an echoed marker is not a section open — 23 of the 59 non-leading corpus markers are "
            "exactly this class";
-    // GitLab's own command echo, same argument.
     EXPECT_EQ(recognize(norm_probe("$ section_start:1784657178:build"), composed).kind,
               IntentMarkerKind::None);
 }
@@ -143,16 +123,14 @@ TEST(GitLabMarkers, TheEchoedMarkerIsRejectedByPositionNotByTheStamp)
 TEST(GitLabMarkers, SectionEndIsNotARow)
 {
     const ComposedSemantics composed{gitlab_only()};
-    // There is no close kind in IntentMarkerKind and the fold is open-marker driven: a section's
-    // quantum runs until the next section opens. Recognizing a close is only useful to BOUND a
-    // span, which is step_duration territory.
+    // invariant: `IntentMarkerKind` has no close kind and the fold is open-marker driven, so a
+    // section's quantum runs until the next section opens; bounding a span is step_duration work.
     EXPECT_EQ(recognize(norm_probe("section_end:1784657178:prepare_executor\r"), composed).kind,
               IntentMarkerKind::None);
 }
 
 TEST(GitLabMarkers, RowsAreDialectGatedAndFailClosedWhenUndeclared)
 {
-    // SRC-II-6: the row is reachable only through a declaration of THIS dialect.
     EXPECT_EQ(recognize(norm_probe("section_start:1784657178:build"), undeclared_stream()).kind,
               IntentMarkerKind::None)
         << "an UNDECLARED stream withholds every concretely-gated row (fail-closed on depth)";
