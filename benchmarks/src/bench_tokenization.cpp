@@ -1,22 +1,4 @@
-// Tokenization throughput benchmark — two arms (ADR-17 / SRC-SP-5).
-//
-// Measures end-to-end Tokenizer::process_line() cost — stateless per-line template
-// masking plus arena-backed CanonicalEvent emission — on a synthetic Zipf-ish corpus.
-//
-//   * BM_TokenizationThroughput            — the COMPOSED set (github + test_frameworks):
-//     the gate metric. This is the shape every product binary runs.
-//   * BM_TokenizationThroughputDegenerate  — compose({}): the format-partition control.
-//     The corpus carries no CI-dialect content, so the composed-vs-degenerate delta on it is
-//     what measures SRC-SP-5 — see canon.compose.cppm for the contract. Expected delta: noise.
-//     A non-noise delta is a mechanism regression here, never a benchmark to re-baseline.
-//
-// Reported metrics:
-//   * `items_per_second`  — log lines tokenized per wall second
-//   * `ns_per_line`       — nanoseconds per line (lower is better)
-//
-// Architectural target (technical_docs/overview/architecture.md):
-//   Steady-state per-line cost ≤ 1 µs at 32 templates.
-
+// refs: ADR-17
 #include <benchmark/benchmark.h>
 
 #include <array>
@@ -26,8 +8,6 @@
 #include <string>
 #include <vector>
 
-// External module consumption (the det_proof shape): the measured object is the shipped
-// library build, not a module-member rebuild.
 import insight.canon;
 import insight.semantic.github;
 import insight.semantic.gitlab;
@@ -39,15 +19,12 @@ namespace
 
 namespace tok = insight::tokenization;
 
-// Owns the synthetic line strings so string_views inside the tokenizer
-// remain valid for the duration of the iteration.
+// invariant: `lines` owns its strings, so a view into one is valid while it lives.
 struct SyntheticCorpus
 {
     std::vector<std::string> lines;
 };
 
-// Generate a Zipf-ish workload: a small set of templates with random
-// numeric values substituted in. Roughly mimics database/HTTP/system logs.
 SyntheticCorpus make_corpus(std::size_t n_templates, std::size_t n_lines, std::uint32_t seed)
 {
     static constexpr const char* kTemplates[] = {
@@ -91,16 +68,7 @@ SyntheticCorpus make_corpus(std::size_t n_templates, std::size_t n_lines, std::u
     return corpus;
 }
 
-// The NON-OTEL NESTED-JSON workload (DN-29.D9's measure-first gate). The two arms above are
-// plaintext KV lines: they never reach JsonStrategy, so they cannot see the cost of the OTLP
-// document probe at all. This corpus is the population that DOES pay it — structured JSON whose
-// nesting and escapes defeat the escape-free fast path, so every line lands on the simdjson slow
-// path where the probe sits, while carrying no OTEL field whatsoever.
-//
-// Lines are deliberately LONG (a nested context object + an escaped message): the quantity under
-// measurement is a whole-line scan versus a bounded prefix read, and on a short line the two are
-// the same thing. This is the honest shape of an application's structured logging, not a
-// worst case built to flatter the bound.
+// refs: DN-29.D9
 SyntheticCorpus make_nested_json_corpus(std::size_t n_lines, std::uint32_t seed)
 {
     static constexpr const char* kMessages[] = {
@@ -140,7 +108,6 @@ SyntheticCorpus make_nested_json_corpus(std::size_t n_lines, std::uint32_t seed)
     return corpus;
 }
 
-// Shared body: both arms run the identical corpus/loop; only the composition differs.
 void run_throughput(benchmark::State& state, const insight::semantic::ComposedSemantics& composed)
 {
     const auto n_templates{static_cast<std::size_t>(state.range(0))};
@@ -151,7 +118,6 @@ void run_throughput(benchmark::State& state, const insight::semantic::ComposedSe
     tok::ArenaAllocator arena{1U << 20U};
     tok::Tokenizer tokenizer{arena, tok::MaskConfig{}, composed};
 
-    // Warm up so the steady-state path dominates.
     for (const auto& line : corpus.lines)
     {
         benchmark::DoNotOptimize(tokenizer.process_line(line));
@@ -164,8 +130,6 @@ void run_throughput(benchmark::State& state, const insight::semantic::ComposedSe
         {
             benchmark::DoNotOptimize(tokenizer.process_line(line));
         }
-        // Reset arena between iterations to avoid unbounded growth dominating
-        // the measurement. The masker is stateless — no template state to preserve.
         state.PauseTiming();
         arena.reset();
         state.ResumeTiming();
@@ -177,7 +141,6 @@ void run_throughput(benchmark::State& state, const insight::semantic::ComposedSe
         benchmark::Counter::kIsIterationInvariantRate | benchmark::Counter::kInvert);
 }
 
-// The gate arm — the product composition (the det_proof set, built once, loop-invariant).
 void BM_TokenizationThroughput(benchmark::State& state)
 {
     static const std::array<insight::semantic::SemanticPackageManifest, 4> kManifests{
@@ -188,17 +151,14 @@ void BM_TokenizationThroughput(benchmark::State& state)
     run_throughput(state, composed);
 }
 
-// The control arm — core-only. Delta vs the gate arm on this non-dialect corpus = the
-// SRC-SP-5 composition overhead (expected: noise; dialect rows are format-partitioned).
+// refs: SRC-SP-5
 void BM_TokenizationThroughputDegenerate(benchmark::State& state)
 {
     static const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};
     run_throughput(state, composed);
 }
 
-// The non-OTEL nested-JSON arm. Not a gate metric and NOT part of the canon-#1 ordering
-// assertion — it is the population the JSON slow-path probes are charged to, measured on its own
-// so a probe's cost is attributable instead of diluted into a plaintext average.
+// refs: DN-29.D9
 void BM_TokenizationThroughputNestedJson(benchmark::State& state)
 {
     static const std::array<insight::semantic::SemanticPackageManifest, 4> kManifests{

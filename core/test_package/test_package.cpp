@@ -1,12 +1,8 @@
-// Smoke test: consumes insight::canon as if external.
 #include <expected>
 #include <gtest/gtest.h>
 #include <string_view>
 
-// Black-box consumer: the 1.5.1 unwrap (ADR-3.D4) replaced the textual public headers with a
-// module — the facade re-exports core types, tokenization
-// (ArenaAllocator/Tokenizer/CanonicalEvent), time_utils (parse_iso8601) and det_math, so one import
-// gives the whole consumer surface.
+// refs: ADR-3.D4
 import insight.canon;
 
 namespace
@@ -15,8 +11,6 @@ namespace
 constexpr std::size_t kArenaCapacity{16 * 1024};
 
 } // namespace
-
-// ── core ──────────────────────────────────────────────────────────────────────
 
 TEST(InsightCanonPackage, CoreLogLevelRoundtrip)
 {
@@ -42,15 +36,10 @@ TEST(InsightCanonPackage, CoreIso8601ParserAcceptsUtc)
     ASSERT_TRUE(ts.has_value());
 }
 
-// ── tokenization ──────────────────────────────────────────────────────────────
-
+// refs: ADR-17
 TEST(InsightCanonPackage, TokenizesJsonLine)
 {
     insight::tokenization::ArenaAllocator arena{kArenaCapacity};
-    // The degenerate composition (ADR-17): core-only, zero packages — a defined, runnable
-    // state. This install smoke tokenizes universal representation formats (JSON / Syslog), which
-    // need no dialect vocabulary; test_package cannot depend on the semantic packages (they depend
-    // on canon).
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};
     insight::tokenization::Tokenizer tokenizer{arena, {}, composed};
 
@@ -64,13 +53,10 @@ TEST(InsightCanonPackage, TokenizesJsonLine)
     EXPECT_FALSE(event.template_str.empty());
 }
 
+// refs: ADR-17
 TEST(InsightCanonPackage, TokenizesSyslogLine)
 {
     insight::tokenization::ArenaAllocator arena{kArenaCapacity};
-    // The degenerate composition (ADR-17): core-only, zero packages — a defined, runnable
-    // state. This install smoke tokenizes universal representation formats (JSON / Syslog), which
-    // need no dialect vocabulary; test_package cannot depend on the semantic packages (they depend
-    // on canon).
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};
     insight::tokenization::Tokenizer tokenizer{arena, {}, composed};
 

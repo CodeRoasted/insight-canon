@@ -2423,13 +2423,247 @@ counts the files never reached. The finding is recorded below; nothing was writt
    additions and **zero losses**, outbound; the inbound leg's 5 mentions read one by one, 4 of them
    prose or wiring and none falsified.
 
+## Unit 15 — `benchmarks/src/` + `core/test_package/` (3 files, 68 would-be violations) — the harness warm-up, zero law blocks, zero convictions
+
+The two remaining harness-tier surfaces, taken together as one unit against `OPS-8.S2`'s
+one-unit-per-directory framing: 68 would-be violations over three files is one reader's load twice
+over, and spawning two readers for 15 and 53 violations measures the same thing twice. Declared as
+a departure below. Neither directory owes a law number, which is why this unit was takeable in a
+session that held none: `core/test_package/` carries **zero** `SRC-` codes of any kind, and
+`benchmarks/src/`'s two declaration-position sites are both explicit citations (one of them says
+*"see canon.compose.cppm for the contract"* in as many words) of a code whose statement stands at
+`core/api/canon.compose.cppm`, which this run has not converted.
+
+| files | comment lines HEAD → gate | forms written |
+|---|---|---|
+| `benchmarks/src/bench_main.cpp` | 9 → 4 | assert 2 · refs 2 |
+| `benchmarks/src/bench_tokenization.cpp` | 45 → 6 | invariant 1 · refs 4 · 1 tool |
+| `core/test_package/test_package.cpp` | 16 → 4 | refs 3 · 1 tool |
+
+Per-file baselines from the gate before the strip: `bench_main.cpp` 9 comment lines / 9 violations
+(bare 8, trailing 1) · `bench_tokenization.cpp` 45 / 44 (bare 39, spacer 5) · `test_package.cpp`
+16 / 15 (bare 15). The three sum to the unit's 70 / 68 exactly, and the repo-wide gate moved
+10 780 → **10 712**, a delta of exactly 68.
+
+### Census (`OPS-8.S4`), derived from the gates rather than from the written list
+
+The derivation of unit 14 was re-used and re-run per file: `NOLINT` in every spelling, `/*name*/`
+and `/*name=*/`, `clang-format off/on`, `wall-clock:`, `DETERMINISM-ALLOW`, the
+`determinism-lint: allow(<reason>)` spelling `coderoast-server` found, `SPDX-License-Identifier:`,
+`registry-lint: allow`, plus the three superproject markers `OPS-8.S4` does not list — the seat
+opt-out of `scripts/log_seat_routing_lint.py`, the closure-model marker of
+`scripts/closure_declaration_lint.py` and the mirror marker of `scripts/pin_coherence.py`.
+**Every token has a population of ZERO in these three files except the namespace closer**, which
+reads 1 in `bench_tokenization.cpp` and 1 in `test_package.cpp` before and after. Zero differences,
+so zero census decisions. Two of the three files also sit outside `malf lint` by the standing law
+that prunes `tests/`, `benchmarks/` and `test_package/` from the walk, so their only lint reader is
+clangd — and neither carries a suppression to measure.
+
+### The stripper cross-check (`OPS-8.S5`) held, and it held VACUOUSLY — said so rather than counted as a pass
+
+`removed == violations − (suppression-without-why + trailing-nolint)` reads 9 == 9 − 0, 44 == 44 − 0
+and 15 == 15 − 0. **Both subtracted classes are zero in this unit**, so what held is the flat form
+that `OPS-8.S5` records as having been published from exactly this situation and falsified by the
+next unit that had a suppression. It is recorded as a pass over a population that cannot exercise
+it, not as evidence the equality is right.
+
+### The check that DID go red, deliberately, before it was trusted
+
+`OPS-8.S10`'s standing instruction — *make it fail once* — was applied to `anchor_collide.py`.
+On the unit's real script it reports **11 anchors checked, 0 colliding**. A discarded probe anchored
+one claim at `test_package.cpp` line 50 instead: it printed
+`COLLISION … 'const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};'
+occurs at [54, 74]` and exited 1. That is the shape `OPS-8.S6.1` warns about — two identical code
+lines in one file, an anchor resolved by text equality, zero anchor errors reported — and it is why
+this unit's two `ADR-17` citations were anchored at the `TEST` declarations (`ADR-26.D6`) rather
+than at the composition statement inside each body.
+
+### The address census (`OPS-8.S7.3b`), outbound and inbound
+
+Outbound, per file against `HEAD`, distinct sets: `bench_main.cpp` `{ADR-17, DN-53.D7}` unchanged ·
+`bench_tokenization.cpp` `{ADR-17, DN-29.D9, SRC-SP-5}` unchanged · `test_package.cpp`
+`{ADR-3.D4, ADR-17}` unchanged. Exit 0, **zero losses and zero additions**.
+
+`SRC-SP-5` moved OUT of a declaration position in `bench_tokenization.cpp` — from the file header to
+the degenerate arm it actually governs — which was checked before it was done rather than after:
+`registry_grammar_lint` classes a declaration by POSITION, and the code keeps a site because
+`core/api/canon.compose.cppm` declares it there (*"the contract is declared HERE, beside the
+mechanism"*). The post-conversion run confirms it: G5 green, form-1 numbering dense.
+
+Inbound: **67 mentions**, of which 63 are basename collisions — `bench_main.cpp` and
+`test_package.cpp` are among the most repeated file names in the workspace, and the leg matches by
+basename. The four that name these files specifically were opened one by one. `DN-53`'s scope list
+rests on `bench_main.cpp` containing the `init_logging` call, which is code and survives.
+`DN-29`'s census row rests on the DIRECTORY holding two files with zero span hits, unaffected.
+`DN-36`'s gate-② arm rests on the two benchmark CORPORA carrying zero backtick or tilde runs — a
+property of the generated lines, not of the file text, and the deletion of comments that did contain
+backticks can only make that claim more robustly true. `OPS-2.S6` rests on the composed-arm
+`std::array` size being hardcoded, which is code. **None falsified.**
+
+### Interrogation
+
+One reader, the working tree only, 18 questions, `interrogation_prompt.md` verbatim with the
+exclusion widened to name this repo's own ledger and the `ADR-26` file as well as LogCraft's.
+Transcript checked: `GIT COMMANDS RUN: none`, and no `git` invocation appears in its tool calls.
+The tree was frozen from the moment it was spawned — the three mechanical witnesses and both
+behaviour runs were finished first, and the only commit made while it was live touched
+`core/tools/`, a directory outside the unit and outside every question.
+
+**18 of 18 recovered · 0 not recovered · 0 reader-wrong · 0 convictions.** Scored from the
+per-question evidence, never from a summary line. Three qualifications are recorded because a
+recovery is not all one thing:
+
+* **Q13 was recovered from the line THIS conversion wrote and from nothing else.** Asked what the
+  `SyntheticCorpus` struct exists for, the reader answered from its `invariant:` line and added
+  *"the file offers no other reason."* That is what a written contract line is for, and it must not
+  be read as the code carrying the claim. The question was phrased to test the written line
+  (`OPS-8.S3.2`) and it did.
+* **Q9 and Q12 were answered correctly at MEDIUM confidence on their second half.** The reader
+  recovered the nested-JSON corpus's *population* at high confidence from the probe's own write-up
+  in `core/src/strategy/span_unpack.cpp` — which names this arm as the baseline its percentages are
+  a fraction of, so `DN-29.D9`'s denominator requirement is already discharged at the probe's source
+  site — but flagged the *why the lines are long* half as assembled rather than stated. Same shape
+  on the arena reset: the *safety* half came from `tokenizer_engine.cpp`'s converted `invariant:`
+  lines at high confidence, the *why* half was derived from the arena's semantics. Both answers are
+  correct, so neither is re-homed: `ADR-26.D5`'s test for a surviving `note:` is whether a reader
+  would get it WRONG without one, and this one did not.
+* **Q3 and Q4 were recovered partly from SIBLING repos**, whose benchmark entry points carry the
+  same rationale. That was checked rather than left as a worry, because a recovery resting only on
+  prose another repo has not yet converted is a recovery with an expiry date:
+  `insight-metalog/benchmarks/bench_main.cpp` is already converted and carries the knowledge in
+  tagged form (`pre:` on the argv rewrite, `note:` on the ASLR noise, `invariant:` on the silence).
+  So the claim survives its own conversion in at least one repo. `insight-eidos`'s two bench mains
+  still carry it as prose and will need the same treatment when that lane reaches them —
+  **a finding for the pilot, below.**
+
+### The claim in the OLD prose the reader falsified, and the defect is in the CODE
+
+The deleted header said *"`ns_per_line` — nanoseconds per line (lower is better)"*. Asked what the
+counter is and how it is computed (Q15), the reader answered the mechanism correctly and then said
+the value **is in seconds per line, not nanoseconds**, and that the name overstates the unit by a
+factor of 10⁹.
+
+Re-derived at the artifact rather than taken from the reader. The counter is
+`Counter(kLinesPerIter, kIsIterationInvariantRate | kInvert)`: the rate form gives
+`lines × iterations ÷ elapsed seconds`, and the inversion gives elapsed seconds per line. The last
+recorded run in `benchmarks/bench_results/` prints `ns_per_line = 1.40672e-06` beside
+`real_time = 1407.099 µs` for 1 000 lines — that is **1 406.7 ns per line**, and the counter's value
+is exactly `1 / items_per_second = 1.40672e-06 s/line`. The identity holds on every arm of the file.
+Read as nanoseconds the figure would be 1.4 picoseconds per line, below one clock cycle.
+
+So the deleted prose was **false**, and deleting it was right; what remains false is the counter's
+NAME, which is code and may not be repaired in a comment-only commit. It is a **finding**, below,
+and it is not confined to this repo: `coderoast-hub/benchmarks/SUMMARY.md` publishes a `ns_per_line`
+column at `v1.10.3` carrying the same values under the same name.
+
+### Stale and false claims deleted, with the evidence and where the search went
+
+* **"two arms"** in the file header, while three `BENCHMARK` registrations stand at the foot of the
+  same file (`BM_TokenizationThroughput`, `…Degenerate`, `…NestedJson`). The header's bullet list
+  enumerates two and was never updated when the nested-JSON arm landed. Deleted; the arms are
+  visible where they are registered.
+* **"the COMPOSED set (github + test_frameworks)"**, while the composed arm builds a
+  `std::array<SemanticPackageManifest, 4>` from github, gitlab, jenkins and test_frameworks in the
+  same file. Deleted here — and the same stale enumeration survives in two files this unit may not
+  touch, which is a finding below rather than a repair.
+* **"Zipf-ish"** as the description of `make_corpus`'s workload. The template choice is
+  `std::uniform_int_distribution<std::size_t> tmpl_dist{0, templates - 1}` over at most eight
+  templates — flat, with no rank skew whatever. The reader, asked what distribution the choice
+  follows (Q7), answered *"Uniform"* at high confidence with the same evidence, independently. The
+  search was widened past the repo before filing: `metalog-spec`'s specification and rationale do
+  establish that real log streams are Zipfian, and two sibling benchmarks use the same word, so the
+  IDIOM is sourced — what is false is this generator's claim to produce it. Deleted, not re-homed.
+* **The architectural target — `technical_docs/overview/architecture.md`, "steady-state per-line
+  cost ≤ 1 µs at 32 templates"** — deleted as an unsourced measurement (`OPS-8.S9`'s row), on three
+  legs. The path exists **nowhere in the workspace**: no `technical_docs/overview/` directory in any
+  repo. The coordinate is unreachable by the instrument that was supposed to prove it —
+  `make_corpus` caps at eight templates and the arms run `Arg(4)` and `Arg(8)`, so "at 32 templates"
+  names a cell this benchmark cannot produce. And the target itself survives only in the ATTIC
+  (`technical_docs/history/architecture-v1/`), which the Founder has ruled disposable and which
+  nothing may lean on. Re-homing it would have been the conversion inventing a live owner for a
+  number that has none. The missing bound is the finding.
+
+### Dispositions
+
+Nothing to re-home: every held claim was recovered. Nothing to repair: no line this conversion
+wrote was convicted, and the two lines a reader leaned on (`assert:` on the re-exec, `invariant:` on
+the corpus's ownership) were both confirmed rather than contradicted. One difference from a sibling
+is recorded and deliberately not copied: `insight-metalog`'s converted bench main carries a `pre:`
+naming `benchmark::Initialize`'s argv rewrite, where this unit's `assert:` says *no work may precede
+it* — which is the stronger statement and subsumes it, and which sits as an `assert:` inside a body
+where `ADR-26.D5` puts a `pre:` at a declaration.
+
+### Findings for other lanes — none fixed here, all recorded
+
+* **The `ns_per_line` counter reports SECONDS per line under a nanosecond name**, in
+  `benchmarks/src/bench_tokenization.cpp` on all three arms, and the value is published under that
+  name in `coderoast-hub/benchmarks/SUMMARY.md` and `coderoast-hub/benchmarks/insight-canon.baseline.json`
+  at `v1.10.3`. Evidence above; the identity `counter == 1 / items_per_second` holds on every arm of
+  the last recorded run. A rename is a code change plus a cascade into the published baseline and its
+  summary table. **Addressee: the pilot, for the lane holding `insight-canon/benchmarks` and the hub's
+  benchmark publication.**
+* **Two surviving copies of the stale composed-set enumeration, both outside the comment tier.**
+  `benchmarks/conanfile.py:17` describes the harness as measuring *"the COMPOSED semantic set
+  (github + test_frameworks)"* — a conan package DESCRIPTION, so it ships in package metadata — and
+  `benchmarks/CMakeLists.txt:4` says *"canon + the two semantic packages"*. Four are required,
+  linked and composed (`packages.yml`, `benchmarks/conanfile.py`'s `requirements()`,
+  `benchmarks/CMakeLists.txt`'s link list). Both predate this unit and neither is falsified by it;
+  after this deletion they are the only surviving statements of the wrong number. The cold reader
+  found both independently while answering Q14. **Addressee: the pilot, for the lane holding
+  `insight-canon/benchmarks`.**
+* **The composed manifest array is duplicated verbatim between two arms.**
+  `BM_TokenizationThroughput` and `BM_TokenizationThroughputNestedJson` each build their own
+  `std::array<SemanticPackageManifest, 4>` with the same four entries, so onboarding a fifth dialect
+  edits the same list twice — a cascade `OPS-2.S6` already flags as *"the `std::array` SIZE is
+  hardcoded, mechanical, size trap"* and which is now doubled. Found by the reader at Q14.
+  **Addressee: the pilot, for the lane holding `insight-canon/benchmarks`.**
+* **`insight-eidos`'s two benchmark entry points still carry the ASLR and silencing rationale as
+  prose**, and this unit's Q3/Q4 recoveries rested partly on them. `insight-metalog`'s equivalent is
+  already converted and keeps the same knowledge in tagged lines, which is the shape to copy.
+  **Addressee: the pilot, for the `insight-eidos` CCC lane.**
+* **The one shared `.clang-tidy` prescribes a comment form the CCC gate classes as a violation.**
+  `malf/config/.clang-tidy` — symlinked by every C++ repo — instructs an author to waive a cognitive
+  complexity finding with a **SAME-LINE** `// NOLINT(readability-function-cognitive-complexity):
+  <reason>`, and gives a reason for the placement (*"so the waiver cannot outlive the code it anchors
+  to by drifting off it"*). `ADR-26.D5` bans trailing comments and requires the directive on its own
+  line above the target under a `note:` or `refs:`, and the gate counts a `trailing-nolint` class —
+  8 of them live in this repo today. The two doctrines disagree about the same token, in the file
+  every repo inherits, and `logcraft` is already ARMED, so an author following the config there reds
+  the gate. Not a CCC-unit repair and not this lane's file. **Addressee: the pilot, for Daidalos
+  (`ADR-26` owns the grammar) and Argos (the shared config and the lint arms).**
+* **The law-number range moved while this run was reading.** `registry_grammar_lint` now reports
+  **15** form-1 declarations with the numbering checked DENSE, and a workspace sweep confirms the
+  declared set is dense at 1 through 15 — `15` is declared in `insight-eidos/sift/src/classify/classify.cpp`.
+  The sixth run's closing paragraph says the next free integer is 15; **it is 16.** Recorded here
+  rather than edited into that section, which is a record of what was true when it was written.
+  **Addressee: the pilot, who issues the ranges.**
+
+### Witnesses
+
+1. **Comment-only** — all three files: *comment-only (code token stream identical to HEAD)*.
+2. **Grammar** — `malf format --check` over both directories: `benchmarks/src` 2 selected, 2 checked,
+   **0 misformatted, 0 would-be violations**, 10 comment lines, forms `invariant` 1 · `assert` 2 ·
+   `refs` 6 · 1 tool; `core/test_package` 1 selected, 1 checked, **0 misformatted, 0 would-be
+   violations**, 4 comment lines, forms `refs` 3 · 1 tool.
+3. **Behaviour** — `malf test insight-canon` on clang-21 and with `--profile linux-gcc16-release`:
+   734 + 32 + 25 + 13 + 5 = **809 of 809 passing on each toolchain**, equal to the baseline. This run
+   covers **unit 15 AND the non-comment-only usage-string repair** landed in the same tree state.
+   `malf lint --all-files` in the same slot acquisition: **21 findings over 56 files checked**, the
+   standing baseline, unchanged — and none of this unit's three files is inside that population.
+4. **Knowledge** — 18 of 18 recovered, 0 not recovered, 0 reader-wrong, 0 convictions; three
+   qualifications and one falsification of deleted prose, all above.
+5. **Addressability** — the per-file census against `HEAD`: all three sets unchanged, zero losses and
+   zero additions, outbound; the inbound leg's 67 mentions triaged, the 4 that name these files read
+   one by one, none falsified.
+
 ---
 
 # The `OPS-8` verdict — third cold reader, first at scale
 
 `insight-canon` is `OPS-8`'s third run and its first large one; findings 14 onward come from the
 third run (units 8-9), findings 20-22 from the fourth (units 10-11), findings 23-24 from the
-fifth (units 12-13) and findings **25-27** from the sixth (unit 14). **Twenty-seven findings**,
+fifth (units 12-13), findings **25-27** from the sixth (unit 14) and finding **28** from the
+seventh (unit 15). **Twenty-eight findings**,
 ordered by what they cost within each run. Items 1, 5,
 14, **20**, **23**, **24**, **25** and **26** are the ones that change the runbook; item 5 needed a Founder ruling before the `core/api/`
 units could be converted at all, and it has one — see the RULED section below. **Item 20's repair has
@@ -2923,6 +3157,28 @@ each hit's scan roots) and it is the only leg that can enumerate a token nobody 
 down. **The three should join the step's floor**; more importantly, the step should say that the
 derivation is run per REPO, because the answer is a property of which gates cover that repo's paths.
 
+## 28. `OPS-8.S9`'s ONE WORKED REMEDY FOR A FALSIFIED STRING LITERAL IS FALSE AT THE ARTIFACT, AND IT IS THE ROW'S ONLY EXAMPLE
+
+`OPS-8.S9`'s *falsified outside the comment tier* row uses this repo's token-index instrument as its
+worked example and offers two remedies, the first being *"repoint the string at the corpus READMEs
+(the per-producer field names are documented there and in the shared corpus studies)"*. Carried out,
+that remedy **fails for two of the three producers**: `coderoast-corpora/jenkins_corpora/marker_corpus/README.md`
+names no outcome field at all, `.../gitlab_corpora/marker_corpus/README.md` mentions *outcome* only
+as a gate-score row and never the field, and only `github_corpora/revert_corpus/README.md` names
+`ci_outcome` — for the R1 gate rather than for this transcription. Following the step as written
+would have moved a dangling pointer one indirection further out and left it dangling.
+
+What worked instead was to make the string carry the fact itself: the row's outcome word comes from
+that corpus manifest's own outcome field, never renamed — `ci_outcome` on GitHub Actions, `result`
+on Jenkins, `job_status` on GitLab — each verified at the manifest rather than carried from the
+deleted prose, and no corpus path named, so nothing about a private corpus is published. **The
+generalisable half is the METHOD, not the three field names:** a remedy that says *point at the doc*
+is only a remedy once someone has opened the doc, and this row's example was written from the
+converting lane's expectation of what the corpus docs contain. The step should say that the target
+of a repointed pointer is READ before the repoint is proposed — which is `MEM:verify-audit-findings-before-destructive-act`
+reaching a runbook step rather than an artifact.
+
+
 ## Departures from `OPS-8` in this run, declared
 
 * **Units 2 and 3 landed in ONE commit**, against `OPS-8.S10`'s one-commit-per-unit. Both are
@@ -2961,6 +3217,18 @@ derivation is run per REPO, because the answer is a property of which gates cove
 * **Unit 14's ledger entry corrected the preamble's law-numbering paragraph**, which had claimed
   this repo declares zero law blocks since before unit 7 minted the first three. A ledger's
   preamble is read as the standing state, so a false one is not left for the drain.
+* **Unit 15 spans TWO directories**, against `OPS-8.S2`'s one-unit-per-directory framing.
+  `benchmarks/src/` (53 violations) and `core/test_package/` (15) are the harness tier's two
+  remaining surfaces; 68 violations over three files is well inside one reader's load, and the
+  ground the step gives for splitting — *split where a reader can answer from a subset* — argues for
+  economy here rather than against it, since two readers would have measured the same form twice.
+  The two directories keep separate rows in the tables above.
+* **Unit 15's run also landed a NON-comment-only commit**, deliberately and separately: the
+  token-index instrument's runtime usage string, which unit 14 recorded as falsified by its own
+  deletion and which no comment-only commit may reach. It was committed alone, by its own pathspec,
+  under a subject that says it is not comment-only, and it shares this unit's behaviour witness
+  because both were in the tree for the same `malf test` pair. `OPS-8.O1`'s witness 1 is unaffected:
+  it is taken per file, and the instrument is not one of unit 15's three.
 * **The suppression measurement was taken for all three files, including the two that did not
   land.** It reads `HEAD` bytes through clang-tidy and is valid whether or not the conversion
   lands, so taking it once is strictly better than making the next lane repeat it — and the four
@@ -3536,3 +3804,160 @@ the same fact, and this run's unconsumed range is the reason 15 is still free.
 **One code repair is owed before that api unit converts**, and it is this run's own: `print_usage`
 in the token-index instrument points at a header transcription this unit deleted. It is a string
 literal, so no comment-only commit can reach it. See unit 14's findings.
+
+---
+
+# Where the SEVENTH run stands (unit 15, 2026-09-06) — and the programme moves to one repo at a time
+
+**Fifteen units converted, eight law blocks standing, none minted this run, the repo still NOT
+armed.** `malf format --check insight-canon` reads **12 182 comment lines and 10 712 would-be
+violations** against the original baseline's 14 489 and 14 242 — **3 530 violations converted,
+24.8 % of the repo**, in fifteen commits across seven runs. The unit's own contribution is exactly
+its measured 68. Arming (`OPS-8.S12`) requires the whole repo at zero and is not reached, so
+`comment_contract: true` is NOT set and the CCC phase still counts this repo rather than failing it.
+
+The gate's verbatim closing line at the end of this run:
+
+```
+malf format: CCC SUMMARY · mode=check-paths · files 126 = armed 0 + report-only 126 + NOT CHECKED 0 · armed repos: none · comment lines 12182 · forms pre=33 post=101 invariant=204 assert=77 note=168 refs=217 continuation=280 law=8 tool=278 · violations in armed files 0 (none) · would-be violations in report-only files 10712 (bare=9224 tag-mid-line=7 slash3=84 spacer=604 ruler=210 trailing=559 trailing-nolint=8 suppression-without-why=16) · rc=0
+```
+
+| unit | surface | violations | comment lines | reader |
+|---|---|---|---|---|
+| 1 | `core/src/arena/` | 37 | 39 → 17 | 10/10 recovered |
+| 2 | `core/src/identity/` | 132 | 136 → 34 | 13/13 recovered |
+| 3 | `core/src/transport/` + `canon.internal.cppm` | 107 | 109 → 40 | 15/15 recovered |
+| 4 | `core/src/tokenizer/` | 112 | 114 → 48 | 14/14 recovered |
+| 5 | `core/src/parse/` | 265 | 273 → 103 | 31/35, **4 wrong** |
+| 6 | `core/src/scan/` | 284 | 287 → 96 | 33/34, **1 wrong** |
+| 7 | `core/src/conformance/` | 313 | 318 → 158 | 30/32, **2 wrong** |
+| 8 | `core/src/compose/` | 395 | 404 → 113 | 35/38, 2 not recovered, **1 wrong** |
+| 9 | `core/api/utils/` + `core/api/det/` | 95 | 97 → 45 | 19/21, 1 not recovered, **1 wrong** |
+| 10 | `core/src/utils/logger.cpp` | 84 | 86 → 18 | 13/14, **1 wrong** |
+| 11 | `proof/det_proof.cpp` | 142 | 144 → 65 | 17/18, **1 wrong** |
+| 12 | `core/src/utils/` (2 files) | 546 | 558 → 191 | 36/36 recovered |
+| 13 | `core/src/mask/` | 530 | 535 → 262 | 37/37 recovered, 1 qualified |
+| 14 | `core/tools/` | 420 | 422 → 81 | 32/35, 1 not recovered, **2 convictions** |
+| 15 | `benchmarks/src/` + `core/test_package/` | 68 | 70 → 14 | 18/18 recovered, 3 qualified |
+| | **total** | **3 530** | **3 592 → 1 285 (64 %)** | |
+
+Forms standing in the repo: `pre` 33 · `post` 101 · `invariant` 204 · `assert` 77 · `note` 168 ·
+`refs` 217 · 280 continuations · 278 tool forms · **8 law blocks**, none of them this run's.
+
+**The commits this run landed**, tree clean at the end: `be804ab`, the NON-comment-only
+usage-string repair of `core/tools/leading_level_token_index_measure.cpp` (pushed before the unit),
+and one comment-only unit commit carrying the three converted files plus this entry.
+
+## The law-number range: the declared set MOVED while this run was reading, and the sixth run's figure is now wrong
+
+The sixth run's closing section says the next free integer is **15**. It is **16**.
+`registry_grammar_lint` reports 15 form-1 declarations with the numbering checked DENSE, and a
+workspace sweep confirms the declared set is dense at 1 through 15 — `15` is declared in
+`insight-eidos/sift/src/classify/classify.cpp`, landed by that repo's lane after the sixth run
+wrote its figure. This is exactly the fact `OPS-8.O4` names: an issued number and a declared number
+are not the same thing, and only the second is one a gate can see. **A lane must re-measure the
+declared set at the start of its run rather than read a figure out of this file.** This run minted
+nothing, so it consumed nothing.
+
+## What the seventh run cost in slot contention, measured
+
+**One acquisition, and the slot was FREE when it was asked for: 4 seconds of wait, total.** The
+acquire was taken in the FOREGROUND and success was tested on the **exit status**, never by grepping
+the output for a word that appears in the refusal too. The single acquisition carried both
+toolchains' behaviour witness and a full `malf lint --all-files`, and the slot was released with its
+token immediately after — `malf slot status` reads FREE at the end of the run. Everything else in
+the run — the reading, the classing, the stripping, the claim placement, the draft gate, both
+address-census legs and the interrogation — needs no slot and took none.
+
+## What remains, and what the next session should take first
+
+**The programme now runs ONE REPO AT A TIME** (the Founder, 2026-09-06, to control token cost), so
+the next `insight-canon` session is a dedicated one rather than a lane in a wave.
+
+Unconverted, by violation count, and the five figures sum exactly to the 10 712 the gate reads:
+`core/api/` 2 697 (`canon.api.cppm` 1 193, `canon.spi.cppm` 672, `canon.transport.cppm` 322,
+`canon.compose.cppm` 268, `canon.cppm` 242) · `core/src/strategy` 1 275 · the test tier
+(`core/tests/`) 4 682 · the four `semantic/` packages 2 058. **The harness tier is now COMPLETE**
+(`core/tools/`, `proof/`, `benchmarks/src/` and `core/test_package/` are all converted), and the
+`core/src/` source tier is complete except `strategy`.
+
+**A correction to the unit plan's own wording, carried since the preamble was written:** it calls
+the 2 058 *"the three dialect packages"*. There are **four** packages and the number is theirs:
+`semantic/github` 603 · `semantic/jenkins` 820 · `semantic/gitlab` 556 · `semantic/test_frameworks`
+79. `test_frameworks` is a vocabulary package with no dialect and no code tier, which is why it was
+not counted as one; the violation total was always right.
+
+### The next unit, and why it is takeable without a law-number range
+
+**`semantic/test_frameworks/` (79 would-be violations, 3 files, 82 comment lines) is scoped, stripped
+and drafted but NOT landed**, and it is the recommended first unit of the next session. Its claims
+script, its stripped draft and its questionnaire were built in this run's scratchpad, which is
+disposable — the analysis below is the part worth keeping and it is recorded here rather than there:
+
+* Files and per-file gate readings: `src/test_frameworks.cppm` 36 comment lines / 35 violations
+  (bare 26, spacer 1, trailing 8) · `tests/conformance.cpp` 6 / 5 (bare 5) ·
+  `tests/test_location_families.cpp` 40 / 39 (bare 29, trailing 10). The three sum to the 82 / 79
+  the directory reads.
+* **The `.cppm` and the tests convert TOGETHER**, on `OPS-8.S2`'s answer-key ground: the tests
+  assert on the very rows the module interface declares.
+* **It owes no law number.** Its three codes each have a declaring site elsewhere: `SRC-SP-7` at
+  `core/api/canon.spi.cppm`, `SRC-SP-2` at `core/src/conformance/canon.conformance.cppm`,
+  `SRC-II-8` at `core/api/canon.spi.cppm` and `core/api/canon.api.cppm`. All three sites are
+  unconverted, so all three survive the unit.
+* **It carries ONE suppression and it is BARE, so the check inventory cannot discharge it.**
+  `tests/conformance.cpp` opens a `NOLINTBEGIN` region whose directive sits **mid-line inside the
+  prose block** (*"…pure over manifest data. NOLINTBEGIN — unit test: short identifiers and string
+  literals are fine."*) and closes with `NOLINTEND` on its own line. **The strip deletes the opener
+  with the prose and keeps the closer** — measured in this run's draft, `NOLINT` census 2 → 1,
+  which is `OPS-8.O3`'s first lesson reproduced exactly. Landing that would leave an unmatched
+  `NOLINTEND`. The directive names no check, so it suppresses every armed check and the inventory
+  argument is unavailable: the TU must be run **twice**, in place, against the RELEASE database at
+  `build-clang21-libcxx-release/compile_commands.json` (the entry's build dir is
+  `semantic/test_frameworks/build-clang21-libcxx-release`), with the directive TEXT stripped and the
+  code kept. `malf lint` prunes `tests/` by policy, so the gate is not that suppression's reader —
+  clangd is.
+* One question the unit's reader should be asked and one limit its score will carry: three of its
+  questions can be answered from `core/tests/compose/test_semantic_walkers.cpp`, which is
+  unconverted and carries the same measured witness (the `##[error]…rcserver_test.go` alert and the
+  24 `##[debug]File:` labels). That is a legitimate recovery from the tree, but it must be recorded
+  as evidence found OUTSIDE the unit.
+
+### Declaration-position codes: what was checked in this run, and what was found
+
+Every remaining candidate was swept for `SRC-` codes in a **declaration position** — any site in a
+`.cppm`/`.hpp`/`.h`/`.ipp`, or a `.cpp`'s first 40 lines, which is how `registry_grammar_lint`
+classes a declaration — so that no session begins a unit it cannot finish:
+
+| candidate | violations | declaration-position sites | verdict |
+|---|---|---|---|
+| `core/test_package/` | 15 | **zero codes of any kind** | taken as unit 15 |
+| `benchmarks/src/` | 53 | 2, both `SRC-SP-5`, both explicit citations of `canon.compose.cppm` | taken as unit 15 |
+| `semantic/test_frameworks/` | 79 | 4 (`SRC-SP-7` ×2, `SRC-SP-2`, `SRC-II-8`) — every one a citation, all three codes declared in `core/` | **takeable, no range needed** |
+| `semantic/github/` | 603 | 3 in tests (`SRC-SP-2`, `SRC-D-PROV-1`, `SRC-SP-7`), 0 in `src/` | citations; `D-PROV-1` declared in `core/api/canon.transport.cppm` |
+| `semantic/gitlab/` | 556 | 6 (`SRC-II-6`, `SRC-D-OUT-RUN-1`, `SRC-SP-7` in the `.cppm`; `SRC-II-6`, `SRC-D-TID-11`, `SRC-SP-2` in tests) | all declared in `core/`; **read each against its statement before converting** |
+| `semantic/jenkins/` | 820 | 8 (5 in the `.cppm`, 3 in tests) | `SRC-II-4`'s ONLY source declaration position in the workspace is `semantic/jenkins/src/jenkins.cppm:146`, and its statement is the intent-identity bible's — a citation, so a `refs:` kept inside the `.cppm` preserves both the address and its position class. The other seven are declared in `core/`. |
+| `core/tests/` | 4 682 | 15 sites over 11 files, 14 distinct codes | the test tier is a CITING tier (`OPS-8.O5`); each site's prose must still be read against the code's statement before it is reduced to a `refs:` |
+
+**The sharp one is `semantic/jenkins`**, and it is sharp in a way no gate reports: `SRC-II-4` has
+exactly one declaration-position site in all of `insight-canon`'s source and it is inside that
+package's module interface. Keeping the address in a `refs:` there keeps `registry_grammar_lint`
+green, because a `.cppm` is a declaration position throughout — which is precisely the shape
+`ADR-26.D5` warns about, a code carried into a `refs:` satisfying the gate exactly as the prose did.
+The statement itself is safe: `technical_docs/bibles/intent_identity.md` owns `SRC-II-4`, so the
+site is a citation and `BIB:intent_identity` is the address to carry beside it.
+
+### `core/src/strategy/` (1 275) — still SCOPED, still needs a law range, still unconverted
+
+Unchanged from the sixth run's scoping, which stands and should be read in full rather than
+re-derived: 23 files, 1 353 comment lines, split by subject into a structured group (the strategy
+interface, `json.cpp`, `span_unpack.cpp`, `simdjson_scratch.hpp` — 782 violations over 4 files) and
+19 plaintext dialect strategies (493). **The structured group is a DECLARING unit** — five distinct
+codes in declaration positions across its four files — **and `DN-29.D9` owes it a law block in
+terms**, ruling that the export probe's soundness premise MUST be stated at the source site with its
+workload and denominator. CCC's only admissible multi-line source form is the law block, so that
+block is owed rather than preferred. **This unit therefore needs a law-number range and this run did
+not hold one; the next free integer is 16.** The plaintext group carries **zero** declaration-position
+codes but cannot be split off naively: the interface's per-strategy documentation blocks are an
+answer key for it, so the interface travels with whichever group converts first.
+
+`core/api/canon.api.cppm` (1 193) remains the other declaring unit, with seven codes of its own.

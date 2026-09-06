@@ -1,21 +1,16 @@
-// Custom benchmark entry point for insight_canon_bench (the composed harness, ADR-17).
-
+// refs: ADR-17
 #include <benchmark/benchmark.h>
-#include <spdlog/common.h> // spdlog::level — named for init_logging's level choice below
+#include <spdlog/common.h>
 
 import insight.canon;
 
 int main(int argc, char** argv)
 {
-    // Re-exec once with ASLR disabled so address-layout randomization does not add run-to-run
-    // timing noise (Google Benchmark's "ASLR is enabled" warning). Must precede any other work.
+    // assert: this may execv the process image, so no work may precede it.
     benchmark::MaybeReenterWithoutASLR(argc, argv);
 
-    // SILENCE, DECLARED (DN-53.D7). A benchmark measures nanoseconds, so an emitted record does not
-    // merely land in the wrong place — it perturbs the number. `off` is the level argument's own
-    // silencing value; the declaration in canon.api.cppm owns why this is the only door, and why
-    // the `spdlog::set_level` + `default_logger()->set_level` pair this replaces stopped reaching
-    // canon. Safe under call_once: nothing else in a bench binary calls init_logging.
+    // assert: no other call to init_logging runs in this binary, so this level takes.
+    // refs: DN-53.D7
     insight::logging::init_logging(spdlog::level::off);
 
     benchmark::Initialize(&argc, argv);
