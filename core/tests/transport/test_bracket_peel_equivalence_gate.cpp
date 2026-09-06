@@ -1,57 +1,34 @@
-// test_bracket_peel_equivalence_gate.cpp — G-T5-PEEL: the bracket row's peel-equivalence gate
-// (the G1-PEEL shape one row over; the transport contract's owed obligation for the Jenkins
-// Timestamper row, discharged).
-//
-// ═══ THE ORACLE IS A FROZEN COPY ═══════════
-// Taken VERBATIM from `semantic/jenkins/src/jenkins_strategy.cpp` at insight-canon commit
-// `f5e4838` — the last commit before T5 5.2 deleted that detection from production. Its
-// provenance lives HERE, in the gate, and not only in the `git log` of a deleted file. It is
-// FROZEN: an "improvement" to it is a DEFECT, not maintenance. Only the decision function
-// `line ↦ (claimed?, content, timestamp)` travelled — the position logic (`[` at 0, datetime at
-// 1, `]` adjacent, one past), the greedy `[ \t]+` strip, the blank decline, and the
-// `parse_iso8601(interior)` extract. The gate NEVER calls the strategy it replaced (it no longer
-// exists to call — the P2b discipline: implementation drift from the frozen spelling is red here,
-// never a silent oracle shift).
-//
-// ═══ WHAT SHARING `rfc3339_datetime_length` MEANS (the can't-PASS ledger) ═══════
-// The CHARACTER grammar is deliberately the ONE shared owner — oracle and SUT both call it, so
-// this gate cannot catch a defect INSIDE that grammar.
-// What it scores is exactly the residual independent surface: the position logic, the strip, the
-// blank decline, and the extract — the surfaces that were re-spelled in the catalogue peel.
-// CLAIM WORD: REFACTOR-EQUIVALENCE, never external validity — no sentence
-// may cite this green as evidence the transport model is right about the world.
-//
-// ═══ POPULATION (clauses 1/3/4/5) ═══
-// The 12 whole-stream traces of jenkins-markers/v2, EVERY `\n`-split line — selected by the
-// committed sidecar's frozen `stamp_class` column (that classifier is generated
-// corpora-side; never by inspection here), bytes verified against the attested sha256 digests.
-// The per-line partition closes: stamped-equal + blank-dropped + unclaimed-identity + mismatch
-// == total lines.
-//
-// ═══ FALSIFIABILITY — OBSERVED 2026-07-30, then recorded (clause 7); every mutation reverted ═══
-//   P-A  the peel over-eats by one byte (`close + 1U` → `close + 2U` in transport.cpp): the
-//        CORPUS ARM STAYED FULLY GREEN — 125 774/125 774 stamped lines still equal, 0 mismatches
-//        — because every real whole-stream line carries a separator the strip eats anyway, AND
-//        the frozen oracle strips the same way, so the blindness is BY CONSTRUCTION, not by
-//        corpus luck. RED landed in the synthetic glued-form law alone ("payload" → "ayload").
-//        ⚠ MEASURED BLINDNESS: the corpus arm cannot see an over-peel of separator width; the
-//        synthetic strip laws are the carrying leg for that defect class — do not delete them
-//        believing the 127 514-line arm covers it.
-//   P-B  the acceptor widened past the `]` requirement (the close-byte check dropped): RED on
-//        exactly the wrong-close decline arm ("[2026-01-02T03:04:05Z more] tail" peeled to
-//        "more] tail" + a timestamp extracted); corpus green — no such shape exists in the 12
-//        traces, which is why the arm is synthetic.
-//   P-C  the extract dropped (observation_time never set for the bracket kind): RED —
-//        127 502/127 514 lines mismatch, every one naming "observation_time differs" (the 12
-//        unclaimed-identity lines stay green); the content cells all held: the #5 extract-equal
-//        leg partitions from the byte legs exactly as designed.
-//
-// Determinism: byte-only — committed-order population, integer counts, no RNG, no clock, no
-// float, no threads. sha256 is FIPS 180-4 over bytes; pure integer.
+// invariant: the bracket row's peel-equivalence gate — the transport contract's owed obligation
+// for the Timestamper row, discharged.
+// invariant: THE ORACLE IS A FROZEN COPY taken verbatim from the strategy at the last commit before
+// that detection was deleted from production.
+// invariant: its provenance lives HERE, in the gate, and not only in the history of a deleted file;
+// it is FROZEN, so an improvement to it is a DEFECT rather than maintenance.
+// invariant: only the DECISION FUNCTION travelled — the position logic, the greedy strip, the
+// blank decline and the extract.
+// invariant: the gate never calls the strategy it replaced, which no longer exists to call.
+// invariant: the CHARACTER grammar is deliberately the ONE shared owner, called by oracle and
+// subject alike, so this gate CANNOT catch a defect inside that grammar.
+// invariant: what it scores is the residual independent surface — position, strip, blank decline
+// and extract, the surfaces re-spelled in the catalogue peel.
+// invariant: the CLAIM WORD is REFACTOR-EQUIVALENCE and never external validity: no sentence may
+// cite this green as evidence the transport model is right about the world.
+// invariant: the population is every line of the pinned traces, selected by the committed sidecar's
+// FROZEN class column and never by inspection here, with bytes verified against attested digests.
+// invariant: the per-line partition CLOSES — the four cells sum to the total.
+// invariant: falsifiability was OBSERVED and every mutation reverted; one of the three is a
+// MEASURED BLINDNESS and is recorded as such.
+// invariant: an over-peel of one byte left the CORPUS ARM fully green, because every real line
+// carries a separator the strip eats anyway AND the frozen oracle strips the same way.
+// invariant: that blindness is BY CONSTRUCTION and not by corpus luck, so the synthetic strip laws
+// are the carrying leg for that defect class and must not be deleted.
+// invariant: byte-only determinism — committed-order population, integer counts, no randomness,
+// no clock, no float, no threads.
+// refs: ADR-23, DN-25.D5
 #include <gtest/gtest.h>
 
 import std;
-import insight.canon; // TransportStack / resolve_transport_stack / parse_iso8601 / rfc3339_…
+import insight.canon;
 
 namespace
 {
@@ -62,21 +39,21 @@ constexpr std::string_view kBytesRoot{"data/v2"};
 constexpr std::string_view kBracketRow{"bracket-rfc3339-line-prefix"};
 constexpr std::size_t kMaxReportedLines{10};
 
-// ── The pins ──────────────────────────────────────────────────────────────────────────────────
-// CORROBORATED — the stamp-class partition's whole-stream cell (the frozen
-// sidecar column): 12 traces.
+// invariant: the whole-stream trace count is CORROBORATED — it is the frozen sidecar column's own
+// cell.
 constexpr std::size_t kWholeStreamTraces{12};
-// CHARACTERIZATION — measured by this gate's first run (2026-07-30), pinned so the population
-// cannot drift silently (clause 3: the SIZE selects the pins; an unrecognized population FAILS).
+// invariant: the line counts are CHARACTERIZATION, measured by this gate's first run and pinned so
+// the population cannot drift silently.
+// invariant: the SIZE selects the pins, and an unrecognized population FAILS rather than being
+// scored.
 constexpr std::size_t kTotalLines{127'514};
 constexpr std::size_t kStampedEqual{125'774};
 constexpr std::size_t kBlankDropped{1'728};
 constexpr std::size_t kUnclaimedIdentity{12};
-// The CLAIM: zero mismatches, all four compare surfaces (bundled #2–#4 byte-exact content, #5
-// extract-equal), per line.
+// invariant: the CLAIM is zero mismatches across all four compare surfaces, per line.
 constexpr std::size_t kMismatches{0};
 
-// ═══ THE FROZEN ORACLE — do not tidy, do not modernize ═══════════
+// invariant: THE FROZEN ORACLE — do not tidy and do not modernize.
 [[nodiscard]] constexpr bool oracle_is_space(char chr) noexcept
 {
     return chr == ' ' || chr == '\t';
@@ -86,9 +63,8 @@ constexpr std::size_t kMismatches{0};
 {
     if (line.empty() || line.front() != '[')
         return 0U;
-    // The character grammar is DELEGATED to the one shared owner — the frozen strategy already
-    // delegated it (canon.api:1320), so freezing a second spelling here would create exactly the
-    // divergence the one-owner rule killed. See the can't-PASS ledger above.
+    // invariant: the character grammar is DELEGATED to the one shared owner, because the frozen
+    // strategy already delegated it and a second spelling would recreate the killed divergence.
     const std::size_t datetime_len{insight::utils::rfc3339_datetime_length(line, 1U)};
     if (datetime_len == 0U)
         return 0U;
@@ -120,14 +96,15 @@ struct OracleOutcome
         content.remove_prefix(1U);
     if (content.empty())
     {
-        outcome.blank_declined = true; // bundled #4: the strategy declined; the peel DROPs
+        outcome.blank_declined = true;
         return outcome;
     }
     outcome.content = content;
     return outcome;
 }
 
-// ── SHA-256 (FIPS 180-4) — frozen, pure integer, single-shot (the retrofit-gate block) ────────
+// invariant: the digest is frozen, pure integer and single-shot, so the byte verification carries
+// no dependency and no float.
 constexpr std::array<std::uint32_t, 64> kSha256RoundConstants{
     0x428a2f98U, 0x71374491U, 0xb5c0fbcfU, 0xe9b5dba5U, 0x3956c25bU, 0x59f111f1U, 0x923f82a4U,
     0xab1c5ed5U, 0xd807aa98U, 0x12835b01U, 0x243185beU, 0x550c7dc3U, 0x72be5d74U, 0x80deb1feU,
@@ -242,7 +219,12 @@ class BracketPeelEquivalenceGate : public ::testing::Test
   protected:
     void SetUp() override
     {
-        // Clause 2 — UNSET vs SET-BUT-BROKEN must not share a verdict.
+        // invariant: NEITHER is a skip: a skip exits 0 and the harness counts it as PASSED, so both
+        // an unset variable and a broken one FAIL.
+        // invariant: that false green is why this suite carries the corpus LABEL and is excluded
+        // from the default run rather than skipping inside it.
+        // invariant: what must not be shared is the DIAGNOSIS — unset says the corpus is absent
+        // from this machine, broken says the wiring is wrong, and the MESSAGE is the discriminator.
         const char* const raw{std::getenv(kCorpusVar)};
         if (raw == nullptr || *raw == '\0')
             FAIL() << kCorpusVar << " unset — the private Jenkins marker corpus is not present.";
@@ -260,7 +242,8 @@ std::filesystem::path BracketPeelEquivalenceGate::root_{};
 
 TEST_F(BracketPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheFrozenStrategyStrip)
 {
-    // Population: the sidecar's whole-stream rows (frozen labels, clause 1), bytes verified.
+    // invariant: the population is the sidecar's whole-stream rows under their frozen labels, with
+    // bytes VERIFIED rather than assumed.
     bool read_ok{true};
     const auto read_file{[&read_ok](const std::filesystem::path& path)
                          {
@@ -294,10 +277,12 @@ TEST_F(BracketPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheFrozenStrateg
             const std::string_view line{sidecar.data() + begin, end - begin};
             begin = end + 1U;
             if (line.empty())
+                // invariant: the sidecar header is frozen and POSITIONAL, and the retrofit gate
+                // pins it.
                 continue;
             ++line_no;
             if (line_no == 1U)
-                continue; // the header is frozen and positional — the retrofit gate pins it
+                continue;
             const auto fields{split_tabs(line)};
             ASSERT_EQ(fields.size(), 14U) << "unparseable sidecar row";
             if (fields[13] != "whole-stream")
@@ -310,7 +295,7 @@ TEST_F(BracketPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheFrozenStrateg
                 {.path = std::string{fields[0]}, .sha256 = std::string{fields[1]}, .size = size});
         }
     }
-    // Clause 3 — the population SIZE selects the pins; an unrecognized population FAILS.
+    // invariant: the population SIZE selects the pins, so an unrecognized population FAILS.
     ASSERT_EQ(traces.size(), kWholeStreamTraces)
         << "the sidecar's whole-stream cell yielded " << traces.size() << " traces, not "
         << kWholeStreamTraces
@@ -332,7 +317,7 @@ TEST_F(BracketPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheFrozenStrateg
         read_ok = true;
         const std::string bytes{read_file(root_ / kBytesRoot / trace.path)};
         ASSERT_TRUE(read_ok) << trace.path;
-        // Clause 4 — bytes verified, never assumed.
+        // invariant: bytes are verified against the attestation, never assumed.
         ASSERT_EQ(bytes.size(), trace.size) << trace.path << ": size drifted from the attestation";
         ASSERT_EQ(sha256_hex(bytes), trace.sha256)
             << trace.path << ": sha256 differs from the attested digest — wrong bytes under a "
@@ -354,7 +339,6 @@ TEST_F(BracketPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheFrozenStrateg
             std::string detail;
             if (oracle.claimed)
             {
-                // #5 extract-equal, then #2–#4 byte-exact content.
                 if (declared.observation_time != oracle.timestamp)
                 {
                     line_ok = false;
@@ -380,8 +364,8 @@ TEST_F(BracketPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheFrozenStrateg
             }
             else
             {
-                // Totality is application, not effect: the declared rule's effect here is the
-                // IDENTITY, and the extract must not fire.
+                // invariant: TOTALITY IS APPLICATION, NOT EFFECT — the declared rule's effect on
+                // an unclaimed line is the IDENTITY, and the extract must not fire.
                 if (declared.content != raw_line || declared.observation_time.has_value())
                 {
                     line_ok = false;
@@ -407,12 +391,10 @@ TEST_F(BracketPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheFrozenStrateg
                              "\n  unclaimed, identity : " + std::to_string(unclaimed_identity) +
                              "\n  MISMATCHES          : " + std::to_string(mismatches)};
 
-    // ═══ THE CLAIM — refactor-equivalence, per line, zero mismatches ═══
     EXPECT_EQ(mismatches, kMismatches) << report;
     for (const std::string& row : mismatch_rows)
         ADD_FAILURE() << "  " << row;
 
-    // Clause 3/5 — the pinned cells and the closed partition.
     EXPECT_EQ(total_lines, kTotalLines) << report;
     EXPECT_EQ(stamped_equal, kStampedEqual) << report;
     EXPECT_EQ(blank_dropped, kBlankDropped) << report;
@@ -424,26 +406,27 @@ TEST_F(BracketPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheFrozenStrateg
     GTEST_LOG_(INFO) << "G-T5-PEEL green" << report;
 }
 
-// ═══ The synthetic arms — no corpus, run everywhere (the decline + strip laws) ══════════════════
-
+// invariant: the synthetic arms need no corpus and run EVERYWHERE, which is what carries the
+// decline and strip laws the corpus arm is measurably blind to.
 TEST(BracketPeelSyntheticArms, DeclineArmsAreIdentityAndExtractNothing)
 {
     const std::array<std::string_view, 1> declared_names{kBracketRow};
     const insight::transport::TransportStack stack{insight::transport::resolve_transport_stack(
         insight::transport::IngestDeclaration{.stack = declared_names})};
 
-    // The shipped strictness carve-outs, plus the malformed-optional-part law: every one fails
-    // the SHARED grammar by construction and must peel to IDENTITY with no extract.
+    // invariant: every decline case fails the SHARED grammar by construction and must peel to
+    // IDENTITY with no extract.
+    // invariant: the malformed-optional-part case is a hard refusal rather than a stop-before-it,
+    // and the wrong-close case is the arm an acceptor widened past the closing byte would peel.
     constexpr std::array<std::string_view, 8> kDeclines{
-        "[10.20.30.40] connection open",            // Proxifier
-        "[Mon Oct 03 12:00:00 2026] [error] child", // ApacheError
-        "[12:34:56] step output",                   // bare time
-        "[Pipeline] sh",                            // the marker prefix itself
-        "[v1.2.3] released",                        // version interior
-        "[2026-01-02T03:04:05+9] truncated zone",   // malformed OPTIONAL part = hard 0
-        "2026-01-02T03:04:05Z not bracketed",       // no bracket — the OTHER row's shape
-        "[2026-01-02T03:04:05Z more] tail",         // valid datetime, WRONG close byte — the arm
-                                                    // an acceptor widened past `]` peels
+        "[10.20.30.40] connection open",
+        "[Mon Oct 03 12:00:00 2026] [error] child",
+        "[12:34:56] step output",
+        "[Pipeline] sh",
+        "[v1.2.3] released",
+        "[2026-01-02T03:04:05+9] truncated zone",
+        "2026-01-02T03:04:05Z not bracketed",
+        "[2026-01-02T03:04:05Z more] tail",
     };
     for (const std::string_view line : kDeclines)
     {
@@ -461,9 +444,9 @@ TEST(BracketPeelSyntheticArms, StripAndBlankLawsMatchTheFrozenSpelling)
     const insight::transport::TransportStack stack{insight::transport::resolve_transport_stack(
         insight::transport::IngestDeclaration{.stack = declared_names})};
 
-    // The greedy `[ \t]+` strip (bundled #3) and the blank DROP (bundled #4), plus the glued
-    // form (acceptor at 0, EMPTY separator run — a peel case, not a decline: the frozen strategy
-    // claimed regardless of what follows the `]`).
+    // invariant: the greedy separator strip and the blank DROP, plus the glued form — acceptor at
+    // offset 0 with an EMPTY separator run, which is a peel case and not a decline.
+    // invariant: the frozen strategy claimed regardless of what follows the closing byte.
     constexpr std::string_view kStamped{"[2026-06-23T15:11:09.020Z]  \t hello"};
     const auto stripped{stack.peel_raw(kStamped)};
     EXPECT_EQ(stripped.content, "hello");
@@ -478,7 +461,8 @@ TEST(BracketPeelSyntheticArms, StripAndBlankLawsMatchTheFrozenSpelling)
     const auto glued{stack.peel_raw("[2026-06-23T15:11:09.020Z]payload")};
     EXPECT_EQ(glued.content, "payload") << "the glued form is a peel case, not a decline";
 
-    // Second-precision zone form (the shared grammar accepts offsets; the strip is form-blind).
+    // invariant: the second-precision zone form — the shared grammar accepts offsets and the
+    // strip is form-blind.
     const auto offset_form{stack.peel_raw("[2026-06-23T15:11:09+02:00] tail")};
     EXPECT_EQ(offset_form.content, "tail");
 }

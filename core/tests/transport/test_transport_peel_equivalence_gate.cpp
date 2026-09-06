@@ -1,136 +1,90 @@
-// test_transport_peel_equivalence_gate.cpp — G1's CORPUS arm + G1-PEEL, homed here.
-//
-// ⚠ THE ORACLE IS FROZEN, AND THIS GATE HAS CHANGED KIND. Read this before
-// citing anything below.
-//
-//   * THE ORACLE IS A FROZEN COPY, taken VERBATIM from `semantic/github/src/github_strategy.cpp` at
-//     insight-canon commit `ac94aff` — the last commit before T4 deleted that detection from
-//     production. Its provenance lives HERE, in the gate, and not only in the `git log` of a
-//     deleted file. It is FROZEN: an "improvement" to it is a DEFECT, not maintenance.
-//   * ONLY THE DECISION FUNCTION `line ↦ (claimed?, content)` TRAVELLED. The level lift,
-//     `parse_iso8601`, `confidence()`, `format()`, the echoed-source SGR machinery and the arena
-//     did NOT — every function a frozen oracle carries must be reached by an assertion, so the
-//     gate reads `has_value()` and `content` and nothing else; a frozen oracle carrying limbs no
-//     assertion exercises is the dormant-code smell reproduced
-//     inside a test. The SIGNATURE changed (`std::optional<std::string_view>` instead of
-//     `std::expected<ParsedLine, std::string>`, which existed only to serve `IFormatStrategy`); the
-//     BYTE LOGIC did not, and may not.
-//   * THIS GATE CERTIFIED A MIGRATION; IT NOW PINS A CHARACTERIZATION. Before T4 it proved the
-//     declared transform behavior-preserving against a SHIPPED detector. After T4
-//     `TransportStack::peel` is the SOLE implementation of the GHA peel, and this frozen,
-//     independently-authored oracle over 22 490 937 lines is what catches an unintended change to
-//     a sole implementation — the one thing a self-consistent codebase cannot catch about itself.
-//   * "WRITTEN YEARS BEFORE THE SUT" IS A FACT ABOUT THE ORIGINAL CERTIFICATION, NEVER AN ONGOING
-//     INDEPENDENCE CLAIM. Two independently authored implementations agreed on 22 490 937 lines of
-//     third-party logs; that event happened, and it is a fact of git history, not of this file's
-//     location. Copying bytes cannot manufacture provenance. What relocation preserves is the
-//     ability to RE-RUN the same comparison — nothing more, and no document may read it as more.
-//   * ⚠ THE ORACLE AND THE SUT ARE NO LONGER THE SAME DECISION FUNCTION, AND THE GREEN BELOW MUST
-//     NOT BE READ AS IDENTITY. The oracle keeps the 19-byte-head-plus-trusted-width grammar; the
-//     SUT's acceptor now requires a COMPLETE RFC 3339 full-datetime of EXACTLY the declared width,
-//     because the trusted 9 bytes were a measured defect (three arms, one root: a 27-byte serving
-//     API stamp, our own writer at a 6-digit fraction, and a whole-second syslog line that lost
-//     the `m` of `myapp`). The two grammars can disagree only on a line whose complete datetime is
-//     not 28 bytes, and this corpus contains NONE — censused before the change, 22 369 563 claimed
-//     lines, every one of them exactly 28. So the zero below is an AGREEMENT ON THIS POPULATION,
-//     which is what a characterization pin measures; it is no longer refactor-equivalence, and it
-//     never again certifies that the two grammars coincide. The oracle is NOT updated to match:
-//     an "improvement" to a frozen oracle is a defect, and a frozen oracle that tracks the SUT
-//     stops being able to catch it.
-//
-// HOMING (Kleio's). `core/tests/transport/`, 1:1 with
-// `core/src/transport/` under the per-domain mirror, beside the sibling G1 grain
-// `test_transport_declaration.cpp` (the third grain is
-// `core/tests/compose/test_transport_identity.cpp`). The SUT is
-// `insight::transport::TransportStack::peel` — core's; the oracle is inline; the corpus arrives by
-// env var. The original home (`semantic/github/tests/`) rested on a premise T4 retired: the gate
-// once needed BOTH implementations in scope at once, and the dependency arrow runs core →
-// semantic/github and never back. With the oracle frozen inline this file imports only
-// `insight.canon`, and leaving it in the package compiled the whole `insight.semantic.github`
-// module into a binary that never referenced it while making a core-owned characterization pin
-// look like a dialect-package obligation (the misreading the frozen-oracle discipline guards
-// against).
-//   • NOT insight-eidos, which already has the `CORPUS_D11_*` plumbing. Reusing that wiring would
-//     home a canon-internal refactor-equivalence claim inside a downstream consumer — homing by
-//     convenience past the package that owns the property.
-//   • NOT a LogCraft scenario. No writer of ours produced these bytes, and that is the entire
-//     value: the oracle is an implementation written years before the SUT, scored on third-party
-//     logs neither was tuned against.
-//
-// WHAT IS BEING CLAIMED, AND WHAT IS NOT (it will be tempting to overstate, so it is restated at
-// the top of the instrument that produces the number):
-//
-//     G1-PEEL is REFACTOR-EQUIVALENCE, never external validity. Zero mismatches proves the declared
-//     transform is behavior-preserving against the shipped detector. It proves NOTHING about the
-//     transport model being right about the world, and no sentence anywhere may cite it as if it
-//     did.
-//
-// THE POPULATION IS A PURE FUNCTION OF THE COMMITTED MANIFEST, and that is load-bearing rather than
-// tidy. The first run of this measurement (Heph, 2026-07-27) scored a machine-local, GITIGNORED log
-// bank sliced by `std::filesystem::directory_iterator` — UNSPECIFIED order — and capped
-// mid-iteration. That population was unnameable BY CONSTRUCTION and unreproducible even on the same
-// box once a file landed; its numbers are withdrawn, not reconciled. So this gate never walks a
-// directory: it reads `corpus.jsonl`, takes every non-null `log_annotated`, SORTS, and does not
-// cap. Same manifest ⇒ same population ⇒ same numbers, on any machine, forever.
-//
-// THE EQUIVALENCE DEFINITION IS THE WHOLE DESIGN, and the naive one is WRONG. Asserting
-// `oracle_claim() == peel().content` over ALL lines reports thousands of "disagreements"
-// that are all artifacts of scoring lines the oracle never claimed. The claim is scored on CELL A
-// ONLY — the lines the oracle claims. The other cells are lines the oracle DECLINES, and each
-// decline has a different cause that must be counted separately, not summed into a failure rate:
-//   A            the oracle claims the line            ⇒ peeled content MUST be byte-identical
-//   blank        timestamp-only; peels to empty        ⇒ bundled behavior (3) surviving the move
-//   empty-input  the source line was already empty     ⇒ split out from `blank`; see below
-//   B            declined solely for a leading BOM     ⇒ a REAL SHIPPED DEFECT, still open
-//   C            unstamped; the peel is a no-op        ⇒ totality is about APPLICATION not EFFECT
-//   violation    declined, yet peel changed the bytes  ⇒ the invariant that must stay 0
-//
-// WHY B IS NOT "FIXED" HERE. A G1-PEEL that corrected the BOM drop would break the very equivalence
-// it asserts — the gate must reproduce the shipped peel INCLUDING its warts. B is its own cell so
-// that the BOM population is NAMED and counted rather than dissolved into "unstamped".
-//
-// ⚠ AND THIS FILE'S FIRST ARM IS INSENSITIVE TO THE BOM FIX, BY CONSTRUCTION. It declares
-// `kDeclaredGha` — the ONE shipped GHA row — and that declaration is FROZEN, exactly as the oracle
-// is: the arm's subject is "the declared GHA peel vs. the shipped GHA detector", and adding a
-// second row to its stack would change the subject. So when `utf8-bom-line-prefix` lands, cell B
-// stays at 511 / 17 487 and this arm stays GREEN. (An earlier revision of this comment claimed the
-// opposite — that the fix would turn cell B red here. It would not, and believing it would have
-// left the un-drop measured by nothing.) The un-drop is measured by the SECOND arm below, which
-// declares the two-row stack over the SAME manifest population.
-//
-// ── G-BOM-3, the second arm (DN-25.D5) — THE UN-DROP, COUNTED ──────────────────────────────────
-// `BomRowUndropsExactlyTheBomDeclinedLinesAndNothingElse` scores the same population under three
-// declarations. It is homed HERE, in this file, rather than in a sibling: the counterfactual it
-// needs — "what would the shipped detector have claimed on the BOM-free twin?" — is `oracle_claim`
-// itself, and copying a FROZEN oracle into a second file to answer it would create the second
-// spelling the freezing discipline exists to prevent. It also inherits the manifest population
-// reader, so both arms score a population that is the same pure function of the same manifest.
-//
-// FALSIFIABILITY — OBSERVED, not asserted (red-capability is a requirement, not a note). Three
-// peel-path mutations were run against this gate; each was reverted:
-//   D  `strip_leading_space` ignored      ⇒ sample RED: 292 985/292 985 cell-A mismatches, AND
-//                                            10 420 decline-side violations. Note WHICH cell caught
-//                                            what: the timestamp-only lines stopped peeling to
-//                                            empty, so they left the blank cell and landed as
-//                                            violations. Cell A structurally could not have seen
-//                                            that — the invariant cell is not decoration.
-//   E  `is_space` stops accepting TAB     ⇒ sample GREEN, full RED (23 157 mismatches + 16
-//                                            violations). See the blindness note below.
-//   (the third, on the unit arms in canon core, is recorded with them.)
-//
-// ⚠ MEASURED BLINDNESS — the two slices are NOT interchangeable, and this is why the pins are
-// per-slice rather than the gate taking whatever it is pointed at. Mutation E is a REAL divergence
-// class (the GHA separator being a tab rather than a space) that `data/v1/sample` does not contain
-// a single instance of: the sample arm stayed fully GREEN under it while the full arm caught 23 157
-// lines. So `sample` (0.4 s) is a SMOKE arm and `full` (23.5 s) is the claim. Wiring only the fast
-// one buys a green that is measurably weaker than it reads — green-BLIND.
-//
-// Determinism: byte-only. Sorted population, fixed files, no RNG, no clock, no float, no threads.
 
+// invariant: the corpus arm plus the peel-equivalence gate, homed here beside the sibling shape
+// grain.
+// invariant: THE ORACLE IS A FROZEN COPY taken verbatim from the strategy at the last commit before
+// that detection was deleted from production, and its provenance lives HERE.
+// invariant: it is FROZEN — an improvement to it is a DEFECT rather than maintenance.
+// invariant: only the DECISION FUNCTION travelled; the level lift, the parse, the confidence, the
+// format and the arena did not.
+// invariant: a frozen oracle carrying limbs no assertion exercises is the dormant-code smell
+// reproduced inside a test.
+// invariant: the SIGNATURE changed because the old one existed only to serve the strategy
+// interface; the BYTE LOGIC did not, and may not.
+// invariant: THIS GATE CERTIFIED A MIGRATION AND NOW PINS A CHARACTERIZATION, because the peel is
+// now the SOLE implementation of that decision.
+// invariant: a frozen, independently-authored oracle is what catches an unintended change to a sole
+// implementation.
+// invariant: that is the one thing a self-consistent codebase cannot catch about itself.
+// invariant: written-years-before-the-subject is a fact about the ORIGINAL certification and never
+// an ongoing independence claim — copying bytes cannot manufacture provenance.
+// invariant: what relocation preserves is the ability to RE-RUN the comparison, nothing more.
+// invariant: THE ORACLE AND THE SUBJECT ARE NO LONGER THE SAME DECISION FUNCTION, and the green
+// must not be read as identity.
+// invariant: the oracle keeps a trusted-width grammar where the subject now requires a COMPLETE
+// datetime of exactly the declared width — the trusted bytes were a measured defect.
+// invariant: the two grammars can disagree only on a line whose complete datetime is not that
+// width, and this corpus contains NONE — censused before the change.
+// invariant: so the zero is an AGREEMENT ON THIS POPULATION, which is what a characterization pin
+// measures; it is no longer refactor-equivalence and never again certifies the grammars coincide.
+// invariant: the oracle is NOT updated to match — a frozen oracle that tracks its subject stops
+// being able to catch it.
+// refs: ADR-23.D4, DN-25.D4, DN-25.D5
+// invariant: the SUBJECT is core's peel and the oracle is inline, so this file imports only the
+// facade.
+// invariant: the original home rested on a premise that retired when the two implementations
+// stopped needing to be in scope at once.
+// invariant: leaving it in the package compiled a whole dialect module into a binary that never
+// referenced it, while making a core-owned characterization pin look like a package obligation.
+// invariant: NOT homed downstream where the corpus plumbing already exists — reusing that wiring
+// would home a canon-internal claim inside a consumer, homing by convenience past the owner.
+// invariant: NOT a generated scenario: no writer of ours produced these bytes, and that is the
+// entire value.
+// invariant: peel equivalence is REFACTOR-EQUIVALENCE and never external validity — zero
+// mismatches proves the transform behaviour-preserving against the shipped detector.
+// invariant: it proves NOTHING about the transport model being right about the world, and no
+// sentence anywhere may cite it as if it did.
+// invariant: THE POPULATION IS A PURE FUNCTION OF THE COMMITTED MANIFEST, and that is load-bearing
+// rather than tidy.
+// invariant: the first run of this measurement scored a machine-local ignored bank walked in
+// UNSPECIFIED order and capped mid-iteration — unnameable by construction and unreproducible.
+// invariant: those numbers are WITHDRAWN, not reconciled; this gate never walks a directory, it
+// reads the manifest, sorts, and does not cap.
+// invariant: THE EQUIVALENCE DEFINITION IS THE WHOLE DESIGN and the naive one is WRONG — scoring
+// every line reports thousands of disagreements that are artifacts of lines the oracle declined.
+// invariant: the claim is scored on the CLAIMED cell only, and each decline cause is counted
+// separately rather than summed into a failure rate.
+// invariant: the mark-declined cell is a REAL SHIPPED DEFECT, still open, and it is NOT fixed here
+// — a gate that corrected it would break the very equivalence it asserts.
+// refs: ADR-23.D3
+// invariant: it is its own cell so the population is NAMED and counted rather than dissolved into
+// unstamped.
+// invariant: THIS FILE'S FIRST ARM IS INSENSITIVE TO THE MARK FIX, by construction — it declares
+// the ONE shipped row and that declaration is FROZEN exactly as the oracle is.
+// invariant: the arm's subject is the declared peel against the shipped detector, and adding a
+// second row to its stack would change the subject.
+// invariant: an earlier revision of this comment claimed the opposite, and believing it would have
+// left the un-drop measured by nothing.
+// invariant: the un-drop is measured by the SECOND arm, which declares the two-row stack over the
+// SAME population.
+// invariant: that arm is homed HERE rather than in a sibling because the counterfactual it needs IS
+// the frozen oracle, and copying it would create the second spelling freezing prevents.
+// refs: DN-25.D5
+// invariant: falsifiability was OBSERVED and not asserted — three peel-path mutations were run
+// and each reverted.
+// invariant: one of them shows WHICH CELL catches what: ignoring the separator strip moved the
+// timestamp-only lines out of the blank cell and into violations.
+// invariant: the claimed cell structurally could not have seen that, so the invariant cell is not
+// decoration.
+// invariant: MEASURED BLINDNESS — a real divergence class left the small slice fully GREEN while
+// the full slice caught tens of thousands of lines.
+// invariant: so the small slice is a SMOKE arm and the full one is the claim; wiring only the fast
+// one buys a green that is measurably weaker than it reads.
+// invariant: byte-only determinism — sorted population, fixed files, no randomness, no clock, no
+// float, no threads.
 #include <gtest/gtest.h>
 
 import std;
-import insight.canon; // insight::transport::* — the SUT. The ORACLE is frozen below.
+import insight.canon;
 
 using insight::transport::IngestDeclaration;
 using insight::transport::RawPeeledLine;
@@ -139,37 +93,29 @@ using insight::transport::TransportStack;
 namespace
 {
 
-// A `const char*`, not a string_view: it is handed to getenv, and string_view::data() carries no
-// null-termination guarantee.
+// invariant: a null-terminated pointer rather than a borrowed view, because it is handed to the
+// environment lookup and a view carries no termination guarantee.
 constexpr const char* kSliceDirVar{"CORPUS_D11_SLICE_DIR"};
 constexpr std::string_view kGhaTransform{"api-rfc3339-line-prefix"};
 constexpr std::array<std::string_view, 1> kDeclaredGha{{kGhaTransform}};
 constexpr std::string_view kUtf8Bom{"\xEF\xBB\xBF"};
 
-// ── G-BOM-3's declarations (DN-25) ────────────────────────────────────────────────────────────
-// OUTSIDE-IN (ADR-23.D4): the bytes are `<BOM><stamp><content>`, so the BOM is the outer delivery
-// layer and comes off first. The reversed spelling is kept as a FIRST-CLASS fixture, not as a
-// comment — it is the counted red arm for DN-25.D4's ordering claim.
+// invariant: OUTSIDE-IN — the mark is the outer delivery layer and comes off first.
+// invariant: the reversed spelling is kept as a FIRST-CLASS fixture and not as a comment, because
+// it is the counted red arm for the ordering claim.
+// refs: ADR-23.D4, DN-25.D4
 constexpr std::string_view kBomTransform{"utf8-bom-line-prefix"};
 constexpr std::array<std::string_view, 2> kDeclaredBomThenGha{{kBomTransform, kGhaTransform}};
 constexpr std::array<std::string_view, 2> kDeclaredGhaThenBom{{kGhaTransform, kBomTransform}};
 
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-// THE FROZEN ORACLE — `GitHubActionsStrategy`'s peel decision, byte-for-byte
-// as it stood in `semantic/github/src/github_strategy.cpp` at insight-canon `ac94aff`, the last
-// commit before T4 removed that detection from production.
-//
-// ⚠ FROZEN. Do not tidy, do not modernize, do not "fix" the BOM wart (cell B below exists precisely
-// so the wart is measured rather than absorbed). A change here is a defect: it silently redefines
-// the very thing this gate certifies. The one thing that legitimately changed on relocation is the
-// SIGNATURE — `std::optional<std::string_view>` in place of `std::expected<ParsedLine,
-// std::string>`, because the latter existed only to satisfy `IFormatStrategy`, whose only
-// implementor on this path is gone, and the gate never reads the error string, the timestamp, the
-// level, the component or the raw line. Dropping the arena is safe by inspection and was checked:
-// the production `parse` copied the content into an arena and returned a view OF THE COPY, so
-// content EQUALITY is unaffected; this returns a view into the input line instead.
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-
+// invariant: THE FROZEN ORACLE — do not tidy, do not modernize, and do not fix the mark wart,
+// which has its own cell precisely so it is measured rather than absorbed.
+// invariant: a change here is a defect, because it silently redefines the very thing this gate
+// certifies.
+// invariant: the one legitimate change on relocation was the SIGNATURE, since the old one existed
+// only to satisfy an interface whose only implementor on this path is gone.
+// invariant: dropping the arena is safe BY INSPECTION and was checked — the production parse
+// copied the content and returned a view OF THE COPY, so content equality is unaffected.
 [[nodiscard]] constexpr bool oracle_is_digit(char chr) noexcept
 {
     return static_cast<unsigned>(chr) - '0' < 10U;
@@ -179,9 +125,9 @@ constexpr std::array<std::string_view, 2> kDeclaredGhaThenBom{{kGhaTransform, kB
     return chr == ' ' || chr == '\t';
 }
 
-constexpr std::size_t kOracleGhaPrefixLen{28U}; // "YYYY-MM-DDTHH:MM:SS.fffffffZ"
+// invariant: the oracle's prefix width is the dialect's own fixed stamp length.
+constexpr std::size_t kOracleGhaPrefixLen{28U};
 
-// "YYYY-MM-DD" at offset `pos`.
 [[nodiscard]] constexpr bool oracle_match_iso_date_at(std::string_view str,
                                                       std::size_t pos) noexcept
 {
@@ -193,7 +139,6 @@ constexpr std::size_t kOracleGhaPrefixLen{28U}; // "YYYY-MM-DDTHH:MM:SS.fffffffZ
            oracle_is_digit(str[pos + 8]) && oracle_is_digit(str[pos + 9]);
 }
 
-// "HH:MM:SS" at offset `pos`.
 [[nodiscard]] constexpr bool oracle_match_time_at(std::string_view str, std::size_t pos) noexcept
 {
     if (pos + 8U > str.size())
@@ -203,16 +148,14 @@ constexpr std::size_t kOracleGhaPrefixLen{28U}; // "YYYY-MM-DDTHH:MM:SS.fffffffZ
            oracle_is_digit(str[pos + 6]) && oracle_is_digit(str[pos + 7]);
 }
 
-// "YYYY-MM-DDTHH:MM:SS" — RFC 3339 prefix (T separator).
 [[nodiscard]] constexpr bool oracle_is_rfc3339_prefix(std::string_view str) noexcept
 {
     return oracle_match_iso_date_at(str, 0) && str.size() > 10U && str[10] == 'T' &&
            oracle_match_time_at(str, 11U);
 }
 
-// "YYYY-MM-DDTHH:MM:SS.fffffffZ" — GHA / Azure Pipelines line prefix (exactly 7 fractional
-// digits + 'Z'). A strict subset of RFC 3339 so the strategy outranked Syslog only on genuine
-// GHA lines.
+// invariant: the dialect prefix is a STRICT SUBSET of the general grammar, which is what let the
+// strategy outrank its neighbour only on genuine lines of that dialect.
 [[nodiscard]] constexpr bool oracle_is_github_actions_prefix(std::string_view str) noexcept
 {
     constexpr std::size_t kDotAt{19U};
@@ -233,68 +176,67 @@ constexpr std::size_t kOracleGhaPrefixLen{28U}; // "YYYY-MM-DDTHH:MM:SS.fffffffZ
     return str.size() == kOracleGhaPrefixLen || oracle_is_space(str[kOracleGhaPrefixLen]);
 }
 
-// The decision function the gate scores against: does the shipped detector CLAIM this line, and
-// with what content? `nullopt` is a decline — the gate partitions declines by cause afterwards and
-// never reads a cause string, which is why the `std::expected` error half did not travel.
+// post: the decision function the gate scores against — whether the shipped detector CLAIMS the
+// line, and with what content.
+// invariant: a decline carries no cause string — the gate partitions declines by cause afterwards
+// and never reads one, which is why the old error half did not travel.
 [[nodiscard]] std::optional<std::string_view> oracle_claim(std::string_view line)
 {
     if (!oracle_is_github_actions_prefix(line))
-        return std::nullopt; // "GitHubActionsStrategy: missing GHA timestamp prefix"
+        return std::nullopt;
 
-    // Everything past the fixed-width timestamp; drop the separator space + any GHA indentation.
+    // invariant: everything past the fixed-width stamp, with the separator and any indentation
+    // dropped.
     std::string_view content{line.substr(kOracleGhaPrefixLen)};
     while (!content.empty() && oracle_is_space(content.front()))
         content.remove_prefix(1U);
 
-    // A timestamp-only line is a blank line: decline it (make_event drops it, never an empty "").
+    // invariant: a timestamp-only line is a BLANK line and is declined, so it is dropped rather
+    // than emitted as an empty template.
     if (content.empty())
-        return std::nullopt; // "GitHubActionsStrategy: blank GHA line (timestamp only)"
+        return std::nullopt;
 
     return content;
 }
 
-// How many disagreeing lines to print before truncating. Enough to see the SHAPE of a failure
-// without burying it; the totals are always printed in full.
+// invariant: the report truncates the per-line detail but never the totals — enough to see the
+// SHAPE of a failure without burying it.
 constexpr std::size_t kMaxReportedLines{10};
 
-// ── The pinned expectations, per slice ────────────────────────────────────────────────────────
-// Two kinds of number live here and they are NOT equally strong. Labelled, because a reader who
-// treats a characterization pin as a corroborated one will over-trust it:
-//   CORROBORATED — measured independently by Heph (manifest-backed re-run) and by me (a separate
-//                  oracle, written without reference to his). Two implementations agreeing is the
-//                  cross-check that matters.
-//   CHARACTERIZATION — measured HERE first, pinned so it cannot move silently. No independent
-//                  corroboration; it guards regression, it does not confirm a prediction.
+// invariant: two kinds of number live here and they are NOT equally strong, so each is LABELLED —
+// a reader who treats a characterization pin as a corroborated one will over-trust it.
+// invariant: CORROBORATED means measured independently by two implementations written without
+// reference to each other, which is the cross-check that matters.
+// invariant: CHARACTERIZATION means measured HERE first and pinned so it cannot move silently —
+// it guards regression and does not confirm a prediction.
 struct SlicePins
 {
     std::string_view label;
-    std::size_t logs;              // CORROBORATED
-    std::size_t lines;             // CORROBORATED
-    std::size_t claimed_equal;     // CORROBORATED (cell A)
-    std::size_t blank_and_empty;   // CORROBORATED (Heph's "blank-decline, both sides")
-    std::size_t bom_declines;      // CORROBORATED (cell B)
-    std::size_t unstamped;         // CORROBORATED (cell C)
-    std::size_t empty_input_lines; // CHARACTERIZATION — my split of blank_and_empty
-    // G-BOM-3 (DN-25). CORROBORATED — counted by an independent second-language replica of this
-    // gate's population reader, oracle and peel, which reproduces EVERY pin above exactly.
-    //
-    // ⚠ IT COINCIDES WITH `bom_declines` ON BOTH SLICES, AND IT IS A DIFFERENT MEASURAND. This
-    // counts lines whose first byte is a BOM; `bom_declines` counts the subset the shipped detector
-    // would have claimed but for that BOM. They are equal here only because every BOM-at-head line
-    // in both slices is also stamped (BOM-with-no-stamp: 0 / 0). A manifest where they diverged
-    // would make `moved_by_bom_row == bom_at_head` while `rescued == bom_declines`, which is why
-    // the arm pins both rather than one number twice.
+    std::size_t logs;
+    std::size_t lines;
+    std::size_t claimed_equal;
+    std::size_t blank_and_empty;
+    std::size_t bom_declines;
+    std::size_t unstamped;
+    std::size_t empty_input_lines;
+    // invariant: this count is CORROBORATED by an independent second-language replica of the
+    // population reader, oracle and peel, which reproduces every pin above exactly.
+    // invariant: it COINCIDES with the mark-decline count on both slices and is a DIFFERENT
+    // measurand.
+    // invariant: one counts lines whose first byte is a mark, the other the subset the detector
+    // would have claimed but for it — equal only because every marked line here is also stamped.
+    // invariant: a population where they diverged would separate them, which is why the arm pins
+    // BOTH rather than one number twice.
     std::size_t bom_at_head;
 };
 
-// Cell A mismatches and decline-side violations are pinned at ZERO for every slice — they are the
-// CLAIM, not a slice property, so they are not a per-slice field.
+// invariant: the mismatch and violation counts are pinned at ZERO for every slice — they are the
+// CLAIM and not a slice property, so they are not per-slice fields.
 constexpr std::size_t kExpectedMismatches{0};
 constexpr std::size_t kExpectedViolations{0};
 
-// `empty_input_lines` is filled in by the first green run and is deliberately NOT guessed here —
-// see the sentinel handling in the assertion. A guessed characterization pin would be a fitted
-// number wearing a contract's clothes.
+// invariant: the unmeasured pin is filled in by the first green run and deliberately NOT guessed
+// — a guessed characterization pin would be a fitted number wearing a contract's clothes.
 constexpr std::size_t kUnmeasured{std::numeric_limits<std::size_t>::max()};
 
 constexpr std::array<SlicePins, 2> kSlices{{
@@ -318,18 +260,18 @@ constexpr std::array<SlicePins, 2> kSlices{{
      .bom_at_head = 17'487},
 }};
 
-// ── The manifest reader ───────────────────────────────────────────────────────────────────────
-// A TARGETED extraction, not a JSON parser, and fail-closed on anything it does not understand: a
-// silently mis-parsed manifest would build a different population and report a confident wrong
-// number, which is the failure mode this whole file exists to avoid. Corpus filenames are
-// `log_annotated/<owner>__<repo>__pr<N>__run<N>.log` — no escapes — so an escape sequence here
-// means the manifest's shape changed and the extraction must be revisited rather than guessed at.
+// invariant: a TARGETED extraction rather than a general parser, fail-closed on anything it does
+// not understand.
+// invariant: a silently mis-parsed manifest would build a different population and report a
+// confident wrong number, which is the failure mode this whole file exists to avoid.
+// invariant: the corpus filenames carry no escapes, so an escape sequence means the manifest's
+// shape changed and the extraction must be revisited rather than guessed at.
 struct ManifestField
 {
     bool found{false};
     bool null_value{false};
     std::string value;
-    std::string error; // non-empty ⇒ fail loudly
+    std::string error;
 };
 
 [[nodiscard]] ManifestField extract_log_annotated(std::string_view record)
@@ -369,15 +311,6 @@ struct ManifestField
     return {.found = true, .null_value = false, .value = std::move(out)};
 }
 
-// ── The independent BOM oracle ────────────────────────────────────────────────────────────────
-// Re-derived from `github_strategy.cpp`'s `is_github_actions_prefix`, deliberately NOT by calling
-// it: cell B asks "would this line have been claimed but for the BOM?", which the strategy cannot
-// answer about itself. Spelled out here so the two never collapse into one implementation.
-//
-// It stays a SECOND, separately-spelled derivation now that the frozen oracle lives in the same
-// file — this pre-existing duplication is the precedent for freezing the
-// oracle here at all. Collapsing it into `oracle_is_github_actions_prefix` would answer cell B's
-// counterfactual with the very implementation the counterfactual is about.
 [[nodiscard]] bool is_gha_stamp(std::string_view str) noexcept
 {
     constexpr std::size_t kPrefixLen{28};
@@ -423,19 +356,18 @@ struct ManifestField
     return out;
 }
 
-// ── The score ─────────────────────────────────────────────────────────────────────────────────
 struct Score
 {
     std::size_t logs{0};
     std::size_t lines{0};
     std::size_t claimed_equal{0};
     std::size_t claimed_mismatch{0};
-    std::size_t blank_decline{0}; // non-empty input that peels to empty
-    std::size_t empty_input{0};   // the source line was already empty
+    std::size_t blank_decline{0};
+    std::size_t empty_input{0};
     std::size_t bom_decline{0};
     std::size_t unstamped{0};
     std::size_t violations{0};
-    std::vector<std::string> reported; // mismatch + violation diagnostics, capped
+    std::vector<std::string> reported;
 
     [[nodiscard]] std::size_t partition_total() const noexcept
     {
@@ -449,9 +381,6 @@ class TransportPeelEquivalenceGate : public ::testing::Test
   protected:
     void SetUp() override
     {
-        // UNSET vs SET-BUT-BROKEN are different states and must not share a verdict. An EMPTY value
-        // counts as unset: an undefined `vars.X` expands to "" on a runner, so a nullptr-only check
-        // would sail past it into a confusing failure.
         const char* const raw{std::getenv(kSliceDirVar)};
         if (raw == nullptr || *raw == '\0')
             FAIL() << kSliceDirVar
@@ -461,8 +390,6 @@ class TransportPeelEquivalenceGate : public ::testing::Test
                       ".../data/v1/full (the full claim, 2.3 GB).";
 
         slice_ = std::filesystem::path{raw};
-        // Set-but-broken is a WIRING FAILURE, not an absent corpus: the operator declared the slice
-        // present, so skipping here is how a mis-wired gate reports green forever.
         ASSERT_TRUE(std::filesystem::is_regular_file(slice_ / "corpus.jsonl"))
             << kSliceDirVar << " is set to '" << raw << "' but there is no corpus.jsonl under it. "
             << "The slice is declared present, so this is a wiring error, not an absent corpus — "
@@ -472,7 +399,6 @@ class TransportPeelEquivalenceGate : public ::testing::Test
             << "' but there is no log_annotated/ under it.";
     }
 
-    // The population: every non-null `log_annotated`, SORTED, UNCAPPED. Never a directory walk.
     [[nodiscard]] std::vector<std::filesystem::path> population() const
     {
         std::vector<std::filesystem::path> paths;
@@ -492,9 +418,6 @@ class TransportPeelEquivalenceGate : public ::testing::Test
             if (!field.error.empty() || !field.found || field.null_value)
                 continue;
             std::filesystem::path path{slice_ / field.value};
-            // A manifest row naming an absent file is a corpus-integrity failure, not a line to
-            // skip — verify the asset against what the manifest ATTESTS. Silently skipping would
-            // shrink the population behind a green.
             EXPECT_TRUE(std::filesystem::exists(path))
                 << "corpus.jsonl record " << record_no << " attests '" << field.value
                 << "' but that file is not present in the slice.";
@@ -534,7 +457,6 @@ class TransportPeelEquivalenceGate : public ::testing::Test
 
                 if (parsed.has_value())
                 {
-                    // ── CELL A — the claim ──
                     if (*parsed == peeled.content)
                     {
                         ++score.claimed_equal;
@@ -550,7 +472,6 @@ class TransportPeelEquivalenceGate : public ::testing::Test
                     continue;
                 }
 
-                // ── The oracle DECLINED. Partition by CAUSE, most specific first. ──
                 if (line.empty())
                 {
                     ++score.empty_input;
@@ -561,8 +482,6 @@ class TransportPeelEquivalenceGate : public ::testing::Test
                     ++score.blank_decline;
                     continue;
                 }
-                // Cell B must be tested BEFORE cell C: a BOM line is ALSO one the peel leaves
-                // alone, so C's "peel did nothing" test would swallow it.
                 if (line.starts_with(kUtf8Bom) && is_gha_stamp(line.substr(kUtf8Bom.size())))
                 {
                     ++score.bom_decline;
@@ -573,10 +492,6 @@ class TransportPeelEquivalenceGate : public ::testing::Test
                     ++score.unstamped;
                     continue;
                 }
-                // ── The invariant: on a decline, the peel either did nothing or blanked the line.
-                // It must NEVER have partially peeled it into a different, non-empty content —
-                // that would be the two implementations disagreeing on a line neither claims, which
-                // no cell above would have caught.
                 ++score.violations;
                 if (score.reported.size() < kMaxReportedLines)
                     score.reported.push_back(
@@ -588,10 +503,6 @@ class TransportPeelEquivalenceGate : public ::testing::Test
         return score;
     }
 
-    // Identify the slice by its population SIZE. Shared by both arms so the "an unrecognized
-    // population FAILS" rule has ONE spelling — two spellings of a selection rule is how one arm
-    // quietly grows a skip the other does not have. Returns nullptr for an unpinned population;
-    // every caller must treat that as a failure, never as a skip.
     [[nodiscard]] static const SlicePins* pins_for(std::size_t logs) noexcept
     {
         for (const SlicePins& candidate : kSlices)
@@ -621,15 +532,11 @@ TEST_F(TransportPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheShippedDete
     ASSERT_FALSE(paths.empty()) << "the manifest yielded an EMPTY population — a gate scoring zero "
                                    "lines reports green while measuring nothing";
 
-    // An UNRECOGNIZED population must FAIL, never skip: the pins below do not apply to it, and a
-    // silent skip is how a re-sliced corpus turns this gate into decoration.
     const SlicePins* pins{pins_for(paths.size())};
     ASSERT_NE(pins, nullptr) << unpinned_population_message(paths.size());
 
     const Score score{score_slice(paths)};
 
-    // ── The diagnostic block. Printed on ANY failure below, so a red is diagnosable without
-    // re-running under a debugger. ──
     const auto report{
         [&score, pins]
         {
@@ -658,7 +565,6 @@ TEST_F(TransportPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheShippedDete
             return out.str();
         }};
 
-    // ── THE CLAIM ──
     EXPECT_EQ(score.claimed_mismatch, kExpectedMismatches)
         << "G1-PEEL FAILED: the declared transform and the shipped detector disagree on a line the "
            "detector CLAIMS. This is refactor-equivalence broken — the two implementations are not "
@@ -670,16 +576,12 @@ TEST_F(TransportPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheShippedDete
            "blank it, never partially peel it into a different non-empty content."
         << report();
 
-    // ── The partition must CLOSE. Without this the cell pins could all pass while lines vanished
-    // into a bucket nobody counted — the classic way a corpus gate reports on a subset it does not
-    // know it is reporting on. ──
     EXPECT_EQ(score.partition_total(), score.lines)
         << "the cells do NOT sum to the line total — the partition is not closed, so some lines "
            "are "
            "unaccounted for and every cell number below is suspect."
         << report();
 
-    // ── Population + corroborated cells ──
     EXPECT_EQ(score.logs, pins->logs) << report();
     EXPECT_EQ(score.lines, pins->lines)
         << "the line total moved: the slice's bytes changed, or the line split did "
@@ -690,19 +592,11 @@ TEST_F(TransportPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheShippedDete
     EXPECT_EQ(score.blank_decline + score.empty_input, pins->blank_and_empty) << report();
     EXPECT_EQ(score.unstamped, pins->unstamped) << report();
 
-    // ── Cell B — the SHIPPED DEFECT, NAMED and counted ──
-    // This arm's declaration is FROZEN at the one shipped GHA row, so landing
-    // `utf8-bom-line-prefix` does NOT move this number: the subject here is the shipped detector's
-    // own behavior, warts included, and a stack that peeled the BOM would be measuring a different
-    // function. Cell B is therefore the pre-fix population, held steady, and the sibling arm below
-    // is what watches it get rescued. A move HERE means the corpus bytes changed or the stamp
-    // acceptor did — never that the BOM row landed.
     EXPECT_EQ(score.bom_decline, pins->bom_declines)
         << "cell B moved. This arm cannot see the BOM row (it declares one transform, frozen), so "
            "this is a corpus or acceptor change, not the DN-25 fix landing."
         << report();
 
-    // ── The characterization pin, held to a different standard and labelled as such ──
     if (pins->empty_input_lines == kUnmeasured)
         GTEST_LOG_(INFO) << "CHARACTERIZATION unmeasured for " << pins->label
                          << ": empty-input = " << score.empty_input
@@ -718,54 +612,19 @@ TEST_F(TransportPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheShippedDete
     GTEST_LOG_(INFO) << "G1-PEEL green on " << pins->label << report();
 }
 
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-// G-BOM-3 (DN-25.D5) — THE UN-DROP, COUNTED. The VALUE arm of the BOM transport row.
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-//
-// ⚠ RED UNTIL THE ROW LANDS, AND THAT IS THE HANDOFF, NOT A REGRESSION — see the ASSERT below. It
-// is an ASSERT rather than a skip because a gate that skips its absent subject is green for the one
-// reason that matters: it never looked. It is an ASSERT rather than a resolve because
-// `resolve_transport_stack` on an unknown name calls `std::terminate()`, which would take the whole
-// test binary down and destroy every sibling suite's verdict.
-//
-// THE MEASURAND, stated before the numbers. Under the declared two-row stack, a line the shipped
-// detector declined SOLELY for a leading BOM must peel to EXACTLY what that detector would have
-// claimed on the line's BOM-free twin. `oracle_claim` — the frozen pre-T4 detector, already in this
-// file — computes the twin's claim. SUT and ORACLE are named and they differ: the SUT is
-// `TransportStack::peel_raw` under a two-row declaration; the oracle is the pre-T4 detector run on
-// bytes the SUT never sees in that form.
-//
-// PRE-REGISTERED, IN BOTH DIRECTIONS (DN-25.D5, verbatim): an inequality either way is a FINDING,
-// never a tolerance. A SMALLER rise means the transform under-applies and the diagnosis was
-// incomplete; a LARGER one means it is stripping bytes that were not a BOM. Both directions are
-// pinned by `moved_by_bom_row`, which counts EVERY line in the slice whose content the added row
-// moved — so an over-strip cannot hide inside a cell that only looks at BOM lines.
-//
-// THE RED ARM IS COUNTED, NOT ASSUMED (DN-25.D4). The same population is scored a third time under
-// the REVERSED declaration, where the stamp acceptor meets EF BB BF at offset 0 and declines. Two
-// numbers pin it from both sides: `reversed_rescued` must be 0, and `reversed_kept_stamp` must be
-// the FULL BOM population — i.e. the reversed order does not merely differ, it reproduces the
-// present shipped defect on every one of those lines. This is the transport stack's first genuine
-// composition; before this row, ADR-23.D3's ordering semantics had no consumer and were untested by
-// construction.
-//
-// COST: two peels on every line plus a third on the BOM lines only. `sample` stays sub-second;
-// `full` adds roughly one peel pass to the corpus job. Deliberate — the over-strip guard requires
-// visiting the lines that must NOT move.
-
 struct BomUndropScore
 {
     std::size_t lines{0};
-    std::size_t bom_at_head{0};        ///< the line's first bytes are EF BB BF
-    std::size_t bom_declined{0};       ///< ... and the shipped detector would have claimed the twin
-    std::size_t rescued{0};            ///< ... and the two-row peel == the twin's claim, byte-exact
-    std::size_t rescue_mismatch{0};    ///< ... and it does not. THE CLAIM: 0.
-    std::size_t rescue_blank{0};       ///< ... and the peel emptied the line (it would still drop)
-    std::size_t still_bom_prefixed{0}; ///< ... and the BOM survived the peel. 17 487 → 0.
-    std::size_t moved_by_bom_row{0};   ///< over ALL lines: two-row content != one-row content
-    std::size_t moved_without_bom{0};  ///< ... on a line carrying no leading BOM. OVER-STRIP: 0.
-    std::size_t reversed_rescued{0};   ///< the reversed stack rescued a line. THE RED ARM: 0.
-    std::size_t reversed_kept_stamp{0}; ///< the reversed stack left a GHA stamp at line head
+    std::size_t bom_at_head{0};
+    std::size_t bom_declined{0};
+    std::size_t rescued{0};
+    std::size_t rescue_mismatch{0};
+    std::size_t rescue_blank{0};
+    std::size_t still_bom_prefixed{0};
+    std::size_t moved_by_bom_row{0};
+    std::size_t moved_without_bom{0};
+    std::size_t reversed_rescued{0};
+    std::size_t reversed_kept_stamp{0};
     std::vector<std::string> reported;
 };
 
@@ -818,7 +677,6 @@ TEST_F(TransportPeelEquivalenceGate, BomRowUndropsExactlyTheBomDeclinedLinesAndN
             const std::string_view before{one_row.peel_raw(line).content};
             const std::string_view after{two_row.peel_raw(line).content};
 
-            // ── The over-strip guard. The ONLY lines the added row may move are BOM lines. ──
             if (after != before)
             {
                 ++score.moved_by_bom_row;
@@ -838,12 +696,9 @@ TEST_F(TransportPeelEquivalenceGate, BomRowUndropsExactlyTheBomDeclinedLinesAndN
                 continue;
             ++score.bom_at_head;
 
-            // The BOM-FREE TWIN and what the frozen detector claims on it. This is the whole
-            // counterfactual: the detector cannot answer "would you have claimed this but for the
-            // BOM?" about itself, so the twin is constructed here and handed to it.
             const std::string_view twin{line.substr(kUtf8Bom.size())};
             if (!is_gha_stamp(twin))
-                continue; // a BOM in front of something the detector never claimed anyway
+                continue;
             ++score.bom_declined;
 
             if (after.starts_with(kUtf8Bom))
@@ -857,7 +712,7 @@ TEST_F(TransportPeelEquivalenceGate, BomRowUndropsExactlyTheBomDeclinedLinesAndN
 
             const std::optional<std::string_view> claim{oracle_claim(twin)};
             if (!claim.has_value())
-                ++score.rescue_blank; // the twin is stamp-only: peels to empty, still drops
+                ++score.rescue_blank;
             else if (after == *claim)
                 ++score.rescued;
             else
@@ -871,7 +726,6 @@ TEST_F(TransportPeelEquivalenceGate, BomRowUndropsExactlyTheBomDeclinedLinesAndN
                         escape(after) + "\"");
             }
 
-            // ── The RED ARM, on the real bytes. ──
             const std::string_view wrong_order{reversed.peel_raw(line).content};
             if (claim.has_value() && wrong_order == *claim)
                 ++score.reversed_rescued;
@@ -910,8 +764,6 @@ TEST_F(TransportPeelEquivalenceGate, BomRowUndropsExactlyTheBomDeclinedLinesAndN
             return out.str();
         }};
 
-    // ── The population must be the SAME one the first arm scored. Without this the counts below
-    // could all pass over a slice that quietly shrank. ──
     EXPECT_EQ(score.lines, pins->lines)
         << "the line total moved — this arm and the first are no longer scoring the same bytes."
         << report();
@@ -923,7 +775,6 @@ TEST_F(TransportPeelEquivalenceGate, BomRowUndropsExactlyTheBomDeclinedLinesAndN
            "spellings drifted."
         << report();
 
-    // ── THE UN-DROP: exactly N, pre-registered, an inequality either way is a finding ──
     EXPECT_EQ(score.rescued, pins->bom_declines)
         << "G-BOM-3 FAILED. The declared two-row stack did not un-drop exactly the BOM-declined "
            "population.\n  FEWER means the transform UNDER-APPLIES — something else also declines "
@@ -945,7 +796,6 @@ TEST_F(TransportPeelEquivalenceGate, BomRowUndropsExactlyTheBomDeclinedLinesAndN
            "is the claim; a non-zero figure here is the transform not firing at all."
         << report();
 
-    // ── THE OVER-STRIP GUARD — the other direction of the pre-registration ──
     EXPECT_EQ(score.moved_without_bom, 0U)
         << "the added row moved a line that carries NO leading BOM. Declaring is SUBTRACTIVE: a "
            "stream that gains this row must lose nothing it had. This is the 'stripping something "
@@ -958,7 +808,6 @@ TEST_F(TransportPeelEquivalenceGate, BomRowUndropsExactlyTheBomDeclinedLinesAndN
            "one. Both are findings, never tolerances."
         << report();
 
-    // ── THE RED ARM — DN-25.D4's ordering claim, observed on the corpus rather than assumed ──
     EXPECT_EQ(score.reversed_rescued, 0U)
         << "THE ORDERING CLAIM IS VACUOUS. The REVERSED declaration [\"" << kGhaTransform
         << "\", \"" << kBomTransform

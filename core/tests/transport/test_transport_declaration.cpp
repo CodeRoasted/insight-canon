@@ -1,46 +1,27 @@
-// test_transport_declaration.cpp — G1's SHAPE arm, homed as a canon-core unit suite.
-//
-// HOMING (Kleio). The transport contract states G1's property and leaves the test design to me;
-// the property decomposes into three grains with three different homes, and this file is the first:
-//
-//   • THIS FILE — the degenerate declaration's shape: empty stack, `peel` is byte-identity, the
-//     catalogue's contract, and fail-closed resolution. Every one of these is a property of ONE
-//     component (`insight.canon.transport`) over bytes this file authors. It needs no seam and no
-//     corpus, so it is a UNIT test and belongs in `core/tests/transport/`, 1:1 with
-//     `src/transport/` (the per-domain test mirror). Homing it as a corpus gate would have been the
-//     mis-homing this role exists to stop: real bytes cannot prove a property that is about the
-//     empty stack.
-//   • `tests/compose/test_transport_identity.cpp` — that declaring transport does not move
-//     `semantic_identity`. Also unit, but its seam is compose's, not transport's.
-//   • The CORPUS arm (byte-identical behavior over the D11 slice) + G1-PEEL — the sibling
-//     `test_transport_peel_equivalence_gate.cpp` in THIS directory. It once homed in
-//     `semantic/github/tests/` because it needed the shipped `GitHubActionsStrategy::parse` in
-//     scope; post-T4 the oracle is frozen INLINE in the gate and the SUT is core's
-//     `TransportStack::peel`, so it is core's.
-//
-// FALSIFIABILITY — what this file DOES discharge, and what it explicitly does NOT.
-// Falsifiability is a requirement here, not a note: G1 must be OBSERVED red under a one-byte
-// mutation of the peel path, never merely asserted red-capable.
-// A gate that cannot fail is vacuous, and "the empty stack changes nothing" is exactly the shape of
-// claim that passes for the wrong reason — it would stay green if `peel` were hard-coded to return
-// its argument for EVERY stack, which would make the whole transform vocabulary a no-op.
-//
-// So the discharge here is a PERMANENT ARM, not a manual mutation: `DeclaredStackActuallyPeels`
-// runs the SAME line table through a DECLARED stack and requires the result to DIFFER wherever a
-// line carries a stamp. The identity arm and the peel arm therefore fail in opposite directions —
-// no single implementation satisfies both by accident. That is what makes the empty-stack green
-// mean something.
-//
-// What it does NOT discharge: the mutation observation on the CORPUS arm. That one is owed and
-// remains owed; it cannot be faked at unit grain, and no sentence here may be read as having paid
-// it.
-//
-// Determinism: byte-only. A fixed authored line table, no RNG, no clock, no float, no allocation on
-// the asserted path (`peel` returns a borrowed view — the pointer identity is itself asserted).
 
+// invariant: the declaration contract's SHAPE arm, homed as a canon-core unit suite — the
+// degenerate declaration's shape, the catalogue's contract, and fail-closed resolution.
+// invariant: every one of those is a property of ONE component over bytes this file authors, so it
+// needs no seam and no corpus.
+// invariant: homing it as a corpus gate would have been the mis-homing that discipline exists to
+// stop — real bytes cannot prove a property that is about the EMPTY stack.
+// invariant: FALSIFIABILITY is a REQUIREMENT here rather than an aside — the property must be
+// OBSERVED red under a one-byte mutation, never merely asserted red-capable.
+// invariant: the-empty-stack-changes-nothing is exactly the claim shape that passes for the wrong
+// reason — it stays green if the peel is hard-coded to return its argument for EVERY stack.
+// invariant: so the discharge is a PERMANENT ARM rather than a manual mutation: the same table runs
+// through a DECLARED stack and must DIFFER wherever a line carries a stamp.
+// invariant: the two arms fail in OPPOSITE directions, so no single implementation satisfies both
+// by accident — that is what makes the empty-stack green mean something.
+// invariant: what it does NOT discharge is the mutation observation on the corpus arm, and no
+// sentence here may be read as having paid it.
+// invariant: that debt is PAID, and not by this file — the peel-equivalence gate beside it ran
+// three peel-path mutations and reverted each.
+// invariant: byte-only determinism — a fixed authored table, no randomness, no clock, no float,
+// and no allocation on the asserted path.
 #include <gtest/gtest.h>
 
-import insight.canon.test; // facade — insight.canon.transport arrives via the facade's export import
+import insight.canon.test;
 
 using insight::transport::find_transform;
 using insight::transport::IngestDeclaration;
@@ -56,34 +37,29 @@ using insight::transport::TransportTransformKind;
 namespace
 {
 
-// The shipped catalogue name. Spelled as a literal rather than read from the catalogue: a test that
-// looks the name up from the thing under test cannot notice the name changing, which is the
-// SUT==ORACLE tautology one layer down.
+// invariant: the catalogue name is spelled as a LITERAL rather than read from the catalogue — a
+// test that looks the name up from the thing under test cannot notice the name changing.
 constexpr std::string_view kGhaTransform{"api-rfc3339-line-prefix"};
 
-// ── The line table ────────────────────────────────────────────────────────────────────────────
-// Authored to be ADVERSARIAL to "the empty stack is the identity", not merely representative. Each
-// row names why it is here; the awkward ones (NUL-bearing, lone-CR, sub-width, near-miss stamp,
-// whole-second syslog) are the cases where a peel that trusted its declared width rather than
-// requiring the grammar to FILL it would corrupt bytes, and where a `std::string_view` mishandled
-// as a C string would truncate. The last two are the arms of one root: a line whose first 19 bytes
-// are a valid RFC 3339 head but whose complete datetime is not `width` bytes long.
+// invariant: the table is authored ADVERSARIAL to the identity claim, not merely representative,
+// and each row names why it is here.
+// invariant: the awkward rows are where a peel that TRUSTED its declared width rather than
+// requiring the grammar to FILL it would corrupt bytes.
+// invariant: they are also where a borrowed view mishandled as a null-terminated string would
+// truncate.
 struct LineCase
 {
     std::string_view label;
     std::string_view bytes;
-    bool carries_stamp; // does a DECLARED api-rfc3339-line-prefix stack actually shorten this line?
+    bool carries_stamp;
 };
 
-// A GHA stamp is exactly 28 bytes: "YYYY-MM-DDTHH:MM:SS.fffffffZ".
 constexpr std::string_view kStamp{"2026-04-15T22:20:38.2879579Z"};
 
-// Embedded NUL: built with an explicit length so the view carries the NUL rather than stopping at
-// it. Real CI logs carry these (the corpus is read with `rg -a` for exactly this reason — a
-// text-mode read would skip the NUL-bearing lines), and a peel that round-tripped through a C
-// string would silently truncate here while every other row stayed green.
-// 28 B stamp + " ok" + NUL + "after-nul" = 41 bytes. The length is spelled out because the whole
-// point of this row is that the view must NOT stop at the NUL.
+// invariant: the embedded null is built with an EXPLICIT LENGTH so the view carries it rather than
+// stopping at it — real logs carry these, which is why the corpus is read in binary.
+// invariant: a peel that round-tripped through a null-terminated string would silently truncate
+// here while every other row stayed green.
 constexpr std::string_view kNulBearing{"2026-04-15T22:20:38.2879579Z ok\0after-nul", 41U};
 
 const std::array<LineCase, 15> kLines{{
@@ -102,37 +78,34 @@ const std::array<LineCase, 15> kLines{{
     {.label = "stamped + indented content",
      .bytes = "2026-04-15T22:20:38.2879579Z    indented",
      .carries_stamp = true},
-    // Offset-0 BOM — a live shipped defect. Present here as a CASE, not as a
-    // fix: the empty stack must leave it alone exactly like everything else, and the declared stack
-    // must NOT claim it (the stamp is not at offset 0). Pinning the current behavior is what lets
-    // the BOM ruling land later without this file quietly agreeing in advance.
+    // invariant: the leading byte-order-mark row is a live shipped defect present as a CASE, not a
+    // fix — the empty stack leaves it alone and the declared stack must NOT claim it.
+    // invariant: pinning the current behaviour is what lets the mark ruling land later without this
+    // file quietly agreeing in advance.
+    // refs: DN-25
     {.label = "BOM then stamp",
      .bytes = "\xEF\xBB\xBF"
               "2026-04-15T22:20:38.2879579Z ok",
      .carries_stamp = false},
     {.label = "NUL-bearing after stamp", .bytes = kNulBearing, .carries_stamp = true},
     {.label = "lone CR (no LF)", .bytes = "carriage\rreturn", .carries_stamp = false},
-    // Shorter than the declared 28-byte width: a width-trusting peel would read past the end or
-    // return garbage. Shape-checking returns the line untouched (transport.cpp has_stamp_at_head).
+    // invariant: shorter than the declared width — a width-trusting peel would read past the end
+    // or return garbage, and shape-checking returns the line untouched.
     {.label = "sub-width digits", .bytes = "2026-04-15T22", .carries_stamp = false},
-    // Correct shape in the invariant head, WRONG in the declared tail (6 fractional digits, no Z):
-    // the complete full-datetime here is 26 bytes, not the declared 28. The acceptor requires the
-    // grammar to fill the width EXACTLY, so the row's effect on these bytes is nothing.
-    //
-    // This row is the ONE fixture the acceptor tightening was pre-registered to move. It asserted
-    // `true` for as long as the width was trusted rather than checked, under a comment that said
-    // in as many words "asserted as it behaves, not as it might be wished to behave". It now
-    // behaves as it was wished to, and the flag stays a MEASURED property of the shipped
-    // algorithm — never "looks like a stamp to a human".
+    // invariant: correct in the invariant head and WRONG in the declared tail, so the complete
+    // datetime is shorter than the declared width and the row's effect is nothing.
+    // invariant: this is the ONE fixture the acceptor tightening was PRE-REGISTERED to move — it
+    // asserted the opposite while the width was trusted rather than checked.
+    // invariant: the flag stays a MEASURED property of the shipped algorithm and never
+    // looks-like-a-stamp-to-a-human.
     {.label = "near-miss stamp (short fraction)",
      .bytes = "2026-04-15T22:20:38.287957 ok",
      .carries_stamp = false},
-    // The third arm of the same root, and the oldest: a whole-second RFC 3339 stamp — 20 bytes,
-    // no fraction — followed by real content. The first 19 bytes are a valid invariant head and
-    // the line is longer than 28, so a width-trusting acceptor removed 28 bytes and ate the `m`
-    // of `myapp`. It was found on a real fixture, written down in a downstream comment, and
-    // compensated for there instead of being closed here; the complete datetime is 20 ≠ 28, so
-    // the row now declines. Nobody was hunting this case, which is exactly why it is pinned.
+    // invariant: the third arm of the same root, and the oldest — a whole-second stamp whose head
+    // is valid, on a line long enough that a width-trusting acceptor ate real content.
+    // invariant: it was found on a real fixture, written down in a downstream comment and
+    // compensated for THERE instead of being closed here.
+    // invariant: nobody was hunting this case, which is exactly why it is pinned.
     {.label = "whole-second stamp, syslog payload",
      .bytes = "2024-01-15T10:30:00Z host1 myapp[123]: connection refused",
      .carries_stamp = false},
@@ -140,8 +113,8 @@ const std::array<LineCase, 15> kLines{{
     {.label = "whitespace only", .bytes = "   \t  ", .carries_stamp = false},
 }};
 
-// Render bytes legibly for a failure message — a NUL or a lone CR printed raw would corrupt the
-// very diagnostic that has to explain the failure.
+// invariant: bytes are escaped for the failure message, because a null or a lone carriage return
+// printed raw would corrupt the very diagnostic that has to explain the failure.
 [[nodiscard]] std::string escape(std::string_view bytes)
 {
     std::string out;
@@ -164,13 +137,9 @@ const std::array<LineCase, 15> kLines{{
     return out;
 }
 
-// A stack declaring the one shipped transform. The backing array must outlive the declaration —
-// `IngestDeclaration::stack` is a span, so a temporary here would dangle.
+// invariant: the backing array must OUTLIVE the declaration, because the stack field is a span and
+// a temporary would dangle.
 constexpr std::array<std::string_view, 1> kDeclaredGha{{kGhaTransform}};
-
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-// G1 — the degenerate declaration
-// ══════════════════════════════════════════════════════════════════════════════════════════════
 
 TEST(TransportDeclaration, DefaultDeclarationResolvesToTheDegenerateStack)
 {
@@ -183,8 +152,8 @@ TEST(TransportDeclaration, DefaultDeclarationResolvesToTheDegenerateStack)
                                << stack.size();
     EXPECT_EQ(stack.size(), 0U);
 
-    // A default-constructed TransportStack and a resolved-from-empty one must be the same thing.
-    // If they ever diverge, "today's behavior" would depend on which door the caller came through.
+    // invariant: a default-constructed stack and a resolved-from-empty one must be the SAME thing,
+    // or today's behaviour would depend on which door the caller came through.
     const TransportStack default_constructed{};
     EXPECT_EQ(default_constructed.empty(), stack.empty());
     EXPECT_EQ(default_constructed.size(), stack.size());
@@ -204,9 +173,9 @@ TEST(TransportDeclaration, DegenerateStackPeelIsByteIdentity)
             << "  in : \"" << escape(line.bytes) << "\" (" << line.bytes.size() << " B)\n"
             << "  out: \"" << escape(peeled.content) << "\" (" << peeled.content.size() << " B)";
 
-        // Byte-EQUAL is not enough: the peel must BORROW, never copy. `peel` is documented
-        // allocation-free and hot-path-safe, and pointer identity is the only assertion that
-        // actually holds that. A copy would compare equal and silently add an allocation per line.
+        // invariant: byte-EQUAL is not enough — the peel must BORROW and never copy, and POINTER
+        // IDENTITY is the only assertion that actually holds that.
+        // invariant: a copy would compare equal and silently add an allocation per line.
         EXPECT_EQ(peeled.content.data(), line.bytes.data())
             << "case [" << idx << "] '" << line.label
             << "': the degenerate peel returned a COPY, not a borrowed view of the caller's buffer "
@@ -223,17 +192,12 @@ TEST(TransportDeclaration, DegenerateStackPeelIsByteIdentity)
     }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-// The FALSIFICATION arm — permanent, not a manual mutation
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-
-// The arm that makes the two tests above non-vacuous. It runs the SAME table through a DECLARED
-// stack and requires the result to DIFFER on every stamped line. A `peel` hard-coded to return its
-// argument — the mutation that leaves the degenerate arms green — fails HERE, loudly.
-//
-// The two arms are opposed by construction: no implementation satisfies both by accident, because
-// arm 1 demands byte-identity under the empty stack and this one demands a byte CHANGE under a
-// declared one, over identical inputs.
+// invariant: the arm that makes the two above NON-VACUOUS — the same table through a DECLARED
+// stack, requiring the result to DIFFER on every stamped line.
+// invariant: a peel hard-coded to return its argument, which is the mutation that leaves the
+// degenerate arms green, fails HERE and loudly.
+// invariant: the two arms are OPPOSED by construction: one demands byte-identity under the empty
+// stack and this one a byte CHANGE under a declared one, over identical inputs.
 TEST(TransportDeclaration, DeclaredStackActuallyPeels)
 {
     const IngestDeclaration declaration{.stack = kDeclaredGha, .dialect = {}, .channel = {}};
@@ -264,9 +228,10 @@ TEST(TransportDeclaration, DeclaredStackActuallyPeels)
         }
         else
         {
-            // TOTALITY IS ABOUT APPLICATION, NOT EFFECT. The row is applied to every
-            // line unconditionally; on these bytes its effect is nothing. That is the declared
-            // rule's effect being nothing — NOT the transform asking "is this line mine?".
+            // invariant: TOTALITY IS ABOUT APPLICATION, NOT EFFECT — the row is applied to every
+            // line unconditionally, and on these bytes its effect is nothing.
+            // invariant: that is the declared rule's effect being nothing, and NOT the transform
+            // asking whether the line is its own.
             EXPECT_EQ(peeled.content, line.bytes)
                 << "case [" << idx << "] '" << line.label
                 << "': the declared row must leave an unstamped line untouched — the row applies "
@@ -275,12 +240,12 @@ TEST(TransportDeclaration, DeclaredStackActuallyPeels)
                 << "  in : \"" << escape(line.bytes) << "\"\n"
                 << "  out: \"" << escape(peeled.content) << "\"";
 
-            // The EXTRACT is the other half of "the rule's effect is nothing", and it is the half
-            // a downstream probe was built to lean on: acquisition's `deduce_transport` counts a
-            // row as evidence only when the peel shortened the line AND the extract parsed,
-            // precisely because the acceptor used to trust its width. Asserting it here is what
-            // makes that bar's discriminating power a property of THIS component rather than a
-            // claim in a comment one repo away.
+            // invariant: the EXTRACT is the other half of the rule's effect being nothing, and it
+            // is the half a downstream probe was built to lean on.
+            // invariant: acquisition counts a row as evidence only when the peel SHORTENED the line
+            // AND the extract parsed, precisely because the acceptor used to trust its width.
+            // invariant: asserting it here makes that bar's discriminating power a property of THIS
+            // component rather than a claim in a comment one repo away.
             EXPECT_FALSE(peeled.observation_time.has_value())
                 << "case [" << idx << "] '" << line.label
                 << "': the row declined these bytes, so it must publish no observation time; a "
@@ -289,9 +254,10 @@ TEST(TransportDeclaration, DeclaredStackActuallyPeels)
                 << "  in : \"" << escape(line.bytes) << "\"";
         }
 
-        // The peel SHORTENS — it never rewrites. Whatever it returns must be a suffix of the input,
-        // sharing its buffer. This holds on both branches and is what keeps `content` safe to hand
-        // to the tokenizer without a copy.
+        // invariant: the peel SHORTENS and never rewrites, so whatever it returns is a SUFFIX of
+        // the input sharing its buffer.
+        // invariant: that holds on both branches and is what keeps the content safe to hand to the
+        // tokenizer without a copy.
         EXPECT_GE(peeled.content.data(), line.bytes.data())
             << "case [" << idx << "] '" << line.label << "': peel returned a view outside the "
             << "caller's buffer";
@@ -301,8 +267,8 @@ TEST(TransportDeclaration, DeclaredStackActuallyPeels)
             << "end of the caller's buffer";
     }
 
-    // A table that stopped exercising the shortening path would make this whole arm vacuous while
-    // every EXPECT above stayed green — the can't-FAIL mode. Pin the count.
+    // invariant: the shortened count is PINNED, because a table that stopped exercising the
+    // shortening path would make this whole arm vacuous while every assertion stayed green.
     constexpr std::size_t kStampedCases{5};
     EXPECT_EQ(shortened, kStampedCases)
         << "the line table must keep exercising the shortening path; if a case was edited out, "
@@ -326,25 +292,21 @@ TEST(TransportDeclaration, DeclaredStackExtractsObservationTimeOnlyWhenTheStampP
     EXPECT_FALSE(unstamped.observation_time.has_value())
         << "a line the rule did not shorten must carry no observation time";
 
-    // A line that is ENTIRELY transport peels to empty, and empty means DROP — not an empty
-    // template. This is how the shipped GHA strategy's "a timestamp-only line is a blank line"
-    // behavior survives the move to a declared peel (bundled behavior 3).
+    // invariant: a line that is ENTIRELY transport peels to empty, and empty means DROP rather than
+    // an empty template.
+    // invariant: that is how the shipped strategy's timestamp-only-is-a-blank-line behaviour
+    // survives the move to a declared peel.
     const RawPeeledLine bare{stack.peel_raw("2026-04-15T22:20:38.2879579Z ")};
     EXPECT_TRUE(bare.is_blank()) << "a stamp-only line must peel to blank, got \""
                                  << escape(bare.content) << "\"";
 }
 
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-// The catalogue's contract, and fail-closed resolution
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-
 TEST(TransportCatalog, ShippedRowsAreExactlyWhatTheCatalogDeclares)
 {
-    // TWO rows today, each landed WITH its algorithm, its row and its gate (the design sketched
-    // seven; this workspace does not ship enum members with no algorithm, no row and no gate).
-    // The second landed at T5 5.2 (`bracket-rfc3339-line-prefix` + G-T5-PEEL) — the co-fire the
-    // version comment predicted. Pinned so that adding a member without its algorithm and its
-    // gate fails here — the anti-dormant rule with teeth.
+    // invariant: the catalogue's rows are pinned by COUNT, because this workspace does not ship
+    // enum members with no algorithm, no row and no gate.
+    // invariant: each row landed WITH its algorithm, its row and its gate, so adding a member
+    // without them fails here — the anti-dormant rule with teeth.
     ASSERT_EQ(kTransportCatalogRows.size(), 3U)
         << "a new catalogue row is a catalogue-VERSION bump landing WITH its algorithm and its "
            "gate. If you are here because you added one, bump kTransportCatalogVersion and add "
@@ -369,10 +331,10 @@ TEST(TransportCatalog, ShippedRowsAreExactlyWhatTheCatalogDeclares)
         << "the bracketed row must strip the separator run too — bundled behavior #3 (the greedy "
            "[ \\t]+ strip) is reproduced by the declared row, byte-exactly";
 
-    // The catalogue version is a component of every composed semantic_identity. Pinned as a
-    // LITERAL: a silent bump would move every digest in the workspace, and a test that read the
-    // constant back from the constant could never say so. `-3` = the third shape (DN-25, the
-    // `utf8-bom-line-prefix` row co-firing with its algorithm and its gate).
+    // invariant: the catalogue version is a component of every composed semantic identity, and it
+    // is pinned as a LITERAL.
+    // invariant: a silent bump would move every digest in the workspace, and a test that read the
+    // constant back from the constant could never say so.
     EXPECT_EQ(kTransportCatalogVersion, "transport-catalog-3");
 }
 
@@ -397,44 +359,46 @@ TEST(TransportCatalog, NamesAreUniqueAndLookupRoundTrips)
 
 TEST(TransportDeclarationDeathTest, UnknownTransformFailsClosedNamingTheCatalog)
 {
-    // canon VERIFIES a declared coordinate, never infers it. An UNKNOWN name is a MISTAKE
-    // and fails closed; an ABSENT name is a CHOICE and degrades. They must never share a code path,
-    // so the death message is part of the contract, not decoration.
-    constexpr std::array<std::string_view, 1> kTypo{{"gha-api-line-prefx"}}; // one byte dropped
+    // invariant: canon VERIFIES a declared coordinate and never infers it — an UNKNOWN name is a
+    // MISTAKE and fails closed, where an ABSENT name is a CHOICE and degrades.
+    // invariant: the two must never share a code path, so the death message is part of the contract
+    // rather than decoration.
+    constexpr std::array<std::string_view, 1> kTypo{{"gha-api-line-prefx"}};
     const IngestDeclaration declaration{.stack = kTypo, .dialect = {}, .channel = {}};
 
     EXPECT_DEATH(
         { (void)resolve_transport_stack(declaration); }, "unknown transport transform")
         << "a typo'd transform name must fatal, not degrade to no peel";
 
-    // The message must NAME the vocabulary — a fail-closed error the operator cannot act on is
-    // only half the posture.
+    // invariant: the message must NAME the vocabulary — a fail-closed error the operator cannot
+    // act on is only half the posture.
     EXPECT_DEATH({ (void)resolve_transport_stack(declaration); }, "api-rfc3339-line-prefix");
     EXPECT_DEATH({ (void)resolve_transport_stack(declaration); }, "bracket-rfc3339-line-prefix");
     EXPECT_DEATH({ (void)resolve_transport_stack(declaration); }, "transport-catalog-3");
 }
 
-// ── The WRITER dual's laws — render_transport_prefix, the emit side of the catalogue ────────────
+// invariant: the WRITER dual's laws — one fixed lexical form, the corpus-attested spelling plus
+// ONE separator.
 TEST(TransportRenderer, BracketPrefixRendersOneFixedFormAndRoundTrips)
 {
     const auto* bracket_row{find_transform("bracket-rfc3339-line-prefix")};
     ASSERT_NE(bracket_row, nullptr);
 
-    // One fixed lexical form: the corpus-attested millisecond-Z spelling + ONE separator space.
     const auto stamp{*insight::utils::parse_iso8601("2026-06-23T15:11:09Z")};
     std::string rendered;
     ASSERT_TRUE(insight::transport::render_transport_prefix(*bracket_row, stamp, rendered));
     EXPECT_EQ(rendered, "[2026-06-23T15:11:09.000Z] ");
 
-    // Determinism: two renders, byte-identical; append semantics (the caller's buffer grows).
+    // invariant: determinism — two renders are byte-identical, and the semantics are APPEND, so
+    // the caller's buffer grows.
     std::string second;
     ASSERT_TRUE(insight::transport::render_transport_prefix(*bracket_row, stamp, second));
     EXPECT_EQ(rendered, second);
 
-    // The round-trip laws at the honest boundary: peel_raw(render ∥ ℓ) recovers
-    // strip_ws(ℓ), and the extracted observation time equals the parser's whole-second reading
-    // of the rendered interior (parse_iso8601 skips the fraction BY DESIGN — the law holds at
-    // the parser's grain; the millisecond digits are covered by the byte-exact form pin above).
+    // invariant: the round-trip laws hold at the HONEST boundary — the peel of a rendered line
+    // recovers the whitespace-stripped original, and the extract equals the parser's own reading.
+    // invariant: the parser skips the fraction BY DESIGN, so the law holds at the parser's grain
+    // and the sub-second digits are covered by the byte-exact form pin instead.
     const std::array<std::string_view, 1> declared_names{"bracket-rfc3339-line-prefix"};
     const TransportStack stack{resolve_transport_stack(IngestDeclaration{.stack = declared_names})};
     const std::string line{rendered + "hello world"};
@@ -443,8 +407,8 @@ TEST(TransportRenderer, BracketPrefixRendersOneFixedFormAndRoundTrips)
     ASSERT_TRUE(peeled.observation_time.has_value());
     EXPECT_EQ(*peeled.observation_time, stamp);
 
-    // `LinePrefixTimestamp` has NO writer dual, deliberately: the GHA API stamp is the
-    // platform's, baked into the GHA IntentFormat's own writer — false, and the buffer untouched.
+    // invariant: the other row has NO writer dual, deliberately — that stamp is the platform's,
+    // baked into its own writer — so the call returns false and leaves the buffer untouched.
     const auto* gha_row{find_transform(kGhaTransform)};
     ASSERT_NE(gha_row, nullptr);
     std::string untouched;
@@ -452,46 +416,35 @@ TEST(TransportRenderer, BracketPrefixRendersOneFixedFormAndRoundTrips)
     EXPECT_TRUE(untouched.empty());
 }
 
-// ── The renderer's DOMAIN — which stamps the writer ACCEPTS, as opposed to what it
-// spells for the ones it does. Split from the form/round-trip law above because a failure must be
-// able to name the window, and because the domain is the one property of this function whose very
-// EXPRESSIBILITY varies by build.
-//
-// `insight::Timestamp` is `system_clock::time_point`, whose tick period is STDLIB-DEFINED:
-// libstdc++ ships a nanosecond tick — the entire clock spans 1677..2262 — while libc++ (µs) and
-// MSVC (100 ns) span the calendar. So "a stamp outside the four-digit-year window" is not a value
-// one can simply write down: on a nanosecond tick no such `Timestamp` EXISTS, and an offset large
-// enough to reach one is signed overflow, i.e. UB. That is precisely how this arm was wrong before:
-// `stamp + 8000 years` wrapped to 1859 on the ship toolchain, the renderer correctly rendered it,
-// and the assertion — not the renderer — was the defect.
-//
-// The shape that survives the variation asserts the law over the domain that ACTUALLY EXISTS in
-// this build, by probing every boundary that domain has: the window's own edges where the clock can
-// carry them (the only place an off-by-one in the guard can hide), and — on every build, without
-// exception — the extreme stamps the build can carry. Where a window edge lies outside the clock's
-// reach the arm does not fall silent: it asserts the fact that makes the edge unreachable, namely
-// that the extreme on that side is itself inside the window, so no out-of-window stamp can be
-// constructed at all. That substitute is a claim about THIS build and it fails when the build's
-// clock widens — which is what separates it from a skipped assertion.
+// invariant: the renderer's DOMAIN — which stamps the writer ACCEPTS, split from the form law
+// because a failure must be able to name the window.
+// invariant: the domain is the one property whose very EXPRESSIBILITY varies by build, because the
+// timestamp type's tick period is standard-library-defined.
+// invariant: on a nanosecond tick the clock spans a few centuries, so a stamp outside the
+// four-digit-year window does not EXIST and an offset large enough to reach one is overflow.
+// invariant: that is exactly how this arm was wrong before — a large offset WRAPPED on the ship
+// toolchain, the renderer correctly rendered the wrapped stamp, and the ASSERTION was the defect.
+// invariant: so the law is asserted over the domain that ACTUALLY EXISTS in this build, by probing
+// every boundary that domain has.
+// invariant: where a window edge lies outside the clock's reach the arm does not fall silent — it
+// asserts the fact that makes the edge unreachable.
+// invariant: that substitute is a claim about THIS build and it FAILS when the build's clock
+// widens, which is what separates it from a skipped assertion.
 constexpr int kFirstRenderableYear{0};
 constexpr int kLastRenderableYear{9999};
 
-// 27 bytes: `[YYYY-MM-DDTHH:MM:SS.mmmZ]` + one separator space. A literal, for the same reason the
-// catalogue name above is one.
+// invariant: the rendered prefix width is a LITERAL, for the same reason the catalogue name is one.
 constexpr std::size_t kRenderedPrefixBytes{27U};
 
-// The widest stamps this build can both CARRY and NAME, at DAY grain.
-//
-// CARRY is the clock's reach: flooring the time_point limits DOWN to days divides and so cannot
-// overflow, whereas building a `Timestamp` UP from an arbitrary day multiplies and can — the trap
-// that produced the 1859 wrap. Everything below therefore compares days, never ticks.
-//
-// NAME is the ORACLE's reach, and it is a separate bound that must not be assumed away:
-// `std::chrono::year` is a ±32767 type, so on a microsecond tick (libc++ spans ~292471 years) the
-// clock outruns the calendar and `year_month_day` reports a WRAPPED year — measured: the true
-// ceiling year 292277 reads back as 32103. An expectation computed from a wrapped year would be a
-// coin flip dressed as an oracle, so the probe stops where the oracle stops. Both clamps sit far
-// outside the four-digit window on every wide-tick stdlib, so nothing that matters is given up.
+// invariant: CARRY is the clock's reach and NAME is the ORACLE's, and they are separate bounds that
+// must not be assumed away.
+// invariant: flooring the limits DOWN to days divides and cannot overflow, where building a
+// timestamp UP from an arbitrary day multiplies and can — the trap that produced the wrap.
+// invariant: so everything compares DAYS and never ticks.
+// invariant: the calendar year type is bounded, so on a wide tick the clock outruns the calendar
+// and the year reads back WRAPPED — measured.
+// invariant: an expectation computed from a wrapped year would be a coin flip dressed as an oracle,
+// so the probe stops where the oracle stops.
 constexpr std::chrono::sys_days kClockFloor{
     std::chrono::ceil<std::chrono::days>(insight::Timestamp::min())};
 constexpr std::chrono::sys_days kClockCeiling{
@@ -504,9 +457,8 @@ constexpr std::chrono::sys_days kFirstProbeDay{kClockFloor > kCalendarFloor ? kC
 constexpr std::chrono::sys_days kLastProbeDay{kClockCeiling < kCalendarCeiling ? kClockCeiling
                                                                                : kCalendarCeiling};
 
-// The oracle for "which year is this day in" is the standard calendar, deliberately NOT the
-// renderer's own `civil_from_days`: an expectation computed by the code under test is the
-// SUT==ORACLE tautology.
+// invariant: the oracle for which year a day falls in is the STANDARD calendar and deliberately not
+// the renderer's own conversion — that would be the subject-equals-oracle tautology.
 [[nodiscard]] int civil_year_of(std::chrono::sys_days day) noexcept
 {
     return int{std::chrono::year_month_day{day}.year()};
@@ -544,15 +496,15 @@ TEST(TransportRenderer, AcceptsExactlyTheStampsInsideTheFourDigitYearWindow)
                     << out << '"';
         }};
 
-    // ── Leg 1: the extremes this build can carry and name. Present whatever the tick period, so
-    // this leg runs on every stdlib; its expectation is DERIVED from the calendar, so on a wide
-    // clock it exercises the guard's refusal on BOTH sides and on a narrow one it pins the
-    // containment that is the whole reason leg 2 cannot reach the window's edges there.
+    // invariant: the extremes this build can carry and name are present WHATEVER the tick period,
+    // so this leg runs on every standard library.
+    // invariant: its expectation is DERIVED from the calendar, so on a wide clock it exercises the
+    // refusal on both sides and on a narrow one it pins the containment the other leg needs.
     for (const auto day : {kFirstProbeDay, kLastProbeDay})
         probe(day, is_in_window(civil_year_of(day)),
               "the widest stamp this build can carry must obey the same law as any other");
 
-    // ── Leg 2: the window's own edges — where an off-by-one in the guard hides.
+    // invariant: the window's own edges are where an off-by-one in the guard hides.
     struct WindowEdge
     {
         std::chrono::year_month_day day;
@@ -579,11 +531,10 @@ TEST(TransportRenderer, AcceptsExactlyTheStampsInsideTheFourDigitYearWindow)
         const std::chrono::sys_days day{edge.day};
         if (day > kLastProbeDay)
         {
-            // Not a skipped assertion. On a nanosecond tick this edge does not EXIST in
-            // `insight::Timestamp` — there is no value to pass — so what stands in its place is the
-            // fact that makes it unreachable: the highest stamp this build can carry is itself
-            // inside the window, hence no stamp above the window can be constructed at all. That is
-            // a claim about THIS build, and it fails the day the clock widens.
+            // invariant: NOT a skipped assertion — on a narrow tick this edge does not EXIST, so
+            // what stands in its place is the fact that makes it unreachable.
+            // invariant: the highest stamp this build carries is itself inside the window, so none
+            // above it exists — a claim about THIS build that fails when it widens.
             EXPECT_LE(civil_year_of(kLastProbeDay), kLastRenderableYear)
                 << edge.why
                 << " — no such Timestamp exists in this build, which is only sound "

@@ -5962,6 +5962,136 @@ baseline. None of this directory's suites carries the `corpus` label, so every o
 that default figure — checked at the `CMakeLists`, where the labelled set is exactly three suites
 and all three live elsewhere.
 
+## Unit 26 — `core/tests/transport/` (4 files, 747 comment lines, 743 would-be violations) — half this unit is invisible to the 809, and the two convictions are a claim I INVENTED and a clause that went stale five days after it was written
+
+The transport directory: the declaration-shape unit suite, the byte-order-mark row suite, and the
+two corpus-labelled peel-equivalence gates. Baseline split: bare 648 · spacer 49 · trailing 34 ·
+`///` 10 · tag-mid-line 2. After: **462 comment lines, 0 would-be violations** —
+`post` 1 · `invariant` 233 · `refs` 17 · 207 continuations · 4 tool forms.
+Repo-level delta **3 641 → 2 898 = exactly 743**. No law block; the next free law integer is
+still 17.
+
+### The stripper cross-check is VACUOUS again, and this is the second consecutive unit
+
+Removed **743**, kept 4 — and all 4 are namespace closers. This unit carries **no suppression of any
+kind**, so there is no kept violation class to subtract and the identity degenerates to
+`removed == violations`. Recorded as vacuous, not quoted as a pass, exactly as in unit 25. The
+repo-wide figures confirm the suppressions are elsewhere: the remaining `trailing-nolint` 2 and
+`suppression-without-why` 4 were unchanged by this unit and belong to test directories not yet
+converted.
+
+### THE BEHAVIOUR WITNESS COVERS HALF THIS UNIT, AND THE OTHER HALF HAD TO BE RUN BY HAND
+
+Two of the four files are corpus-labelled gates. `malf test` runs `ctest -LE corpus`, so **their
+cases do not run in the 809** — a green 809 is silent about them, and reporting 809 alone would have
+been a witness quoted outside its scope. In the `core` package the labelled set is exactly three
+suites and two of them are in this directory; the label is assigned per package, so that figure is
+`core`'s and not the repo's.
+
+So this directory's gates were run explicitly, with the private third-party corpus mounted from the
+machine-local store: **3 of 3 cases pass on BOTH toolchains** — the bracket-peel equivalence case and
+the two transport-peel cases — measured against the FULL revert slice rather than the fast sample,
+which matters because the gate's own text records that a real divergence class left the small slice
+entirely green while the full one caught tens of thousands of lines.
+
+The workspace corpus-gate job was then run whole, as the cross-check: **all 8 gates RAN, none
+skipped, all passed**, with the registry closed against the tree and 14 labelled rows all owned.
+
+**Two corrections to figures carried in earlier reporting of this run, both found by re-measuring
+rather than by recall.** First, this directory's corpus population is **3 cases, not 4**. Second,
+the `MaskedSpanCensus` producer-name case in the GitHub semantic package, previously described as a
+remaining corpus red, is a **DECLARED EXCLUSION of the gate job with a registered ratchet mount** —
+its hard failure on an unset bank is the designed behaviour that replaced a skip, not a defect of
+this repo.
+
+### The unset-mount clause was demonstrated live, by an invocation error of mine
+
+Running this unit's gates with only the revert slice mounted, the bracket gate FAILED on both
+toolchains with a message naming the variable it was missing: it reads the Jenkins marker corpus,
+not the revert slice, and my invocation was simply wrong. That is the clause this unit converted,
+executing: not a skip, not a silent pass, but a hard failure whose MESSAGE is the discriminator
+between an absent corpus and broken wiring. The repaired text claims exactly this behaviour, and the
+mistake accidentally witnessed it.
+
+### CONVICTION 1 (reader B) — a claim I INVENTED, against a ruling this same session had cited twice
+
+Converting the corpus gate's clause that an UNSET mount variable and a SET-BUT-BROKEN one must not
+share a verdict, I wrote that **an unset variable is a skip and a broken one is a failure**. Both are
+a hard failure. Neither skips — and the reason is the Founder's ruling of 2026-09-04 that a skip
+exits 0 and the harness counts it as PASSED, which is the false green that ruling exists to end.
+
+**This is the sharpest self-inflicted defect of the run, and it differs in KIND from every other
+conviction in this ledger.** Every previous one was a claim CARRIED from prose that had gone stale
+or was already false. This one was ADDED by the conversion. It contradicted a ruling I had cited
+twice in my own ledger entries the same day, and the disproof had been on screen minutes earlier:
+running that very gate to check the mount printed its unset branch as a FAILURE, and I read it for a
+different purpose and never carried it back to the sentence I had just written.
+
+The repair needed a second pass of its own: the first fix referred to *"that ruling"* with no
+antecedent in the file, which is precisely the dangling reference the cold-reader bar forbids. The
+text now states the consequence instead — that both conditions fail, that neither is a skip, that
+the false green is why the suite carries the `corpus` label and is excluded from the default run
+rather than skipping inside it, and that what must not be shared is the DIAGNOSIS, the message being
+the discriminator.
+
+### CONVICTION 2 (reader A) — a carried clause that went stale FIVE DAYS after it was written, and the tree contradicted itself for five weeks
+
+Reader A answered its question correctly and then reported that the unit's two headers disagree.
+The declaration suite's header said the mutation observation on the corpus arm *"is owed and remains
+owed, and no sentence here may be read as having paid it."* The peel-equivalence gate's header, in
+the same directory, records that falsifiability was **OBSERVED and not asserted — three peel-path
+mutations were run and each reverted**. The byte-order-mark gate beside it records the same.
+
+Dated at the artifacts: the "remains owed" clause was written on **2026-07-27**, and the corpus arm's
+mutation observation was recorded as taken on **2026-08-01** — five days later. Nobody went back.
+This is `OPS-8.O3`'s *the world moved* class in its cleanest form, and it is the second time this run
+that a claim survived because the file stating it was not the file that changed.
+
+The clause was CARRIED, not invented — it is in the pre-conversion prose — but the conversion would
+have shipped it forward, which is what makes it a conviction rather than a corpus finding. The
+repair keeps the boundary, which is still true and worth stating, and drops the false status: what
+this file discharges still does not include the corpus arm's observation, and no sentence in it may
+be read as having paid that — but the debt **is** paid, and paid where it is owed, by the gate beside
+it.
+
+### The address census, both legs
+
+**Outbound: ZERO lost across all four files**, exit 0 — 15 addresses unchanged in the byte-order-mark
+suite, 7 in the peel-equivalence gate, 1 in the declaration suite. Two ADDED in the bracket gate,
+`ADR-23` and `DN-25.D5`, each a rule its prose had named in words only.
+
+**Inbound:** the citing sites rest on the suite and test NAMES and on the shipped catalogue
+constants, not on this directory's prose — the same shape unit 25 recorded for the test tier.
+
+### The cold reader (`OPS-8.S8`) — 60 questions, 60 recovered, TWO convictions
+
+Reader A took the declaration and byte-order-mark suites; reader B the two corpus gates.
+`GIT COMMANDS RUN: none` and `EXCLUDED PATHS SEEN: none` from both.
+
+| reader | questions | recovered | convictions |
+|---|---|---|---|
+| A — declaration shape, catalogue contract, fail-closed resolution, the mark row | 30 | 30 | 1 |
+| B — the two peel-equivalence corpus gates | 30 | 30 | 1 |
+
+**Both convictions came from a reader going PAST its question**, which is now the fifth consecutive
+unit in which the finding was in the margin rather than in the score. Reader A's arrived as a
+flagged contradiction attached to an otherwise-correct answer, at medium confidence and explicitly
+labelled an inference from reading two headers against each other — a reader that had answered only
+what was asked would have scored 30 of 30 and surfaced nothing.
+
+**The unit also confirms a limit worth stating plainly: a unit's reader is scoped to that unit's
+files, so a false claim about file X written into file Y is invisible to Y's own interrogation.**
+This is the mechanism by which unit 24's reader convicted a line that unit 22 had already pushed.
+
+### The behaviour witness
+
+`malf test insight-canon` on **both** toolchains after the repairs landed: **809 of 809** on
+`linux-clang21-libcxx-release` and **809 of 809** on `linux-gcc16-release`, equal to the pre-unit
+baseline (734 + 32 + 25 + 13 + 5; the `benchmarks` package declares no tests, which is the
+baseline's own shape). Plus this directory's **3 of 3** corpus cases on both toolchains against the
+full slice, and the whole-workspace corpus job at **8 of 8 gates run and passed** — none of which
+the 809 covers, and all of which this unit needed.
+
 
 
 

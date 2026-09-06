@@ -1,67 +1,35 @@
-// test_bom_transport_row.cpp — G-BOM-1 (peel equivalence) and G-BOM-2 (stack order, with its RED
-// arm), the two MECH arms DN-25.D5 owes for the `utf8-bom-line-prefix` catalogue row.
-//
-// ⚠ THIS FILE IS RED UNTIL THE ROW LANDS, AND THAT IS THE HANDOFF, NOT A REGRESSION.
-// The arms are pre-registered ahead of the transform (DN-25.D5 / ADR-2.D7 — a member grows in with
-// its algorithm, its row and its gate). Every test below opens with
-// `ASSERT_NE(find_transform("utf8-bom-line-prefix"), nullptr)`, so the absence of the row is a
-// FAILURE and never a skip: an absent subject that skips is how a gate goes green for the one
-// reason that matters — it never looked. It is an ASSERT rather than a resolve, deliberately:
-// `resolve_transport_stack` on an unknown name calls `std::terminate()`, which would take the whole
-// `insight_canon_tests` binary down and destroy every sibling suite's verdict.
-// Nothing here names `TransportTransformKind::LinePrefixByteOrderMark` — the enumerator does not
-// exist yet, and a file that could not COMPILE before the row landed would block three other lanes
-// sharing this tree. The row is reached by NAME (which is what a declaration references) and its
-// kind is asserted by its serialized VALUE.
-//
-// ── HOMING (Kleio's call) ─────────────────────────────────────────────────────────────────────
-// UNIT, in `core/tests/transport/`, 1:1 with `core/src/transport/` under the per-domain mirror,
-// beside the sibling grains `test_transport_declaration.cpp` (G1 shape) and
-// `test_transport_peel_equivalence_gate.cpp` (G1-PEEL + G-BOM-3, the corpus arm).
-//
-// WHY NOT INTEGRATION. The asserted property crosses no seam. `find_transform`,
-// `resolve_transport_stack` and `TransportStack::peel_raw` are all `insight.canon.transport`; the
-// inputs are bytes this file authors; the oracle is a byte string. An integration home would buy no
-// extra proof, cost wall clock on every gate, and blur which package broke.
-//
-// WHY NOT THE CORPUS — AND THIS ONE IS MEASURED, NOT ASSERTED. The D11 slices CANNOT falsify the
-// decisions this file exists to pin. Counted over both pinned slices (an independent
-// second-language replica of the gate's population reader, oracle and peel; it reproduces every
-// committed G1-PEEL pin exactly, which is what entitles these counts to be believed):
-//
-//                                    data/v1/sample     data/v1/full
-//     lines starting with a BOM              511            17 487
-//     ... immediately followed by a space      0                 0   <<< strip_leading_space
-//     ... a SECOND BOM                         0                 0   <<< strip-once
-//     a BOM anywhere but offset 0              0                 0   <<< prefix, not `find`
-//
-// So a corpus-homed G-BOM-1 would stay GREEN under `strip_leading_space = true` (DN-25.D3), GREEN
-// under a greedy multi-BOM strip (DN-25.D7), and GREEN under a `find`-anywhere strip. Every real
-// BOM line in both slices has the single production shape `<BOM><stamp><space><content>`, so the
-// corpus scores one shape and would pronounce on four decisions. The authored table below is the
-// CARRYING leg for those defect classes; the corpus arm is the carrying leg for the count. Neither
-// substitutes for the other.
-//
-// ⚠ THIS TABLE IS A HOMING ARGUMENT, NEVER A REASON FOR ANY DECISION, and DN-25.D7 says so in as
-// many words about the strip-once case. "Zero doubles in the corpus" is why the corpus cannot TEST
-// the rule; it is emphatically not why the rule is what it is. Reading a measured absence as a
-// justification is how a pin acquires a reason that a wider population would refute.
-//
-// ── FALSIFIABILITY — every arm names the implementation it kills ──────────────────────────────
-// Red-capability is a requirement, not a note, so each case in `kCases` carries the defect it is
-// the sole guard against, and the two stack-order arms pin EXACT BYTES ON BOTH SIDES of the
-// ordering boundary rather than asserting a bare inequality: a relational assert pins a relation,
-// never a magnitude, and "the reversed stack differs" is satisfied by a reversed stack that does
-// something else wrong entirely. Here the reversed declaration's output is pinned to the exact
-// bytes of the SHIPPED DEFECT — `<stamp><space><content>`, stamp intact — because that is what
-// DN-25.D4 claims reversal reproduces, and a claim is worth its exact statement or nothing.
-//
-// Determinism: byte-only. A fixed authored table, no RNG, no clock, no float, no threads, no
-// allocation on the asserted path (`peel_raw` borrows; pointer identity is itself asserted).
 
+// invariant: the two mechanism arms owed for the byte-order-mark catalogue row, PRE-REGISTERED
+// ahead of the transform — a member grows in with its algorithm, its row and its gate.
+// invariant: every arm opens by asserting the row EXISTS, so the row's absence is a FAILURE and
+// never a skip: an absent subject that skips is how a gate goes green for never having looked.
+// invariant: it is an ASSERT rather than a resolve because resolving an unknown name TERMINATES,
+// which would take the whole test binary down and destroy every sibling suite's verdict.
+// invariant: nothing here names the transform's enumerator — a file that could not COMPILE before
+// the row landed would block other lanes sharing this tree.
+// invariant: the row is reached by NAME, which is what a declaration references, and its kind is
+// asserted by its serialized VALUE.
+// invariant: HOMED as a unit suite because the asserted property crosses no seam — the inputs are
+// bytes this file authors and the oracle is a byte string.
+// invariant: NOT corpus-homed, and that is MEASURED rather than asserted: over both pinned slices,
+// every real byte-order-mark line has one production shape.
+// invariant: so a corpus-homed arm would stay GREEN under a leading-space strip, a greedy
+// multi-mark strip and a find-anywhere strip — one shape ruling on four decisions.
+// invariant: THE TABLE IS A HOMING ARGUMENT AND NEVER A REASON FOR ANY DECISION — a measured
+// absence is why the corpus cannot TEST a rule, emphatically not why the rule is what it is.
+// invariant: reading a measured absence as a justification is how a pin acquires a reason a wider
+// population would refute.
+// invariant: each case names the implementation it is the SOLE guard against, and the two ordering
+// arms pin EXACT BYTES on both sides rather than asserting a bare inequality.
+// invariant: a relational assert pins a relation and never a magnitude, so the reversed stack's
+// output is pinned to the exact bytes of the SHIPPED DEFECT.
+// invariant: byte-only determinism — a fixed authored table, no randomness, no clock, no float,
+// no threads, and no allocation on the asserted path.
+// refs: ADR-2.D7, ADR-23.D4, DN-25.D3, DN-25.D4
+// refs: DN-25.D5, DN-25.D7, DN-25.D8
 #include <gtest/gtest.h>
 
-import insight.canon.test; // facade — insight.canon.transport arrives via the facade's export import
+import insight.canon.test;
 
 using insight::transport::find_transform;
 using insight::transport::IngestDeclaration;
@@ -76,30 +44,30 @@ using insight::transport::TransportTransformRow;
 namespace
 {
 
-// The declaration keys, spelled as literals rather than read back from the catalogue: a test that
-// looks its subject's name up from its subject cannot notice the name changing — SUT==ORACLE one
-// layer down.
+// invariant: the declaration keys are spelled as LITERALS rather than read back from the catalogue
+// — a test that looks its subject's name up from its subject cannot notice it change.
 constexpr std::string_view kBomRow{"utf8-bom-line-prefix"};
 constexpr std::string_view kGhaRow{"api-rfc3339-line-prefix"};
 
-// The declared stacks. The backing arrays must outlive the declaration — `IngestDeclaration::stack`
-// is a span, so a temporary would dangle.
+// invariant: the backing arrays must OUTLIVE the declaration, because the stack field is a span and
+// a temporary would dangle.
 constexpr std::array<std::string_view, 1> kBomOnly{{kBomRow}};
 constexpr std::array<std::string_view, 1> kGhaOnly{{kGhaRow}};
-// OUTSIDE-IN (ADR-23.D4): the bytes are `<BOM><stamp><content>`, so the BOM is the outer layer and
-// comes off first. This is DN-25.D4's declaration, verbatim.
+// invariant: OUTSIDE-IN — the bytes are mark, then stamp, then content, so the mark is the outer
+// layer and comes off first.
+// invariant: the WRONG order is kept as a first-class fixture and not as a comment, because
+// reversing it makes the stamp acceptor meet the mark at offset 0 and decline.
+// invariant: that reproduces the present shipped defect THROUGH the declaration.
+// refs: ADR-23.D4, DN-25.D4
 constexpr std::array<std::string_view, 2> kBomThenGha{{kBomRow, kGhaRow}};
-// The WRONG order — kept as a first-class fixture, not as a comment. Reversing it makes the stamp
-// acceptor meet `EF BB BF` at offset 0 and decline, which is the present shipped defect reproduced
-// THROUGH the declaration.
 constexpr std::array<std::string_view, 2> kGhaThenBom{{kGhaRow, kBomRow}};
 
 constexpr std::string_view kBom{"\xEF\xBB\xBF"};
-// A GHA stamp is exactly 28 bytes: "YYYY-MM-DDTHH:MM:SS.fffffffZ".
+// invariant: the stamp is exactly 28 bytes.
 constexpr std::string_view kStamp{"2026-04-15T22:20:38.2879579Z"};
 
-// The message every arm prints when the row is not in the catalogue yet. It states what is owed and
-// who owns it, so a red read cold is actionable without opening the design note.
+// invariant: the absent-row message states what is owed AND who owns it, so a red read cold is
+// actionable without opening the design note.
 constexpr std::string_view kRowAbsent{
     "the catalogue does not declare \"utf8-bom-line-prefix\".\n"
     "These arms are PRE-REGISTERED (DN-25.D5) and are RED BY DESIGN until the row, its algorithm\n"
@@ -107,8 +75,8 @@ constexpr std::string_view kRowAbsent{
     "It is an ASSERT rather than a skip because a gate that skips its absent subject is green for\n"
     "the one reason that matters: it never looked."};
 
-// Render bytes legibly for a failure message — a BOM, a NUL or a lone CR printed raw would corrupt
-// the very diagnostic that has to explain the failure.
+// invariant: bytes are escaped for the failure message, because a mark, a null or a lone carriage
+// return printed raw would corrupt the very diagnostic that has to explain the failure.
 [[nodiscard]] std::string escape(std::string_view bytes)
 {
     std::string out;
@@ -131,22 +99,19 @@ constexpr std::string_view kRowAbsent{
     return out;
 }
 
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-// The line table — authored ADVERSARIAL to `utf8-bom-line-prefix`, not representative of the corpus
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-//
-// `expected` is the byte-exact output of the BOM row applied ALONE. Every row states the
-// implementation it is the sole guard against; a case with no such sentence does not belong here.
+// invariant: the table is authored ADVERSARIAL to the row and is not representative of the corpus.
+// invariant: every row states the implementation it is the sole guard against, and a case with no
+// such sentence does not belong here.
 struct Case
 {
     std::string_view label;
     std::string_view bytes;
-    std::string_view expected; // what the BOM row alone must yield, byte-exact
-    std::string_view kills;    // the implementation this case, and only this case, refutes
+    std::string_view expected;
+    std::string_view kills;
 };
 
-// NUL-bearing: built with an explicit length so the view CARRIES the NUL rather than stopping at
-// it. Real CI logs carry these. 3 B BOM + "ok" + NUL + "after-nul" = 15 bytes.
+// invariant: the null-bearing case is built with an EXPLICIT LENGTH so the view carries the null
+// rather than stopping at it — real logs carry these.
 constexpr std::string_view kNulAfterBom{"\xEF\xBB\xBF"
                                         "ok\0after-nul",
                                         15U};
@@ -177,9 +142,10 @@ const std::array<Case, 17> kCases{{
               "about the transform and not about removing a LINE (DN-25.D8). The bound is "
               "STRUCTURAL, not a promise: is_blank() is bytes().empty() and is never "
               "whitespace-trimmed, so <BOM> followed by spaces peels to \"   \" and SURVIVES."},
-    // The OTHER side of that bound, and the case that ENFORCES it. Its twin above says a line that
-    // is entirely transport DROPS; this one says a line that is transport plus whitespace does NOT.
-    // Together they pin exactly where DN-25.D8's licence stops.
+    // invariant: the OTHER side of the drop bound — its twin says a line that is entirely
+    // transport DROPS, and this one says transport plus whitespace does NOT.
+    // invariant: together they pin exactly where the drop licence stops.
+    // refs: DN-25.D8
     {.label = "BOM + whitespace only (the D8 bound)",
      .bytes = "\xEF\xBB\xBF"
               "   ",
@@ -269,10 +235,8 @@ const std::array<Case, 17> kCases{{
      .kills = "a strip keyed on 'the first byte is >= 0x80'"},
 }};
 
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-// The row's SHAPE — DN-25.D3's four decisions, each pinned where it is decided
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-
+// invariant: the row's four shape decisions, each pinned where it is decided.
+// refs: DN-25.D3
 TEST(BomTransportRow, RowShapeIsExactlyWhatTheDesignDecided)
 {
     const TransportTransformRow* row{find_transform(kBomRow)};
@@ -311,21 +275,21 @@ TEST(BomTransportRow, RowAppendsAtTheEndOfTheCatalogAndTheEnumIsNotRenumbered)
         << "three rows: the two shipped ones plus this. A row that landed without its algorithm "
            "and its gate — or a gate written for a row that did not land — fails here.";
 
-    // The row's POSITION, computed from the pointer rather than by indexing a constexpr array out
-    // of range. Rows serialize in catalogue order (compose.cpp), so an insertion mid-array moves
-    // the digest of every row after it.
+    // invariant: the row's POSITION is computed from the pointer rather than by indexing a constant
+    // array out of range.
+    // invariant: rows serialize in CATALOGUE ORDER, so an insertion mid-array moves the digest of
+    // every row after it — the new row must APPEND.
     EXPECT_EQ(row - kTransportCatalogRows.data(), 2)
         << "the new row must APPEND. Rows serialize in catalogue order into every composed "
            "semantic_identity, so inserting one shifts the serialized bytes of rows nobody touched "
            "— and it does so SILENTLY: the diff is one line and the compiler says nothing.";
 
-    // ⚠ THE ENUM'S NUMERIC VALUES ARE THE SERIALIZED BYTES (`ADR-2.D7` —
-    // identity-bearing, new members APPEND, never renumber, never insert mid-enum). The sibling
-    // suite pins each row's kind SYMBOLICALLY, which cannot see a renumbering at all: renaming
-    // nothing and renumbering everything leaves every symbolic assert green while every golden in
-    // the workspace moves. This is the arm that sees it, and it is spelled numerically ON PURPOSE.
-    // The BOM row's kind is asserted by VALUE and never by enumerator name, so this file compiles
-    // before the enumerator exists.
+    // invariant: THE ENUM'S NUMERIC VALUES ARE THE SERIALIZED BYTES — new members APPEND, and
+    // nothing is renumbered or inserted mid-enum.
+    // invariant: the sibling suite pins each kind SYMBOLICALLY, which cannot see a renumbering at
+    // all — renaming nothing and renumbering everything leaves every symbolic assert green.
+    // invariant: this is the arm that sees it, and it is spelled NUMERICALLY on purpose.
+    // refs: ADR-2.D7
     EXPECT_EQ(static_cast<std::uint8_t>(kTransportCatalogRows[0].kind), 0U)
         << "LinePrefixTimestamp is the anchor and is never renumbered";
     EXPECT_EQ(static_cast<std::uint8_t>(kTransportCatalogRows[1].kind), 1U)
@@ -340,12 +304,13 @@ TEST(BomTransportRow, CatalogVersionCoFiredWithTheNewRow)
 {
     ASSERT_NE(find_transform(kBomRow), nullptr) << kRowAbsent;
 
-    // ⚠ THE VALUE IS NOT ASSERTED, AND THAT IS DELIBERATE. A monotonic token is ASSIGNED AT SHIP,
-    // BY WHOEVER SHIPS, NEVER RESERVED (ADR-2, normative; DN-25.O1 names the bump as owed and
-    // pointedly does not take the value). What this arm owns is the CO-FIRE: a row that serializes
-    // bytes without moving the version silently re-uses an identity that no longer means what it
-    // meant. So the assertion is that the token MOVED off the value the two-row catalogue shipped
-    // under — satisfiable by exactly one act, and it fires precisely when the bump is forgotten.
+    // invariant: THE VERSION VALUE IS NOT ASSERTED, deliberately — a monotonic token is assigned
+    // AT SHIP by whoever ships, and never reserved in advance.
+    // invariant: what this arm owns is the CO-FIRE: a row that serializes bytes without moving the
+    // version silently re-uses an identity that no longer means what it meant.
+    // invariant: so the assertion is that the token MOVED off the value the previous catalogue
+    // shipped under, which fires precisely when the bump is forgotten.
+    // refs: ADR-2, DN-25.O1
     EXPECT_NE(kTransportCatalogVersion, "transport-catalog-2")
         << "the catalogue gained a third row and kept the version of the two-row shape. That "
            "version is a component of EVERY composed semantic_identity — including for streams "
@@ -356,10 +321,7 @@ TEST(BomTransportRow, CatalogVersionCoFiredWithTheNewRow)
     EXPECT_FALSE(kTransportCatalogVersion.empty());
 }
 
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-// G-BOM-1 — peel equivalence: strip a leading BOM, and otherwise be the identity
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-
+// invariant: peel equivalence — the row strips a leading mark and is otherwise the IDENTITY.
 TEST(BomTransportRowGBom1, RowIsStripLeadingBomAndOtherwiseTheIdentity)
 {
     ASSERT_NE(find_transform(kBomRow), nullptr) << kRowAbsent;
@@ -386,9 +348,9 @@ TEST(BomTransportRowGBom1, RowIsStripLeadingBomAndOtherwiseTheIdentity)
             << "': the row declares TransportExtract::None — it must never set an observation "
                "time. A BOM carries no clock.";
 
-        // The peel SHORTENS from the head; it never rewrites and never copies. Pointer identity is
-        // the only assertion that actually holds "allocation-free" — a copy would compare equal and
-        // silently add an allocation per line on a hot path.
+        // invariant: the peel SHORTENS from the head; it never rewrites and never copies.
+        // invariant: POINTER IDENTITY is the only assertion that actually holds allocation-free —
+        // a copy would compare equal and silently add an allocation per line on a hot path.
         EXPECT_GE(peeled.content.data(), item.bytes.data())
             << "case [" << idx << "] '" << item.label
             << "': peel returned a view OUTSIDE the caller's buffer — it copied.";
@@ -407,9 +369,11 @@ TEST(BomTransportRowGBom1, RowIsStripLeadingBomAndOtherwiseTheIdentity)
     }
 }
 
-// The equivalence law itself, stated as a law rather than as a table: prefixing ANY line with a BOM
-// must be invisible to the row. This is the content-neutrality obligation ADR-23.D6 places on a
-// transform, and it is the unit-grain statement of exactly what the corpus arm scores at scale.
+// invariant: the equivalence LAW stated as a law rather than as a table — prefixing ANY line with
+// a mark must be invisible to the row.
+// invariant: that is the content-neutrality obligation a transform carries, and it is the
+// unit-grain statement of exactly what the corpus arm scores at scale.
+// refs: ADR-23.D6
 TEST(BomTransportRowGBom1, PrefixingAnyLineWithABomIsInvisibleToTheRow)
 {
     ASSERT_NE(find_transform(kBomRow), nullptr) << kRowAbsent;
@@ -420,8 +384,8 @@ TEST(BomTransportRowGBom1, PrefixingAnyLineWithABomIsInvisibleToTheRow)
     for (std::size_t idx{0}; idx < kCases.size(); ++idx)
     {
         const Case& item{kCases[idx]};
-        // Skip the cases that already start with a BOM: prefixing THOSE tests the strip-once rule,
-        // which the table above owns. Here the law is about lines the row must leave alone.
+        // invariant: cases already starting with a mark are skipped — prefixing THOSE tests the
+        // strip-once rule, which the table owns.
         if (item.bytes.starts_with(kBom))
             continue;
         ++exercised;
@@ -444,22 +408,19 @@ TEST(BomTransportRowGBom1, PrefixingAnyLineWithABomIsInvisibleToTheRow)
                "identically.";
     }
 
-    // A table that stopped exercising this law would leave the arm green while asserting nothing.
+    // invariant: the exercised count is PINNED, because a table that stopped exercising this law
+    // would leave the arm green while asserting nothing.
     constexpr std::size_t kBomFreeCases{9};
     EXPECT_EQ(exercised, kBomFreeCases)
         << "the table must keep enough BOM-free cases to make this law non-vacuous; if cases were "
            "edited out, this arm stopped falsifying anything.";
 }
 
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-// G-BOM-2 — stack ORDER, with its RED arm. The transport stack's first genuine composition.
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-//
-// ADR-23.D3 justified transport carrying its own catalogue on NESTING, whose named beneficiary
-// (docker-inside-GHA) was never built — so the stack has shipped with NO consumer and every
-// ordering property in it is untested BY CONSTRUCTION. These two arms are the first thing that
-// makes stack order load-bearing.
-
+// invariant: stack ORDER, with its red arm — the transport stack's first genuine composition.
+// invariant: the stack's own justification was NESTING, whose named beneficiary was never built, so
+// the stack has shipped with NO consumer and every ordering property is untested BY CONSTRUCTION.
+// invariant: these two arms are the first thing that makes stack order load-bearing.
+// refs: ADR-23.D3, DN-25.D5
 TEST(BomTransportRowGBom2, DeclaredOrderPeelsTheProductionShapeToItsContent)
 {
     ASSERT_NE(find_transform(kBomRow), nullptr) << kRowAbsent;
@@ -478,9 +439,10 @@ TEST(BomTransportRowGBom2, DeclaredOrderPeelsTheProductionShapeToItsContent)
         << "  in     : \"" << escape(line) << "\"\n"
         << "  actual : \"" << escape(peeled.content) << "\"";
 
-    // The SECOND coordinate, and it is the one that exists ONLY on the far side of the ordering
-    // boundary: an observation time can be extracted only if the stamp acceptor actually ran on the
-    // stamp. Its presence IS the proof that the composition happened, independently of the bytes.
+    // invariant: the SECOND coordinate exists ONLY on the far side of the ordering boundary — an
+    // observation time can be extracted only if the stamp acceptor actually ran on the stamp.
+    // invariant: its presence IS the proof that the composition happened, independently of the
+    // bytes.
     ASSERT_TRUE(peeled.observation_time.has_value())
         << "the stamp row declares TransportExtract::EventObservationTime, so the correctly "
            "ordered "
@@ -496,10 +458,11 @@ TEST(BomTransportRowGBom2, DeclaredOrderPeelsTheProductionShapeToItsContent)
            "key, never a replay input)";
 }
 
-// ── THE RED ARM ───────────────────────────────────────────────────────────────────────────────
-// DN-25.D4's ordering claim is vacuous without this. It pins the reversed declaration's output to
-// EXACT BYTES rather than to "differs": the claim is that reversal reproduces the SHIPPED DEFECT,
-// and that claim is worth its exact statement or nothing.
+// invariant: THE RED ARM, without which the ordering claim is vacuous — it pins the reversed
+// declaration's output to EXACT BYTES rather than to differs.
+// invariant: the claim is that reversal reproduces the SHIPPED DEFECT, and a claim is worth its
+// exact statement or nothing.
+// refs: DN-25.D4
 TEST(BomTransportRowGBom2, ReversedOrderReproducesTheShippedDefectThroughTheDeclaration)
 {
     ASSERT_NE(find_transform(kBomRow), nullptr) << kRowAbsent;
@@ -511,9 +474,10 @@ TEST(BomTransportRowGBom2, ReversedOrderReproducesTheShippedDefectThroughTheDecl
     const std::string line{std::string{kBom} + std::string{kStamp} + " ok"};
     const RawPeeledLine peeled{reversed.peel_raw(line)};
 
-    // The stamp row runs FIRST, meets EF BB BF at offset 0, and its effect is nothing. The BOM row
-    // then removes the BOM — too late for anyone. What survives is the stamp, un-peeled: the exact
-    // bytes that make GitHubActionsStrategy::parse decline and LogParser drop the line today.
+    // invariant: the stamp row runs FIRST, meets the mark at offset 0, and its effect is nothing;
+    // the mark row then removes the mark, too late for anyone.
+    // invariant: what survives is the stamp un-peeled — the exact bytes that make the dialect
+    // parse decline and the line be dropped today.
     const std::string defect_shape{std::string{kStamp} + " ok"};
     EXPECT_EQ(peeled.content, defect_shape)
         << "the reversed declaration must leave the STAMP intact — that is the present shipped "
@@ -532,8 +496,8 @@ TEST(BomTransportRowGBom2, ReversedOrderReproducesTheShippedDefectThroughTheDecl
            "declined, so nothing parsed. A value here means the stamp row somehow reached its "
            "grammar despite running first — the order is not being honoured.";
 
-    // Both orders resolve, both are legal declarations, and they produce DIFFERENT bytes. That is
-    // the whole content of "order is load-bearing", asserted after both sides were pinned exactly.
+    // invariant: both orders RESOLVE and both are legal declarations, and they produce DIFFERENT
+    // bytes — the whole content of order being load-bearing, after both sides were pinned.
     const TransportStack correct{resolve_transport_stack(
         IngestDeclaration{.stack = kBomThenGha, .dialect = {}, .channel = {}})};
     EXPECT_NE(correct.peel_raw(line).content, reversed.peel_raw(line).content)
@@ -541,10 +505,11 @@ TEST(BomTransportRowGBom2, ReversedOrderReproducesTheShippedDefectThroughTheDecl
            "order-free way, and no declaration can express nesting";
 }
 
-// The stack-grain statement of the equivalence law: the two-row stack on `BOM + X` yields exactly
-// what the ONE-row stamp stack yields on the BOM-free twin `X`. This is DN-25.D5's G-BOM-2 as
-// written, and it is the same oracle the corpus arm scores at 17 487 lines — the two grains JOINED
-// on one object rather than each proven alone.
+// invariant: the stack-grain statement of the equivalence law — the two-row stack on a marked
+// line yields exactly what the one-row stamp stack yields on the mark-free twin.
+// invariant: it is the same oracle the corpus arm scores at scale, so the two grains are JOINED on
+// one object rather than each proven alone.
+// refs: DN-25.D5
 TEST(BomTransportRowGBom2, TwoRowStackOnBomLineEqualsStampRowOnTheBomFreeTwin)
 {
     ASSERT_NE(find_transform(kBomRow), nullptr) << kRowAbsent;
@@ -555,6 +520,10 @@ TEST(BomTransportRowGBom2, TwoRowStackOnBomLineEqualsStampRowOnTheBomFreeTwin)
     ASSERT_EQ(composed.size(), 2U);
     ASSERT_EQ(stamp_only.size(), 1U);
 
+    // invariant: the OTHER direction of otherwise-the-identity — on a line with no mark, adding
+    // the row to the stack must change nothing at all.
+    // invariant: this is the over-strip guard at unit grain, and the corpus arm counts the same
+    // property over millions of lines.
     for (std::size_t idx{0}; idx < kCases.size(); ++idx)
     {
         const Case& item{kCases[idx]};
@@ -577,9 +546,6 @@ TEST(BomTransportRowGBom2, TwoRowStackOnBomLineEqualsStampRowOnTheBomFreeTwin)
             << "': the EXTRACT must agree too — a BOM must not cost the line its observation time.";
     }
 
-    // And the other direction of "otherwise the identity": on a line with NO BOM, adding the BOM
-    // row to the stack must change nothing at all. This is the over-strip guard at unit grain — the
-    // corpus arm counts the same property over 22 490 937 lines.
     for (std::size_t idx{0}; idx < kCases.size(); ++idx)
     {
         const Case& item{kCases[idx]};
@@ -592,9 +558,9 @@ TEST(BomTransportRowGBom2, TwoRowStackOnBomLineEqualsStampRowOnTheBomFreeTwin)
     }
 }
 
-// The RECOGNITION door must agree with the TOKENIZER-FEEDING door byte-for-byte. A divergence
-// between `peel` and `peel_raw` is the two-implementations defect the whole transport contract is
-// about, and stage 1 (ANSI strip) is a fixed point on a BOM — it has no ESC byte — so the two
+// invariant: the RECOGNITION door must agree with the TOKENIZER-FEEDING door byte-for-byte — a
+// divergence between them is the two-implementations defect the transport contract is about.
+// invariant: stage 1 is a FIXED POINT on a mark, since a mark carries no escape byte, so the two
 // doors have no licence to differ here.
 TEST(BomTransportRowGBom2, BothPeelDoorsAgreeOnBomBearingLines)
 {
