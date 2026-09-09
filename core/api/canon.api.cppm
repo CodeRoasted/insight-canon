@@ -190,7 +190,8 @@ struct OtelTraceContext
 // stay core as a structured catalog rather than scattered inline predicates.
 // invariant: the three trace keys route to consumed structural metadata, dropped from the template
 // and never tokenized; severity_number routes to the LogLevel band.
-// refs: ADR-17, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext, SRC-D-OTEL-4a, SRC-D-TID-6
+// refs: ADR-17, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext
+// refs: F-SRC-insight-canon:canon.api.cppm:kOtelFieldCatalog, SRC-D-TID-6
 enum class OtelFieldClass : std::uint8_t
 {
     TraceId,
@@ -210,7 +211,6 @@ struct OtelFieldDescriptor
 // a value_counts channel canon does not have.
 // invariant: routing it through an existing channel would fabricate an ordinal or smuggle a
 // vocabulary into a semantic-unaware core, so the honest state is absent.
-// refs: SRC-D-OTEL-18b
 inline constexpr std::array<OtelFieldDescriptor, 4> kOtelFieldCatalog{{
     {.field_class = OtelFieldClass::TraceId, .key = "traceId"},
     {.field_class = OtelFieldClass::SpanId, .key = "spanId"},
@@ -282,7 +282,7 @@ inline constexpr std::int64_t kNanosPerSecond{1'000'000'000};
 inline constexpr std::array<OrdinalFieldDescriptor, 15> kOrdinalFieldCatalog{{
     // invariant: computed by the flat-span parser as endTime minus startTime, already integer
     // nanoseconds; the key also self-matches a literal field if a log carries one.
-    // refs: ADR-29, SRC-D-OTEL-12
+    // refs: ADR-29
     {.key = "span_duration_ns",
      .schedule = OrdinalSchedule::DurationLog2Ns,
      .scale_to_canonical = 1},
@@ -576,7 +576,7 @@ enum class RunOutcome : std::uint8_t
 // when present.
 // invariant: canon keeps its own six-level model and DISCARDS the raw 1-24 number — the 24-band
 // granularity is deliberately not inherited.
-// refs: ADR-29, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext, SRC-D-OTEL-8
+// refs: ADR-29, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext
 [[nodiscard]] constexpr LogLevel
 log_level_from_severity_number(std::int64_t severity_number) noexcept
 {

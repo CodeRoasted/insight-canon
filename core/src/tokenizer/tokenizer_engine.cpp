@@ -191,7 +191,7 @@ Tokenizer::process_batch(std::span<const std::string_view> lines)
     std::vector<std::string> span_records;
     for (auto line : lines)
     {
-        // refs: SRC-D-OTEL-18
+        // refs: F-SRC-insight-canon:canon.detail.strategy.cppm:unpack_otel_spans
         // invariant: an export is unpacked 1 to N and each record tokenized 1:1; a flat span and
         // every non-OTEL line take the direct path, byte-identical to it.
         if (is_otel_span_document(line))

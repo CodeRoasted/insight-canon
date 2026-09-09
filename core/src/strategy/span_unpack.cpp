@@ -14,7 +14,8 @@ import insight.canon.api;
 // one-to-N strategy.
 // invariant: the simdjson entities stay TEXTUAL in the global module fragment and are TU-local, so
 // no third-party declaration leaks through the module.
-// refs: ADR-3.D4, ADR-29, SRC-D-OTEL-18, SRC-D-OTEL-18a
+// refs: ADR-3.D4, ADR-29, F-SRC-insight-canon:canon.detail.strategy.cppm:unpack_otel_spans
+// refs: F-SRC-insight-canon:canon.detail.strategy.cppm:unpack_otel_spans
 namespace insight::tokenization
 {
 
@@ -107,7 +108,7 @@ namespace
     // ids, name and times pass through as their raw JSON, quotes and escaping byte-preserved.
     // invariant: kind and status are normalized to the string enum; the resource service name is
     // injected FIRST, then the span's own attributes verbatim.
-    // refs: SRC-D-OTEL-18a
+    // refs: F-SRC-insight-canon:canon.detail.strategy.cppm:unpack_otel_spans
     void append_canonical_span(simdjson::ondemand::object& span, std::string_view service_name,
                                std::string& out)
     {

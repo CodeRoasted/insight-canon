@@ -321,7 +321,7 @@ TEST_F(TokenizerTest, BatchReturnsOneResultPerNonDocumentLine)
 // — the unpack tests never call the batch entry and the batch tests never fed it a document.
 // invariant: worse, the surviving guard was NAMED for one result per line, so a green suite
 // actively ENDORSED the deletion.
-// refs: SRC-D-OTEL-18
+// refs: F-SRC-insight-canon:canon.detail.strategy.cppm:unpack_otel_spans
 namespace
 {
 // invariant: two spans under one resource, the same shape as the span-unpack fixture, kept LOCAL so

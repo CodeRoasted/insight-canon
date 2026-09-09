@@ -420,7 +420,7 @@ struct SyslogHeader
 
 // invariant: the record-source layer routes an export DOCUMENT to the unpack before tokenization; a
 // flat span and every non-OTEL line are not documents.
-// refs: ADR-29, SRC-D-OTEL-18
+// refs: ADR-29
 export namespace insight::tokenization
 {
 
@@ -468,7 +468,6 @@ export namespace insight::tokenization
 // lab emits for the same spans, so the flat-span parser is authored ONCE.
 // invariant: that is what makes shape-1 equals shape-2 a golden-tested property rather than a hope;
 // the resource service name is injected into each span's attributes.
-// refs: SRC-D-OTEL-18a
 std::size_t unpack_otel_spans(std::string_view document, std::vector<std::string>& out);
 
 // invariant: the ACQUISITION-side recogniser — broad and deliberately OVER-triggering, which is

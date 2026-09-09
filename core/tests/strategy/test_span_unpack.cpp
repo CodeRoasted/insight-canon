@@ -13,7 +13,7 @@ using namespace insight::tokenization;
 // class.
 // invariant: the resource service name is injected, and int-form kind and status are normalized to
 // the protojson string enum.
-// refs: SRC-D-OTEL-18, SRC-D-OTEL-18a
+// refs: F-SRC-insight-canon:canon.detail.strategy.cppm:unpack_otel_spans
 namespace
 {
 
@@ -124,7 +124,7 @@ TEST(SpanUnpack, UnpacksDocumentToByteIdenticalCanonicalRecords)
     ASSERT_EQ(records.size(), 2U);
     // invariant: byte-identical to the lab's flat-span emission, which is the two-shapes
     // equivalence property itself.
-    // refs: SRC-D-OTEL-18a
+    // refs: F-SRC-insight-canon:canon.detail.strategy.cppm:unpack_otel_spans
     EXPECT_EQ(records[0], kExpectedSpan0) << "got: " << records[0];
     EXPECT_EQ(records[1], kExpectedSpan1) << "got: " << records[1];
 }
@@ -285,7 +285,7 @@ TEST(SpanUnpack, NonDocumentYieldsNothing)
 // invariant: canon collects each link's span id IN ORDER.
 // invariant: the link's trace id and any link attributes are consumed-not-retained, since only the
 // span id feeds the cross-trace distillation downstream.
-// refs: ADR-29.D2, SRC-D-OTEL-23
+// refs: ADR-29.D2, F-SRC-logcraft:core.api-agent.cppm:LinkInstanceSelector
 constexpr std::string_view kSpanWithLinks{
     R"({"traceId":"aabb","spanId":"0001","name":"consumer","kind":"SPAN_KIND_INTERNAL",)"
     R"("startTimeUnixNano":"1000","endTimeUnixNano":"1500","status":{"code":"STATUS_CODE_UNSET"},)"

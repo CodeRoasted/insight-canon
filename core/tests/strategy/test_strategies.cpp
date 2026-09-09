@@ -286,7 +286,7 @@ TEST_F(JsonStrategyTest, NonOtelJsonHasNoTraceContext)
 
 // invariant: the canonical FLAT-SPAN record the lab emits, distinct from the OTLP log record above
 // and detected by the span-specific start-time key.
-// refs: SRC-D-OTEL-18
+// refs: F-SRC-insight-canon:canon.detail.strategy.cppm:unpack_otel_spans
 static constexpr std::string_view kSpanLine{
     R"({"traceId":"0123456789abcdeffedcba9876543210","spanId":"00000000000000ff",)"
     R"("parentSpanId":"0000000000000001","name":"checkout","kind":"SPAN_KIND_INTERNAL",)"
@@ -321,7 +321,7 @@ TEST_F(JsonStrategyTest, OtelSpanMapsAllFields)
     EXPECT_TRUE(pl.trace.has_parent);
     EXPECT_EQ(pl.trace.parent_span_id, span_id_from_hex("0000000000000001"));
     // invariant: end minus start becomes the span-duration ordinal on the declared duration ladder.
-    // refs: SRC-D-OTEL-12
+    // refs: F-SRC-insight-canon:canon.api.cppm:DurationLog2Ns
     ASSERT_EQ(pl.ordinals.size(), 1U);
     EXPECT_EQ(pl.ordinals[0].field_name, "span_duration_ns");
     EXPECT_EQ(pl.ordinals[0].schedule, OrdinalSchedule::DurationLog2Ns);

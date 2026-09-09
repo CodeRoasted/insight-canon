@@ -185,7 +185,8 @@ namespace
     // declared outranks inferred.
     // invariant: trace ids are hashed to scalar PODs and never retained as values.
     // invariant: kept separate so the strategy's own parse stays within its complexity budget.
-    // refs: F-SRC-insight-canon:canon.api.cppm:OtelTraceContext, SRC-D-OTEL-4a
+    // refs: F-SRC-insight-canon:canon.api.cppm:OtelTraceContext
+    // refs: F-SRC-insight-canon:canon.api.cppm:kOtelFieldCatalog
     [[nodiscard]] bool extract_otel_fields(simdjson::ondemand::object& root,
                                            ParsedLine& parsed_line)
     {
@@ -384,7 +385,9 @@ namespace
     // intruder and rots on the next envelope, and this enumerates nothing.
     // invariant: so it holds for every probe, parser and format that ever routes here; the rule is
     // do not emit what you did not parse.
-    // refs: DN-29.D17, SRC-D-OTEL-12, SRC-D-OTEL-18, SRC-D-OTEL-18b
+    // refs: DN-29.D17, F-SRC-insight-canon:canon.api.cppm:DurationLog2Ns
+    // refs: F-SRC-insight-canon:canon.detail.strategy.cppm:unpack_otel_spans
+    // refs: F-SRC-insight-canon:canon.api.cppm:kOtelFieldCatalog
     [[nodiscard]] bool parse_otel_span(simdjson::ondemand::object& root, ParsedLine& parsed_line,
                                        ArenaAllocator& arena)
     {
@@ -517,7 +520,7 @@ namespace
 
         // invariant: the duration becomes the declared ordinal; an end before the start yields a
         // ZERO duration, the smallest bin, and never a negative one.
-        // refs: SRC-D-OTEL-12
+        // refs: F-SRC-insight-canon:canon.api.cppm:DurationLog2Ns
         const std::int64_t start_value{parse_span_nano(start_nano)};
         const std::int64_t end_value{parse_span_nano(end_nano)};
         const std::int64_t duration_ns{end_value > start_value ? end_value - start_value : 0};
@@ -693,7 +696,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
 
     // invariant: a flat span is a DISTINCT shape parsed in its own forward pass, routed on the
     // raw-byte signal BEFORE spending the root cursor on the log-record lookups below.
-    // refs: SRC-D-OTEL-18
+    // refs: F-SRC-insight-canon:canon.detail.strategy.cppm:unpack_otel_spans
     if (is_otel_span_line(line))
     {
         if (parse_otel_span(root, parsed_line, arena))
@@ -752,7 +755,8 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     // structural metadata; the trace keys are top-level, so they are never tokenized.
     // invariant: they are therefore dropped from the template BY CONSTRUCTION rather than by a
     // rule.
-    // refs: ADR-29, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext, SRC-D-OTEL-4a
+    // refs: ADR-29, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext
+    // refs: F-SRC-insight-canon:canon.api.cppm:kOtelFieldCatalog
     const bool is_otel{extract_otel_fields(root, parsed_line)};
 
     // pre: the ordinal route MUST precede the body descent below, which spends the on-demand
