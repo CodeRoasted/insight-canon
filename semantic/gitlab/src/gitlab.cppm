@@ -18,6 +18,8 @@ export import insight.canon.spi;
 namespace insight::semantic::gitlab
 {
 
+// post: a fresh strategy the CALLER owns and frees; the manifest holds only the factory pointer
+// (`.strategy = &make_strategy`), never an instance.
 export std::unique_ptr<insight::tokenization::IFormatStrategy> make_strategy();
 
 // refs: ADR-22.D6
@@ -44,6 +46,7 @@ inline constexpr std::array<IntentMarkerRow, 1> kMarkers{{
 // PLACEHOLDER digit where the producer's epoch sits.
 // invariant: so a generated marker carries no wall-clock and therefore no section duration; a
 // VARYING stamp would be a step_duration capability, not a package detail.
+// post: render_row(row, "build") is the exact bytes `section_start:0:build`.
 inline constexpr std::array<IntentEmitRow, 1> kEmitMarkers{{
     {.prefix = "section_start:",
      .kind = insight::tokenization::IntentMarkerKind::Step,
@@ -64,6 +67,7 @@ static_assert(
 
 // invariant: `skipped` and `manual` map to Unknown as EXPLICIT rows — a known token carrying no
 // verdict, where an ABSENT row would raise a fail-closed note about a token this dialect defines.
+// note: the five tokens are success, failed, canceled, skipped, manual — `cancelled` has no row.
 inline constexpr std::array<OutcomeTokenRow, 5> kOutcomeTokens{{
     {.token = "success", .outcome = insight::RunOutcome::Success, .dialect_gate = kDialect},
     {.token = "failed", .outcome = insight::RunOutcome::Failure, .dialect_gate = kDialect},
@@ -77,6 +81,7 @@ inline constexpr std::array<OutcomeTokenRow, 5> kOutcomeTokens{{
 // strict extension of the failure row, and it matches on 17 of the 25 cancelled jobs.
 // invariant: the console tail is the DEGENERATE fallback and the API result is authoritative; the
 // divergence it exists for is measured — 2 of the 25 cancelled jobs end on `Job succeeded`.
+// invariant: `ERROR: Job failed: canceled` resolves to Aborted and `ERROR: Job failed` to Failure.
 // note: the third row is MEASURED, not symmetry: GitLab announces a cancel with the failure prefix
 inline constexpr std::array<OutcomeMarkerRow, 3> kOutcomeMarkers{{
     {.prefix = "Job succeeded",

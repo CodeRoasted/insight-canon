@@ -97,6 +97,8 @@ namespace
     class GitLabStrategy final : public insight::tokenization::IFormatStrategy
     {
       public:
+        // post: a decline is a VALUE — std::unexpected carrying a non-empty diagnostic, never a
+        // throw — and no ParsedLine is produced, so the line falls through, typically to RawText.
         [[nodiscard]] std::expected<insight::tokenization::ParsedLine, std::string>
         parse(std::string_view line, insight::tokenization::ArenaAllocator& arena) const override
         {
