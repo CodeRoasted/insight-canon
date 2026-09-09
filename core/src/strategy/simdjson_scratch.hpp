@@ -133,7 +133,7 @@ inline void read_raw_json_or_keep(simdjson::simdjson_result<simdjson::ondemand::
 // value.
 // pre: this MUST be the LAST field accessed on the object — it descends into a child, after which
 // the parent cursor cannot rewind to a sibling.
-// refs: ADR-29, SRC-D-OTEL-1
+// refs: ADR-29, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext
 [[nodiscard]] inline bool try_get_otel_body(simdjson::ondemand::object& obj,
                                             std::string_view& out) noexcept
 {

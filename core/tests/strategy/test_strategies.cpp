@@ -220,7 +220,7 @@ TEST_F(JsonStrategyTest, LevelErrorParsed)
 
 // invariant: one OTLP JSON log record as the LogCraft producer emits it — nested body string
 // value, numeric severity number, and top-level trace, span and parent span ids.
-// refs: SRC-D-OTEL-1
+// refs: F-SRC-insight-canon:canon.api.cppm:OtelTraceContext
 static constexpr std::string_view kOtelLine{
     R"({"timeUnixNano":"1705312200000000000","observedTimeUnixNano":"1705312200000000000",)"
     R"("severityNumber":17,"severityText":"ERROR","body":{"stringValue":"GET /api/users -> 500"},)"

@@ -125,7 +125,7 @@ struct ParsedLine
     // invariant: populated only by a strategy that recognizes OTEL log records; present is false
     // for every non-OTEL input.
     // invariant: consumed downstream, never serialized.
-    // refs: SRC-D-OTEL-1, ADR-29.D2
+    // refs: F-SRC-insight-canon:canon.api.cppm:OtelTraceContext, ADR-29.D2
     OtelTraceContext trace{};
     // invariant: a span over arena-stable storage, empty for every non-ordinal line, consumed
     // metalog-side and never tokenized into the template.
@@ -133,7 +133,7 @@ struct ParsedLine
     std::span<const OrdinalObservation> ordinals;
     // invariant: the span_ids this span declares a cross-trace edge to, empty for every line
     // without links, consumed metalog-side and never tokenized.
-    // refs: SRC-D-OTEL-9, SRC-D-OTEL-21
+    // refs: ADR-29.D2, F-SRC-insight-metalog:metalog.api.cppm:ServiceEdgeBlock
     std::span<const SpanId> linked_span_ids;
 };
 

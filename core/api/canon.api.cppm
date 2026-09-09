@@ -109,7 +109,7 @@ struct NgramId
 // post: byte-identical to template_id_of(canonicalize_intent(name)); one call keeps intent_id
 // co-located with its comparability version.
 // invariant: a STRUCTURAL grouping key derived from the marker, never a retained value.
-// refs: SRC-II-1, SRC-D-OTEL-1
+// refs: SRC-II-1, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext
 [[nodiscard]] TemplateId intent_id_of(std::string_view name);
 
 // invariant: location recognition lives on the FACADE, not here — it walks composed location rows
@@ -129,7 +129,7 @@ inline std::ostream& operator<<(std::ostream& out, const TemplateId& template_id
 // absent and present can never collide.
 // invariant: what is NOT built is consuming a declared edge as GROUND TRUTH rather than folding it
 // into the inferred graph.
-// refs: ADR-29, ADR-29.O1, SRC-D-OTEL-1, SRC-D-TIR-4
+// refs: ADR-29, ADR-29.O1, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext, SRC-D-TIR-4
 struct TraceId
 {
     std::uint64_t value{};
@@ -147,14 +147,14 @@ struct SpanId
 // record carried a trace_id, which is the graph-scoping key.
 // invariant: span_id and parent_span_id carry the DECLARED causal vertex and edge, and the
 // trace-scoping path does not read them.
-// refs: ADR-29.D2, SRC-D-OTEL-1
+// refs: ADR-29.D2
 struct OtelTraceContext
 {
     bool present{false};
     bool has_parent{false};
     // invariant: a SPAN record declares causality and metalog routes it to the observed DAG; a log
     // record with trace context carries positional causality and goes to the adjacency ring.
-    // refs: SRC-D-OTEL-11
+    // refs: F-SRC-insight-metalog:metalog.cppm:record_span
     bool is_span{false};
     TraceId trace_id{};
     SpanId span_id{};
@@ -190,7 +190,7 @@ struct OtelTraceContext
 // stay core as a structured catalog rather than scattered inline predicates.
 // invariant: the three trace keys route to consumed structural metadata, dropped from the template
 // and never tokenized; severity_number routes to the LogLevel band.
-// refs: ADR-17, SRC-D-OTEL-1, SRC-D-OTEL-4a, SRC-D-TID-6
+// refs: ADR-17, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext, SRC-D-OTEL-4a, SRC-D-TID-6
 enum class OtelFieldClass : std::uint8_t
 {
     TraceId,
@@ -576,7 +576,7 @@ enum class RunOutcome : std::uint8_t
 // when present.
 // invariant: canon keeps its own six-level model and DISCARDS the raw 1-24 number — the 24-band
 // granularity is deliberately not inherited.
-// refs: ADR-29, SRC-D-OTEL-1, SRC-D-OTEL-8
+// refs: ADR-29, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext, SRC-D-OTEL-8
 [[nodiscard]] constexpr LogLevel
 log_level_from_severity_number(std::int64_t severity_number) noexcept
 {
@@ -761,7 +761,7 @@ template <> struct hash<insight::NgramId>
 };
 
 // invariant: value is already an fnv1a hash of the OTEL hex, so it IS a good size_t — no mixing.
-// refs: SRC-D-OTEL-1
+// refs: F-SRC-insight-canon:canon.api.cppm:TraceId
 template <> struct hash<insight::TraceId>
 {
     [[nodiscard]] std::size_t operator()(const insight::TraceId& trace_id) const noexcept
@@ -771,7 +771,7 @@ template <> struct hash<insight::TraceId>
 };
 // invariant: keys the per-window span-to-template map metalog resolves observed edges through at
 // window close.
-// refs: SRC-D-OTEL-11
+// refs: F-SRC-insight-metalog:metalog.cppm:record_span
 template <> struct hash<insight::SpanId>
 {
     [[nodiscard]] std::size_t operator()(const insight::SpanId& span_id) const noexcept
@@ -961,7 +961,8 @@ struct CanonicalEvent
     StructuralRole structural_role{StructuralRole::None};
     // invariant: consumed in memory and NEVER serialized, so the MetaLog wire shape is unchanged;
     // present is false for every non-OTEL input, so the cost is zero there.
-    // refs: ADR-29, SRC-D-OTEL-1, SRC-D-OTEL-11
+    // refs: ADR-29, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext
+    // refs: F-SRC-insight-metalog:metalog.cppm:record_span
     OtelTraceContext trace{};
     // invariant: consumed-not-tokenized — metalog bins these per schedule into the W1 carrier and
     // they are NEVER params.
@@ -973,7 +974,7 @@ struct CanonicalEvent
     // by span id and across traces, into the SAME distilled topology as intra-trace parentage.
     // invariant: a span over arena-allocated storage, EMPTY for every span without links and every
     // non-span line; never retained, never serialized.
-    // refs: ADR-29, SRC-D-OTEL-9, SRC-D-OTEL-21
+    // refs: ADR-29, ADR-29.D2, F-SRC-insight-metalog:metalog.api.cppm:ServiceEdgeBlock
     std::span<const SpanId> linked_span_ids;
     // invariant: the line is echoed program or script SOURCE rather than an observed runtime event,
     // recognized at the ANSI strip layer by the command-echo SGR wrapper.

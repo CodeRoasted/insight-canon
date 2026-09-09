@@ -185,7 +185,7 @@ namespace
     // declared outranks inferred.
     // invariant: trace ids are hashed to scalar PODs and never retained as values.
     // invariant: kept separate so the strategy's own parse stays within its complexity budget.
-    // refs: SRC-D-OTEL-1, SRC-D-OTEL-4a
+    // refs: F-SRC-insight-canon:canon.api.cppm:OtelTraceContext, SRC-D-OTEL-4a
     [[nodiscard]] bool extract_otel_fields(simdjson::ondemand::object& root,
                                            ParsedLine& parsed_line)
     {
@@ -355,7 +355,7 @@ namespace
 
     // post: an arena-stable copy of the linked span ids; empty in means empty out with no
     // allocation, so a span without links stays zero-cost.
-    // refs: SRC-D-OTEL-9
+    // refs: ADR-29.D2
     [[nodiscard]] std::span<const SpanId> store_span_ids(std::span<const SpanId> ids,
                                                          ArenaAllocator& arena)
     {
@@ -474,7 +474,7 @@ namespace
                 // resolves them by span id ACROSS traces into the distilled service topology.
                 // invariant: the link's own trace id and attributes are consumed-not-retained, like
                 // the parent context.
-                // refs: SRC-D-OTEL-9
+                // refs: ADR-29.D2
                 simdjson::ondemand::array links_array;
                 if (field.value().get_array().get(links_array) == simdjson::SUCCESS)
                     for (auto element : links_array)
@@ -504,7 +504,7 @@ namespace
         // it outranks a transport stamp where a merely PARSED time does not.
         // invariant: the span flag is set here too: DECLARED causality routes the record to the
         // observed DAG rather than to the adjacency ring.
-        // refs: DN-29.D12, SRC-D-OTEL-11
+        // refs: DN-29.D12, F-SRC-insight-metalog:metalog.cppm:record_span
         if (const auto declared_start{utils::parse_unix_nano_timestamp(start_nano)})
             parsed_line.timestamp = EventTime::declared(*declared_start);
         else
@@ -752,7 +752,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     // structural metadata; the trace keys are top-level, so they are never tokenized.
     // invariant: they are therefore dropped from the template BY CONSTRUCTION rather than by a
     // rule.
-    // refs: ADR-29, SRC-D-OTEL-1, SRC-D-OTEL-4a
+    // refs: ADR-29, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext, SRC-D-OTEL-4a
     const bool is_otel{extract_otel_fields(root, parsed_line)};
 
     // pre: the ordinal route MUST precede the body descent below, which spends the on-demand
