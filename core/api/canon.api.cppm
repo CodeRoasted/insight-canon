@@ -49,6 +49,12 @@ struct TemplateId
     bool operator==(const TemplateId&) const = default;
 };
 
+// invariant: 16 bytes is a MetaLog wire MUST, and every reader of the width DERIVES it from this
+// type rather than spelling a second literal that could drift.
+static_assert(TemplateId{}.bytes.size() == 16U,
+              "the template id is 128 bits on the wire; changing this breaks every published "
+              "MetaLog document and every golden that carries a rendered id");
+
 // invariant: a fixed-width 128-bit key for an n-gram SEQUENCE, so a map keys on a scalar instead of
 // rehashing and recomparing a variable-length sequence on every operation.
 // invariant: NEVER serialized — the n-gram maps emit their output sorted by the sequence, not by

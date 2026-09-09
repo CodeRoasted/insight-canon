@@ -128,15 +128,18 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
     if (auto_detect_ || strategy == nullptr)
         strategy = select_strategy(line);
 
+    // invariant: the detector offers no strategy for exactly ONE input class — a line that is blank
+    // after leading whitespace — because every other line reaches the raw-text fallback.
+    // invariant: that is ordinary NO-EVENT input, sibling to the empty and all-escape-bytes seats
+    // above, so it lands on skipped_count_.
+    // invariant: it was counted as a FAILURE, which diluted the very rate skipped_count_ exists to
+    // protect — the one that gates the bounded WARN and feeds the failure-rate statistic.
+    // refs: ADR-16.D5
     if (strategy == nullptr)
     {
-        ++failed_count_;
-        if (failed_count_ == 1 || failed_count_ % kWarnEveryNFailures == 0)
-        {
-            INSIGHT_LOG_WARN(logging::parser_logger(), "no strategy matched (total failures={})",
-                             failed_count_);
-        }
-        return std::unexpected(std::string("LogParser: no strategy matched the line format"));
+        ++skipped_count_;
+        INSIGHT_LOG_TRACE(logging::parser_logger(), "parse: whitespace-only line skipped");
+        return std::unexpected(std::string("LogParser: blank line"));
     }
 
     // invariant: the arena copy happens only after a strategy is known — a failed detection must
@@ -210,15 +213,18 @@ std::expected<ParsedLine, std::string> LogParser::parse_stable(std::string_view 
     if (auto_detect_ || strategy == nullptr)
         strategy = select_strategy(stable_line);
 
+    // invariant: the detector offers no strategy for exactly ONE input class — a line that is blank
+    // after leading whitespace — because every other line reaches the raw-text fallback.
+    // invariant: that is ordinary NO-EVENT input, sibling to the empty and all-escape-bytes seats
+    // above, so it lands on skipped_count_.
+    // invariant: it was counted as a FAILURE, which diluted the very rate skipped_count_ exists to
+    // protect — the one that gates the bounded WARN and feeds the failure-rate statistic.
+    // refs: ADR-16.D5
     if (strategy == nullptr)
     {
-        ++failed_count_;
-        if (failed_count_ == 1 || failed_count_ % kWarnEveryNFailures == 0)
-        {
-            INSIGHT_LOG_WARN(logging::parser_logger(), "no strategy matched (total failures={})",
-                             failed_count_);
-        }
-        return std::unexpected(std::string("LogParser: no strategy matched the line format"));
+        ++skipped_count_;
+        INSIGHT_LOG_TRACE(logging::parser_logger(), "parse: whitespace-only line skipped");
+        return std::unexpected(std::string("LogParser: blank line"));
     }
 
     auto result{strategy->parse(stable_line, arena_)};

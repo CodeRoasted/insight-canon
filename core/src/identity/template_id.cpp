@@ -10,7 +10,10 @@ namespace insight
 namespace
 {
     constexpr std::size_t kSha256Bytes{32};
-    constexpr std::size_t kTemplateIdBytes{16};
+    // invariant: DERIVED from the id's own extent, never a second literal — the truncation width
+    // and the type it truncates into are ONE fact, and two spellings of it drift silently.
+    // note: 16 bytes is a MetaLog wire MUST, pinned at the type in canon.api.cppm.
+    constexpr std::size_t kTemplateIdBytes{TemplateId{}.bytes.size()};
     constexpr unsigned kNibbleMask{0xFU};
     constexpr std::array<char, 16> kHexDigits{'0', '1', '2', '3', '4', '5', '6', '7',
                                               '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};

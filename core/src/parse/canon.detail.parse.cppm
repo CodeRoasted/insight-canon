@@ -24,6 +24,8 @@ class FormatDetector
 
     // post: the highest-confidence strategy, or the raw-text fallback on a non-empty line no
     // structured strategy claims; O(C + U) in candidates and custom strategies.
+    // post: nullptr for EXACTLY ONE input class — a line blank after leading whitespace — which is
+    // what lets LogParser::parse_line class that seat as skipped rather than failed.
     [[nodiscard]] IFormatStrategy* detect(std::string_view line) const;
 
     // post: the strategy with the highest CUMULATIVE confidence over the sample — a sum, so one

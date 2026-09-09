@@ -27,6 +27,36 @@ TEST_F(FormatDetectorTest, HasNineteenBuiltInRepresentationStrategies)
     EXPECT_EQ(detector.strategies().size(), 19u);
 }
 
+// invariant: NO-EVENT INPUT IS NOT A FAILURE — a whitespace-only line is the ONE input class for
+// which the detector offers no strategy, and it was landing on the failure counter.
+// invariant: skipped_count_ exists so no-event input cannot dilute the failure rate that gates the
+// bounded WARN and feeds the failure-rate statistic; whitespace-only input defeated it.
+// invariant: the arm asserts the DETECTOR contract and the PARSER accounting together, because the
+// parser's classification rests on that contract holding for exactly one class.
+// refs: ADR-16.D5
+TEST_F(FormatDetectorTest, ABlankLineIsSkippedRatherThanCountedAsAParseFailure)
+{
+    EXPECT_EQ(detector.detect("   \t  "), nullptr) << "the one nullptr class is a blank line";
+    ASSERT_NE(detector.detect("   \t  x"), nullptr)
+        << "every other line reaches the raw-text fallback, so nullptr means blank and only blank";
+
+    ArenaAllocator arena{4096};
+    LogParser parser{arena, insight::test_support::degenerate_composition()};
+    for (const std::string_view blank : {std::string_view{"   "}, std::string_view{"\t\t"},
+                                         std::string_view{" \t \t "}, std::string_view{""}})
+    {
+        EXPECT_FALSE(parser.parse_line(blank).has_value())
+            << "a blank line yields no event; line = \"" << blank << "\"";
+    }
+    EXPECT_EQ(parser.lines_failed(), 0U)
+        << "four no-event lines moved the FAILURE counter, which gates the bounded WARN; failed = "
+        << parser.lines_failed();
+
+    ASSERT_TRUE(parser.parse_line("a line no structured strategy claims").has_value());
+    EXPECT_EQ(parser.lines_parsed(), 1U);
+    EXPECT_EQ(parser.lines_failed(), 0U);
+}
+
 TEST_F(FormatDetectorTest, DetectsJSON)
 {
     auto* s{detector.detect(R"({"level":"INFO","message":"hello"})")};

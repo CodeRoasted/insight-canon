@@ -136,19 +136,31 @@ void run_throughput(benchmark::State& state, const insight::semantic::ComposedSe
     }
 
     state.SetItemsProcessed(static_cast<std::int64_t>(state.iterations() * kLinesPerIter));
-    state.counters["ns_per_line"] = benchmark::Counter(
+    // invariant: the NAME carries the unit the counter actually computes — the rate form yields
+    // lines per second and kInvert yields SECONDS per line, which the SI renderer then prefixes.
+    // note: it was named ns_per_line and published seconds under it, off by 10^9, through v1.10.3.
+    state.counters["s_per_line"] = benchmark::Counter(
         static_cast<double>(kLinesPerIter),
         benchmark::Counter::kIsIterationInvariantRate | benchmark::Counter::kInvert);
 }
 
-void BM_TokenizationThroughput(benchmark::State& state)
+// refs: ADR-17.D1
+// post: THE composed vocabulary set, built once and shared by every arm that needs it.
+// invariant: ONE list, so onboarding a dialect edits this file in a single place — two copies made
+// the array's hardcoded SIZE a double cascade trap.
+[[nodiscard]] const insight::semantic::ComposedSemantics& composed_vocabulary()
 {
     static const std::array<insight::semantic::SemanticPackageManifest, 4> kManifests{
         insight::semantic::github::kManifest, insight::semantic::gitlab::kManifest,
         insight::semantic::jenkins::kManifest, insight::semantic::test_frameworks::kManifest};
-    static const insight::semantic::ComposedSemantics composed{
+    static const insight::semantic::ComposedSemantics kComposed{
         insight::semantic::compose(kManifests)};
-    run_throughput(state, composed);
+    return kComposed;
+}
+
+void BM_TokenizationThroughput(benchmark::State& state)
+{
+    run_throughput(state, composed_vocabulary());
 }
 
 // refs: LSRC-28
@@ -161,11 +173,7 @@ void BM_TokenizationThroughputDegenerate(benchmark::State& state)
 // refs: DN-29.D9
 void BM_TokenizationThroughputNestedJson(benchmark::State& state)
 {
-    static const std::array<insight::semantic::SemanticPackageManifest, 4> kManifests{
-        insight::semantic::github::kManifest, insight::semantic::gitlab::kManifest,
-        insight::semantic::jenkins::kManifest, insight::semantic::test_frameworks::kManifest};
-    static const insight::semantic::ComposedSemantics composed{
-        insight::semantic::compose(kManifests)};
+    const insight::semantic::ComposedSemantics& composed{composed_vocabulary()};
 
     constexpr std::size_t kLinesPerIter{1'000};
     const auto corpus{make_nested_json_corpus(kLinesPerIter, 42)};
@@ -187,7 +195,10 @@ void BM_TokenizationThroughputNestedJson(benchmark::State& state)
     }
 
     state.SetItemsProcessed(static_cast<std::int64_t>(state.iterations() * kLinesPerIter));
-    state.counters["ns_per_line"] = benchmark::Counter(
+    // invariant: the NAME carries the unit the counter actually computes — the rate form yields
+    // lines per second and kInvert yields SECONDS per line, which the SI renderer then prefixes.
+    // note: it was named ns_per_line and published seconds under it, off by 10^9, through v1.10.3.
+    state.counters["s_per_line"] = benchmark::Counter(
         static_cast<double>(kLinesPerIter),
         benchmark::Counter::kIsIterationInvariantRate | benchmark::Counter::kInvert);
 }
