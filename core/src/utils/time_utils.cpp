@@ -699,7 +699,7 @@ namespace
 {
     // invariant: only an alerting tier can be falsely earned, so the outcome guard is paid on a
     // would-be-positive result only.
-    // refs: SRC-D-OUT-1, SRC-D-OUT-1b
+    // refs: F-SRC-insight-canon:canon.api.cppm:leading_outcome_is_pass
     [[nodiscard]] constexpr bool is_alerting_level(LogLevel level) noexcept
     {
         return level == LogLevel::Warn || level == LogLevel::Error || level == LogLevel::Fatal;
@@ -709,7 +709,7 @@ namespace
     // post: true iff any token starts after `token` ends, derived over the WHOLE line.
     // invariant: terminality is a property of the line - deriving it inside a bounded head made the
     // verdict move with the prefix's byte count.
-    // refs: ADR-20.D3, SRC-D-OUT-4c
+    // refs: ADR-20.D3, F-SRC-insight-canon:failure_lexicon.cpp:token_in_kind_slot
     // note: for_each_token's substr is the only throw path and its bound is checked.
     // NOLINTNEXTLINE(bugprone-exception-escape)
     [[nodiscard]] bool token_follows(std::string_view line, std::string_view token) noexcept
@@ -739,7 +739,7 @@ EventLevel infer_leading_log_level(std::string_view line) noexcept
 
     // assert: a leading level word is authoritative only when verdict-anchored or terminal -
     // parse_log_level is outcome-blind, so "error handling enabled" would otherwise alert.
-    // refs: SRC-D-OUT-4
+    // refs: F-SRC-insight-canon:canon.api.cppm:is_verdict_anchored
     LogLevel leading{LogLevel::Unknown};
     std::string_view level_token{};
     std::size_t visited{0};
@@ -759,14 +759,14 @@ EventLevel infer_leading_log_level(std::string_view line) noexcept
                                    token_follows(line, level_token)};
     // assert: a leading level word in count register is a summary, not a verdict - it is checked
     // before the anchors and falls through to Stage 2.
-    // refs: SRC-D-CNT-1
+    // refs: ADR-20.D5
     if (leading != LogLevel::Unknown &&
         (detail::is_verdict_anchored(line, level_token) || !token_follows_level) &&
         !(is_alerting_level(leading) && detail::is_count_register(line, level_token)))
     {
         // assert: a leading pass glyph demotes an alerting level to Unknown; a genuine "ERROR:"
         // leads with the word, so nothing is lost.
-        // refs: SRC-D-OUT-1b
+        // refs: F-SRC-insight-canon:canon.api.cppm:leading_outcome_is_pass
         if (is_alerting_level(leading) && detail::leading_outcome_is_pass(line))
             return EventLevel::inferred(LogLevel::Unknown);
         return EventLevel::inferred(leading);
@@ -776,12 +776,12 @@ EventLevel infer_leading_log_level(std::string_view line) noexcept
         // assert: contains_failure_cue self-guards on the outcome, so it is not applied twice.
         return EventLevel::inferred(LogLevel::Error);
     // assert: a count-register failure word caps the line at Warn - demote, never suppress.
-    // refs: SRC-D-CNT-1
+    // refs: ADR-20.D5
     if (detail::contains_failure_summary_cue(line, kKeywordHead))
         return EventLevel::inferred(detail::leading_outcome_is_pass(line) ? LogLevel::Unknown
                                                                           : LogLevel::Warn);
     // assert: contains_warning_cue has no outcome guard, so the caller applies it here.
-    // refs: SRC-D-OUT-1b
+    // refs: F-SRC-insight-canon:canon.api.cppm:leading_outcome_is_pass
     if (contains_warning_cue(line, kKeywordHead))
         return EventLevel::inferred(detail::leading_outcome_is_pass(line) ? LogLevel::Unknown
                                                                           : LogLevel::Warn);

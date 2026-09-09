@@ -56,11 +56,11 @@ Severity-from-`severity_number`, trace-context routing, and the trace-scoped gra
 
 Three masking rules in one generation:
 
-* `SRC-D-MSK-1` — generalized **diagnostic-composite** masking — a per-`:` / per-`/`-segment digit-leading rule
+* `LSRC-11` — generalized **diagnostic-composite** masking — a per-`:` / per-`/`-segment digit-leading rule
   that collapses the Chromium/glog prefix `[PID:DATE/TIME:LEVEL:file.cc:line]` and subsumes the
   source-location rule;
-* `SRC-D-MSK-2` — the **ephemeral-root path catalog** (`/tmp/…` → `/tmp/<*>`);
-* `SRC-D-MSK-3` — JSON **nested-`fields` component/level descent**, a cube-axis change folded
+* `F-SRC-insight-canon:mask.cpp:normalize_ephemeral_root` — the **ephemeral-root path catalog** (`/tmp/…` → `/tmp/<*>`);
+* `F-SRC-insight-canon:simdjson_scratch.hpp:get_nested_object` — JSON **nested-`fields` component/level descent**, a cube-axis change folded
   into the same bump.
 
 Content changes ONLY for inputs carrying a diagnostic-composite or ephemeral-root token, or a
@@ -72,11 +72,11 @@ Landed at `4e46af0`.
 
 ## `-6` — the ephemeral-root batch
 
-`SRC-D-MSK-4` — canon ephemeral-root masking plus the lexicon-context precision fix (`9c5db20`).
+The `-6` batch (canon `9c5db20`) — canon ephemeral-root masking plus the lexicon-context precision fix (`9c5db20`).
 
 ## `-7` — the NOTE register
 
-`SRC-D-NOTE-1`. A failure word inside a compiler note's message (`<path>:<line>:<col>: note: … failed:`) no longer
+The NOTE register (`F-SRC-insight-canon:failure_lexicon.cpp:note_register_begin`). A failure word inside a compiler note's message (`<path>:<line>:<col>: note: … failed:`) no longer
 confers a failure verdict, so the serialized `dominant_level` of a gcc/clang cascade's note lines
 moves Error → Unknown.
 
@@ -89,13 +89,13 @@ classification class.**
 
 *(`bibles/jenkins_dialect.md` §4; ADR-23 erratum 2 — "the bracket is the entire difference".)*
 
-`SRC-D-MSK-5` — a WHOLE-token bracketed RFC3339 full datetime (`[2026-06-23T15:11:09.020Z]`) masks to `[<*>]`
+`LSRC-12` — a WHOLE-token bracketed RFC3339 full datetime (`[2026-06-23T15:11:09.020Z]`) masks to `[<*>]`
 instead of falling through to literal KEEP. `template_str` / `template_id` move ONLY for lines
 carrying that token class; every other document is byte-identical except this version string.
 
 ## `-9` — the compound-key shapes
 
-`SRC-D-ECS-1`. A top-level key is resolved to its LAST SEGMENT (`log.level` → `level`) and an object value is
+The compound-key shapes (`F-SRC-insight-canon:simdjson_scratch.hpp:compound_key_name`). A top-level key is resolved to its LAST SEGMENT (`log.level` → `level`) and an object value is
 descended EXACTLY ONE level (`"log":{"level":…}`), each resolved name matched against canon's
 existing four role vocabularies. **ZERO field names are added** — the grammar learns two shapes,
 never a vendor's spelling.
@@ -118,7 +118,7 @@ the next bump was `-11`. This is the standing instance ADR-2.D9's tombstone clau
 
 ## `-11` — the wrapper-shell repair
 
-`SRC-D-MSK-6`. `kWrapperPairs` (`canon.detail.scan`) declares the six byte pairs a producer wraps a whole token
+The wrapper-shell repair (`F-SRC-insight-canon:canon.detail.scan.cppm:kWrapperPairs`). `kWrapperPairs` (`canon.detail.scan`) declares the six byte pairs a producer wraps a whole token
 in — `[]` `()` `{}` `<>` `""` `''` — and closes a **grammar defect, not a missing rule**: rule 4
 already tolerated a shell (`\[?…\]?`) but only for the ONE pair the first corpus showed, so
 `(163.27.187.39)` failed at byte 0, was not digit-leading, carried no byte in the composite

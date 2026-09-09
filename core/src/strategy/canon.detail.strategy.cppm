@@ -162,7 +162,7 @@ export namespace insight::tokenization
 // live in its implementation scope, where the compound-key router needs them.
 // invariant: a module interface carrying a private lookup table publishes an implementation detail,
 // and forces every consumer of that interface to recompile when a name is added.
-// refs: SRC-D-ECS-1
+// refs: F-SRC-insight-canon:simdjson_scratch.hpp:compound_key_name
 class JsonStrategy final : public IFormatStrategy
 {
   public:

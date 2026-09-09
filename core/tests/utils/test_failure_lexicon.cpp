@@ -41,11 +41,12 @@ TEST(FailureLexicon, StandaloneWordIsACue)
 // kernel by construction rather than as a side effect.
 // invariant: the gutter row below is the measured cost, and it is the SAME ruling that excludes a
 // code-frame gutter marker — carving one out would be the per-shape allowlist the rule avoids.
-// refs: SRC-D-OUT-4b, SRC-D-OUT-4c
+// refs: F-SRC-insight-canon:failure_lexicon.cpp:error_type_anchors
+// refs: F-SRC-insight-canon:failure_lexicon.cpp:token_in_kind_slot
 TEST(FailureLexicon, CamelCaseTypeIsACueOnlyInVerdictRegister)
 {
     EXPECT_FALSE(contains_failure_cue("E   sqlalchemy.exc.OperationalError: bad"))
-        << "SRC-D-OUT-4c: the pytest report gutter 'E' is neither colon-terminated nor "
+        << "the kind-slot rule: the pytest report gutter 'E' is neither colon-terminated nor "
            "bracket-enclosed, so the type is not in the kind slot — the declared recall edge";
     EXPECT_TRUE(contains_failure_cue("sqlalchemy.exc.OperationalError: bad"))
         << "the same dotted type at index 0 IS the kind slot — the discriminator is POSITION, not "
@@ -63,7 +64,7 @@ TEST(FailureLexicon, CamelCaseTypeIsACueOnlyInVerdictRegister)
 // invariant: a CamelCase error-TYPE inside a suite NAME line NAMES a type, it does not throw one,
 // so it is demoted there while a real thrown verdict still fires — no recall loss.
 // invariant: the discriminator is REGISTER and POSITION, never the token.
-// refs: SRC-D-OUT-4b
+// refs: F-SRC-insight-canon:failure_lexicon.cpp:error_type_anchors
 TEST(FailureLexicon, CamelCaseErrorTypeDemotedInDescriptiveRegister)
 {
     EXPECT_FALSE(contains_failure_cue("\xE2\x96\xB6 Send 200 when frameworkError calls "
@@ -75,7 +76,7 @@ TEST(FailureLexicon, CamelCaseErrorTypeDemotedInDescriptiveRegister)
     EXPECT_TRUE(contains_failure_cue("FrameworkError: connection reset by peer"))
         << "a `:`-bound thrown type is a verdict — still fires (no ▶ lead)";
     EXPECT_FALSE(contains_failure_cue("raise FrameworkError"))
-        << "SRC-D-MSK-4: a bare non-▶ echo with no verdict register no longer fires — the "
+        << "ADR-20.D5: a bare non-▶ echo with no verdict register no longer fires — the "
            "discriminator "
            "is register (is_verdict_anchored), and the actual `FrameworkError: …` line still fires";
     EXPECT_TRUE(contains_failure_cue("\xE2\x9C\x97 teardown threw FrameworkError"))
@@ -97,7 +98,8 @@ TEST(FailureLexicon, NegatedErrorTypeIsNotACue)
         << "control: a real type ('Value' before 'Error') in verdict register (a kind-slot colon) "
            "is a cue — the negation guard is not a blanket suppressor";
     EXPECT_FALSE(contains_failure_cue("raises ValueError: bad value"))
-        << "SRC-D-OUT-4c: 'raises' is prose, so the type is not in the kind slot — consistent with "
+        << "the kind-slot rule: 'raises' is prose, so the type is not in the kind slot — "
+           "consistent with "
            "`raise ValueError` (no register) already demoting; the thrown line still fires above";
 }
 
@@ -119,7 +121,8 @@ TEST(FailureLexicon, PassVerdictDemotesBareErrorTypeName)
         << "gtest '[ FAILED ]' — the failure word wins";
     EXPECT_TRUE(contains_failure_cue("ERROR teardown failed though setup was ok"))
         << "a pass WORD never overrides a failure word; only an unambiguous leading pass "
-           "GLYPH does (SRC-D-OUT-1) — here the line is led by a failure word, not a glyph";
+           "GLYPH does (leading_outcome_is_pass) — here the line is led by a failure word, not a "
+           "glyph";
 }
 
 // invariant: a leading pass GLYPH demotes even an explicit failure WORD, because a glyph is an
@@ -128,7 +131,7 @@ TEST(FailureLexicon, PassVerdictDemotesBareErrorTypeName)
 // empty token, so a lexicon alone never sees it.
 // invariant: this is the STRICT half of the precision gradient: a failure word is demoted by a
 // leading pass GLYPH and never by a pass WORD, which would false-demote a real summary.
-// refs: SRC-D-OUT-1
+// refs: F-SRC-insight-canon:canon.api.cppm:leading_outcome_is_pass
 TEST(FailureLexicon, LeadingPassGlyphDemotesFailureWord)
 {
     EXPECT_FALSE(contains_failure_cue("@cline/core test: ✓ marks runs failed when it throws"))
@@ -146,11 +149,12 @@ TEST(FailureLexicon, LeadingPassGlyphDemotesFailureWord)
 
 // invariant: the demotion is GLYPH-gated and not word-gated — the discriminator is that the first
 // outcome token is a pass glyph, and nothing weaker.
-// refs: SRC-D-OUT-1
+// refs: F-SRC-insight-canon:canon.api.cppm:leading_outcome_is_pass
 TEST(FailureLexicon, PassWordOrTrailingGlyphDoesNotDemote)
 {
     EXPECT_FALSE(contains_failure_cue("======== 25 passed, 5 failed ========"))
-        << "pytest summary: '5 failed' is a count summary, not a per-item verdict (SRC-D-CNT-1)";
+        << "pytest summary: '5 failed' is a count summary, not a per-item verdict (the count "
+           "register, ADR-20.D5)";
     EXPECT_TRUE(contains_failure_cue("build failed after a retry"))
         << "'failed' preceded by a WORD (not a bare-integer count) is a genuine verdict — fires";
     EXPECT_TRUE(contains_failure_cue("ERROR build broke ✓ cache restored"))
@@ -165,7 +169,8 @@ TEST(FailureLexicon, PassWordOrTrailingGlyphDoesNotDemote)
 // is no marker to demote against because the line is simply not a verdict.
 // invariant: the discriminator is the decoration CI and test tooling use to MARK an outcome, and a
 // term-noun carries none.
-// refs: SRC-D-OUT-1, SRC-D-OUT-1b, SRC-D-OUT-4
+// refs: F-SRC-insight-canon:canon.api.cppm:leading_outcome_is_pass
+// refs: F-SRC-insight-canon:canon.api.cppm:is_verdict_anchored
 TEST(FailureLexicon, InformationalFailureWordIsNotAVerdictCue)
 {
     EXPECT_FALSE(
@@ -182,7 +187,7 @@ TEST(FailureLexicon, InformationalFailureWordIsNotAVerdictCue)
 // invariant: the partition is by ROLE and not a blanket family suppression, and the minimal pairs
 // against the demotions above are what prove it.
 // invariant: the anchors CONFIRM an existing failure token and never create one.
-// refs: SRC-D-OUT-4
+// refs: F-SRC-insight-canon:canon.api.cppm:is_verdict_anchored
 TEST(FailureLexicon, VerdictAnchoredFailureSurvives)
 {
     EXPECT_TRUE(contains_failure_cue("BUILD FAILED in 3.2s")) << "caps 'FAILED'";
@@ -203,7 +208,7 @@ TEST(FailureLexicon, VerdictAnchoredFailureSurvives)
 // essentially never appears benignly fires BARE, and gating it only suppressed recall.
 // invariant: these rows pin the role assignment, so a future re-tag of any of them breaks this
 // test.
-// refs: SRC-D-OUT-4
+// refs: F-SRC-insight-canon:canon.api.cppm:is_verdict_anchored
 TEST(FailureLexicon, SelfAnchoringNounsFireBare)
 {
     EXPECT_TRUE(contains_failure_cue("segfault in worker 3 during teardown"))
@@ -232,7 +237,7 @@ TEST(FailureLexicon, RegisterAnchoredNounDemotesInProseFiresAnchored)
 // glyph-only line with no failure word stays silent.
 // invariant: the multiplication sign is excluded from the glyph set on purpose — it doubles as a
 // dimension separator, which is the precision risk that deferred an earlier rule.
-// refs: SRC-D-OUT-4a
+// refs: F-SRC-insight-canon:failure_lexicon.cpp:leading_outcome_is_fail
 TEST(FailureLexicon, LeadingFailGlyphAnchorsButNeverCreates)
 {
     EXPECT_TRUE(contains_failure_cue("✗ should not crash on empty input"))
@@ -266,7 +271,7 @@ TEST(FailureLexicon, UnderscoreCompoundIsOneAtomNotADecomposedCue)
 // invariant: the root was a counted summary read as a fatal verdict, outranking the named per-item
 // failure it summarized.
 // invariant: count register is checked BEFORE the verdict anchors.
-// refs: SRC-D-CNT-1
+// refs: ADR-20.D5
 TEST(FailureLexicon, CountRegisterFailureWordIsSummaryNotVerdict)
 {
     EXPECT_FALSE(contains_failure_cue("There was 1 failure:"))
@@ -288,7 +293,7 @@ TEST(FailureLexicon, CountRegisterFailureWordIsSummaryNotVerdict)
 // protects a counted pass-and-fail summary.
 // invariant: it closes the runner recall gap where a PASSING assertion's description carries
 // failure vocabulary, and the count register is the independent backstop.
-// refs: SRC-D-OUT-1, SRC-D-OUT-2
+// refs: F-SRC-insight-canon:canon.api.cppm:leading_outcome_is_pass
 TEST(FailureLexicon, LeadingPassWordDemotesAsFirstSignificantToken)
 {
     EXPECT_FALSE(contains_failure_cue("ok 1 - request failed and retried"))
@@ -302,7 +307,8 @@ TEST(FailureLexicon, LeadingPassWordDemotesAsFirstSignificantToken)
     EXPECT_TRUE(contains_failure_cue("worker crashed but all 4 checks passed"))
         << "'crashed' is the first significant token; a TRAILING 'passed' must not demote it";
     EXPECT_FALSE(contains_failure_cue("======== 25 passed, 5 failed ========"))
-        << "a NUMBER is the first significant token (not 'passed') — SRC-D-OUT-2 does not fire; "
+        << "a NUMBER is the first significant token (not 'passed') — the leading-pass-word "
+           "demotion does not fire; "
            "the "
            "count register independently demotes '5 failed' (so still no cue)";
 }
@@ -348,7 +354,7 @@ TEST(FailureLexicon, AnsiColourWrappedCueIsExtracted)
 // invariant: the demotion is anchored at the STRUCTURAL diagnostic-kind position and nowhere else,
 // because a bare-word demoter would turn a labelling defect into a detection defect.
 // invariant: the lexicon is NOT touched — the defect is CONTEXT, not vocabulary.
-// refs: SRC-D-NOTE-1
+// refs: F-SRC-insight-canon:failure_lexicon.cpp:note_register_begin
 TEST(FailureLexicon, CompilerNoteDiagnosticCarriesNoFailureVerdict)
 {
     EXPECT_FALSE(contains_failure_cue("/opt/gcc-15.3/include/c++/15.3.0/bits/random.tcc:910:5: "
@@ -376,7 +382,7 @@ TEST(FailureLexicon, CompilerNoteDiagnosticCarriesNoFailureVerdict)
 // authority over its OWN message, and a verdict anchored earlier is a different author's claim.
 // invariant: that is what makes it a fourth register beside verdict, count and echoed-source rather
 // than a suppression path.
-// refs: SRC-D-NOTE-1
+// refs: F-SRC-insight-canon:failure_lexicon.cpp:note_register_begin
 TEST(FailureLexicon, NoteRegisterDoesNotReachAVerdictAnchoredEarlierOnTheLine)
 {
     EXPECT_TRUE(contains_failure_cue(

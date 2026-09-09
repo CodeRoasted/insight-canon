@@ -95,7 +95,7 @@ constexpr std::string_view kInlineBody{
 // material and do NOT displace the kind slot.
 // invariant: the first token that displaces it is the INNER record's own bare frame — without
 // that the row would be re-pinning a different declared limitation and would prove nothing.
-// refs: SRC-D-OUT-4c
+// refs: F-SRC-insight-canon:failure_lexicon.cpp:token_in_kind_slot
 [[nodiscard]] std::string nested_record(std::string_view kind)
 {
     return "[runner-7] [job-42] [step-3] [attempt-1] May 29 10:00:00 api-1 kernel: " +
@@ -225,7 +225,7 @@ TEST(LeadingScanTokenBudget, ANestedRecordsKindWordAtIndexNineIsTheDeclaredResid
 // above has become VACUOUS — still green, pinning nothing.
 // invariant: the fixture's own preconditions are ASSERTED rather than assumed, or the line is a
 // different class under this one's name.
-// refs: ADR-16.D8, SRC-D-OUT-4c
+// refs: ADR-16.D8, F-SRC-insight-canon:failure_lexicon.cpp:token_in_kind_slot
 TEST(LeadingScanTokenBudget, ANestedRecordsLowercaseErrorAtIndexElevenIsTheDeclaredR2Residual)
 {
     const std::string declined{nested_record("error")};

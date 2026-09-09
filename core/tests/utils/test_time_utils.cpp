@@ -317,7 +317,7 @@ TEST(InferLeadingLogLevel, EmbeddedFailureSubstringIsNotError)
 }
 // invariant: a CamelCase error type in verdict register IS the cue even with no other error word on
 // the line; a bare source echo no longer promotes, and the thrown verdict line still does.
-// refs: SRC-D-MSK-4, SRC-D-OUT-4b
+// refs: ADR-20.D5, F-SRC-insight-canon:failure_lexicon.cpp:error_type_anchors
 TEST(InferLeadingLogLevel, CamelCaseErrorTypeIsError)
 {
     EXPECT_EQ(infer_leading_log_level("  ValueError: bad input"), LogLevel::Error)
@@ -356,7 +356,7 @@ TEST(InferLeadingLogLevel, AnsiColourWrappedLevelRecovered)
 // invariant: the pass GLYPH leading the line says it PASSED, so an alerting tier must demote.
 // invariant: THE TEST HOLE THIS CLOSES — the earlier assertion was on the cue BOOLEAN and went
 // green while the LEVEL of the same line was alerting: outcome-awareness at the wrong altitude.
-// refs: SRC-D-OUT-1, SRC-D-OUT-1b
+// refs: F-SRC-insight-canon:canon.api.cppm:leading_outcome_is_pass
 TEST(InferLeadingLogLevel, LeadingPassGlyphDemotesAlertingStage1Level)
 {
     EXPECT_EQ(infer_leading_log_level("✔ start debugging failure (134ms)"), LogLevel::Unknown)
@@ -380,7 +380,7 @@ TEST(InferLeadingLogLevel, AnsiWrappedLeadingPassGlyphDemotesStage1Level)
 // invariant: the recall guard — a demotion requires a LEADING pass glyph, so a genuine leading
 // failure word stops the walk and a summary with no leading glyph stays a failure.
 // invariant: these are the rejected true-leading-only recall loss made into a standing assertion.
-// refs: SRC-D-OUT-1b
+// refs: F-SRC-insight-canon:canon.api.cppm:leading_outcome_is_pass
 TEST(InferLeadingLogLevel, GenuineLeadingFailureSurvivesWithoutPassGlyph)
 {
     EXPECT_EQ(infer_leading_log_level("ERROR: db connection failed"), LogLevel::Error)
@@ -390,7 +390,8 @@ TEST(InferLeadingLogLevel, GenuineLeadingFailureSurvivesWithoutPassGlyph)
     EXPECT_EQ(infer_leading_log_level("[worker-3] ERROR connection refused"), LogLevel::Error)
         << "scope-prefixed ERROR (token 1, not 0) — preserved (the recall guard)";
     EXPECT_EQ(infer_leading_log_level("======== 25 passed, 5 failed ========"), LogLevel::Warn)
-        << "SRC-D-CNT-1: '5 failed' is a count summary → demoted to Warn (surfaced, below per-item "
+        << "the count register: '5 failed' is a count summary → demoted to Warn (surfaced, below "
+           "per-item "
            "verdicts), not Error";
     // invariant: the symmetric disconfirm — the SAME line led by a FAIL glyph keeps its level,
     // which proves the guard demotes PASS glyphs only and never any glyph.
@@ -402,7 +403,7 @@ TEST(InferLeadingLogLevel, GenuineLeadingFailureSurvivesWithoutPassGlyph)
 // is a failure VERDICT at all.
 // invariant: a non-verdict line carrying a failure NOUN must infer Unknown, and these route through
 // the cue stage, so the cue fix alone demotes them with no explicit-level change.
-// refs: SRC-D-OUT-4
+// refs: F-SRC-insight-canon:canon.api.cppm:is_verdict_anchored
 TEST(InferLeadingLogLevel, InformationalFailureWordLineIsNotAlerting)
 {
     EXPECT_EQ(infer_leading_log_level(
@@ -430,7 +431,7 @@ TEST(InferLeadingLogLevel, VerdictAnchoredFailureLevelSurvives)
 // explicit-level stage, which is the non-glyph form of the same unguarded feeder.
 // invariant: the rule is that a leading level WORD is authoritative only when register-anchored or
 // when it is the terminal or sole significant token.
-// refs: SRC-D-OUT-4
+// refs: F-SRC-insight-canon:canon.api.cppm:is_verdict_anchored
 TEST(InferLeadingLogLevel, LeadingBareLevelWordDemotedWhenUnanchored)
 {
     EXPECT_EQ(infer_leading_log_level("error handling enabled for the worker pool"),
@@ -446,7 +447,7 @@ TEST(InferLeadingLogLevel, LeadingBareLevelWordDemotedWhenUnanchored)
 // but it still surfaces, capped at a warning: demote, never suppress.
 // invariant: the root was a counted summary read as a fatal verdict, outranking the named per-item
 // failure it summarized.
-// refs: SRC-D-CNT-1
+// refs: ADR-20.D5
 TEST(InferLeadingLogLevel, CountRegisterSummaryCapsAtWarn)
 {
     EXPECT_EQ(infer_leading_log_level("There was 1 failure:"), LogLevel::Warn)
@@ -463,7 +464,7 @@ TEST(InferLeadingLogLevel, CountRegisterSummaryCapsAtWarn)
 
 // invariant: a passing runner assertion whose description embeds failure vocabulary must not earn
 // an alerting level, and the pass WORD demotes ONLY as the first significant token.
-// refs: SRC-D-OUT-2
+// refs: F-SRC-insight-canon:canon.api.cppm:leading_outcome_is_pass
 TEST(InferLeadingLogLevel, LeadingPassWordDemotesLevel)
 {
     EXPECT_EQ(infer_leading_log_level("ok 1 - request failed and retried"), LogLevel::Unknown)

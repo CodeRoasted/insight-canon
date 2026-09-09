@@ -135,7 +135,7 @@ namespace
     // invariant: ONE catalog, consulted as a per-segment predicate from every call site, so adding
     // a root extends them all with no second edit.
     // note: masking only and no semantics, so it is canon CORE and never a dialect package.
-    // refs: ADR-16.D2, ADR-17.D4, SRC-D-MSK-4
+    // refs: ADR-16.D2, ADR-17.D4
     enum class RootAnchor : std::uint8_t
     {
         // note: the root's first component is the first component after a leading separator.
@@ -198,7 +198,6 @@ namespace
     // pre: `window` ends at the CURRENT component and holds at most kMaxRootSegments of them.
     // post: the scope of the longest declared root ENDING at the current component, else nullopt -
     // longest wins, so the answer is order-independent.
-    // refs: SRC-D-MSK-4
     [[nodiscard]] inline std::optional<RootScope>
     root_scope_ending_at(std::span<const PathComponent> window) noexcept
     {
@@ -247,7 +246,7 @@ namespace
     // anchor exists; false otherwise, leaving the dispatch to fall through.
     // invariant: pure, byte-only and single-token, so the normal form is bit-identical across
     // standard libraries.
-    // refs: SRC-D-MSK-1, SRC-D-MSK-4
+    // refs: LSRC-11, F-SRC-insight-canon:mask.cpp:root_scope_ending_at
     // note: one pass does the walk, the classification and the root masking; a split fragments it.
     // NOLINTNEXTLINE(readability-function-cognitive-complexity)
     [[nodiscard]] inline bool normalize_diagnostic_composite(std::string_view tok, std::string& out)
@@ -272,7 +271,7 @@ namespace
         // assert: the same catalog as the standalone rule; the component after a declared root is a
         // per-run instance and masks whatever its leading byte, overriding the letter-leading KEEP.
         // assert: scope is CLAMPED to Instance here, so a file-and-line tail is never masked.
-        // refs: SRC-D-MSK-4
+        // refs: F-SRC-insight-canon:mask.cpp:root_scope_ending_at
         bool mask_next{false};
         std::array<PathComponent, kMaxRootSegments> window{};
         std::size_t window_len{0};
@@ -370,7 +369,7 @@ namespace
     // root masks the one component under it and KEEPS the tail.
     // invariant: segment-anchored rather than prefix-matched, which is what lets a mid-path
     // floating root match; it is not a general absolute-path masker.
-    // refs: SRC-D-MSK-2, SRC-D-MSK-4
+    // refs: F-SRC-insight-canon:mask.cpp:root_scope_ending_at
     [[nodiscard]] inline bool normalize_ephemeral_root(std::string_view tok, std::string& out)
     {
         std::array<PathComponent, kMaxRootSegments> window{};
@@ -472,7 +471,7 @@ namespace
     // post: the whole token is `[`, one COMPLETE RFC3339 full datetime, `]`, and it masks to a
     // bracketed wildcard; every other interior and any trailing punctuation is declined.
     // invariant: the byte grammar has ONE owner and is never spelled twice here.
-    // refs: SRC-D-MSK-5, ADR-23.D1
+    // refs: LSRC-12, ADR-23.D1
     // note: the output-class collision with the bracketed-index normal form is named and accepted.
     [[nodiscard]] inline bool normalize_bracket_timestamp(std::string_view tok, std::string& out)
     {
@@ -777,7 +776,7 @@ namespace
     };
     // invariant: the two bracket rules are ADJACENT, most specific first, and non-overlapping
     // today, so future drift between them has a rule to violate loudly.
-    // refs: SRC-D-MSK-1, SRC-D-MSK-2, SRC-D-MSK-5
+    // refs: LSRC-11, F-SRC-insight-canon:mask.cpp:normalize_ephemeral_root, LSRC-12
     // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
     // refs: F-SRC-insight-canon:mask.cpp:normalize_hash_counter
     // refs: SRC-D-TID-13b, SRC-D-TID-17, F-SRC-insight-canon:mask.cpp:normalize_marker_number

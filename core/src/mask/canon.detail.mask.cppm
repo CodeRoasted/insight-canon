@@ -28,7 +28,8 @@ immediately preceded WITHIN the composite by a status keyword, is KEPT, so an ex
 status flipping from green to red never collapses into one template. This rule SUBSUMES the older
 source-location rule exactly rather than sitting beside it - one general segment rule in place of a
 family of shape-specific ones - and it is what collapses the Chromium and glog prefix, which the
-source-location rule left whole because a PID and a date are not path-like. It absorbs SRC-D-MSK-1.
+source-location rule left whole because a PID and a date are not path-like. It absorbs the retired
+form-2 code MSK-1 (2026-09-09).
 ***************************************************************************************************/
 /**************************************************************************************************
 D-LSRC-12 — the BRACKET_TIMESTAMP class - the bracket is the entire difference
@@ -44,7 +45,8 @@ or version interior is declined, and so is any trailing punctuation. The byte gr
 F-SRC-insight-canon:canon.api.cppm:rfc3339_datetime_length, shared with the transport peel, so the
 shape is never spelled twice. The output-class collision with the bracket-index rule's own `[<*>]`
 is NAMED AND ACCEPTED: both are a masked instance inside brackets, and inventing a second
-placeholder vocabulary for one rule is worse than sharing the normal form. It absorbs SRC-D-MSK-5.
+placeholder vocabulary for one rule is worse than sharing the normal form. It absorbs the retired
+form-2 code MSK-5 (2026-09-09).
 ***************************************************************************************************/
 /**************************************************************************************************
 D-LSRC-13 — a class PREFIX inside a bracket survives the mask
@@ -69,7 +71,8 @@ masked either: it is not digit-leading, and equating two spellings of a varying 
 cross-line learning, which is the unbuilt registry's job and never this masker's. It absorbs
 SRC-D-TID-17.
 ***************************************************************************************************/
-// refs: ADR-16.D2, SRC-D-MSK-2, SRC-D-MSK-4
+// refs: ADR-16.D2, F-SRC-insight-canon:mask.cpp:normalize_ephemeral_root
+// refs: F-SRC-insight-canon:mask.cpp:root_scope_ending_at
 // refs: F-SRC-insight-canon:mask.cpp:normalize_hash_counter, ADR-16.D5, SRC-D-TID-17
 struct StatelessTemplate
 {

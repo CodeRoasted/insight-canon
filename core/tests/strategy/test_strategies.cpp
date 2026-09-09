@@ -147,7 +147,7 @@ TEST_F(JsonStrategyTest, FallsBackToJSONDumpWhenNoMessageKey)
 // invariant: the top-level lookups therefore missed, and the cube's WHERE axis went blind on JSON.
 // invariant: when the top-level lookup misses, descend ONE level and read component and level
 // there.
-// refs: SRC-D-MSK-3
+// refs: F-SRC-insight-canon:simdjson_scratch.hpp:get_nested_object
 TEST_F(JsonStrategyTest, NestedFieldsComponentExtracted)
 {
     auto result{strategy.parse(R"({"msg":"User logged in","fields":{"component":"auth"}})", arena)};

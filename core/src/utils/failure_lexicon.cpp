@@ -39,7 +39,7 @@ namespace
     }
 
     // post: true iff `prev` is a bare integer whose own predecessor is not digit-leading.
-    // refs: SRC-D-CNT-1
+    // refs: ADR-20.D5
     [[nodiscard]] bool is_count_preceded(std::string_view prev, std::string_view prev2) noexcept
     {
         return is_bare_integer(prev) && !is_digit_leading_numeric(prev2);
@@ -82,7 +82,7 @@ namespace
     }
 
     // invariant: the partition axis is benign-collision-proneness, never grammatical role.
-    // refs: SRC-D-OUT-4
+    // refs: F-SRC-insight-canon:canon.api.cppm:is_verdict_anchored
     enum class FailureRole : unsigned char
     {
         // note: a benign-collision-prone word - it fires only when verdict-anchored.
@@ -130,7 +130,7 @@ namespace
                                          std::string_view prev_prev) noexcept;
 
     // pre: `token` carries its source case - for_each_token trims but never folds.
-    // refs: SRC-D-OUT-4
+    // refs: F-SRC-insight-canon:canon.api.cppm:is_verdict_anchored
     [[nodiscard]] bool is_caps_register(std::string_view token) noexcept
     {
         std::size_t letters{0U};
@@ -148,7 +148,7 @@ namespace
     constexpr std::array<Phrase, 1U> kFailurePhrases{{{"segmentation", "fault"}}};
 
     // invariant: a success word demotes only the CamelCase-type signal, never a failure word.
-    // refs: SRC-D-OUT-1
+    // refs: F-SRC-insight-canon:canon.api.cppm:leading_outcome_is_pass
     constexpr std::array<std::string_view, 4U> kSuccessVerdicts{"passed", "ok", "success",
                                                                 "succeeded"};
 
@@ -168,7 +168,7 @@ namespace
     }
 
     // note: a bare glyph trims to an empty token, so it is byte-matched at a token start.
-    // refs: SRC-D-OUT-1
+    // refs: F-SRC-insight-canon:canon.api.cppm:leading_outcome_is_pass
     using Glyph = std::array<unsigned char, 3U>;
     constexpr std::array<Glyph, 4U> kPassGlyphs{{
         // note: in order U+2713, U+2714, U+2705, U+221A - the last is mocha's Windows pass mark.
@@ -179,7 +179,7 @@ namespace
     }};
     // invariant: every entry is 3-byte UTF-8; U+00D7 is two bytes and the rule excludes it.
     // note: in order U+2715, U+2716, U+2717, U+2718, U+274C - the last is the emoji fail mark.
-    // refs: SRC-D-OUT-4a
+    // refs: F-SRC-insight-canon:failure_lexicon.cpp:leading_outcome_is_fail
     constexpr std::array<Glyph, 5U> kFailGlyphs{{
         {0xE2U, 0x9CU, 0x95U},
         {0xE2U, 0x9CU, 0x96U},
@@ -244,7 +244,7 @@ namespace
     // pre: `raw_begin`/`raw_end` bound the UNTRIMMED span - the trim can hide the byte that carries
     // the structure.
     // invariant: the prefix classes are a closed declared set, never per-shape tuning.
-    // refs: SRC-D-OUT-4c
+    // refs: F-SRC-insight-canon:failure_lexicon.cpp:token_in_kind_slot
     [[nodiscard]] bool is_prefix_material(std::string_view line, std::size_t raw_begin,
                                           std::size_t raw_end) noexcept
     {
@@ -260,7 +260,7 @@ namespace
     // post: true iff every token before `token` is prefix material; a token never reached is
     // treated as absent, which demotes.
     // invariant: derived over the WHOLE line - a register is a claim, never a byte budget.
-    // refs: ADR-20.D3, SRC-D-OUT-4c
+    // refs: ADR-20.D3
     [[nodiscard]] bool token_in_kind_slot(std::string_view line, std::string_view token) noexcept
     {
         std::size_t pos{0};
@@ -283,7 +283,6 @@ namespace
     // post: true iff the first outcome-bearing token in the head is a fail glyph.
     // invariant: it only ANCHORS an already-matched failure word and never creates a cue, so a
     // glyph-only line stays silent.
-    // refs: SRC-D-OUT-4a
     [[nodiscard]] bool leading_outcome_is_fail(std::string_view line) noexcept
     {
         // invariant: equal to leading_outcome_is_pass's kOutcomeHead - the two heads must agree.
@@ -305,7 +304,6 @@ namespace
     }
 
     // pre: the caller reached this only on a line carrying no failure-lexicon word at all.
-    // refs: SRC-D-OUT-4b
     [[nodiscard]] bool error_type_anchors(std::string_view line, std::string_view token) noexcept
     {
         return detail::is_verdict_anchored(line, token);
@@ -328,7 +326,6 @@ namespace detail
 
     // post: true iff a pass glyph leads the head, or a pass word is its first significant token.
     // invariant: a failure word met first stops the walk and returns false.
-    // refs: SRC-D-OUT-1b, SRC-D-OUT-2
     [[nodiscard]] bool leading_outcome_is_pass(std::string_view line) noexcept
     {
         // invariant: equal to leading_outcome_is_fail's kOutcomeHead - the two heads must agree.
@@ -348,7 +345,7 @@ namespace detail
                     return false;
             // assert: leading is defined over SIGNIFICANT tokens, so punctuation never spends the
             // slot.
-            // refs: SRC-D-OUT-2
+            // refs: F-SRC-insight-canon:canon.api.cppm:leading_outcome_is_pass
             if (first_significant)
             {
                 for (const std::string_view verdict : kSuccessVerdicts)
@@ -361,7 +358,7 @@ namespace detail
     }
 
     // pre: `token` is a sub-view of `line` - anchor #2 reads the bytes around it.
-    // refs: SRC-D-OUT-4
+    // refs: F-SRC-insight-canon:canon.api.cppm:is_verdict_anchored
     [[nodiscard]] bool is_verdict_anchored(std::string_view line, std::string_view token) noexcept
     {
         if (is_caps_register(token))
@@ -372,19 +369,19 @@ namespace detail
         const char after{end < line.size() ? line[end] : '\0'};
         // assert: only the colon anchor carries the kind-slot precondition, and that asymmetry is
         // the design - a bracket pair is already two-sided, a trailing colon is not.
-        // refs: SRC-D-OUT-4c
+        // refs: F-SRC-insight-canon:failure_lexicon.cpp:token_in_kind_slot
         if (after == ':' && token_in_kind_slot(line, token))
             return true;
         if ((before == '[' && after == ']') || (before == '(' && after == ')'))
             return true;
         // assert: anchor #3 is line-level and never creates a cue - no failure word, never called.
-        // refs: SRC-D-OUT-4a
+        // refs: F-SRC-insight-canon:failure_lexicon.cpp:leading_outcome_is_fail
         return leading_outcome_is_fail(line);
     }
 
     // pre: `token` is a sub-view of `line` - the occurrence, matched by pointer identity.
     // post: true iff `token`'s immediately preceding token is a digit-leading numeric.
-    // refs: SRC-D-CNT-1
+    // refs: ADR-20.D5
     [[nodiscard]] bool is_count_register(std::string_view line, std::string_view token) noexcept
     {
         std::string_view prev{};
@@ -408,7 +405,6 @@ namespace detail
 
     // post: the offset of the first message byte past a diagnostic's note marker, else npos.
     // invariant: the first occurrence wins - it is the line's diagnostic-kind slot.
-    // refs: SRC-D-NOTE-1
     [[nodiscard]] std::size_t note_register_begin(std::string_view line) noexcept
     {
         constexpr std::string_view kNoteMarker{": note: "};
@@ -440,7 +436,7 @@ namespace detail
 
     // pre: `token` is a sub-view of `line`, and `message_at` came from note_register_begin.
     // invariant: a thin view on note_register_begin - one property, never two implementations.
-    // refs: SRC-D-NOTE-1
+    // refs: F-SRC-insight-canon:failure_lexicon.cpp:note_register_begin
     [[nodiscard]] bool token_in_note_message(std::string_view line, std::string_view token,
                                              std::size_t message_at) noexcept
     {
@@ -452,7 +448,7 @@ namespace detail
     // post: true iff the head carries a failure word in count register - a summary, not a per-item
     // verdict.
     // invariant: the caller demotes such a line to Warn; it is never suppressed.
-    // refs: SRC-D-CNT-1
+    // refs: ADR-20.D5
     // note: for_each_token's substr is the only throw path and its bound is checked.
     // NOLINTNEXTLINE(bugprone-exception-escape)
     [[nodiscard]] bool contains_failure_summary_cue(std::string_view text,
@@ -462,7 +458,7 @@ namespace detail
         std::string_view prev_prev{};
         // assert: a counted failure word inside a diagnostic's message is that diagnostic's word,
         // so it asserts no verdict.
-        // refs: SRC-D-NOTE-1
+        // refs: F-SRC-insight-canon:failure_lexicon.cpp:note_register_begin
         const std::size_t note_message_at{note_register_begin(text)};
         return for_each_token(text, scan_limit,
                               [&](std::string_view token) noexcept
@@ -493,7 +489,7 @@ namespace
                 continue;
             // assert: the count check runs BEFORE the verdict anchors - a counted noun is a summary
             // even with a trailing colon.
-            // refs: SRC-D-CNT-1
+            // refs: ADR-20.D5
             if (is_count_preceded(prev, prev_prev))
                 return {.fired = false, .matched = true};
             return {.fired = entry.role == FailureRole::SelfAnchoring ||
@@ -515,7 +511,7 @@ bool contains_failure_cue(std::string_view text, std::size_t scan_limit) noexcep
     std::string_view prev_prev{};
     // assert: resolved once per line; every cue inside the message is demoted, while tokens before
     // the marker keep their authority.
-    // refs: SRC-D-NOTE-1
+    // refs: F-SRC-insight-canon:failure_lexicon.cpp:note_register_begin
     const std::size_t note_message_at{detail::note_register_begin(text)};
     const bool saw_failure_word{for_each_token(
         text, scan_limit,
@@ -535,7 +531,7 @@ bool contains_failure_cue(std::string_view text, std::size_t scan_limit) noexcep
             const LexiconHit hit{lexicon_hit(text, token, prev, prev_prev)};
             // assert: cold - reached only when the lexicon missed, so the extra full-line scan is
             // paid on non-matching lines only.
-            // refs: SRC-D-OUT-4b
+            // refs: F-SRC-insight-canon:failure_lexicon.cpp:error_type_anchors
             if (!hit.matched && is_camel_error_type(token) && error_type_anchors(text, token))
                 saw_error_type = true;
             prev_prev = prev;
@@ -548,7 +544,7 @@ bool contains_failure_cue(std::string_view text, std::size_t scan_limit) noexcep
                       (saw_error_type && !any_standalone_word(text, kSuccessVerdicts,
                                                               /*scan_limit=*/0U))};
     // assert: only a leading pass GLYPH demotes a failure word; a leading pass WORD never does.
-    // refs: SRC-D-OUT-1
+    // refs: F-SRC-insight-canon:canon.api.cppm:leading_outcome_is_pass
     if (result && detail::leading_outcome_is_pass(text))
         return false;
     return result;

@@ -14,7 +14,7 @@
 // and killed the pure token anchor would pass every other row and read green.
 // invariant: the invariance row is METAMORPHIC over ONE input, so no constant can be tuned to
 // satisfy it — it pins the HEAD defect where the rows above pin the ANCHOR.
-// refs: SRC-D-OUT-4c
+// refs: F-SRC-insight-canon:failure_lexicon.cpp:token_in_kind_slot
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -84,10 +84,11 @@ TEST(VerdictRegisterKindSlot, EveryDeclaredPrefixClassKeepsTheAnchor)
     // integer predecessor as an aggregate and caps the line, independently of this register.
     // invariant: the positive row uses a second numeric field so the integer's own predecessor is
     // digit-leading, which is the numeric-chain guard the count register already carries.
-    // refs: SRC-D-CNT-1
+    // refs: ADR-20.D5
     EXPECT_EQ(infer_leading_log_level("<WORKSPACE>:16: error: no comment on the exported symbol"),
               LogLevel::Warn)
-        << "SRC-D-CNT-1 (count register), not SRC-D-OUT-4c: a bare integer immediately before the "
+        << "the count register (ADR-20.D5), not the kind-slot rule: a bare integer immediately "
+           "before the "
            "level "
            "word makes it a summary, and a summary caps at Warn";
 }

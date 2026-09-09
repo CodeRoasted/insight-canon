@@ -471,7 +471,7 @@ struct NestedLine
 
 // invariant: the three classes are disjoint BY THE ORDER OF THE TESTS — head, then lexicon, then
 // anchor.
-// refs: DN-54.D23, ADR-16.D8, ADR-16.D7, SRC-D-OUT-4c
+// refs: DN-54.D23, ADR-16.D8, ADR-16.D7, F-SRC-insight-canon:failure_lexicon.cpp:token_in_kind_slot
 enum class UnreadClass : std::uint8_t
 {
     R1,
@@ -537,7 +537,7 @@ struct NestedResidual
     std::uint64_t error_in_head{0};
     std::uint64_t error_in_head_raw{0};
     std::array<std::uint64_t, kLevelCount> pipeline_of_error_in_head{};
-    // refs: SRC-D-OUT-4c
+    // refs: F-SRC-insight-canon:failure_lexicon.cpp:token_in_kind_slot
     std::array<std::uint64_t, kProxyCount> promoted_by_proxy{};
     std::array<std::uint64_t, kProxyCount> unpromoted_by_proxy{};
     std::uint64_t promoted{0};
@@ -1294,7 +1294,7 @@ void print_unread_partition(const NestedResidual& nested)
                  "  — reaches NO register: declined by nothing, invisible; by outcome:{}",
                  r1, percent(r1, nested.unread), outcome_cells(nested.r1_by_outcome));
     std::println("      R2 in the lexicon, still unread, condition (c)              : {} ({:.2f}%)"
-                 "  — the REGISTER RULE's population (SRC-D-OUT-4c); by outcome:{}",
+                 "  — the REGISTER RULE's population (the kind-slot rule); by outcome:{}",
                  r2, percent(r2, nested.unread), outcome_cells(nested.r2_by_outcome));
     std::println("        of the {} R2 — kind-slot walk REFUSED the anchor: {}; verdict-anchored "
                  "yet still unread (a count / NOTE register, or a leading pass glyph — NOT the "

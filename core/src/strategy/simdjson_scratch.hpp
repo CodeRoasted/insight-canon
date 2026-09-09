@@ -159,7 +159,6 @@ inline void read_raw_json_or_keep(simdjson::simdjson_result<simdjson::ondemand::
 // the parent cursor cannot rewind to a sibling.
 // invariant: a nested object also forces the fast byte scanner to bail, so every nested-fields line
 // takes this slow path.
-// refs: SRC-D-MSK-3
 [[nodiscard]] inline bool get_nested_object(simdjson::ondemand::object& obj, std::string_view key,
                                             simdjson::ondemand::object& out) noexcept
 {
@@ -249,7 +248,6 @@ inline void skip_json_ws(std::string_view line, std::size_t& pos) noexcept
 // resolves to NOTHING and is claimed by no role.
 // invariant: taking the last segment at any depth would make the dotted spelling resolve while the
 // equivalent nested spelling refused it — one logical document read two ways.
-// refs: SRC-D-ECS-1
 [[nodiscard]] inline constexpr std::string_view compound_key_name(std::string_view key) noexcept
 {
     const std::size_t dot{key.find('.')};
@@ -266,7 +264,7 @@ inline void assign_string_field(FastJsonResult& result, std::string_view raw_key
 {
     // invariant: the compound SHAPE is applied BEFORE any name comparison — no vendor field name
     // is added to the comparisons below, only the key handed to them is resolved first.
-    // refs: SRC-D-ECS-1
+    // refs: F-SRC-insight-canon:simdjson_scratch.hpp:compound_key_name
     const std::string_view key{compound_key_name(raw_key)};
     const bool no_ts = result.timestamp_str.empty() && result.timestamp_ms == 0;
     if (no_ts && (key == "ts" || key == "timestamp" || key == "@timestamp" || key == "time" ||

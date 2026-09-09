@@ -118,7 +118,7 @@ TEST(StatelessTemplate, CompositesNormalized)
 // invariant: these arms are one of the two NAMED holders of the over-masking blind spot — the A/B
 // prefix-image comparison cancels a leak that hits both arms.
 // invariant: so the decline list HERE, plus the corpus collateral leg, is what carries that hazard.
-// refs: SRC-D-MSK-5
+// refs: LSRC-12
 TEST(StatelessTemplate, BracketTimestampCollapsesTheStampClass)
 {
     ArenaAllocator arena{256U * 1024U};
@@ -168,7 +168,7 @@ TEST(StatelessTemplate, BracketTimestampDeclinesEverythingAdjacentToTheClass)
 // byte-identical in baseline read as a NEW error pattern.
 // invariant: the repair masks EVERY digit-leading sub-segment independently while keeping the
 // letter-leading class anchors, so both sides collapse to one template and are dropped.
-// refs: SRC-D-MSK-1
+// refs: LSRC-11
 TEST(StatelessTemplate, DiagnosticCompositeCollapsesChromiumPrefix)
 {
     ArenaAllocator arena{256U * 1024U};
@@ -216,7 +216,7 @@ TEST(StatelessTemplate, DiagnosticCompositeKeepsStatusValuePerSegment)
 // invariant: the suffix is UNDECIDABLE, but the ROOT is an enumerable byte-exact catalog.
 // invariant: a child of an ephemeral root is a per-run instance BY CONSTRUCTION, so the post-root
 // remainder masks, which is lossless for diffing.
-// refs: SRC-D-MSK-2
+// refs: F-SRC-insight-canon:mask.cpp:normalize_ephemeral_root
 TEST(StatelessTemplate, EphemeralRootPathMasksRemainder)
 {
     ArenaAllocator arena{256U * 1024U};
@@ -480,7 +480,7 @@ TEST(StatelessTemplate, HexClassifierFoldsAsciiCase)
 // falsified.
 // invariant: a path component directly under a declared ephemeral root is a per-run instance and
 // masks, while the location tail is PROTECTED.
-// refs: SRC-D-MSK-4
+// refs: F-SRC-insight-canon:mask.cpp:root_scope_ending_at
 TEST(EphemeralRootMask, G1_ReportedConanPairCollapses)
 {
     ArenaAllocator arena{256U * 1024U};

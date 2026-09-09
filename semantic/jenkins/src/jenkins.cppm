@@ -25,7 +25,7 @@ export import insight.canon.spi;
 namespace insight::semantic::jenkins
 {
 
-// refs: ADR-23.D1, ADR-23.D6, SRC-D-MSK-5
+// refs: ADR-23.D1, ADR-23.D6, LSRC-12
 // invariant: the payload-stamped class is NOT declarable as transport — the stamp is a
 // payload-determined subset, not a stream property — so its stamps stay CONTENT.
 // assert: those lines therefore template WITH the stamp, collapsed to the `[<*>]` bracket normal

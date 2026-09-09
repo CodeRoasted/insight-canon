@@ -1,4 +1,4 @@
-// refs: ADR-23.D1, ADR-23.D6, SRC-D-MSK-5
+// refs: ADR-23.D1, ADR-23.D6, LSRC-12
 // invariant: this is the pre-registered measurement owed by the ruling that a PAYLOAD stamp is
 // dialect content and never a transport envelope.
 // invariant: the templates change on that class and that is settled; what is measured here is
@@ -269,7 +269,7 @@ TEST(JenkinsPayloadStampMeasurement, CounterCanReportAnExplosion)
            "lines";
 }
 
-// refs: SRC-D-MSK-5
+// refs: LSRC-12
 // invariant: this test was PRE-REGISTERED to go red on the day the masker claimed the token to a
 // stable normal form; that day came, and this is the rewrite it demanded.
 // assert: what it asserts now is the repair — the stamp class collapses to the `[<*>]` normal
@@ -292,7 +292,7 @@ TEST(JenkinsPayloadStampMeasurement, TheMaskerClaimsTheTimestamperTokenToTheBrac
         std::cout << "  unstripped[" << index << "] = \"" << outcomes[index].template_str << "\"\n";
         EXPECT_EQ(outcomes[index].template_str, "[<*>] + git fetch --tags")
             << "the bracketed RFC3339 token must mask to the bracket normal form `[<*>]` — the "
-               "SRC-D-MSK-5 claim, the bracketed branch of the stamp rule discharged";
+               "LSRC-12 claim, the bracketed branch of the stamp rule discharged";
     }
     EXPECT_EQ(outcomes[0].template_str, outcomes[1].template_str)
         << "two lines differing ONLY in the stamp's milliseconds must now share ONE template — "
@@ -309,7 +309,7 @@ TEST(JenkinsPayloadStampMeasurement, TheMaskerClaimsTheTimestamperTokenToTheBrac
     ASSERT_TRUE(bare_outcomes[1].produced);
     std::cout << "  unbracketed[0] = \"" << bare_outcomes[0].template_str << "\"\n";
     EXPECT_EQ(bare_outcomes[0].template_str, bare_outcomes[1].template_str)
-        << "the unbracketed token is digit-leading → masked → collapses (unchanged by SRC-D-MSK-5)";
+        << "the unbracketed token is digit-leading → masked → collapses (unchanged by LSRC-12)";
     const std::array<std::string, 2> bracketed{"fetched at [2026-06-23T15:11:09.020Z] ok",
                                                "fetched at [2026-06-24T09:02:44.001Z] ok"};
     std::vector<std::string> kept{bracketed.begin(), bracketed.end()};
@@ -492,7 +492,7 @@ TEST(JenkinsPayloadStampMeasurement, TemplateCountUnderTheStrip)
                             kExplosionCeilingShare * static_cast<double>(stamped_raw.size())};
     std::cout << "FROZEN clause-2 CLASSIFIER reads: "
               << (explodes ? "EXPLODES" : (stable ? "COUNT STABLE" : "NEITHER branch"))
-              << "  — the frozen record's reading, NOT the exit verdict: post-SRC-D-MSK-5 the exit "
+              << "  — the frozen record's reading, NOT the exit verdict: post-LSRC-12 the exit "
                  "predicate is the prefix-image triangle (PrefixImageExitGate, below), and this "
                  "classifier's ceiling leg is can't-PASS on these bytes by construction\n\n";
 

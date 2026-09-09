@@ -56,7 +56,7 @@ export namespace insight::tokenization
     return chr == ' ' || chr == '\t';
 }
 
-// refs: SRC-D-MSK-4, SRC-D-MSK-6
+// refs: F-SRC-insight-canon:mask.cpp:root_scope_ending_at
 // invariant: FROZEN, DECLARED byte pairs — a shell is NOT part of the value it surrounds, and no
 // mask rule may treat it as one.
 // invariant: ONE catalog for every reader — a second copy is how two maskers diverge and template

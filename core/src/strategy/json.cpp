@@ -21,7 +21,7 @@ namespace
 
     // invariant: these are canon's OWN names for the four roles it reads, and they are deliberately
     // NOT a registry of vendor field names.
-    // refs: SRC-D-ECS-1
+    // refs: F-SRC-insight-canon:simdjson_scratch.hpp:compound_key_name
     constexpr std::array<std::string_view, 5> kTimestampKeys{"timestamp", "ts", "@timestamp",
                                                              "time", "datetime"};
     constexpr std::array<std::string_view, 4> kLevelKeys{"level", "severity", "loglevel",
@@ -51,7 +51,7 @@ namespace
     // invariant: BOUNDED at exactly one level in both shapes: one dot, one descent. Unbounded
     // descent would make a level field anywhere in a tree a severity claim.
     // invariant: the bound is what makes the shape a GRAMMAR rather than a search.
-    // refs: SRC-D-ECS-1, ADR-17.D1, DN-30.D11
+    // refs: F-SRC-insight-canon:simdjson_scratch.hpp:compound_key_name, ADR-17.D1, DN-30.D11
     enum class JsonRole : std::uint8_t
     {
         None,
@@ -131,7 +131,7 @@ namespace
     // which is what makes this a grammar rather than a list.
     // invariant: it SUBSUMES the hard-coded single-vendor descent it replaces, so this is a name
     // REMOVED from core rather than added.
-    // refs: SRC-D-ECS-1
+    // refs: F-SRC-insight-canon:simdjson_scratch.hpp:compound_key_name
     void route_compound_keys(simdjson::ondemand::object& root, ParsedLine& parsed_line,
                              ArenaAllocator& arena, bool& recognized_message)
     {
@@ -797,7 +797,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
         // invariant: net effect on core's vocabulary is one name REMOVED and none added.
         // invariant: a fresh cursor is required and is not free, and it is paid ONLY on a line
         // still missing a role — never on a canon-named line.
-        // refs: SRC-D-ECS-1
+        // refs: F-SRC-insight-canon:simdjson_scratch.hpp:compound_key_name
         if (parsed_line.component.empty() || parsed_line.level == LogLevel::Unknown ||
             !parsed_line.timestamp.has_value() || !recognized_message)
         {

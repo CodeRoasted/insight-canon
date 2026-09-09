@@ -1202,7 +1202,8 @@ export namespace insight::utils
 // scans all of the text.
 // invariant: alloc-free and noexcept, a single head-bounded pass, except the rare
 // error-type-without-failure-word line, which costs one extra full scan.
-// refs: ADR-20.D5, SRC-D-OUT-1, SRC-D-OUT-4, DN-54
+// refs: ADR-20.D5, F-SRC-insight-canon:canon.api.cppm:leading_outcome_is_pass
+// refs: F-SRC-insight-canon:canon.api.cppm:is_verdict_anchored, DN-54
 [[nodiscard]] bool contains_failure_cue(std::string_view text, std::size_t scan_limit = 0) noexcept;
 [[nodiscard]] bool contains_warning_cue(std::string_view text, std::size_t scan_limit = 0) noexcept;
 
@@ -1217,7 +1218,7 @@ namespace detail
     // invariant: promoted out of the lexicon's anonymous namespace so the explicit-level stage in a
     // SEPARATE translation unit can consult the same predicate.
     // note: internal detail; the public API stays the two cue predicates.
-    // refs: ADR-20.D5, SRC-D-OUT-1, SRC-D-OUT-1b, SRC-D-OUT-2
+    // refs: ADR-20.D5
     [[nodiscard]] bool leading_outcome_is_pass(std::string_view line) noexcept;
 
     // post: MEMBERSHIP in the failure lexicon, never firing — case-insensitive, whole-token and
@@ -1253,7 +1254,9 @@ namespace detail
     // invariant: a CamelCase error TYPE anchors ONLY in verdict register — a thrown one fires, a
     // suite NAME that merely references the type does not; the discriminator is position.
     // refs: ADR-9, ADR-20.D3, ADR-20.D5, BIB:canon_pipeline
-    // refs: SRC-D-OUT-4, SRC-D-OUT-4a, SRC-D-OUT-4b, SRC-D-OUT-4c
+    // refs: F-SRC-insight-canon:failure_lexicon.cpp:leading_outcome_is_fail
+    // refs: F-SRC-insight-canon:failure_lexicon.cpp:error_type_anchors
+    // refs: F-SRC-insight-canon:failure_lexicon.cpp:token_in_kind_slot
     [[nodiscard]] bool is_verdict_anchored(std::string_view line, std::string_view token) noexcept;
 
     // pre: token MUST be a sub-view of line.
@@ -1266,7 +1269,7 @@ namespace detail
     // invariant: a count-register word does NOT confer an alerting level: it caps at a warning —
     // demote, never suppress.
     // invariant: pure byte and case test, order-independent, so cross-stdlib bit-identical.
-    // refs: ADR-20.D5, SRC-D-CNT-1, SRC-D-OUT-1
+    // refs: ADR-20.D5, F-SRC-insight-canon:canon.api.cppm:leading_outcome_is_pass
     [[nodiscard]] bool is_count_register(std::string_view line, std::string_view token) noexcept;
 
     // post: true iff the head carries a failure-lexicon word in COUNT register.
@@ -1284,7 +1287,7 @@ namespace detail
     // the same line is a different author's claim and survives.
     // invariant: it DEMOTES and never suppresses — the cue does not fire, the line lands at
     // Unknown and still surfaces; the lexicon is untouched, because the defect is CONTEXT.
-    // refs: ADR-20.D5, SRC-D-CNT-1, SRC-D-NOTE-1
+    // refs: ADR-20.D5, F-SRC-insight-canon:failure_lexicon.cpp:note_register_begin
     [[nodiscard]] bool contains_failure_summary_cue(std::string_view text,
                                                     std::size_t scan_limit = 0) noexcept;
 
@@ -1323,7 +1326,7 @@ inline constexpr int kDefaultReferenceYear{2024};
 // invariant: homed PUBLIC because a SEPARATE package must reach it: a package imports only the api
 // and spi modules, and canon's detail shards are sealed.
 // invariant: pure constexpr byte scan — no locale, no wall clock, ASCII only.
-// refs: ADR-23, SRC-D-MSK-5, BIB:jenkins_dialect, BIB:determinism_model
+// refs: ADR-23, LSRC-12, BIB:jenkins_dialect, BIB:determinism_model
 [[nodiscard]] constexpr std::size_t rfc3339_datetime_length(std::string_view text,
                                                             std::size_t pos) noexcept
 {
