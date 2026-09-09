@@ -69,8 +69,8 @@ TEST(GithubDeclaredIngest, StampOnlyLinePeelsToBlank)
 
 // invariant: the rows are this package's DATA and the walk is canon's, so the composed pipeline end
 // to end is the only place a declared row reaches a decision.
-// assert: all EIGHT rows, because a line that loses its lift falls through to
-// `infer_leading_log_level`, whose vocabulary carries no `notice` at all.
+// assert: all EIGHT rows, and each asserts the SPECIES as well as the value — canon's own word
+// lexicon now knows `notice`, so a value check alone cannot see a lift that stopped firing.
 // invariant: half this vocabulary is corpus-unfalsifiable and is falsified only here: over the D11
 // slice (4 082 logs, 22 490 937 lines) the five forms lead 41 lines, `::notice::` none.
 TEST(GithubDeclaredIngest, LiftsDeclaredLevelsFromWorkflowCommands)
@@ -110,6 +110,11 @@ TEST(GithubDeclaredIngest, LiftsDeclaredLevelsFromWorkflowCommands)
             << "marker=" << probe.marker << " expected " << insight::to_string(probe.expected)
             << ", got " << insight::to_string(event->level) << " (template=\""
             << event->template_str << "\")";
+        EXPECT_TRUE(event->declared_level)
+            << "marker=" << probe.marker
+            << ": the level must be DECLARED by the row, not inferred from the marker word by "
+               "canon's own lexicon — for `notice` the two species carry the SAME value, so the "
+               "value check above cannot tell them apart";
         EXPECT_TRUE(event->template_str.starts_with(probe.marker))
             << "the marker stays in the templated content; template=\"" << event->template_str
             << "\"";
@@ -131,9 +136,19 @@ TEST(GithubDeclaredIngest, AnUndeclaredStreamGetsNoDeclaredLift)
         stream.transport.peel_raw("2026-05-27T15:26:41.7842152Z ##[notice]the quick brown fox")
             .content)};
     ASSERT_TRUE(event.has_value()) << event.error();
-    EXPECT_EQ(event->level, LogLevel::Unknown)
+    // assert: the discriminator is the SPECIES, never the value — canon's word lexicon learned
+    // `notice`, so the generic inference now reads Info from this marker on its own.
+    // assert: Unknown was a PROXY for "no lift fired", and the proxy stopped being sound the day
+    // the two species began to agree on the value.
+    // refs: DN-93.D1, DN-93.D2
+    EXPECT_FALSE(event->declared_level)
         << "a dialect-gated level lift fired on a stream that declared NO dialect — fail-closed on "
            "depth is not optional; got "
+        << insight::to_string(event->level);
+    EXPECT_EQ(event->level, LogLevel::Info)
+        << "the undeclared stream still gets the NARROWER reading: canon infers Info from the "
+           "word, "
+           "and declaring the dialect is what upgrades it to a declared fact; got "
         << insight::to_string(event->level);
 }
 

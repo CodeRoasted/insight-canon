@@ -1579,12 +1579,20 @@ class ApacheErrorLogStrategyTest : public ::testing::Test
     ArenaAllocator arena{4096};
 };
 
+// invariant: the arm was named for the level and never asserted it — `[notice]` read Unknown on
+// 1 405 of the 2 000 Apache sample records and this suite was green throughout.
+// invariant: this is a DECLARED SLOT: the producer put the word in the position its own format
+// reserves for the level, so the lexicon is decoding here and never detecting.
+// refs: DN-93.D1, DN-93.D2
 TEST_F(ApacheErrorLogStrategyTest, ParsesNoticeLevel)
 {
     auto result{strategy.parse(kApacheErrorLine, arena)};
     ASSERT_TRUE(result.has_value()) << result.error();
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
+    EXPECT_EQ(pl.level, LogLevel::Info)
+        << "syslog severity 5 maps to the tier severity 6 maps to; level = "
+        << to_string(pl.level.value());
     EXPECT_NE(pl.content.find("workerEnv.init()"), std::string::npos);
 }
 

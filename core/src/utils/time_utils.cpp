@@ -656,6 +656,11 @@ std::optional<Timestamp> parse_log4j_timestamp(std::string_view timestamp_str) n
     return std::chrono::system_clock::from_time_t(utc_mktime(parsed_tm));
 }
 
+// refs: DN-93.D1
+// invariant: a word that IS a syslog severity name maps to the tier its severity NUMBER maps to —
+// the same 0-7 ladder rfc5424 and systemd_journal already decode, never a private judgment.
+// invariant: the additive vocabulary that is NOT a syslog name — trace, dbg, information, severe,
+// failure — is a separate decision this rule does not reach.
 LogLevel parse_log_level(std::string_view level_str) noexcept
 {
     if (level_str.empty())
@@ -663,6 +668,14 @@ LogLevel parse_log_level(std::string_view level_str) noexcept
 
     switch (static_cast<unsigned char>(level_str[0]) | 0x20U)
     {
+    case 'a':
+        // note: syslog severity 1, so Fatal by the ladder rule, never by judgment.
+        // refs: DN-93.D1
+        return iequals(level_str, "alert") ? LogLevel::Fatal : LogLevel::Unknown;
+    case 'n':
+        // note: syslog severity 5, the tier `info` at severity 6 already maps to.
+        // refs: DN-93.D1
+        return iequals(level_str, "notice") ? LogLevel::Info : LogLevel::Unknown;
     case 't':
         return iequals(level_str, "trace") ? LogLevel::Trace : LogLevel::Unknown;
     case 'd':
@@ -676,8 +689,12 @@ LogLevel parse_log_level(std::string_view level_str) noexcept
         return (iequals(level_str, "warn") || iequals(level_str, "warning")) ? LogLevel::Warn
                                                                              : LogLevel::Unknown;
     case 'e':
-        return (iequals(level_str, "error") || iequals(level_str, "err")) ? LogLevel::Error
-                                                                          : LogLevel::Unknown;
+        // note: severity 3 is Error and severity 0 is Fatal, so the two `e` names split.
+        // refs: DN-93.D1
+        if (iequals(level_str, "error") || iequals(level_str, "err"))
+            return LogLevel::Error;
+        return (iequals(level_str, "emerg") || iequals(level_str, "emergency")) ? LogLevel::Fatal
+                                                                                : LogLevel::Unknown;
     case 'f':
         // note: BGL emits FAILURE as a top RAS severity, beside FATAL.
         // refs: DN-43.D14
