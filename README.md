@@ -181,7 +181,7 @@ insight-canon/
 └── .github/workflows/      ci.yml · lint.yml · golden.yaml · release.yaml
 ```
 
-Module layering (the §11.9.11 pattern): `internal ◀ api ◀ detail.{scan ◀ strategy ◀ parse, mask} ◀
+Module layering (the ADR-3.D4 layering): `internal ◀ api ◀ detail.{scan ◀ strategy ◀ parse, mask} ◀
 facade`. The facade interface never imports a detail shard; `tokenizer_engine.cpp` (a facade impl
 unit) imports `detail.{strategy,mask,parse}` to assemble the pipeline — consumers just
 `import insight.canon;`.

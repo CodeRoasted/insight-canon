@@ -1,9 +1,9 @@
 ###########################################################
-#  insight_canon — core types · tokenization (1.5.2 domain-decomposed named modules)
+#  insight_canon — core types · tokenization (domain-decomposed named modules)
 ###########################################################
 cmake_minimum_required(VERSION 3.28)
 
-# 1.5.1 unwrap: the pure module does `import std` → the experimental import-std gate UUID MUST be set
+# modules unwrap: the pure module does `import std` → the experimental import-std gate UUID MUST be set
 # before project()/CXX-enable (451f2fe2-… = CMake 4.3.1's CMAKE_EXPERIMENTAL_CXX_IMPORT_STD).
 set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "451f2fe2-a8a2-47c3-bc32-94786d8fc91b")
 
@@ -75,13 +75,13 @@ find_package(simdjson REQUIRED CONFIG)
 find_package(picosha2 REQUIRED CONFIG)
 
 ###########################################################
-#  Sources (1.5.2 domain decomposition, §11.9.11)
+#  Sources (domain decomposition, ADR-3.D4)
 #  - PUBLIC module interface units (installed): internal (src/) + api + facade (api/).
 #  - PRIVATE (sealed, build-only) detail shards (src/<domain>/): scan ◀ strategy ◀ parse; mask a
 #    leaf over api. Never installed — external consumers cannot import insight.canon.detail.*.
 #  - Module impl units (regular sources, scanned): src/**/*.cpp attach via
 #    `module insight.canon{.api|.detail.<domain>};` (+ the facade impl unit tokenizer_engine.cpp).
-#  - Textual layer: api/utils/log_macros.hpp (the §11.9 macro layer) and
+#  - Textual layer: api/utils/log_macros.hpp (the textual macro layer ADR-3.D4 rule 2 admits) and
 #    src/strategy/simdjson_scratch.hpp (TU-local simdjson entities).
 ###########################################################
 set(CANON_PUBLIC_MODULE_UNITS
@@ -119,7 +119,7 @@ file(GLOB_RECURSE CANON_IMPL_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_D
 ###########################################################
 #  Module-bearing static library
 ###########################################################
-# §11.9.7/§11.9.11 install seal: the PUBLIC file set (internal/api/facade) is installed; the
+# ADR-3.D4 install seal: the PUBLIC file set (internal/api/facade) is installed; the
 # PRIVATE cxx_modules_detail set (the detail.<domain> shards) is build-only — legal because no
 # external target imports the lib's private modules (tests/benchmarks are module MEMBERS below).
 add_library(insight_canon STATIC ${CANON_IMPL_SOURCES})
@@ -310,7 +310,7 @@ set_target_properties(leading_level_token_index_measure PROPERTIES CXX_SCAN_FOR_
 #  Tests (unit + regression)
 ###########################################################
 if(INSIGHT_CANON_BUILD_TESTS)
-    # Per-domain test mirror (§11.9.11): tests/<domain>/*.cpp 1:1 with the src/ domains
+    # Per-domain test mirror (ADR-3.D4): tests/<domain>/*.cpp 1:1 with the src/ domains
     # (math/arena/utils are api-homed domains).
     file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp"
@@ -320,7 +320,7 @@ if(INSIGHT_CANON_BUILD_TESTS)
         find_package(GTest REQUIRED CONFIG)
         enable_testing()
 
-        # §11.9.7 white-box tests are MODULE MEMBERS: the test target RECOMPILES the whole module
+        # ADR-3.D4 white-box tests are MODULE MEMBERS: the test target RECOMPILES the whole module
         # (interface units + impl .cpp) + the test TUs, so a test may import the sealed
         # insight.canon.detail.* shards (via the insight.canon.test aggregate) WITHOUT the lib
         # exporting them. CXX_MODULE_STD ON: the recompiled module is built against the std module,
