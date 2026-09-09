@@ -547,13 +547,39 @@ constexpr std::size_t kNginxTimestampLen{19U};
     return match_time_at(str, pos + kClfTimeAt);
 }
 
+// refs: DN-92.D2
+// post: the index of the `"` that CLOSES a quoted field opening at str[0], or npos when `str` does
+// not open with `"` or the field never terminates.
+// invariant: a backslash consumes the next byte, so an escaped quote never terminates the field,
+// which also makes nginx's hex form safe: the backslash consumes the `x`.
+// invariant: parity is what the byte-consuming walk encodes — an escaped backslash is consumed as
+// one byte, so the quote that follows it CLOSES the field.
+// invariant: ONE scanner for is_clf_record_prefix and for CLFStrategy::parse — a claim and its
+// parse disagreeing about where the field ends is a DELETION after a 0.95 claim.
+[[nodiscard]] constexpr std::size_t clf_quoted_close_index(std::string_view str) noexcept
+{
+    if (str.empty() || str[0] != '"')
+        return std::string_view::npos;
+    for (std::size_t i{1U}; i < str.size(); ++i)
+    {
+        if (str[i] == '\\')
+        {
+            ++i;
+            continue;
+        }
+        if (str[i] == '"')
+            return i;
+    }
+    return std::string_view::npos;
+}
+
 // refs: DN-43.D1, DN-43.D11, DN-43.D16
 // invariant: the WHOLE record is proven from byte 0 — three leading tokens, the bracketed stamp
 // AND its close, the quoted request AND its close, then a three-digit status.
 // invariant: so CLFStrategy::parse keeps ONE guard and carries no exit that could DELETE a line
 // this strategy claimed.
-// invariant: the first `"` closes the request, so a request carrying `\"` fails the status check
-// and the line is DEMOTED with every byte intact rather than deleted.
+// invariant: the request field closes under the ESCAPE rule, the same scanner parse() walks, so a
+// request carrying `\"` is CLAIMED rather than declined at the status check.
 [[nodiscard]] constexpr bool is_clf_record_prefix(std::string_view str) noexcept
 {
     static constexpr std::size_t kClfLeadingTokens{3U};
@@ -574,12 +600,12 @@ constexpr std::size_t kNginxTimestampLen{19U};
     if (stamp_close == std::string_view::npos)
         return false;
     pos = skip_spaces(str, stamp_close + 1U);
-    if (pos >= str.size() || str[pos] != '"')
+    if (pos >= str.size())
         return false;
-    const std::size_t request_close{str.find('"', pos + 1U)};
+    const std::size_t request_close{clf_quoted_close_index(str.substr(pos))};
     if (request_close == std::string_view::npos)
         return false;
-    pos = skip_spaces(str, request_close + 1U);
+    pos = skip_spaces(str, pos + request_close + 1U);
     if (pos + kClfStatusDigits > str.size())
         return false;
     for (std::size_t digit{0}; digit < kClfStatusDigits; ++digit)
@@ -789,16 +815,16 @@ inline void sv_skip_ws(std::string_view& str) noexcept
     return result;
 }
 
-// refs: ADR-16.D9, DN-43.D11
-// post: the quoted content without its quotes, `str` advanced past the closing `"`; on a view not
-// opening `"`, or one whose quote never closes, an empty result and `str` UNTOUCHED.
-// note: both substr positions are bounded by the find that returned close < size — cannot throw.
+// refs: DN-92.D2, ADR-16.D9
+// post: the interior of a CLF quoted field, `str` advanced past the closing `"`; on a view not
+// opening `"`, or one whose field never terminates, an empty result and `str` UNTOUCHED.
+// invariant: the bytes are NOT unescaped — the result stays a view into the arena-stable line, so
+// the masker sees what the producer wrote and no second, undeclared masking stage exists.
+// note: both substr positions are bounded by the index the scanner returned — cannot throw.
 // NOLINTNEXTLINE(bugprone-exception-escape)
-[[nodiscard]] constexpr std::string_view sv_take_quoted_or_none(std::string_view& str) noexcept
+[[nodiscard]] constexpr std::string_view sv_take_clf_quoted_or_none(std::string_view& str) noexcept
 {
-    if (str.empty() || str[0] != '"')
-        return {};
-    const auto close = str.find('"', 1U);
+    const auto close = clf_quoted_close_index(str);
     if (close == std::string_view::npos)
         return {};
     const auto result = str.substr(1U, close - 1U);

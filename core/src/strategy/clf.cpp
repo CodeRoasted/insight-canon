@@ -44,7 +44,10 @@ std::expected<ParsedLine, std::string> CLFStrategy::parse(std::string_view line,
     sv_skip_ws(rest);
     const std::string_view raw_ts{sv_take_bracketed_or_none(rest)};
     sv_skip_ws(rest);
-    const std::string_view request{sv_take_quoted_or_none(rest)};
+    // invariant: the SAME scanner the claim predicate walked, so the take is total by
+    // construction and the escape bytes reach content unrewritten.
+    // refs: DN-92.D2, DN-92.D4
+    const std::string_view request{sv_take_clf_quoted_or_none(rest)};
     const std::string_view status_str{sv_take_token(rest)};
     (void)sv_take_token(rest);
 

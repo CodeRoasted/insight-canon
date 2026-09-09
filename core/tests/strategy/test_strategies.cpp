@@ -574,18 +574,57 @@ TEST_F(CLFStrategyTest, ShapesCarryingAClfStampButNotAClfRecordAreDeclinedNotDel
     }
 }
 
-// invariant: an escaped `\"` inside the request is the OPEN grammar question — does canon's CLF
-// claim Apache's escaping? — and until it is ruled the line is DECLINED, never deleted.
-// invariant: the scan stops at the escaped quote, so the token after it is not a three-digit
-// status and the record predicate fails; every byte survives into another strategy's projection.
-// refs: DN-43.D16
-TEST_F(CLFStrategyTest, RequestCarryingAnEscapedQuoteIsDeclinedRatherThanDeleted)
+// invariant: canon's CLF CLAIMS the escaped quoted field — a backslash consumes the next byte, so
+// an escaped quote does not terminate the request and the record is read whole.
+// invariant: the injection probe this fixture carries is exactly the line an anomaly instrument
+// exists for, and it was DELETED before this grammar landed.
+// invariant: the bytes are NOT unescaped — the escape reaches content as the producer wrote it, so
+// the masker decides identity and no second, undeclared masking stage exists.
+// refs: DN-92.D1, DN-92.D2
+TEST_F(CLFStrategyTest, RequestCarryingAnEscapedQuoteIsClaimedAndTheEscapeBytesSurvive)
 {
     static constexpr std::string_view kEscapedQuote{
-        R"(10.0.0.1 - - [15/Jan/2024:10:30:00 +0000] "GET /a?q=\" OR 1=1-- HTTP/1.1" 200 12)"};
-    EXPECT_EQ(strategy.confidence(kEscapedQuote), 0.0) << "line = \"" << kEscapedQuote << "\"";
-    EXPECT_FALSE(strategy.parse(kEscapedQuote, arena).has_value())
-        << "an injection probe must be demoted, never deleted; line = \"" << kEscapedQuote << "\"";
+        R"(10.0.0.1 - - [15/Jan/2024:10:30:00 +0000] "GET /a?q=\" OR 1=1-- HTTP/1.1" 500 12)"};
+    EXPECT_GT(strategy.confidence(kEscapedQuote), 0.9) << "line = \"" << kEscapedQuote << "\"";
+    auto result{strategy.parse(kEscapedQuote, arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const auto& pl{result.value()};
+    EXPECT_EQ(pl.level, LogLevel::Error) << "the status is read from BEYOND the escaped quote";
+    EXPECT_EQ(pl.content, R"(GET /a?q=\" 500)")
+        << "the escape bytes must reach content unrewritten; content = \"" << pl.content << "\"";
+}
+
+// invariant: nginx's default combined layout writes the hex form rather than a backslash-quote, and
+// the SAME clause covers it — the backslash consumes the `x`.
+// refs: DN-92.D2
+TEST_F(CLFStrategyTest, RequestCarryingAnNginxHexEscapeIsClaimed)
+{
+    static constexpr std::string_view kHexEscape{
+        R"(10.0.0.1 - - [15/Jan/2024:10:30:00 +0000] "GET /a?q=\x22 HTTP/1.1" 200 12)"};
+    EXPECT_GT(strategy.confidence(kHexEscape), 0.9) << "line = \"" << kHexEscape << "\"";
+    auto result{strategy.parse(kHexEscape, arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    EXPECT_EQ(result.value().content, R"(GET /a?q=\x22 200)")
+        << "content = \"" << result.value().content << "\"";
+}
+
+// invariant: an UNTERMINATED quoted field DECLINES — sv_take_until's no-delimiter branch hands
+// back the whole remainder, which is the hazard the _or_none forms exist for.
+// refs: DN-92.D2, ADR-16.D9
+TEST_F(CLFStrategyTest, UnterminatedRequestFieldIsDeclinedRatherThanDeleted)
+{
+    static constexpr std::string_view kUnterminated{
+        R"(10.0.0.1 - - [15/Jan/2024:10:30:00 +0000] "GET /a HTTP/1.1 200 12)"};
+    static constexpr std::string_view kEscapedTerminator{
+        R"(10.0.0.1 - - [15/Jan/2024:10:30:00 +0000] "GET /a HTTP/1.1\" 200 12)"};
+
+    for (const std::string_view line : {kUnterminated, kEscapedTerminator})
+    {
+        EXPECT_EQ(strategy.confidence(line), 0.0)
+            << "an unterminated field must be DEMOTED with every byte intact; line = \"" << line
+            << "\"";
+        EXPECT_FALSE(strategy.parse(line, arena).has_value()) << "line = \"" << line << "\"";
+    }
 }
 
 TEST_F(SyslogStrategyTest, ParsesBSDLineWithSingleDigitDay)
