@@ -225,7 +225,8 @@ inline constexpr std::array<OtelFieldDescriptor, 4> kOtelFieldCatalog{{
 // invariant: names are unit-explicit, so each value's unit is unambiguous at the key.
 // invariant: the SCHEDULE a field bins onto is a VERSIONED catalog, and its stable string id is the
 // eidos diff's comparability key.
-// refs: SRC-D-W1-2, SRC-D-W1-3, SRC-D-W1-4, SRC-D-W1-5, SRC-D-W1-8, SRC-D-TID-6, SRC-D-TID-14
+// refs: F-SRC-insight-canon:canon.api.cppm:OrdinalFieldDescriptor, SRC-D-W1-8
+// refs: SRC-D-TID-6, SRC-D-TID-14
 enum class OrdinalSchedule : std::uint8_t
 {
     DurationLog2Ns,
@@ -234,7 +235,7 @@ enum class OrdinalSchedule : std::uint8_t
 
 // invariant: canon carries the stable schedule id and the bin count and NEVER bins — the ladder
 // map itself lives metalog-side, which owns binning.
-// refs: SRC-D-W1-2
+// refs: F-SRC-insight-metalog:metalog.api.cppm:ordinal_bin_index
 struct OrdinalScheduleSpec
 {
     OrdinalSchedule schedule;
@@ -269,7 +270,6 @@ inline constexpr std::array<OrdinalScheduleSpec, 2> kOrdinalScheduleCatalog{{
 // EXACT and reads the JSON number's decimal TEXT rather than a double.
 // invariant: a get_double()-then-cast would be the forbidden float-to-int on the
 // deterministic-content path.
-// refs: SRC-D-W1-3
 struct OrdinalFieldDescriptor
 {
     std::string_view key;
@@ -332,7 +332,6 @@ match_ordinal_field(std::string_view key) noexcept
 // exponent-bearing or overflowing token — the observation is then omitted.
 // invariant: integer and decimal-string arithmetic only, never via double; fractional digits beyond
 // the scale's decimal places truncate, deterministically.
-// refs: SRC-D-W1-3
 [[nodiscard]] constexpr std::optional<std::int64_t>
 parse_decimal_scaled(std::string_view text, std::int64_t scale) noexcept
 {
@@ -384,7 +383,6 @@ parse_decimal_scaled(std::string_view text, std::int64_t scale) noexcept
 // NEVER serialized as a param.
 // invariant: field_name is the catalog's STATIC key, stable for the program lifetime and not
 // arena-backed, which is what lets a diff row attribute to it.
-// refs: SRC-D-W1-3
 struct OrdinalObservation
 {
     std::string_view field_name;
@@ -969,7 +967,7 @@ struct CanonicalEvent
     // they are NEVER params.
     // invariant: a span over arena-allocated storage, EMPTY for every non-ordinal line, so the hot
     // path pays nothing input-conditionally.
-    // refs: SRC-D-W1-3
+    // refs: F-SRC-insight-canon:canon.api.cppm:OrdinalObservation
     std::span<const OrdinalObservation> ordinals;
     // invariant: the span ids this span DECLARES a cross-trace edge to; each resolves metalog-side,
     // by span id and across traces, into the SAME distilled topology as intra-trace parentage.

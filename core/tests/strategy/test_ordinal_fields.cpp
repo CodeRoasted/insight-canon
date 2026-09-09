@@ -7,7 +7,7 @@
 // double, which is the determinism pin.
 // invariant: both doors are covered — the escape-free fast path and the simdjson slow path, which
 // an escaped string forces and which exercises the unordered field lookup and cursor behaviour.
-// refs: SRC-D-W1-3
+// refs: F-SRC-insight-canon:canon.api.cppm:OrdinalObservation
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -69,7 +69,7 @@ TEST_F(OrdinalFieldTest, FastPathLatencyMsToNanos)
 TEST_F(OrdinalFieldTest, FastPathDecimalParsedWithoutDouble)
 {
     // invariant: converted by integer and decimal-string arithmetic rather than through a double.
-    // refs: SRC-D-W1-3
+    // refs: F-SRC-insight-canon:canon.api.cppm:OrdinalObservation
     const auto result{tokenizer.process_line(R"({"message":"x","latency_ms":100.5})")};
     ASSERT_TRUE(result.has_value());
     const auto* obs{find(result.value(), "latency_ms")};

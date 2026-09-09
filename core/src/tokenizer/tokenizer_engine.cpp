@@ -115,7 +115,8 @@ struct Tokenizer::Impl
         if (config.recognize_test_where && event.component.empty())
             event.component =
                 insight::recognize_location(parser.attest(parsed_line.content), composed);
-        // refs: SRC-D-OTEL-1, SRC-D-W1-3, SRC-D-OTEL-9, SRC-D-PROV-1
+        // refs: SRC-D-OTEL-1, F-SRC-insight-canon:canon.api.cppm:OrdinalObservation, SRC-D-OTEL-9
+        // refs: SRC-D-PROV-1
         // invariant: trace context, ordinals, span links and the echoed-source flag are CONSUMED in
         // memory and never serialized.
         event.trace = parsed_line.trace;

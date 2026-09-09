@@ -537,7 +537,7 @@ namespace
     // with no allocation, so a non-ordinal line stays zero-cost.
     // invariant: the observations' field names view the declared catalog's STATIC keys, stable for
     // the program lifetime, so only the small POD array is arena-copied.
-    // refs: SRC-D-W1-3
+    // refs: F-SRC-insight-canon:canon.api.cppm:OrdinalObservation
     [[nodiscard]] std::span<const OrdinalObservation>
     store_ordinals(std::span<const OrdinalObservation> observations, ArenaAllocator& arena)
     {
@@ -555,7 +555,7 @@ namespace
     // consumed ordinal observation.
     // invariant: the decimal TEXT becomes the int64 — there is no float-to-int anywhere on this
     // path.
-    // refs: SRC-D-W1-3
+    // refs: F-SRC-insight-canon:canon.api.cppm:parse_decimal_scaled
     [[nodiscard]] std::span<const OrdinalObservation>
     extract_ordinals_fast(const FastJsonResult& fast, ArenaAllocator& arena)
     {
@@ -584,7 +584,7 @@ namespace
     // pre: this MUST run before the OTLP body descent below, which spends the on-demand cursor.
     // invariant: the value's raw decimal TOKEN becomes the int64, never a double read — that is
     // the determinism pin.
-    // refs: SRC-D-W1-3
+    // refs: F-SRC-insight-canon:canon.api.cppm:parse_decimal_scaled
     [[nodiscard]] std::span<const OrdinalObservation>
     extract_ordinals_slow(simdjson::ondemand::object& root, ArenaAllocator& arena)
     {
@@ -757,7 +757,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
 
     // pre: the ordinal route MUST precede the body descent below, which spends the on-demand
     // cursor.
-    // refs: SRC-D-W1-3
+    // refs: F-SRC-insight-canon:canon.api.cppm:OrdinalObservation
     parsed_line.ordinals = extract_ordinals_slow(root, arena);
 
     if (is_otel)

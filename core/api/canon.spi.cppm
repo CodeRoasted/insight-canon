@@ -129,7 +129,7 @@ struct ParsedLine
     OtelTraceContext trace{};
     // invariant: a span over arena-stable storage, empty for every non-ordinal line, consumed
     // metalog-side and never tokenized into the template.
-    // refs: SRC-D-W1-3
+    // refs: F-SRC-insight-canon:canon.api.cppm:OrdinalObservation
     std::span<const OrdinalObservation> ordinals;
     // invariant: the span_ids this span declares a cross-trace edge to, empty for every line
     // without links, consumed metalog-side and never tokenized.
