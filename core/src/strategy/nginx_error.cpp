@@ -26,17 +26,14 @@ std::expected<ParsedLine, std::string> NginxErrorStrategy::parse(std::string_vie
             std::string("NginxErrorStrategy: line does not match Nginx error format"));
     }
 
+    // invariant: the guard above is the ONLY exit — the predicate proved the level bracket is the
+    // next token and that it closes, so the take is total and cannot delete a claimed line.
+    // refs: DN-43.D16
     std::string_view rest{line};
-    const std::string_view ts_str{sv_take_n(rest, 19U)};
+    const std::string_view ts_str{sv_take_n(rest, kNginxTimestampLen)};
     sv_skip_ws(rest);
 
-    const std::string_view level_sv{sv_take_bracketed(rest)};
-    if (level_sv.empty())
-    {
-        INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=NginxError parse miss (no level)");
-        return std::unexpected(
-            std::string("NginxErrorStrategy: line does not match Nginx error format"));
-    }
+    const std::string_view level_sv{sv_take_bracketed_or_none(rest)};
 
     (void)sv_take_token(rest);
 

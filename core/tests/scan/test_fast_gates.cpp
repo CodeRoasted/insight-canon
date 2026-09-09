@@ -120,13 +120,19 @@ TEST(FastGatesPrefix, IsoDatetimeSpace)
     EXPECT_FALSE(is_iso_datetime_space_prefix("2024-04-27T10:15:00 T separator", false));
 }
 
+// invariant: the level bracket must be the NEXT token AND must close — proving CLOSURE here is
+// what lets parse() drop the exit that DELETED a timestamped line whose next token was not `[`.
+// refs: DN-43.D16
 TEST(FastGatesPrefix, NginxError)
 {
     EXPECT_TRUE(is_nginx_error_prefix("2024/04/27 10:15:00 [error] 1#1: *5 connect() failed"));
     EXPECT_FALSE(is_nginx_error_prefix("2024-04-27 10:15:00 [error] dashes, not slashes"));
-    EXPECT_FALSE(is_nginx_error_prefix(
-        "2024/04/27 10:15:00                  [error] bracket past the scan window"))
-        << "the '[' scan is bounded (kNginxScanTo) — a far bracket must not gate";
+    EXPECT_FALSE(is_nginx_error_prefix("2024/04/27 10:15:00 1#1: [error] bracket is not next"))
+        << "a Go-style bracketed tag after a pid must be DEMOTED, not claimed then deleted";
+    EXPECT_FALSE(is_nginx_error_prefix("2024/04/27 10:15:00 [error 1#1: unclosed level bracket"))
+        << "an unclosed '[' would empty content and lose the level";
+    EXPECT_FALSE(is_nginx_error_prefix("2024/04/27 10:15:00 [] 1#1: empty level bracket"))
+        << "the level is exact-match, so an empty bracket names no level";
 }
 
 TEST(FastGatesPrefix, SparkAndHdfs)

@@ -144,6 +144,9 @@ struct TokenShape
 // a function-local copy would be a second constant.
 constexpr std::size_t kBsdMinLen{15U};
 constexpr std::size_t kHdfsMinLen{16U};
+// invariant: `YYYY/MM/DD HH:MM:SS` is fixed width, and NginxErrorStrategy::parse takes exactly
+// this many bytes — one constant, so the predicate and the take cannot drift apart.
+constexpr std::size_t kNginxTimestampLen{19U};
 
 [[nodiscard]] constexpr bool match_iso_date_at(std::string_view str, std::size_t pos) noexcept
 {
@@ -219,6 +222,11 @@ constexpr std::size_t kHdfsMinLen{16U};
     return pos < str.size() && (str[pos] == '.' || str[pos] == ',');
 }
 
+// refs: DN-43.D11, DN-43.D16
+// invariant: the level bracket is proven to be the NEXT token AND to close, so parse()'s take is
+// total and its level-empty exit — which DELETED the line — is gone.
+// invariant: the whitespace run is unbounded exactly as parse()'s sv_skip_ws is; the bounded scan
+// this replaces accepted a `[` that was not the next token at all.
 [[nodiscard]] constexpr bool is_nginx_error_prefix(std::string_view str) noexcept
 {
     static constexpr std::size_t kNginxMinLen{22U};
@@ -229,8 +237,6 @@ constexpr std::size_t kHdfsMinLen{16U};
     static constexpr std::size_t kNginxDd2{9U};
     static constexpr std::size_t kNginxSpaceAt{10U};
     static constexpr std::size_t kNginxTimeAt{11U};
-    static constexpr std::size_t kNginxScanFrom{19U};
-    static constexpr std::size_t kNginxScanTo{32U};
     if (str.size() < kNginxMinLen)
         return false;
     if (!(is_digit(str[0]) && is_digit(str[1]) && is_digit(str[2]) && is_digit(str[3]) &&
@@ -241,10 +247,11 @@ constexpr std::size_t kHdfsMinLen{16U};
         return false;
     if (!match_time_at(str, kNginxTimeAt))
         return false;
-    for (std::size_t i{kNginxScanFrom}; i < str.size() && i < kNginxScanTo; ++i)
-        if (str[i] == '[')
-            return true;
-    return false;
+    const std::size_t bracket{skip_spaces(str, kNginxTimestampLen)};
+    if (bracket >= str.size() || str[bracket] != '[')
+        return false;
+    const auto close = str.find(']', bracket + 1U);
+    return close != std::string_view::npos && close > bracket + 1U;
 }
 
 [[nodiscard]] constexpr bool is_spark_prefix(std::string_view str) noexcept
