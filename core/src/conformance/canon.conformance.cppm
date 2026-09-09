@@ -71,7 +71,7 @@ struct Report
 // seedless, so the report is a pure function of the manifest data.
 [[nodiscard]] Report run(const SemanticPackageManifest& manifest);
 
-// refs: ADR-23, STU-8, SRC-SID-2
+// refs: ADR-23, STU-8, ADR-18.D4
 // post: for every recognition marker, its PAIRED generation row is materialized and canon must
 // recognize the declared kind, child order and payload back.
 // invariant: both projections are read off the MANIFEST, so the rows this closes over are the rows
@@ -122,7 +122,7 @@ std::string marker_probe_for(const IntentMarkerRow& row, std::span<const IntentE
 namespace
 {
 
-    // refs: SRC-II-6
+    // refs: ADR-17.D8
     // invariant: every row key is ASCII and every matcher is a byte comparison, so no
     // locale-sensitive path exists; the property is ASSERTED here rather than argued.
     [[nodiscard]] bool is_ascii(std::string_view str) noexcept
@@ -248,10 +248,11 @@ namespace
                             .detail = "role key \"" + std::string{row.prefix} + "\" (gated to \"" +
                                       std::string{row.dialect_gate} +
                                       "\") FIRED on a stream declaring \"" +
-                                      std::string{kForeignDialect} + "\" — SRC-II-6 gate leak."};
+                                      std::string{kForeignDialect} +
+                                      "\" — dialect-gate leak (ADR-22.D6)."};
             }
         }
-        // refs: SRC-II-6
+        // refs: ADR-22.D6
         // assert: the OWN leg is scored at the row's own Medium, never the kAnyChannel view, where
         // a channel-gated marker is legitimately absent.
         // note: skipping the own leg is what let the leak leg go vacuous.
@@ -271,7 +272,8 @@ namespace
                             .detail = "marker key \"" + std::string{row.prefix} +
                                       "\" (gated to \"" + std::string{row.dialect_gate} +
                                       "\") FIRED on a stream declaring \"" +
-                                      std::string{kForeignDialect} + "\" — SRC-II-6 gate leak."};
+                                      std::string{kForeignDialect} +
+                                      "\" — dialect-gate leak (ADR-22.D6)."};
                 continue;
             }
             return {.name = "dialect_gate.marker_own",
@@ -304,7 +306,8 @@ namespace
                         .detail = "outcome token \"" + std::string{row.token} + "\" (gated to \"" +
                                   std::string{row.dialect_gate} +
                                   "\") RESOLVED on a stream declaring \"" +
-                                  std::string{kForeignDialect} + "\" — SRC-II-6 gate leak."};
+                                  std::string{kForeignDialect} +
+                                  "\" — dialect-gate leak (ADR-22.D6)."};
         }
         // assert: an UNDECLARED stream is fail-closed on DEPTH — no concretely-gated row of any
         // kind may fire, which is the leg that catches a filter that never ran.
@@ -406,7 +409,7 @@ namespace
                 return {.name = "grammar.empty_emit",
                         .passed = false,
                         .detail = "an intent-emit row has an empty prefix."};
-        // refs: ADR-23, SRC-SID-2
+        // refs: ADR-23, ADR-18.D4
         // assert: a reader without a writer is a MANIFEST property, so the runtime kit states it
         // — the concept cannot see an `emits` wired to another array.
         for (const IntentMarkerRow& row : manifest.markers)

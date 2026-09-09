@@ -25,7 +25,7 @@ export std::unique_ptr<insight::tokenization::IFormatStrategy> make_strategy();
 // canon knows the field and knows no value — a package NAME, never an enum.
 export inline constexpr std::string_view kDialect{"gitlab"};
 
-// refs: SRC-II-6, STU-12
+// refs: ADR-17.D1, STU-12
 // invariant: NO `payload_excludes` — a CLOSED exclusion set cannot name the runner's OPEN
 // `step_*` family (579 depth-1 occurrences), so it would mirror the producer and rot.
 // assert: a genuine marker sits at offset 0 of the peeled, ANSI-stripped content and `recognize`
@@ -98,7 +98,7 @@ inline constexpr std::array<OutcomeMarkerRow, 3> kOutcomeMarkers{{
 // a new one; `.version` above moves when WE edit the ruleset.
 export inline constexpr std::array<std::string_view, 1> kDialectRevisions{{"v1"}};
 
-// refs: SRC-SP-7, ADR-23, ADR-22
+// refs: ADR-17.D3, ADR-23, ADR-22
 // invariant: `.version` is immutable-release discipline, `.emits` makes the generation projection
 // identity-bearing, and `.channels = {}` is the degenerate kAnyChannel case.
 // note: no `echoed_source` hook is needed: GitLab's marker phantom dies to anchoring alone

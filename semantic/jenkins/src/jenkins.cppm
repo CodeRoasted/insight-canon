@@ -43,7 +43,7 @@ namespace insight::semantic::jenkins
 // static_asserts it against `kManifest.name`.
 export inline constexpr std::string_view kDialect{"jenkins"};
 
-// refs: SRC-II-6, STU-6
+// refs: ADR-22.D6, STU-6
 // invariant: the rows are DIALECT-GATED to this package: `[Pipeline] ` is Jenkins-runner-specific
 // and must fire on nothing else.
 // invariant: the exclusion set is CLOSED and small because the structural tokens are a fixed
@@ -128,7 +128,7 @@ inline constexpr std::array<OutcomeMarkerRow, 1> kOutcomeMarkers{{
 // Jenkins ships a new console syntax generation.
 export inline constexpr std::array<std::string_view, 1> kDialectRevisions{{"v1"}};
 
-// refs: SRC-SP-7, ADR-23
+// refs: ADR-17.D3, ADR-23
 // invariant: `.version` is immutable-release discipline, and the generation projection `.emits` is
 // identity-bearing, so both are serialized into the semantic identity.
 // assert: the DEPTH claim this vocabulary carries is scoped to DECLARATIVE Pipeline — 100 % stage
@@ -137,7 +137,7 @@ export inline constexpr std::array<std::string_view, 1> kDialectRevisions{{"v1"}
 // the degenerate-closure floor for STRUCTURE.
 // assert: they still get a correct four-class VERDICT, because the `result` is always present and
 // `Finished:` is emitted on every Jenkins job type.
-// refs: SRC-II-4, BIB:intent_identity
+// refs: LSRC-27, BIB:intent_identity
 export inline constexpr SemanticPackageManifest kManifest{
     .name = "jenkins",
     .version = "1.1.0",

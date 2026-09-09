@@ -1,4 +1,4 @@
-// refs: SRC-II-6, STU-6
+// refs: ADR-17.D1, STU-6
 // invariant: this file guards the stage/step VOCABULARY the frozen spike measured on real consoles
 // and graduated into rows — the rows, never canon's walkers.
 // invariant: the guarded semantics are STAGE = a named block open at the container level and
@@ -58,7 +58,7 @@ TEST(JenkinsMarkers, NamedBlockOpenIsAStage)
            "their sequence is not a structural fact and must never be diffed as one";
 }
 
-// refs: SRC-II-9
+// refs: ADR-18.D1
 // invariant: a matrix/parallel leg keeps its axis tuple VERBATIM in the discriminant while
 // downstream canonicalization collapses the class.
 // invariant: that is the guard against the measured phantom vanish/insert storm a masked-away
@@ -113,7 +113,7 @@ TEST(JenkinsMarkers, StructuralTokensAreScaffoldNotQuanta)
     }
 }
 
-// refs: SRC-II-6, ADR-22
+// refs: ADR-22.D6, ADR-22
 // assert: the gate is against the DECLARATION, never against per-line format detection: the old
 // form passed a LogFormat per call and made this a question about the line's own bytes.
 // invariant: a stream that declared no dialect fires nothing — failing closed on depth is not

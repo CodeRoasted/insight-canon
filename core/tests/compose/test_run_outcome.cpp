@@ -198,7 +198,7 @@ TEST(RunOutcomeMap, DialectGatedExactMatch)
     // view, and not in an UNDECLARED stream's view at all.
     // invariant: both are re-derived from the SAME composition, so this exercises the filter rather
     // than a second copy of it.
-    // refs: SRC-II-6
+    // refs: ADR-22.D6
     const ComposedSemantics all{compose(std::array{kOutcomePkg, kOtherGatePkg})};
     EXPECT_FALSE(map_outcome_token("BAD", all.for_stream(kOtherDialect, {})).has_value())
         << "a dialect's verdict token must not resolve on a stream declaring another dialect";

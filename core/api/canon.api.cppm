@@ -85,7 +85,7 @@ struct NgramId
 // distinct rule set from the value masker, which keeps what identity must collapse.
 // invariant: deterministic, ASCII-safe, no float, no regex, no cross-line state; cold path, so it
 // returns an owned string.
-// refs: ADR-17, SRC-II-1, SRC-II-2, SRC-II-6, ADR-17.D3, BIB:intent_identity
+// refs: ADR-17, ADR-18.D1, ADR-17.D3, BIB:intent_identity
 [[nodiscard]] std::string canonicalize_intent(std::string_view name);
 
 // post: a VIEW into name — canon's intent trim bytes removed from both ends, everything else
@@ -103,13 +103,13 @@ struct NgramId
 // DECLARATION, so raw keys pair exactly across runs.
 // invariant: the exact complement of canonicalize_intent — the class masks the tuple, the
 // discriminant keeps it.
-// refs: ADR-18, SRC-II-9
+// refs: ADR-18, ADR-18.D1
 [[nodiscard]] std::string_view discriminant_of(std::string_view name) noexcept;
 
 // post: byte-identical to template_id_of(canonicalize_intent(name)); one call keeps intent_id
 // co-located with its comparability version.
 // invariant: a STRUCTURAL grouping key derived from the marker, never a retained value.
-// refs: SRC-II-1, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext
+// refs: ADR-18.D1, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext
 [[nodiscard]] TemplateId intent_id_of(std::string_view name);
 
 // invariant: location recognition lives on the FACADE, not here — it walks composed location rows
@@ -117,7 +117,7 @@ struct NgramId
 // invariant: the three match families are canon ALGORITHMS; the file-naming vocabulary they match
 // is package DATA.
 // note: the stream rendering below is a diagnostic only; the wire path is render().
-// refs: SRC-II-8, BIB:intent_identity
+// refs: BIB:intent_identity
 inline std::ostream& operator<<(std::ostream& out, const TemplateId& template_id)
 {
     return out << render(template_id);
@@ -1025,7 +1025,7 @@ struct MaskConfig
     // default-path output and no golden.
     // invariant: it does NOT keep the canonicalization generation — the generation names the
     // RULES FUNCTION over the whole config space, not the default slice of it.
-    // refs: SRC-II-8, BIB:intent_identity
+    // refs: ADR-18.D1, BIB:intent_identity
     bool recognize_test_where{false};
 };
 
@@ -1035,7 +1035,7 @@ struct MaskConfig
 // packages own the rule ROWS.
 // invariant: the registry CLASSES live on the facade's composed walkers; the result TYPES stay
 // here, because the spi rows and every downstream consumer reference them.
-// refs: ADR-17, SRC-SP-1
+// refs: ADR-17, ADR-17.D1
 export namespace insight::tokenization
 {
 
@@ -1054,7 +1054,7 @@ export namespace insight::tokenization
 // invariant: a phantom quantum fails to align rather than silently mispairing, which is why the
 // residual cost is a low-severity pair and never a wrong match.
 // invariant: deterministic, ASCII-safe, no cross-line state.
-// refs: SRC-II-2, SRC-II-6, BIB:intent_identity, STU-4
+// refs: ADR-17.D1, BIB:intent_identity, STU-4
 // refs: F-SRC-insight-canon:github.dialect.yaml
 enum class IntentMarkerKind : std::uint8_t
 {
@@ -1083,7 +1083,7 @@ struct IntentMarker
     std::string_view name;
     // invariant: the raw discriminant kept VERBATIM and never masked — the stable declared
     // coordinate separating co-occurring siblings. Empty when the name carries no tuple.
-    // refs: ADR-18, SRC-II-9
+    // refs: ADR-18, ADR-18.D1
     std::string_view discriminant;
     ChildOrder child_order{ChildOrder::Ordered};
     auto operator<=>(const IntentMarker&) const = default;

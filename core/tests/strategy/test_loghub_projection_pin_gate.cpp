@@ -43,7 +43,7 @@
 // which returns BGL's RawText count to 348 460 against a pinned 10.
 // invariant: determinism — byte-only, single-threaded, committed file order, integer counts, no
 // RNG, no clock, no float, no threads, and the arena reset per line as the shipping ingest does.
-// refs: ADR-16.D9, DN-43.D14, DN-43.D15, SRC-SP-1
+// refs: ADR-16.D9, DN-43.D14, DN-43.D15, ADR-17.D1
 #include <gtest/gtest.h>
 
 import std;

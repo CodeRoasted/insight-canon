@@ -200,7 +200,7 @@ export namespace insight::semantic
 // compose.cpp, and no wire field and no MetaLog block.
 // invariant: distinct from the MASKING token kCanonicalizationVersion, whose value canon.api.cppm
 // owns; this one names the GRAMMAR's shape.
-// refs: ADR-2.D5, ADR-17.D4, ADR-22.D8, SRC-SID-3
+// refs: ADR-2.D5, ADR-17.D4, ADR-22.D8
 inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-6"};
 
 // invariant: a DIALECT is a VOCABULARY over a HOST FORMAT — the format owns the layout rule, the
@@ -212,7 +212,7 @@ inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-6"};
 // invariant: an empty ROW gate means "fires on any dialect"; an empty DECLARATION means the caller
 // did not say, which drops every concretely-gated row.
 // invariant: fail-closed on DEPTH, never on the run.
-// refs: ADR-22.D2, ADR-22.D6, SRC-II-6
+// refs: ADR-22.D2, ADR-22.D6
 inline constexpr std::string_view kAnyDialect{};
 
 // post: kAnyDialect always fires; a concrete gate fires on the same declared dialect and on no
@@ -291,7 +291,7 @@ enum class PayloadExtract : std::uint8_t
 // un-hashable and would let the two projections diverge.
 // invariant: a new emit shape is a grammar-version bump, part of the identity, exactly as a new
 // extractor is.
-// refs: SRC-SID-2, STU-8, DN-17.D15
+// refs: ADR-18.D4, STU-8, DN-17.D15
 enum class PayloadEmit : std::uint8_t
 {
     // invariant: dual of PayloadExtract::None — the prefix alone.
@@ -334,7 +334,7 @@ enum class PayloadEmit : std::uint8_t
 
 // invariant: a CLOSED enum selecting and parameterizing one core location-matching ALGORITHM; a new
 // family is a grammar-version bump, part of the identity.
-// refs: SRC-II-8, ADR-2.D7
+// refs: ADR-18.D1, ADR-2.D7
 enum class LocationMatchKind : std::uint8_t
 {
     // invariant: <base>.test.<ext> or <base>.spec.<ext> with ext in params.extensions.
@@ -362,20 +362,20 @@ struct StructuralRoleRow
 // the level-typed alignment declaration — and the payload extractor.
 // invariant: DIALECT-gated by construction: an intent marker names its own package and never fires
 // cross-dialect.
-// refs: SRC-II-6, ADR-18, ADR-22.D6
+// refs: ADR-18, ADR-22.D6
 struct IntentMarkerRow
 {
     std::string_view prefix;
     insight::tokenization::IntentMarkerKind kind;
     insight::tokenization::ChildOrder child_order;
-    // refs: ADR-22.D6, SRC-II-6
+    // refs: ADR-22.D6
     std::string_view dialect_gate{kAnyDialect};
     PayloadExtract extract;
     // invariant: a CLOSED exclusion set over the extracted payload — the row does NOT fire when
     // an entry equals the payload, or the payload starts with an entry followed by a space.
     // invariant: empty for rows without exclusions; the span points at package-static constexpr
     // storage and is serialized into semantic_identity.
-    // refs: SRC-SP-7, STU-6
+    // refs: ADR-17.D3, STU-6
     std::span<const std::string_view> payload_excludes;
     // invariant: the row fires only on a stream the caller declared as this IntentChannel;
     // kAnyChannel, the default, fires on any.
@@ -394,7 +394,7 @@ struct IntentMarkerRow
 // invariant: rows-as-data — the emit shape is the closed PayloadEmit enum, never a callable.
 // invariant: content-hashable exactly as IntentMarkerRow is, so a generation-side change moves
 // semantic_identity as a recognition change does.
-// refs: SRC-SID-2, STU-8, ADR-18
+// refs: ADR-18.D4, STU-8, ADR-18
 struct IntentEmitRow
 {
     std::string_view prefix;
@@ -409,7 +409,7 @@ struct IntentEmitRow
     // drift onto different channels.
     // invariant: it is the MEDIUM SELECTOR's input — a writer picks the emit row whose
     // channel_gate matches, never the first row that matches by array order.
-    // refs: ADR-22.D6, SRC-SID-1
+    // refs: ADR-22.D6
     std::string_view channel_gate{kAnyChannel};
 };
 
@@ -428,7 +428,7 @@ struct LevelLiftRow
 // invariant: infixes and extensions serve TestSpecExtension; SuffixSet reads suffixes alone; and
 // PrefixAndExtension reads extensions plus prefixes OR suffixes, so suffixes serve two kinds.
 // invariant: the spans point at package-static constexpr arrays.
-// refs: SRC-II-8, SRC-SP-7, BIB:intent_identity
+// refs: ADR-18.D1, ADR-17.D3, BIB:intent_identity
 struct LocationRow
 {
     LocationMatchKind kind;
@@ -526,7 +526,7 @@ struct SemanticPackageManifest
     std::string_view name;
     // invariant: version moves when what this package RECOGNIZES or EMITS moves — its rows, their
     // gates, or its code tier — and never for a grammar-shape change or a rename.
-    // refs: SRC-SP-7, ADR-17.D3, DN-17.D22
+    // refs: ADR-17.D3, DN-17.D22
     std::string_view version;
     std::span<const StructuralRoleRow> roles;
     std::span<const IntentMarkerRow> markers;
@@ -535,7 +535,7 @@ struct SemanticPackageManifest
     // invariant: EMPTY for a package that ships no markers.
     // invariant: every package with markers declares the SAME span its Dialect type exposes as
     // emit_markers — one array, two views.
-    // refs: SRC-SID-2, ADR-23, DN-17.D15
+    // refs: ADR-18.D4, ADR-23, DN-17.D15
     std::span<const IntentEmitRow> emits;
     std::span<const LevelLiftRow> level_lifts;
     std::span<const LocationRow> locations;
@@ -553,7 +553,7 @@ struct SemanticPackageManifest
     // fires, unknown is a HARD ERROR listing these names.
     // invariant: the span points at package-static constexpr storage and is serialized into
     // semantic_identity alongside the rows it gates.
-    // refs: ADR-22.D5, ADR-22.D6, SRC-SP-7
+    // refs: ADR-22.D5, ADR-22.D6, ADR-17.D3
     std::span<const std::string_view> channels;
     // invariant: the package's declared DIALECT REVISION vocabulary — which VENDOR generation of
     // the dialect these rows recognize.
@@ -569,7 +569,7 @@ struct SemanticPackageManifest
     // wire surface, which has a different owner and external implementers.
     // invariant: the span points at package-static constexpr storage and is serialized at the END
     // of the manifest preimage.
-    // refs: ADR-17.D9, ADR-22.D8, SRC-SP-7
+    // refs: ADR-17.D9, ADR-22.D8, ADR-17.D3
     std::span<const std::string_view> dialect_revisions;
     // invariant: both code-tier hooks are nullable; a data-only package leaves each null.
     StrategyFactory strategy{nullptr};
@@ -760,7 +760,7 @@ all_packages_named(std::span<const SemanticPackageManifest> packages) noexcept
 
 // invariant: every recognition marker has a paired generation row — no reader without a writer;
 // consteval, so a package static_asserts it over its constexpr rows.
-// refs: SRC-SID-2, STU-8
+// refs: ADR-18.D4, STU-8
 [[nodiscard]] consteval bool all_intents_paired(std::span<const IntentMarkerRow> markers,
                                                 std::span<const IntentEmitRow> emits) noexcept
 {
@@ -772,7 +772,7 @@ all_packages_named(std::span<const SemanticPackageManifest> packages) noexcept
 // every reader row is paired.
 // invariant: a dialect whose type ships a recognition row without its generation row does NOT
 // compile where the concept is required.
-// refs: SRC-SID-2, STU-8
+// refs: ADR-18.D4, STU-8
 template <typename Dialect>
 concept DialectIntent = requires {
     { Dialect::markers } -> std::convertible_to<std::span<const IntentMarkerRow>>;

@@ -16,7 +16,7 @@ export import insight.canon.spi;
 namespace insight::semantic::test_frameworks
 {
 
-// refs: SRC-SP-7
+// refs: ADR-17.D3
 // invariant: LocationRow holds spans into these arrays, so each keeps package-static constexpr
 // storage for as long as a composed manifest can be read.
 inline constexpr std::array<std::string_view, 2> kTestSpecInfixes{".test.", ".spec."};
@@ -53,7 +53,7 @@ inline constexpr std::array<LocationRow, 3> kLocations{{
 // identity digests finds the same field in each of them.
 export inline constexpr std::array<std::string_view, 1> kDialectRevisions{{"v1"}};
 
-// refs: SRC-SP-7
+// refs: ADR-17.D3
 // invariant: compose orders packages by name, so these rows follow github's in the canonical order
 // that the identity digest is taken over.
 export inline constexpr SemanticPackageManifest kManifest{

@@ -7,7 +7,7 @@
 // ZERO heap allocations, measured by a global operator-new counter.
 // invariant: that counter is legitimate in a test binary and NEVER in the shipped library.
 // invariant: determinism — byte-only, with no RNG, clock or float.
-// refs: SRC-SP-5
+// refs: LSRC-28
 #include <cstdlib>
 #include <new>
 
@@ -53,7 +53,7 @@ using insight::tokenization::recognize;
 // canon library, where it would intercept every product allocation.
 // invariant: that is exactly why the no-allocation leg is homed HERE, in core, rather than in the
 // installed conformance module.
-// refs: SRC-SP-5
+// refs: LSRC-28
 namespace
 {
 thread_local unsigned g_alloc_armed{0};
@@ -112,7 +112,7 @@ void operator delete[](void* ptr, std::size_t) noexcept
 // invariant: the synthetic vocabulary is deliberately NOT any real ecosystem's tokens, so a failure
 // implicates the ALGORITHM and never a package's data.
 // invariant: static storage, because the composed rows' views point here.
-// refs: SRC-SP-7
+// refs: ADR-17.D3
 namespace
 {
 // invariant: TWO synthetic packages, because the gate is a composed package NAME and the
@@ -134,7 +134,7 @@ constexpr std::array<StructuralRoleRow, 4> kSynthRoles{{
 }};
 
 // invariant: one intent marker, concretely gated, with a remainder-after-prefix payload.
-// refs: SRC-II-6
+// refs: ADR-22.D6
 constexpr std::array<IntentMarkerRow, 1> kSynthMarkers{{
     {.prefix = "STEP ",
      .kind = IntentMarkerKind::Step,
@@ -427,7 +427,7 @@ TEST(SemanticWalkers, LevelLiftUnclaimedLineIsUnknown)
 }
 
 // invariant: the recognizer probe path performs ZERO heap allocations — it is a pure byte scan.
-// refs: SRC-SP-5
+// refs: LSRC-28
 TEST(SemanticWalkers, RecognizersDoNotHeapAllocate)
 {
     // invariant: composition MAY allocate, so it is done BEFORE the counter is armed.
@@ -449,6 +449,6 @@ TEST(SemanticWalkers, RecognizersDoNotHeapAllocate)
         observed = guard.count();
     }
     EXPECT_EQ(observed, 0U)
-        << "the composed recognition walkers must be heap-free (SRC-SP-5): observed " << observed
+        << "the composed recognition walkers must be heap-free (LSRC-28): observed " << observed
         << " allocation(s) over the probe path.";
 }

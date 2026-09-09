@@ -295,7 +295,7 @@ TEST(CompositionDeathTest, UnnamedPackageFailsClosedAtRuntime)
 
 // invariant: the degenerate core-only composition is a defined, RUNNABLE state at the composition
 // layer.
-// refs: SRC-II-4
+// refs: LSRC-27
 TEST(Composition, DegenerateCoreOnlyRuns)
 {
     const ComposedSemantics core{compose({})};

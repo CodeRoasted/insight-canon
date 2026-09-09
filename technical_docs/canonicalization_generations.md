@@ -233,7 +233,7 @@ offset 0 — so the location's START was never established, and a producer annot
 with no separator was published INSIDE the resolved WHERE
 (`##[error]fs/rc/rcserver/rcserver_test.go`). A `loc_is_path` byte class walked backwards from the
 match now establishes the start: the exact mirror of the boundary test at the other end, and
-semantic-unaware (`SRC-SP-1`) — no dialect literal, no marker table.
+semantic-unaware (`ADR-17.D1`) — no dialect literal, no marker table.
 
 `template_str` / `template_id` do NOT move for this rider (the masker is untouched), and neither
 does any `dedup_id_of`, which hashes the class tag and the template ids only. The serialized

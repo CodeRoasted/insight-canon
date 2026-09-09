@@ -35,7 +35,7 @@ export namespace insight::transport
 // means "the Nth shape", and which change causes the Nth shape is not knowable in advance.
 inline constexpr std::string_view kTransportCatalogVersion{"transport-catalog-3"};
 
-// refs: ADR-2.D7, ADR-23.D3, SRC-SID-2
+// refs: ADR-2.D7, ADR-23.D3
 // invariant: NORMATIVE — catalogue enum values are IDENTITY-BEARING: new members APPEND, a value
 // is never renumbered and never inserted mid-enum.
 // invariant: both enums below serialize as their `uint8_t` VALUE on every row, so inserting a
@@ -116,7 +116,7 @@ struct TransportTransformRow
     bool strip_leading_space;
 };
 
-// refs: ADR-8, ADR-17, ADR-23.D3, SRC-SP-1
+// refs: ADR-8, ADR-17, ADR-23.D3, ADR-17.D1
 // invariant: a per-line RFC 3339 prefix plus a separator space, 28 bytes wide.
 // invariant: TOTAL scope — every line the serving API stamps carries it — so it is admissible
 // transport, and it is the one transform with BOTH a corpus and an INDEPENDENT oracle.
@@ -186,7 +186,7 @@ inline constexpr std::size_t kBracketedTimestampPrefixBytes{27U};
     return nullptr;
 }
 
-// refs: BIB:determinism_model, BIB:jenkins_dialect, DN-69.D3, SRC-SID-3
+// refs: BIB:determinism_model, BIB:jenkins_dialect, DN-69.D3
 // invariant: the WRITER dual of the catalogue, and there is no third spelling: canon owns every
 // transform ALGORITHM while the caller supplies the stamp value and the plumbing.
 // post: it appends the row's line prefix — stamp plus the single separator space — or answers
@@ -307,7 +307,7 @@ struct RawPeeledLine
     }
 };
 
-// refs: ADR-23, SRC-II-1, SRC-SID-1
+// refs: ADR-23, ADR-18.D4
 // invariant: the resolved stack is built ONCE per stream, from the declaration, BEFORE the first
 // line, and is cheap to hold: a handful of pointers to catalogue-static rows.
 // invariant: NORMATIVE, and the reason this type exists: LINE IDENTITY IS A PURE FUNCTION OF PEELED

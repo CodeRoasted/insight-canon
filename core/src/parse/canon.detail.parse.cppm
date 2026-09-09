@@ -15,7 +15,7 @@ export namespace insight::tokenization
 class FormatDetector
 {
   public:
-    // refs: ADR-17, SRC-SP-1
+    // refs: ADR-17, ADR-17.D1
     // invariant: only REPRESENTATION strategies are named here; every DIALECT strategy arrives as a
     // factory carried by `composed`, so canon core names no dialect.
     explicit FormatDetector(const insight::semantic::ComposedSemantics& composed);

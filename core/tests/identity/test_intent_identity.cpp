@@ -10,7 +10,7 @@
 // now the composed semantic identity, pinned in the composition suite.
 // invariant: a diff here is a cross-run COMPARABILITY BREAK and not a retune; fix the code, never
 // the assertion.
-// refs: SRC-II-2
+// refs: ADR-18.D1
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -52,7 +52,7 @@ void expect_same_intent(std::string_view lhs, std::string_view rhs)
 }
 
 // invariant: two distinct WHERE must stay DISTINCT — the over-collapse guard.
-// refs: SRC-II-2
+// refs: ADR-18.D1
 void expect_distinct_intent(std::string_view lhs, std::string_view rhs)
 {
     EXPECT_NE(intent_id_of(lhs), intent_id_of(rhs))
@@ -84,7 +84,7 @@ TEST(IntentCanonicalize, MatrixLegsCollapseToOneClass)
 // invariant: a single BARE digit is a distinct WHERE ordinal and is KEPT verbatim.
 // invariant: collapsing it would OVER-MERGE — two shards are two instances, ordinal-separated
 // downstream, never fused into one class here.
-// refs: SRC-II-2
+// refs: ADR-18.D1
 TEST(IntentCanonicalize, SingleBareDigitKeptNoOverCollapse)
 {
     expect_canon({"Shard 1", "Shard 1"});

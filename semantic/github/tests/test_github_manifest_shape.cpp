@@ -1,4 +1,4 @@
-// refs: SRC-SP-7, DN-17.D22
+// refs: ADR-17.D3, DN-17.D22
 // invariant: canon's kit asks only whether the rows a package ships are WELL-FORMED and
 // deliberately admits an EMPTY package, so nothing in canon says THIS one ships any row.
 // assert: all fourteen manifest members are bound, so a FIFTEENTH is a compile error here.
@@ -18,7 +18,7 @@ TEST(GithubManifestShape, ShipsTheDeclaredRulesetShapeAndNothingElse)
                                  "row carries and what a caller declares; actual: "
                               << name;
     EXPECT_EQ(version, "1.4.0") << "ruleset version moved without this pin moving with it — if the "
-                                   "rows below changed, both edits belong in one pass (SRC-SP-7); "
+                                   "rows below changed, both edits belong in one pass (ADR-17.D3); "
                                    "actual: "
                                 << version;
 

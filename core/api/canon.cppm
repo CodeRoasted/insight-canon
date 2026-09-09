@@ -139,7 +139,7 @@ class Tokenizer
 export namespace insight
 {
 
-// refs: ADR-17.D5, SRC-II-6
+// refs: ADR-17.D5, ADR-17.D1
 // invariant: canon owns the run-outcome ALGORITHMS — the token map, the console-tail scan and the
 // precedence resolver; the composed outcome rows are the DATA.
 // post: `map_outcome_token` maps a native verdict token through the RESOLVED VIEW's
@@ -264,7 +264,7 @@ resolve_run_outcome(SideInputVerdict side_input, const RunOutcomeScan& scan,
                     const insight::semantic::ComposedSemantics& stream_view,
                     const insight::semantic::ComposedSemantics& vocabularies);
 
-// refs: BIB:intent_identity, SRC-II-8
+// refs: BIB:intent_identity, ADR-18.D1
 // post: returns the test-file WHERE coordinate as a view into the content's bytes, or empty when no
 // composed location row matches.
 // invariant: canon owns the three `LocationMatchKind` algorithms; the composed rows are the

@@ -108,7 +108,7 @@ struct Tokenizer::Impl
         // on this line; six strategies rebuild content into arena bytes.
         event.structural_role =
             insight::tokenization::classify(parser.attest(parsed_line.content), composed);
-        // refs: SRC-II-8, SRC-SP-1
+        // refs: ADR-18.D1, ADR-17.D1
         // invariant: semantic-unaware — no dialect literal; a format carrying a native component
         // skips, and an unrecognized location returns empty so nothing is faked.
         // note: config-gated and default-OFF, so every default path stays byte-identical.

@@ -91,7 +91,7 @@ std::string_view trimmed_intent_name(std::string_view name) noexcept
     return name;
 }
 
-// refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate, SRC-II-2, STU-4
+// refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate, STU-4
 // invariant: a DISTINCT rule set from the value masker: the masker keeps structure to distinguish,
 // identity canonicalization collapses it to align.
 // invariant: the rules run left-to-right in one pass at word boundaries, R1 before R3 so a dotted
@@ -139,7 +139,7 @@ std::string canonicalize_intent(std::string_view name)
     return out;
 }
 
-// refs: SRC-II-1
+// refs: ADR-18.D1
 TemplateId intent_id_of(std::string_view name)
 {
     return template_id_of(canonicalize_intent(name));
@@ -147,7 +147,7 @@ TemplateId intent_id_of(std::string_view name)
 
 std::string_view discriminant_of(std::string_view name) noexcept
 {
-    // refs: ADR-18, SRC-II-9, DN-38.D3
+    // refs: ADR-18, ADR-18.D1, DN-38.D3
     // post: the envelope of the masked spans, first span's start to last span's end, class material
     // between them included; empty when no span is claimed.
     // invariant: (class, envelope) separates two names whose spans occupy the same class positions;

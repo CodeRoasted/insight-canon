@@ -132,7 +132,7 @@ TEST(GithubMarkers, UndeclaredChannelFiresNoStepRowEitherWay)
         << "same, for the annotated materialization";
 }
 
-// refs: SRC-II-6
+// refs: ADR-22.D6
 // invariant: the dialect gate is the stream's DECLARATION, taken once before the first line, and
 // never the line's own content as a per-line detector's winner once was.
 TEST(GithubMarkers, DialectGatedToTheDeclaringStream)

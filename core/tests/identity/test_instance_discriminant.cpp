@@ -11,7 +11,7 @@
 // invariant: fix the CODE, never the assertion.
 // invariant: the child-order marker-row property is NOT here — it migrated with the dialect
 // marker VOCABULARY to that package's own suite.
-// refs: SRC-II-9
+// refs: ADR-18.D1
 #include <array>
 #include <cstddef>
 #include <gtest/gtest.h>

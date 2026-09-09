@@ -42,7 +42,7 @@ namespace
 }
 } // namespace
 
-// refs: SRC-II-6
+// refs: ADR-17.D5
 // invariant: UNSTABLE is its own class and is never folded into Failure or Success; NOT_BUILT is a
 // MAPPING to Unknown rather than a miss, which is why its arm asserts a value is present.
 // invariant: an unmapped token stays unmapped, and the map is dialect-gated: on a stream that

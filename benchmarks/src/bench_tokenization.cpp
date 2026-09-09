@@ -151,7 +151,7 @@ void BM_TokenizationThroughput(benchmark::State& state)
     run_throughput(state, composed);
 }
 
-// refs: SRC-SP-5
+// refs: LSRC-28
 void BM_TokenizationThroughputDegenerate(benchmark::State& state)
 {
     static const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};

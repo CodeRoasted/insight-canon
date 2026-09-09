@@ -173,7 +173,7 @@ insight-canon/
 │   ├── gitlab/             insight_semantic_gitlab — GitLab CI dialect (rows + strategy)
 │   ├── jenkins/            insight_semantic_jenkins — Jenkins dialect (rows)
 │   └── test_frameworks/    insight_semantic_test_frameworks — test-file location families
-├── benchmarks/             insight_canon_bench — the composed perf harness (SRC-SP-5 gate)
+├── benchmarks/             insight_canon_bench — the composed perf harness (the LSRC-28 gate)
 ├── proof/                  Public determinism proof gate (composes core + every package)
 ├── scripts/                det_public_proof.sh · sp1_semantic_unawareness_lint.sh · download_logs.sh
 │   └── tests/              det_public_proof_reporting_test.sh — the proof's failure paths, desk-runnable

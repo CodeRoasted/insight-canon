@@ -19,7 +19,7 @@ dialect:
   name: github
   version: "1.4.0"
   why:
-    - "SRC-SP-7 keys identity on CONTENT, not on spelling: `version:` moves when what this package"
+    - "ADR-17.D3 keys identity on CONTENT, not on spelling: `version:` moves when what this package"
     - "RECOGNIZES or EMITS moves — its rows, their gates, or its code tier — and never for a"
     - "grammar-shape change or a rename. The discipline and the alternative it rejects are"
     - "ADR-17.D3's; DN-17.D22 is the slot that applied it to the grammar-6 widening and ruled that"

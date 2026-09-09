@@ -13,11 +13,11 @@ class InsightCanonBenchConan(ConanFile):
     license = "Apache-2.0"
     url = "https://github.com/CodeRoasted/insight-canon"
     description = (
-        "InSight Canon composed benchmark harness (ADR-17.D8 · SRC-SP-5). Measures the tokenization "
+        "InSight Canon composed benchmark harness (ADR-17.D8 · LSRC-28). Measures the tokenization "
         "hot path under the COMPOSED semantic set (github + test_frameworks) against the "
         "degenerate core-only composition, in one binary — the per-line-cost gate for every "
         "composition-mechanism change. A leaf package by necessity: linking the vocabulary "
-        "packages from the core build would invert the SRC-SP-1 / R1 dependency arrow (core must "
+        "packages from the core build would invert the ADR-17.D1 / R1 dependency arrow (core must "
         "never depend on a semantic package), so the perf gate lives where the composition "
         "point does — above them all."
     )

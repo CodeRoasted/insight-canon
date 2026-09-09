@@ -1,4 +1,4 @@
-// refs: SRC-II-6, STU-12
+// refs: ADR-17.D1, STU-12
 // invariant: every byte form here is verbatim from marker_corpus_v1, never invented — the
 // vocabulary was measured on real traces and then graduated into rows.
 // note: determinism — byte-only recognition over the composed rows, no RNG, clock or float

@@ -54,7 +54,7 @@ namespace
 
     // post: a stable index permutation by package name, compared byte-wise and locale-independent.
     // invariant: a name tie is impossible; the version tiebreak keeps the sort total regardless.
-    // refs: SRC-SP-7
+    // refs: ADR-17.D3
     [[nodiscard]] std::vector<std::size_t>
     canonical_order(std::span<const SemanticPackageManifest> packages)
     {
@@ -143,7 +143,7 @@ namespace
             append_u8(out, static_cast<std::uint8_t>(row.outcome));
         }
         // note: two writers materializing one intent differently are two rulesets.
-        // refs: SRC-SID-2, ADR-18.D4
+        // refs: ADR-18.D4
         append_u32_le(out, static_cast<std::uint32_t>(pkg.emits.size()));
         for (const IntentEmitRow& row : pkg.emits)
         {

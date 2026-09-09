@@ -24,7 +24,7 @@ namespace
         return loc_is_lower(chr) || (chr >= 'A' && chr <= 'Z') || (chr >= '0' && chr <= '9') ||
                chr == '_';
     }
-    // refs: SRC-SP-1, F-SRC-insight-canon:test_semantic_walkers.cpp
+    // refs: ADR-17.D1, F-SRC-insight-canon:test_semantic_walkers.cpp
     [[nodiscard]] constexpr bool loc_is_path(char chr) noexcept
     {
         return loc_is_word(chr) || chr == '/' || chr == '\\' || chr == '.' || chr == '-' ||

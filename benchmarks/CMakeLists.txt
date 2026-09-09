@@ -1,11 +1,11 @@
 ###########################################################
-#  insight_canon_bench — the composed benchmark harness (ADR-17.D8 · SRC-SP-5)
+#  insight_canon_bench — the composed benchmark harness (ADR-17.D8 · LSRC-28)
 #
 #  Consumes canon + the two semantic packages as EXTERNAL module libraries (the det_proof /
 #  test_package consumption shape — not a module-member rebuild), so the measured object is the
 #  shipped library build. Two arms in one binary: BM_TokenizationThroughput composes the real
 #  vocabulary set; the Degenerate arm composes {}. Their delta on a non-dialect corpus is what
-#  measures SRC-SP-5 — see canon.compose.cppm for the contract.
+#  measures LSRC-28 — see canon.compose.cppm for the contract.
 ###########################################################
 cmake_minimum_required(VERSION 3.28)
 

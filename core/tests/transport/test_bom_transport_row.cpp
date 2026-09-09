@@ -243,7 +243,7 @@ TEST(BomTransportRow, RowShapeIsExactlyWhatTheDesignDecided)
     ASSERT_NE(row, nullptr) << kRowAbsent;
 
     EXPECT_EQ(row->name, kBomRow)
-        << "the name is DELIVERY-shaped, never ecosystem-shaped: ADR-17 (SRC-SP-1) forbids an "
+        << "the name is DELIVERY-shaped, never ecosystem-shaped: ADR-17.D1 forbids an "
            "ecosystem literal in core, and the catalogue's own rule names a row for the byte "
            "grammar it peels. `gha-bom` is doubly excluded — any UTF-8 delivery declares this row.";
 

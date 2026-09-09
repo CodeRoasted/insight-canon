@@ -1,3 +1,14 @@
+/***************************************************************************************************
+D-LSRC-28 — composition is HOT-PATH-INVISIBLE: one more package costs an unclaimed line nothing
+Absorbs the retired form-2 code SP-5 (2026-09-09). Composing MORE semantic packages costs the
+tokenizer nothing on a line no package claims, and that is a MEASUREMENT, never an assertion. Three
+mechanism constraints carry it: no unconditional per-token indirection, no per-line allocation on
+the recognizer probe path, and rows partitioned by format. The throughput benchmark over the
+composed set against its Degenerate control arm (`compose({})`), on a corpus carrying no dialect
+content, IS the claim; every composition-mechanism change re-runs it, and the gate lives in the
+bench leaf because that leaf may link the vocabulary packages core never may. The no-allocation
+leg is homed in the core test binary, where a global `operator new` override is legitimate.
+***************************************************************************************************/
 // refs: ADR-17, ADR-17.D2, ADR-17.D3
 // invariant: a consumer binary names its composition ONCE and threads the result into every
 // Tokenizer; composition is STATIC — fixed by which manifests the call names.
@@ -9,16 +20,7 @@
 // constexpr `find_conflict`, and a startup fatal in the runtime compose.
 // invariant: IDENTITY-BEARING — the composed rule set carries a content hash over its canonical
 // serialization, and the transport catalogue's version and rows enter it too.
-// refs: ADR-17.D3, SRC-SP-5
-// invariant: HOT-PATH-INVISIBLE — composing MORE packages costs the tokenizer nothing on a line
-// no package claims, and that is a MEASUREMENT rather than an assertion.
-// invariant: three mechanism constraints carry it: no unconditional per-token indirection, no
-// per-line allocation on the recognizer probe path, and rows partitioned by format.
-// assert: the throughput benchmark over the composed set against its Degenerate control arm
-// (`compose({})`), on a corpus carrying no dialect content, IS that claim.
-// invariant: every composition-mechanism change re-runs it, and the gate lives in the bench leaf
-// because that leaf may link the vocabulary packages core never may.
-// refs: SRC-SP-1
+// refs: ADR-17.D1
 // invariant: public and installed; the facade `export import`s this module, and it plain-imports
 // the provider spi so the provider contract stays off a consumer's default surface.
 module;
@@ -102,7 +104,7 @@ inline constexpr std::string_view kConflictKindPackageName{"package_name"};
 [[nodiscard]] constexpr ConflictInfo
 find_conflict(std::span<const SemanticPackageManifest> packages) noexcept;
 
-// refs: SRC-SP-7
+// refs: ADR-17.D3
 // invariant: the composed rule set: the canonically-ordered, conflict-free tables the core
 // mechanisms walk, the code-tier seams, the package list and the content hash.
 // invariant: it OWNS its row storage — small PODs copied from the manifest spans in canonical

@@ -10,7 +10,7 @@
 // invariant: DEFAULT-OFF is the load-bearing invariant — with the flag off the component is
 // byte-identical, so the gated block stays ADDITIVE and the wire version does not move.
 // invariant: determinism — byte-only, with no RNG, clock or float.
-// refs: SRC-II-8, SRC-SP-1
+// refs: ADR-18.D1, ADR-17.D1
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -57,7 +57,7 @@ constexpr SemanticPackageManifest kManifest{.name = "synth_loc",
 // invariant: a line whose synthetic test-file token routes to raw text and carries no native
 // component — the empty-component tier the identity-derived WHERE populates.
 // invariant: FORMAT-AGNOSTIC by construction, which is the regression guard.
-// refs: SRC-SP-1
+// refs: ADR-17.D1
 constexpr std::string_view kTestLine{"PASS src/auth/login.chk.aa"};
 constexpr std::string_view kNonTestLine{"Syncing repository acme/widget"};
 // invariant: the same token with a producer's annotation glued to it and no separator — the shape
@@ -78,7 +78,7 @@ TEST(WhereWiring, FlagOnPopulatesTestFileWhereOnEmptyComponentLine)
     ASSERT_TRUE(result.has_value()) << result.error();
     const auto& ev{result.value()};
     EXPECT_NE(ev.format, LogFormat::GitHubActions)
-        << "SRC-SP-1 guard: the wiring must fire on a NON-GHA line (no dialect literal in core)";
+        << "ADR-17.D1 guard: the wiring must fire on a NON-GHA line (no dialect literal in core)";
     EXPECT_EQ(ev.component, "src/auth/login.chk.aa")
         << "identity-derived WHERE not populated; component=\"" << ev.component << '"';
 }

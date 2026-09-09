@@ -76,7 +76,7 @@ TEST(GithubOutcome, TheSevenNativeConclusionStringsMap)
     // assert: GHA ships no native UNSTABLE string — the class is core's, and the Jenkins literal
     // must not leak into this dialect's vocabulary.
     EXPECT_FALSE(map_outcome_token("UNSTABLE", composed).has_value());
-    // refs: SRC-II-6
+    // refs: ADR-17.D5
     EXPECT_FALSE(map_outcome_token("SUCCESS", composed).has_value())
         << "GHA conclusions are lowercase — the uppercase form is Jenkins data, not GHA data";
     const ComposedSemantics undeclared{undeclared_stream()};

@@ -1,4 +1,4 @@
-// refs: ADR-16.D7, ADR-16.D8, ADR-21.D4, DN-18.D1, ADR-7.D3, SRC-SP-1
+// refs: ADR-16.D7, ADR-16.D8, ADR-21.D4, DN-18.D1, ADR-7.D3, ADR-17.D1
 // invariant: prints counts, prefix shape LETTERS and the matched level word — never any other
 // byte of a corpus line.
 #include <cstdio>

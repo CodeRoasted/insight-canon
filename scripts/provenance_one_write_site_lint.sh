@@ -108,7 +108,7 @@ BRACE_RE="${FIELD}[[:space:]]*\{"
 DECL_RE="\bbool[[:space:]]+${FIELD}[[:space:]]*\{"
 
 # Comment-stripping, string-literals preserved, newline-preserving for block
-# comments so reported line numbers stay true. Same helper as the SRC-SP-1 lint.
+# comments so reported line numbers stay true. Same helper as the semantic-unawareness lint.
 strip_comments() {
   perl -0777 -pe '
     s{

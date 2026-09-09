@@ -13,7 +13,7 @@ jobs:
     # No `with:` at all: every gate in the reusable workflow defaults TRUE, so a caller that says
     # nothing is fully gated, and a hole would have to be a written line here.
 
-  # SRC-SP-1 (ADR-17.D1): canon core is semantic-unaware — no ecosystem literal fused into the
+  # ADR-17.D1: canon core is semantic-unaware — no ecosystem literal fused into the
   # mechanism. Canon-repo-local (the deny-list is canon-specific, so it stays here, not in the shared
   # reusable lint). Gates PRs directly and the tag via release.yaml's `lint` job. Runs no package code
   # — a pure greppable scrub over src/ + api/ — so it needs only checkout + perl (preinstalled).
@@ -24,7 +24,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v5
-      - name: SRC-SP-1 — canon core carries no behavioral ecosystem literal
+      - name: ADR-17.D1 — canon core carries no behavioral ecosystem literal
         run: bash scripts/sp1_semantic_unawareness_lint.sh
 
       # DN-29.D14 / DN-32.D3 — on both provenance pairs the seam keeps the plain datum + a separate

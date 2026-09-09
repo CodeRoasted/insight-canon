@@ -1,4 +1,4 @@
-// refs: SRC-II-8
+// refs: ADR-18.D1
 // refs: F-SRC-insight-canon:test_semantic_walkers.cpp
 // invariant: the matching mechanism is canon's and the vocabulary asserted here is this package's
 // kLocations rows, so the knowledge test homes in this package.
