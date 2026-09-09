@@ -177,6 +177,40 @@ TEST_F(FormatDetectorTest, DetectsLog4j)
     EXPECT_EQ(s->format(), LogFormat::Log4j);
 }
 
+// invariant: COLD DETECTION, not a direct parse() call — the OpenStack layout begins with a
+// FILENAME, so the leading-date candidate gate never offered Log4j at all.
+// invariant: the branch was reachable only through the sticky format latch or an explicit set.
+// invariant: the arm asserts the PROJECTION as well as the routing, because an arm checking only
+// the routed format is satisfied by a strategy that then publishes the whole line as content.
+// invariant: the published render carried this corpus as 81 whole-line raw-text templates with
+// every level read Unknown.
+// refs: DN-43.D19
+TEST_F(FormatDetectorTest, DetectsTheOpenStackLayoutFromCold)
+{
+    ArenaAllocator arena{4096};
+    static constexpr std::string_view kOpenStack{
+        "nova-api.log.1.2017-05-16_13:53:08 2017-05-16 00:00:00.008 25746 INFO "
+        "nova.osapi_compute.wsgi.server [req-38101a0b-2096-447d-96ea-a692162415ae "
+        "113d3a99c3da401fbd62cc2caa5b96d2 54fadb412c4e40cdbaed9335e4c35a9e - - -] "
+        R"(10.11.10.1 "GET /v2/54fadb412c4e40cdbaed9335e4c35a9e/servers/detail HTTP/1.1" )"
+        "status: 200 len: 1893 time: 0.2477829"};
+
+    auto* strategy{detector.detect(kOpenStack)};
+    ASSERT_NE(strategy, nullptr);
+    ASSERT_EQ(strategy->format(), LogFormat::Log4j) << "routed to " << to_string(strategy->format())
+                                                    << ", expected Log4j\n  line: " << kOpenStack;
+
+    auto parsed{strategy->parse(kOpenStack, arena)};
+    ASSERT_TRUE(parsed.has_value()) << parsed.error();
+    EXPECT_EQ(parsed.value().component, "nova.osapi_compute.wsgi.server")
+        << "component = \"" << parsed.value().component << "\"";
+    EXPECT_EQ(parsed.value().level, LogLevel::Info)
+        << "the declared level must be READ, not left Unknown by a raw-text fallback";
+    EXPECT_TRUE(parsed.value().timestamp.has_value());
+    EXPECT_NE(parsed.value().content, kOpenStack)
+        << "the whole line reached content, so the door is still shut";
+}
+
 TEST_F(FormatDetectorTest, DetectsSparkHDFS)
 {
     auto* s{detector.detect("17/06/09 20:10:40 INFO executor.CoarseGrainedExecutorBackend: "

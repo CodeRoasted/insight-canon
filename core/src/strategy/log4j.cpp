@@ -16,37 +16,6 @@ import insight.canon.detail.scan;
 namespace insight::tokenization
 {
 
-namespace
-{
-    // post: true, with the index where the timestamp begins, when the line carries one.
-    constexpr bool find_log4j_ts_start(std::string_view line, std::size_t& ts_start) noexcept
-    {
-        static constexpr std::size_t kIsoTimestampMinLen{20U};
-
-        if (is_iso_datetime_space_prefix(line, /*require_fraction=*/true))
-        {
-            ts_start = 0;
-            return true;
-        }
-        // invariant: the search for an optional leading prefix is BOUNDED, so a line that carries
-        // no timestamp at all costs a bounded scan rather than a whole-line one.
-        constexpr std::size_t kScanLimit{96U};
-        const std::size_t limit{line.size() < kScanLimit ? line.size() : kScanLimit};
-        for (std::size_t i{1U}; i + kIsoTimestampMinLen <= limit; ++i)
-        {
-            if (!is_space(line[i - 1U]))
-                continue;
-            if (is_iso_datetime_space_prefix(line.substr(i), /*require_fraction=*/true))
-            {
-                ts_start = i;
-                return true;
-            }
-        }
-        return false;
-    }
-
-} // namespace
-
 std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view line,
                                                             ArenaAllocator& /*arena*/) const
 {

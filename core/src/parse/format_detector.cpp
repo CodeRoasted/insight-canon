@@ -175,7 +175,8 @@ namespace
         if (looks_like_android_logcat(line))
             candidates.add(LogFormat::AndroidLogcat);
 
-        if (looks_like_yyyy_mm_dd(line))
+        const bool iso_date_prefix{looks_like_yyyy_mm_dd(line)};
+        if (iso_date_prefix)
         {
             if (line.size() > kTimestampSeparatorIndex && line[kTimestampSeparatorIndex] == 'T')
             {
@@ -191,6 +192,15 @@ namespace
                 candidates.add(LogFormat::Log4j);
             }
         }
+
+        // refs: DN-43.D19
+        // invariant: the OpenStack layout puts a FILENAME before the stamp, so the date-prefix gate
+        // above never offered Log4j and its OpenStack branch was unreachable from COLD detection.
+        // invariant: the same bounded locator Log4jStrategy uses decides here, so the gate and the
+        // claim cannot disagree about which lines the layout covers.
+        std::size_t log4j_ts_start{0};
+        if (!iso_date_prefix && find_log4j_ts_start(line, log4j_ts_start))
+            candidates.add(LogFormat::Log4j);
 
         if (looks_like_clf(line))
             candidates.add(LogFormat::CLF);

@@ -227,6 +227,39 @@ constexpr std::size_t kNginxTimestampLen{19U};
 // total and its level-empty exit — which DELETED the line — is gone.
 // invariant: the whitespace run is unbounded exactly as parse()'s sv_skip_ws is; the bounded scan
 // this replaces accepted a `[` that was not the next token at all.
+// refs: DN-43.D19
+// post: true, with `ts_start` at the offset where the ISO datetime begins, when the line carries
+// one at byte 0 or after a whitespace-delimited leading token.
+// invariant: the search for the optional leading prefix is BOUNDED, so a line carrying no
+// timestamp at all costs a bounded scan rather than a whole-line one.
+// invariant: ONE reader for the detector's candidate gate and for Log4jStrategy — a second copy of
+// this shape is how a strategy branch becomes unreachable from COLD detection.
+[[nodiscard]] constexpr bool find_log4j_ts_start(std::string_view line,
+                                                 std::size_t& ts_start) noexcept
+{
+    static constexpr std::size_t kIsoTimestampMinLen{20U};
+    static constexpr std::size_t kLog4jPrefixScanLimit{96U};
+
+    if (is_iso_datetime_space_prefix(line, /*require_fraction=*/true))
+    {
+        ts_start = 0;
+        return true;
+    }
+    const std::size_t limit{line.size() < kLog4jPrefixScanLimit ? line.size()
+                                                                : kLog4jPrefixScanLimit};
+    for (std::size_t i{1U}; i + kIsoTimestampMinLen <= limit; ++i)
+    {
+        if (!is_space(line[i - 1U]))
+            continue;
+        if (is_iso_datetime_space_prefix(line.substr(i), /*require_fraction=*/true))
+        {
+            ts_start = i;
+            return true;
+        }
+    }
+    return false;
+}
+
 [[nodiscard]] constexpr bool is_nginx_error_prefix(std::string_view str) noexcept
 {
     static constexpr std::size_t kNginxMinLen{22U};

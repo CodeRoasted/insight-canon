@@ -1033,6 +1033,9 @@ TEST_F(Log4jStrategyTest, UnclosedOpenStackRequestSectionKeepsEveryByteInContent
         << "content = \"" << pl.content << "\"";
 }
 
+// invariant: EXACT EQUALITY on component — a containment check for "nova" is satisfied by any
+// mis-split that leaves the substring anywhere in the field.
+// refs: DN-43.D19
 TEST_F(Log4jStrategyTest, ParsesOpenStackLine)
 {
     auto result{strategy.parse(kLog4jOpenStackLine, arena)};
@@ -1040,7 +1043,8 @@ TEST_F(Log4jStrategyTest, ParsesOpenStackLine)
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.level, LogLevel::Info);
-    EXPECT_NE(pl.component.find("nova"), std::string::npos);
+    EXPECT_EQ(pl.component, "nova.osapi_compute.wsgi.server")
+        << "component = \"" << pl.component << "\"";
 }
 
 // invariant: PROJECTION TOTALITY on the branch the table-driven family structurally CANNOT see.
