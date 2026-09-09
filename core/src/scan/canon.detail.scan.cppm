@@ -332,6 +332,9 @@ constexpr std::size_t kNginxTimestampLen{19U};
     return match_iso_date_at(str, skip_spaces(str, pos));
 }
 
+// refs: DN-43.D16
+// invariant: the head bracket must CLOSE, which is what makes parse()'s timestamp take total and
+// retires the empty-result guard that byte 1 being uppercase had already made unreachable.
 [[nodiscard]] constexpr bool is_apache_error_prefix(std::string_view str) noexcept
 {
     static constexpr std::size_t kApacheMinLen{22U};
@@ -339,6 +342,7 @@ constexpr std::size_t kNginxTimestampLen{19U};
     static constexpr std::size_t kApacheMon2{6U};
     static constexpr std::size_t kApacheMon3{7U};
     static constexpr std::size_t kApacheDayAt{8U};
+    static constexpr std::size_t kApacheTimeLen{8U};
     if (str.size() < kApacheMinLen || str[0] != '[')
         return false;
     if (!(is_upper(str[1]) && is_lower(str[2]) && is_lower(str[3]) && is_space(str[4]) &&
@@ -350,7 +354,9 @@ constexpr std::size_t kNginxTimestampLen{19U};
         return false;
     pos += 2U;
     pos = skip_spaces(str, pos);
-    return match_time_at(str, pos);
+    if (!match_time_at(str, pos))
+        return false;
+    return str.find(']', pos + kApacheTimeLen) != std::string_view::npos;
 }
 
 // invariant: two RAS columns share this byte class — the alert LABEL and SUBSYS — and differ

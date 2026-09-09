@@ -158,11 +158,16 @@ TEST(FastGatesPrefix, Rfc5424)
     EXPECT_FALSE(is_rfc5424_prefix("<165>1 Apr 27 not an ISO date"));
 }
 
+// invariant: the head bracket must CLOSE — without that clause parse()'s timestamp take swallowed
+// the whole line and emptied content.
+// refs: DN-43.D16
 TEST(FastGatesPrefix, ApacheError)
 {
     EXPECT_TRUE(is_apache_error_prefix("[Tue Apr 27 10:15:22 2024] [error] [client 1.2.3.4]"));
     EXPECT_FALSE(is_apache_error_prefix("[tue Apr 27 10:15:22 2024] lowercase day"));
     EXPECT_FALSE(is_apache_error_prefix("Tue Apr 27 10:15:22 2024 no bracket"));
+    EXPECT_FALSE(is_apache_error_prefix("[Tue Apr 27 10:15:22 2024 no closing bracket at all"))
+        << "an unclosed head bracket must not be claimed";
 }
 
 TEST(FastGatesPrefix, BglHealthAppHpc)

@@ -1504,6 +1504,42 @@ TEST_F(ApacheErrorLogStrategyTest, ConfidenceHighForApache)
     EXPECT_GT(strategy.confidence(kApacheErrorLine), 0.5);
 }
 
+// invariant: DEGRADED INPUT — an unclosed bracket at any of the three optional seats used to empty
+// content, putting the whole line on the digest of the empty string.
+// invariant: each case asserts content by EXACT EQUALITY, because a containment assertion holds on
+// both sides of the split it is meant to pin.
+// refs: DN-43.D11, DN-43.D16
+TEST_F(ApacheErrorLogStrategyTest, UnclosedOptionalBracketsKeepEveryByteInContent)
+{
+    static constexpr std::string_view kUnclosedLevel{
+        "[Sun Dec 04 04:47:44 2005] [notice workerEnv.init() ok"};
+    auto level_result{strategy.parse(kUnclosedLevel, arena)};
+    ASSERT_TRUE(level_result.has_value()) << level_result.error();
+    EXPECT_EQ(level_result.value().content, "[notice workerEnv.init() ok")
+        << "an unclosed level bracket must decline the FIELD, never swallow the message";
+    EXPECT_EQ(level_result.value().level, LogLevel::Unknown)
+        << "and it names no level, rather than recovering one from the swallowed remainder";
+
+    static constexpr std::string_view kUnclosedSection{
+        "[Sun Dec 04 04:47:44 2005] [error] [client 1.2.3.4 mod_jk child in error state"};
+    auto section_result{strategy.parse(kUnclosedSection, arena)};
+    ASSERT_TRUE(section_result.has_value()) << section_result.error();
+    EXPECT_EQ(section_result.value().content, "[client 1.2.3.4 mod_jk child in error state")
+        << "the skip loop stops at the first section that does not close";
+    EXPECT_EQ(section_result.value().level, LogLevel::Error);
+}
+
+// invariant: the head bracket must CLOSE for the strategy to claim, so a line whose timestamp
+// bracket never closes is DEMOTED with every byte intact rather than parsed to an empty content.
+// refs: DN-43.D16
+TEST_F(ApacheErrorLogStrategyTest, UnclosedTimestampBracketIsNotClaimed)
+{
+    static constexpr std::string_view kUnclosedStamp{
+        "[Sun Dec 04 04:47:44 2005 workerEnv.init() ok with no closing bracket"};
+    EXPECT_EQ(strategy.confidence(kUnclosedStamp), 0.0);
+    EXPECT_FALSE(strategy.parse(kUnclosedStamp, arena).has_value());
+}
+
 static constexpr std::string_view kWindowsCBSLine =
     "2016-09-28 04:30:30, Info                  CBS    Loaded Servicing Stack "
     "v6.1.7601.23505 with Core: "

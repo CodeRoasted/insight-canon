@@ -45,25 +45,33 @@ ApacheErrorLogStrategy::parse(std::string_view line, ArenaAllocator& /*arena*/) 
             std::string("ApacheErrorLogStrategy: line does not match Apache error-log format"));
     }
 
+    // invariant: the guard above is the ONLY exit — the predicate proved the head bracket closes,
+    // so the timestamp take is total and the empty-result guard it replaces is gone.
+    // refs: DN-43.D16
     std::string_view rest{line};
-    const std::string_view raw_ts{sv_take_bracketed(rest)};
-    if (raw_ts.empty())
-    {
-        INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=ApacheError parse miss (no ts)");
-        return std::unexpected(
-            std::string("ApacheErrorLogStrategy: line does not match Apache error-log format"));
-    }
+    const std::string_view raw_ts{sv_take_bracketed_or_none(rest)};
 
     sv_skip_ws(rest);
-    const std::string_view level_bracket{sv_take_bracketed(rest)};
+    // invariant: the level bracket is OPTIONAL and unproven, so an unclosed one declines the field
+    // and leaves its bytes in content instead of swallowing the remainder.
+    // refs: DN-43.D11
+    const std::string_view level_bracket{sv_take_bracketed_or_none(rest)};
     const std::string_view level_word{extract_level_word(level_bracket)};
 
     sv_skip_ws(rest);
     // invariant: any number of further bracketed sections may follow the level, so they are skipped
     // as a group rather than enumerated.
+    // invariant: the skip stops at the first section that does NOT close — those bytes reach no
+    // field, so removing them would delete what no predicate validated.
+    // assert: sv_take_bracketed_or_none either shortens `rest` or leaves it identical, so the size
+    // comparison terminates the loop in every case.
+    // refs: DN-43.D11
     while (!rest.empty() && rest[0] == '[')
     {
-        (void)sv_take_bracketed(rest);
+        const std::size_t before{rest.size()};
+        (void)sv_take_bracketed_or_none(rest);
+        if (rest.size() == before)
+            break;
         sv_skip_ws(rest);
     }
 
