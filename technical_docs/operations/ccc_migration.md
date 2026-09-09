@@ -847,6 +847,7 @@ converted code, the module interfaces it imports, `core/CMakeLists.txt`, the ADR
    `F-SRC-insight-canon:test_semantic_walkers.cpp`'s `RecognizersDoNotHeapAllocate`, in canon's own
    test binary. Re-derived at both artifacts. So an external package author running the kit does
    not get that leg, and the ADR promises they do. An ADR edit, which this lane may not make.
+   DISCHARGED 2026-09-09 `coderoast f80aaadf` — `ADR-17.D8` withdraws the allocation-freedom leg and says where that property is proven and why the kit cannot carry it.
 2. **`check_determinism`'s `recognize` leg is vacuous for an unpaired marker row — Kleio.** For a
    row with no paired writer, `marker_probe_for` returns `""`; the two `recognize` calls then
    compare an empty probe's result against itself and agree trivially. The manifest still reds, via
