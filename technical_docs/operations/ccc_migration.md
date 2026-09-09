@@ -269,6 +269,10 @@ block.
    `canon.api.cppm`'s `std::array<std::uint8_t, 16>` are both spelled `16` with neither derived
    from the other. `metalog-spec` §3.2 makes 16 a wire MUST, so the value is right; the duplication
    is a code change and did not belong in a comment-only commit.
+   DISCHARGED 2026-09-09 `insight-canon dfe4f4e` — `kTemplateIdBytes` is now `TemplateId{}.bytes.size()`,
+   so the truncation width is DERIVED from the type it truncates into, and a `static_assert` beside
+   the struct pins the extent at 16 with the wire MUST as its message. `NgramId`'s own 16 is
+   deliberately NOT coupled to it: same value, different fact, and never serialized.
 
 ### Witnesses
 
@@ -569,6 +573,13 @@ than a hand edit).
    `++failed_count_`. `skipped_count_` exists precisely so no-event input cannot dilute the failure
    counter that gates the bounded WARN and feeds the failure-rate stat, and whitespace-only input
    defeats it. This is a **code** change and did not belong in a comment-only commit.
+   DISCHARGED 2026-09-09 `insight-canon dfe4f4e` — re-derived at the artifact first: the
+   `strategy == nullptr` seat in `parse_line` is reachable for EXACTLY that one input class, because
+   `FormatDetector::detect` returns the raw-text fallback for every other line. So the seat is
+   reclassified in place (`++skipped_count_`) rather than gaining a second blank predicate that
+   could drift from the detector's, and `detect` gains a `post:` naming its one nullptr class. Arm:
+   `FormatDetectorTest.ABlankLineIsSkippedRatherThanCountedAsAParseFailure`, asserting both the
+   detector contract and `lines_failed() == 0` over four no-event lines.
 2. **The measurement that justified splitting the two counters has no home — Eqya, to route.**
    87 643 strategy failures over the 4 082-log GitHub CI slice, and the 837 → 1 439 bounded-report
    effect with its two zero-to-nonzero classes, exist only in the comment this unit deleted. The
@@ -2603,6 +2614,13 @@ where `ADR-26.D5` puts a `pre:` at a declaration.
   the last recorded run. A rename is a code change plus a cascade into the published baseline and its
   summary table. **Addressee: the pilot, for the lane holding `insight-canon/benchmarks` and the hub's
   benchmark publication.**
+  DISCHARGED 2026-09-09 `insight-canon dfe4f4e` — renamed `s_per_line` rather than rescaled, and the
+  choice was MEASURED rather than reasoned: rescaling by 10⁹ was implemented and run first, and
+  Google Benchmark's SI renderer then printed `ns_per_line=1.36251ks`, i.e. the console read
+  KILOseconds. Under the rename the same run prints `s_per_line=1.34104us` beside `Time = 1341 us`
+  for 1 000 lines — name, value and rendering agree. **The publication half is NOT done here:
+  `coderoast-hub/benchmarks/SUMMARY.md` and `insight-canon.baseline.json` still carry the
+  `ns_per_line` column at `v1.10.3`, and re-publishing is the pilot's act.**
 * **Two surviving copies of the stale composed-set enumeration, both outside the comment tier.**
   `benchmarks/conanfile.py:17` describes the harness as measuring *"the COMPOSED semantic set
   (github + test_frameworks)"* — a conan package DESCRIPTION, so it ships in package metadata — and
@@ -2613,11 +2631,17 @@ where `ADR-26.D5` puts a `pre:` at a declaration.
   found both independently while answering Q14. **Addressee: the pilot, for the lane holding
   `insight-canon/benchmarks`.**
 * **The composed manifest array is duplicated verbatim between two arms.**
+  DISCHARGED 2026-09-09 `insight-canon dfe4f4e` — both now name all FOUR packages, and the
+  `CMakeLists.txt` header's "Two arms in one binary" is corrected to three in the same pass, the
+  nested-JSON arm having been absent from it as well.
+* **The composed manifest array is duplicated verbatim between two arms.**
   `BM_TokenizationThroughput` and `BM_TokenizationThroughputNestedJson` each build their own
   `std::array<SemanticPackageManifest, 4>` with the same four entries, so onboarding a fifth dialect
   edits the same list twice — a cascade `OPS-2.S6` already flags as *"the `std::array` SIZE is
   hardcoded, mechanical, size trap"* and which is now doubled. Found by the reader at Q14.
   **Addressee: the pilot, for the lane holding `insight-canon/benchmarks`.**
+  DISCHARGED 2026-09-09 `insight-canon dfe4f4e` — one `composed_vocabulary()` accessor holds the list
+  and both arms read it, so onboarding a dialect edits this file once.
 * **`insight-eidos`'s two benchmark entry points still carry the ASLR and silencing rationale as
   prose**, and this unit's Q3/Q4 recoveries rested partly on them. `insight-metalog`'s equivalent is
   already converted and keeps the same knowledge in tagged lines, which is the shape to copy.
@@ -5563,6 +5587,11 @@ findings rather than repairs:
   this sentence used to say all three were validated grammar"* — and the conversion carries the
   corrected rule as three `invariant:` lines naming which field is validated by what. The cascade
   is closed and the design note still records it as open. **Addressee: Daidalos.**
+  CONFIRMED 2026-09-09 — re-derived at the artifact by the lane holding the `BglRecord`-preamble
+  row: the preamble at HEAD reads *"the SECOND NODE field is the one that is not validated
+  anywhere, and it must STAY that way"*, which is `DN-43.D15`'s ruling. Nothing is owed in canon.
+  What remains open is the design note's own *"Cascade owed by this ruling"* section, which still
+  describes the comment as wrong — a Design Note repair, **Daidalos's shelf, not this repo's.**
 * **`DN-29` quotes this unit's comment VERBATIM.** It writes *"`json.cpp:parse_otel_span`'s own
   comment names its precondition — 'THIS MUST PRECEDE `is_otel_span_line`: that predicate tests only
   for `startTimeUnixNano`, and a document carries that key inside its spans'"*. The FACT survives as
