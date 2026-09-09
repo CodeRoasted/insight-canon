@@ -551,6 +551,43 @@ TEST_F(CLFStrategyTest, DashBodySizeIsParsed)
     EXPECT_EQ(result.value().level, LogLevel::Info);
 }
 
+// invariant: DEGRADED INPUT — each shape below carries a CLF timestamp and is NOT a CLF record, so
+// the strategy must decline in confidence() where the line is merely DEMOTED to another claimant.
+// invariant: the same three shapes reached parse() before this repair and were DELETED there,
+// every byte of them lost.
+// refs: DN-43.D16
+TEST_F(CLFStrategyTest, ShapesCarryingAClfStampButNotAClfRecordAreDeclinedNotDeleted)
+{
+    static constexpr std::string_view kHaProxy{
+        R"(Jan 15 10:30:00 lb haproxy[9]: 10.0.0.1:52 [15/Jan/2024:10:30:00.001] fe be/srv "GET /a HTTP/1.1")"};
+    static constexpr std::string_view kVhostCombined{
+        R"(example.com:443 127.0.0.1 - frank [15/Jan/2024:10:30:00 +0000] "GET / HTTP/1.1" 200 2326)"};
+    static constexpr std::string_view kUnclosedStamp{
+        R"(127.0.0.1 - frank [15/Jan/2024:10:30:00 +0000 "GET / HTTP/1.1" 200 2326)"};
+
+    for (const std::string_view line : {kHaProxy, kVhostCombined, kUnclosedStamp})
+    {
+        EXPECT_EQ(strategy.confidence(line), 0.0)
+            << "claimed at 0.95 it would outrank every core strategy; line = \"" << line << "\"";
+        EXPECT_FALSE(strategy.parse(line, arena).has_value())
+            << "and the guard must agree with the claim; line = \"" << line << "\"";
+    }
+}
+
+// invariant: an escaped `\"` inside the request is the OPEN grammar question — does canon's CLF
+// claim Apache's escaping? — and until it is ruled the line is DECLINED, never deleted.
+// invariant: the scan stops at the escaped quote, so the token after it is not a three-digit
+// status and the record predicate fails; every byte survives into another strategy's projection.
+// refs: DN-43.D16
+TEST_F(CLFStrategyTest, RequestCarryingAnEscapedQuoteIsDeclinedRatherThanDeleted)
+{
+    static constexpr std::string_view kEscapedQuote{
+        R"(10.0.0.1 - - [15/Jan/2024:10:30:00 +0000] "GET /a?q=\" OR 1=1-- HTTP/1.1" 200 12)"};
+    EXPECT_EQ(strategy.confidence(kEscapedQuote), 0.0) << "line = \"" << kEscapedQuote << "\"";
+    EXPECT_FALSE(strategy.parse(kEscapedQuote, arena).has_value())
+        << "an injection probe must be demoted, never deleted; line = \"" << kEscapedQuote << "\"";
+}
+
 TEST_F(SyslogStrategyTest, ParsesBSDLineWithSingleDigitDay)
 {
     // invariant: BSD syslog uses SPACE-PADDED single-digit days, which is why this fixture carries

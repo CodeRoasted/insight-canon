@@ -26,6 +26,15 @@ namespace
 std::expected<ParsedLine, std::string> CLFStrategy::parse(std::string_view line,
                                                           ArenaAllocator& arena) const
 {
+    // invariant: the ONE guard — the claim predicate proved the whole record, so every take below
+    // is total and no further exit exists to DELETE a line this strategy claimed.
+    // refs: DN-43.D16
+    if (!is_clf_record_prefix(line))
+    {
+        INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=CLF parse miss");
+        return std::unexpected(std::string("CLFStrategy: line does not match CLF/Combined format"));
+    }
+
     std::string_view rest{line};
 
     const std::string_view host{sv_take_token(rest)};
@@ -33,28 +42,11 @@ std::expected<ParsedLine, std::string> CLFStrategy::parse(std::string_view line,
     (void)sv_take_token(rest);
 
     sv_skip_ws(rest);
-    const std::string_view raw_ts{sv_take_bracketed(rest)};
-    if (raw_ts.empty())
-    {
-        INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=CLF parse miss (no timestamp)");
-        return std::unexpected(std::string("CLFStrategy: line does not match CLF/Combined format"));
-    }
-
+    const std::string_view raw_ts{sv_take_bracketed_or_none(rest)};
     sv_skip_ws(rest);
-    if (rest.empty() || rest[0] != '"')
-    {
-        INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=CLF parse miss (no request)");
-        return std::unexpected(std::string("CLFStrategy: line does not match CLF/Combined format"));
-    }
-    const std::string_view request{sv_take_quoted(rest)};
+    const std::string_view request{sv_take_quoted_or_none(rest)};
     const std::string_view status_str{sv_take_token(rest)};
     (void)sv_take_token(rest);
-
-    if (host.empty() || status_str.size() != 3U)
-    {
-        INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=CLF parse miss (bad fields)");
-        return std::unexpected(std::string("CLFStrategy: line does not match CLF/Combined format"));
-    }
 
     int status_code{kDefaultSuccessStatusCode};
     // invariant: a raw pointer pair rather than iterators, because a string view's iterator is not
@@ -114,9 +106,12 @@ double CLFStrategy::confidence(std::string_view line) const noexcept
     static constexpr double kStrongConfidence{0.95};
     static constexpr double kNoConfidence{0.0};
 
-    // invariant: the gate locates the bracketed timestamp only; the strong-versus-weak distinction
-    // was a tie-break, and the parse catches a malformed line anyway.
-    if (has_clf_timestamp(line))
+    // invariant: the claim is the WHOLE record, proven from byte 0, so 0.95 outranking every core
+    // strategy is a claim the predicate carries rather than a tie-break.
+    // invariant: a line the predicate declines is DEMOTED to another strategy with every byte
+    // intact — the parse-side decline it replaces DELETED the line.
+    // refs: DN-43.D1, DN-43.D16
+    if (is_clf_record_prefix(line))
         return kStrongConfidence;
     return kNoConfidence;
 }

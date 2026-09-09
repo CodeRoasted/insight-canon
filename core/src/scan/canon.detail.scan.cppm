@@ -471,37 +471,76 @@ constexpr std::size_t kHdfsMinLen{16U};
     return pos < str.size() && is_space(str[pos]);
 }
 
-[[nodiscard]] constexpr bool has_clf_timestamp(std::string_view str) noexcept
+// post: true iff `[DD/Mon/YYYY:HH:MM:SS` begins at `pos` — the opening bracket included, the
+// zone offset and the closing bracket excluded.
+[[nodiscard]] constexpr bool match_clf_timestamp_at(std::string_view str, std::size_t pos) noexcept
 {
-    static constexpr std::size_t kClfMinLen{22U};
-    static constexpr std::size_t kClfMon3{5U};
-    static constexpr std::size_t kClfSlash2{6U};
-    static constexpr std::size_t kClfYear1{7U};
-    static constexpr std::size_t kClfYear2{8U};
-    static constexpr std::size_t kClfYear3{9U};
-    static constexpr std::size_t kClfYear4{10U};
-    static constexpr std::size_t kClfColon{11U};
-    static constexpr std::size_t kClfTimeAt{12U};
-    if (str.size() < kClfMinLen)
+    static constexpr std::size_t kClfStampLen{21U};
+    static constexpr std::size_t kClfMon1{4U};
+    static constexpr std::size_t kClfMon2{5U};
+    static constexpr std::size_t kClfMon3{6U};
+    static constexpr std::size_t kClfSlash2{7U};
+    static constexpr std::size_t kClfYear1{8U};
+    static constexpr std::size_t kClfYear2{9U};
+    static constexpr std::size_t kClfYear3{10U};
+    static constexpr std::size_t kClfYear4{11U};
+    static constexpr std::size_t kClfColon{12U};
+    static constexpr std::size_t kClfTimeAt{13U};
+    if (pos + kClfStampLen > str.size())
         return false;
-    const std::size_t limit{str.size() - 21U};
-    for (std::size_t i{0}; i <= limit; ++i)
+    if (str[pos] != '[' || !is_digit(str[pos + 1]) || !is_digit(str[pos + 2]) ||
+        str[pos + 3] != '/')
+        return false;
+    if (!is_upper(str[pos + kClfMon1]) || !is_lower(str[pos + kClfMon2]) ||
+        !is_lower(str[pos + kClfMon3]) || str[pos + kClfSlash2] != '/')
+        return false;
+    if (!is_digit(str[pos + kClfYear1]) || !is_digit(str[pos + kClfYear2]) ||
+        !is_digit(str[pos + kClfYear3]) || !is_digit(str[pos + kClfYear4]) ||
+        str[pos + kClfColon] != ':')
+        return false;
+    return match_time_at(str, pos + kClfTimeAt);
+}
+
+// refs: DN-43.D1, DN-43.D11, DN-43.D16
+// invariant: the WHOLE record is proven from byte 0 — three leading tokens, the bracketed stamp
+// AND its close, the quoted request AND its close, then a three-digit status.
+// invariant: so CLFStrategy::parse keeps ONE guard and carries no exit that could DELETE a line
+// this strategy claimed.
+// invariant: the first `"` closes the request, so a request carrying `\"` fails the status check
+// and the line is DEMOTED with every byte intact rather than deleted.
+[[nodiscard]] constexpr bool is_clf_record_prefix(std::string_view str) noexcept
+{
+    static constexpr std::size_t kClfLeadingTokens{3U};
+    static constexpr std::size_t kClfStatusDigits{3U};
+    std::size_t pos{skip_spaces(str, 0U)};
+    for (std::size_t field{0}; field < kClfLeadingTokens; ++field)
     {
-        if (str[i] != '[')
-            continue;
-        const std::size_t pos{i + 1U};
-        if (!is_digit(str[pos]) || !is_digit(str[pos + 1]) || str[pos + 2] != '/' ||
-            !is_upper(str[pos + 3]) || !is_lower(str[pos + 4]) || !is_lower(str[pos + kClfMon3]) ||
-            str[pos + kClfSlash2] != '/')
-            continue;
-        if (!is_digit(str[pos + kClfYear1]) || !is_digit(str[pos + kClfYear2]) ||
-            !is_digit(str[pos + kClfYear3]) || !is_digit(str[pos + kClfYear4]) ||
-            str[pos + kClfColon] != ':')
-            continue;
-        if (match_time_at(str, pos + kClfTimeAt))
-            return true;
+        const std::size_t start{pos};
+        while (pos < str.size() && !is_space(str[pos]))
+            ++pos;
+        if (pos == start)
+            return false;
+        pos = skip_spaces(str, pos);
     }
-    return false;
+    if (!match_clf_timestamp_at(str, pos))
+        return false;
+    const std::size_t stamp_close{str.find(']', pos)};
+    if (stamp_close == std::string_view::npos)
+        return false;
+    pos = skip_spaces(str, stamp_close + 1U);
+    if (pos >= str.size() || str[pos] != '"')
+        return false;
+    const std::size_t request_close{str.find('"', pos + 1U)};
+    if (request_close == std::string_view::npos)
+        return false;
+    pos = skip_spaces(str, request_close + 1U);
+    if (pos + kClfStatusDigits > str.size())
+        return false;
+    for (std::size_t digit{0}; digit < kClfStatusDigits; ++digit)
+        if (!is_digit(str[pos + digit]))
+            return false;
+    pos += kClfStatusDigits;
+    return pos == str.size() || is_space(str[pos]);
 }
 
 [[nodiscard]] constexpr std::size_t count_kv_pair_signatures(std::string_view str,
@@ -683,6 +722,75 @@ inline void sv_skip_ws(std::string_view& str) noexcept
         return {};
     str.remove_prefix(1U);
     return sv_take_until(str, '"');
+}
+
+// refs: ADR-16.D9, DN-43.D11
+// post: the bracketed content with `str` advanced past the `]` that closes it; on a view not
+// opening `[`, or one whose bracket never closes, an empty result and `str` UNTOUCHED.
+// invariant: the bracket door's counterpart to sv_take_until_or_none — a field whose terminator is
+// absent is simply NOT NAMED, so bytes no predicate validated survive into the caller's content.
+// note: both substr positions are bounded by the find that returned close < size — cannot throw.
+// NOLINTNEXTLINE(bugprone-exception-escape)
+[[nodiscard]] constexpr std::string_view sv_take_bracketed_or_none(std::string_view& str) noexcept
+{
+    if (str.empty() || str[0] != '[')
+        return {};
+    const auto close = str.find(']', 1U);
+    if (close == std::string_view::npos)
+        return {};
+    const auto result = str.substr(1U, close - 1U);
+    str = str.substr(close + 1U);
+    return result;
+}
+
+// refs: ADR-16.D9, DN-43.D11
+// post: the quoted content without its quotes, `str` advanced past the closing `"`; on a view not
+// opening `"`, or one whose quote never closes, an empty result and `str` UNTOUCHED.
+// note: both substr positions are bounded by the find that returned close < size — cannot throw.
+// NOLINTNEXTLINE(bugprone-exception-escape)
+[[nodiscard]] constexpr std::string_view sv_take_quoted_or_none(std::string_view& str) noexcept
+{
+    if (str.empty() || str[0] != '"')
+        return {};
+    const auto close = str.find('"', 1U);
+    if (close == std::string_view::npos)
+        return {};
+    const auto result = str.substr(1U, close - 1U);
+    str = str.substr(close + 1U);
+    return result;
+}
+
+// refs: DN-43.D19
+// post: the interior of a BALANCED `[`...`]`, `str` advanced past the close at depth 0; on a view
+// not opening `[`, or one whose brackets never balance, an empty result and `str` UNTOUCHED.
+// invariant: opt-in at the seat whose grammar is balanced — sv_take_bracketed_or_none stays
+// first-`]` for the syslog-family `[pid]` shape, which genuinely ends at the first close.
+// note: both substr positions are bounded by the index that closed depth 0 — cannot throw.
+// NOLINTNEXTLINE(bugprone-exception-escape)
+[[nodiscard]] constexpr std::string_view
+sv_take_balanced_bracketed_or_none(std::string_view& str) noexcept
+{
+    if (str.empty() || str[0] != '[')
+        return {};
+    std::size_t depth{0};
+    for (std::size_t i{0}; i < str.size(); ++i)
+    {
+        if (str[i] == '[')
+        {
+            ++depth;
+            continue;
+        }
+        if (str[i] != ']')
+            continue;
+        --depth;
+        if (depth == 0U)
+        {
+            const auto result = str.substr(1U, i - 1U);
+            str = str.substr(i + 1U);
+            return result;
+        }
+    }
+    return {};
 }
 
 // refs: DN-43.D3, DN-43.D11, ADR-16.D9

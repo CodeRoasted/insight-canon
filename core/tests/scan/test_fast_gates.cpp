@@ -231,13 +231,32 @@ TEST(FastGatesPrefix, BglHealthAppHpc)
     EXPECT_FALSE(is_hpc_prefix("node-246 starts with a token, not an id"));
 }
 
-TEST(FastGatesPrefix, ClfTimestampAnchor)
+// invariant: the predicate proves the WHOLE record from byte 0 — a stamp SOMEWHERE in the line is
+// no longer a claim, because the parse it gates has no exit left that could delete the line.
+// refs: DN-43.D16
+TEST(FastGatesPrefix, ClfRecordPrefix)
 {
-    EXPECT_TRUE(has_clf_timestamp(
+    EXPECT_TRUE(is_clf_record_prefix(
         R"(10.0.0.1 - frank [27/Apr/2024:10:15:00 +0000] "GET / HTTP/1.1" 200 2326)"));
     EXPECT_FALSE(
-        has_clf_timestamp(R"(10.0.0.1 - frank [27/apr/2024:10:15:00 +0000] lowercase month)"));
-    EXPECT_FALSE(has_clf_timestamp(R"(no bracketed timestamp anywhere 27/Apr/2024:10:15:00)"));
+        is_clf_record_prefix(R"(10.0.0.1 - frank [27/apr/2024:10:15:00 +0000] lowercase month)"));
+    EXPECT_FALSE(is_clf_record_prefix(R"(no bracketed timestamp anywhere 27/Apr/2024:10:15:00)"));
+
+    EXPECT_FALSE(is_clf_record_prefix(
+        R"(10.0.0.1 - frank [27/Apr/2024:10:15:00 +0000 "GET / HTTP/1.1" 200 2326)"))
+        << "the timestamp bracket must CLOSE, or the take would swallow the line";
+    EXPECT_FALSE(is_clf_record_prefix(
+        R"(10.0.0.1 - frank [27/Apr/2024:10:15:00 +0000] "GET / HTTP/1.1 200 2326)"))
+        << "the request quote must CLOSE";
+    EXPECT_FALSE(is_clf_record_prefix(
+        R"(10.0.0.1 - frank [27/Apr/2024:10:15:00 +0000] "GET / HTTP/1.1" ok 2326)"))
+        << "the status must be three digits";
+    EXPECT_FALSE(is_clf_record_prefix(
+        R"(Jan 15 10:15:00 lb haproxy[9]: 10.0.0.1:52 [27/Apr/2024:10:15:00.001] fe be/s "GET /")"))
+        << "a HAProxy line carries a CLF stamp and is NOT a CLF record — token 4 is not the stamp";
+    EXPECT_FALSE(is_clf_record_prefix(
+        R"(host:80 10.0.0.1 - frank [27/Apr/2024:10:15:00 +0000] "GET / HTTP/1.1" 200 2326)"))
+        << "an Apache vhost_combined line puts the stamp at token 5";
 }
 
 TEST(FastGatesKv, CountKvPairSignatures)
