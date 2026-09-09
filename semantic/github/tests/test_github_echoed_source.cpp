@@ -1,4 +1,4 @@
-// refs: SRC-D-PROV-1
+// refs: ADR-20.D5
 // invariant: the `\x1b[36;1m … \x1b[0m` command-echo grammar is GHA dialect knowledge, so the
 // predicate homes in this package and never in canon core.
 #include <gtest/gtest.h>

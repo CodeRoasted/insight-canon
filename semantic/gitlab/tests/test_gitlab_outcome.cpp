@@ -1,4 +1,4 @@
-// refs: ADR-17, SRC-D-OUT-RUN-1
+// refs: ADR-17, ADR-17.D5
 // invariant: every terminal-line form here is verbatim from marker_corpus_v1 — the run-verdict
 // vocabulary was measured on real traces, not invented.
 // note: determinism — byte-only scan plus an integer line index, no RNG, clock or float

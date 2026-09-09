@@ -91,7 +91,7 @@ std::string_view trimmed_intent_name(std::string_view name) noexcept
     return name;
 }
 
-// refs: SRC-D-TID-1, SRC-D-TID-2, SRC-II-2, STU-4
+// refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate, SRC-II-2, STU-4
 // invariant: a DISTINCT rule set from the value masker: the masker keeps structure to distinguish,
 // identity canonicalization collapses it to align.
 // invariant: the rules run left-to-right in one pass at word boundaries, R1 before R3 so a dotted

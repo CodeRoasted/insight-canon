@@ -88,7 +88,8 @@ inline constexpr std::array<WrapperPair, 6> kWrapperPairs{{
                                [chr](const WrapperPair& pair) { return pair.close == chr; });
 }
 
-// refs: ADR-16.D5, SRC-D-TID-9, SRC-D-TID-12
+// refs: ADR-16.D5, F-SRC-insight-canon:canon.api.cppm:TemplateId
+// refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
 // invariant: each field is the byte-exact equivalent of the scan it replaces, so the
 // KEEP/MASK/NORMALIZE decision per token — and hence the template id — is unchanged.
 // invariant: byte-only, single-token, no float and order-independent, so the profile is
@@ -522,7 +523,7 @@ constexpr std::size_t kHdfsMinLen{16U};
     return found;
 }
 
-// refs: SRC-D-TID-9
+// refs: F-SRC-insight-canon:canon.api.cppm:TemplateId
 // invariant: the SIMD and scalar paths return identical pointers, so the canonical digest is
 // invariant to whether SSE2 was compiled in.
 // note: the scalar loop IS the SIMD remainder handler, reused as the whole range.

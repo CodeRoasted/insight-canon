@@ -12,7 +12,7 @@ using insight::tokenization::ArenaAllocator;
 
 namespace
 {
-// refs: SRC-D-TID-11
+// refs: F-SRC-insight-canon:canon.api.cppm:normalize
 // pre: every fixture is verbatim from marker_corpus_v1 with the ANSI escapes canon's ingest strip
 // has already removed — which is what a strategy actually sees.
 constexpr std::string_view kStamped{"2026-07-21T18:06:18.101984Z 00O section_start:1784657178:"

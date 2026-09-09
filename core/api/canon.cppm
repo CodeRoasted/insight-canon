@@ -139,7 +139,7 @@ class Tokenizer
 export namespace insight
 {
 
-// refs: ADR-17.D5, SRC-D-OUT-RUN-1, SRC-II-6
+// refs: ADR-17.D5, SRC-II-6
 // invariant: canon owns the run-outcome ALGORITHMS — the token map, the console-tail scan and the
 // precedence resolver; the composed outcome rows are the DATA.
 // post: `map_outcome_token` maps a native verdict token through the RESOLVED VIEW's
@@ -226,7 +226,7 @@ struct RunOutcomeScan
 [[nodiscard]] RunOutcomeScan scan_run_outcome(std::span<const std::string> lines,
                                               const insight::semantic::ComposedSemantics& composed);
 
-// refs: ADR-17.D5, SRC-D-OUT-RUN-1
+// refs: ADR-17.D5
 // invariant: the resolution order is STRICT and TOTAL, never a reconciliation: the authoritative
 // side-input token if it maps, else the console tail's last match if it maps, else Unknown.
 // invariant: when rung 1 resolves, a present-but-DISAGREEING console tail is NOT consulted — it

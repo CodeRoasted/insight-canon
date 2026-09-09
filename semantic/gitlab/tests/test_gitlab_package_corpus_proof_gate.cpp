@@ -717,7 +717,7 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
                         std::to_string(row.job_id) + ", banner leg '" + row.leg + "'): API '" +
                         row.job_status + "', console " + outcome_name(result.outcome) +
                         " — the console's declared subordination to the API result "
-                        "(SRC-D-OUT-RUN-1), a counted cell, never a row defect");
+                        "(ADR-17.D5), a counted cell, never a row defect");
                 }
             }
         }

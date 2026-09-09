@@ -12,7 +12,7 @@ export namespace insight::tokenization
 // pre: the caller keeps `content` alive for the params' lifetime - they are views into it.
 // invariant: a pure function of the line's OWN tokens - no cluster state and no cross-line
 // learning, so the same logical line templates identically in any run and any order.
-// refs: ADR-16.D5, SRC-D-TID-1, SRC-D-TID-2, SRC-D-TID-3
+// refs: ADR-16.D5
 // note: the per-token KEEP, MASK and normalize classification is DECIDED, never discovered.
 /**************************************************************************************************
 D-LSRC-11 — the DIAGNOSTIC_COMPOSITE class, which subsumes the source-location rule
@@ -70,7 +70,7 @@ cross-line learning, which is the unbuilt registry's job and never this masker's
 SRC-D-TID-17.
 ***************************************************************************************************/
 // refs: ADR-16.D2, SRC-D-MSK-2, SRC-D-MSK-4
-// refs: SRC-D-TID-5, SRC-D-TID-12, SRC-D-TID-13, SRC-D-TID-14, SRC-D-TID-17
+// refs: F-SRC-insight-canon:mask.cpp:normalize_hash_counter, ADR-16.D5, SRC-D-TID-17
 struct StatelessTemplate
 {
     std::string_view template_str;
@@ -85,7 +85,7 @@ stateless_template(std::string_view content, ArenaAllocator& out_arena, const Ma
 // invariant: this limb sees a rule ADDED, REMOVED or REORDERED and nothing else - widening an
 // existing rule in place leaves every table byte-identical.
 // note: the other limb is the masked-output golden, and neither substitutes for the other.
-// refs: SRC-D-TID-16
+// refs: F-SRC-insight-canon:canon.api.cppm:kCanonicalizationVersion
 namespace rule_catalog
 {
 

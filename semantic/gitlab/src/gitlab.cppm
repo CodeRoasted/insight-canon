@@ -72,7 +72,7 @@ inline constexpr std::array<OutcomeTokenRow, 5> kOutcomeTokens{{
     {.token = "manual", .outcome = insight::RunOutcome::Unknown, .dialect_gate = kDialect},
 }};
 
-// refs: ADR-17, SRC-D-OUT-RUN-1
+// refs: ADR-17, ADR-17.D5
 // assert: all three rows resolve by LONGEST PREFIX, never by array order: the cancel row is a
 // strict extension of the failure row, and it matches on 17 of the 25 cancelled jobs.
 // invariant: the console tail is the DEGENERATE fallback and the API result is authoritative; the

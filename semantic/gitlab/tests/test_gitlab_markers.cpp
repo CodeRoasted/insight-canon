@@ -66,7 +66,7 @@ TEST(GitLabMarkers, TheEpochIsSkippedNotFoldedIntoTheName)
 TEST(GitLabMarkers, TheCarriageReturnTerminatesTheNameAndTheOptionGroupIsDropped)
 {
     const ComposedSemantics composed{gitlab_only()};
-    // refs: SRC-D-TID-11
+    // refs: F-SRC-insight-canon:canon.api.cppm:normalize
     // assert: GitLab closes a marker with `\r` plus an erase-line escape — the escape dies at
     // ingest normalization and the CR survives, so the CR is what terminates the name.
     EXPECT_EQ(recognize(norm_probe("section_start:1784657178:prepare_executor\r"), composed).name,

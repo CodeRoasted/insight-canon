@@ -28,7 +28,7 @@ using EventID = uint64_t;
 // does not touch the rules must not move it, and a rules change must.
 // invariant: every MetaLog producer defaults to this, so old and new documents become incomparable
 // at the wire spec's 2.4 gate: re-derive, never migrate.
-// refs: ADR-2.D5, ADR-2.D9, SRC-D-TID-16, SRC-D-TID-9, SRC-D-TID-22
+// refs: ADR-2.D5, ADR-2.D9, F-SRC-insight-canon:canon.api.cppm:TemplateId, SRC-D-TID-22
 // note: the generation ledger is technical_docs/canonicalization_generations.md.
 inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-15"};
 
@@ -36,7 +36,7 @@ inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-15"}
 // POD; the 34-byte "h:"+hex string materialises only at the serialize seam.
 // invariant: canon owns it because identity IS the hash UNDER kCanonicalizationVersion, so the
 // identity and its comparability version belong in one place.
-// refs: SRC-D-TIR-1, SRC-D-TID-9, SRC-D-TID-16
+// refs: F-SRC-insight-canon:canon.api.cppm:kCanonicalizationVersion
 struct TemplateId
 {
     std::array<std::uint8_t, 16> bytes{};
@@ -53,7 +53,6 @@ struct TemplateId
 // invariant: NEVER serialized — the n-gram maps emit their output sorted by the sequence, not by
 // this id, so a fast non-crypto hash is correct here.
 // invariant: order-sensitive: [a,b] and [b,a] are distinct n-grams and take distinct ids.
-// refs: SRC-D-TIR-4
 struct NgramId
 {
     std::array<std::uint8_t, 16> bytes{};
@@ -62,17 +61,17 @@ struct NgramId
 };
 
 // post: render(template_id_of(s)) is byte-identical to the former string id for every s.
-// refs: SRC-D-TIR-1
+// refs: F-SRC-insight-canon:canon.api.cppm:TemplateId
 [[nodiscard]] TemplateId template_id_of(std::string_view canonical_template) noexcept;
 // post: "h:" + 32 lowercase hex — the ONLY place the id string materialises.
 [[nodiscard]] std::string render(TemplateId template_id);
 // note: a TEST and fixture helper only — no product path parses an id back.
-// refs: SRC-D-TIR-1
+// refs: F-SRC-insight-canon:canon.api.cppm:TemplateId
 [[nodiscard]] TemplateId parse_template_id(std::string_view rendered);
 
 // post: a transient 128-bit content key over the sequence's id bytes — never serialized,
 // order-sensitive.
-// refs: SRC-D-TIR-4
+// refs: F-SRC-insight-canon:canon.api.cppm:NgramId
 [[nodiscard]] NgramId ngram_id_of(const std::vector<TemplateId>& sequence) noexcept;
 
 // invariant: the comparability identity of the recognizer and marker rule set is the composed
@@ -85,7 +84,7 @@ struct NgramId
 // distinct rule set from the value masker, which keeps what identity must collapse.
 // invariant: deterministic, ASCII-safe, no float, no regex, no cross-line state; cold path, so it
 // returns an owned string.
-// refs: ADR-17, SRC-II-1, SRC-II-2, SRC-II-6, SRC-II-7, BIB:intent_identity
+// refs: ADR-17, SRC-II-1, SRC-II-2, SRC-II-6, ADR-17.D3, BIB:intent_identity
 [[nodiscard]] std::string canonicalize_intent(std::string_view name);
 
 // post: a VIEW into name — canon's intent trim bytes removed from both ends, everything else
@@ -129,7 +128,8 @@ inline std::ostream& operator<<(std::ostream& out, const TemplateId& template_id
 // absent and present can never collide.
 // invariant: what is NOT built is consuming a declared edge as GROUND TRUTH rather than folding it
 // into the inferred graph.
-// refs: ADR-29, ADR-29.O1, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext, SRC-D-TIR-4
+// refs: ADR-29, ADR-29.O1, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext
+// refs: F-SRC-insight-canon:canon.api.cppm:NgramId
 struct TraceId
 {
     std::uint64_t value{};
@@ -191,7 +191,7 @@ struct OtelTraceContext
 // invariant: the three trace keys route to consumed structural metadata, dropped from the template
 // and never tokenized; severity_number routes to the LogLevel band.
 // refs: ADR-17, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext
-// refs: F-SRC-insight-canon:canon.api.cppm:kOtelFieldCatalog, SRC-D-TID-6
+// refs: F-SRC-insight-canon:canon.api.cppm:kOtelFieldCatalog, ADR-16.D5
 enum class OtelFieldClass : std::uint8_t
 {
     TraceId,
@@ -226,7 +226,7 @@ inline constexpr std::array<OtelFieldDescriptor, 4> kOtelFieldCatalog{{
 // invariant: the SCHEDULE a field bins onto is a VERSIONED catalog, and its stable string id is the
 // eidos diff's comparability key.
 // refs: F-SRC-insight-canon:canon.api.cppm:OrdinalFieldDescriptor, SRC-D-W1-8
-// refs: SRC-D-TID-6, SRC-D-TID-14
+// refs: ADR-16.D5
 enum class OrdinalSchedule : std::uint8_t
 {
     DurationLog2Ns,
@@ -733,7 +733,7 @@ enum class StructuralRole : uint8_t
 // size_t — no mixing, no allocation.
 // invariant: reachable to importers of this module, so an unordered_map keyed on it resolves
 // downstream; a specialization need not be exported, importing the module suffices.
-// refs: SRC-D-TIR-1
+// refs: F-SRC-insight-canon:canon.api.cppm:TemplateId
 namespace std
 {
 template <> struct hash<insight::TemplateId>
@@ -749,7 +749,7 @@ template <> struct hash<insight::TemplateId>
 // invariant: already a uniform 128-bit hash, so the first 8 bytes ARE a good size_t.
 // invariant: the n-gram maps re-sort their output, so unordered iteration order is not a
 // determinism surface here.
-// refs: ADR-16, SRC-D-TIR-4
+// refs: ADR-16, F-SRC-insight-canon:canon.api.cppm:NgramId
 template <> struct hash<insight::NgramId>
 {
     [[nodiscard]] std::size_t operator()(const insight::NgramId& ngram_id) const noexcept
@@ -980,7 +980,7 @@ struct CanonicalEvent
     // recognized at the ANSI strip layer by the command-echo SGR wrapper.
     // invariant: consumed in memory and never serialized — it already demoted the level in the
     // parser, and metalog skips the level-blind salience tier for an all-echoed template.
-    // refs: SRC-D-PROV-1
+    // refs: ADR-20.D5
     bool echoed_source{false};
     // invariant: EMPTY when the parse recognized at least one declared role; NON-EMPTY when it
     // recognized none, holding a witness key that WAS present in the input.
@@ -1007,7 +1007,7 @@ export namespace insight::tokenization
 // invariant: byte-only single-token rules are also the only shape that is cross-stdlib identical.
 // invariant: the Drain clustering knobs are gone with the clustering — a stateless masker has no
 // tree, no similarity match and no cluster cap to bound.
-// refs: SRC-D-TID-14, SRC-D-TID-3, ADR-17
+// refs: ADR-16.D5, F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate, ADR-17
 struct MaskConfig
 {
     // invariant: structurally variable tokens are replaced before the masked template is formed, so
@@ -1283,7 +1283,7 @@ namespace detail
     // the same line is a different author's claim and survives.
     // invariant: it DEMOTES and never suppresses — the cue does not fire, the line lands at
     // Unknown and still surfaces; the lexicon is untouched, because the defect is CONTEXT.
-    // refs: ADR-20.D5, SRC-D-CNT-1, SRC-D-NOTE-1, SRC-D-PROV-1
+    // refs: ADR-20.D5, SRC-D-CNT-1, SRC-D-NOTE-1
     [[nodiscard]] bool contains_failure_summary_cue(std::string_view text,
                                                     std::size_t scan_limit = 0) noexcept;
 
@@ -1643,7 +1643,7 @@ template <typename Visit>
 // obligation the walkers place on their CALLERS, who cannot discharge a build-private one.
 // invariant: it sits beside the token scanner's own escape length because the two are the pair that
 // will have to be reconciled — one treats a run as a delimiter and handles no OSC.
-// refs: ADR-21, SRC-D-TID-10, SRC-D-TID-11, SRC-D-PROV-1
+// refs: ADR-21, F-SRC-insight-canon:canon.api.cppm:normalize, ADR-20.D5
 export namespace insight::tokenization
 {
 
@@ -1812,7 +1812,7 @@ constexpr NormalizedContent NormalizedLine::undeclared_suffix(std::size_t offset
 // invariant: it must NEVER overwrite the buffer a Tokenizer later reads — the echo wrapper the
 // provenance hook needs survives only on the raw line, so stage 1 produces a DERIVED view.
 // invariant: a pure byte state machine: no float, order-independent, cross-stdlib bit-identical.
-// refs: ADR-17, ADR-21, SRC-D-TID-10, SRC-D-PROV-1
+// refs: ADR-17, ADR-21, ADR-20.D5
 [[nodiscard]] inline NormalizedLine normalize(std::string_view raw_line, std::string& scratch)
 {
     if (raw_line.find(static_cast<char>(kEsc)) == std::string_view::npos)

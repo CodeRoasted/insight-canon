@@ -16,7 +16,7 @@
 // invariant: that property is a differential corpus gate elsewhere; what belongs HERE is the
 // complement — NAMED hazards on a single function, which is the one thing a fixture does well.
 // invariant: each test below is a NAMED hazard with a STATED consequence.
-// refs: SRC-D-TID-11
+// refs: F-SRC-insight-canon:canon.api.cppm:normalize
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -25,7 +25,7 @@ using namespace insight::tokenization;
 
 // invariant: two coloured variants of one line fold to the same colour-free bytes, so they cannot
 // mint two templates.
-// refs: SRC-D-TID-11
+// refs: F-SRC-insight-canon:canon.api.cppm:normalize
 TEST(AnsiNormalization, EscapesInterleavedWithTokensAreRemoved)
 {
     std::string scratch;

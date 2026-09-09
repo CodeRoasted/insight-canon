@@ -9,7 +9,7 @@ import insight.canon.detail.strategy;
 import insight.canon.detail.mask;
 import insight.canon.detail.parse;
 
-// refs: SRC-D-TID-11, ADR-16.D5
+// refs: F-SRC-insight-canon:canon.api.cppm:normalize, ADR-16.D5
 // invariant: the template is a pure function of the line's own masked tokens — no clustering
 // state and no cross-line learning, so the identity is run-independent.
 // invariant: the arena is external; every string_view on a CanonicalEvent points into it and is
@@ -117,7 +117,7 @@ struct Tokenizer::Impl
                 insight::recognize_location(parser.attest(parsed_line.content), composed);
         // refs: F-SRC-insight-canon:canon.api.cppm:OtelTraceContext
         // refs: F-SRC-insight-canon:canon.api.cppm:OrdinalObservation, ADR-29.D2
-        // refs: SRC-D-PROV-1
+        // refs: ADR-20.D5
         // invariant: trace context, ordinals, span links and the echoed-source flag are CONSUMED in
         // memory and never serialized.
         event.trace = parsed_line.trace;

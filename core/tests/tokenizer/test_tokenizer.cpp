@@ -262,7 +262,7 @@ TEST_F(TokenizerTest, VariablePartBecomesWildcardInTemplate)
     // the template.
     // invariant: letter-leading names are KEPT rather than masked — only syntactic
     // high-cardinality classes mask.
-    // refs: SRC-D-TID-14
+    // refs: ADR-16.D5
     auto r{tokenizer.process_line(R"({"msg":"User bob logged in from 10.0.0.2"})")};
     ASSERT_TRUE(r.has_value());
     EXPECT_NE(r.value().template_str.find("User"), std::string::npos);
@@ -465,7 +465,7 @@ TEST_F(TokenizerTest, EmptyLineReturnsError)
 
 // invariant: the cluster-count accessor was RETIRED with the clustering it reported — the
 // stateless masker has no cluster state.
-// refs: SRC-D-TID-3
+// refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
 TEST_F(TokenizerTest, ReportsParsedLineCount)
 {
     static_cast<void>(tokenizer.process_line(R"({"msg":"test"})"));
@@ -543,7 +543,7 @@ TEST_F(TokenizerTest, JSONWithKVContentMaskedStatelessly)
     // invariant: masking it needs the unbuilt semantic class registry, so two lines differing only
     // in a value-word are DISTINCT templates.
     // invariant: that is the accepted stateless OVER-SPLIT, and NOT the old cross-line wildcard.
-    // refs: SRC-D-TID-14
+    // refs: ADR-16.D5
     auto ra{tokenizer.process_line(R"({"msg":"action=login user=alice status=ok"})")};
     auto rb{tokenizer.process_line(R"({"msg":"action=login user=bob status=ok"})")};
     ASSERT_TRUE(ra.has_value() && rb.has_value());

@@ -1,11 +1,11 @@
 # The canonicalization generation ledger — every value `kCanonicalizationVersion` has held
 
-`kCanonicalizationVersion` (declared in `core/api/canon.api.cppm`, the code `SRC-D-TID-16` names)
+`kCanonicalizationVersion` (declared in `core/api/canon.api.cppm`, `F-SRC-insight-canon:canon.api.cppm:kCanonicalizationVersion`)
 is the single canon-owned identifier of the canonicalization **contract**: the masking rules that turn a raw line into its
 `template_str`, plus every classification rule whose output is serialized. Every MetaLog producer
 defaults to it, so a rules change is one edit at that declaration and impossible to skip — bump it
 and old/new metalogs become incomparable at the specification's §2.4 gate — re-derive, never
-migrate (`SRC-D-TID-9`).
+migrate (`F-SRC-insight-canon:canon.api.cppm:TemplateId`).
 
 It names the **rules generation, not the package version**. The two are decoupled: a patch release
 that does not touch the rules must not change it, and a rules change inside an unreleased window

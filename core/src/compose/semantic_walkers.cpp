@@ -186,7 +186,7 @@ namespace tokenization
         // trailing option group.
         // post: nullopt on any shape failure, an empty payload included.
         // note: the CR TERMINATES the payload; trimming it welds header prose into the name.
-        // refs: ADR-17.D6, SRC-D-TID-11
+        // refs: ADR-17.D6, F-SRC-insight-canon:canon.api.cppm:normalize
         [[nodiscard]] constexpr std::optional<std::string_view>
         skip_numeric_field(std::string_view remainder) noexcept
         {

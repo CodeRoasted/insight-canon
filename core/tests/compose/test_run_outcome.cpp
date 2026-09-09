@@ -16,7 +16,7 @@
 // unknown classes excluded.
 // invariant: determinism — byte-only walks and an integer line index, with no RNG, clock or
 // float.
-// refs: SRC-D-OUT-RUN-1
+// refs: ADR-17.D5
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -318,7 +318,7 @@ TEST(RunOutcomeGrammar5, TheCarriageReturnTerminatorAndOptionGroupAreDropped)
     // invariant: the carriage return is the producer's marker TERMINATOR, paired with an erase-line
     // escape that canon's ingest strip has already removed.
     // invariant: left in, it would ride into every payload and into the alignment key.
-    // refs: SRC-D-TID-11
+    // refs: F-SRC-insight-canon:canon.api.cppm:normalize
     EXPECT_EQ(recognize(norm_probe("mark:1784657178:prepare_executor\r"), composed).name,
               "prepare_executor");
     // invariant: a TERMINATOR and not a trailing byte to trim — the producer may continue the

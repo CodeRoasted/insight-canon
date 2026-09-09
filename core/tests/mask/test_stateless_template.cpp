@@ -4,7 +4,7 @@
 // invariant: the masker-cardinality RE-MEASURE used to live here as an env-gated test; it is a
 // measurement over an operator-mounted population and not a regression property.
 // invariant: so it moved out of the unit tree to a CLI instrument.
-// refs: SRC-D-TID-1, SRC-D-TID-2
+// refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -79,7 +79,7 @@ TEST(StatelessTemplate, KillsThePhantomPair)
     EXPECT_EQ(in_stream_a, alone) << "priming must have zero effect: " << in_stream_a << " vs "
                                   << alone;
     // invariant: the accepted tradeoff — the region word is KEPT literal rather than wildcarded.
-    // refs: SRC-D-TID-14
+    // refs: ADR-16.D5
     EXPECT_NE(in_stream_a.find("eu-west"), std::string::npos)
         << "a letter-leading word stays literal (F13 boundary): " << in_stream_a;
 }
@@ -252,7 +252,7 @@ TEST(StatelessTemplate, NonEphemeralPathsAndSourcePathsUntouched)
 
 // invariant: the re-measure rule set, whose discriminator is the digit-leading rule the whole model
 // rests on.
-// refs: SRC-D-TID-12
+// refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
 TEST(StatelessTemplate, DigitLeadingTokensMask)
 {
     ArenaAllocator arena{256U * 1024U};
@@ -269,7 +269,7 @@ TEST(StatelessTemplate, LetterLeadingKeptUuidAndHashMasked)
 {
     ArenaAllocator arena{256U * 1024U};
     // invariant: letter-leading words are KEPT, because a word is not a number.
-    // refs: SRC-D-TID-14
+    // refs: ADR-16.D5
     EXPECT_NE(masked("decode utf8 stream", arena), masked("decode ascii stream", arena));
     EXPECT_EQ(masked("decode utf8 stream", arena), masked("decode utf8 stream", arena));
     EXPECT_NE(masked("hash sha256 ok", arena), masked("hash sha512 ok", arena));
@@ -294,14 +294,14 @@ TEST(StatelessTemplate, KvNumericValueMaskedWordKept)
     ArenaAllocator arena{256U * 1024U};
     // invariant: a key with a digit-leading value masks the VALUE and keeps the KEY, so per-id
     // lines collapse to one template and no error singleton produces a false diff.
-    // refs: SRC-D-TID-13
+    // refs: F-SRC-insight-canon:mask.cpp:normalize_hash_counter
     EXPECT_EQ(masked("checkout completed order=100000", arena),
               masked("checkout completed order=999999", arena));
     EXPECT_EQ(masked("payment timeout txn=50000", arena),
               masked("payment timeout txn=70000", arena));
     EXPECT_EQ(masked("GC pause=512ms heap=87%", arena), masked("GC pause=9ms heap=3%", arena));
     // invariant: a value WORD stays literal, which is the boundary and the registry's job.
-    // refs: SRC-D-TID-14
+    // refs: ADR-16.D5
     EXPECT_NE(masked("login user=alice", arena), masked("login user=bob", arena));
     // invariant: the status-value KEEP in its key-value form — a green-to-red flip must NOT
     // collapse.
@@ -352,7 +352,7 @@ TEST(StatelessTemplate, CurrencyMarkerNumberMasked)
 // invariant: these assert CURRENT SHIPPED BEHAVIOUR and do not argue the floor is correct.
 // invariant: the value is not tunable by a threshold study — a red here means someone moved a
 // load-bearing masking constant, which is an identity-affecting change requiring a version bump.
-// refs: SRC-D-TID-16
+// refs: F-SRC-insight-canon:canon.api.cppm:kCanonicalizationVersion
 namespace
 {
 // invariant: both fixtures are LETTER-leading on purpose, because a digit-leading hex run is masked

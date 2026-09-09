@@ -54,7 +54,8 @@ export namespace insight::tokenization
 class LogParser;
 } // namespace insight::tokenization
 
-// refs: ADR-21.D4, SRC-D-TID-11, F-SRC-insight-canon:test_normalized_content_doors.cpp
+// refs: ADR-21.D4, F-SRC-insight-canon:canon.api.cppm:normalize
+// refs: F-SRC-insight-canon:test_normalized_content_doors.cpp
 // invariant: THE one non-public producer of `NormalizedContent` — the passkey's friend list is
 // pinned at ONE by the door census, and growing it deletes the mechanism.
 // invariant: the conformance kit must never mint here; its probes are escape-free by construction,
@@ -106,7 +107,7 @@ class LogParser
     [[nodiscard]] std::vector<std::expected<ParsedLine, std::string>>
     parse_batch(std::span<const std::string_view> lines);
 
-    // refs: ADR-21.D4, SRC-D-TID-11
+    // refs: ADR-21.D4, F-SRC-insight-canon:canon.api.cppm:normalize
     // pre: `stage1_content` is strategy-produced; any other bytes go through `normalize()`.
     // post: attests WHO minted, never WHAT ran before — via `parse_line` the bytes carry stage-1
     // performance, via `parse_stable` door provenance only.
@@ -145,7 +146,7 @@ class LogParser
     // invariant: lines carrying NO EVENT — empty, or all escape bytes — are counted here and
     // never in failed_count_, which gates the failure warns and the failure rate.
     std::size_t skipped_count_{0};
-    // refs: SRC-D-TID-11
+    // refs: F-SRC-insight-canon:canon.api.cppm:normalize
     // invariant: the strip's result is never longer than its input, so the retained capacity makes
     // stage 1 allocation-free in steady state.
     std::string escape_scratch_;

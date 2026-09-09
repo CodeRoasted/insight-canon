@@ -5,8 +5,11 @@ import insight.canon.detail.scan;
 
 // invariant: the sole identity source - a pure function of a line's own whitespace-delimited
 // tokens, each classified by its OWN class.
-// refs: ADR-6.D8, ADR-16.D5, SRC-D-TID-1, SRC-D-TID-2, SRC-D-TID-3
-// refs: SRC-D-TID-11, SRC-D-TID-12, SRC-D-TID-13, SRC-D-TID-14
+// refs: ADR-6.D8, ADR-16.D5, F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
+// refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
+// refs: F-SRC-insight-canon:canon.api.cppm:normalize
+// refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
+// refs: F-SRC-insight-canon:mask.cpp:normalize_hash_counter, ADR-16.D5
 // note: the composite-normalizer contracts are declared beside the exported masker they govern.
 namespace insight::tokenization
 {
@@ -96,7 +99,7 @@ namespace
 
     // invariant: an integer is KEPT only when it follows a status keyword AND is short, so an exit
     // code or an HTTP status stays distinct while a bare count stays masked.
-    // refs: SRC-D-TID-14
+    // refs: ADR-16.D5
     constexpr std::size_t kMaxStatusDigits{3};
 
     [[nodiscard]] inline bool equals_ascii_lower(std::string_view tok,
@@ -434,7 +437,7 @@ namespace
     // post: keeps the name and masks the numeric version, so a version bump is not a new template.
     // pre: a separator whose suffix is a numeric version run, then punctuation only - an alphabetic
     // suffix is a path segment and is declined.
-    // refs: SRC-D-TID-12
+    // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
     [[nodiscard]] inline bool normalize_versioned_ref(std::string_view tok, std::string& out)
     {
         const std::size_t slash{tok.rfind('/')};
@@ -521,7 +524,9 @@ namespace
     // or timestamp, and intrinsically high-cardinality.
     // invariant: subsumes the all-digit mask and every separator, decimal, unit-suffixed and
     // versioned numeric in ONE rule, with no unit lexicon.
-    // refs: ADR-16.D5, SRC-D-TID-12, SRC-D-TID-13, SRC-D-TID-14
+    // refs: ADR-16.D5, F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
+    // refs: F-SRC-insight-canon:mask.cpp:normalize_hash_counter
+    // refs: ADR-16.D5
     [[nodiscard]] inline bool is_digit_leading(std::string_view tok) noexcept
     {
         std::size_t pos{0};
@@ -536,7 +541,7 @@ namespace
 
     // post: true for a standalone UUID or a hex-only run at or above the floor.
     // invariant: the floor is what keeps a short hex-looking word literal.
-    // refs: SRC-D-TID-12
+    // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
     [[nodiscard]] inline bool is_uuid_or_long_hash(std::string_view tok) noexcept
     {
         constexpr std::size_t kUuidLen{36};
@@ -557,7 +562,6 @@ namespace
 
     // post: keeps the counter marker and masks the index; the digit run must reach end or
     // punctuation, so a marker followed by a word is not a counter.
-    // refs: SRC-D-TID-13
     [[nodiscard]] inline bool normalize_hash_counter(std::string_view tok, std::string& out)
     {
         if (tok.size() < 2U || tok[0] != '#' || !is_digit(tok[1]))
@@ -577,7 +581,7 @@ namespace
     // invariant: FROZEN, DECLARED byte sequences - byte-exact, with no Unicode property lookup,
     // which is what keeps the decision identical across standard libraries.
     // invariant: adding a marker here extends BOTH touch points, so there is one source of truth.
-    // refs: SRC-D-TID-9, SRC-D-TID-22
+    // refs: F-SRC-insight-canon:canon.api.cppm:TemplateId, SRC-D-TID-22
     inline constexpr std::array<std::string_view, 1> kCurrencyMarkers{std::string_view{"$"}};
 
     // post: the length in BYTES of the declared marker prefixing `tok`, 0 when there is none.
@@ -594,7 +598,7 @@ namespace
     // trailing alphanumeric rejects, and trailing punctuation is kept.
     // invariant: a DECIDABLE numeric - no low-cardinality keyword has the shape marker-then-digits,
     // so it joins the digit-leading numerics the first-byte test misses on a leading marker.
-    // refs: SRC-D-TID-12, SRC-D-TID-22
+    // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate, SRC-D-TID-22
     [[nodiscard]] inline bool normalize_marker_number(std::string_view tok, std::string& out)
     {
         const std::size_t marker{marker_prefix_len(tok)};
@@ -682,7 +686,7 @@ namespace
     // keeping the surrounding structure.
     // invariant: a CLOSED grammar pinned by literal bytes at fixed offsets, every member of whose
     // acceptance set is an instance value by the encoding's own semantics.
-    // refs: SRC-D-TID-12, SRC-D-TID-14
+    // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate, ADR-16.D5
     // invariant: the reasoning does not extend to an embedded long-DIGIT-run arm - a stable name
     // and an ephemeral id are the same shape there, and no parameter separates them.
     [[nodiscard]] inline bool normalize_embedded_identity(std::string_view tok, std::string& out)
@@ -730,7 +734,7 @@ namespace
 
     // post: keeps the key and masks a digit-leading value; a status value and a value WORD are both
     // excluded, so a green-to-red flip stays distinct and a varying word stays literal.
-    // refs: SRC-D-TID-5, SRC-D-TID-14, SRC-D-TID-17
+    // refs: LSRC-14, ADR-16.D5, SRC-D-TID-17
     [[nodiscard]] inline bool normalize_kv_value(std::string_view tok, std::string& out)
     {
         const std::size_t eq_pos{tok.find('=')};
@@ -763,7 +767,8 @@ namespace
     // version names, so adding, reordering or removing a rule REQUIRES a version bump.
     // assert: the catalog's SHAPE is one limb of that obligation and not all of it - widening an
     // existing rule in place leaves this array byte-identical and owes the same bump.
-    // refs: SRC-D-TID-12, SRC-D-TID-16
+    // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
+    // refs: F-SRC-insight-canon:canon.api.cppm:kCanonicalizationVersion
     struct CompositeRule
     {
         std::string_view name;
@@ -772,7 +777,9 @@ namespace
     // invariant: the two bracket rules are ADJACENT, most specific first, and non-overlapping
     // today, so future drift between them has a rule to violate loudly.
     // refs: SRC-D-MSK-1, SRC-D-MSK-2, SRC-D-MSK-5
-    // refs: SRC-D-TID-12, SRC-D-TID-13, SRC-D-TID-13b, SRC-D-TID-17, SRC-D-TID-22
+    // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
+    // refs: F-SRC-insight-canon:mask.cpp:normalize_hash_counter
+    // refs: SRC-D-TID-13b, SRC-D-TID-17, SRC-D-TID-22
     constexpr std::array<CompositeRule, 9U> kCompositeRules{{
         {.name = "diagnostic_composite", .normalize = normalize_diagnostic_composite},
         {.name = "ephemeral_root", .normalize = normalize_ephemeral_root},
@@ -834,7 +841,8 @@ namespace
 // normalized position does not.
 // invariant: a function of the content bytes only - no float, no map iteration, no state - so it is
 // bit-identical across standard libraries and independent of order and stream.
-// refs: ADR-16.D5, SRC-D-TID-1, SRC-D-TID-2, SRC-D-TID-9
+// refs: ADR-16.D5, F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
+// refs: F-SRC-insight-canon:canon.api.cppm:TemplateId
 StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& out_arena,
                                      const MaskConfig& config)
 {
@@ -847,7 +855,7 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
 
     // assert: the declared per-token classification in TOTAL precedence - the KEEP carve-outs win
     // first, then the masks.
-    // refs: SRC-D-TID-12
+    // refs: ADR-16.D5
     for_each_token(content,
                    [&](std::string_view tok)
                    {

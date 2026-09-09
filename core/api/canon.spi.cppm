@@ -112,7 +112,7 @@ struct ParsedLine
     // the ANSI-stripped content.
     // invariant: a per-line classification attribute, NOT part of template identity; false for
     // every non-echoed line.
-    // refs: SRC-D-PROV-1
+    // refs: ADR-20.D5
     bool echoed_source{false};
     // invariant: EMPTY when the parse recognized at least one declared role; NON-EMPTY when it
     // recognized NONE.
@@ -281,7 +281,7 @@ enum class PayloadExtract : std::uint8_t
     // MATCH, so a malformed producer marker is declined rather than mis-parsed.
     // invariant: digit-length is deliberately unconstrained; anchoring, not the stamp, is what
     // excludes the echoed phantoms.
-    // refs: SRC-D-TID-11, STU-12, ADR-17
+    // refs: F-SRC-insight-canon:canon.api.cppm:normalize, STU-12, ADR-17
     NumericFieldThenRemainder,
 };
 
@@ -445,7 +445,7 @@ struct LocationRow
 // invariant: one native verdict token to RunOutcome, byte-exact and dialect-gated.
 // invariant: consumed on BOTH resolution rungs — the authoritative side-input token and the
 // console-tail marker's extracted remainder map through the SAME set.
-// refs: SRC-D-OUT-RUN-1, ADR-17.D5
+// refs: ADR-17.D5
 struct OutcomeTokenRow
 {
     std::string_view token;
@@ -473,7 +473,7 @@ enum class OutcomeMarkerShape : std::uint8_t
 // invariant: the LONGEST matching prefix wins within a line, and the LAST matching line wins across
 // lines — a run has one terminal verdict.
 // invariant: no dependence on row declaration order.
-// refs: SRC-D-OUT-RUN-1
+// refs: ADR-17.D5
 struct OutcomeMarkerRow
 {
     std::string_view prefix;
@@ -514,7 +514,7 @@ using StrategyFactory = std::unique_ptr<insight::tokenization::IFormatStrategy> 
 // function — a discouraged escape-hatch recognizer.
 // invariant: consulted by LogParser on the RAW, ANSI-bearing line, independent of the routed
 // strategy.
-// refs: SRC-D-PROV-1, ADR-17
+// refs: ADR-20.D5, ADR-17
 using ProvenanceHook = bool (*)(std::string_view raw_line) noexcept;
 
 // invariant: each package exports one constexpr SemanticPackageManifest from its own named module.
@@ -542,7 +542,7 @@ struct SemanticPackageManifest
     std::span<const ValueClassRow> value_classes;
     // invariant: the run-outcome vocabulary; both spans may be empty, a package declaring exactly
     // the outcome surfaces its dialect actually has.
-    // refs: SRC-D-OUT-RUN-1, ADR-17.D5
+    // refs: ADR-17.D5
     std::span<const OutcomeTokenRow> outcome_tokens;
     std::span<const OutcomeMarkerRow> outcome_markers;
     // invariant: the package's declared INTENT CHANNEL vocabulary — every materialization this
@@ -629,7 +629,7 @@ inline constexpr std::string_view kPlaceholderNumericField{"0:"};
 // which is its minimal shape-valid rendering.
 // invariant: no new row kind is needed — the outcome rows are already symmetric literals, and the
 // conformance kit asserts that scanning a rendered line recovers that row's own verdict.
-// refs: SRC-D-OUT-RUN-1, BIB:jenkins_dialect
+// refs: ADR-17.D5, BIB:jenkins_dialect
 [[nodiscard]] inline std::string render_outcome(const OutcomeMarkerRow& row, std::string_view token)
 {
     std::string out;

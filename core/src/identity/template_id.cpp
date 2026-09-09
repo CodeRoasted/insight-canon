@@ -4,7 +4,7 @@ module;
 module insight.canon.api;
 import insight.canon.internal;
 
-// refs: SRC-D-TIR-1
+// refs: F-SRC-insight-canon:canon.api.cppm:TemplateId
 namespace insight
 {
 namespace

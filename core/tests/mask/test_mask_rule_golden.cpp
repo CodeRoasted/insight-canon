@@ -66,7 +66,7 @@ namespace
 // invariant: this list plus that catalog is the complete rule-id namespace.
 // invariant: it is hand-held because the dispatcher states these as a disjunction chain rather than
 // a table, and a sibling arm is what keeps a typo here from silently minting a sixth id.
-// refs: SRC-D-TID-12
+// refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
 constexpr std::array<std::string_view, 5> kTopLevelRuleIds{
     {std::string_view{"status_keep"}, std::string_view{"uuid_or_hash"}, std::string_view{"ipv4"},
      std::string_view{"digit_leading"}, std::string_view{"literal_keep"}}};

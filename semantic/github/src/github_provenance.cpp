@@ -53,7 +53,7 @@ namespace
 
 } // namespace
 
-// refs: SRC-D-PROV-1, BIB:determinism_model
+// refs: ADR-20.D5, BIB:determinism_model
 // pre: `line` carries its ANSI intact and its declared transport already peeled — the SGR wrapper
 // is the only signal and stage 1 would destroy it.
 // post: true iff the whole visible content is ONE command-echo SGR span — open (`36;1`/`1;36`), a

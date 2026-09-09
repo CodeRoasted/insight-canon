@@ -23,7 +23,6 @@
 // envelope to peel.
 // assert: the digest is strictly STRONGER than the legible columns, and that was observed rather
 // than argued: a mutation moved 74 of 82 digests with every legible count identical.
-// refs: SRC-D-TID-12
 // assert: red-capability was re-observed on the RE-EMITTED baseline, since a baseline re-frozen
 // from the current chain agrees with itself by construction.
 // assert: a one-byte change to the epilogue prefix in the shipped manifest moved 82 of 82 traces;

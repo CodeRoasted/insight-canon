@@ -1,4 +1,4 @@
-// refs: ADR-17, SRC-D-OUT-RUN-1
+// refs: ADR-17, ADR-17.D5
 // invariant: this file guards the JENKINS run-outcome DATA and its end-to-end recognizability,
 // never the resolution ladder — that is core's, over synthetic manifests.
 // refs: F-SRC-insight-canon:test_run_outcome.cpp
@@ -114,7 +114,7 @@ TEST(JenkinsOutcome, BareFreestyleEpilogueStillResolves)
               RunOutcome::Aborted);
 }
 
-// refs: SRC-D-OUT-RUN-1
+// refs: ADR-17.D5
 // invariant: the ladder is a total PRECEDENCE, never a reconciliation: the authoritative side-input
 // stands, the divergence is flagged, and neither side is a tiebreak.
 // note: a present console verdict can be a nested outcome the whole-run API verdict overrides

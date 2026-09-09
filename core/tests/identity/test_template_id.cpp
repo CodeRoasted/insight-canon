@@ -3,7 +3,7 @@
 // performance refactor rests on.
 // invariant: byte-lexicographic order matching the old rendered-string order, the render and parse
 // round trip, content determinism, and a working hash specialization.
-// refs: SRC-D-TIR-1
+// refs: F-SRC-insight-canon:canon.api.cppm:TemplateId
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -98,7 +98,7 @@ TEST(TemplateIdInvariants, StdHashUsableInUnorderedContainer)
 // is in-memory keying only.
 // invariant: deterministic, ORDER-SENSITIVE, distinct per distinct sequence, and usable in a hash
 // container.
-// refs: SRC-D-TIR-4
+// refs: F-SRC-insight-canon:canon.api.cppm:NgramId
 namespace
 {
 [[nodiscard]] std::vector<TemplateId> seq(std::initializer_list<std::string_view> templates)

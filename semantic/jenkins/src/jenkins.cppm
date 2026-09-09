@@ -102,7 +102,7 @@ static_assert(
     insight::semantic::DialectIntent<Dialect>,
     "jenkins: a recognition marker has no paired generation row (reader without a writer)");
 
-// refs: ADR-17, STU-6, SRC-D-OUT-RUN-1
+// refs: ADR-17, STU-6, ADR-17.D5
 // invariant: the five native `result` strings map into the core four-class vocabulary, and
 // NOT_BUILT maps to Unknown because the run never produced a verdict — honest, not a guess.
 // invariant: the console-tail `Finished: <RESULT>` epilogue is the DEGENERATE fallback source only:

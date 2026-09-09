@@ -288,7 +288,7 @@ struct PeeledLine
     }
 };
 
-// refs: SRC-D-PROV-1
+// refs: ADR-20.D5
 // invariant: what one line's peel yielded on the TOKENIZER-FEEDING path: a plain view of the
 // caller's RAW bytes with the declared transforms unwound.
 // invariant: deliberately NOT the normalized type, because no stage 1 has run and this struct must
@@ -330,7 +330,7 @@ class TransportStack
     {
     }
 
-    // refs: ADR-21.D2, ADR-21.D4, ADR-23.D2, SRC-D-PROV-1
+    // refs: ADR-21.D2, ADR-21.D4, ADR-23.D2, ADR-20.D5
     // post: unwinds every declared transform, outside-in. Pure, allocation-free, deterministic and
     // noexcept: a byte function over a borrowed view.
     // invariant: TOTALITY IS ABOUT APPLICATION, NOT EFFECT. Every declared transform is applied to

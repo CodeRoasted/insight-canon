@@ -9,7 +9,7 @@
 // constexpr `find_conflict`, and a startup fatal in the runtime compose.
 // invariant: IDENTITY-BEARING — the composed rule set carries a content hash over its canonical
 // serialization, and the transport catalogue's version and rows enter it too.
-// refs: SRC-II-7, SRC-SP-5
+// refs: ADR-17.D3, SRC-SP-5
 // invariant: HOT-PATH-INVISIBLE — composing MORE packages costs the tokenizer nothing on a line
 // no package claims, and that is a MEASUREMENT rather than an assertion.
 // invariant: three mechanism constraints carry it: no unconditional per-token indirection, no
@@ -457,7 +457,7 @@ constexpr ConflictInfo find_conflict(std::span<const SemanticPackageManifest> pa
 
 } // namespace insight::semantic
 
-// refs: ADR-22, SRC-D-PROV-1
+// refs: ADR-22, ADR-20.D5
 // invariant: the level-lift walker is declared HERE rather than in the facade because its
 // production consumer is the sealed parse shard, which sits BELOW the facade.
 // invariant: the level is decided at the parse stage, where the echoed-source demotion overrides

@@ -734,7 +734,7 @@ EventLevel infer_leading_log_level(std::string_view line) noexcept
     // invariant: a COST bound over canon's own cue vocabulary, so raw bytes are admissible here; a
     // prefix longer than this is the declared residual.
     // note: 128 aligns with kOutcomeHead - a verdict anchor can sit at the end of a long line.
-    // refs: ADR-16.D7, ADR-16.D8, SRC-D-RNK-2
+    // refs: ADR-16.D7, ADR-16.D8
     constexpr std::size_t kKeywordHead{128};
 
     // assert: a leading level word is authoritative only when verdict-anchored or terminal -

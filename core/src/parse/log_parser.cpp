@@ -24,7 +24,7 @@ LogParser::LogParser(ArenaAllocator& arena, const insight::semantic::ComposedSem
 {
 }
 
-// refs: SRC-D-PROV-1
+// refs: ADR-20.D5
 // pre: `raw_line` is the RAW, ANSI-bearing line — stage-1 `normalize()` destroys the SGR wrapper
 // the hooks key on.
 // invariant: strategy-independent, and core names no hook — every provenance hook arrives from a
@@ -110,7 +110,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
         return std::unexpected(std::string("LogParser: empty line"));
     }
 
-    // refs: SRC-D-TID-11, ADR-21.D4
+    // refs: F-SRC-insight-canon:canon.api.cppm:normalize, ADR-21.D4
     // invariant: THE one named site where this parser performs stage 1 unconditionally;
     // `parse_stable` performs none.
     const NormalizedLine normalized{normalize(raw_line, escape_scratch_)};
@@ -149,7 +149,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
         ++parsed_count_;
         last_format_ = strategy->format();
         apply_level_lift(*result, composed_);
-        // refs: SRC-D-PROV-1
+        // refs: ADR-20.D5
         // invariant: an echoed-source line is run-step SCRIPT text, not an observed event, so its
         // level is driven to absence.
         // note: a failure word in echoed shell source must confer no alerting level.
@@ -227,7 +227,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_stable(std::string_view 
         ++parsed_count_;
         last_format_ = strategy->format();
         apply_level_lift(*result, composed_);
-        // refs: SRC-D-PROV-1
+        // refs: ADR-20.D5
         // note: a caller that already stripped ANSI hands no wrapper here, so this is a no-op.
         if (is_echoed_source(stable_line, composed_))
         {

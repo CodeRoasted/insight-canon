@@ -180,7 +180,7 @@ RunOutcomeScan scan_run_outcome(std::span<const std::string> lines,
 
 // post: the strict total ladder — authoritative side-input, then the console tail, then Unknown;
 // never a reconciliation.
-// refs: ADR-17.D5, SRC-D-OUT-RUN-1
+// refs: ADR-17.D5
 RunOutcomeResolution resolve_run_outcome(SideInputVerdict side_input, const RunOutcomeScan& scan,
                                          const insight::semantic::ComposedSemantics& stream_view,
                                          const insight::semantic::ComposedSemantics& vocabularies)
@@ -221,7 +221,7 @@ RunOutcomeResolution resolve_run_outcome(SideInputVerdict side_input, const RunO
                 resolution.divergent = true;
                 INSIGHT_LOG_TRACE(logging::parser_logger(),
                                   "run_outcome: authoritative={} console={} -> {} (divergent "
-                                  "console tail not consulted, SRC-D-OUT-RUN-1)",
+                                  "console tail not consulted, ADR-17.D5)",
                                   to_string(*mapped), to_string(*console_mapped),
                                   to_string(resolution.outcome));
             }
