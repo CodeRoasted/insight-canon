@@ -28,7 +28,8 @@ using EventID = uint64_t;
 // does not touch the rules must not move it, and a rules change must.
 // invariant: every MetaLog producer defaults to this, so old and new documents become incomparable
 // at the wire spec's 2.4 gate: re-derive, never migrate.
-// refs: ADR-2.D5, ADR-2.D9, F-SRC-insight-canon:canon.api.cppm:TemplateId, SRC-D-TID-22
+// refs: ADR-2.D5, ADR-2.D9, F-SRC-insight-canon:canon.api.cppm:TemplateId
+// refs: F-SRC-insight-canon:mask.cpp:normalize_marker_number
 // note: the generation ledger is technical_docs/canonicalization_generations.md.
 inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-15"};
 

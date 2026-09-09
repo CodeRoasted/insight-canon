@@ -581,7 +581,8 @@ namespace
     // invariant: FROZEN, DECLARED byte sequences - byte-exact, with no Unicode property lookup,
     // which is what keeps the decision identical across standard libraries.
     // invariant: adding a marker here extends BOTH touch points, so there is one source of truth.
-    // refs: F-SRC-insight-canon:canon.api.cppm:TemplateId, SRC-D-TID-22
+    // refs: F-SRC-insight-canon:canon.api.cppm:TemplateId
+    // refs: F-SRC-insight-canon:mask.cpp:normalize_marker_number
     inline constexpr std::array<std::string_view, 1> kCurrencyMarkers{std::string_view{"$"}};
 
     // post: the length in BYTES of the declared marker prefixing `tok`, 0 when there is none.
@@ -598,7 +599,7 @@ namespace
     // trailing alphanumeric rejects, and trailing punctuation is kept.
     // invariant: a DECIDABLE numeric - no low-cardinality keyword has the shape marker-then-digits,
     // so it joins the digit-leading numerics the first-byte test misses on a leading marker.
-    // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate, SRC-D-TID-22
+    // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
     [[nodiscard]] inline bool normalize_marker_number(std::string_view tok, std::string& out)
     {
         const std::size_t marker{marker_prefix_len(tok)};
@@ -744,7 +745,7 @@ namespace
         const std::string_view raw_value{tok.substr(eq_pos + 1)};
         // assert: a declared currency marker is stripped off the value before the digit-leading
         // gate, so the key AND the marker are kept while the amount masks.
-        // refs: SRC-D-TID-22
+        // refs: F-SRC-insight-canon:mask.cpp:normalize_marker_number
         const std::size_t marker{marker_prefix_len(raw_value)};
         const std::string_view value{raw_value.substr(marker)};
         if (!is_digit_leading(value))
@@ -779,7 +780,7 @@ namespace
     // refs: SRC-D-MSK-1, SRC-D-MSK-2, SRC-D-MSK-5
     // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
     // refs: F-SRC-insight-canon:mask.cpp:normalize_hash_counter
-    // refs: SRC-D-TID-13b, SRC-D-TID-17, SRC-D-TID-22
+    // refs: SRC-D-TID-13b, SRC-D-TID-17, F-SRC-insight-canon:mask.cpp:normalize_marker_number
     constexpr std::array<CompositeRule, 9U> kCompositeRules{{
         {.name = "diagnostic_composite", .normalize = normalize_diagnostic_composite},
         {.name = "ephemeral_root", .normalize = normalize_ephemeral_root},

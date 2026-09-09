@@ -315,7 +315,7 @@ TEST(StatelessTemplate, KvNumericValueMaskedWordKept)
 // shape, which is the decidable-numeric refinement of the registry rule.
 // invariant: it closes the over-split twin, so a per-amount total collapses to one stable template
 // and its vanish can form.
-// refs: SRC-D-TID-22
+// refs: F-SRC-insight-canon:mask.cpp:normalize_marker_number
 TEST(StatelessTemplate, CurrencyMarkerNumberMasked)
 {
     ArenaAllocator arena{256U * 1024U};

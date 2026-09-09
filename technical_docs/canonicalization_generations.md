@@ -50,7 +50,7 @@ Severity-from-`severity_number`, trace-context routing, and the trace-scoped gra
 
 ## `-3` — currency-marker numerics
 
-`SRC-D-TID-22` — `$463` / `total=$463` mask to `$<*>` / `total=$<*>`.
+`F-SRC-insight-canon:mask.cpp:normalize_marker_number` — `$463` / `total=$463` mask to `$<*>` / `total=$<*>`.
 
 ## `-4` — the 1.6.4 masking batch
 
