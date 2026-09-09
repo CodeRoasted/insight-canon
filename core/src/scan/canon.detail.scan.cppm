@@ -776,26 +776,6 @@ inline void sv_skip_ws(std::string_view& str) noexcept
     return result;
 }
 
-// post: the bracketed content with `str` advanced past `]`; on a view not opening `[`, an empty
-// result and `str` untouched.
-[[nodiscard]] constexpr std::string_view sv_take_bracketed(std::string_view& str) noexcept
-{
-    if (str.empty() || str[0] != '[')
-        return {};
-    str.remove_prefix(1U);
-    return sv_take_until(str, ']');
-}
-
-// post: the quoted content without its quotes; on a view not opening `"`, an empty result and `str`
-// untouched.
-[[nodiscard]] constexpr std::string_view sv_take_quoted(std::string_view& str) noexcept
-{
-    if (str.empty() || str[0] != '"')
-        return {};
-    str.remove_prefix(1U);
-    return sv_take_until(str, '"');
-}
-
 // refs: ADR-16.D9, DN-43.D11
 // post: the bracketed content with `str` advanced past the `]` that closes it; on a view not
 // opening `[`, or one whose bracket never closes, an empty result and `str` UNTOUCHED.

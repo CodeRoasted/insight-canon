@@ -327,21 +327,51 @@ TEST(FastGatesScan, SvTakeUntilTakeN)
     EXPECT_TRUE(fixed.empty());
 }
 
-TEST(FastGatesScan, SvTakeBracketedAndQuoted)
+// invariant: the NO-CLOSE branch is the point of these forms — an absent terminator DECLINES the
+// field and leaves the view UNTOUCHED.
+// invariant: the raw forms it replaces handed back the whole remainder and emptied the view.
+// invariant: the raw sv_take_bracketed and sv_take_quoted are deleted, so no caller can reach that
+// branch through the bracket or the quote door any more.
+// refs: ADR-16.D9, DN-43.D11, DN-92.D2
+TEST(FastGatesScan, SvTakeBracketedAndQuotedDeclineWhenTheTerminatorIsAbsent)
 {
     std::string_view sv{"[27/Apr/2024:10:15:00] rest"};
-    EXPECT_EQ(sv_take_bracketed(sv), "27/Apr/2024:10:15:00");
+    EXPECT_EQ(sv_take_bracketed_or_none(sv), "27/Apr/2024:10:15:00");
     EXPECT_EQ(sv, " rest");
 
     std::string_view not_bracketed{"x[y]"};
-    EXPECT_EQ(sv_take_bracketed(not_bracketed), "") << "no leading '[' yields empty";
+    EXPECT_EQ(sv_take_bracketed_or_none(not_bracketed), "") << "no leading '[' yields empty";
     EXPECT_EQ(not_bracketed, "x[y]") << "and must not consume anything";
 
+    std::string_view unclosed{"[27/Apr/2024:10:15:00 rest"};
+    EXPECT_EQ(sv_take_bracketed_or_none(unclosed), "") << "an unclosed '[' names no field";
+    EXPECT_EQ(unclosed, "[27/Apr/2024:10:15:00 rest") << "and every byte must survive";
+
+    std::string_view balanced{"[QuorumPeer[myid=1]/2181:Election@774] - msg"};
+    EXPECT_EQ(sv_take_balanced_bracketed_or_none(balanced), "QuorumPeer[myid=1]/2181:Election@774");
+    EXPECT_EQ(balanced, " - msg");
+
+    std::string_view unbalanced{"[QuorumPeer[myid=1 - msg"};
+    EXPECT_EQ(sv_take_balanced_bracketed_or_none(unbalanced), "")
+        << "brackets that never balance name no field";
+    EXPECT_EQ(unbalanced, "[QuorumPeer[myid=1 - msg") << "and every byte must survive";
+
     std::string_view quoted{R"("GET / HTTP/1.1" 200)"};
-    EXPECT_EQ(sv_take_quoted(quoted), "GET / HTTP/1.1");
+    EXPECT_EQ(sv_take_clf_quoted_or_none(quoted), "GET / HTTP/1.1");
     EXPECT_EQ(quoted, " 200");
+
     std::string_view unquoted{"plain"};
-    EXPECT_EQ(sv_take_quoted(unquoted), "");
+    EXPECT_EQ(sv_take_clf_quoted_or_none(unquoted), "");
+    EXPECT_EQ(unquoted, "plain");
+
+    std::string_view escaped{R"("GET /a?q=\" HTTP/1.1" 200)"};
+    EXPECT_EQ(sv_take_clf_quoted_or_none(escaped), R"(GET /a?q=\" HTTP/1.1)")
+        << "an escaped quote does not terminate the field, and nothing is unescaped";
+    EXPECT_EQ(escaped, " 200");
+
+    std::string_view unterminated{R"("GET / HTTP/1.1 200)"};
+    EXPECT_EQ(sv_take_clf_quoted_or_none(unterminated), "") << "an unterminated field names none";
+    EXPECT_EQ(unterminated, R"("GET / HTTP/1.1 200)") << "and every byte must survive";
 }
 
 // invariant: the per-token byte profile collapses THREE scans the masker's dispatch used to run per
