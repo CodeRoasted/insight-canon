@@ -226,7 +226,7 @@ inline constexpr std::array<OtelFieldDescriptor, 4> kOtelFieldCatalog{{
 // invariant: names are unit-explicit, so each value's unit is unambiguous at the key.
 // invariant: the SCHEDULE a field bins onto is a VERSIONED catalog, and its stable string id is the
 // eidos diff's comparability key.
-// refs: F-SRC-insight-canon:canon.api.cppm:OrdinalFieldDescriptor, SRC-D-W1-8
+// refs: F-SRC-insight-canon:canon.api.cppm:OrdinalFieldDescriptor
 // refs: ADR-16.D5
 enum class OrdinalSchedule : std::uint8_t
 {

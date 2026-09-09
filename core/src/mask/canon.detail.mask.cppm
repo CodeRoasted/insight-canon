@@ -56,7 +56,7 @@ the digits after it, so a make recursion depth reads `make[<*>]:` and a pytest-x
 the index varies, so masking the whole bracket would destroy exactly the distinction the template
 exists to carry. This generalizes the pure bracketed-digits form to a prefix plus digits - keep the
 stable class marker, mask the varying instance - which is the same shape the counter and currency
-rules use. It absorbs SRC-D-TID-13b.
+rules use. It absorbs the retired form-2 code TID-13b (2026-09-09).
 ***************************************************************************************************/
 /**************************************************************************************************
 D-LSRC-14 — a key=value pair masks the VALUE and keeps the KEY
@@ -69,11 +69,11 @@ part of the rule. A status value is NOT masked, on the same keyword-and-size gat
 space-separated carve-out, so a green-to-red flip stays distinct. A value that is a WORD is not
 masked either: it is not digit-leading, and equating two spellings of a varying word would require
 cross-line learning, which is the unbuilt registry's job and never this masker's. It absorbs
-SRC-D-TID-17.
+the retired form-2 code TID-17 (2026-09-09).
 ***************************************************************************************************/
 // refs: ADR-16.D2, F-SRC-insight-canon:mask.cpp:normalize_ephemeral_root
 // refs: F-SRC-insight-canon:mask.cpp:root_scope_ending_at
-// refs: F-SRC-insight-canon:mask.cpp:normalize_hash_counter, ADR-16.D5, SRC-D-TID-17
+// refs: F-SRC-insight-canon:mask.cpp:normalize_hash_counter, ADR-16.D5, LSRC-14
 struct StatelessTemplate
 {
     std::string_view template_str;

@@ -1,4 +1,4 @@
-// refs: SRC-SP-2, LSRC-5
+// refs: LSRC-5
 // invariant: the canon conformance kit is package-agnostic and canon-shipped, so this file is the
 // ENTIRE per-package instantiation — the shape an external package author copies.
 // invariant: a failing check prints its own verbose-on-failure diagnostic naming the row and the

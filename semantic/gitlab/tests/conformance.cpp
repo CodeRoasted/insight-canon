@@ -1,4 +1,4 @@
-// refs: SRC-SP-2
+// refs: LSRC-5
 // invariant: the kit is canon-shipped and package-agnostic, so this file is the WHOLE per-package
 // instantiation an external package author copies.
 // note: seedless and single-threaded — every check is a pure function of the manifest data

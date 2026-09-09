@@ -1,4 +1,4 @@
-// refs: SRC-SP-2
+// refs: LSRC-5
 // invariant: the kit is canon's and package-agnostic; this file is the whole of this package's
 // instantiation of it.
 // invariant: seedless, single-threaded and pure over manifest data.

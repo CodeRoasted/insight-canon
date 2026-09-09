@@ -1,6 +1,6 @@
 /***************************************************************************************************
 D-LSRC-5 — the conformance kit SHIPS INSTALLED — a gate the vendor keeps is a claim, not a gate
-Absorbs SRC-SP-2, whose form ADR-26.D5 retires: this block IS that code's statement, and it
+Absorbs the retired form-2 code SP-2 (2026-09-09): this block IS that code's statement, and it
 sits at the code's only declaration-position site. The kit is installed and public, so an
 external semantic-package author runs the IDENTICAL gate CodeRoast's own packages are held
 to — same source, same checks, same verdicts.

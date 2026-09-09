@@ -489,7 +489,7 @@ namespace
 
     // post: normalizes the bracketed digit run and KEEPS a short alphabetic class prefix inside the
     // bracket - keep the stable class marker, mask the varying index.
-    // refs: SRC-D-TID-13b
+    // refs: LSRC-13
     [[nodiscard]] inline bool normalize_bracket_index(std::string_view tok, std::string& out)
     {
         const std::size_t open{tok.find('[')};
@@ -734,7 +734,7 @@ namespace
 
     // post: keeps the key and masks a digit-leading value; a status value and a value WORD are both
     // excluded, so a green-to-red flip stays distinct and a varying word stays literal.
-    // refs: LSRC-14, ADR-16.D5, SRC-D-TID-17
+    // refs: LSRC-14, ADR-16.D5
     [[nodiscard]] inline bool normalize_kv_value(std::string_view tok, std::string& out)
     {
         const std::size_t eq_pos{tok.find('=')};
@@ -779,7 +779,7 @@ namespace
     // refs: LSRC-11, F-SRC-insight-canon:mask.cpp:normalize_ephemeral_root, LSRC-12
     // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
     // refs: F-SRC-insight-canon:mask.cpp:normalize_hash_counter
-    // refs: SRC-D-TID-13b, SRC-D-TID-17, F-SRC-insight-canon:mask.cpp:normalize_marker_number
+    // refs: LSRC-13, LSRC-14, F-SRC-insight-canon:mask.cpp:normalize_marker_number
     constexpr std::array<CompositeRule, 9U> kCompositeRules{{
         {.name = "diagnostic_composite", .normalize = normalize_diagnostic_composite},
         {.name = "ephemeral_root", .normalize = normalize_ephemeral_root},
