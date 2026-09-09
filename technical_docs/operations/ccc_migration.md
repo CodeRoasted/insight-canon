@@ -6745,7 +6745,7 @@ token immediately after — `malf slot status` reads FREE at the end of the run.
 the run — the reading, the classing, the stripping, the claim placement, the draft gate, both
 address-census legs and the interrogation — needs no slot and took none.
 
-## What remains, and what the next session should take first
+## What remains, and what the next session should take first — A CHECKPOINT OF 2026-09-06, SUPERSEDED: units 16–32 converted everything below and the repo ARMED on 2026-09-07 (the closing entry at the end of this file)
 
 **The programme now runs ONE REPO AT A TIME** (the Founder, 2026-09-06, to control token cost), so
 the next `insight-canon` session is a dedicated one rather than a lane in a wave.
@@ -6843,3 +6843,28 @@ codes but cannot be split off naively: the interface's per-strategy documentatio
 answer key for it, so the interface travels with whichever group converts first.
 
 `core/api/canon.api.cppm` (1 193) remains the other declaring unit, with seven codes of its own.
+
+## The run, closed — 2026-09-07, thirty-two units, the repo ARMED (entry written 2026-09-09)
+
+This ledger recorded units 16–32 as they landed and never wrote its closing line; this entry is
+that line, taken from the gate and the repo's log rather than from memory. **14 242 would-be
+violations over 126 files became 0 in 32 units; 14 489 comment lines became 8 642**; `malf test`
+held at **809 of 809 on clang-21 and on gcc-16.2** throughout (canon 734 · github 32 · gitlab 25 ·
+jenkins 13 · test_frameworks 5), the three corpus-labelled suites run separately against the
+private corpus. **Nine law blocks stand in this repo** — `LSRC-5`, `-6`, `-7` (the conformance
+interface), `-9` (the portable 128-bit header), `-11` to `-14` (the mask interface), `-16` (the OTLP
+export probe, `core/src/strategy/span_unpack.cpp`, unit 23). The gate's red was OBSERVED at arming:
+a bare comment made `malf format --check` exit 1, and the probe was reverted. The arming commit is
+`bd1418c` (`gate(canon): arm the comment contract — 126 files, zero violations, and the red
+observed`), a non-`ccc` subject, which is why a `ccc`-prefix scan of the log does not see it.
+
+The gate's closing line, 2026-09-09:
+
+```
+malf format: CCC SUMMARY · mode=check-sweep · files 126 = checked 126 + NOT CHECKED 0 · comment lines 8642 · forms pre=73 post=288 invariant=3409 assert=175 note=291 refs=746 continuation=3220 law=9 tool=281 · violations 0 (none) · rc=0
+```
+
+Since 2026-09-09 the gate reds in every repo with no declaration (`OPS-8.S13`); the
+`comment_contract: true` line this repo carried from `bd1418c` was deleted the same day. The
+programme's record across the eight repos is `STU-18`; the findings this ledger raised for other
+lanes stay where they are, each leaving by an appended `DISCHARGED` line under it.
