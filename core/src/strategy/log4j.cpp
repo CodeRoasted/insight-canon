@@ -80,7 +80,12 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
     {
         (void)sv_take_token(rest);
         const std::string_view level_sv{sv_take_token(rest)};
-        const std::string_view thread_name{sv_take_bracketed(rest)};
+        // invariant: the thread field is BALANCED — its interior may hold balanced pairs, so
+        // the close that ends it is the one at depth 0, never the first `]`.
+        // invariant: an unbalanced bracket DECLINES the field, so bytes no predicate
+        // validated stay in content rather than being swallowed with the message.
+        // refs: DN-43.D19
+        const std::string_view thread_name{sv_take_balanced_bracketed_or_none(rest)};
         sv_skip_ws(rest);
         if (!rest.empty() && rest[0] == '-')
             (void)sv_take_token(rest);
@@ -115,8 +120,11 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
             level_sv = pid_or_level;
 
         const std::string_view component{sv_take_token(rest)};
+        // invariant: the request-id section is a FLAT optional skip reaching no field, so an
+        // unclosed one keeps its bytes rather than emptying content.
+        // refs: DN-43.D11
         if (!rest.empty() && rest[0] == '[')
-            (void)sv_take_bracketed(rest);
+            (void)sv_take_bracketed_or_none(rest);
 
         parsed_line.level = EventLevel::declared(utils::parse_log_level(level_sv));
         parsed_line.component = component;
@@ -129,7 +137,10 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
     }
 
     const std::string_view level_sv{sv_take_token(rest)};
-    (void)sv_take_bracketed(rest);
+    // invariant: the SAME balanced thread field as the dash layout, discarded here rather than
+    // named — a first-`]` take leaves a stray `]` at the head of the component.
+    // refs: DN-43.D19
+    (void)sv_take_balanced_bracketed_or_none(rest);
     sv_skip_ws(rest);
 
     // invariant: the colon TERMINATES the component, so its ABSENCE means this line names no

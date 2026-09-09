@@ -964,6 +964,11 @@ TEST_F(Log4jStrategyTest, ParsesHadoopLine)
     EXPECT_NE(pl.content.find("MRAppMaster"), std::string::npos);
 }
 
+// invariant: the Log4j thread field is a BALANCED bracket construct, so the close that ends it is
+// the one at depth 0 — the first `]` truncates it mid-token on 163 of 2 000 Zookeeper sample lines.
+// invariant: EXACT EQUALITY on both halves, because the containment assertion this replaces held on
+// BOTH sides of the split it was meant to pin, and so could not fail.
+// refs: DN-43.D19
 TEST_F(Log4jStrategyTest, ParsesZookeeperLine)
 {
     auto result{strategy.parse(kLog4jZookeeperLine, arena)};
@@ -971,7 +976,61 @@ TEST_F(Log4jStrategyTest, ParsesZookeeperLine)
     const auto& pl{result.value()};
     EXPECT_TRUE(pl.timestamp.has_value());
     EXPECT_EQ(pl.level, LogLevel::Info);
-    EXPECT_NE(pl.content.find("Notification time out"), std::string::npos);
+    EXPECT_EQ(pl.component, "QuorumPeer[myid=1]/0:0:0:0:0:0:0:0:2181:FastLeaderElection@774")
+        << "a first-`]` take truncates the thread name mid-token; component = \"" << pl.component
+        << "\"";
+    EXPECT_EQ(pl.content, "Notification time out: 3200")
+        << "the thread residue, the stray `]` and the ` - ` separator must stay OUT of the "
+           "template "
+           "identity; content = \""
+        << pl.content << "\"";
+}
+
+// invariant: the standard layout takes the SAME thread field and discards it, so a nested thread
+// name there leaves a stray `]` at the head of component.
+// refs: DN-43.D19
+TEST_F(Log4jStrategyTest, NestedThreadNameInTheStandardLayoutLeavesNoResidue)
+{
+    static constexpr std::string_view kNested{
+        "2015-10-18 18:01:47,978 INFO [main[worker-1]] org.apache.hadoop.Foo: started"};
+    auto result{strategy.parse(kNested, arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const auto& pl{result.value()};
+    EXPECT_EQ(pl.component, "org.apache.hadoop.Foo") << "component = \"" << pl.component << "\"";
+    EXPECT_EQ(pl.content, "started") << "content = \"" << pl.content << "\"";
+}
+
+// invariant: DEGRADED INPUT — an unbalanced thread bracket must DECLINE the field and keep every
+// byte, where the unbounded take swallowed the message and emptied content.
+// refs: DN-43.D19, DN-43.D11
+TEST_F(Log4jStrategyTest, UnclosedThreadBracketKeepsEveryByteInContent)
+{
+    static constexpr std::string_view kUnclosed{
+        "2015-07-29 17:41:44,747 - INFO  [QuorumPeer[myid=1 Notification time out: 3200"};
+    auto result{strategy.parse(kUnclosed, arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const auto& pl{result.value()};
+    EXPECT_EQ(pl.level, LogLevel::Info);
+    EXPECT_TRUE(pl.component.empty()) << "component = \"" << pl.component << "\"";
+    EXPECT_EQ(pl.content, "[QuorumPeer[myid=1 Notification time out: 3200")
+        << "content = \"" << pl.content << "\"";
+}
+
+// invariant: the OpenStack layout's request-id section is an OPTIONAL SKIP whose bytes reach no
+// field, so an unclosed one must not be removed.
+// refs: DN-43.D11
+TEST_F(Log4jStrategyTest, UnclosedOpenStackRequestSectionKeepsEveryByteInContent)
+{
+    static constexpr std::string_view kUnclosed{
+        "nova-api.log.1.2017-05-16_13:53:08 2017-05-16 00:00:00.008 25746 INFO "
+        "nova.osapi_compute.wsgi.server [req-abc 10.11.10.1 GET /v2/servers"};
+    auto result{strategy.parse(kUnclosed, arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const auto& pl{result.value()};
+    EXPECT_EQ(pl.component, "nova.osapi_compute.wsgi.server")
+        << "component = \"" << pl.component << "\"";
+    EXPECT_EQ(pl.content, "[req-abc 10.11.10.1 GET /v2/servers")
+        << "content = \"" << pl.content << "\"";
 }
 
 TEST_F(Log4jStrategyTest, ParsesOpenStackLine)
