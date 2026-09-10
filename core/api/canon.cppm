@@ -25,7 +25,7 @@ export import insight.canon.transport;
 export namespace insight::tokenization
 {
 
-// refs: ADR-17, ADR-21.D3, ADR-22, DN-75
+// refs: ADR-17, ADR-21.D3, ADR-21.D5, ADR-22
 // invariant: canon owns the walker ALGORITHMS and the composed rows are the DATA; they are homed in
 // the facade because `ComposedSemantics` lives in a module that imports api.
 // invariant: NO walker takes a dialect or channel coordinate — `composed` is the RESOLVED
@@ -75,7 +75,7 @@ class Tokenizer
     [[nodiscard]] std::expected<CanonicalEvent, std::string>
     process_line(std::string_view raw_line);
 
-    // refs: ADR-21.D4, DN-75.D2
+    // refs: ADR-21.D1, ADR-21.D4
     // invariant: THE STABLE DOOR performs NO stage 1 at all, deliberately, so its answers — the
     // projection, the level lift, the role, the marker — are functions of the caller's bytes.
     // invariant: it exists so the echoed-source demotion can read the SGR command-echo wrapper that
