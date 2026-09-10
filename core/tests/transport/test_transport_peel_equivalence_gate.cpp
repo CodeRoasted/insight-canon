@@ -28,7 +28,7 @@
 // measures; it is no longer refactor-equivalence and never again certifies the grammars coincide.
 // invariant: the oracle is NOT updated to match — a frozen oracle that tracks its subject stops
 // being able to catch it.
-// refs: ADR-23.D4, DN-25.D4, DN-25.D5
+// refs: ADR-23.D4, ADR-23.D6
 // invariant: the SUBJECT is core's peel and the oracle is inline, so this file imports only the
 // facade.
 // invariant: the original home rested on a premise that retired when the two implementations
@@ -68,7 +68,7 @@
 // SAME population.
 // invariant: that arm is homed HERE rather than in a sibling because the counterfactual it needs IS
 // the frozen oracle, and copying it would create the second spelling freezing prevents.
-// refs: DN-25.D5
+// refs: ADR-23.D6
 // invariant: falsifiability was OBSERVED and not asserted — three peel-path mutations were run
 // and each reverted.
 // invariant: one of them shows WHICH CELL catches what: ignoring the separator strip moved the
@@ -103,7 +103,7 @@ constexpr std::string_view kUtf8Bom{"\xEF\xBB\xBF"};
 // invariant: OUTSIDE-IN — the mark is the outer delivery layer and comes off first.
 // invariant: the reversed spelling is kept as a FIRST-CLASS fixture and not as a comment, because
 // it is the counted red arm for the ordering claim.
-// refs: ADR-23.D4, DN-25.D4
+// refs: ADR-23.D4
 constexpr std::string_view kBomTransform{"utf8-bom-line-prefix"};
 constexpr std::array<std::string_view, 2> kDeclaredBomThenGha{{kBomTransform, kGhaTransform}};
 constexpr std::array<std::string_view, 2> kDeclaredGhaThenBom{{kGhaTransform, kBomTransform}};
@@ -594,7 +594,7 @@ TEST_F(TransportPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheShippedDete
 
     EXPECT_EQ(score.bom_decline, pins->bom_declines)
         << "cell B moved. This arm cannot see the BOM row (it declares one transform, frozen), so "
-           "this is a corpus or acceptor change, not the DN-25 fix landing."
+           "this is a corpus or acceptor change, not the byte-order-mark row landing."
         << report();
 
     if (pins->empty_input_lines == kUnmeasured)
@@ -632,7 +632,7 @@ TEST_F(TransportPeelEquivalenceGate, BomRowUndropsExactlyTheBomDeclinedLinesAndN
 {
     ASSERT_NE(insight::transport::find_transform(kBomTransform), nullptr)
         << "the catalogue does not declare \"" << kBomTransform
-        << "\". This arm is PRE-REGISTERED (DN-25.D5) and is RED BY DESIGN until the row, its "
+        << "\". This arm is PRE-REGISTERED (ADR-23.D6) and is RED BY DESIGN until the row, its "
            "algorithm and its identity bump land in ONE commit (ADR-2.D7). A handoff, not a "
            "regression — and an ASSERT rather than a skip, because a gate that skips its absent "
            "subject is green for the one reason that matters: it never looked.";

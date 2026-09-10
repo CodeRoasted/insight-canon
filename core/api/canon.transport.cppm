@@ -63,7 +63,7 @@ enum class TransportTransformKind : std::uint8_t
     // invariant: peel-equivalence is the ONLY obligation this row carries: the invariance cell
     // stays empty because no world vehicle exists.
     LinePrefixBracketedTimestamp,
-    // refs: DN-25
+    // refs: ADR-23.D3
     // invariant: a UTF-8 byte-order mark at the head of a line: a FIXED three-byte prefix removed
     // ONCE — not a greedy loop and not a search anywhere in the line.
     // invariant: the mark is a delivery artifact of the stream's first bytes, so a second one is
@@ -150,7 +150,7 @@ inline constexpr std::array<TransportTransformRow, 3> kTransportCatalogRows{{
      .extract = TransportExtract::EventObservationTime,
      .prefix_width = 0U,
      .strip_leading_space = true},
-    // refs: DN-25
+    // refs: ADR-23.D3
     // invariant: the UTF-8 mark at line head, delivery-shaped name on the same argument as the two
     // rows above: a mark is a property of how the bytes were DELIVERED, never of an ecosystem.
     // invariant: it is the first row in this catalogue that extracts NOTHING — a mark carries no

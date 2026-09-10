@@ -101,7 +101,7 @@ class Tokenizer
     [[nodiscard]] std::vector<std::expected<CanonicalEvent, std::string>>
     process_batch(std::span<const std::string_view> lines);
 
-    // refs: DN-29.D6, DN-29.D15
+    // refs: ADR-29.D7
     // post: true with `records` replaced by the N canonical flat-span records the document carries
     // when `raw_line` is an OTLP span-export DOCUMENT; false with `records` untouched otherwise.
     // pre: FOR THE ENTRY THAT HOLDS THE WHOLE INPUT — a file, a CLI read, a receiver body — and

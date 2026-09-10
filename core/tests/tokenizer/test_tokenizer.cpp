@@ -397,7 +397,7 @@ TEST_F(TokenizerTest, BatchFanOutKeepsSurroundingLinesInPlace)
 // invariant: nothing distinguished that event from a real one.
 // invariant: this is the PAIRED assertion to the fan-out tests above — the same input, the two
 // entries, two DIFFERENT and both-correct answers.
-// refs: DN-29.D6
+// refs: ADR-29.D7
 TEST_F(TokenizerTest, RecordEntryRefusesASpanDocumentInsteadOfCollapsingIt)
 {
     const auto result{tokenizer.process_line(kSpanDocument)};

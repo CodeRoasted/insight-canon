@@ -19,7 +19,7 @@ export namespace insight::tokenization
 // independently settable.
 // invariant: there is deliberately NO implicit conversion from std::optional<Timestamp>, so every
 // assignment names its provenance and the compiler enforces it.
-// refs: DN-29.D12, DN-29.D14
+// refs: ADR-29.D5
 class EventTime
 {
   public:
@@ -37,7 +37,7 @@ class EventTime
     // post: the DECLARED species — a schema field whose MEANING is the event time, never content
     // that resembles one.
     // invariant: a declared time outranks a transport stamp where a parsed one does not.
-    // refs: DN-29.D12
+    // refs: ADR-29.D5
     [[nodiscard]] static EventTime declared(Timestamp value) noexcept
     {
         EventTime out;
@@ -120,7 +120,7 @@ struct ParsedLine
     // into the raw line or the arena — no allocation on any path.
     // invariant: a STATEMENT, never a verdict: a marked line is still emitted and still analysed,
     // and the marker MUST NOT become a rejection.
-    // refs: DN-29.D15, DN-29.D16, DN-30
+    // refs: ADR-29.D7, ADR-17.D12
     std::string_view no_role_witness_key;
     // invariant: populated only by a strategy that recognizes OTEL log records; present is false
     // for every non-OTEL input.

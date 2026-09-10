@@ -25,8 +25,8 @@
 // output is pinned to the exact bytes of the SHIPPED DEFECT.
 // invariant: byte-only determinism — a fixed authored table, no randomness, no clock, no float,
 // no threads, and no allocation on the asserted path.
-// refs: ADR-2.D7, ADR-23.D4, DN-25.D3, DN-25.D4
-// refs: DN-25.D5, DN-25.D7, DN-25.D8
+// refs: ADR-2.D7, ADR-23.D4, ADR-23.D3
+// refs: ADR-23.D6, ADR-23.D3, ADR-23.D4
 #include <gtest/gtest.h>
 
 import insight.canon.test;
@@ -58,7 +58,7 @@ constexpr std::array<std::string_view, 1> kGhaOnly{{kGhaRow}};
 // invariant: the WRONG order is kept as a first-class fixture and not as a comment, because
 // reversing it makes the stamp acceptor meet the mark at offset 0 and decline.
 // invariant: that reproduces the present shipped defect THROUGH the declaration.
-// refs: ADR-23.D4, DN-25.D4
+// refs: ADR-23.D4
 constexpr std::array<std::string_view, 2> kBomThenGha{{kBomRow, kGhaRow}};
 constexpr std::array<std::string_view, 2> kGhaThenBom{{kGhaRow, kBomRow}};
 
@@ -70,7 +70,7 @@ constexpr std::string_view kStamp{"2026-04-15T22:20:38.2879579Z"};
 // actionable without opening the design note.
 constexpr std::string_view kRowAbsent{
     "the catalogue does not declare \"utf8-bom-line-prefix\".\n"
-    "These arms are PRE-REGISTERED (DN-25.D5) and are RED BY DESIGN until the row, its algorithm\n"
+    "These arms are PRE-REGISTERED (ADR-23.D6) and are RED BY DESIGN until the row, its algorithm\n"
     "and its identity bump land in ONE commit (ADR-2.D7). A handoff, not a regression.\n"
     "It is an ASSERT rather than a skip because a gate that skips its absent subject is green for\n"
     "the one reason that matters: it never looked."};
@@ -128,7 +128,7 @@ const std::array<Case, 17> kCases{{
               " indented",
      .expected = " indented",
      .kills = "strip_leading_space = true on this row — it would eat a real content byte "
-              "(DN-25.D3). ZERO instances in either D11 slice: this case is the SOLE guard."},
+              "(ADR-23.D3). ZERO instances in either D11 slice: this case is the SOLE guard."},
     {.label = "BOM + TAB + content",
      .bytes = "\xEF\xBB\xBF"
               "\tindented",
@@ -139,18 +139,18 @@ const std::array<Case, 17> kCases{{
      .expected = "",
      .kills = "a peel that refuses to shorten a line to nothing. Empty means DROP, and the licence "
               "is ADR-23.D4 — 'declaring is purely SUBTRACTIVE' — never ADR-23.D2, which speaks "
-              "about the transform and not about removing a LINE (DN-25.D8). The bound is "
+              "about the transform and not about removing a LINE (ADR-23.D4). The bound is "
               "STRUCTURAL, not a promise: is_blank() is bytes().empty() and is never "
               "whitespace-trimmed, so <BOM> followed by spaces peels to \"   \" and SURVIVES."},
     // invariant: the OTHER side of the drop bound — its twin says a line that is entirely
     // transport DROPS, and this one says transport plus whitespace does NOT.
     // invariant: together they pin exactly where the drop licence stops.
-    // refs: DN-25.D8
+    // refs: ADR-23.D4
     {.label = "BOM + whitespace only (the D8 bound)",
      .bytes = "\xEF\xBB\xBF"
               "   ",
      .expected = "   ",
-     .kills = "a blank test that treats whitespace as blank ON A PEELED LINE. DN-25.D8's bound is "
+     .kills = "a blank test that treats whitespace as blank ON A PEELED LINE. ADR-23.D4's bound is "
               "structural — is_blank() is bytes().empty(), never trimmed — and a bound stated in "
               "prose and enforced by nothing is not a bound. Grow a trim and this line silently "
               "DROPS: real content, three spaces wide, gone with no diagnostic. ⚠ MEASURED "
@@ -165,7 +165,7 @@ const std::array<Case, 17> kCases{{
      .expected = "\xEF\xBB\xBF"
                  "x",
      .kills = "a greedy `while (starts_with(BOM)) remove` loop. ONE removal is BY DEFINITION "
-              "(DN-25.D7): U+FEFF is a byte-order mark only at STREAM HEAD — anywhere else it is "
+              "(ADR-23.D3): U+FEFF is a byte-order mark only at STREAM HEAD — anywhere else it is "
               "ZWNBSP, a CONTENT character, so a loop would delete a codepoint and call it "
               "delivery. A loop is also ADR-23.D2's DETECTION shape N times over, which would "
               "retro-weaken the very argument that made this row admissible. The corpus is "
@@ -187,7 +187,7 @@ const std::array<Case, 17> kCases{{
               "utf16",
      .expected = "\xFF\xFE"
                  "utf16",
-     .kills = "prefix_width carried as a PARAMETER a row could declare as 2 (DN-25.D3's exact "
+     .kills = "prefix_width carried as a PARAMETER a row could declare as 2 (ADR-23.D3's exact "
               "argument): a width-2 acceptor strips two bytes off this line silently"},
     {.label = "UTF-16 BE BOM (FE FF)",
      .bytes = "\xFE\xFF"
@@ -201,7 +201,7 @@ const std::array<Case, 17> kCases{{
      .expected = "prefix\xEF\xBB\xBF"
                  "suffix",
      .kills = "a `find`-anywhere / erase-all-BOMs implementation. Zero instances in either slice — "
-              "sole guard. DN-25.D2's declared limitation: a BOM the prefix test misses keeps "
+              "sole guard. ADR-23.D3's declared limitation: a BOM the prefix test misses keeps "
               "TODAY's behavior, it never gains a new one."},
     {.label = "BOM at end of line only",
      .bytes = "trailing\xEF\xBB\xBF",
@@ -236,7 +236,7 @@ const std::array<Case, 17> kCases{{
 }};
 
 // invariant: the row's four shape decisions, each pinned where it is decided.
-// refs: DN-25.D3
+// refs: ADR-23.D3
 TEST(BomTransportRow, RowShapeIsExactlyWhatTheDesignDecided)
 {
     const TransportTransformRow* row{find_transform(kBomRow)};
@@ -310,12 +310,12 @@ TEST(BomTransportRow, CatalogVersionCoFiredWithTheNewRow)
     // version silently re-uses an identity that no longer means what it meant.
     // invariant: so the assertion is that the token MOVED off the value the previous catalogue
     // shipped under, which fires precisely when the bump is forgotten.
-    // refs: ADR-2, DN-25.O1
+    // refs: ADR-2
     EXPECT_NE(kTransportCatalogVersion, "transport-catalog-2")
         << "the catalogue gained a third row and kept the version of the two-row shape. That "
            "version is a component of EVERY composed semantic_identity — including for streams "
            "that declare no transport at all — so two incomparable vocabularies are now digesting "
-           "to the same identity. Bump it, and re-derive the goldens in the SAME pass (DN-25.O1 "
+           "to the same identity. Bump it, and re-derive the goldens in the SAME pass (ADR-2 "
            "S2: "
            "no commit may exist in which the catalogue version and the goldens disagree).";
     EXPECT_FALSE(kTransportCatalogVersion.empty());
@@ -420,7 +420,7 @@ TEST(BomTransportRowGBom1, PrefixingAnyLineWithABomIsInvisibleToTheRow)
 // invariant: the stack's own justification was NESTING, whose named beneficiary was never built, so
 // the stack has shipped with NO consumer and every ordering property is untested BY CONSTRUCTION.
 // invariant: these two arms are the first thing that makes stack order load-bearing.
-// refs: ADR-23.D3, DN-25.D5
+// refs: ADR-23.D3, ADR-23.D6
 TEST(BomTransportRowGBom2, DeclaredOrderPeelsTheProductionShapeToItsContent)
 {
     ASSERT_NE(find_transform(kBomRow), nullptr) << kRowAbsent;
@@ -462,7 +462,7 @@ TEST(BomTransportRowGBom2, DeclaredOrderPeelsTheProductionShapeToItsContent)
 // declaration's output to EXACT BYTES rather than to differs.
 // invariant: the claim is that reversal reproduces the SHIPPED DEFECT, and a claim is worth its
 // exact statement or nothing.
-// refs: DN-25.D4
+// refs: ADR-23.D4
 TEST(BomTransportRowGBom2, ReversedOrderReproducesTheShippedDefectThroughTheDeclaration)
 {
     ASSERT_NE(find_transform(kBomRow), nullptr) << kRowAbsent;
@@ -509,7 +509,7 @@ TEST(BomTransportRowGBom2, ReversedOrderReproducesTheShippedDefectThroughTheDecl
 // line yields exactly what the one-row stamp stack yields on the mark-free twin.
 // invariant: it is the same oracle the corpus arm scores at scale, so the two grains are JOINED on
 // one object rather than each proven alone.
-// refs: DN-25.D5
+// refs: ADR-23.D6
 TEST(BomTransportRowGBom2, TwoRowStackOnBomLineEqualsStampRowOnTheBomFreeTwin)
 {
     ASSERT_NE(find_transform(kBomRow), nullptr) << kRowAbsent;

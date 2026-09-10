@@ -89,7 +89,7 @@ namespace
         }
         case TransportTransformKind::LinePrefixByteOrderMark:
         {
-            // refs: DN-25.D3
+            // refs: ADR-23.D3
             // invariant: all three bytes are shape-checked, so `EF BB` alone and the UTF-16 marks
             // survive untouched; removed once and never in a loop, a second mark is content.
             // note: nothing is extracted and no separator is stripped — a mark carries no datum.

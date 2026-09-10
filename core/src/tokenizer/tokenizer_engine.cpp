@@ -89,7 +89,7 @@ struct Tokenizer::Impl
 
         CanonicalEvent event;
         event.id = next_id++;
-        // refs: DN-29.D14
+        // refs: ADR-29.D5
         // invariant: time and provenance are copied together off ONE EventTime, so no edit can set
         // a declared time here and forget the marker.
         event.timestamp = parsed_line.timestamp.value_or(Timestamp{});
@@ -124,7 +124,7 @@ struct Tokenizer::Impl
         event.ordinals = parsed_line.ordinals;
         event.linked_span_ids = parsed_line.linked_span_ids;
         event.echoed_source = parsed_line.echoed_source;
-        // refs: DN-29.D16
+        // refs: ADR-29.D7
         // invariant: the legibility marker crosses to the event by the same copy `component` and
         // `host` take; stopping at ParsedLine would leave a confident, unmarked event.
         event.no_role_witness_key = parsed_line.no_role_witness_key;

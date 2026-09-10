@@ -82,7 +82,7 @@ const std::array<LineCase, 15> kLines{{
     // fix — the empty stack leaves it alone and the declared stack must NOT claim it.
     // invariant: pinning the current behaviour is what lets the mark ruling land later without this
     // file quietly agreeing in advance.
-    // refs: DN-25
+    // refs: ADR-23.D3
     {.label = "BOM then stamp",
      .bytes = "\xEF\xBB\xBF"
               "2026-04-15T22:20:38.2879579Z ok",

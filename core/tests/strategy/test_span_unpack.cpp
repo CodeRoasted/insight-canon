@@ -33,7 +33,7 @@ namespace
 // subject was minted for, the span link being the declared cross-trace edge.
 // invariant: A FIXTURE THAT OMITS THE LOAD-BEARING FIELD TURNS AN EQUIVALENCE ASSERTION INTO A
 // TAUTOLOGY.
-// refs: ADR-29.D1, ADR-29.D2, DN-29.D7, MEM:synthetic-gate-vacuity-vs-judgment
+// refs: ADR-29.D1, ADR-29.D2, ADR-29.D8, MEM:synthetic-gate-vacuity-vs-judgment
 constexpr std::string_view kDocument{
     R"({"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"checkout-svc"}}]},)"
     R"("scopeSpans":[{"spans":[)"
@@ -78,7 +78,7 @@ TEST(SpanUnpack, DetectsDocumentNotFlatSpan)
 // not OTEL at all.
 // invariant: a verdict-only test is satisfied by the unbounded whole-line scan the bar forbids, so
 // the gate and the bound EACH get an assertion that the forbidden form would fail.
-// refs: ADR-29.D7, DN-29.D9
+// refs: ADR-29.D7
 TEST(SpanUnpack, ProbeIsGatedOnTheJsonLayoutSoNonJsonLinesAreNeverScanned)
 {
     // invariant: leading whitespace is skipped, exactly as the JSON strategy's confidence skips it.
@@ -151,7 +151,7 @@ TEST(SpanUnpack, UnpacksDocumentToByteIdenticalCanonicalRecords)
 // the predicates are genuinely split.
 // invariant: if someone later re-merges them for tidiness this is the arm that goes red, and
 // nothing else in the suite would notice.
-// refs: ADR-29.D5, ADR-29.D7, DN-29.D15
+// refs: ADR-29.D5, ADR-29.D7
 constexpr std::string_view kNonCanonicalKeyOrderDocument{
     R"({"schemaUrl":"https://opentelemetry.io/schemas/1.21.0",)"
     R"("resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"checkout-svc"}}]},)"
@@ -194,7 +194,7 @@ TEST(SpanUnpack, RecordPathDiagnosesAConformantExportWhoseKeysAreNotInCanonicalO
                "spans. Nothing in the line was understood — no timestamp, level, component or "
                "message role matched — yet the result is indistinguishable to a caller from a "
                "well-parsed record. That is the silent-wrong-answer class, reached through the "
-               "door built to stop it (DN-29.D15 L2).";
+               "door built to stop it (ADR-29.D7's backstop).";
         if (!parsed->no_role_witness_key.empty())
             EXPECT_EQ(parsed->no_role_witness_key, "schemaUrl")
                 << "marked, but the witness is not a key that was actually present on the line, so "
@@ -219,7 +219,7 @@ TEST(SpanUnpack, RecordPathDiagnosesAConformantExportWhoseKeysAreNotInCanonicalO
 // invariant: test ORDER must never decide whether a guarantee is checked.
 // invariant: it asserts on the MARKER and never on log volume, because the counter is thread-local
 // so the number of warning lines varies with worker count and is not a property any test may pin.
-// refs: DN-29.D16
+// refs: ADR-29.D7
 TEST(SpanUnpack, TheNoRoleMarkerIsSetOnEveryRecordNotOncePerRateLimitPeriod)
 {
     // invariant: one full period plus one, so a boundary is crossed wherever the shared counter
@@ -253,7 +253,7 @@ TEST(SpanUnpack, TheNoRoleMarkerIsSetOnEveryRecordNotOncePerRateLimitPeriod)
         << "). The marker has been tied to the WARN rate limit, so all but one record per period "
            "reaches the caller indistinguishable from a well-parsed record.\n"
            "    The rate limit is correct for the CONSOLE and must stay. It must never reach the "
-           "record: the marker is set on EVERY role-less record, unconditionally (DN-29.D16).";
+           "record: the marker is set on EVERY role-less record, unconditionally (ADR-29.D7).";
 }
 
 TEST(SpanUnpack, AcquisitionPathStillUnpacksAConformantNonCanonicalKeyOrderExport)
@@ -268,7 +268,7 @@ TEST(SpanUnpack, AcquisitionPathStillUnpacksAConformantNonCanonicalKeyOrderExpor
            "    The acquisition entry is not the hot record path: it holds the whole input "
            "already, "
            "so it must use a BROAD, deliberately over-triggering check rather than the O(1) "
-           "first-key compare the record path is bound to (DN-29.D15).\n"
+           "first-key compare the record path is bound to (ADR-29.D7).\n"
            "    Sharing one predicate between the two is what makes a conformant export "
            "simultaneously unrecognised and unrefused.";
 }
@@ -329,7 +329,7 @@ TEST(SpanUnpack, FlatSpanWithoutLinksHasEmptyLinkedSpanIds)
 // the result, and compares against the SAME span parsed directly as a flat record.
 // invariant: no expected-bytes constant participates, so a field the unpack drops makes the two
 // parsed events differ no matter what anyone remembered to write down.
-// refs: DN-29.D7
+// refs: ADR-29.D8
 constexpr std::string_view kLinkedSpanFlat{
     R"({"traceId":"aabb","spanId":"0002","parentSpanId":"0001",)"
     R"("links":[{"traceId":"ccdd","spanId":"00a1"},{"traceId":"eeff","spanId":"00b2"}],)"
@@ -361,7 +361,7 @@ TEST(SpanUnpack, DocumentPathAndFlatPathAgreeOnLinkedSpanIds)
         << ". The document path is LOSSY w.r.t. links[] — every Span Link in an export is "
            "destroyed "
            "before the flat-span parser sees it, which deletes the cross-trace Régime-B edge the "
-           "OTEL subject exists for (DN-29.D7, ADR-29.D1/D2)";
+           "OTEL subject exists for (ADR-29.D8, ADR-29.D1/D2)";
 
     for (std::size_t index{0}; index < via_flat->linked_span_ids.size(); ++index)
         EXPECT_EQ(via_document->linked_span_ids[index], via_flat->linked_span_ids[index])

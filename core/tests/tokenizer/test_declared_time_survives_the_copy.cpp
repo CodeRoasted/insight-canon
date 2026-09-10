@@ -82,7 +82,7 @@ TEST(DeclaredTimeCopy, AnOtelLogRecordIsMarkedDeclaredAndKeepsItsDeclaredValue)
         << "an OTLP log record crossed into CanonicalEvent WITHOUT its declared provenance. "
            "`timeUnixNano` is the schema's statement of when the event happened, so the ladder "
            "must rank it above a transport stamp — unmarked, it silently drops to rung 3 and the "
-           "delivery stamp overwrites it (DN-29.D12).";
+           "delivery stamp overwrites it (ADR-29.D5).";
     EXPECT_EQ(event->timestamp, stamp_at(kDeclaredUnixSeconds))
         << "marked declared, but the VALUE that crossed is not the declared one. The flag and the "
            "time are separate fields on CanonicalEvent and this is exactly the drift that makes "
@@ -129,7 +129,7 @@ TEST(DeclaredTimeCopy, AParsedTimestampCrossesAsPARSEDAndStillCarriesItsTime)
         << "a STRATEGY-PARSED timestamp crossed into CanonicalEvent marked DECLARED. `ts` is "
            "applicative content of ambiguous authorship — exactly what ADR-23 ranks BELOW the "
            "delivery stamp. Marked declared it climbs to rung 1 and outranks the transport stamp, "
-           "inverting the rule DN-29.D12 explicitly did NOT overturn.\n"
+           "inverting the rule ADR-29.D5 explicitly did NOT overturn.\n"
            "    A blanket `declared_timestamp = true` passes every declared-input case; this is "
            "the only arm that sees it.";
 

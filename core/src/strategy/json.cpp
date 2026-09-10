@@ -51,7 +51,7 @@ namespace
     // invariant: BOUNDED at exactly one level in both shapes: one dot, one descent. Unbounded
     // descent would make a level field anywhere in a tree a severity claim.
     // invariant: the bound is what makes the shape a GRAMMAR rather than a search.
-    // refs: F-SRC-insight-canon:simdjson_scratch.hpp:compound_key_name, ADR-17.D1, DN-30.D11
+    // refs: F-SRC-insight-canon:simdjson_scratch.hpp:compound_key_name, ADR-17.D1, ADR-17.D12
     enum class JsonRole : std::uint8_t
     {
         None,
@@ -205,7 +205,7 @@ namespace
                 // the event happened, not content that resembles a time.
                 // invariant: one of exactly TWO declared-time sites, and the one that made the span
                 // flag unusable as a marker.
-                // refs: DN-29.D12
+                // refs: ADR-29.D5
                 parsed_line.timestamp = EventTime::declared(*timestamp);
                 is_otel = true;
             }
@@ -248,7 +248,7 @@ namespace
 
     // invariant: first occurrence then every Nth — an unreadable stream would otherwise flood the
     // log from the hot path, and the tenth identical line adds nothing.
-    // refs: DN-29.D15
+    // refs: ADR-29.D7
     constexpr std::uint64_t kWarnEveryNRoleless{1000};
 
     // post: a view into the caller's own line — never into the padded scratch buffer, which the
@@ -258,7 +258,7 @@ namespace
     // invariant: the FIRST top-level key is the witness — the same O(1) walk the document probe
     // does, no cursor spent, and one key that was genuinely present answers what arrived.
     // invariant: the full key list is the diagnostic's job, never the value's.
-    // refs: DN-29.D16
+    // refs: ADR-29.D7
     [[nodiscard]] std::string_view first_top_level_key(std::string_view line) noexcept
     {
         // invariant: non-empty by construction, because an EMPTY marker MEANS roles were recognized
@@ -385,7 +385,7 @@ namespace
     // intruder and rots on the next envelope, and this enumerates nothing.
     // invariant: so it holds for every probe, parser and format that ever routes here; the rule is
     // do not emit what you did not parse.
-    // refs: DN-29.D17, F-SRC-insight-canon:canon.api.cppm:DurationLog2Ns
+    // refs: ADR-17.D13, F-SRC-insight-canon:canon.api.cppm:DurationLog2Ns
     // refs: F-SRC-insight-canon:canon.detail.strategy.cppm:unpack_otel_spans
     // refs: F-SRC-insight-canon:canon.api.cppm:kOtelFieldCatalog
     [[nodiscard]] bool parse_otel_span(simdjson::ondemand::object& root, ParsedLine& parsed_line,
@@ -507,7 +507,7 @@ namespace
         // it outranks a transport stamp where a merely PARSED time does not.
         // invariant: the span flag is set here too: DECLARED causality routes the record to the
         // observed DAG rather than to the adjacency ring.
-        // refs: DN-29.D12, F-SRC-insight-metalog:metalog.cppm:record_span
+        // refs: ADR-29.D5, F-SRC-insight-metalog:metalog.cppm:record_span
         if (const auto declared_start{utils::parse_unix_nano_timestamp(start_nano)})
             parsed_line.timestamp = EventTime::declared(*declared_start);
         else
@@ -710,7 +710,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
         // a depth-0 trace id would otherwise leave a half-populated context.
         // invariant: a declined parse must leave NO trace of itself, which makes the decline total
         // rather than nearly total.
-        // refs: DN-29.D17
+        // refs: ADR-17.D13
         parsed_line = ParsedLine{};
         parsed_line.raw_line = line;
 
@@ -829,7 +829,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     // the console while a caller would still receive an indistinguishable value.
     // invariant: it is also untestable through the log, because canon has no test-observable sink,
     // so an arm written against a log line goes green the day this code is deleted.
-    // refs: DN-29.D6, DN-29.D15, DN-29.D16, DN-30, DN-30.O1
+    // refs: ADR-29.D7, ADR-17.D12
     // refs: MEM:synthetic-gate-vacuity-vs-judgment
     if (!is_otel && !parsed_line.timestamp.has_value() && parsed_line.level == LogLevel::Unknown &&
         parsed_line.component.empty() && !recognized_message)
@@ -839,7 +839,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
         // invariant: moving it inside the sampled branch would leave almost every role-less event
         // carrying an EMPTY marker, indistinguishable from a well-parsed record.
         // invariant: two statements about one condition, and only the console's may be sampled.
-        // refs: DN-29.D16
+        // refs: ADR-29.D7
         parsed_line.no_role_witness_key = first_top_level_key(line);
 
         // invariant: ERGONOMICS, never the contract, and no test may assert against it.

@@ -475,7 +475,7 @@ std::size_t unpack_otel_spans(std::string_view document, std::vector<std::string
 // invariant: the acquisition entry holds the whole input by definition and is not the hot path, so
 // RECALL matters here and PRECISION matters on the record path.
 // note: the definition site states why one predicate could not serve both.
-// refs: DN-29.D15
+// refs: ADR-29.D7
 [[nodiscard]] bool is_otel_span_document_broad(std::string_view document) noexcept;
 
 } // namespace insight::tokenization

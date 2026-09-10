@@ -24,7 +24,7 @@ using namespace insight::tokenization;
 // invariant: the real ECS spellings are asserted at the END, as the acceptance case — they must
 // pass as a CONSEQUENCE of the shape rule and never as its cause.
 // invariant: determinism — literal inputs, one arena per case, no RNG, no clock, no shared state.
-// refs: DN-30
+// refs: ADR-17.D12
 namespace
 {
 
@@ -198,7 +198,7 @@ TEST(CompoundKeyShape, AProducerControlledValueNeverBecomesAWhereLabel)
 // invariant: so the trap is not a cardinality RISK — it puts a host-class value into the one
 // field that declares it is not one.
 // invariant: a red arm here is not a licence to add a spelling.
-// refs: DN-30.D5, DN-30.D11
+// refs: ADR-17.D12
 TEST(CompoundKeyShape, EcsFlatLibraryShapeResolvesTheFieldPositionRoleAndDeclinesTheNamespaceOne)
 {
     JsonStrategy strategy;
@@ -218,11 +218,11 @@ TEST(CompoundKeyShape, EcsFlatLibraryShapeResolvesTheFieldPositionRoleAndDecline
 
     EXPECT_TRUE(parsed->component.empty())
         << "`service.name` populated component with \"" << parsed->component
-        << "\". Namespace-position resolution is REFUSED (DN-30.D11): it is structurally "
+        << "\". Namespace-position resolution is REFUSED (ADR-17.D12): it is structurally "
            "indistinguishable from `source.ip`, which would put a host-class value into the field "
            "that declares itself a low-cardinality cube dimension. A red here means either the "
            "refusal was reversed without this boundary being restated, or a field NAME was added — "
-           "and DN-30.D5 forbids the second outright.";
+           "and ADR-17.D12 forbids the second outright.";
 }
 
 TEST(CompoundKeyShape,

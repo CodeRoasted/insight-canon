@@ -24,7 +24,7 @@
 // are the carrying leg for that defect class and must not be deleted.
 // invariant: byte-only determinism — committed-order population, integer counts, no randomness,
 // no clock, no float, no threads.
-// refs: ADR-23, DN-25.D5
+// refs: ADR-23, ADR-23.D6
 #include <gtest/gtest.h>
 
 import std;

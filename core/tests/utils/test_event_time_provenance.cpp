@@ -11,7 +11,7 @@ using namespace insight::tokenization;
 // runtime check on a default-constructed value tests only what the default happens to be.
 // invariant: no negative-compilation harness is needed: a type-trait assertion states
 // inexpressibility directly, and it cannot be skipped or filtered.
-// refs: DN-29.D14
+// refs: ADR-29.D5
 namespace
 {
 
@@ -20,7 +20,7 @@ namespace
 static_assert(!std::is_convertible_v<std::optional<Timestamp>, EventTime>,
               "EventTime is implicitly constructible from optional<Timestamp> — an assignment can "
               "now silently mean PARSED without naming its provenance, which is the exact hole "
-              "DN-29.D14 closes");
+              "ADR-29.D5 closes");
 
 // invariant: the same hole one step over — a bare timestamp must not slide in either, or a
 // declared-time field read could be assigned without saying so.
@@ -60,7 +60,7 @@ TEST(EventTimeProvenance, ADefaultConstructedValueIsEmptyAndUndeclared)
         << "a default-constructed EventTime carries a time — an unassigned field would supply one";
     EXPECT_FALSE(unset.is_declared())
         << "a default-constructed EventTime reports DECLARED provenance. Every site that forgets "
-           "to assign would then outrank a transport stamp on the DN-29.D12 ladder, which inverts "
+           "to assign would then outrank a transport stamp on the ADR-29.D5 ladder, which inverts "
            "the ruling exactly where it is least visible";
 }
 
@@ -81,7 +81,7 @@ TEST(EventTimeProvenance, TheTwoRungsAreDistinguishableAndCarryTheSameTime)
     EXPECT_TRUE(declared.is_declared());
     EXPECT_FALSE(parsed.is_declared())
         << "a parsed time reports declared provenance — it would outrank a transport stamp, which "
-           "is precisely the ADR-23 rule DN-29.D12 did NOT overturn";
+           "is precisely the ADR-23 rule ADR-29.D5 did NOT overturn";
 }
 
 // invariant: the empty rung stays empty AND undeclared, which the forward-fill and sentinel steps

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###############################################################################
-# DN-29.D14 / DN-29.D16 / DN-32.D3 — the PROVENANCE-PAIR ONE-WRITE-SITE lint
+# ADR-29.D5 / ADR-29.D7 / DN-32.D3 — the PROVENANCE-PAIR ONE-WRITE-SITE lint
 #
 #   "A value and its provenance are assigned together, through one site, and are
 #    not independently settable."
@@ -92,7 +92,7 @@ EXPECTED_WRITES=1
 # green: an unknown field has zero write sites everywhere, which would read as
 # "the write site is GONE" on a field that never existed.
 case "$FIELD" in
-  declared_timestamp) PAIR='the timestamp and its provenance'; PARTNER='EventTime'; SLOT='DN-29.D14' ;;
+  declared_timestamp) PAIR='the timestamp and its provenance'; PARTNER='EventTime'; SLOT='ADR-29.D5' ;;
   declared_level)     PAIR='the level and its provenance';     PARTNER='EventLevel'; SLOT='DN-32.D3' ;;
   *) echo "::error::unknown field '${FIELD}' — this lint covers declared_timestamp and declared_level." >&2
      exit 2 ;;

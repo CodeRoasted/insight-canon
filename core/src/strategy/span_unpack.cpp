@@ -178,7 +178,7 @@ namespace
         // because that is where the lab writes it — a different slot is not byte-equivalence.
         // invariant: empty means nothing written, matching the lab's own rule, so a span without
         // links stays byte-identical to the pre-links form.
-        // refs: ADR-29.D1, ADR-29.D2, DN-29.D7
+        // refs: ADR-29.D1, ADR-29.D2, ADR-29.D8
         if (span_links.size() > 2 && span_links.front() == '[' && span_links.back() == ']')
         {
             out += R"(,"links":)";
@@ -261,7 +261,7 @@ fix, and it changes only which layer catches it, never whether one does.
 DO NOT VENDOR A PROTOCOL DEFINITION TO FIX THE UNVERIFIABLE PREMISE. That takes a real dependency to
 support a comment, and layer 2 already removes the consequence that would justify it.
 ***************************************************************************************************/
-// refs: DN-29.D9, ADR-29.D7, DN-29.D15, ADR-22.D5
+// refs: ADR-29.D7, ADR-22.D5
 constexpr std::array<std::string_view, 1> kExportFirstKeys{R"("resourceSpans")"};
 
 bool is_otel_span_document(std::string_view line) noexcept
@@ -301,7 +301,7 @@ bool is_otel_span_document(std::string_view line) noexcept
 // moves, layer 1 stops recognising, layer 2 marks the line, and THIS still unpacks.
 // invariant: the acquisition entry is its live consumer, so that sentence is STATE and not
 // intention.
-// refs: ADR-22.D5, DN-29.D6, DN-29.D15
+// refs: ADR-22.D5, ADR-29.D7
 [[nodiscard]] bool is_otel_span_document_broad(std::string_view document) noexcept
 {
     return document.contains(R"("resourceSpans")");

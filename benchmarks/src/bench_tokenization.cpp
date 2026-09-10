@@ -68,7 +68,7 @@ SyntheticCorpus make_corpus(std::size_t n_templates, std::size_t n_lines, std::u
     return corpus;
 }
 
-// refs: DN-29.D9
+// refs: ADR-29.D7
 SyntheticCorpus make_nested_json_corpus(std::size_t n_lines, std::uint32_t seed)
 {
     static constexpr const char* kMessages[] = {
@@ -170,7 +170,7 @@ void BM_TokenizationThroughputDegenerate(benchmark::State& state)
     run_throughput(state, composed);
 }
 
-// refs: DN-29.D9
+// refs: ADR-29.D7
 void BM_TokenizationThroughputNestedJson(benchmark::State& state)
 {
     const insight::semantic::ComposedSemantics& composed{composed_vocabulary()};

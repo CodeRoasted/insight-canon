@@ -441,7 +441,7 @@ enum class LogLevel : uint8_t
 // forgets UNDER-claims; the opposite default would silently promote a guess to a fact.
 // invariant: there is deliberately NO implicit conversion from LogLevel — constraining WRITERS is
 // the point, and readers keep == against a bare LogLevel and value().
-// refs: DN-32.D3, DN-29.D14, ADR-22.D3
+// refs: DN-32.D3, ADR-29.D5, ADR-22.D3
 class EventLevel
 {
   public:
@@ -935,7 +935,7 @@ struct CanonicalEvent
     // the pair cannot be split on the way here; consumed in memory and never serialized.
     // invariant: NOT derivable from trace.is_span and it must never be re-derived that way — an
     // OTLP LOG record carries a declared time with is_span false and often no trace at all.
-    // refs: DN-29.D12
+    // refs: ADR-29.D5
     bool declared_timestamp{false};
     LogLevel level{LogLevel::Unknown};
     // invariant: true iff the level came from a position whose MEANING is the level; false for
@@ -948,7 +948,7 @@ struct CanonicalEvent
     // in memory and never serialized.
     // invariant: the one-ness of that write site is held by a LINT rather than by the type, because
     // correct-today-and-held-by-discipline was the sentence that was wrong four times before.
-    // refs: DN-32.D3, DN-29.D14
+    // refs: DN-32.D3, ADR-29.D5
     bool declared_level{false};
     // invariant: observability metadata, NOT deterministic MetaLog content — downstream may group
     // or correlate by it; Unknown when no strategy matched.
@@ -998,7 +998,7 @@ struct CanonicalEvent
     // invariant: a view into arena-stable bytes, consumed in memory and never serialized.
     // invariant: a STATEMENT and never a verdict — a marked event is still analysed, and no
     // consumer may drop it on this field alone.
-    // refs: DN-29.D16
+    // refs: ADR-29.D7
     std::string_view no_role_witness_key;
 };
 
