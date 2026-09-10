@@ -152,6 +152,10 @@ shape a Founder ruling replaced. It is **not repaired here**: it lives in a diff
 comment-only commit does not reach across unit boundaries. It is repaired when
 `core/api/canon.api.cppm` converts, and the claim that lands there is compile-time gating, not
 SKIP.
+REFUSED 2026-09-10 already clean at HEAD: `core/api/canon.api.cppm:1187-1188`, above
+`arena_poisons_on_reset()`, now reads *"such a gate is therefore COMPILE-TIME gated on canon's
+exported availability definition and asserts this query inside it — a runtime skip exits 0 and
+counts as PASSED."* Unit 22's conversion landed the repair this finding predicted; nothing owed.
 
 This is also why the unit deliberately did NOT re-home that MUST at the definition site: the
 declaration is where a caller contract belongs (`ADR-26.D5`), the declaration is in another unit,
@@ -592,6 +596,11 @@ than a hand edit).
    highest cumulative confidence, not the most-claimed format; the fixture's sum and count happen
    to agree, so the test passes without discriminating the two rules. The caption is repaired when
    `core/tests/parse/` converts, and the test that would discriminate them is Kleio's call.
+   REFUSED 2026-09-10 already clean at HEAD: the caption is gone. `test_format_detector.cpp:165-175`
+   carries no prose at all now — three fixture lines and two assertions. Unit 32 converted
+   `core/tests/parse/` and dropped the sentence rather than restating it. **The residual half is NOT
+   this finding**: no arm anywhere separates highest-cumulative-confidence from most-claimed-format,
+   and that arm is Kleio's homing call, recorded fresh below rather than left riding a closed item.
 
 ### Witnesses
 
@@ -709,6 +718,11 @@ carries the rule and the reader recovers it, minting one would add an address no
    calls the imported `is_alpha` at five other sites. Re-derived at the artifact. It is a second
    copy of a char class whose single-home property is exactly what keeps `template_id` a pure
    function of the line's bytes — a **code** change, so it is recorded rather than made here.
+   DISCHARGED 2026-09-10 `insight-canon 511ad3d` — the site had drifted to `mask.cpp:460` and was
+   re-derived there before acting. Now `is_digit(chr) || is_alpha(chr)`. The predicates are
+   byte-identical by construction: `is_alpha` is `is_upper(chr) || is_lower(chr)` and each is an
+   unsigned-subtraction range test over the same 26 letters, false for every negative (non-ASCII)
+   byte — so no template id moves.
 2. **A unit test's independent oracle is stale, and its case list is what keeps it green — Kleio.**
    `core/tests/scan/test_fast_gates.cpp`'s `reference_shape` computes
    `has_separator = tok.find_first_of(":/[#-=")` — the **pre-widening** separator set. Today
@@ -720,6 +734,14 @@ carries the rule and the reader recovers it, minting one would add an address no
    honest case reds the test, which is the tell that this is a stale oracle rather than thin
    coverage — and the test's name claims byte-exactness with a predicate that no longer exists in
    that form.
+   DISCHARGED 2026-09-10 `insight-canon 511ad3d` — re-derived at both artifacts first:
+   `canon.detail.scan.cppm:120-121` triggers `has_separator` on `: / # - =` plus
+   `is_wrapper_open(chr) || is_wrapper_close(chr)` over the six `kWrapperPairs` rows, i.e. twelve
+   further bytes `[ ] ( ) { } < > " '`; `test_fast_gates.cpp:418` still spelled `:/[#-=`. The oracle
+   now spells the full set as literal bytes (still a different idiom from the production scan, so it
+   stays a cross-check and not a tautology), and TWELVE honest cases were added — `[a]` `(a)` `{a}`
+   `<a>` `"a"` `'a'` and each closer alone. Ten of those twelve carry no byte of the old set, so
+   they are exactly the red-first evidence the finding asked for.
 
 ### Witnesses
 
@@ -1045,6 +1067,12 @@ bounded by the longest segment"*, which is the claim the code actually keeps.
    array. **No `static_assert` ties them** (swept, zero hits), so raising the local alone overruns
    the member. `ADR-26.D1` puts a constant that sizes a member inside the type that owns it. A code
    change; not a comment-only commit's to make.
+   DISCHARGED 2026-09-10 `insight-canon 511ad3d` — `kIdentityBytes` is deleted and both former uses
+   (`compose.cpp:263` reserve, `compose.cpp:421` digest-copy loop) now read `identity_.size()`, the
+   extent of the member being written, so the width cannot be raised in one place only. A
+   `static_assert(kSemanticIdentityBytes <= kSha256Bytes)` beside the loop pins the second, unstated
+   half — the identity TRUNCATES a SHA-256 and cannot exceed the digest it truncates. Value
+   unchanged at 16, so no `semantic_identity` moves.
 3. **Two operator-facing fatal messages in `outcome.cpp` print a record identifier —
    Hephaïstos.** `map_outcome_token_in`'s two `std::cerr` blocks spell `(DN-32.D6)` inside the text
    an operator reads, which is exactly `ADR-6.D10` Form 1 — the defect that ruling repaired for four
@@ -1053,6 +1081,13 @@ bounded by the longest segment"*, which is the claim the code actually keeps.
    simply go. A third, weaker instance is the divergence TRACE log, which prints
    `SRC-D-OUT-RUN-1` — a log line rather than a fail-closed message, and arguably outside the rule.
    Both cold readers found this independently.
+   DISCHARGED 2026-09-10 `insight-canon 511ad3d` — both in-string copies are gone from
+   `outcome.cpp:101` and `:117`; the `refs: DN-32.D6` lines at `:92` and `:190` already carry the
+   citation where `ADR-6.D10` puts it, and were left untouched. **The third, weaker instance was
+   already clean and is NOT part of this discharge**: `SRC-D-OUT-RUN-1` occurs nowhere in any source
+   file of this repo at HEAD (swept over `core/`, `semantic/`, `proof/`, `benchmarks/`; the only
+   surviving occurrences are in this ledger's own prose), so the log-line question the finding left
+   open no longer has a subject.
 4. **`canon.cppm`'s *"the ~30-POD-row copy"* is a LEAD, not yet a finding — the `core/api/canon.cppm`
    unit.** The scored reader counted the shipped four-package composition at 41 unfiltered rows plus
    ~22 filtered, 3 locations, 2 channels and 4 package records — of the order of 70 PODs, against a
@@ -1199,6 +1234,10 @@ work.
    once forced-portable"*; the file includes the shim once and hand-writes the native view as a pair
    of aliases. Found by the cold reader, re-derived at the file. It is a later unit of this same
    migration and is repaired there.
+   REFUSED 2026-09-10 already clean at HEAD: the file is `core/tests/math/test_det_int128_portable.cpp`
+   (unit 32's directory, not `core/tests/utils/`), and its header now carries the correction in
+   terms — *"the native half is a direct TYPEDEF rather than a second include, and this prose claimed
+   a double include until 2026-09-07."* The repair this finding predicted landed with the conversion.
 
 ### Witnesses
 
@@ -1435,12 +1474,32 @@ why that instruction exists.
   `parse_log_level`'s switch accepts `failure`, `severe`, `critical` and `crit`, none of which the
   array holds. **Addressee: the canon source lane** (`ADR-26.D1`, rip dormant plumbing). Not a
   comment-only change, so not made here.
+  DISCHARGED 2026-09-10 `insight-canon 511ad3d` — `struct LevelAlias` and the ten-entry
+  `kLevelAliases` table are deleted from `core/src/utils/time_utils.cpp` (17 lines). Re-derived
+  before acting: a repo sweep returned exactly two hits, the struct's own declaration and the
+  array's, and the array is in the file's anonymous namespace so it is unreachable from any other
+  TU by construction. It had drifted further than the finding recorded — besides `failure`,
+  `severe`, `critical` and `crit`, it also lacked `notice`, `alert` and `emerg`, which landed in
+  `parse_log_level`'s switch on 2026-09-09 (`insight-canon c3cb53c`). `iequals` and `ascii_tolower`
+  in the same anonymous namespace are LIVE (read by `parse_log_level` at nine sites) and stay.
 * **`core/api/canon.api.cppm` carries two false character counts at its timestamp declarations.**
   *"Parse Spark-style short-year date+time: `YY/MM/DD HH:MM:SS` (19 chars)"* — that form is 17
   characters, and `time_constants::kShortYearSlashMinLength` is 17. *"Parse HealthApp compact
   timestamp: `YYYYMMDD-HH:MM:SS:mmm` (22 chars)"* — that form is 21 characters, and the field
   widths are variable since `DN-43.O5`, so a fixed count is wrong in kind as well as in value.
   **Addressee: the `core/api/canon.api.cppm` CCC unit**, which is where those lines convert.
+  DISCHARGED 2026-09-10 `insight-canon cc9be13` — and the finding SURVIVED unit 22's
+  conversion, which is why it is worth saying how it was nearly missed here: a sweep for the literal
+  strings `19 chars` and `22 chars` returned ZERO, because the conversion had reworded them to `19
+  characters` and `up to 22 characters` while keeping both numbers. The zero read as a clean repair.
+  Re-derived at the declarations instead. `parse_short_year_slash` now states `YY/MM/DD HH:MM:SS` —
+  17 characters, named as a FLOOR, matching `time_constants::kShortYearSlashMinLength{17}` at
+  `time_utils.cpp:40` and the fixed-offset parse that consumes exactly 17 bytes and ignores the tail.
+  `parse_health_app_ts` now states `YYYYMMDD-` plus three VARIABLE-width clock fields and a
+  millisecond terminator, with 15 as the floor (`kHealthAppMinLength{15}`, `time_utils.cpp:45`), so
+  the upper bound is gone rather than corrected — `DN-43.O5` makes a fixed width wrong in kind.
+  `parse_apache_error_ts`'s *"24 characters"* was checked in the same pass and is TRUE
+  (`kApacheErrorMinLength{24}`); it is left alone.
 * **`failure_lexicon.cpp` and two sibling files cite `D-OUT-3`, a deferred decision whose only
   statement is in the frozen attic.** The live tree carries the name at
   `core/src/utils/failure_lexicon.cpp`, `core/api/canon.api.cppm` and
@@ -1450,12 +1509,21 @@ why that instruction exists.
   other files.** The claim beside it — that this predicate only anchors an already-matched failure
   word and so a glyph-only line stays silent — is real, has a test, and rides into the tagged form
   without the name.
+  REFUSED 2026-09-10 already clean at HEAD: `D-OUT-3` occurs in NO source file of this repo. Swept
+  over `core/`, `semantic/`, `proof/` and `benchmarks/` for the prefix `D-OUT-` rather than the full
+  code, so the sweep would have caught a renumbering as well as a deletion, and it returned nothing.
+  The three named sites (`failure_lexicon.cpp`, `canon.api.cppm`, `test_failure_lexicon.cpp`) all
+  converted; each dropped the unresolvable name and kept the claim.
 * **`time_utils.cpp` cites `D-F3b-3`, which resolves nowhere in the live tree.** `F3b` is a
   `LEXICON.md` term owned by `ADR-19`; the numbered clauses `D-F3b-1`, `-4`, `-5` and `-7` appear
   only in `technical_docs/history/architecture-v1/`, and `-3` appears nowhere at all. The claim it
   decorates — BGL emits `FAILURE` as a top RAS severity and `SEVERE` between `ERROR` and `FATAL` —
   IS owned live, by `DN-43.D14`, which counted 19 213 `SEVERE` and 1 652 unlabelled `FAILURE` lines
   in `BGL.log`. **Addressee: the `time_utils.cpp` conversion**, once finding 20 unblocks it.
+  REFUSED 2026-09-10 already clean at HEAD: `D-F3b` occurs in NO source file of this repo — swept on
+  the term prefix, not the full clause code, over `core/`, `semantic/`, `proof/` and `benchmarks/`.
+  Unit 12 converted `time_utils.cpp` and dropped the citation; the BGL severity claim it decorated
+  survives in tagged form without it.
 * **A `registry_grammar_lint` `G15-coord` red is live on `main` and it is NOT this unit's.**
   `python3 scripts/registry_grammar_lint.py` from the workspace root read **0 failures** when this
   run started and **1** when it finished. The gate names three bare source coordinates on two
@@ -1474,6 +1542,8 @@ why that instruction exists.
   fixed row is ERASED, not kept** (2026-07-22, with the drain ceremony) and its oldest surviving row
   is 2026-07-17. So the pointer cannot resolve and by that register's own rule never will again.
   **Addressee: the `failure_lexicon.cpp` conversion.**
+  REFUSED 2026-09-10 already clean at HEAD: the string `bugs` occurs in no file under `core/` or
+  `semantic/`. The pointer went with unit 12's conversion of `failure_lexicon.cpp`.
 
 ## Unit 11 — `proof/det_proof.cpp` (1 file, 340 lines, 142 would-be violations)
 
@@ -1701,6 +1771,12 @@ this file is almost entirely argument: 12 of its 65 surviving lines are `assert:
   for one drift: the two `composition.cpp` sources and `det_proof.cpp` all compose four packages
   including gitlab. **Addressee: Argos** (the workflow surface). Not repaired here — it is outside
   this repo's source tier and outside a comment-only commit's reach.
+  DISCHARGED 2026-09-10 `insight-canon 511ad3d` — the workflow header now reads *"github + gitlab +
+  jenkins + test_frameworks"*. Re-derived at `proof/det_proof.cpp:101-103`, which composes
+  `std::array<SemanticPackageManifest, 4>` naming github, gitlab, jenkins and test_frameworks.
+  **This is a workflow file and therefore Argos's surface**; what landed is the correction of a
+  false factual claim in a comment, changing no job, step, trigger or matrix — the file's YAML is
+  byte-identical apart from that one line. Flagged to Argos rather than assumed.
 
 ## Unit 12 — `core/src/utils/` (the directory's 2 remaining files, 546 would-be violations) — the gate repair confirmed at a real site, and a false attribution that six citers share
 
@@ -2138,6 +2214,14 @@ comment-only commit.
   embedded-identity pin in `core/tests/mask/test_stateless_template.cpp` still speaks of a *separate*
   copy of the hex floor; there is one declaration today and the embedded scanner reads it.
   **Addressee: this lane's test-tier unit**, which opens that file.
+  DISCHARGED 2026-09-10 `insight-canon 511ad3d` — and it had SURVIVED that unit. Unit 28's
+  conviction 1 repaired the constant-pinning BLOCK's version of this claim and left the identical
+  sentence 150 lines further down, above `HashFloorPinnedAtSixteenEmbedded`, still reading *"a
+  separate copy of the constant and therefore a separate pin"*. Re-derived at the artifact:
+  `core/src/mask/mask.cpp` declares `kMinHashLen{16}` ONCE, at line 539, read at :557 (the
+  standalone whole-token check), :721 (the embedded-identity scanner) and :969 (the exposed
+  accessor). The line now states what unit 28 established — a second independent PATH through one
+  declared floor, and why the second pin is therefore not redundant.
 
 ### Dispositions
 
@@ -2400,11 +2484,23 @@ counts the files never reached. The finding is recorded below; nothing was writt
   names are documented there and in the shared corpus studies), or re-home the three transcriptions
   into the owning corpus doc and point the string there. Recorded rather than improvised.
   **Addressee: the pilot, for the lane holding `insight-canon/**`.**
+  REFUSED 2026-09-10 already clean at HEAD, and by NEITHER of the two shapes this finding offered:
+  `leading_level_token_index_measure.cpp:1485-1491` now carries the field names INLINE in the usage
+  string — *"transcribed verbatim from that corpus manifest's OWN outcome field and never renamed —
+  `ci_outcome` on the GitHub Actions corpus, `result` on Jenkins, `job_status` on GitLab"*. The
+  dangling pointer is gone because the string stopped pointing and started stating, which is
+  strictly better than either repoint. Nothing owed.
 * **Two printed stream-tag labels suggest a discriminator the code does not use.** The self-test
   line prints the two tag kinds as `NNO `/`NNE+` and the report as `NNO `/`NNO+`, which reads as
   though the stream letter separates a new line from a continuation. It does not: the classifier
   accepts either letter for both kinds and discriminates on the fourth byte alone. Both are string
   literals. **Addressee: the pilot, for the lane holding `insight-canon/**`.**
+  DISCHARGED 2026-09-10 `insight-canon 511ad3d` — both labels now print `NN[OE] ` and `NN[OE]+`.
+  Re-derived at `stream_tag_of` (`leading_level_token_index_measure.cpp:297-308`) before acting: the
+  gate is `is_digit(byte 0) && is_digit(byte 1) && (byte 2 == 'O' || byte 2 == 'E')`, and byte 3
+  alone chooses — `' '` NewLine, `'+'` Continuation, anything else None. So the finding is exact,
+  and the report line's `NNO+` was wrong in the same way as the selftest's `NNE+`. Console text of a
+  measurement instrument; no serialized output moves.
 * **The two instruments handle the format latch differently, and only one says so.** The nested-leg
   instrument constructs a fresh `Tokenizer` per file because the parser's sticky-strategy latch is
   per stream; the cardinality instrument constructs ONE for the whole walk, so its latch carries
@@ -2630,10 +2726,18 @@ where `ADR-26.D5` puts a `pre:` at a declaration.
   after this deletion they are the only surviving statements of the wrong number. The cold reader
   found both independently while answering Q14. **Addressee: the pilot, for the lane holding
   `insight-canon/benchmarks`.**
-* **The composed manifest array is duplicated verbatim between two arms.**
   DISCHARGED 2026-09-09 `insight-canon dfe4f4e` — both now name all FOUR packages, and the
   `CMakeLists.txt` header's "Two arms in one binary" is corrected to three in the same pass, the
   nested-JSON arm having been absent from it as well.
+  CONFIRMED 2026-09-10 — re-derived at both artifacts: `benchmarks/conanfile.py`'s `description`
+  now reads *"the COMPOSED semantic set (github + gitlab + jenkins + test_frameworks)"* and
+  `benchmarks/CMakeLists.txt:3-6` reads *"the FOUR semantic packages"* and *"Three arms in one
+  binary"*. **LEDGER REPAIR IN THE SAME PASS:** that DISCHARGED line was appended under a PHANTOM
+  bullet — a duplicate of the next item's heading with no body — so it read as the disposition of
+  the manifest-array finding and left THIS finding looking open. The phantom heading is deleted and
+  the line is re-homed here, where its evidence belongs. Nothing else moved. This is the second
+  measured instance in this ledger of a disposition landing under the wrong subject; the first was
+  the four *"comment repaired"* lines that closed nothing.
 * **The composed manifest array is duplicated verbatim between two arms.**
   `BM_TokenizationThroughput` and `BM_TokenizationThroughputNestedJson` each build their own
   `std::array<SemanticPackageManifest, 4>` with the same four entries, so onboarding a fifth dialect
@@ -3752,6 +3856,12 @@ result.
    in the diagnostic printed immediately before `std::terminate()`. Found by the lane and confirmed
    independently by a reader; verified here as the only occurrence in the source tree. String
    literal, so no comment-only commit may carry it. **Addressee: Hephaïstos.**
+   REFUSED 2026-09-10 already clean at HEAD: the diagnostic at `core/src/compose/compose.cpp:216-217`
+   reads *"FATAL: insight::semantic::ComposedSemantics::for_stream — unknown IntentChannel"*, and
+   `for_stream` DOES exist (declared in `canon.compose.cppm`, defined at `compose.cpp:288`). Checked
+   in both directions rather than only the fixed one: `for_channel` occurs in NO file of this repo,
+   and `for_stream` occurs at 30 sites across `core/` and `semantic/`. Repaired between this finding
+   and now; nothing owed.
 2. **A test assertion cites a source file by LINE NUMBER and the pointer was already stale** before
    this unit moved it again. String literal. **Addressee: Kleio.**
 3. **A design note attributes to one code a sentence that is about another.** It quotes *"the
@@ -6898,3 +7008,79 @@ Since 2026-09-09 the gate reds in every repo with no declaration (`OPS-8.S13`); 
 `comment_contract: true` line this repo carried from `bd1418c` was deleted the same day. The
 programme's record across the eight repos is `STU-18`; the findings this ledger raised for other
 lanes stay where they are, each leaving by an appended `DISCHARGED` line under it.
+
+---
+
+# The findings drain — 2026-09-10, first pass over the whole ledger
+
+The conversion run closed on 2026-09-07; this section is about the **findings**, which outlived it.
+A pass on 2026-09-09 (`insight-canon dfe4f4e`) took six. This one read every numbered and bulleted
+item in every *Findings for other lanes* section and dispositioned seventeen more.
+
+**The arithmetic, counted by a rule rather than by eye.** An ITEM is a numbered or bulleted line
+opening with a bold heading inside a section whose title contains the word *finding*; it is
+DISPOSITIONED when one of its own body lines starts `DISCHARGED`, `REFUSED` or `CONFIRMED`.
+By that rule: **82 items, 6 dispositioned, 76 open** before this pass — **81 items, 22
+dispositioned, 59 open** after. The item count fell by one because a PHANTOM duplicate heading was
+merged away (below). The rule under-counts by design at two shapes it cannot see: a closing
+sentence written as prose (*"Discharged rather than open"*, *"A measured negative"*) and a
+disposition on a bullet outside a *finding*-titled section.
+
+**What was actually done, split into the two kinds.**
+
+* **Nine repaired in code** — `insight-canon 511ad3d` and `cc9be13`: a dead ten-entry level
+  lexicon ripped from `time_utils.cpp`; `compose.cpp`'s duplicate identity width derived from the
+  member it sizes, with a `static_assert` against the digest it truncates; two design-note codes out
+  of operator-facing fatal text in `outcome.cpp`; `mask.cpp` routed to the one `is_alpha`;
+  `test_fast_gates.cpp`'s independent oracle widened to the real separator set with twelve honest
+  cases; `test_stateless_template.cpp`'s two-copies argument corrected to two paths through one
+  floor; two GitLab stream-tag labels made to state the discriminator the code uses; the
+  `golden.yaml` header's three-package claim corrected to four; and the two false timestamp
+  character counts at the api declarations.
+* **Eight refused as already clean at `HEAD`**, each with what was read and where — the arena
+  compile-time-gating claim, the mixed-format test caption, the 128-bit oracle header, the `D-OUT-3`
+  / `D-F3b-3` / `bugs.md` citations, the runtime usage string, and the `for_channel` fatal message.
+* **One confirmed** — the two benchmark composed-set enumerations, whose own `DISCHARGED` line was
+  the one sitting under the phantom heading; re-derived at both files and re-homed.
+
+**Two method notes this pass paid for.**
+
+1. **A zero-hit sweep for a QUOTED string is not evidence the claim was repaired.** The timestamp
+   character counts were swept for as `19 chars` / `22 chars`, the strings the finding quoted. Both
+   returned zero — because the conversion had reworded them to `19 characters` and `up to 22
+   characters` while keeping both wrong numbers. The zero read as a clean repair. Sweep for the
+   SUBJECT (the declaration) or for a prefix that survives rewording (`D-OUT-`, `D-F3b`), never for
+   the sentence the finding happened to quote.
+2. **A disposition can land under the wrong subject, and then it closes nothing and hides the
+   finding it displaced.** Unit 15 carried a bullet heading duplicated verbatim from the next item,
+   with no body, carrying a `DISCHARGED` line whose evidence belonged to the item ABOVE it. Repaired
+   here. This is the second measured instance of the shape; the first was the four *"comment
+   repaired"* lines that closed nothing.
+
+**What remains, and why each is not takeable by a single-repo lane.** The 59 open items are
+dominated by three classes. **Design-note and ADR repairs (Daidalos's shelf)** — roughly twenty
+items about slots that quote a comment that has since changed, or attribute a sentence to the wrong
+symbol. **Census ceilings and gate registry rows (Argos)** — the `registry_grammar_lint`
+`insight-canon` ceilings are quoted five times across five units and are one act, not five.
+**Cross-repo or output-affecting code changes** — four items in `insight-canon` code that a
+single-repo lane cannot land, named individually in the next paragraph because each is a decision
+rather than an omission.
+
+* **`AndroidLogcatStrategy::confidence`** and **`KVStrategy::parse`'s dropped late message key** are
+  both real at `HEAD` and both move SERIALIZED output for at least one input class, so each owes a
+  `kCanonicalizationVersion` bump under this repo's own generation ledger — whose scope is *"the
+  masking rules that turn a raw line into its `template_str`, plus every classification rule whose
+  output is serialized"*, with `-14` and the BGL entry as strategy-grammar precedent. A bump is a
+  comparability event: `stateless-masks-15` is carried in `insight-eidos` and in three
+  `insight-metalog` vector files as well as this repo's own `mask_rules.golden`. **The decision is
+  the pilot's, and the cascade crosses two repos.**
+* **`parse_template_id`'s silent tolerance** is real, and the repair is a signature change with four
+  call sites in TWO OTHER REPOS. One of them, `insight-metalog`'s
+  `test_param_histograms_compose.cpp`, passes `"h:abc"` — deliberately malformed — as a
+  label-to-id shorthand, so a hard refusal breaks it. The honest question is not *optional or
+  refuse* but *is this function a PARSER or a deterministic LABEL map?*, and it is a claim-boundary
+  call before it is a code change.
+* **`parse_iso8601` normalises a malformed date while `parse_health_app_ts` refuses one** — two
+  parsers in one file taking opposite dispositions on one hazard, with the argument written on only
+  one side. Normalising `2023-02-29` into `2023-03-01` publishes a different instant with no signal,
+  in a precision-first product. Either disposition is defensible; neither is a comment repair.
