@@ -166,7 +166,7 @@ inline constexpr std::array<TransportTransformRow, 3> kTransportCatalogRows{{
      .strip_leading_space = false},
 }};
 
-// refs: DN-69.D2
+// refs: ADR-37.D1
 // invariant: the bytes ONE bracketed-timestamp row renders: the fixed lexical form plus its single
 // separator space.
 // invariant: published beside the catalogue because a WRITER cannot promise not to allocate without
@@ -186,7 +186,7 @@ inline constexpr std::size_t kBracketedTimestampPrefixBytes{27U};
     return nullptr;
 }
 
-// refs: BIB:determinism_model, BIB:jenkins_dialect, DN-69.D3
+// refs: BIB:determinism_model, BIB:jenkins_dialect, ADR-37.D2
 // invariant: the WRITER dual of the catalogue, and there is no third spelling: canon owns every
 // transform ALGORITHM while the caller supplies the stamp value and the plumbing.
 // post: it appends the row's line prefix — stamp plus the single separator space — or answers

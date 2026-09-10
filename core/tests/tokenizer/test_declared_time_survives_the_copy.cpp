@@ -23,7 +23,7 @@ using namespace insight::tokenization;
 // invariant: the two fields are exactly what can drift apart, so an arm reading only one is blind
 // to the drift it exists to catch; every case below asserts the flag AND the value together.
 // invariant: determinism — literal lines, one arena per case, no wall clock, no RNG.
-// refs: DN-29.D18, MEM:synthetic-gate-vacuity-vs-judgment
+// refs: ADR-26.D1, MEM:synthetic-gate-vacuity-vs-judgment
 namespace
 {
 

@@ -463,7 +463,7 @@ TEST(ArenaAllocator_Accessors, UsedNeverExceedsCapacity)
 // invariant: a skip that CHANGED MEANING under a toolchain repair reads exactly like the skip it
 // always was, so the way out is program OUTPUT at the moment of the block.
 // invariant: not a comment the blocked reader is not reading.
-// refs: DN-29.D13
+// refs: ADR-26.D4
 // invariant: the SINGLE spelling of the remedy, so the two gated blocks cannot drift apart.
 // invariant: the three routes differ in WHAT THEY BUY and not only in price, which is why the
 // message states both halves.

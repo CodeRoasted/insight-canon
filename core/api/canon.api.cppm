@@ -1508,7 +1508,7 @@ inline constexpr std::array kAllLoggers{kArenaLogger,    kMaskLogger,   kPipelin
 // registry, and the accessors' fallback logger is registered under no name.
 // invariant: silencing the host's default logger does not reach canon either — it used to, only
 // because the accessors borrowed that logger.
-// refs: DN-53.D3, DN-53.D7
+// refs: ADR-5.D1
 void init_logging(spdlog::level::level_enum default_level = spdlog::level::info);
 
 // post: a registered name yields its own logger; before init_logging has run they yield a

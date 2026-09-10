@@ -10,7 +10,7 @@ int main(int argc, char** argv)
     benchmark::MaybeReenterWithoutASLR(argc, argv);
 
     // assert: no other call to init_logging runs in this binary, so this level takes.
-    // refs: DN-53.D7
+    // refs: ADR-5.D1
     insight::logging::init_logging(spdlog::level::off);
 
     benchmark::Initialize(&argc, argv);

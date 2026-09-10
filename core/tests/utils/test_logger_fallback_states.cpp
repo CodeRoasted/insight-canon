@@ -18,7 +18,7 @@
 // invariant: three pieces of state in the implementation are process-global and ONE-WAY — the
 // call-once flag, the initialised atomic, and the memo of already-reported names.
 // invariant: each of the three is answered at the entity that answers it, below.
-// refs: DN-53.D1, DN-53.D3, DN-53.D6
+// refs: ADR-5.D1
 #include <gtest/gtest.h>
 #include <spdlog/common.h>
 #include <spdlog/details/log_msg.h>
@@ -509,7 +509,8 @@ void observe_state_a_stdout()
             "called. Every entry point that links canon and calls nothing therefore emits its "
             "diagnostics into its own standard output: a machine artifact downstream parses or "
             "hashes stops being a function of the input and becomes a function of the operator's "
-            "log level (DN-53.D1 (a) — 4 of the 6 measured arms were exactly this shape, "
+            "log level (ADR-5.D1, the un-initialised fall-through — 4 of the 6 measured arms were "
+            "exactly this shape, "
             "insight-metalog's determinism fixture among them). Expected 0 byte(s) after the "
             "control line from " +
                 std::to_string(kAccessors.size()) + " accessor(s)." + summary);
@@ -695,7 +696,7 @@ TEST(LoggerFallbackStateADeathTest, AccessorsStaySilentWhenInitLoggingNeverRan)
 // invariant: with init never called, no module logger writes a byte to the process's standard
 // output — the property this file did not previously hold.
 // invariant: a SECOND re-exec'd child, for the reason stated at its observation body.
-// refs: DN-53.D6
+// refs: ADR-5.D1
 TEST(LoggerFallbackStateADeathTest, NoModuleRecordReachesStdoutWhenInitLoggingNeverRan)
 {
     const DeathTestStyleHold style{"threadsafe"};

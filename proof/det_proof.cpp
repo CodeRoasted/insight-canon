@@ -87,7 +87,7 @@ int main(int argc, char** argv)
     // hashed bytes makes the digest a function of the operator, not of the corpus.
     // assert: this call no longer guards that; canon's un-initialised state is stderr-only. It
     // stays for the module tag and for level info rather than the fallback's warn.
-    // refs: DN-53.D3
+    // refs: ADR-5.D1
     // note: info rather than off — the destination was the defect, never the diagnostics.
     insight::logging::init_logging(spdlog::level::info);
 
