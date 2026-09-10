@@ -146,24 +146,6 @@ namespace
         return std::ranges::equal(lhs, rhs, {}, ascii_tolower, ascii_tolower);
     }
 
-    struct LevelAlias
-    {
-        std::string_view name;
-        LogLevel level;
-    };
-
-    inline constexpr std::array<LevelAlias, 10> kLevelAliases{
-        {{.name = "trace", .level = LogLevel::Trace},
-         {.name = "debug", .level = LogLevel::Debug},
-         {.name = "dbg", .level = LogLevel::Debug},
-         {.name = "info", .level = LogLevel::Info},
-         {.name = "information", .level = LogLevel::Info},
-         {.name = "warn", .level = LogLevel::Warn},
-         {.name = "warning", .level = LogLevel::Warn},
-         {.name = "error", .level = LogLevel::Error},
-         {.name = "err", .level = LogLevel::Error},
-         {.name = "fatal", .level = LogLevel::Fatal}}};
-
 } // namespace
 
 std::optional<Timestamp> parse_iso8601(std::string_view timestamp_str) noexcept

@@ -457,7 +457,7 @@ namespace
         for (std::size_t pos{cursor}; pos < tok.size(); ++pos)
         {
             const char chr{tok[pos]};
-            if (is_digit(chr) || (chr >= 'a' && chr <= 'z') || (chr >= 'A' && chr <= 'Z'))
+            if (is_digit(chr) || is_alpha(chr))
                 return false;
         }
 

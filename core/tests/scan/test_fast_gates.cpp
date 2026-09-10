@@ -415,7 +415,11 @@ struct ShapeOracle
     const std::size_t lead{(tok[0] == '+' || tok[0] == '-') ? 1U : 0U};
     ref.digit_leading = lead < tok.size() && ascii_digit(tok[lead]);
 
-    ref.has_separator = tok.find_first_of(":/[#-=") != std::string_view::npos;
+    // invariant: the trigger set is `: / # - =` PLUS every kWrapperPairs byte, opener and closer.
+    // invariant: spelled as literal bytes here rather than read from the scan shard, so the oracle
+    // stays independent of the code it cross-checks.
+    // note: the pre-widening set `:/[#-=` went stale when the wrapper bytes joined the trigger.
+    ref.has_separator = tok.find_first_of(R"(:/#-=[](){}<>"')") != std::string_view::npos;
     return ref;
 }
 } // namespace
@@ -451,6 +455,20 @@ TEST(FastGatesTokenShape, FieldsAreByteExactWithReplacedPredicates)
         "\xB0\xB0",
         "\xFF"
         "9",
+        // invariant: one token per wrapper byte, opener and closer — the half of the separator
+        // trigger the pre-widening oracle could not see.
+        "[a]",
+        "(a)",
+        "{a}",
+        "<a>",
+        "\"a\"",
+        "'a'",
+        "]",
+        ")",
+        "}",
+        ">",
+        "\"",
+        "'",
     };
 
     for (const std::string_view tok : cases)

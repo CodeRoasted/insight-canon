@@ -1015,7 +1015,7 @@ struct NestedSelfTestRow
                       stream_tag_of("00E+more") == StreamTag::Continuation &&
                       stream_tag_of("0O0 x") == StreamTag::None};
     all_ok = all_ok && tag_ok;
-    std::println("  [{}] GitLab stream tag: `NNO ` new-line, `NNE+` continuation, else none",
+    std::println("  [{}] GitLab stream tag: `NN[OE] ` new-line, `NN[OE]+` continuation, else none",
                  tag_ok ? "ok" : "FAIL");
     return all_ok;
 }
@@ -1428,9 +1428,9 @@ void print_root(const RootReport& report)
                  percent(report.control_agree, report.control_agree + report.control_disagree),
                  report.control_disagree, by_door.empty() ? "" : " (by door:" + by_door + ")",
                  report.control_declared);
-    std::println("gitlab shift : of the Rfc3339Text lines, {} carry a runner stream tag `NNO ` "
-                 "(package-door index = core-door index − 1) and {} a `NNO+` continuation (shift "
-                 "not modelled)",
+    std::println("gitlab shift : of the Rfc3339Text lines, {} carry a runner stream tag `NN[OE] ` "
+                 "(package-door index = core-door index − 1) and {} a `NN[OE]+` continuation "
+                 "(shift not modelled)",
                  report.stream_tag_newline, report.stream_tag_continuation);
     std::println("level-bearing: modelled {} ({:.3f}% of modelled)  unmodelled {} ({:.3f}% of "
                  "unmodelled)",

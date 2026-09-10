@@ -98,7 +98,7 @@ std::optional<RunOutcome> map_outcome_token_in(std::string_view token, std::stri
         stream_composed_packages(packages);
         std::cerr
             << ".\nA caller-declared verdict is a PAIR — (vocabulary, token) — never a bare "
-               "string (DN-32.D6): `failure` / `failed` / `FAILURE` mean the same thing on three "
+               "string: `failure` / `failed` / `FAILURE` mean the same thing on three "
                "platforms and `UNSTABLE` means nothing on two of them, so a token does not "
                "interpret itself. A side-input verdict is interpreted by the vocabulary of whoever "
                "SUPPLIED it, not by the dialect of whoever WROTE the bytes — name it (e.g. "
@@ -114,7 +114,7 @@ std::optional<RunOutcome> map_outcome_token_in(std::string_view token, std::stri
                   << vocabulary << "\". The composed packages are: ";
         stream_composed_packages(packages);
         std::cerr
-            << ".\nThis is the vocabulary that INTERPRETS a caller-supplied verdict (DN-32.D6) — "
+            << ".\nThis is the vocabulary that INTERPRETS a caller-supplied verdict — "
                "who SUPPLIED the verdict, which is not the same question as the stream's dialect "
                "(who WROTE the bytes). An unknown name is a MISTAKE: it would resolve nothing and "
                "silently disarm every rule that reads the verdict. Declare one of the names above, "

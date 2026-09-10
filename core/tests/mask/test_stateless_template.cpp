@@ -394,7 +394,9 @@ TEST(StatelessTemplate, HashFloorPinnedAtSixteenStandalone)
 }
 
 // invariant: the same boundary on the EMBEDDED path — a delimiter-bounded run inside a larger
-// token, which is a separate copy of the constant and therefore a separate pin.
+// token, which is a second independent PATH through the ONE declared floor.
+// invariant: the two paths do not share a read, so one can stop consulting the floor while the
+// other still does — which is what the second pin catches, and why neither pin is redundant.
 TEST(StatelessTemplate, HashFloorPinnedAtSixteenEmbedded)
 {
     ArenaAllocator arena{256U * 1024U};

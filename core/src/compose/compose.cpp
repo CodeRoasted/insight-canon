@@ -13,7 +13,6 @@ namespace insight::semantic
 namespace
 {
     constexpr std::size_t kSha256Bytes{32};
-    constexpr std::size_t kIdentityBytes{16};
     constexpr unsigned kNibbleMask{0xFU};
     constexpr unsigned kNibbleShift{4U};
     constexpr std::array<char, 16> kHexDigits{'0', '1', '2', '3', '4', '5', '6', '7',
@@ -261,7 +260,7 @@ ResolvedStream resolve_stream(const ComposedSemantics& composed,
 std::string ComposedSemantics::identity_hex() const
 {
     std::string out;
-    out.reserve(2U * kIdentityBytes);
+    out.reserve(2U * identity_.size());
     for (const std::uint8_t byte : identity_)
     {
         out.push_back(kHexDigits[(static_cast<unsigned>(byte) >> kNibbleShift) & kNibbleMask]);
@@ -415,7 +414,11 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
 
     std::array<unsigned char, kSha256Bytes> digest{};
     picosha2::hash256(serialized.begin(), serialized.end(), digest.begin(), digest.end());
-    for (std::size_t i{0}; i < kIdentityBytes; ++i)
+    // invariant: the truncation width is the identity member's OWN extent, never a second literal
+    // beside it — two spellings of one width drift silently and the wider one overruns the array.
+    static_assert(kSemanticIdentityBytes <= kSha256Bytes,
+                  "the composed identity truncates SHA-256; it cannot be wider than the digest");
+    for (std::size_t i{0}; i < composed.identity_.size(); ++i)
         composed.identity_[i] = static_cast<std::uint8_t>(digest[i]);
 
     // note: shadows use the FULL sets: a shadow is the vocabulary's property, not a view's.
