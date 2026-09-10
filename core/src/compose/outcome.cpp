@@ -89,7 +89,7 @@ std::optional<RunOutcome> map_outcome_token_in(std::string_view token, std::stri
 {
     const auto packages{composed.packages()};
     // note: a missing vocabulary is a CONFIG error; an unmapped token is a VALUE error.
-    // refs: DN-32.D6
+    // refs: ADR-22.D10
     if (vocabulary.empty())
     {
         std::cerr << "FATAL: insight::map_outcome_token_in — a verdict token (\"" << token
@@ -187,7 +187,7 @@ RunOutcomeResolution resolve_run_outcome(SideInputVerdict side_input, const RunO
 {
     const std::string_view side_input_token{side_input.token};
     // note: a verdict in the bytes is read by its WRITER, a side-input by its SUPPLIER.
-    // refs: DN-32.D6
+    // refs: ADR-22.D10
     const insight::semantic::ComposedSemantics& composed{stream_view};
     RunOutcomeResolution resolution;
 
@@ -205,7 +205,7 @@ RunOutcomeResolution resolve_run_outcome(SideInputVerdict side_input, const RunO
     }
 
     // note: an ABSENT declaration skips this rung; an INCOMPLETE one terminates before it.
-    // refs: DN-32.D7
+    // refs: ADR-22.D10
     if (!side_input_token.empty())
     {
         const std::optional<RunOutcome> mapped{

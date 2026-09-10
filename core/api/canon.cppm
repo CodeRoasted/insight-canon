@@ -151,7 +151,7 @@ export namespace insight
 map_outcome_token(std::string_view token,
                   const insight::semantic::ComposedSemantics& composed) noexcept;
 
-// refs: ADR-17.D1, ADR-22.D1, DN-32.D6
+// refs: ADR-17.D1, ADR-22.D1, ADR-22.D10
 // invariant: a caller-declared verdict is a PAIR — `(vocabulary, token)` — never a bare string,
 // and the two halves answer different questions the authorship test keeps apart.
 // invariant: the STREAM's dialect answers who WROTE the bytes, and "no dialect" is a fact rather
@@ -161,11 +161,11 @@ map_outcome_token(std::string_view token,
 // `UNSTABLE` has no universal meaning — so resolving one would force a spelling list into CORE.
 struct SideInputVerdict
 {
-    // refs: DN-32.D7
+    // refs: ADR-22.D10
     // invariant: the producer's own spelling, verbatim, never a pre-resolved `RunOutcome`; empty
     // means the caller declared nothing, which is a CHOICE and asserts nothing.
     std::string_view token;
-    // refs: DN-32.D6, DN-32.D7
+    // refs: ADR-22.D10
     // invariant: the name of the package whose `outcome_tokens` interpret that spelling, REQUIRED
     // whenever `token` is non-empty: the two fields are one declaration.
     // invariant: a non-empty token beside an empty vocabulary TERMINATES — half a declaration is
@@ -176,7 +176,7 @@ struct SideInputVerdict
     std::string_view vocabulary;
 };
 
-// refs: ADR-22, ADR-22.D5, DN-32.D6
+// refs: ADR-22, ADR-22.D5, ADR-22.D10
 // post: maps a native verdict token through a NAMED vocabulary's `outcome_tokens`, INDEPENDENTLY of
 // any stream's resolved dialect.
 // pre: `composed` is the FULL composition — every package's rows — and never a stream view.
@@ -250,7 +250,7 @@ struct RunOutcomeResolution
     std::string note;
 };
 
-// refs: DN-32.D6
+// refs: ADR-22.D10
 // pre: TWO compositions, and they are not interchangeable: `stream_view` is the resolved view of
 // the stream being diffed, `vocabularies` is the FULL composition.
 // invariant: rung 2 reads `stream_view` and must — a console marker came out of THESE bytes, so a

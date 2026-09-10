@@ -17,7 +17,7 @@ using insight::semantic::ComposedSemantics;
 
 namespace
 {
-// refs: DN-32.D6
+// refs: ADR-22.D10
 // invariant: a side-input verdict resolves against the DECLARER's vocabulary, so the UNFILTERED
 // composition is what a caller-declared verdict maps in.
 // assert: `map_outcome_token_in` re-derives through `for_stream` itself, so handing it an already

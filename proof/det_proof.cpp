@@ -250,7 +250,7 @@ int main(int argc, char** argv)
                 insight::scan_run_outcome(peeled_lines, stream.semantics)};
             // assert: the empty side-input verdict is the third state, never a defaulted success
             // — this proof declares nothing and asserts rung 2.
-            // refs: DN-32.D6, DN-32.D7
+            // refs: ADR-22.D10
             // assert: `stream.semantics` is passed twice deliberately and cannot move a byte —
             // rung 1's vocabulary is read only when the pair names a token.
             const insight::RunOutcomeResolution outcome_resolution{

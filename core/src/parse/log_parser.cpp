@@ -38,7 +38,7 @@ is_echoed_source(std::string_view raw_line,
                                { return hook(raw_line); });
 }
 
-// refs: ADR-22, ADR-22.D3, ADR-22.D6, DN-32.D3
+// refs: ADR-22, ADR-22.D3, ADR-22.D6, ADR-20.D19
 // pre: runs AFTER the strategy, whose `content` the lift keys on, and BEFORE the echoed-source
 // demotion, which must outrank it.
 // invariant: Unknown from the walk is the ABSENCE of a declared row, never a level, so it must not

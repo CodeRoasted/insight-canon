@@ -136,7 +136,7 @@ TEST(IntentCanonicalize, FrozenRuleSet)
 // invariant: no exclusion was ever written and none is needed.
 // invariant: KEPT is the arm below, which is the OPPOSITE of the two ripped ones — it is the
 // standing statement of WHY no prefix arm may exist, and it is cited from three live sites.
-// refs: DN-37.D33
+// refs: ADR-20.D12
 // invariant: A CLASS PREFIX IS A CLASS PREDICATE — it separates no siblings, BY CONSTRUCTION.
 // invariant: the mask exists to collapse matrix legs to one class, so a prefix match at the
 // separator CANNOT distinguish two legs of one job.
@@ -159,12 +159,12 @@ TEST(IntentCanonicalize, FrozenRuleSet)
 // is shown to match this leg's class prefix — not a property any consumer relies on.
 // invariant: its two anchors carry balanced parens and no trailing trim byte, so the escapes the
 // ripped catalogue described cannot bite it.
-// refs: DN-37.D33
+// refs: ADR-20.D12
 TEST(IntentCanonicalize, AClassPrefixIsInstanceBlindAndSeparatesNoSiblings)
 {
     // invariant: the separator's grammar is OWNED elsewhere and cited rather than restated —
     // canon knows only that these bytes are non-word.
-    // refs: DN-37.D14
+    // refs: ADR-22.D13
     constexpr std::string_view kPlatformSeparator{" / "};
     constexpr std::string_view lhs{"Test (ubuntu-latest, Node 24.x)"};
     constexpr std::string_view rhs{"Test (windows-latest, Node 24.x)"};
@@ -172,9 +172,10 @@ TEST(IntentCanonicalize, AClassPrefixIsInstanceBlindAndSeparatesNoSiblings)
     EXPECT_TRUE(canonicalize_intent(std::string{rhs} + std::string{kPlatformSeparator} + "inner")
                     .starts_with(canonicalize_intent(lhs) + std::string{kPlatformSeparator}))
         << "the OTHER leg's rendered name no longer matches this leg's class prefix. If the mask "
-           "stopped collapsing legs, the REFUSAL this arm underwrites is stale — `DN-37.D33` "
+           "stopped collapsing legs, the REFUSAL this arm underwrites is stale — `ADR-20.D12` "
            "deleted the fold's prefix arm because a class prefix cannot separate siblings, and "
-           "`DN-38`'s over-merge is the same collapse on the roll-up's key. Both citations must be "
+           "`ADR-20.D12`'s over-merge is the same collapse on the roll-up's key. Both citations "
+           "must be "
            "re-derived before this arm is relaxed.\n"
         << "  \"" << lhs << "\" -> \"" << canonicalize_intent(lhs) << "\"\n"
         << "  \"" << rhs << "\" -> \"" << canonicalize_intent(rhs) << '"';

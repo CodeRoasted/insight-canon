@@ -94,7 +94,7 @@ struct Tokenizer::Impl
         // a declared time here and forget the marker.
         event.timestamp = parsed_line.timestamp.value_or(Timestamp{});
         event.declared_timestamp = parsed_line.timestamp.is_declared();
-        // refs: DN-32.D3
+        // refs: ADR-20.D19
         // invariant: level and provenance are copied together off ONE EventLevel — the level
         // channel's twin of the pair above.
         event.level = parsed_line.level.value();

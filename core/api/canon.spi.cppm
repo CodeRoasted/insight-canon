@@ -99,7 +99,7 @@ struct ParsedLine
     EventTime timestamp;
     // invariant: declared() when the bytes came from a position whose MEANING is the level;
     // inferred() when canon read it out of message content.
-    // refs: DN-32.D3
+    // refs: ADR-20.D19
     EventLevel level;
     // invariant: component is the low-cardinality functional source; host is the high-cardinality
     // node identity, and it is hors-cube.

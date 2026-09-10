@@ -100,7 +100,7 @@ struct NgramId
 // the class masks, the instance keeps, and a report renders.
 // invariant: a carriage return is in the trim set because a Windows runner emits CRLF, not for
 // tidiness; a report trimming a different set would show one intent two ways.
-// refs: DN-38.D1
+// refs: ADR-20.D12
 [[nodiscard]] std::string_view trimmed_intent_name(std::string_view name) noexcept;
 
 // post: the matrix tuple rendered into the display name, returned VERBATIM as a view; empty when
@@ -441,7 +441,7 @@ enum class LogLevel : uint8_t
 // forgets UNDER-claims; the opposite default would silently promote a guess to a fact.
 // invariant: there is deliberately NO implicit conversion from LogLevel — constraining WRITERS is
 // the point, and readers keep == against a bare LogLevel and value().
-// refs: DN-32.D3, ADR-29.D5, ADR-22.D3
+// refs: ADR-20.D19, ADR-29.D5, ADR-22.D3
 class EventLevel
 {
   public:
@@ -948,7 +948,7 @@ struct CanonicalEvent
     // in memory and never serialized.
     // invariant: the one-ness of that write site is held by a LINT rather than by the type, because
     // correct-today-and-held-by-discipline was the sentence that was wrong four times before.
-    // refs: DN-32.D3, ADR-29.D5
+    // refs: ADR-20.D19, ADR-29.D5
     bool declared_level{false};
     // invariant: observability metadata, NOT deterministic MetaLog content — downstream may group
     // or correlate by it; Unknown when no strategy matched.
@@ -1440,7 +1440,7 @@ parse_log4j_timestamp(std::string_view timestamp_str) noexcept;
 // guessing the word IS the line's level, not a producer declaring one.
 // invariant: so a caller cannot mistake the guess for a declaration and no consumer has to
 // re-derive the distinction by re-reading the words.
-// refs: ADR-22.D3, DN-32.D3
+// refs: ADR-22.D3, ADR-20.D19
 [[nodiscard]] EventLevel infer_leading_log_level(std::string_view line) noexcept;
 
 // post: an Nginx error-log timestamp — a slash-separated date and clock, 19 characters.

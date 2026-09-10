@@ -566,7 +566,7 @@ TEST(RunOutcomeResolve, UnmappedSideInputSurfacesANoteAndFallsThrough)
 // RIGHT THING IS SATISFIABLE WITHOUT DYING.
 // invariant: print-then-continue is the single most likely accidental refactor of a fatal, because
 // the message and the terminate are two statements and only one looks load-bearing.
-// refs: DN-32.D7
+// refs: ADR-22.D10
 TEST(RunOutcomeResolveDeathTest, AHalfDeclaredVerdictTerminatesNamingTheComposition)
 {
     const ComposedSemantics vocabularies{compose(std::array{kOutcomePkg})};
@@ -613,7 +613,7 @@ TEST(RunOutcomeResolve, AnAbsentDeclarationDegradesWhereAHalfOneWouldTerminate)
     // dialect-gated, it is absent from this view, and it must stay absent.
     // invariant: the scan is canon reading the BYTES, and nothing about the side-input rule may
     // reach it.
-    // refs: DN-32.D6
+    // refs: ADR-22.D10
     const ComposedSemantics vocabularies{compose(std::array{kOutcomePkg})};
     const ComposedSemantics composed{vocabularies.for_stream(kSyntheticDialect, {})};
     const std::vector<std::string> lines{"working", "no epilogue here"};

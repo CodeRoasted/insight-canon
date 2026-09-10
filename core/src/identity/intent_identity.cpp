@@ -72,7 +72,7 @@ namespace
             return NumericClaim{.mask = kDigitMask, .end = pos};
         return std::nullopt;
     }
-    // refs: DN-38.D1
+    // refs: ADR-20.D12
     // invariant: ONE definition, because the class and the discriminant are complements —
     // different trim sets would disagree about where a name starts.
     // note: CR is a materialization artifact — a Windows runner emits CRLF into banners.

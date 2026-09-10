@@ -16,7 +16,7 @@ using insight::semantic::ComposedSemantics;
 
 namespace
 {
-// refs: DN-32.D6
+// refs: ADR-22.D10
 // invariant: a caller-declared verdict resolves against the UNFILTERED vocabulary set, because it
 // answers who SUPPLIED the verdict, not who WROTE the bytes.
 // assert: `map_outcome_token_in` re-derives through `for_stream` itself, so handing it an

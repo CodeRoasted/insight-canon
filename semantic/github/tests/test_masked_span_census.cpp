@@ -1,4 +1,4 @@
-// refs: DN-38.D1, ADR-16.D13
+// refs: ADR-20.D12, ADR-16.D13
 // invariant: this file measures HALF ONE — the rendered BYTES, a pure function of the NAMES. The
 // row COUNT needs the engine and is measured outside this repo.
 // note: half two is the `gd_gate1_over_merge` harness in `coderoast-corpora`, over the same pairs
@@ -327,7 +327,7 @@ TEST(MaskedSpanCensus, TheRenderDeltaPredicateAndTheRiskDetectorBothFireAndBothS
            "cannot reach.";
     EXPECT_FALSE(risk_of(trimmed("build \r")).interior_control)
         << "the interior-control flag fires on a CR the trim already removed, so it would charge "
-           "`DN-38.D1` clause 1 for a byte clause 1 never renders.";
+           "`ADR-20.D12` clause 1 for a byte clause 1 never renders.";
     EXPECT_TRUE(
         risk_of(std::string{"build"} + std::string{kPhaseSeparator} + "test").carries_separator)
         << "the separator flag does not fire";
@@ -442,7 +442,7 @@ TEST(MaskedSpanCensus, TheProducerNameRenderDeltaOnTheMarkerCoverageBank)
                                   << " file(s) — the census walked the corpus and saw no name, so "
                                      "every zero below is about the reader, not about the bytes.";
 
-    std::cout << "\n[DN-38 gate 2 / half one] subject " << subject.size() << " side-records, "
+    std::cout << "\n[ADR-20.D12 gate 2 / half one] subject " << subject.size() << " side-records, "
               << files_read << " read | lines " << lines_total << " (peeled-blank "
               << lines_blank_after_peel << ", marker " << lines_recognized << ", other "
               << lines_other << ")" << std::endl;
@@ -452,7 +452,7 @@ TEST(MaskedSpanCensus, TheProducerNameRenderDeltaOnTheMarkerCoverageBank)
         for (const auto& [kind, tally] : by_kind)
         {
             const Bucketed b{bucket(tally)};
-            std::cout << "[DN-38 gate 2] side=" << side << " surface=marker/" << kind << "  "
+            std::cout << "[ADR-20.D12 gate 2] side=" << side << " surface=marker/" << kind << "  "
                       << show(b, tally) << std::endl;
             // invariant: EVERY member is printed, never a head — an enumeration truncated for
             // readability is how a complete enumeration gets read as a complete disposition.
@@ -483,8 +483,9 @@ TEST(MaskedSpanCensus, TheProducerNameRenderDeltaOnTheMarkerCoverageBank)
         const auto step{by_kind.find("Step")};
         const std::size_t job_len{job == by_kind.end() ? 0 : job->second.size()};
         const std::size_t step_len{step == by_kind.end() ? 0 : step->second.size()};
-        std::cout << "[DN-38 gate 2] side=" << side << " widest JOINED headline BOUND = " << job_len
-                  << " + " << kPhaseSeparator.size() << " + " << step_len << " = "
+        std::cout << "[ADR-20.D12 gate 2] side=" << side
+                  << " widest JOINED headline BOUND = " << job_len << " + "
+                  << kPhaseSeparator.size() << " + " << step_len << " = "
                   << job_len + kPhaseSeparator.size() + step_len << "B"
                   << "\n        widest Job  \"" << escaped(job == by_kind.end() ? "" : job->second)
                   << "\"\n        widest Step \""
@@ -512,7 +513,7 @@ TEST(MaskedSpanCensus, TheProducerNameRenderDeltaOnTheMarkerCoverageBank)
     const auto enumerate{
         [](std::string_view label, const std::map<std::string, std::set<std::string>>& set)
         {
-            std::cout << "[DN-38 gate 2] " << label << ": " << set.size() << " pair(s)"
+            std::cout << "[ADR-20.D12 gate 2] " << label << ": " << set.size() << " pair(s)"
                       << std::endl;
             for (const auto& [pair, what] : set)
             {
@@ -522,12 +523,13 @@ TEST(MaskedSpanCensus, TheProducerNameRenderDeltaOnTheMarkerCoverageBank)
                 std::cout << std::endl;
             }
         }};
-    std::cout << "[DN-38 gate 2] MOVED (the pair carries >=1 payload whose rendered headline "
-                 "changes under `DN-38.D1` clause 1; every OTHER report keeps every `phase` byte): "
-              << moved.size()
-              << " pair(s) — not enumerated, it is the majority set; its "
-                 "COMPLEMENT is the prediction and it is "
-              << (payloads.size() - moved.size()) << " pair(s)." << std::endl;
+    std::cout
+        << "[ADR-20.D12 gate 2] MOVED (the pair carries >=1 payload whose rendered headline "
+           "changes under `ADR-20.D12` clause 1; every OTHER report keeps every `phase` byte): "
+        << moved.size()
+        << " pair(s) — not enumerated, it is the majority set; its "
+           "COMPLEMENT is the prediction and it is "
+        << (payloads.size() - moved.size()) << " pair(s)." << std::endl;
     enumerate("DISPLAY HAZARD INTRODUCED BY CLAUSE 1 (the rendered name carries a non-ASCII byte, "
               "an interior control byte, the phase separator or a double quote AND its class does "
               "not — the set the ruling is answerable for)",
