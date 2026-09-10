@@ -52,7 +52,7 @@ export namespace insight::tokenization
 // uppercase class name on an anomalous one — and the grammar VALIDATES it.
 // invariant: it is carried in NO projection field, because the column is the corpus curators'
 // answer key rather than producer content.
-// refs: DN-43.D14
+// refs: ADR-16.D11
 class BGLStrategy final : public IFormatStrategy
 {
   public:
@@ -113,7 +113,7 @@ export namespace insight::tokenization
 // one-digit minute is the same grammar as a two-digit one.
 // invariant: the ARITY is grammar: the claim predicate proves the head AND all three separators,
 // because parse consumes three unconditionally and a parse-side decline DELETES the line.
-// refs: DN-43.D16
+// refs: ADR-16.D11
 class HealthAppStrategy final : public IFormatStrategy
 {
   public:
@@ -290,7 +290,7 @@ export namespace insight::tokenization
 // is a fact where inventing one would be a fabrication on the cube's WHERE axis.
 // invariant: the BSD prefix gets no sibling — it carries no year and collides with prose, so
 // consuming it would fabricate an event time from an inference.
-// refs: ADR-17.D1, DN-43.D4, DN-43.D12
+// refs: ADR-17.D1, ADR-16.D10, DN-43.D12
 class Rfc3339TextStrategy final : public IFormatStrategy
 {
   public:
@@ -336,7 +336,7 @@ class SparkHDFSStrategy final : public IFormatStrategy
 // invariant: module-internal — defined in the strategy whose grammar it is, and consumed by
 // nothing else.
 // invariant: ONE scan with two readers, so the format gate and the grammar cannot drift apart.
-// refs: DN-43.D2, DN-43.D14
+// refs: ADR-16.D10, ADR-16.D11
 namespace insight::tokenization
 {
 
@@ -356,7 +356,7 @@ namespace insight::tokenization
 // invariant: it would also throw away a level the producer DECLARED.
 // invariant: everything the parse publishes is declared below, so a non-zero confidence means
 // exactly this parse will succeed — gate and grammar then cannot drift apart.
-// refs: DN-43.D11, DN-43.D15
+// refs: DN-43.D11, ADR-16.D11
 // refs: F-SRC-insight-canon:canon.detail.scan.cppm, F-SRC-insight-canon:test_strategies.cpp
 struct BglRecord
 {
@@ -368,7 +368,7 @@ struct BglRecord
     // DECLARES its severity in a fixed column, so the level is read rather than guessed.
     // invariant: the Thunderbird branch has no level column at all and infers from the message body
     // in the inferred species.
-    // refs: ADR-16.D9, DN-43.D5, ADR-19.D4
+    // refs: ADR-16.D9, ADR-16.D10, ADR-19.D4
     std::string_view epoch;
     std::string_view node;
     std::string_view component;
@@ -385,7 +385,7 @@ struct BglRecord
 
 // invariant: deliberately NOT exported — module-internal, defined in the strategy whose grammar
 // it is, and consumed by the one other strategy that claims exactly its negation.
-// refs: DN-43.D2
+// refs: ADR-16.D10
 namespace insight::tokenization
 {
 
@@ -397,7 +397,7 @@ namespace insight::tokenization
 // parse consumes the split it already computed instead of re-deriving it by hand.
 // invariant: one predicate serves the parse gate, the detector's routing and the sticky stream
 // latch, and making it mean this parse will succeed makes it correct for all three.
-// refs: DN-43.D1, DN-43.D2
+// refs: ADR-16.D10
 struct SyslogHeader
 {
     // invariant: the stamp is the raw timestamp field, read by the branch's own parser; the tag is

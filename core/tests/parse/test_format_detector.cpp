@@ -23,7 +23,7 @@ TEST_F(FormatDetectorTest, HasNineteenBuiltInRepresentationStrategies)
     // invariant: dialect strategies register into the CUSTOM set and not here.
     // invariant: the count was one lower until the leading-timestamp LAYOUT was split out of the
     // syslog strategy.
-    // refs: DN-43.D4
+    // refs: ADR-16.D10
     EXPECT_EQ(detector.strategies().size(), 19u);
 }
 
@@ -81,7 +81,7 @@ TEST_F(FormatDetectorTest, DetectsRFC3339Syslog)
 // invariant: the ROUTING, not just the parse — a level word where a hostname belongs is what made
 // the syslog strategy claim application lines.
 // invariant: a test that only checked the PARSE could not tell the gate from the grammar.
-// refs: DN-43.D3
+// refs: ADR-16.D10
 TEST_F(FormatDetectorTest, RoutesRfc3339AppLineToRfc3339TextNotSyslog)
 {
     auto* s{detector.detect("2026-05-31T08:00:01Z INFO request method=GET path=/api/users/1000")};
@@ -214,7 +214,7 @@ TEST_F(FormatDetectorTest, DetectsLog4j)
 // the routed format is satisfied by a strategy that then publishes the whole line as content.
 // invariant: the published render carried this corpus as 81 whole-line raw-text templates with
 // every level read Unknown.
-// refs: DN-43.D19
+// refs: ADR-16.D11
 TEST_F(FormatDetectorTest, DetectsTheOpenStackLayoutFromCold)
 {
     ArenaAllocator arena{4096};
@@ -261,7 +261,7 @@ TEST_F(FormatDetectorTest, DetectsBGL)
 // invariant: before it did not — the candidate list was gated on a leading dash, so 348 460 lines
 // of the pinned corpus were never offered a probe at all.
 // invariant: they fell to the raw-text fallback with their DECLARED level unread.
-// refs: DN-43.D14
+// refs: ADR-16.D11
 TEST_F(FormatDetectorTest, DetectsAnAlertLabelledBGLLine)
 {
     auto* s{detector.detect("KERNDTLB 1117838570 2005.06.03 R02-M1-N0 2005-06-03-15.42.50 "
@@ -325,7 +325,7 @@ TEST_F(FormatDetectorTest, DetectsHealthApp)
 // invariant: a zero confidence is a DEMOTION: the detector falls back to the raw-text strategy,
 // which puts the whole line in the content.
 // invariant: both arms therefore end on the SAME assertion — every byte survives.
-// refs: DN-43.D16
+// refs: ADR-16.D11
 TEST_F(FormatDetectorTest, HealthAppHeadWithTooFewSeparatorsDemotesToRawTextKeepingEveryByte)
 {
     ArenaAllocator arena{4096};

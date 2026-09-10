@@ -1,4 +1,4 @@
-// refs: DN-38.D1, DN-38.D3
+// refs: DN-38.D1, ADR-16.D13
 // invariant: this file measures HALF ONE — the rendered BYTES, a pure function of the NAMES. The
 // row COUNT needs the engine and is measured outside this repo.
 // note: half two is the `gd_gate1_over_merge` harness in `coderoast-corpora`, over the same pairs

@@ -47,7 +47,7 @@ ApacheErrorLogStrategy::parse(std::string_view line, ArenaAllocator& /*arena*/) 
 
     // invariant: the guard above is the ONLY exit — the predicate proved the head bracket closes,
     // so the timestamp take is total and the empty-result guard it replaces is gone.
-    // refs: DN-43.D16
+    // refs: ADR-16.D11
     std::string_view rest{line};
     const std::string_view raw_ts{sv_take_bracketed_or_none(rest)};
 

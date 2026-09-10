@@ -178,7 +178,7 @@ class IFormatStrategy
     // DETERMINED by that prefix.
     // invariant: bounded by the line's HEADER and never by the line — this runs on every line of
     // every stream.
-    // refs: DN-43.D1
+    // refs: ADR-16.D10
     [[nodiscard]] virtual double confidence(std::string_view line) const noexcept = 0;
 };
 

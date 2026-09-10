@@ -32,7 +32,7 @@ std::expected<ParsedLine, std::string> HealthAppStrategy::parse(std::string_view
     // line rather than demote it.
     // invariant: an empty component is a POSITIVE statement that the record declares no functional
     // source, never a parse failure.
-    // refs: ADR-16.D5, DN-43.D16
+    // refs: ADR-16.D5, ADR-16.D11
     std::string_view rest{line};
     const std::string_view ts_str{sv_take_until(rest, '|')};
     const std::string_view component{sv_take_until(rest, '|')};

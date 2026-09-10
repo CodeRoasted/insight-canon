@@ -147,7 +147,7 @@ namespace
         if (line.front() == '<')
             candidates.add(LogFormat::RFC5424);
 
-        // refs: DN-43.D14
+        // refs: ADR-16.D11
         // note: the alert class column is `-` normally, an uppercase label when anomalous.
         if (line.front() == '-' || is_upper(line.front()))
             candidates.add(LogFormat::BGL);
@@ -180,7 +180,7 @@ namespace
         {
             if (line.size() > kTimestampSeparatorIndex && line[kTimestampSeparatorIndex] == 'T')
             {
-                // refs: DN-43.D4
+                // refs: ADR-16.D10
                 // note: the two RFC3339+T claimants are disjoint — the syslog header decides.
                 candidates.add(LogFormat::Syslog);
                 candidates.add(LogFormat::Rfc3339Text);
@@ -193,7 +193,7 @@ namespace
             }
         }
 
-        // refs: DN-43.D19
+        // refs: ADR-16.D11
         // invariant: the OpenStack layout puts a FILENAME before the stamp, so the date-prefix gate
         // above never offered Log4j and its OpenStack branch was unreachable from COLD detection.
         // invariant: the same bounded locator Log4jStrategy uses decides here, so the gate and the

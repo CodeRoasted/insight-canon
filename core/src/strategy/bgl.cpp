@@ -17,7 +17,7 @@ import insight.canon.detail.scan;
 // oracle stays outside canon, where the cube-measurement loader reads it.
 // invariant: a hand-written scanner: no regex and, on the SUCCESS path, no string copies — a
 // decline builds an error message.
-// refs: DN-43.D14
+// refs: ADR-16.D11
 // invariant: the log macros stay TEXTUAL in the global module fragment, so no first-party
 // declaration leaks through it.
 // refs: ADR-3.D4
@@ -165,7 +165,7 @@ std::expected<ParsedLine, std::string> BGLStrategy::parse(std::string_view line,
     // none, so the two branches land in different species — read on one, inferred on the other.
     // invariant: that declared column is the reason the alert-labelled lines were worth claiming
     // — 348 460 of them, every one carrying a fatal-class word nothing was reading.
-    // refs: DN-43.D5
+    // refs: ADR-16.D10
     parsed_line.level = record->declared_level.has_value()
                             ? EventLevel::declared(*record->declared_level)
                             : utils::infer_leading_log_level(record->content);
@@ -200,7 +200,7 @@ double BGLStrategy::confidence(std::string_view line) const noexcept
     // succeed.
     // invariant: what fails it declines to the raw-text fallback rather than publishing a
     // mis-aligned parse; 10 pinned lines hold a spliced message fragment where a node belongs.
-    // refs: DN-43.D2
+    // refs: ADR-16.D10
     if (scan_bgl_record(line).has_value())
         return kBglConfidence;
     return kNoConfidence;

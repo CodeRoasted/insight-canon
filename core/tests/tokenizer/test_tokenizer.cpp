@@ -30,7 +30,7 @@ class TokenizerTest : public ::testing::Test
 // can't-FAIL arm, and nine generations of green said nothing about this path.
 // invariant: the prose it carried was also FALSE as a general claim, which is why the repair is a
 // line whose body DOES carry a level rather than a re-assertion of the old one.
-// refs: DN-43.D5
+// refs: ADR-16.D10
 TEST_F(TokenizerTest, ProcessesBSDSyslogLine)
 {
     constexpr std::string_view line{
@@ -150,7 +150,7 @@ TEST_F(TokenizerTest, ProcessesCLFLine)
 // alternative, a bare rejection to raw text.
 // invariant: that alternative sets no event time and would lose the clock the downstream windows
 // are built on.
-// refs: DN-43.D4, DN-43.D6
+// refs: ADR-16.D10, DN-43.D6
 TEST_F(TokenizerTest, Rfc3339ApplicationLinesTemplateDistinctlyAndKeepTheirStamp)
 {
     static constexpr std::array kLines{
@@ -231,7 +231,7 @@ TEST_F(TokenizerTest, SameStructuredLinesSameTemplateID)
 // invariant: that class is flagged on 348 398 pinned-corpus lines and unflagged on 506 797.
 // invariant: asserted at the PIPELINE grain, because template identity is what the wire carries and
 // a per-field strategy assertion cannot see it.
-// refs: DN-43.D14
+// refs: ADR-16.D11
 TEST_F(TokenizerTest, AnAlertLabelledBGLLineHasTheSameTemplateAsItsUnlabelledTwin)
 {
     constexpr std::string_view kLabelled{

@@ -638,7 +638,7 @@ enum class LogFormat : uint8_t
     // invariant: a core REPRESENTATION format, not a dialect — it names no ecosystem.
     // invariant: an RFC-3339 prefix is evidence of a TIMESTAMP and not of syslog; splitting it out
     // keeps the event time while level and component become what the bytes actually say.
-    // refs: DN-43.D4
+    // refs: ADR-16.D10
     Rfc3339Text,
     // invariant: selected only when no structured strategy matches a NON-EMPTY line, so the
     // tokenizer never silently drops a line.
@@ -1023,7 +1023,7 @@ struct MaskConfig
     // token it accepted was already digit-leading and the knob was inert over ALL inputs.
     // invariant: the IP knob stays because its grammar admits a leading bracket, and a bracketed
     // token is not digit-leading, so it genuinely gates.
-    // refs: DN-27
+    // refs: ADR-16.D5
     bool mask_ip_addresses{true};
     // invariant: when set, a line whose NATIVE component is empty takes its recognized test-file as
     // component — populating the cube WHERE axis above the empty native tier, never faking it.

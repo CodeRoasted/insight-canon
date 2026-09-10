@@ -28,7 +28,7 @@ std::expected<ParsedLine, std::string> NginxErrorStrategy::parse(std::string_vie
 
     // invariant: the guard above is the ONLY exit — the predicate proved the level bracket is the
     // next token and that it closes, so the take is total and cannot delete a claimed line.
-    // refs: DN-43.D16
+    // refs: ADR-16.D11
     std::string_view rest{line};
     const std::string_view ts_str{sv_take_n(rest, kNginxTimestampLen)};
     sv_skip_ws(rest);

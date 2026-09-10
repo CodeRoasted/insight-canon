@@ -53,7 +53,7 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
         // the close that ends it is the one at depth 0, never the first `]`.
         // invariant: an unbalanced bracket DECLINES the field, so bytes no predicate
         // validated stay in content rather than being swallowed with the message.
-        // refs: DN-43.D19
+        // refs: ADR-16.D11
         const std::string_view thread_name{sv_take_balanced_bracketed_or_none(rest)};
         sv_skip_ws(rest);
         if (!rest.empty() && rest[0] == '-')
@@ -108,7 +108,7 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
     const std::string_view level_sv{sv_take_token(rest)};
     // invariant: the SAME balanced thread field as the dash layout, discarded here rather than
     // named — a first-`]` take leaves a stray `]` at the head of the component.
-    // refs: DN-43.D19
+    // refs: ADR-16.D11
     (void)sv_take_balanced_bracketed_or_none(rest);
     sv_skip_ws(rest);
 

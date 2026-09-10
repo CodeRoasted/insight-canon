@@ -147,7 +147,7 @@ TemplateId intent_id_of(std::string_view name)
 
 std::string_view discriminant_of(std::string_view name) noexcept
 {
-    // refs: ADR-18, ADR-18.D1, DN-38.D3
+    // refs: ADR-18, ADR-18.D1, ADR-16.D13
     // post: the envelope of the masked spans, first span's start to last span's end, class material
     // between them included; empty when no span is claimed.
     // invariant: (class, envelope) separates two names whose spans occupy the same class positions;

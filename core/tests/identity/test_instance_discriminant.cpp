@@ -102,7 +102,7 @@ TEST(InstanceDiscriminant, RunnerAgnosticNoHardcodedNames)
 // two arms above, whose every literal carries at most one span.
 // invariant: so the widening left all of them byte-identical, and it is not restated here — one
 // assertion, one home.
-// refs: DN-38.D2, DN-38.D3
+// refs: ADR-16.D13
 TEST(InstanceDiscriminant, SeparatesCellsSharingAFirstMaskedSpan)
 {
     static constexpr std::array<std::string_view, 9> kCells{
@@ -118,7 +118,7 @@ TEST(InstanceDiscriminant, SeparatesCellsSharingAFirstMaskedSpan)
         EXPECT_EQ(canonicalize_intent(cell), "macos-N (M)")
             << "class of \"" << cell
             << "\" is no longer the shared class — the collision premise "
-               "this arm rests on is gone; the mask moved, and that is not what DN-38.D2 ruled";
+               "this arm rests on is gone; the mask moved, and that is not what ADR-16.D13 ruled";
 
     // invariant: THE PROPERTY — two DISTINCT cells of one class carry DISTINCT coordinates.
     // invariant: the 20 cross-group pairs pass TODAY and are the built-in proof that this assertion

@@ -28,7 +28,7 @@ std::expected<ParsedLine, std::string> CLFStrategy::parse(std::string_view line,
 {
     // invariant: the ONE guard — the claim predicate proved the whole record, so every take below
     // is total and no further exit exists to DELETE a line this strategy claimed.
-    // refs: DN-43.D16
+    // refs: ADR-16.D11
     if (!is_clf_record_prefix(line))
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=CLF parse miss");
@@ -46,7 +46,7 @@ std::expected<ParsedLine, std::string> CLFStrategy::parse(std::string_view line,
     sv_skip_ws(rest);
     // invariant: the SAME scanner the claim predicate walked, so the take is total by
     // construction and the escape bytes reach content unrewritten.
-    // refs: DN-92.D2, DN-92.D4
+    // refs: ADR-16.D12
     const std::string_view request{sv_take_clf_quoted_or_none(rest)};
     const std::string_view status_str{sv_take_token(rest)};
     (void)sv_take_token(rest);
@@ -113,7 +113,7 @@ double CLFStrategy::confidence(std::string_view line) const noexcept
     // strategy is a claim the predicate carries rather than a tie-break.
     // invariant: a line the predicate declines is DEMOTED to another strategy with every byte
     // intact — the parse-side decline it replaces DELETED the line.
-    // refs: DN-43.D1, DN-43.D16
+    // refs: ADR-16.D10, ADR-16.D11
     if (is_clf_record_prefix(line))
         return kStrongConfidence;
     return kNoConfidence;

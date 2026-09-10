@@ -889,7 +889,7 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                        }
                        // assert: a hexadecimal-prefixed token needs no arm: it starts with a digit,
                        // so the digit-leading test carries it.
-                       // refs: DN-27
+                       // refs: ADR-16.D5
                        if (shape.empty || is_uuid_or_long_hash(tok) ||
                            (config.mask_ip_addresses && is_ipv4_token(tok)) || shape.digit_leading)
                        {

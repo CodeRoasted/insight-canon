@@ -602,7 +602,7 @@ TEST(EphemeralRootMask, G7_NoCatalogedRootNoOverFire)
 // invariant: disabling the hex rule wholesale left the entire suite GREEN at 596 of 596, which is
 // the measurement the rip rests on.
 // invariant: it is recorded here because after the rip there is no predicate left to mutate.
-// refs: DN-027
+// refs: ADR-16.D5
 namespace
 {
 // invariant: the masker under a CALLER-CHOSEN config, which is exactly why no committed test using
@@ -854,7 +854,7 @@ TEST(StatelessTemplate, AWrappedHashNormalizesLikeTheBracketedFormItAlreadyMatch
 // which is why removing the rule moved nothing.
 // invariant: deliberately NOT a test of the ripped rule: that rule could not be tested, which is
 // why it is gone, and there is no predicate left to mutate.
-// refs: DN-027
+// refs: ADR-16.D5
 TEST(StatelessTemplate, HexTokensStillMaskViaDigitLeadingAfterTheRuleFiveRip)
 {
     ArenaAllocator arena{256U * 1024U};
@@ -1033,7 +1033,7 @@ TEST(StatelessTemplate, EmbeddedIdentityArmsAreDisjoint)
 // gone.
 // invariant: the fixture address is a RESERVED documentation range, routable nowhere, so it cannot
 // become a real address by someone's later edit.
-// refs: DN-86.D3
+// refs: ADR-16.O3
 TEST(StatelessTemplate, MaskingRelocatesTheValueIntoParamsRatherThanDeletingIt)
 {
     ArenaAllocator arena{256U * 1024U};
@@ -1054,6 +1054,6 @@ TEST(StatelessTemplate, MaskingRelocatesTheValueIntoParamsRatherThanDeletingIt)
     // `mask` the wrong word for what happens to the value.
     EXPECT_NE(std::ranges::find(result.params, kDocAddress), result.params.end())
         << "the address left the template and is in NO param — that would be a scrub, and the "
-           "egress ruling (DN-86.D5) rests on it NOT being one.\n  template : "
+           "egress ruling (ADR-33.D12) rests on it NOT being one.\n  template : "
         << result.template_str << "\n  params   : " << result.params.size() << " entr(y|ies)";
 }

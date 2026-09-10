@@ -29,7 +29,7 @@ std::expected<ParsedLine, std::string> ProxifierStrategy::parse(std::string_view
     std::string_view rest{line};
     // invariant: the predicate proved `]` at byte 15 and bytes 1-14 are digits, dots, a space and
     // colons, so no earlier `]` can exist and this take can never decline.
-    // refs: DN-43.D3
+    // refs: ADR-16.D10
     (void)sv_take_bracketed_or_none(rest);
     sv_skip_ws(rest);
     const std::string_view process{sv_take_token(rest)};

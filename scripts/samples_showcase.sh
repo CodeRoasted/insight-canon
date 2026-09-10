@@ -124,7 +124,7 @@ packages="$(grep -m1 '^# semantic_packages ' "$first_out" | sed 's/^# semantic_p
 #
 # THE FAILURE THIS PREVENTS is specific and it is self-inflicted: a reader who re-runs the tool
 # against different inputs or a different build measures a different class set, and under
-# DN-39.D4's exact-set rule (declared must equal fired, in BOTH directions) that reader REFUSES
+# ADR-7.D9's exact-set rule (declared must equal fired, in BOTH directions) that reader REFUSES
 # OUR DISCLOSURE WITH OUR OWN INSTRUMENT. The pins are what make the re-run land where the
 # disclosure says it will.
 #

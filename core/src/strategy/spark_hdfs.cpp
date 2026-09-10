@@ -38,7 +38,7 @@ std::expected<ParsedLine, std::string> SparkHDFSStrategy::parse(std::string_view
         // invariant: the colon TERMINATES the component; absent it this line names none.
         // invariant: the unbounded form emptied content and moved the message onto the cube's WHERE
         // axis — the same defect shape repaired at the syslog strategy and left live here.
-        // refs: ADR-16.D9, DN-43.D3
+        // refs: ADR-16.D9, ADR-16.D10
         const std::string_view component{sv_take_until_or_none(rest, ':')};
         sv_skip_ws(rest);
 

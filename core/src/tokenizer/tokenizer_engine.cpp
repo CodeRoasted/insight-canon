@@ -74,7 +74,7 @@ struct Tokenizer::Impl
             ++empty_projections;
             if (empty_projections == 1 || empty_projections % kEmptyProjectionWarnEvery == 0)
             {
-                // refs: DN-43.D14
+                // refs: ADR-16.D11
                 // note: `component` separates the two readings only on a syslog-shaped grammar.
                 INSIGHT_LOG_WARN(
                     logging::tokenizer_logger(),

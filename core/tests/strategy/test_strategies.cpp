@@ -555,7 +555,7 @@ TEST_F(CLFStrategyTest, DashBodySizeIsParsed)
 // the strategy must decline in confidence() where the line is merely DEMOTED to another claimant.
 // invariant: the same three shapes reached parse() before this repair and were DELETED there,
 // every byte of them lost.
-// refs: DN-43.D16
+// refs: ADR-16.D11
 TEST_F(CLFStrategyTest, ShapesCarryingAClfStampButNotAClfRecordAreDeclinedNotDeleted)
 {
     static constexpr std::string_view kHaProxy{
@@ -580,7 +580,7 @@ TEST_F(CLFStrategyTest, ShapesCarryingAClfStampButNotAClfRecordAreDeclinedNotDel
 // exists for, and it was DELETED before this grammar landed.
 // invariant: the bytes are NOT unescaped — the escape reaches content as the producer wrote it, so
 // the masker decides identity and no second, undeclared masking stage exists.
-// refs: DN-92.D1, DN-92.D2
+// refs: ADR-16.D12
 TEST_F(CLFStrategyTest, RequestCarryingAnEscapedQuoteIsClaimedAndTheEscapeBytesSurvive)
 {
     static constexpr std::string_view kEscapedQuote{
@@ -596,7 +596,7 @@ TEST_F(CLFStrategyTest, RequestCarryingAnEscapedQuoteIsClaimedAndTheEscapeBytesS
 
 // invariant: nginx's default combined layout writes the hex form rather than a backslash-quote, and
 // the SAME clause covers it — the backslash consumes the `x`.
-// refs: DN-92.D2
+// refs: ADR-16.D12
 TEST_F(CLFStrategyTest, RequestCarryingAnNginxHexEscapeIsClaimed)
 {
     static constexpr std::string_view kHexEscape{
@@ -610,7 +610,7 @@ TEST_F(CLFStrategyTest, RequestCarryingAnNginxHexEscapeIsClaimed)
 
 // invariant: an UNTERMINATED quoted field DECLINES — sv_take_until's no-delimiter branch hands
 // back the whole remainder, which is the hazard the _or_none forms exist for.
-// refs: DN-92.D2, ADR-16.D9
+// refs: ADR-16.D12, ADR-16.D9
 TEST_F(CLFStrategyTest, UnterminatedRequestFieldIsDeclinedRatherThanDeleted)
 {
     static constexpr std::string_view kUnterminated{
@@ -655,7 +655,7 @@ TEST_F(SyslogStrategyTest, ConfidenceZeroForKVLine)
 // published all-INFO window — the host take ate the level word and the level was never read.
 // invariant: the assertion is on CONFIDENCE and not on parse, because the gate is what ROUTES and a
 // parse-only guard would DROP the line instead of re-routing it.
-// refs: DN-43.D1, DN-43.D3
+// refs: ADR-16.D10
 TEST_F(SyslogStrategyTest, ClaimsNothingWhenTheHostSlotHoldsALevelWord)
 {
     for (const std::string_view line :
@@ -705,7 +705,7 @@ TEST_F(SyslogStrategyTest, ClaimsNothingWhenTheOnlyColonIsInsideTheBracketPair)
 // invariant: BOTH branches infer the level from the message BODY, in the inferred species.
 // invariant: the BSD arm is asserted here because it is the one the old suite could not see — its
 // only level assertion used a body with no level and no cue, so it held before and after.
-// refs: DN-43.D5
+// refs: ADR-16.D10
 TEST_F(SyslogStrategyTest, InfersTheLevelFromTheBodyOnBothBranches)
 {
     auto bsd{
@@ -738,7 +738,7 @@ class Rfc3339TextStrategyTest : public ::testing::Test
 // invariant: the level is still inferred from the POST-STAMP remainder.
 // invariant: that is the assertion separating this disposition from one that scans content from
 // byte 0 and loses the level word to the stamp's share of the leading head.
-// refs: ADR-23.D5, DN-43.D4, DN-43.D12
+// refs: ADR-23.D5, ADR-16.D10, DN-43.D12
 TEST_F(Rfc3339TextStrategyTest, KeepsTheStampAndProjectsTheWholeRemainder)
 {
     const std::string_view line{kRfc3339AppLine};
@@ -1007,7 +1007,7 @@ TEST_F(Log4jStrategyTest, ParsesHadoopLine)
 // the one at depth 0 — the first `]` truncates it mid-token on 163 of 2 000 Zookeeper sample lines.
 // invariant: EXACT EQUALITY on both halves, because the containment assertion this replaces held on
 // BOTH sides of the split it was meant to pin, and so could not fail.
-// refs: DN-43.D19
+// refs: ADR-16.D11
 TEST_F(Log4jStrategyTest, ParsesZookeeperLine)
 {
     auto result{strategy.parse(kLog4jZookeeperLine, arena)};
@@ -1027,7 +1027,7 @@ TEST_F(Log4jStrategyTest, ParsesZookeeperLine)
 
 // invariant: the standard layout takes the SAME thread field and discards it, so a nested thread
 // name there leaves a stray `]` at the head of component.
-// refs: DN-43.D19
+// refs: ADR-16.D11
 TEST_F(Log4jStrategyTest, NestedThreadNameInTheStandardLayoutLeavesNoResidue)
 {
     static constexpr std::string_view kNested{
@@ -1041,7 +1041,7 @@ TEST_F(Log4jStrategyTest, NestedThreadNameInTheStandardLayoutLeavesNoResidue)
 
 // invariant: DEGRADED INPUT — an unbalanced thread bracket must DECLINE the field and keep every
 // byte, where the unbounded take swallowed the message and emptied content.
-// refs: DN-43.D19, DN-43.D11
+// refs: ADR-16.D11, DN-43.D11
 TEST_F(Log4jStrategyTest, UnclosedThreadBracketKeepsEveryByteInContent)
 {
     static constexpr std::string_view kUnclosed{
@@ -1074,7 +1074,7 @@ TEST_F(Log4jStrategyTest, UnclosedOpenStackRequestSectionKeepsEveryByteInContent
 
 // invariant: EXACT EQUALITY on component — a containment check for "nova" is satisfied by any
 // mis-split that leaves the substring anywhere in the field.
-// refs: DN-43.D19
+// refs: ADR-16.D11
 TEST_F(Log4jStrategyTest, ParsesOpenStackLine)
 {
     auto result{strategy.parse(kLog4jOpenStackLine, arena)};
@@ -1298,7 +1298,7 @@ TEST_F(BGLStrategyTest, ConfidenceHighForBGL)
 // invariant: the fixture below is the canonical line with the label column set to an alert class
 // and the declared level raised.
 // invariant: that is the exact byte shape of 348 398 of the pinned corpus's 348 460 labelled lines.
-// refs: DN-43.D14
+// refs: ADR-16.D11
 static constexpr std::string_view kBGLAlertLine =
     "KERNDTLB 1117838570 2005.06.03 R02-M1-N0-C:J12-U11 2005-06-03-15.42.50.675872 "
     "R02-M1-N0-C:J12-U11 RAS KERNEL FATAL data TLB error interrupt";
@@ -1394,7 +1394,7 @@ TEST_F(BGLStrategyTest, DeclinesARecordWhoseFacilityIsAtNeitherPosition)
 // hygiene side.
 // invariant: these two arms are that contrast, and they exist because a reader who checks the
 // verdict at the CONSUMPTION SITE reads the two fields as the same case and gets one backwards.
-// refs: DN-43.D15
+// refs: ADR-16.D11
 TEST_F(BGLStrategyTest, TheDateFieldIsValidatedByTheFormatGateNotAtItsConsumptionSite)
 {
     // invariant: the canonical line with the third field replaced and everything else
@@ -1411,7 +1411,8 @@ TEST_F(BGLStrategyTest, TheDateFieldIsValidatedByTheFormatGateNotAtItsConsumptio
                                "error corrected"};
         EXPECT_DOUBLE_EQ(strategy.confidence(line), 0.0)
             << "variant '" << name
-            << "': the gate IS the grammar (DN-43.D2), so a field the gate refuses must score zero";
+            << "': the gate IS the grammar (ADR-16.D10), so a field the gate refuses must score "
+               "zero";
         EXPECT_FALSE(strategy.parse(line, arena).has_value())
             << "variant '" << name
             << "' PARSED. `<date>` carries a real predicate — the exact "
@@ -1444,7 +1445,7 @@ TEST_F(BGLStrategyTest, TheDateFieldIsValidatedByTheFormatGateNotAtItsConsumptio
 // mounted.
 // invariant: THIS arm pins the behaviour with NO corpus at all, so the ruling is not resting on a
 // gate that skips.
-// refs: DN-43.D15
+// refs: ADR-16.D11
 TEST_F(BGLStrategyTest, ARecordWhoseUnvalidatedNode2HoldsABinaryBlobStillParsesAndPublishesTruth)
 {
     static const std::string kBlobNodeLine{
@@ -1454,7 +1455,7 @@ TEST_F(BGLStrategyTest, ARecordWhoseUnvalidatedNode2HoldsABinaryBlobStillParsesA
     auto result{strategy.parse(kBlobNodeLine, arena)};
     ASSERT_TRUE(result.has_value())
         << "DECLINED: " << result.error()
-        << "\n  a decline here means <node2> acquired a byte-hygiene predicate, which DN-43.D15 "
+        << "\n  a decline here means <node2> acquired a byte-hygiene predicate, which ADR-16.D11 "
            "refuses: the alignment proof sits on the token BEHIND <node2> and succeeds truthfully";
     const auto& pl{result.value()};
     EXPECT_EQ(pl.component, "KERNEL");
@@ -1618,7 +1619,7 @@ TEST_F(ApacheErrorLogStrategyTest, ConfidenceHighForApache)
 // content, putting the whole line on the digest of the empty string.
 // invariant: each case asserts content by EXACT EQUALITY, because a containment assertion holds on
 // both sides of the split it is meant to pin.
-// refs: DN-43.D11, DN-43.D16
+// refs: DN-43.D11, ADR-16.D11
 TEST_F(ApacheErrorLogStrategyTest, UnclosedOptionalBracketsKeepEveryByteInContent)
 {
     static constexpr std::string_view kUnclosedLevel{
@@ -1641,7 +1642,7 @@ TEST_F(ApacheErrorLogStrategyTest, UnclosedOptionalBracketsKeepEveryByteInConten
 
 // invariant: the head bracket must CLOSE for the strategy to claim, so a line whose timestamp
 // bracket never closes is DEMOTED with every byte intact rather than parsed to an empty content.
-// refs: DN-43.D16
+// refs: ADR-16.D11
 TEST_F(ApacheErrorLogStrategyTest, UnclosedTimestampBracketIsNotClaimed)
 {
     static constexpr std::string_view kUnclosedStamp{

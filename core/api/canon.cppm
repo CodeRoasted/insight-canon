@@ -119,7 +119,7 @@ class Tokenizer
     [[nodiscard]] std::size_t events_produced() const noexcept;
     [[nodiscard]] std::size_t lines_parsed() const noexcept;
 
-    // refs: ADR-16.D9, DN-43.D14
+    // refs: ADR-16.D9, ADR-16.D11
     // post: the PROJECTION-TOTALITY count for this stream — lines that had bytes and projected to
     // an empty `content`; a monotonic per-stream total, reset by nothing, read after the walk.
     // invariant: it is NOT a defect count. The population has two members: a genuinely empty body,

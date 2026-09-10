@@ -16,7 +16,7 @@ import insight.canon.detail.scan;
 // declares no severity, so content inference is the correct layer rather than a fallback.
 // invariant: the declared-marker lift still runs afterwards and still outranks it, so a dialect's
 // announced level keeps precedence.
-// refs: ADR-22.D3, DN-43.D2
+// refs: ADR-22.D3, ADR-16.D10
 // invariant: the log macros stay TEXTUAL in the global module fragment, so no first-party
 // declaration leaks through it.
 // refs: ADR-3.D4
@@ -30,7 +30,7 @@ namespace insight::tokenization
 // invariant: bounding it made the no-delimiter branch unreachable FROM HERE, and removing the
 // branch itself mattered because the other caller still reached it.
 // invariant: there it ate 1 309 whole message bodies onto the component field.
-// refs: DN-43.D3, DN-43.D14
+// refs: ADR-16.D10, ADR-16.D11
 std::optional<SyslogHeader> scan_syslog_header(std::string_view line) noexcept
 {
     static constexpr std::size_t kBsdTimeLen{8U};
@@ -73,7 +73,7 @@ std::optional<SyslogHeader> scan_syslog_header(std::string_view line) noexcept
     // word as a hostname, which published a window of application lines as uniformly one level.
     // invariant: its cost is a host literally named after a level, which the raw fallback still
     // templates honestly.
-    // refs: DN-43.D3
+    // refs: ADR-16.D10
     const std::string_view host{sv_take_token(rest)};
     if (host.empty() || host.find_first_of(kHostReject) != std::string_view::npos)
         return std::nullopt;

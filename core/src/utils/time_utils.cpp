@@ -679,12 +679,12 @@ LogLevel parse_log_level(std::string_view level_str) noexcept
                                                                                 : LogLevel::Unknown;
     case 'f':
         // note: BGL emits FAILURE as a top RAS severity, beside FATAL.
-        // refs: DN-43.D14
+        // refs: ADR-16.D11
         return (iequals(level_str, "fatal") || iequals(level_str, "failure")) ? LogLevel::Fatal
                                                                               : LogLevel::Unknown;
     case 's':
         // note: BGL's SEVERE sits between ERROR and FATAL, and LogLevel has no tier there.
-        // refs: DN-43.D14
+        // refs: ADR-16.D11
         return iequals(level_str, "severe") ? LogLevel::Error : LogLevel::Unknown;
     case 'c':
         return (iequals(level_str, "critical") || iequals(level_str, "crit")) ? LogLevel::Fatal

@@ -122,7 +122,7 @@ TEST(FastGatesPrefix, IsoDatetimeSpace)
 
 // invariant: the level bracket must be the NEXT token AND must close — proving CLOSURE here is
 // what lets parse() drop the exit that DELETED a timestamped line whose next token was not `[`.
-// refs: DN-43.D16
+// refs: ADR-16.D11
 TEST(FastGatesPrefix, NginxError)
 {
     EXPECT_TRUE(is_nginx_error_prefix("2024/04/27 10:15:00 [error] 1#1: *5 connect() failed"));
@@ -160,7 +160,7 @@ TEST(FastGatesPrefix, Rfc5424)
 
 // invariant: the head bracket must CLOSE — without that clause parse()'s timestamp take swallowed
 // the whole line and emptied content.
-// refs: DN-43.D16
+// refs: ADR-16.D11
 TEST(FastGatesPrefix, ApacheError)
 {
     EXPECT_TRUE(is_apache_error_prefix("[Tue Apr 27 10:15:22 2024] [error] [client 1.2.3.4]"));
@@ -179,7 +179,7 @@ TEST(FastGatesPrefix, BglHealthAppHpc)
 
     // invariant: the alert-label column is a dash or a BOUNDED uppercase class name, and nothing
     // else.
-    // refs: DN-43.D14
+    // refs: ADR-16.D11
     EXPECT_TRUE(is_bgl_labelled_prefix(
         "KERNDTLB 1117838570 2005.06.03 R02-M1-N0-C:J12-U11 RAS KERNEL FATAL"));
     EXPECT_TRUE(
@@ -197,7 +197,7 @@ TEST(FastGatesPrefix, BglHealthAppHpc)
     // reason its text NAMES and not for its arity.
     // invariant: before that rule landed these two carried ONE separator each, which made the
     // second arm's green a statement about SEPARATOR COUNT rather than about field width.
-    // refs: DN-43.D16, MEM:synthetic-gate-vacuity-vs-judgment
+    // refs: ADR-16.D11, MEM:synthetic-gate-vacuity-vs-judgment
     EXPECT_TRUE(is_health_app_prefix("20171223-2:15:29:606|c|1|single-digit hour"));
     EXPECT_FALSE(is_health_app_prefix("20171223 22:15:29:606|c|1|space, not dash"));
 
@@ -226,7 +226,7 @@ TEST(FastGatesPrefix, BglHealthAppHpc)
     // at all.
     // invariant: both now score zero and are demoted to raw text, which keeps every byte, instead
     // of being parsed into a lie.
-    // refs: DN-43.D16
+    // refs: ADR-16.D11
     EXPECT_FALSE(is_health_app_prefix("20171223-22:15:29:606|onStandStepChanged 3579"))
         << "one separator: a four-field record's arity is not proven by its head";
     EXPECT_FALSE(is_health_app_prefix("20171223-22:15:29:606|Step_LSC|onStandStepChanged 3579"))
@@ -244,7 +244,7 @@ TEST(FastGatesPrefix, BglHealthAppHpc)
 
 // invariant: the predicate proves the WHOLE record from byte 0 — a stamp SOMEWHERE in the line is
 // no longer a claim, because the parse it gates has no exit left that could delete the line.
-// refs: DN-43.D16
+// refs: ADR-16.D11
 TEST(FastGatesPrefix, ClfRecordPrefix)
 {
     EXPECT_TRUE(is_clf_record_prefix(
@@ -332,7 +332,7 @@ TEST(FastGatesScan, SvTakeUntilTakeN)
 // invariant: the raw forms it replaces handed back the whole remainder and emptied the view.
 // invariant: the raw sv_take_bracketed and sv_take_quoted are deleted, so no caller can reach that
 // branch through the bracket or the quote door any more.
-// refs: ADR-16.D9, DN-43.D11, DN-92.D2
+// refs: ADR-16.D9, DN-43.D11, ADR-16.D12
 TEST(FastGatesScan, SvTakeBracketedAndQuotedDeclineWhenTheTerminatorIsAbsent)
 {
     std::string_view sv{"[27/Apr/2024:10:15:00] rest"};

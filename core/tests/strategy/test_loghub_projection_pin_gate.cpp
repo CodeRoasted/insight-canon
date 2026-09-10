@@ -43,7 +43,7 @@
 // which returns BGL's RawText count to 348 460 against a pinned 10.
 // invariant: determinism — byte-only, single-threaded, committed file order, integer counts, no
 // RNG, no clock, no float, no threads, and the arena reset per line as the shipping ingest does.
-// refs: ADR-16.D9, DN-43.D14, DN-43.D15, ADR-17.D1
+// refs: ADR-16.D9, ADR-16.D11, ADR-17.D1
 #include <gtest/gtest.h>
 
 import std;
@@ -73,7 +73,7 @@ struct CorpusPin
     std::uint64_t lines;
     // invariant: re-derived at this desk after the alert-label slice landed, against a stated
     // canonicalization generation.
-    // refs: DN-43.D14
+    // refs: ADR-16.D11
     std::uint64_t raw_text_lines;
     std::uint64_t empty_projections;
     // invariant: the BINARY population is here to keep the RawText pin's REASON honest and not only
@@ -106,7 +106,7 @@ constexpr std::array<CorpusPin, 2> kPins{{
      // because the splice is multi-token so the alignment probe fails at BOTH positions.
      // invariant: so no line in this corpus is both binary and declining, which is asserted below
      // and never assumed.
-     // refs: DN-43.D14, DN-43.D15
+     // refs: ADR-16.D11
      .raw_text_lines = 10U,
      // invariant: a complete header with no message, which is the ruling's legitimate member —
      // 0.73 % of the corpus.
@@ -115,7 +115,7 @@ constexpr std::array<CorpusPin, 2> kPins{{
      // measured by byte scan over the pinned file on 2026-09-02; all 12 parse.
      .nonprintable_lines = 12U,
      .raw_text_and_nonprintable = 0U,
-     .why = "BGL: the alert-labelled RAS shape, claimed by BGLStrategy since DN-43.D14"},
+     .why = "BGL: the alert-labelled RAS shape, claimed by BGLStrategy since ADR-16.D11"},
     {.file = "Thunderbird_5M.log",
      .bytes = 868147617U,
      .lines = 5000000U,
@@ -129,7 +129,7 @@ constexpr std::array<CorpusPin, 2> kPins{{
      // invariant: so the ruling's own arithmetic reads 40 959 after the slice it ordered.
      // invariant: that movement is what this pin exists to have caught, and it is why a number
      // living only in a design note is not a pin.
-     // refs: DN-43.D14
+     // refs: ADR-16.D11
      .empty_projections = 6489U,
      .nonprintable_lines = 0U,
      .raw_text_and_nonprintable = 0U,
@@ -251,7 +251,7 @@ class LogHubProjectionPinGate : public ::testing::Test
             // TEMPLATE, which additionally catches a content of pure whitespace.
             // invariant: so this histogram is an UPPER BOUND on the counter, which is exactly why
             // it is a diagnostic and the ASSERTION reads the shipped counter instead.
-            // refs: DN-43.D14
+            // refs: ADR-16.D11
             if (event->template_str.empty())
                 ++walked.empty_projection_components[std::string{event->component}];
             arena.reset();
@@ -290,19 +290,19 @@ TEST_F(LogHubProjectionPinGate, EveryPinnedCorpusHoldsItsDeclineAndEmptyProjecti
 
         EXPECT_EQ(walked.raw_text, pin.raw_text_lines)
             << pin.why << "\n  format=RawText lines: got " << walked.raw_text << ", pinned "
-            << pin.raw_text_lines << " (DN-43.D14 (3): what fails the grammar's own validation is "
+            << pin.raw_text_lines << " (ADR-16.D11: what fails the grammar's own validation is "
             << "DECLINED to RawText, and nothing else is).\n  partition: lines=" << walked.lines
             << " non-empty=" << walked.nonempty << " declined-by-the-pipeline=" << walked.declined
             << " raw-text=" << walked.raw_text;
 
         // invariant: the pin's REASON and not only its value, because the ruling got the reason
         // wrong.
-        // refs: DN-43.D14
+        // refs: ADR-16.D11
         EXPECT_EQ(walked.nonprintable, pin.nonprintable_lines)
             << pin.why << "\n  lines carrying a control byte: got " << walked.nonprintable
             << ", pinned " << pin.nonprintable_lines
             << ". On BGL the 12 are 8 with a blob where <node2> sits plus 4 with a NUL in the "
-               "message body; all 12 PARSE, because DN-43.D15 rules a consumed-but-unpublished "
+               "message body; all 12 PARSE, because ADR-16.D11 rules a consumed-but-unpublished "
                "field is validated only where its value proves the record's FIELD ALIGNMENT, and "
                "<node2> proves nothing.";
 
@@ -322,7 +322,7 @@ TEST_F(LogHubProjectionPinGate, EveryPinnedCorpusHoldsItsDeclineAndEmptyProjecti
             << "\n  empty projections (Tokenizer::empty_projections(), the ADR-16.D9 "
                "projection-totality counter): got "
             << walked.empty_projections << ", pinned " << pin.empty_projections
-            << ".\n  THIS IS A SUM, NOT A DEFECT COUNT (DN-43.D14 (4)): member (a) is a genuinely "
+            << ".\n  THIS IS A SUM, NOT A DEFECT COUNT (ADR-16.D9): member (a) is a genuinely "
                "empty body and is the CORRECT identity for a content-less line; member (b) is a "
                "body moved onto a cube dimension. The component histogram below separates them ON "
                "A SYSLOG-SHAPED GRAMMAR ONLY — on BGL the component is a header field (KERNEL), so "
@@ -338,10 +338,10 @@ TEST_F(LogHubProjectionPinGate, EveryPinnedCorpusHoldsItsDeclineAndEmptyProjecti
     // invariant: the figure the ruling states as a single number across both corpora, pinned as the
     // SUM of the two per-corpus pins rather than as a third independent constant.
     // invariant: a total that could disagree with its own addends is a fourth number to keep true.
-    // refs: DN-43.D14
+    // refs: ADR-16.D11
     constexpr std::uint64_t kExpectedTotal{kPins[0].empty_projections + kPins[1].empty_projections};
     EXPECT_EQ(total_empty, kExpectedTotal)
-        << "the cross-corpus empty-projection total DN-43.D14 (4) names: got " << total_empty
+        << "the cross-corpus empty-projection total ADR-16.D9 names: got " << total_empty
         << ", pinned " << kExpectedTotal
         << ". The ruling's own text says 34 470 + 6 508 = 40 978, measured before its clause (3) "
            "landed; after the slice it ordered the figure is 34 470 + 6 489 = 40 959.";

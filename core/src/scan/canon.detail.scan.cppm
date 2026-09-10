@@ -222,12 +222,12 @@ constexpr std::size_t kNginxTimestampLen{19U};
     return pos < str.size() && (str[pos] == '.' || str[pos] == ',');
 }
 
-// refs: DN-43.D11, DN-43.D16
+// refs: DN-43.D11, ADR-16.D11
 // invariant: the level bracket is proven to be the NEXT token AND to close, so parse()'s take is
 // total and its level-empty exit — which DELETED the line — is gone.
 // invariant: the whitespace run is unbounded exactly as parse()'s sv_skip_ws is; the bounded scan
 // this replaces accepted a `[` that was not the next token at all.
-// refs: DN-43.D19
+// refs: ADR-16.D11
 // post: true, with `ts_start` at the offset where the ISO datetime begins, when the line carries
 // one at byte 0 or after a whitespace-delimited leading token.
 // invariant: the search for the optional leading prefix is BOUNDED, so a line carrying no
@@ -365,7 +365,7 @@ constexpr std::size_t kNginxTimestampLen{19U};
     return match_iso_date_at(str, skip_spaces(str, pos));
 }
 
-// refs: DN-43.D16
+// refs: ADR-16.D11
 // invariant: the head bracket must CLOSE, which is what makes parse()'s timestamp take total and
 // retires the empty-result guard that byte 1 being uppercase had already made unreachable.
 [[nodiscard]] constexpr bool is_apache_error_prefix(std::string_view str) noexcept
@@ -399,7 +399,7 @@ constexpr std::size_t kNginxTimestampLen{19U};
     return is_upper(chr) || is_digit(chr) || chr == '_';
 }
 
-// refs: DN-43.D14
+// refs: ADR-16.D11
 // invariant: the alert-class column is part of the GRAMMAR and of NO projection field — an
 // instrument must never ingest its own oracle as a feature.
 // note: the column is the corpus curators' answer key, written by no producer.
@@ -424,7 +424,7 @@ constexpr std::size_t kNginxTimestampLen{19U};
         while (pos < str.size() && pos < kBglLabelMaxLen && is_bgl_identifier_byte(str[pos]))
             ++pos;
     }
-    // refs: DN-43.D2
+    // refs: ADR-16.D10
     // assert: the label is a TOKEN and must end at whitespace — otherwise the length bound
     // silently truncates an over-long run and hands `<epoch>` a suffix of it.
     if (pos >= str.size() || !is_space(str[pos]))
@@ -478,7 +478,7 @@ constexpr std::size_t kNginxTimestampLen{19U};
         return false;
     if (pos >= str.size() || str[pos] != '|')
         return false;
-    // refs: DN-43.D16
+    // refs: ADR-16.D11
     // assert: proving the two remaining separators HERE is what makes parse()'s three unconditional
     // takes total.
     // note: a parse()-side decline deletes the line; a decline here demotes it to raw text.
@@ -547,7 +547,7 @@ constexpr std::size_t kNginxTimestampLen{19U};
     return match_time_at(str, pos + kClfTimeAt);
 }
 
-// refs: DN-92.D2
+// refs: ADR-16.D12
 // post: the index of the `"` that CLOSES a quoted field opening at str[0], or npos when `str` does
 // not open with `"` or the field never terminates.
 // invariant: a backslash consumes the next byte, so an escaped quote never terminates the field,
@@ -573,7 +573,7 @@ constexpr std::size_t kNginxTimestampLen{19U};
     return std::string_view::npos;
 }
 
-// refs: DN-43.D1, DN-43.D11, DN-43.D16
+// refs: ADR-16.D10, DN-43.D11, ADR-16.D11
 // invariant: the WHOLE record is proven from byte 0 — three leading tokens, the bracketed stamp
 // AND its close, the quoted request AND its close, then a three-digit status.
 // invariant: so CLFStrategy::parse keeps ONE guard and carries no exit that could DELETE a line
@@ -795,7 +795,7 @@ inline void sv_skip_ws(std::string_view& str) noexcept
     return result;
 }
 
-// refs: DN-92.D2, ADR-16.D9
+// refs: ADR-16.D12, ADR-16.D9
 // post: the interior of a CLF quoted field, `str` advanced past the closing `"`; on a view not
 // opening `"`, or one whose field never terminates, an empty result and `str` UNTOUCHED.
 // invariant: the bytes are NOT unescaped — the result stays a view into the arena-stable line, so
@@ -812,7 +812,7 @@ inline void sv_skip_ws(std::string_view& str) noexcept
     return result;
 }
 
-// refs: DN-43.D19
+// refs: ADR-16.D11
 // post: the interior of a BALANCED `[`...`]`, `str` advanced past the close at depth 0; on a view
 // not opening `[`, or one whose brackets never balance, an empty result and `str` UNTOUCHED.
 // invariant: opt-in at the seat whose grammar is balanced — sv_take_bracketed_or_none stays
@@ -845,7 +845,7 @@ sv_take_balanced_bracketed_or_none(std::string_view& str) noexcept
     return {};
 }
 
-// refs: DN-43.D3, DN-43.D11, ADR-16.D9
+// refs: ADR-16.D10, DN-43.D11, ADR-16.D9
 // post: a tag bounded to ONE token ending in `:`, or in `[pid]:` closing inside that token,
 // returned with its pid stripped and `str` left at the message body.
 // invariant: when no tag is delimited NOTHING is removed — the result is empty and `str` is

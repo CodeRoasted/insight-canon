@@ -200,7 +200,7 @@ fix.
 `BGLStrategy`'s grammar gains LogHub's leading alert-class column — `-` on a normal record,
 `[A-Z][A-Z0-9_]{0,15}` on an anomalous one — which the predicate VALIDATES and every projection
 field DROPS, because the column is the corpus curators' answer key rather than producer content
-(DN-43.D14).
+(ADR-16.D11).
 
 The bump is owed because the **rule's own acceptance set widens**: 348 460 of the pinned `BGL.log`'s
 4 747 963 lines and 226 095 of `Thunderbird_5M.log`'s 5 000 000 move from a whole-line raw-text
@@ -213,7 +213,7 @@ Three narrower moves ride the same generation, all in the same strategy:
 
 * a second BGL header shape (306 lines with no repeated node) parses instead of yielding `level`
   Unknown and `component` = `FATAL`;
-* the Thunderbird branch takes DN-43.D3's one-token tag bound, so 405 401 lines stop having a
+* the Thunderbird branch takes ADR-16.D10's one-token tag bound, so 405 401 lines stop having a
   message fragment cut onto `component` and 1 309 of those stop projecting to empty content
   entirely;
 * 10 BGL lines whose `<node2>` field holds a spliced message fragment now DECLINE to raw text
@@ -265,7 +265,7 @@ comparability event whether that cut carries `-14` or `-15`. What it costs is re
 `HealthApp_2k.log` is not zero-padded anywhere, so 247 of its 2 000 lines (12.35 %) were declined
 to RawText, where the whole line — timestamp and process id included — became the template. The
 predicate now accepts 1–2 digits per clock field and 1–3 millisecond digits, and
-`parse_health_app_ts` widens its minute to match (DN-43.O5; DN-43.D16 for the arity half).
+`parse_health_app_ts` widens its minute to match (DN-43.O5; ADR-16.D11 for the arity half).
 
 **Measured** over that corpus through the public `Tokenizer::process_line` at a zero-package
 composition: routing 1 753 HealthApp / 247 RawText → 2 000 HealthApp / 0 RawText; sum of
