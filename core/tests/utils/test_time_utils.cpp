@@ -191,7 +191,7 @@ TEST(ParseLogLevel, CritAlias)
 // tier its severity NUMBER maps to — 5 Info, 1 Fatal, 0 Fatal.
 // invariant: the three that were absent are exactly the three that disagreed with the ladder; every
 // name already present agreed with it.
-// refs: DN-93.D1
+// refs: ADR-20.D16
 TEST(ParseLogLevel, SyslogSeverityNamesMapToTheirNumericTier)
 {
     EXPECT_EQ(parse_log_level("notice"), LogLevel::Info) << "syslog severity 5";
@@ -204,7 +204,7 @@ TEST(ParseLogLevel, SyslogSeverityNamesMapToTheirNumericTier)
 
 // invariant: the switch dispatches on the FIRST BYTE, so each new case must reject every other word
 // starting with it — an over-matching case would confer Fatal on ordinary infrastructure English.
-// refs: DN-93.D1, DN-93.D4
+// refs: ADR-20.D16
 TEST(ParseLogLevel, TheNewFirstByteCasesRejectTheirNeighbours)
 {
     EXPECT_EQ(parse_log_level("error"), LogLevel::Error) << "severity 3 and 0 share a first byte";
@@ -240,7 +240,7 @@ TEST(ParseLogLevel, UnknownReturnsUnknown)
 // load-bearing for a word it was not sized for.
 // invariant: the corpus returns 0 benign occurrences, but loghub carries no monitoring-stack log at
 // all, so that 0 does not cover the domain where the risk lives.
-// refs: DN-93.D4
+// refs: ADR-20.D16
 TEST(InferLeadingLogLevel, AlertConfersFatalOnlyWhenTheStandingGuardHolds)
 {
     EXPECT_EQ(infer_leading_log_level("combo logrotate: ALERT exited abnormally with [1]"),
@@ -259,7 +259,7 @@ TEST(InferLeadingLogLevel, AlertConfersFatalOnlyWhenTheStandingGuardHolds)
 // consulted, so a `notice` in the leading window suppresses the failure-cue stage for that line.
 // invariant: it is a recall loss rather than a precision loss, and it is the one cost that the
 // three lexicon additions carry between them.
-// refs: DN-93.D4, DN-93.O1
+// refs: ADR-20.D16
 TEST(InferLeadingLogLevel, ALeadingNoticeSuppressesTheFailureCueStageAndThatIsTheDeclaredCost)
 {
     static constexpr std::string_view kCue{"caught SIGTERM, the upstream connection failed"};

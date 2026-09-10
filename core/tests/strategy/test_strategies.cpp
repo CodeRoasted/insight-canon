@@ -1584,7 +1584,7 @@ class ApacheErrorLogStrategyTest : public ::testing::Test
 // 1 405 of the 2 000 Apache sample records and this suite was green throughout.
 // invariant: this is a DECLARED SLOT: the producer put the word in the position its own format
 // reserves for the level, so the lexicon is decoding here and never detecting.
-// refs: DN-93.D1, DN-93.D2
+// refs: ADR-20.D16
 TEST_F(ApacheErrorLogStrategyTest, ParsesNoticeLevel)
 {
     auto result{strategy.parse(kApacheErrorLine, arena)};

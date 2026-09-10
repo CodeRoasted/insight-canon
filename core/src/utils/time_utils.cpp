@@ -638,7 +638,7 @@ std::optional<Timestamp> parse_log4j_timestamp(std::string_view timestamp_str) n
     return std::chrono::system_clock::from_time_t(utc_mktime(parsed_tm));
 }
 
-// refs: DN-93.D1
+// refs: ADR-20.D16
 // invariant: a word that IS a syslog severity name maps to the tier its severity NUMBER maps to —
 // the same 0-7 ladder rfc5424 and systemd_journal already decode, never a private judgment.
 // invariant: the additive vocabulary that is NOT a syslog name — trace, dbg, information, severe,
@@ -652,11 +652,11 @@ LogLevel parse_log_level(std::string_view level_str) noexcept
     {
     case 'a':
         // note: syslog severity 1, so Fatal by the ladder rule, never by judgment.
-        // refs: DN-93.D1
+        // refs: ADR-20.D16
         return iequals(level_str, "alert") ? LogLevel::Fatal : LogLevel::Unknown;
     case 'n':
         // note: syslog severity 5, the tier `info` at severity 6 already maps to.
-        // refs: DN-93.D1
+        // refs: ADR-20.D16
         return iequals(level_str, "notice") ? LogLevel::Info : LogLevel::Unknown;
     case 't':
         return iequals(level_str, "trace") ? LogLevel::Trace : LogLevel::Unknown;
@@ -672,7 +672,7 @@ LogLevel parse_log_level(std::string_view level_str) noexcept
                                                                              : LogLevel::Unknown;
     case 'e':
         // note: severity 3 is Error and severity 0 is Fatal, so the two `e` names split.
-        // refs: DN-93.D1
+        // refs: ADR-20.D16
         if (iequals(level_str, "error") || iequals(level_str, "err"))
             return LogLevel::Error;
         return (iequals(level_str, "emerg") || iequals(level_str, "emergency")) ? LogLevel::Fatal

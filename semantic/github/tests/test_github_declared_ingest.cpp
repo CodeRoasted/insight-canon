@@ -140,7 +140,7 @@ TEST(GithubDeclaredIngest, AnUndeclaredStreamGetsNoDeclaredLift)
     // `notice`, so the generic inference now reads Info from this marker on its own.
     // assert: Unknown was a PROXY for "no lift fired", and the proxy stopped being sound the day
     // the two species began to agree on the value.
-    // refs: DN-93.D1, DN-93.D2
+    // refs: ADR-20.D16
     EXPECT_FALSE(event->declared_level)
         << "a dialect-gated level lift fired on a stream that declared NO dialect — fail-closed on "
            "depth is not optional; got "
