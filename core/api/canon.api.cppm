@@ -1235,7 +1235,7 @@ namespace detail
     // of the two a residual line is without re-listing the vocabulary on its own side.
     // invariant: pure byte compare plus ASCII case fold, order-independent, so cross-stdlib
     // bit-identical.
-    // refs: DN-37.D20, BIB:determinism_model
+    // refs: ADR-8.D12, BIB:determinism_model
     [[nodiscard]] bool is_failure_lexicon_word(std::string_view token) noexcept;
 
     // pre: token MUST be a sub-view of line — the kernel recovers surrounding bytes by pointer

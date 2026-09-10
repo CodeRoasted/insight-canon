@@ -315,7 +315,7 @@ namespace detail
 {
     // post: true iff the token is in kFailureLexicon - membership, never firing, and role-blind.
     // note: exposed so an instrument never re-lists the vocabulary and goes stale when it grows.
-    // refs: DN-37.D20
+    // refs: ADR-8.D12
     [[nodiscard]] bool is_failure_lexicon_word(std::string_view token) noexcept
     {
         for (const FailureWord& entry : kFailureLexicon)

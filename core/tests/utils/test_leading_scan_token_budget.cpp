@@ -245,7 +245,7 @@ TEST(LeadingScanTokenBudget, ANestedRecordsLowercaseErrorAtIndexElevenIsTheDecla
     const std::string_view token{std::string_view{declined}.substr(word.byte, word.size)};
     // invariant: condition (b) — membership is asked of the SHIPPED table and never re-listed
     // here, because a row that enumerates the vocabulary goes stale the day one word is added.
-    // refs: DN-37.D20
+    // refs: ADR-8.D12
     ASSERT_TRUE(insight::utils::detail::is_failure_lexicon_word(token))
         << "fixture error: `" << token
         << "` is not a kFailureLexicon word — that is class R1 (invisible to every register), not "

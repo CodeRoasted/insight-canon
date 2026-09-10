@@ -462,7 +462,7 @@ struct NestedLine
     std::string_view lexeme{};
     // invariant: the product's own predicate, never a re-listing — a local copy goes stale in
     // silence the day a word is added.
-    // refs: DN-37.D20
+    // refs: ADR-8.D12
     bool in_stage2_lexicon{false};
     // invariant: meaningful only where `in_stage2_lexicon` holds — the kernel is reached only
     // after a lexicon match.
@@ -1311,7 +1311,7 @@ void print_unread_partition(const NestedResidual& nested)
                  nested.r3_verdict_anchored, percent(nested.r3_verdict_anchored, r3),
                  nested.r3_in_lexicon_and_anchored, percent(nested.r3_in_lexicon_and_anchored, r3));
     std::println("      lexeme histograms (casefolded; membership by the SHIPPED "
-                 "kFailureLexicon test, never a re-listing — DN-37.D20)");
+                 "kFailureLexicon test, never a re-listing — ADR-8.D12)");
     std::println("        R1:{}", lexeme_cells(nested.r1_lexemes));
     std::println("        R2:{}", lexeme_cells(nested.r2_lexemes));
     std::println("        R3:{}", lexeme_cells(nested.r3_lexemes));
