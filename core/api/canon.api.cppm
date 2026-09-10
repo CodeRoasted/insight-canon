@@ -1408,7 +1408,8 @@ parse_unix_nano_timestamp(std::string_view timestamp_str) noexcept;
 [[nodiscard]] std::optional<Timestamp> parse_compact_date_time(std::string_view date,
                                                                std::string_view time) noexcept;
 
-// post: a Spark-style short-year date and time, 19 characters.
+// post: a Spark-style short-year date and time, `YY/MM/DD HH:MM:SS` — 17 characters, which is a
+// FLOOR and not a fixed width: a longer input's tail is ignored.
 [[nodiscard]] std::optional<Timestamp>
 parse_short_year_slash(std::string_view timestamp_str) noexcept;
 
@@ -1416,7 +1417,8 @@ parse_short_year_slash(std::string_view timestamp_str) noexcept;
 [[nodiscard]] std::optional<Timestamp>
 parse_apache_error_ts(std::string_view timestamp_str) noexcept;
 
-// post: a HealthApp compact timestamp, up to 22 characters.
+// post: a HealthApp compact timestamp — `YYYYMMDD-` then three VARIABLE-width clock fields and a
+// millisecond terminator, so 15 characters is the FLOOR and no fixed width exists.
 [[nodiscard]] std::optional<Timestamp> parse_health_app_ts(std::string_view timestamp_str) noexcept;
 
 // post: an ISO-like timestamp with comma or dot milliseconds; unlike the ISO 8601 parser this
