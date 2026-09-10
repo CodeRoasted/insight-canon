@@ -292,7 +292,7 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/insight_canon-config.cmake
 ###########################################################
 #  Measurement instruments (tools/) — built on the package's own compile surface
 ###########################################################
-# The F13 masker-cardinality re-measure (DN-18.D1 § 3.3): a CLI over the PUBLIC
+# The F13 masker-cardinality re-measure (ADR-8.D5): a CLI over the PUBLIC
 # facade, deliberately NOT a test — its population is operator-mounted, so it reports and declares
 # rather than asserts. Built unconditionally so it can never rot unseen (the malf one-compile-surface
 # rule), linked exactly as an external consumer would link.

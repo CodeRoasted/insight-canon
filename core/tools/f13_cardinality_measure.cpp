@@ -1,4 +1,4 @@
-// refs: DN-18.D1, ADR-16.D5, ADR-17.D1
+// refs: ADR-8.D5, ADR-16.D5, ADR-17.D1
 #include <cstdio>
 
 import std;

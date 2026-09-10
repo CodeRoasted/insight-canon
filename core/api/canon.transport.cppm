@@ -53,7 +53,7 @@ enum class TransportTransformKind : std::uint8_t
 {
     // invariant: a fixed-width timestamp stamped at the head of EVERY line by the delivery layer.
     LinePrefixTimestamp = 0,
-    // refs: ADR-8, ADR-23.D6, ADR-23.O2, BIB:jenkins_dialect, DN-15
+    // refs: ADR-8, ADR-23.D6, ADR-23.O2, BIB:jenkins_dialect, DN-62.D11
     // invariant: a BRACKETED strict-RFC3339 stamp at the head of every line of a declared stream,
     // VARIABLE width: bracket, the shared datetime grammar, bracket, then the strip.
     // invariant: that grammar has ONE owner — the shared datetime-length function — and both
