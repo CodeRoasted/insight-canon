@@ -58,7 +58,7 @@ namespace
 
     // post: registers no name, leaves initialised() false and does not consume init_flag(), so a
     // later init_logging() still wins whatever logged first.
-    // refs: DN-53
+    // refs: ADR-5.D1
     std::shared_ptr<spdlog::logger> quiet_logger()
     {
         static const std::shared_ptr<spdlog::logger> logger{
