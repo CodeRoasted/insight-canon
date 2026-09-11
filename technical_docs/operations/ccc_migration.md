@@ -268,6 +268,7 @@ block.
 
 1. **The eidos CR comment contradicts canon — Hephaïstos, with Kleio.** As above. The block's
    numbers are correct and worth keeping; its opening premise is not.
+   DISCHARGED 2026-09-11 `insight-eidos 79622fb` — re-derived at canon first: `is_intent_trim_byte` holds `'\r'`, and `canonicalize_intent` trims through `trimmed_intent_name`. The arm itself already asserted the fixed behaviour (zero structural churn) while its comment, its failure message and its NAME still described the defect. All three are repaired, `TrailingCarriageReturnMintsASecondStepIdentity` → `TrailingCarriageReturnDoesNotMintASecondStepIdentity`, with the prevalence measurements kept as the arm's why. Behaviour: `malf test insight-eidos` on clang-21 and on gcc-16.2 alike: `llm` 22/22, root 351/351, `sift` 427/427, `insight-e2e` 169/169 (`fuzz` builds and runs no ctest suite); `malf format --check insight-eidos`: 263 files, 0 violations.
 2. **`kTemplateIdBytes` and `TemplateId::bytes`' extent are two independent literals — Hephaïstos.**
    The reader observed that `template_id.cpp`'s `constexpr std::size_t kTemplateIdBytes{16}` and
    `canon.api.cppm`'s `std::array<std::uint8_t, 16>` are both spelled `16` with neither derived
