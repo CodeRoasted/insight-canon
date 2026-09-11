@@ -18,6 +18,7 @@ import insight.semantic.github;
 
 using insight::canonicalize_intent;
 using insight::discriminant_of;
+using insight::trimmed_intent_name;
 using insight::semantic::ComposedSemantics;
 using insight::semantic::ResolvedStream;
 using insight::tokenization::IntentMarker;
@@ -28,18 +29,6 @@ using insight::transport::PeeledLine;
 
 namespace
 {
-
-// invariant: a RESTATEMENT of canon's trim set, never a fork — `TrimIsCanonInvariant` makes a
-// divergence fail loudly instead of quietly renaming what the producer's name means.
-[[nodiscard]] std::string_view trimmed(std::string_view name)
-{
-    const auto is_trim{[](char byte) { return byte == ' ' || byte == '\t' || byte == '\r'; }};
-    while (!name.empty() && is_trim(name.front()))
-        name.remove_prefix(1);
-    while (!name.empty() && is_trim(name.back()))
-        name.remove_suffix(1);
-    return name;
-}
 
 // note: how many producer names already contain the separator is READABILITY, not correctness
 constexpr std::string_view kPhaseSeparator{" ▸ "};
@@ -151,7 +140,7 @@ struct Bucketed
 
 [[nodiscard]] bool risk_introduced(std::string_view name)
 {
-    return risk_of(trimmed(name)).any() && !risk_of(canonicalize_intent(name)).any();
+    return risk_of(trimmed_intent_name(name)).any() && !risk_of(canonicalize_intent(name)).any();
 }
 
 [[nodiscard]] Bucketed bucket(const Tally& tally)
@@ -160,7 +149,7 @@ struct Bucketed
     for (const std::string& name : tally.names)
     {
         const std::size_t occ{tally.occurrences_by_name.at(name)};
-        const std::string_view rendered{trimmed(name)};
+        const std::string_view rendered{trimmed_intent_name(name)};
         const std::string clazz{canonicalize_intent(name)};
         if (rendered != clazz)
         {
@@ -305,11 +294,11 @@ TEST(MaskedSpanCensus, TheRenderDeltaPredicateAndTheRiskDetectorBothFireAndBothS
     }};
     for (const auto& [name, moves, why] : kDeltaCases)
     {
-        const bool observed{trimmed(name) != canonicalize_intent(name)};
+        const bool observed{trimmed_intent_name(name) != canonicalize_intent(name)};
         EXPECT_EQ(observed, moves)
             << "the render-delta predicate answered " << (observed ? "MOVES" : "unchanged")
             << " for \"" << name << "\" and the case says " << (moves ? "MOVES" : "unchanged")
-            << " — " << why << ".\n  trimmed name : \"" << escaped(trimmed(name))
+            << " — " << why << ".\n  trimmed name : \"" << escaped(trimmed_intent_name(name))
             << "\"\n  class today  : \"" << escaped(canonicalize_intent(name)) << "\"";
     }
     EXPECT_FALSE(discriminant_of("Test (M)").empty())
@@ -325,7 +314,7 @@ TEST(MaskedSpanCensus, TheRenderDeltaPredicateAndTheRiskDetectorBothFireAndBothS
         << "the interior-control flag does not fire on a CR between two words — and an end-trimmed "
            "CR is NOT this case: canon's trim set removes those, this flag is for the ones it "
            "cannot reach.";
-    EXPECT_FALSE(risk_of(trimmed("build \r")).interior_control)
+    EXPECT_FALSE(risk_of(trimmed_intent_name("build \r")).interior_control)
         << "the interior-control flag fires on a CR the trim already removed, so it would charge "
            "`ADR-20.D12` clause 1 for a byte clause 1 never renders.";
     EXPECT_TRUE(
@@ -341,20 +330,6 @@ TEST(MaskedSpanCensus, TheRenderDeltaPredicateAndTheRiskDetectorBothFireAndBothS
         << "a quote that the paren mask REMOVES from the class — class \""
         << canonicalize_intent("deploy (\"eu-west-1\")")
         << "\" — is a hazard clause 1 puts back in front of a reader, and the split must see it.";
-}
-
-TEST(MaskedSpanCensus, TrimIsCanonInvariant)
-{
-    static constexpr std::array<std::string_view, 4> kPadded{
-        {"  macos-14 (15.3)", "macos-14 (15.3)\r", "\tESLint v6 ", "  Lint\t\r"}};
-    for (const std::string_view padded : kPadded)
-    {
-        const std::string_view body{trimmed(padded)};
-        EXPECT_EQ(canonicalize_intent(padded), canonicalize_intent(body))
-            << "canon's trim set and this file's disagree on \"" << escaped(padded) << "\"";
-        EXPECT_EQ(discriminant_of(padded), discriminant_of(body))
-            << "canon's trim set and this file's disagree on \"" << escaped(padded) << "\"";
-    }
 }
 
 TEST(MaskedSpanCensus, TheProducerNameRenderDeltaOnTheMarkerCoverageBank)
@@ -458,7 +433,7 @@ TEST(MaskedSpanCensus, TheProducerNameRenderDeltaOnTheMarkerCoverageBank)
             // readability is how a complete enumeration gets read as a complete disposition.
             for (const std::string& name : tally.names)
             {
-                const std::string_view rendered{trimmed(name)};
+                const std::string_view rendered{trimmed_intent_name(name)};
                 if (rendered.size() > widest[side][kind].size())
                     widest[side][kind] = std::string{rendered};
                 const DisplayRisk risk{risk_of(rendered)};
@@ -503,7 +478,7 @@ TEST(MaskedSpanCensus, TheProducerNameRenderDeltaOnTheMarkerCoverageBank)
             for (const auto& [kind, names] : by_kind)
                 for (const std::string& name : names)
                 {
-                    const std::string_view rendered{trimmed(name)};
+                    const std::string_view rendered{trimmed_intent_name(name)};
                     if (rendered != canonicalize_intent(name))
                         moved[pair].insert(kind);
                     if (risk_introduced(name))
