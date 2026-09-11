@@ -226,4 +226,3 @@ TEST(DetInt128Portable, WeightWideningIsValuePreserving)
 #endif
 
 } // namespace
-// NOLINTEND

@@ -1,6 +1,3 @@
-
-// note: bare and file-wide; measured to silence 4 checks, main's complexity among them.
-// NOLINTBEGIN Test
 #include <algorithm>
 #include <cstdint>
 #include <fstream>
@@ -11,7 +8,7 @@
 #include <spdlog/common.h>
 #include <string>
 #include <vector>
-#if defined(_WIN32)
+#ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>
 #endif
@@ -67,8 +64,8 @@ std::string basename_of(const std::string& path)
 // invariant: drives canon's public API only, over a public corpus — nothing here reveals the
 // moat.
 // refs: BIB:determinism_model
-// note: an escaping exception aborts a standalone proof binary, which is acceptable here.
-// NOLINTNEXTLINE(bugprone-exception-escape)
+// note: an escaping exception aborts a standalone proof binary, and main is its one script.
+// NOLINTNEXTLINE(bugprone-exception-escape,readability-function-cognitive-complexity)
 int main(int argc, char** argv)
 {
     if (argc < 2)
@@ -79,7 +76,7 @@ int main(int argc, char** argv)
 
 // assert: the digest is hashed byte for byte, so the separators must stay LF; Windows std::cout is
 // text mode and would translate them, and POSIX makes this a no-op.
-#if defined(_WIN32)
+#ifdef _WIN32
     (void)_setmode(_fileno(stdout), _O_BINARY);
 #endif
 
@@ -201,11 +198,12 @@ int main(int argc, char** argv)
             for (std::size_t idx{0}; idx < peeled_lines.size(); ++idx)
             {
                 auto event{tokenizer.process_line(peeled_lines[idx])};
+                const auto& observation{observation_times[idx]};
                 // assert: an OBSERVATION time the caller injects, never an ordering key or a replay
                 // input.
                 // refs: ADR-22, ADR-23
-                if (event && observation_times[idx])
-                    event->timestamp = *observation_times[idx];
+                if (event && observation)
+                    event->timestamp = *observation;
                 std::string tmpl{event ? std::string{event->template_str}
                                        : std::string{"<<parse-error>>"}};
                 std::string level{event ? std::string{insight::to_string(event->level)}
@@ -265,4 +263,3 @@ int main(int argc, char** argv)
 
     return 0;
 }
-// NOLINTEND Test
