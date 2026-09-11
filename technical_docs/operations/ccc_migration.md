@@ -5063,6 +5063,7 @@ surface — or the next lane will re-derive the same wall. With that one charact
 `core/src/utils`'s two remaining files are **already read, classed and drafted**: the claims are
 recorded in this ledger's unit-10 entry, the suppression measurements are complete and the four
 dead `readability-magic-numbers` directives are identified with their evidence.
+DISCHARGED 2026-09-11 `malf-toolchain f9fad90` (2026-09-06) — the CCC gate's `refs:` address grammar admits the lowercase clause suffix `registry_grammar_lint` resolves. Re-derived at the artifact: the commit's own message names this lane's 57 live-source occurrences over 8 codes, it is an ancestor of the `malf-toolchain b5e15eee` pin this repo carries today, and this ledger's fifth-run record (the paragraph opening *"The fourth run's blocked road is open"*) confirms it at a real site: 13 `refs-prose` violations go to 0, and a probe `refs:` line of prose still reds. The whole `SRC-<code>` form has since been retired (`LEXICON.md` § Rulings closed, `DN-91.D2`) and the gate's `REF_FORM` no longer admits any `SRC-` spelling (this ledger's recogniser entry above), so no live site depends on the repair any more. No build: this is a disposition of an already-landed instrument change.
 
 **Without that repair, what is still convertible in this repo is `benchmarks/src/` (53) and
 `core/test_package/` (15) — 68 violations, against the 12 276 the repo still carries.** `proof/`
