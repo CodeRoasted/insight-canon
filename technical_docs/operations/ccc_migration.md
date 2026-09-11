@@ -1105,6 +1105,7 @@ bounded by the longest segment"*, which is the claim the code actually keeps.
    `G13-bare` reads 10 against a ceiling of 13 and `G14-sigil` 15 against 20, both after this unit
    and this commit's ledger repair. Advisory today because a sibling repo's census cannot be a
    verdict, and a superproject edit either way.
+   REFUSED 2026-09-11 already clean at HEAD: the two censuses no longer exist. `registry_grammar_lint.py` declares `G13` (bare-code) and `G14` (sigil) SPENT, retired with the `SRC-<code>` form on 2026-09-09 (`coderoast d241aca2`), so there is no ceiling left to bank.
 
 ### Witnesses
 
@@ -2760,6 +2761,7 @@ where `ADR-26.D5` puts a `pre:` at a declaration.
   every repo inherits, and `logcraft` is already ARMED, so an author following the config there reds
   the gate. Not a CCC-unit repair and not this lane's file. **Addressee: the pilot, for Daidalos
   (`ADR-26` owns the grammar) and Argos (the shared config and the lint arms).**
+  REFUSED 2026-09-11 already clean at HEAD: `malf/config/.clang-tidy` lines 90-98 now prescribe `// NOLINTNEXTLINE(readability-function-cognitive-complexity)` on its own line under the `note:` that carries the why, citing `ADR-26.D5` and naming the same-line form as the `trailing-nolint` violation; repaired at `malf-toolchain d4391b4` (2026-09-07). The config and the grammar now say the same thing.
 * **The law-number range moved while this run was reading.** `registry_grammar_lint` now reports
   **15** form-1 declarations with the numbering checked DENSE, and a workspace sweep confirms the
   declared set is dense at 1 through 15 — `15` is declared in `insight-eidos/sift/src/classify/classify.cpp`.
@@ -3261,6 +3263,7 @@ takeable without a range.
    ruling of 2026-09-04. Found by a cold reader, re-derived here at both artifacts. This is not a
    stale sentence: the coverage claim is the argument that pays for the exclusion.
    **Addressee: Argos** — the corpus-gate registry is his.
+   DISCHARGED 2026-09-11 `coderoast 44aaf44d` — the registry record in `scripts/run_corpus_gates.sh` now says all three `MaskedSpanCensus` cases carry the `corpus` label (`CORPUS_SUITES` in `semantic/github/CMakeLists.txt`), none runs in the default `-LE corpus` run, and the bank arm FAILS rather than skips when unmounted. Found open while doing it: the whole script had been a bash syntax error since `coderoast 55f4353f` (2026-09-10, an unescaped apostrophe at line 102), so `--census` could not run at all; repaired in the same commit, `--census` closes against the tree.
 2. **`DN-17.D19` was carrying an argument that is `DN-17.D16`'s**, in `src/github.cppm`. Repaired
    in this unit at the citing site, as `OPS-8.O5` requires; recorded because the false attribution
    was in the prose before the conversion and the same misattribution may stand at other citers of
@@ -3512,12 +3515,14 @@ and **no law block was minted** — this unit consumed no law number.
 3. **Two `insight-canon` census ceilings now over-admit** — the bare-code census reads 10 against a
    ceiling of 13 and the sigil census 11 against 20, both shrunk by this unit converting bare `SRC-`
    prose into `refs:` form. The lint asks for the ceilings to be banked. **Addressee: Argos.**
+   REFUSED 2026-09-11 already clean at HEAD: the two censuses no longer exist. `registry_grammar_lint.py` declares `G13` (bare-code) and `G14` (sigil) SPENT, retired with the `SRC-<code>` form on 2026-09-09 (`coderoast d241aca2`), so there is no ceiling left to bank.
 4. **Discharged rather than open, recorded so it is not re-dispatched**: a sibling repo's ledger
    records two form-3 address defects owed to this lane in this repo's token-index instrument. At
    HEAD both already read correctly and `registry_grammar_lint` reports 0 failures. Nothing owed.
 5. **A measured negative for unit 17's Argos finding**: the corpus-gate registry's record for THIS
    gate is clean — it registers it `RUN`, makes no CI-coverage claim about the default build, and
    the header clause it rides on is true. The defect unit 17 found does not generalise.
+   REFUSED 2026-09-11 not a defect: it records a clean state (this gate's registry record was true); nothing is owed.
 
 ### Witnesses
 
@@ -3690,8 +3695,10 @@ statements and **all eight TRUE** — the second measured negative in a row, aft
    measurement file's two mount-free cases runs on a clean clone. Structurally the same shape as
    unit 17's finding, here without a false registry sentence behind it. **Addressee: Kleio**, with
    **Argos** for the label split.
+   PARTIAL. REFUSED 2026-09-11 for the Argos half (the label split): no build-system change is owed — the label unit is the gtest SUITE, selected by the `CORPUS_SUITES` filter in each `semantic/*/CMakeLists.txt`, so separating the mount-free cases from the corpus arm is a suite rename in the test file, which is Kleio's half.
 5. **Two `insight-canon` census ceilings still over-admit** — unchanged by this unit. Unit 18's
    finding stands. **Addressee: Argos.**
+   REFUSED 2026-09-11 already clean at HEAD: the two censuses no longer exist. `registry_grammar_lint.py` declares `G13` (bare-code) and `G14` (sigil) SPENT, retired with the `SRC-<code>` form on 2026-09-09 (`coderoast d241aca2`), so there is no ceiling left to bank.
 6. **A measured negative against unit 17's registry finding, again.** All three Jenkins gates are
    registered `RUN`, none of the three records makes a CI-coverage claim about the default build,
    and the bare-null record's 75-of-82 narrowing agrees line-for-line with both the gate header and
@@ -3869,6 +3876,7 @@ result.
    source that clause is the subject of a different code's bullet. **Addressee: Daidalos.**
 4. **Two `insight-canon` census ceilings still over-admit and shrank again** — the bare-code census
    now reads 9 against a ceiling of 13 and the sigil census 10 against 20. **Addressee: Argos.**
+   REFUSED 2026-09-11 already clean at HEAD: the two censuses no longer exist. `registry_grammar_lint.py` declares `G13` (bare-code) and `G14` (sigil) SPENT, retired with the `SRC-<code>` form on 2026-09-09 (`coderoast d241aca2`), so there is no ceiling left to bank.
 5. **A measured negative, recorded so it is not re-dispatched.** A design note's standing flag asking
    whoever owns a source comment to reconcile two welded figures is already DISCHARGED at two
    `insight-eidos` sites, which name the two populations separately. **Addressee: Daidalos**, to
@@ -4058,12 +4066,14 @@ gate after the hand edit, which is the step that exists for it.
 4. **Two corpus census scripts cite this file by LINE NUMBER**, and the pointer was already stale
    before this unit moved it. A versioned record rather than a live contract, recorded so it is not
    rediscovered. **Addressee: Argos.**
+   REFUSED 2026-09-11 not a defect: the two scripts are `coderoast-corpora/sift_assessment/1.9.3/{vanished_phase_census,redgreen_tier_census}/run_census.py`, inside a frozen dated assessment that `registry_grammar_lint` exempts as a record shelf; their line pointer into `canon.spi.cppm` records what they read at 1.9.3, and repointing it would make the record lie.
 5. **A code carries a reading its declaring statement does not support, at four sites across two
    packages.** Units 19 and 21 both kept it and both added the owning slot beside it; if the
    cross-repo cascade reaches that code, these four sites are where the two readings meet.
    **Addressee: Daidalos, at the cascade rather than now.**
 6. **Two `insight-canon` census ceilings still over-admit**, unchanged by this unit.
    **Addressee: Argos.**
+   REFUSED 2026-09-11 already clean at HEAD: the two censuses no longer exist. `registry_grammar_lint.py` declares `G13` (bare-code) and `G14` (sigil) SPENT, retired with the `SRC-<code>` form on 2026-09-09 (`coderoast d241aca2`), so there is no ceiling left to bank.
 
 ### Witnesses
 
@@ -4468,6 +4478,7 @@ between them, against the 12 418 the repo still carries.
 a selftest row carrying a suffixed code, since a structural arm proves the shape and not the
 firing. **It is outside this repo and this lane did not make it.** Addressee: the pilot, for
 Argos or Hephaïstos on the `malf` surface.
+REFUSED 2026-09-11 already clean at HEAD: the `SRC-<code>` form this recogniser would have had to widen for was RETIRED on 2026-09-05 (`LEXICON.md` § Rulings closed; the rule is `DN-91.D2`), and `malf/comment_contract_lint.py`'s `REF_FORM` no longer admits any `SRC-` spelling — its selftest carries `refs: SRC-D-FOO-1` as a `refs-prose` violation. There is no suffixed code left to recognise.
 
 ## 21. THE SUPPRESSION MEASUREMENT SILENTLY DOES NOTHING WHEN THE COPY LIVES OUTSIDE THE SOURCE TREE
 
