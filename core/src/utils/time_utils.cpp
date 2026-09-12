@@ -28,7 +28,6 @@ namespace time_constants
     // 1970, so a year outside this window would overflow the conversion.
     inline constexpr int kMinReprYear{1678};
     inline constexpr int kMaxReprYear{2261};
-    inline constexpr int kMaxDayOfMonth{31};
     inline constexpr std::size_t kIso8601MinLength{19};
     inline constexpr std::size_t kBsdSyslogMinLength{15};
     inline constexpr std::size_t kClfMinLength{20};
@@ -82,9 +81,11 @@ namespace
         return true;
     }
 
-    // post: the UTC instant for `utc_tm`, with no local-timezone offset applied; an out-of-range
-    // field returns the epoch sentinel 0 instead of a normalized wrong instant.
-    std::time_t utc_mktime(std::tm& utc_tm) noexcept
+    // post: the UTC instant for `utc_tm` with no local-timezone offset applied, or nullopt when the
+    // month, the year or the day of that month is out of range, never a normalised wrong instant.
+    // invariant: the refusal is an ABSENCE, never a sentinel value: every caller publishes what
+    // this returns as a present timestamp, and a zone offset added to a sentinel is a real instant.
+    std::optional<std::time_t> utc_mktime(const std::tm& utc_tm) noexcept
     {
         const int year{utc_tm.tm_year + time_constants::kTmYearOffset};
         const int month{utc_tm.tm_mon + 1};
@@ -93,11 +94,17 @@ namespace
         // assert: this guard is what keeps the kMonthOffset index and the nanosecond conversion in
         // range; both would otherwise be undefined behaviour.
         if (month < 1 || month > time_constants::kMonthsPerYear)
-            return 0;
+            return std::nullopt;
         if (year < time_constants::kMinReprYear || year > time_constants::kMaxReprYear)
-            return 0;
-        if (utc_tm.tm_mday < 1 || utc_tm.tm_mday > time_constants::kMaxDayOfMonth)
-            return 0;
+            return std::nullopt;
+
+        const bool leap{(year % 4 == 0 && year % time_constants::kCenturyYears != 0) ||
+                        year % time_constants::kLeapCycleYears == 0};
+        constexpr std::array<int, 12> kDaysInMonth{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+        const int days_in_month{kDaysInMonth[static_cast<std::size_t>(month - 1)] +
+                                (month == 2 && leap ? 1 : 0)};
+        if (utc_tm.tm_mday < 1 || utc_tm.tm_mday > days_in_month)
+            return std::nullopt;
 
         // note: 492, 19 and 4 are floor(1969/4), floor(1969/100) and floor(1969/400).
         const std::int64_t days_to_year{
@@ -106,8 +113,6 @@ namespace
 
         constexpr std::array<int, 12> kMonthOffset{0,   31,  59,  90,  120, 151,
                                                    181, 212, 243, 273, 304, 334};
-        const bool leap{(year % 4 == 0 && year % time_constants::kCenturyYears != 0) ||
-                        year % time_constants::kLeapCycleYears == 0};
         const int yday{kMonthOffset[static_cast<std::size_t>(month - 1)] +
                        (month > 2 && leap ? 1 : 0) + utc_tm.tm_mday - 1};
 
@@ -116,6 +121,15 @@ namespace
             (static_cast<std::int64_t>(utc_tm.tm_hour) * time_constants::kSecondsPerHour) +
             (static_cast<std::int64_t>(utc_tm.tm_min) * time_constants::kSecondsPerMinute) +
             utc_tm.tm_sec);
+    }
+
+    // post: utc_mktime's instant as a Timestamp, absent exactly when utc_mktime refuses.
+    std::optional<Timestamp> utc_timestamp(const std::tm& utc_tm) noexcept
+    {
+        const auto utc_seconds{utc_mktime(utc_tm)};
+        if (!utc_seconds.has_value())
+            return std::nullopt;
+        return std::chrono::system_clock::from_time_t(*utc_seconds);
     }
 
     constexpr std::array<std::string_view, 12> kMonthNames{
@@ -191,7 +205,10 @@ std::optional<Timestamp> parse_iso8601(std::string_view timestamp_str) noexcept
     parsed_tm.tm_min = minute;
     parsed_tm.tm_sec = second;
 
-    std::time_t parsed_time{utc_mktime(parsed_tm)};
+    const auto utc_seconds{utc_mktime(parsed_tm)};
+    if (!utc_seconds.has_value())
+        return std::nullopt;
+    std::time_t parsed_time{*utc_seconds};
 
     std::size_t pos{19};
     if (pos < timestamp_str.size() && timestamp_str[pos] == '.')
@@ -278,7 +295,7 @@ std::optional<Timestamp> parse_bsd_syslog_ts(std::string_view timestamp_str,
     parsed_tm.tm_min = minute;
     parsed_tm.tm_sec = second;
 
-    return std::chrono::system_clock::from_time_t(utc_mktime(parsed_tm));
+    return utc_timestamp(parsed_tm);
 }
 
 std::optional<Timestamp> parse_clf_timestamp(std::string_view timestamp_str) noexcept
@@ -324,7 +341,10 @@ std::optional<Timestamp> parse_clf_timestamp(std::string_view timestamp_str) noe
     parsed_tm.tm_min = minute;
     parsed_tm.tm_sec = second;
 
-    std::time_t parsed_time{utc_mktime(parsed_tm)};
+    const auto utc_seconds{utc_mktime(parsed_tm)};
+    if (!utc_seconds.has_value())
+        return std::nullopt;
+    std::time_t parsed_time{*utc_seconds};
 
     if (timestamp_str.size() >= 26 && timestamp_str[20] == ' ')
     {
@@ -423,7 +443,7 @@ std::optional<Timestamp> parse_compact_date_time(std::string_view date,
     parsed_tm.tm_hour = hour;
     parsed_tm.tm_min = minute;
     parsed_tm.tm_sec = second;
-    return std::chrono::system_clock::from_time_t(utc_mktime(parsed_tm));
+    return utc_timestamp(parsed_tm);
 }
 
 std::optional<Timestamp> parse_short_year_slash(std::string_view timestamp_str) noexcept
@@ -472,7 +492,7 @@ std::optional<Timestamp> parse_short_year_slash(std::string_view timestamp_str) 
     parsed_tm.tm_hour = hour;
     parsed_tm.tm_min = minute;
     parsed_tm.tm_sec = second;
-    return std::chrono::system_clock::from_time_t(utc_mktime(parsed_tm));
+    return utc_timestamp(parsed_tm);
 }
 
 std::optional<Timestamp> parse_apache_error_ts(std::string_view timestamp_str) noexcept
@@ -523,7 +543,7 @@ std::optional<Timestamp> parse_apache_error_ts(std::string_view timestamp_str) n
     parsed_tm.tm_hour = hour;
     parsed_tm.tm_min = minute;
     parsed_tm.tm_sec = second;
-    return std::chrono::system_clock::from_time_t(utc_mktime(parsed_tm));
+    return utc_timestamp(parsed_tm);
 }
 
 // invariant: all three clock fields are variable-width, as is the millisecond terminator.
@@ -588,7 +608,7 @@ std::optional<Timestamp> parse_health_app_ts(std::string_view timestamp_str) noe
     parsed_tm.tm_hour = hour;
     parsed_tm.tm_min = minute;
     parsed_tm.tm_sec = second;
-    return std::chrono::system_clock::from_time_t(utc_mktime(parsed_tm));
+    return utc_timestamp(parsed_tm);
 }
 
 std::optional<Timestamp> parse_log4j_timestamp(std::string_view timestamp_str) noexcept
@@ -635,7 +655,7 @@ std::optional<Timestamp> parse_log4j_timestamp(std::string_view timestamp_str) n
     parsed_tm.tm_hour = hour;
     parsed_tm.tm_min = minute;
     parsed_tm.tm_sec = second;
-    return std::chrono::system_clock::from_time_t(utc_mktime(parsed_tm));
+    return utc_timestamp(parsed_tm);
 }
 
 // refs: ADR-20.D16
@@ -829,7 +849,7 @@ std::optional<Timestamp> parse_nginx_error_ts(std::string_view timestamp_str) no
     parsed_tm.tm_hour = hour;
     parsed_tm.tm_min = minute;
     parsed_tm.tm_sec = second;
-    return std::chrono::system_clock::from_time_t(utc_mktime(parsed_tm));
+    return utc_timestamp(parsed_tm);
 }
 
 } // namespace insight::utils

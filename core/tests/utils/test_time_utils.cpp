@@ -64,15 +64,39 @@ TEST(ParseISO8601, LeapDayFeb29ValidYear)
     EXPECT_TRUE(t.has_value());
 }
 
-TEST(ParseISO8601, LeapDayFeb29NonLeapYearNormalises)
+// invariant: a day past its month's length is REFUSED as an absence, never normalised into the next
+// month: 2023-02-29 is no instant, and 2023-03-01 is a different one published with no signal.
+// invariant: the offset forms are the load-bearing half: a zone offset added to a refusal SENTINEL
+// would publish an instant near 1970, so a refusal must be absent before any offset applies.
+TEST(ParseISO8601, DayPastItsMonthIsRefused)
 {
-    // invariant: a leap day in a NON-leap year is NORMALIZED rather than refused, and the function
-    // must neither crash nor return an absence.
-    auto t{parse_iso8601("2023-02-29T00:00:00Z")};
-    EXPECT_TRUE(t.has_value());
-    auto expected{parse_iso8601("2023-03-01T00:00:00Z")};
-    ASSERT_TRUE(expected.has_value());
-    EXPECT_EQ(to_tt(*t), to_tt(*expected));
+    for (const char* impossible :
+         {"2023-02-29T00:00:00Z", "2023-02-29T00:00:00+02:00", "2023-02-29T00:00:00-0700",
+          "2024-02-30T12:00:00Z", "2023-04-31T12:00:00Z", "2023-11-31T12:00:00Z",
+          "2023-01-00T12:00:00Z", "2023-01-32T12:00:00Z"})
+    {
+        const auto parsed{parse_iso8601(impossible)};
+        EXPECT_FALSE(parsed.has_value())
+            << impossible << " is no instant, yet it parsed to epoch second " << to_tt(*parsed);
+    }
+    for (const char* real :
+         {"2024-02-29T00:00:00Z", "2023-02-28T23:59:59+02:00", "2023-04-30T12:00:00Z",
+          "2023-12-31T23:59:59Z", "2000-02-29T00:00:00Z"})
+        EXPECT_TRUE(parse_iso8601(real).has_value())
+            << real << " is a real instant and was refused";
+}
+
+// invariant: an out-of-range MONTH is refused as an absence with or without an offset, the
+// pre-existing guard carried by the same absence.
+TEST(ParseISO8601, MonthOutOfRangeIsRefusedWithAnOffset)
+{
+    for (const char* impossible : {"2023-13-01T00:00:00Z", "2023-13-01T00:00:00+02:00",
+                                   "2023-00-10T00:00:00-05:00", "1600-01-01T00:00:00+01:00"})
+    {
+        const auto parsed{parse_iso8601(impossible)};
+        EXPECT_FALSE(parsed.has_value())
+            << impossible << " is out of range, yet it parsed to epoch second " << to_tt(*parsed);
+    }
 }
 
 TEST(ParseISO8601, CompactTimezoneWithoutColon)
@@ -105,11 +129,18 @@ TEST(ParseBSDSyslog, InvalidMonthReturnsNullopt)
     EXPECT_FALSE(parse_bsd_syslog_ts("Xxx 15 08:03:22").has_value());
 }
 
-TEST(ParseBSDSyslog, OutOfRangeDayNormalises)
+// invariant: an impossible day is REFUSED as an absence, and Feb 29 follows the INJECTED reference
+// year's calendar, since RFC3164 carries no year of its own.
+TEST(ParseBSDSyslog, OutOfRangeDayIsRefused)
 {
-    // invariant: an impossible day is normalized rather than refused, so the parser must not crash
-    // and must return a value.
-    EXPECT_TRUE(parse_bsd_syslog_ts("Feb 30 12:00:00").has_value());
+    const auto feb30{parse_bsd_syslog_ts("Feb 30 12:00:00")};
+    EXPECT_FALSE(feb30.has_value()) << "Feb 30 parsed to epoch second " << to_tt(*feb30);
+    const auto apr31{parse_bsd_syslog_ts("Apr 31 12:00:00")};
+    EXPECT_FALSE(apr31.has_value()) << "Apr 31 parsed to epoch second " << to_tt(*apr31);
+    EXPECT_FALSE(parse_bsd_syslog_ts("Feb 29 12:00:00", 2023).has_value())
+        << "Feb 29 in the non-leap reference year 2023 parsed";
+    EXPECT_TRUE(parse_bsd_syslog_ts("Feb 29 12:00:00", 2024).has_value())
+        << "Feb 29 in the leap reference year 2024 was refused";
 }
 
 TEST(ParseCLF, ValidTimestampParsed)
@@ -120,6 +151,20 @@ TEST(ParseCLF, ValidTimestampParsed)
 TEST(ParseCLF, TooShortReturnsNullopt)
 {
     EXPECT_FALSE(parse_clf_timestamp("10/Oct/2000").has_value());
+}
+
+// invariant: CLF adds its zone offset after the calendar conversion, so an impossible day with an
+// offset is the case a sentinel would have published as an instant near 1970.
+TEST(ParseCLF, DayPastItsMonthIsRefusedWithAnOffset)
+{
+    for (const char* impossible :
+         {"29/Feb/2023:13:55:36 -0700", "31/Apr/2023:13:55:36 +0200", "00/Jan/2023:13:55:36 +0000"})
+    {
+        const auto parsed{parse_clf_timestamp(impossible)};
+        EXPECT_FALSE(parsed.has_value())
+            << impossible << " is no instant, yet it parsed to epoch second " << to_tt(*parsed);
+    }
+    EXPECT_TRUE(parse_clf_timestamp("29/Feb/2024:13:55:36 -0700").has_value());
 }
 
 TEST(ParseCLF, NegativeTimezoneNormalisedToUTC)

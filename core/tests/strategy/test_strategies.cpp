@@ -923,15 +923,16 @@ TEST_F(KVStrategyTest, EmptyValueReturnsError)
     EXPECT_FALSE(result.has_value());
 }
 
-TEST_F(SyslogStrategyTest, InvalidDayLineDoesNotCrash)
+TEST_F(SyslogStrategyTest, InvalidDayLineParsesWithNoTimestamp)
 {
     // invariant: the BSD regex checks only the SHAPE of the date field and not calendar validity.
-    // invariant: the conversion NORMALISES an out-of-range day, so the parse must succeed without
-    // crashing.
+    // invariant: the conversion REFUSES an impossible day, so the line still parses and carries NO
+    // timestamp rather than a normalised wrong instant.
     auto result{strategy.parse("Feb 30 12:00:00 myhost proc[1]: msg after invalid day", arena)};
-    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result.has_value()) << result.error();
     EXPECT_EQ(result.value().content, "msg after invalid day");
-    EXPECT_TRUE(result.value().timestamp.has_value());
+    EXPECT_FALSE(result.value().timestamp.has_value())
+        << "an impossible date published a timestamp";
 }
 
 TEST_F(JsonStrategyTest, NestedObjectMessageExtracted)
