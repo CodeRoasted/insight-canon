@@ -41,7 +41,7 @@ namespace
 // invariant: the sidecar is the COMMITTED projection of the manifest's 627 trace rows and the delta
 // file is the standing harness's per-trace emission; this binary cannot see the JSON.
 // assert: that the sidecar equals projection(manifest) is the CORPORA repo's governance, and the
-// delta file's eidos pre/post columns belong to the two-path gate in `insight_sift_tests`.
+// delta file's six eidos-side columns are read by nothing here — this gate reads canon's five.
 // note: a `const char*`, not a string_view: it is handed to getenv, which needs the terminator
 constexpr const char* kCorpusVar{"CORPUS_GITLAB_MARKERS_DIR"};
 constexpr std::string_view kSidecarFile{"PROBE-v1.trace-sidecar.tsv"};
