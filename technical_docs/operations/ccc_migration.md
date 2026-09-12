@@ -888,11 +888,13 @@ converted code, the module interfaces it imports, `core/CMakeLists.txt`, the ADR
    `grammar.unpaired_marker` and `round_trip.unpaired` — so nothing escapes — but that particular
    leg reports green about a row it could not have measured, which is the same vacuity shape the
    kit's own `marker_own` leg exists to close.
+   DISCHARGED 2026-09-12 `insight-canon bfac775` — the determinism leg now reds a marker row whose probe fired on neither composition, as `determinism.unmeasured`, after the divergence check: an unpaired row's empty probe is one case, a paired row whose writer renders bytes it does not recognize is the other. Arm `ConformanceKitNonVacuity.TheDeterminismLegRedsAMarkerRowItCouldNotProbe` (`core/tests/conformance/test_kit_non_vacuity.cpp`): a paired control passes the whole kit, the unpaired subject must red this leg and name its key. Red first against the unfixed kit, where the report read `[determinism] pass` beside `[grammar.unpaired_marker] FAIL`. All four shipped packages still pass the kit. `malf test insight-canon`: 832/832 on clang-21 and 832/832 on gcc-16.2 (core 753, github 33, gitlab 25, jenkins 15, test_frameworks 6).
 3. **`run()`'s `outcome_round_trip` check is green with nothing measured, and a caller cannot tell
    — Kleio.** For a package shipping outcome tokens but no outcome marker (the GitHub package
    today), the loop body never executes and the check is pushed green. `round_trip_report`'s
    per-row shape lets a caller assert non-vacuity with `ASSERT_FALSE(report.checks.empty())`;
    `run()`'s six-check report offers no equivalent signal.
+   DISCHARGED 2026-09-12 `insight-canon bfac775` — a pass over zero round trips is named `outcome_round_trip.nothing_measured`, so the scope travels in the one field every framework shows (the kit's own `presence_only` convention; `detail` stays empty on a pass, as `CheckResult` declares). It stays a PASS: the GitHub package's missing outcome marker is a declared absence, not a defect. Arm `ConformanceKitNonVacuity.TheOutcomeRoundTripNamesAPassThatMeasuredNothing`: a two-token control reads `outcome_round_trip`; tokens-without-marker and marker-without-tokens must read the new name. Red first against the unfixed kit, where both subjects read `outcome_round_trip`. Counts as above.
 
 ### Witnesses
 
@@ -1102,6 +1104,7 @@ bounded by the longest segment"*, which is the claim the code actually keeps.
    fixture is `static_assert`ed conflict-free, so the arm measures only the name fence), and that no
    committed arm exercises a `NumericFieldThenRemainder` payload carrying **two** bracket groups,
    which is what distinguishes `rfind('[')` from `find('[')`.
+   DISCHARGED 2026-09-12 `insight-canon bfac775` — both claims now have a falsifier, each red under its own mutation. Fence order: `CompositionDeathTest.TheUnnamedPackageFenceAnswersBeforeTheConflictFence` composes an unnamed package whose role duplicates a named package's (a `static_assert` proves the conflict fence would fire on that set) and requires the EMPTY-name diagnostic; with the two fences swapped in `compose()` it died with `exact-duplicate role match key "<AAA>"`. Two bracket groups: `RunOutcomeGrammar5.TheCarriageReturnTerminatorAndOptionGroupAreDropped` gains `mark:1784657178:build[matrix][collapsed=true]`, which must name `build[matrix]` (the declared trailing-group rule); with `rfind('[')` turned into `find('[')` it read `build`. Counts as above.
 7. **`registry_grammar_lint`'s `insight-canon` census ceilings are now above the tree — Argos.**
    `G13-bare` reads 10 against a ceiling of 13 and `G14-sigil` 15 against 20, both after this unit
    and this commit's ledger repair. Advisory today because a sibling repo's census cannot be a
@@ -2203,6 +2206,7 @@ comment-only commit.
   units, one file-local and one exported from the scan shard, and only prose ties them. An overlap
   would let a byte removed from the shell catalog keep being tolerated through the file-local set.
   **Addressee: Kleio**, for a compile-time assertion or a witness row.
+  DISCHARGED 2026-09-12 `insight-canon bfac775` — a `static_assert` beside `is_trailing_punct` in `core/src/mask/mask.cpp`, the one translation unit that sees both sets, requires that no `kWrapperPairs` closer is trailing punctuation. Red first: with `]` added to the file-local set, `malf build` of core stopped at that assertion. Compile-time only; no masked byte moves.
 * **The root matcher requires the path separator BEFORE the root's first component, which is stricter
   than the rule `ADR-16.D2` states, and it makes a floating root at token start unreachable.**
   Re-derived at `root_scope_ending_at`: the separator loop runs from the root's first component
@@ -2368,6 +2372,7 @@ comment-only, so it is discharged here rather than deferred: the converted `refs
 declares `DN-54.D23, ADR-16.D8, ADR-16.D7, SRC-D-OUT-4c` — the argument, the disposition, the budget
 and the register — and the incomplete sentence is gone with the prose. Nothing outside this repo was
 touched.
+REFUSED 2026-09-12 not an open finding: the paragraph records its own discharge. Re-derived at HEAD: the partition's `refs:` in `core/tools/leading_level_token_index_measure.cpp` reads `DN-54.D23, ADR-16.D8, ADR-16.D7, F-SRC-insight-canon:failure_lexicon.cpp:token_in_kind_slot` (the retired `SRC-D-OUT-4c` code became that form-3 address), and no sentence there names an owner for one residual alone. Nothing is owed.
 
 ### Stale and false claims deleted, with the evidence and where the search went
 
@@ -2948,6 +2953,7 @@ and survives the unit, which is why the unit was takeable without a range.
    through this module, so a regression that turned the re-export into a plain import would pass
    every gate this repo runs. **Addressee: Kleio** — if the external-consumer contract is worth
    holding, it needs an arm that names the type.
+   DISCHARGED 2026-09-12 `insight-canon bfac775` — `semantic/test_frameworks/tests/test_module_surface.cpp` imports `std` and the package module and nothing of canon's, then names `insight::semantic::SemanticPackageManifest` in a `static_assert` and in `TestFrameworksModuleSurface.AConsumerImportingOnlyThePackageNamesTheManifestType`. Red first: with `export import insight.canon.spi` made a plain import, that unit failed to compile (`no member named 'SemanticPackageManifest' in namespace 'insight::semantic'`) and it was the only unit that did. The github, gitlab and jenkins packages re-export the same way and still carry no such witness; that is reported to the pilot, not fixed here.
 3. **`SRC-SP-2`'s citer at `semantic/test_frameworks/tests/conformance.cpp` is on the cascade list.**
    The code is already absorbed by a law block at its declaration-position site; this citer stays
    `refs: SRC-SP-2` until the pilot's cross-repo repoint pass. **Addressee: the pilot.**
@@ -3112,6 +3118,7 @@ Inbound: **255 mentions, every one read as a lead**. Three classes and one findi
   reading, and the third had already been held. The seam keeps only what the study leaves standing:
   the compile-error argument, addressed to `DN-17.D16`, and a pointer to the declaration's own
   `code_tier.echoed_source.why`.
+  REFUSED 2026-09-12 not a finding: the bullet records two draft lines this unit withdrew before its commit, on `STU-15`'s reading. Re-derived at HEAD: `semantic/github/src/github.cppm` carries no `ProvenanceHook` signature restatement and no rationale on its `export import insight.canon.spi`. Nothing is owed.
 * **Line coordinates into these files** appear on the superproject's two FROZEN RECORD SHELVES
   (`technical_docs/history/`, `technical_docs/audits/`). A record states what was true when it was
   written, so a moved line does not falsify it and no repair is owed — and this ledger may not cite
@@ -3276,6 +3283,7 @@ takeable without a range.
    anywhere for that half, and it is a synthetic one. **Addressee: Kleio** — whether a
    corpus-unfalsifiable declared row should ship is a test-homing and claim-boundary question, not
    a comment one.
+   PARTIAL. REFUSED 2026-09-12 for the test-homing half: the synthetic arm is the right home and nothing more is owed. A declared row's behaviour is a function of the row and the line, so the fixture must control the line; a corpus can only say whether a producer emits the form, which is a reachability question and never a second witness of the mechanism. The arm is not vacuous: `GithubDeclaredIngest.LiftsDeclaredLevelsFromWorkflowCommands` asserts all eight rows by value AND by species (`declared_level`), and with the `::notice::` row deleted from `github.dialect.yaml` it went red on that row's species check (with `GithubManifestShape`'s row-count pin), measured 2026-09-12 on clang-21 and reverted. Whether a row no corpus shows should SHIP is the claim-boundary half. **Addressee: Eqya.**
 
 ### Witnesses
 
@@ -3344,6 +3352,7 @@ did not have to exist. Verified at both sites in this run. Deleting the local co
 and no comment-only commit may make it. **Addressee: Kleio** — the guard is a test-homing question,
 with Hephaïstos for the call-site change.
 PARTIAL. DISCHARGED 2026-09-11 for the Hephaïstos half (the call site) `insight-canon 8056503` — the census's local `trimmed()` is deleted and all seven call sites call canon's exported `trimmed_intent_name`, so the fork no longer exists. `TrimIsCanonInvariant` compared canon's trim with the fork; with the fork gone it compares canon with itself, so it is deleted as vacuous. No canon library byte moves: the change is test-only and `kCanonicalizationVersion` is untouched. Built and run on clang-21 and on gcc-16.2: the census translation unit compiles, `MaskedSpanCensus.TheRenderDeltaPredicateAndTheRiskDetectorBothFireAndBothStaySilent` passes on both, and `TheProducerNameRenderDeltaOnTheMarkerCoverageBank` fails on both with its designed unmounted-bank message (the suite is labelled `corpus`); `malf format --check insight-canon`: 126 files, 0 violations. No parent red exists by construction: the change removes a restatement, it adds no behaviour. THE HOMING HALF IS OPEN and is Kleio's to close: with no fork left, whether any guard remains owed is her call. **Addressee: Kleio.**
+DISCHARGED 2026-09-12 for the homing half `insight-canon bfac775` — with the fork gone, the guard moves to the definition: `IntentTrim.TrimsExactlySpaceTabAndCarriageReturnFromBothEnds` (core identity suite) pins `trimmed_intent_name`'s byte set from both ends, interior bytes verbatim, LF/VT/FF untouched, and a view into the argument. Red first: with `'\r'` dropped from `is_intent_trim_byte`, four of its nine rows went red and NO other core arm did, so the trim had no canon-side guard at all. The census's mount-free arming control also left the corpus label (`MaskedSpanCensusControl`) and now runs in the default build; the corpus-gate registry followed at `coderoast 80110f03`.
 
 **And a correction to this lane's own scoring, because the failure it repeats is already on the
 record.** The lane scored its duplicate reader A **31 of 31**. It is **30 of 31**: that reader's
@@ -3509,6 +3518,7 @@ and **no law block was minted** — this unit consumed no law number.
    control: those column names occur in exactly three places workspace-wide (this gate, the corpus
    generator script, and the TSV itself), and no such gate exists. Either the gate is owed or the
    columns are. **Addressee: Kleio.**
+   PARTIAL. DISCHARGED 2026-09-12 for the false pointer `insight-canon 46ac14b` — re-derived: `markers_eidos_pre`, `markers_eidos_post` and the four lost/gained columns occur in no `insight-eidos` source, and the gate reads fields 0 to 4 of each delta row. The `assert:` line no longer assigns the six columns to a gate that does not exist; it says this gate reads canon's five and nothing here reads the other six. NOT decided: whether a gate over the canon-versus-eidos marker residual is owed at all is a claim question (would it back a stated product claim, or only corroborate the generator?). Until it is ruled, the six columns stay an unread emission. **Addressee: Eqya, with Daidalos.**
 2. **A design note names an unplaced repair for a file this unit opened.** `DN-64.O5` records an
    `R4.1` comment repair owed to this package's strategy, noting no row opens that file. This unit
    IS that opening, and the repair could not be acted on: `R4.1` appears on no live plan surface, so
@@ -3685,6 +3695,7 @@ statements and **all eight TRUE** — the second measured negative in a row, aft
    leg"* is described only on a frozen record shelf and implemented nowhere. The unit's own `note:`
    is repaired; the same claim also stands in `core/tests/mask/test_stateless_template.cpp`, which
    is unconverted. Either the leg is owed or the claim is. **Addressee: Kleio.**
+   DISCHARGED 2026-09-12 `insight-canon bfac775` — the claim goes; the leg is not owed. Homing call: over-masking by the bracket-timestamp rule is a function of one token's bytes, so the fixture must control the ADJACENT shapes (date-only, time-only, word, version, trailing punctuation, truncated time), and `StatelessTemplate.BracketTimestampDeclinesEverythingAdjacentToTheClass` already does, byte for byte through the masker. A corpus leg could only report which adjacent shapes a producer happens to emit, which is reachability and never a second witness. `core/tests/mask/test_stateless_template.cpp` now names that one holder instead of two.
 2. **The package's published conan description advertises a code tier the package does not have.**
    It still names *"the dialect format strategy (timestamper strip, `[Pipeline]` annotations, the
    `Finished:` epilogue — the code tier)"*, which the module denies in its first three lines. Found
@@ -3698,6 +3709,7 @@ statements and **all eight TRUE** — the second measured negative in a row, aft
    unit 17's finding, here without a false registry sentence behind it. **Addressee: Kleio**, with
    **Argos** for the label split.
    PARTIAL. REFUSED 2026-09-11 for the Argos half (the label split): no build-system change is owed — the label unit is the gtest SUITE, selected by the `CORPUS_SUITES` filter in each `semantic/*/CMakeLists.txt`, so separating the mount-free cases from the corpus arm is a suite rename in the test file, which is Kleio's half.
+   DISCHARGED 2026-09-12 for the Kleio half `insight-canon bfac775` — `CounterCanReportAnExplosion` and `TheMaskerClaimsTheTimestamperTokenToTheBracketNormalForm` are now the suite `JenkinsPayloadStampMeasurementControl`, outside `CORPUS_SUITES`, so both run in the default `malf test`: `semantic/jenkins` reads 15 tests where it read 13, 15/15 on clang-21 and on gcc-16.2. The two corpus arms keep the label; `scripts/run_corpus_gates.sh --census` closes with 14 labelled rows verified, and no registry text named the two cases. The same move took the GitHub census's mount-free control out of the label (`MaskedSpanCensusControl`), with its registry records at `coderoast 80110f03`.
 5. **Two `insight-canon` census ceilings still over-admit** — unchanged by this unit. Unit 18's
    finding stands. **Addressee: Argos.**
    REFUSED 2026-09-11 already clean at HEAD: the two censuses no longer exist. `registry_grammar_lint.py` declares `G13` (bare-code) and `G14` (sigil) SPENT, retired with the `SRC-<code>` form on 2026-09-09 (`coderoast d241aca2`), so there is no ceiling left to bank.
@@ -3873,6 +3885,7 @@ result.
    and now; nothing owed.
 2. **A test assertion cites a source file by LINE NUMBER and the pointer was already stale** before
    this unit moved it again. String literal. **Addressee: Kleio.**
+   DISCHARGED 2026-09-12 `insight-canon bfac775` — the message in `TransportIdentity.DeclaringATransportStackDoesNotMoveSemanticIdentity` cited a line of `canon.compose.cppm` that by then held the closing brace of `channels()`; it now names the contract it meant, `ComposedSemantics::for_stream`'s, which carries the ruleset-identity invariant. Swept: no other string literal in `core/tests` or `semantic/*/tests` cites a first-party source file by line.
 3. **A design note attributes to one code a sentence that is about another.** It quotes *"the
    contract is declared HERE, beside the mechanism"* as one code's unambiguous declaration; in the
    source that clause is the subject of a different code's bullet. **Addressee: Daidalos.**
@@ -4697,6 +4710,7 @@ reaching a runbook step rather than an artifact.
   with Kleio as addressee. This was that pass, the repair is comment-only and it lands inside the
   converted `refs:` line, so it was made rather than deferred; nothing outside this repo was
   touched and no other lane's work was entered.
+  REFUSED 2026-09-12 not an open finding: a process record of the `DN-54.O5` comment repair addressed to Kleio, discharged in unit 14 and re-derived at HEAD under that repair's own paragraph (the `refs:` in `core/tools/leading_level_token_index_measure.cpp`). Nothing is owed.
 * **Unit 14's ledger entry corrected the preamble's law-numbering paragraph**, which had claimed
   this repo declares zero law blocks since before unit 7 minted the first three. A ledger's
   preamble is read as the standing state, so a false one is not left for the drain.
