@@ -29,8 +29,8 @@
 // invariant: the oracle is NOT updated to match — a frozen oracle that tracks its subject stops
 // being able to catch it.
 // refs: ADR-23.D4, ADR-23.D6
-// invariant: the SUBJECT is core's peel and the oracle is inline, so this file imports only the
-// facade.
+// invariant: the SUBJECT is core's peel and the oracle is inline; the one detail surface read is
+// LogParser's counters, for the counter-split arm, which is why the file imports the test harness.
 // invariant: the original home rested on a premise that retired when the two implementations
 // stopped needing to be in scope at once.
 // invariant: leaving it in the package compiled a whole dialect module into a binary that never
@@ -83,8 +83,7 @@
 // float, no threads.
 #include <gtest/gtest.h>
 
-import std;
-import insight.canon;
+import insight.canon.test;
 
 using insight::transport::IngestDeclaration;
 using insight::transport::RawPeeledLine;
@@ -826,6 +825,179 @@ TEST_F(TransportPeelEquivalenceGate, BomRowUndropsExactlyTheBomDeclinedLinesAndN
         << report();
 
     GTEST_LOG_(INFO) << "G-BOM-3 green on " << pins->label << report();
+}
+
+// invariant: THE COUNTER SPLIT'S MEASUREMENT on this file's population: a no-event line lands on
+// the skip counter, and the failure counter holds strategy refusals only.
+// invariant: each peeled line goes through LogParser::parse_line, one parser per log in manifest
+// order, under the zero-package composition; a composed dialect may route a line elsewhere.
+// invariant: that parse is the one under the facade's process_line and so under
+// InsightPipeline::ingest_peeled_line.
+// invariant: a refusal whose reason starts "LogParser: " is a no-event line; any other refusal is
+// a strategy's, keyed by the "<Name>Strategy" prefix of its reason.
+// invariant: lines_failed() is asserted against those reasons log by log, so a no-event line
+// counted as a failure reds the arm wherever the population carries one.
+// invariant: the WARN replay is LOGGED, never pinned: each log's refusals are walked with the split
+// counter and with an unsplit one that also counts no-event lines, firing at 1 and every 100th.
+// refs: F-SRC-insight-canon:log_parser.cpp:parse_line
+struct CounterSplitPins
+{
+    std::size_t logs;
+    std::size_t parsed;
+    std::size_t failed;
+    std::size_t no_event;
+};
+
+// invariant: CHARACTERIZATION pins, measured by this arm on both slices and never guessed.
+constexpr std::array<CounterSplitPins, 2> kCounterSplitPins{{
+    {.logs = 60, .parsed = 293'955, .failed = 160, .no_event = 11'737},
+    {.logs = 4'082, .parsed = 21'841'845, .failed = 87'283, .no_event = 561'809},
+}};
+
+// note: the parse arena of InsightPipeline, reset after every line as that pipeline does.
+constexpr std::size_t kParseArenaBytes{static_cast<std::size_t>(4) * 1024U * 1024U};
+// note: the cadence of the bounded failure WARN in log_parser.cpp, used ONLY for the logged replay.
+constexpr std::size_t kWarnCadence{100};
+constexpr std::string_view kNoEventReason{"LogParser: "};
+
+struct CounterSplitScore
+{
+    std::size_t logs{0};
+    std::size_t lines{0};
+    std::size_t parsed{0};
+    std::size_t failed_by_reason{0};
+    std::size_t failed_by_counter{0};
+    std::size_t no_event{0};
+    std::size_t logs_disagreeing{0};
+    std::size_t warns_split{0};
+    std::size_t warns_unsplit{0};
+    std::map<std::string, std::size_t, std::less<>> failed_by_strategy;
+    std::map<std::string, std::size_t, std::less<>> warns_split_by_strategy;
+    std::map<std::string, std::size_t, std::less<>> warns_unsplit_by_strategy;
+    std::vector<std::string> reported;
+};
+
+[[nodiscard]] bool warns_at(std::size_t count) noexcept
+{
+    return count == 1U || count % kWarnCadence == 0U;
+}
+
+TEST_F(TransportPeelEquivalenceGate, NoEventLinesLandOnTheSkipCounterAndNeverOnTheFailureCounter)
+{
+    const std::vector<std::filesystem::path> paths{population()};
+    ASSERT_FALSE(paths.empty()) << "the manifest yielded an EMPTY population — a gate scoring zero "
+                                   "lines reports green while measuring nothing";
+    const auto pins{std::ranges::find(kCounterSplitPins, paths.size(), &CounterSplitPins::logs)};
+    ASSERT_NE(pins, kCounterSplitPins.end()) << unpinned_population_message(paths.size());
+
+    const TransportStack stack{insight::transport::resolve_transport_stack(
+        IngestDeclaration{.stack = kDeclaredGha, .dialect = {}, .channel = {}})};
+    const auto composition{insight::test_support::degenerate_composition()};
+
+    CounterSplitScore score;
+    for (const std::filesystem::path& path : paths)
+    {
+        std::ifstream input{path, std::ios::binary};
+        std::ostringstream buffer;
+        buffer << input.rdbuf();
+        const std::string bytes{buffer.str()};
+        ++score.logs;
+
+        insight::tokenization::ArenaAllocator arena{kParseArenaBytes};
+        insight::tokenization::LogParser parser{arena, composition};
+        std::size_t log_failed_by_reason{0};
+        std::size_t unsplit_count{0};
+        for (std::size_t begin{0}; begin < bytes.size();)
+        {
+            std::size_t end{bytes.find('\n', begin)};
+            if (end == std::string::npos)
+                end = bytes.size();
+            const std::string_view line{bytes.data() + begin, end - begin};
+            begin = end + 1U;
+            ++score.lines;
+
+            const RawPeeledLine peeled{stack.peel_raw(line)};
+            const auto result{parser.parse_line(peeled.content)};
+            arena.reset();
+            if (result.has_value())
+            {
+                ++score.parsed;
+                continue;
+            }
+            ++unsplit_count;
+            const std::string_view reason{result.error()};
+            if (reason.starts_with(kNoEventReason))
+            {
+                ++score.no_event;
+                continue;
+            }
+            ++log_failed_by_reason;
+            const std::string strategy{reason.substr(0U, reason.find(':'))};
+            ++score.failed_by_strategy[strategy];
+            if (warns_at(log_failed_by_reason))
+            {
+                ++score.warns_split;
+                ++score.warns_split_by_strategy[strategy];
+            }
+            if (warns_at(unsplit_count))
+            {
+                ++score.warns_unsplit;
+                ++score.warns_unsplit_by_strategy[strategy];
+            }
+        }
+        score.failed_by_reason += log_failed_by_reason;
+        score.failed_by_counter += parser.lines_failed();
+        if (parser.lines_failed() != log_failed_by_reason)
+        {
+            ++score.logs_disagreeing;
+            if (score.reported.size() < kMaxReportedLines)
+                score.reported.push_back(
+                    path.filename().string() +
+                    ": lines_failed() = " + std::to_string(parser.lines_failed()) +
+                    ", strategy refusals = " + std::to_string(log_failed_by_reason));
+        }
+    }
+
+    const auto report{
+        [&score]
+        {
+            std::ostringstream out;
+            out << "\n  logs               : " << score.logs
+                << "\n  lines fed          : " << score.lines
+                << "\n  parsed             : " << score.parsed
+                << "\n  no-event (skipped) : " << score.no_event
+                << "\n  strategy refusals  : " << score.failed_by_reason
+                << "\n  lines_failed()     : " << score.failed_by_counter
+                << "\n  logs disagreeing   : " << score.logs_disagreeing
+                << "\n  bounded WARNs, split counter   : " << score.warns_split
+                << "\n  bounded WARNs, unsplit replay  : " << score.warns_unsplit;
+            for (const auto& [strategy, count] : score.failed_by_strategy)
+            {
+                const auto split{score.warns_split_by_strategy.find(strategy)};
+                const auto unsplit{score.warns_unsplit_by_strategy.find(strategy)};
+                out << "\n    " << strategy << ": refused " << count << ", WARNs split "
+                    << (split == score.warns_split_by_strategy.end() ? 0U : split->second)
+                    << ", unsplit "
+                    << (unsplit == score.warns_unsplit_by_strategy.end() ? 0U : unsplit->second);
+            }
+            for (const std::string& line : score.reported)
+                out << "\n  " << line;
+            return out.str();
+        }};
+
+    // assert: the partition closes before any count below means anything.
+    ASSERT_EQ(score.parsed + score.no_event + score.failed_by_reason, score.lines) << report();
+    EXPECT_EQ(score.logs_disagreeing, 0U)
+        << "THE COUNTER SPLIT FAILED: a log's failure counter disagrees with its strategy "
+           "refusals, so a line carrying no event reached the counter that gates the bounded WARN "
+           "and feeds the failure rate."
+        << report();
+    EXPECT_EQ(score.failed_by_counter, score.failed_by_reason) << report();
+
+    EXPECT_EQ(score.parsed, pins->parsed) << report();
+    EXPECT_EQ(score.failed_by_reason, pins->failed) << report();
+    EXPECT_EQ(score.no_event, pins->no_event) << report();
+    GTEST_LOG_(INFO) << "counter split green" << report();
 }
 
 } // namespace

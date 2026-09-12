@@ -145,8 +145,8 @@ class LogParser
     std::size_t parsed_count_{0};
     std::size_t failed_count_{0};
     // refs: F-SRC-insight-canon:test_transport_peel_equivalence_gate.cpp
-    // invariant: lines carrying NO EVENT — empty, or all escape bytes — are counted here and
-    // never in failed_count_, which gates the failure warns and the failure rate.
+    // invariant: lines carrying NO EVENT — empty, all escape bytes, or blank after leading
+    // whitespace — are counted here, never in failed_count_, which gates warns and failure rate.
     std::size_t skipped_count_{0};
     // refs: F-SRC-insight-canon:canon.api.cppm:normalize
     // invariant: the strip's result is never longer than its input, so the retained capacity makes
