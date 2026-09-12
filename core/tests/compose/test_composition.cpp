@@ -171,6 +171,19 @@ constexpr SemanticPackageManifest kUnnamedPkg{.name = "",
 constexpr std::array<SemanticPackageManifest, 2> kNamedSet{kPkgA, kPkgB};
 constexpr std::array<SemanticPackageManifest, 2> kUnnamedSet{kPkgA, kUnnamedPkg};
 
+// invariant: a set carrying BOTH fatal defects at once — an unnamed package whose one role
+// duplicates a named package's — so the diagnostic that answers pins the two fences' ORDER.
+constexpr SemanticPackageManifest kUnnamedDupOfA{.name = "",
+                                                 .version = "1.0.0",
+                                                 .roles = kRolesA,
+                                                 .markers = {},
+                                                 .level_lifts = {},
+                                                 .locations = {},
+                                                 .value_classes = {},
+                                                 .strategy = nullptr,
+                                                 .echoed_source = nullptr};
+constexpr std::array<SemanticPackageManifest, 2> kUnnamedAndRowDupSet{kPkgA, kUnnamedDupOfA};
+
 // invariant: the dialect-REVISION vocabulary fence has three ways to fail, and each needs its own
 // set because the predicate returns on the first one it meets.
 // invariant: an EMPTY vocabulary is the undeclared state the coordinate exists to remove; an empty
@@ -291,6 +304,25 @@ TEST(CompositionDeathTest, UnnamedPackageFailsClosedAtRuntime)
                  "package at position 1 of 2 declares an EMPTY manifest name")
         << "compose() must fatal on a runtime-assembled set carrying a package named \"\" — the "
            "silent alternative is that package's rows reading as universally gated downstream";
+}
+
+// invariant: the ORDER arm's non-vacuity, proved at COMPILE TIME — the conflict fence WOULD fire on
+// this set, so the death test below measures which fence answers FIRST, never whether one exists.
+static_assert(find_conflict(kUnnamedAndRowDupSet).has_conflict &&
+                  find_conflict(kUnnamedAndRowDupSet).kind == "role",
+              "kUnnamedAndRowDupSet must carry a live role duplicate — otherwise the order arm "
+              "below cannot tell the two fences apart");
+
+// invariant: the unnamed-package fence answers BEFORE the conflict fence, because the conflict
+// diagnostic that follows cannot name an unnamed package — swapping the two fences reds this arm.
+// refs: DN-17.D17
+TEST(CompositionDeathTest, TheUnnamedPackageFenceAnswersBeforeTheConflictFence)
+{
+    EXPECT_DEATH((void)compose(kUnnamedAndRowDupSet),
+                 "package at position 1 of 2 declares an EMPTY manifest name")
+        << "compose() answered a set carrying an unnamed package AND a live role duplicate with "
+           "some other diagnostic — the conflict fence ran first, so the operator is told about a "
+           "row key when the package that owns it has no name to report";
 }
 
 // invariant: the degenerate core-only composition is a defined, RUNNABLE state at the composition

@@ -87,7 +87,7 @@ TEST(TransportIdentity, DeclaringATransportStackDoesNotMoveSemanticIdentity)
         << "  composed : " << composed.identity_hex() << "\n"
         << "  resolved : " << without.semantics.identity_hex() << "\n"
         << "semantic_identity is the RULESET's identity, not a stream's view of it "
-           "(canon.compose.cppm:166).";
+           "(ComposedSemantics::for_stream's contract, canon.compose.cppm).";
 
     EXPECT_EQ(with.semantics.identity(), baseline)
         << "DECLARING A TRANSPORT TRANSFORM MOVED semantic_identity — the transport-invariance "

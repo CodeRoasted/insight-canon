@@ -115,9 +115,8 @@ TEST(StatelessTemplate, CompositesNormalized)
 // 95.9 % of the no-collapse ceiling.
 // invariant: the rule claims the bracketed full-datetime class and NOTHING adjacent to it, which is
 // precision-first, so the decline list stays byte-identical.
-// invariant: these arms are one of the two NAMED holders of the over-masking blind spot — the A/B
-// prefix-image comparison cancels a leak that hits both arms.
-// invariant: so the decline list HERE, plus the corpus collateral leg, is what carries that hazard.
+// invariant: the A/B prefix-image comparison cannot see over-masking — a leak that hits both arms
+// cancels — so `BracketTimestampDeclinesEverythingAdjacentToTheClass` is that hazard's one holder.
 // refs: LSRC-12
 TEST(StatelessTemplate, BracketTimestampCollapsesTheStampClass)
 {

@@ -9,7 +9,7 @@
 // note: the acquirer's DECLARED display names are a second surface and are NOT censused here
 // invariant: no RNG, no thread, no wall clock, no float — the subject is a committed sorted TSV
 // and every printed set is sorted, so the output is a pure function of the banked bytes.
-// note: the whole suite is LABELLED `corpus` and is excluded from the default `malf test` run
+// note: the bank arm's suite is LABELLED `corpus`; the mount-free control is a suite of its own
 #include <gtest/gtest.h>
 
 import std;
@@ -276,7 +276,7 @@ struct SubjectRow
 // refs: MEM:synthetic-gate-vacuity-vs-judgment
 // invariant: both detectors are exercised in BOTH directions here — a case that must fire and a
 // case that must not — because a census whose detectors cannot fire reports meaningless zeros.
-TEST(MaskedSpanCensus, TheRenderDeltaPredicateAndTheRiskDetectorBothFireAndBothStaySilent)
+TEST(MaskedSpanCensusControl, TheRenderDeltaPredicateAndTheRiskDetectorBothFireAndBothStaySilent)
 {
     struct DeltaCase
     {

@@ -20,8 +20,8 @@
 // invariant: every read is binary, lines split on newline ONLY and no carriage return is trimmed,
 // so both arms see identical bytes and the comparison is fair by construction.
 // note: a CR-folding read has already fabricated a gate score in this workspace
-// assert: all FOUR cases in this suite are labelled `corpus`, the two needing no mount included, so
-// none of them runs in a default build — only under the corpus ctest selection.
+// assert: the two cases needing no mount are a suite of their own, outside the `corpus` label, so
+// the controls run in every default build and the corpus arms only under the corpus selection.
 // assert: an unset manifest variable is a hard FAIL, never a skip: a skip exits 0 and ctest counts
 // a skipping case as passed.
 // note: determinism: pure byte functions, no RNG, no clock, no float in any counted quantity
@@ -239,7 +239,7 @@ struct DistinctCounter
 // distinct count must track the line count, or a `count stable` verdict is a counter artifact.
 // assert: the second half is the other direction: identical lines must collapse to ONE template, so
 // the counter is not merely counting lines.
-TEST(JenkinsPayloadStampMeasurement, CounterCanReportAnExplosion)
+TEST(JenkinsPayloadStampMeasurementControl, CounterCanReportAnExplosion)
 {
     const std::array manifests{insight::semantic::jenkins::kManifest};
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose(manifests)};
@@ -276,7 +276,8 @@ TEST(JenkinsPayloadStampMeasurement, CounterCanReportAnExplosion)
 // form, and the bracket has stopped being a difference.
 // assert: the bracketed and unbracketed spellings of one token both collapse, through different
 // rules, and the token sits mid-line in every probe so no line's routing can differ.
-TEST(JenkinsPayloadStampMeasurement, TheMaskerClaimsTheTimestamperTokenToTheBracketNormalForm)
+TEST(JenkinsPayloadStampMeasurementControl,
+     TheMaskerClaimsTheTimestamperTokenToTheBracketNormalForm)
 {
     const insight::semantic::ComposedSemantics none{
         insight::semantic::compose(std::span<const insight::semantic::SemanticPackageManifest>{})};

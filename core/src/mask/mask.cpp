@@ -52,6 +52,13 @@ namespace
         return chr == ',' || chr == ';' || chr == ':' || chr == '.';
     }
 
+    // assert: the disjointness is COMPILED rather than declared — an overlap would keep a byte
+    // retired from the wrapper catalog tolerated here, through the file-local set.
+    static_assert(std::ranges::none_of(kWrapperPairs, [](const WrapperPair& pair)
+                                       { return is_trailing_punct(pair.close); }),
+                  "a wrapper-pair closer is also a trailing-punctuation byte — the two sets the "
+                  "address rule tolerates after an address must stay disjoint");
+
     // invariant: held at 2 so a repair widens WHICH bytes are tolerated, never HOW MANY - a longer
     // punctuation run is a different token, not a wrapped address.
     constexpr std::size_t kMaxIpv4TrailBytes{2};

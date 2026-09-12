@@ -342,6 +342,12 @@ TEST(RunOutcomeGrammar5, TheCarriageReturnTerminatorAndOptionGroupAreDropped)
         recognize(norm_probe("mark:1784657178:build[hide_duration=true,collapsed=true]"), composed)
             .name,
         "build");
+    // invariant: only the TRAILING group drops — a payload carrying two keeps its first, which is
+    // the row that separates the trailing-group rule from a cut at the FIRST bracket.
+    EXPECT_EQ(recognize(norm_probe("mark:1784657178:build[matrix][collapsed=true]"), composed).name,
+              "build[matrix]")
+        << "two bracket groups: the extractor must drop the LAST group only — cutting at the "
+           "first '[' drops a group that is part of the name";
     // invariant: a closing bracket that closes nothing is CONTENT, not a group.
     EXPECT_EQ(recognize(norm_probe("mark:1784657178:weird]"), composed).name, "weird]");
     // invariant: a group that would consume the WHOLE payload leaves nothing to name, so it is

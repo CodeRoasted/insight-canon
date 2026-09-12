@@ -188,6 +188,19 @@ namespace
                                   "\") diverged across identical compositions for "
                                   "marker key \"" +
                                   std::string{row.prefix} + "\"."};
+            // assert: two agreeing misses are not a measurement — an unpaired row's probe is empty
+            // and agrees with itself trivially, so a probe that fired nowhere reds the leg.
+            if (lhs.kind == insight::tokenization::IntentMarkerKind::None)
+                return {.name = "determinism.unmeasured",
+                        .passed = false,
+                        .detail = "marker key \"" + std::string{row.prefix} + "\": the probe \"" +
+                                  probe +
+                                  "\" fired on neither composition, so recognize()'s determinism "
+                                  "was never measured for this row — " +
+                                  (probe.empty() ? "the row has no paired emit row to render a "
+                                                   "probe from (grammar.unpaired_marker)."
+                                                 : "its own paired emit row rendered bytes the "
+                                                   "row does not recognize.")};
         }
         return {.name = "determinism", .passed = true, .detail = {}};
     }
@@ -524,11 +537,13 @@ namespace
     // by the shipped scan under the package's OWN declaration.
     // invariant: self-adapting over both marker shapes — a RemainderToken row round-trips once
     // per declared token, a PrefixIsVerdict row round-trips its prefix alone.
-    // note: trivially green for a package with tokens but no outcome marker.
+    // post: a pass over ZERO round trips is named `outcome_round_trip.nothing_measured`, so the
+    // vacuity travels with the report into a framework that shows nothing but names.
     CheckResult check_outcome_round_trip(const SemanticPackageManifest& manifest,
                                          const ComposedSemantics& composed)
     {
         const ComposedSemantics own{composed.for_stream(manifest.name, kAnyChannel)};
+        std::size_t measured{0};
         for (const OutcomeMarkerRow& row : manifest.outcome_markers)
         {
             const auto scan_one{[&own](const std::string& line)
@@ -549,6 +564,7 @@ namespace
                                       "the row's own verdict (marker_present=" +
                                       (scan.marker_present ? "true" : "false") +
                                       ") — the two projections of the run-verdict line disagree."};
+                ++measured;
                 continue;
             }
             for (const OutcomeTokenRow& token : manifest.outcome_tokens)
@@ -570,9 +586,13 @@ namespace
                                       "(marker_present=" +
                                       (scan.marker_present ? "true" : "false") +
                                       ", scanned token \"" + scan.token + "\")."};
+                ++measured;
             }
         }
-        return {.name = "outcome_round_trip", .passed = true, .detail = {}};
+        return {.name =
+                    measured == 0 ? "outcome_round_trip.nothing_measured" : "outcome_round_trip",
+                .passed = true,
+                .detail = {}};
     }
 
 } // namespace

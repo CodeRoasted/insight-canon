@@ -195,3 +195,76 @@ TEST(IntentIdentity, IdIsHashOfCanonicalForm)
             << "intent_id_of diverged from template_id_of(canonicalize_intent()) for: \"" << name
             << '"';
 }
+
+namespace
+{
+// post: the bytes spelled so a failure message shows every control byte rather than moving the
+// cursor.
+[[nodiscard]] std::string spelled(std::string_view bytes)
+{
+    std::string out;
+    for (const char byte : bytes)
+        switch (byte)
+        {
+        case '\t':
+            out += "\\t";
+            break;
+        case '\r':
+            out += "\\r";
+            break;
+        case '\n':
+            out += "\\n";
+            break;
+        case '\v':
+            out += "\\v";
+            break;
+        case '\f':
+            out += "\\f";
+            break;
+        default:
+            out.push_back(byte);
+        }
+    return out;
+}
+} // namespace
+
+// refs: ADR-20.D12
+// invariant: canon's intent trim is ONE definition with three consumers, so its byte set is pinned
+// at the definition's own suite — a consumer that calls it can no longer guard it by comparison.
+// invariant: exactly space, tab and carriage return, from BOTH ends and nowhere else — an interior
+// byte of the set and every other whitespace byte stay verbatim.
+// invariant: the carriage return case is the load-bearing row: a Windows runner emits CRLF into
+// banners, so a trim without it names one intent two ways.
+TEST(IntentTrim, TrimsExactlySpaceTabAndCarriageReturnFromBothEnds)
+{
+    struct TrimCase
+    {
+        std::string_view input;
+        std::string_view expected;
+    };
+    constexpr std::array<TrimCase, 9> kCases{{
+        {.input = "build\r", .expected = "build"},
+        {.input = "\rbuild", .expected = "build"},
+        {.input = " \t\rbuild\r\t ", .expected = "build"},
+        {.input = "build \r\t step", .expected = "build \r\t step"},
+        {.input = "build\n", .expected = "build\n"},
+        {.input = "\vbuild\f", .expected = "\vbuild\f"},
+        {.input = "build", .expected = "build"},
+        {.input = " \t\r", .expected = ""},
+        {.input = "", .expected = ""},
+    }};
+    for (const TrimCase& kase : kCases)
+    {
+        const std::string_view got{insight::trimmed_intent_name(kase.input)};
+        EXPECT_EQ(got, kase.expected)
+            << "trimmed_intent_name(\"" << spelled(kase.input) << "\") = \"" << spelled(got)
+            << "\"  expected \"" << spelled(kase.expected) << '"';
+        // assert: the post promises a VIEW into the argument, so the result's bytes are the
+        // argument's own and nothing was copied.
+        if (!got.empty())
+            EXPECT_TRUE(got.data() >= kase.input.data() &&
+                        got.data() + got.size() <= kase.input.data() + kase.input.size())
+                << "trimmed_intent_name(\"" << spelled(kase.input)
+                << "\") returned bytes outside its argument";
+    }
+}
