@@ -591,6 +591,7 @@ than a hand edit).
    population is the same one `test_transport_peel_equivalence_gate.cpp` pins, so the missing half
    is re-derivable by running the measurement again — but it is not knowledge the tree currently
    holds, and re-asserting it in a tagged line would have been the conversion inventing a fact.
+   PARTIAL. DISCHARGED 2026-09-12 for Eqya's routing — Kleio owes re-running the measurement on the population `test_transport_peel_equivalence_gate.cpp` pins, and recording it where the counter split is documented, so the numbers have a live home.
 3. **A test caption states a rule the code does not implement —
    `F-SRC-insight-canon:test_format_detector.cpp`, for this migration's own test tier.**
    `BatchHandlesMixedFormats` opens with *"Majority JSON (2/3) should win"*. The winner is the
@@ -1063,6 +1064,7 @@ bounded by the longest segment"*, which is the claim the code actually keeps.
    *"DONE, verified at source"* on the strength of it. CCC deletes the sentence: it is a claim about
    a destination, which `LEXICON.md:265` and `ADR-23.D4` both state on the durable tier, and the
    site now carries `refs: ADR-23.D4`. Nothing is lost; the design note's row is now stale.
+   PARTIAL. DISCHARGED 2026-09-12 for Eqya's pass-through — routed to Daidalos to correct `DN-46.D1`'s row and action list, or to confirm the finding moot if that note has already left the design-note shelf (it was absent on 2026-09-12).
 2. **`compose.cpp`'s `kIdentityBytes` is a second, hand-kept copy of `kSemanticIdentityBytes` —
    Hephaïstos.** `canon.compose.cppm:41` exports `inline constexpr std::size_t
    kSemanticIdentityBytes{16}` and sizes `identity_` with it; `compose.cpp:16` declares its own
@@ -5986,6 +5988,7 @@ than the question.
   faithful to the retired regex it replicates, and it is covered by no test: both Apache fixtures
   are 2.2-style single-word brackets. Whether 2.4 is in scope is a product question, not a comment
   one. **Addressee: the `insight-canon` strategy lane, and Eqya for the scope call.**
+  PARTIAL. DISCHARGED 2026-09-12 for Eqya's scope call — already ruled as a claim boundary: canon claims Apache 2.4, so the compound level bracket is read. The repair is sequenced for the canon strategy lane.
 
 ### The behaviour witness
 
@@ -6121,6 +6124,7 @@ and the argument exists on only one of them. A window boundary derived from a no
 precision-first. **This is not a comment repair**: the disposition is a product question, and if
 normalisation is right it needs its argument written down, while if refusal is right it is a code
 change with a corpus cost. **Addressee: the `insight-canon` utils lane, and Eqya for the disposition.**
+  PARTIAL. DISCHARGED 2026-09-12 for Eqya's disposition, by ruling (precision-first) — REFUSAL is right on both parsers: a normalised `2023-02-29` is a different instant published with no signal, which the contract forbids, while a refused field is an honest absence. Kleio first counts the corpus lines the refusal affects, then Hephaïstos owes `parse_iso8601`'s refusal. `kCanonicalizationVersion` does not move, so any byte this changes rides the open generation.
 
 ### The behaviour witness
 
