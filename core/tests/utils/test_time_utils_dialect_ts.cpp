@@ -237,9 +237,8 @@ TEST(ParseHealthAppTs, SingleDigitMinuteParsed)
 
 TEST(ParseHealthAppTs, ASignedFieldIsRefusedRatherThanNormalized)
 {
-    // invariant: the standard conversion accepts a leading sign for a signed type, so reading a
-    // clock field bare would take a negative minute, normalize it and publish a WRONG instant.
-    // invariant: precision-first: refuse.
+    // invariant: the standard conversion takes a leading sign for a signed type, so a signed clock
+    // field is refused as ill-formed rather than read as a negative, or a -0 as a zero.
     EXPECT_FALSE(parse_health_app_ts("20171223--5:15:29:606").has_value()) << "negative hour";
     EXPECT_FALSE(parse_health_app_ts("20171223-22:-5:29:606").has_value()) << "negative minute";
     EXPECT_FALSE(parse_health_app_ts("20171223-22:15:-9:606").has_value()) << "negative second";
@@ -350,6 +349,42 @@ TEST(ParseNginxErrorTs, MalformedInputRefused)
         << "a two-digit year shifts every field — this is the Spark format, not nginx's";
     EXPECT_FALSE(parse_nginx_error_ts("2024/01/15T10:30:00").has_value());
     EXPECT_FALSE(parse_nginx_error_ts("2024/01/15 10:30-00").has_value());
+}
+
+TEST(DialectTimestampCalendar, AClockFieldOutOfRangeIsRefusedByEveryParser)
+{
+    // invariant: the range guard sits in the shared calendar conversion, so every dialect refuses
+    // an hour past 23, a minute or second past 59 and a signed field instead of rolling it over.
+    const std::vector<std::pair<std::string_view, std::optional<Timestamp>>> parsed{
+        {"compact hour 24", parse_compact_date_time("240115", "240000")},
+        {"compact minute 60", parse_compact_date_time("240115", "106000")},
+        {"compact second 60", parse_compact_date_time("240115", "103060")},
+        {"compact signed hour", parse_compact_date_time("240115", "-10000")},
+        {"short-year hour 24", parse_short_year_slash("24/01/15 24:30:00")},
+        {"short-year minute 60", parse_short_year_slash("24/01/15 10:60:00")},
+        {"short-year second 60", parse_short_year_slash("24/01/15 10:30:60")},
+        {"short-year signed hour", parse_short_year_slash("24/01/15 -1:30:00")},
+        {"apache hour 24", parse_apache_error_ts("Sun Dec 04 24:47:44 2005")},
+        {"apache minute 60", parse_apache_error_ts("Sun Dec 04 04:60:44 2005")},
+        {"apache second 60", parse_apache_error_ts("Sun Dec 04 04:47:60 2005")},
+        {"apache signed hour", parse_apache_error_ts("Sun Dec 04 -1:47:44 2005")},
+        {"health-app hour 24", parse_health_app_ts("20171223-24:15:29:606")},
+        {"health-app minute 60", parse_health_app_ts("20171223-22:60:29:606")},
+        {"health-app second 60", parse_health_app_ts("20171223-22:15:60:606")},
+        {"log4j hour 24", parse_log4j_timestamp("2024-01-15 24:30:00,123")},
+        {"log4j minute 60", parse_log4j_timestamp("2024-01-15 10:60:00,123")},
+        {"log4j second 60", parse_log4j_timestamp("2024-01-15 10:30:60,123")},
+        {"log4j signed hour", parse_log4j_timestamp("2024-01-15 -1:30:00,123")},
+        {"nginx hour 24", parse_nginx_error_ts("2024/01/15 24:30:00")},
+        {"nginx minute 60", parse_nginx_error_ts("2024/01/15 10:60:00")},
+        {"nginx second 60", parse_nginx_error_ts("2024/01/15 10:30:60")},
+        {"nginx signed hour", parse_nginx_error_ts("2024/01/15 -1:30:00")},
+    };
+    for (const auto& [label, result] : parsed)
+        EXPECT_FALSE(result.has_value())
+            << label << " is out of range, yet it parsed to epoch second " << epoch_of(*result);
+    EXPECT_PARSES_TO(parse_nginx_error_ts("2024/01/15 23:59:59"),
+                     utc_epoch(2024, 1, 15, 23, 59, 59));
 }
 
 TEST(DialectTimestampCalendar, LeapDayAndYearBoundariesAgreeWithTheCivilCalendar)

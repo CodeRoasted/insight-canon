@@ -99,6 +99,51 @@ TEST(ParseISO8601, MonthOutOfRangeIsRefusedWithAnOffset)
     }
 }
 
+// invariant: a clock field past its range is REFUSED as an absence, never rolled into the next
+// minute, hour or day; the offset forms are refused before any offset applies.
+TEST(ParseISO8601, ClockFieldOutOfRangeIsRefused)
+{
+    for (const char* impossible :
+         {"2023-06-15T24:00:00Z", "2023-06-15T25:00:00+02:00", "2023-06-15T12:60:00Z",
+          "2023-06-15T12:00:60-0700", "2023-06-15T99:99:99Z"})
+    {
+        const auto parsed{parse_iso8601(impossible)};
+        EXPECT_FALSE(parsed.has_value())
+            << impossible << " is out of range, yet it parsed to epoch second " << to_tt(*parsed);
+    }
+    for (const char* real : {"2023-06-15T23:59:59+02:00", "2023-06-15T00:00:00-0700"})
+        EXPECT_TRUE(parse_iso8601(real).has_value())
+            << real << " is a real instant and was refused";
+}
+
+// invariant: a leap second is refused: time_t counts none, so 23:59:60 could only be published as
+// the next day's 00:00:00, an instant other than the one written.
+TEST(ParseISO8601, LeapSecondIsRefused)
+{
+    for (const char* leap : {"2016-12-31T23:59:60Z", "2016-12-31T23:59:60+00:00"})
+    {
+        const auto parsed{parse_iso8601(leap)};
+        EXPECT_FALSE(parsed.has_value())
+            << leap << " names a leap second, yet it parsed to epoch second " << to_tt(*parsed);
+    }
+}
+
+// invariant: a zone offset past 23 hours or 59 minutes is refused as an absence, never applied.
+TEST(ParseISO8601, ZoneOffsetOutOfRangeIsRefused)
+{
+    for (const char* impossible :
+         {"2023-06-15T12:00:00+24:00", "2023-06-15T12:00:00-9900", "2023-06-15T12:00:00+02:60"})
+    {
+        const auto parsed{parse_iso8601(impossible)};
+        EXPECT_FALSE(parsed.has_value())
+            << impossible << " is out of range, yet it parsed to epoch second " << to_tt(*parsed);
+    }
+    for (const char* real :
+         {"2023-06-15T12:00:00+14:00", "2023-06-15T12:00:00-12:00", "2023-06-15T12:00:00+23:59"})
+        EXPECT_TRUE(parse_iso8601(real).has_value())
+            << real << " is a real instant and was refused";
+}
+
 TEST(ParseISO8601, CompactTimezoneWithoutColon)
 {
     // invariant: a zone offset written without its colon must parse IDENTICALLY to the colon form.
@@ -143,6 +188,20 @@ TEST(ParseBSDSyslog, OutOfRangeDayIsRefused)
         << "Feb 29 in the leap reference year 2024 was refused";
 }
 
+// invariant: an out-of-range or signed clock field is refused as an absence, never normalised into
+// a neighbouring minute, hour or day.
+TEST(ParseBSDSyslog, ClockFieldOutOfRangeIsRefused)
+{
+    for (const char* impossible :
+         {"Jun 15 24:00:00", "Jun 15 12:60:00", "Jun 15 12:00:60", "Jun 15 -1:00:00"})
+    {
+        const auto parsed{parse_bsd_syslog_ts(impossible)};
+        EXPECT_FALSE(parsed.has_value())
+            << impossible << " is out of range, yet it parsed to epoch second " << to_tt(*parsed);
+    }
+    EXPECT_TRUE(parse_bsd_syslog_ts("Jun 15 23:59:59").has_value());
+}
+
 TEST(ParseCLF, ValidTimestampParsed)
 {
     EXPECT_TRUE(parse_clf_timestamp("10/Oct/2000:13:55:36 -0700").has_value());
@@ -165,6 +224,22 @@ TEST(ParseCLF, DayPastItsMonthIsRefusedWithAnOffset)
             << impossible << " is no instant, yet it parsed to epoch second " << to_tt(*parsed);
     }
     EXPECT_TRUE(parse_clf_timestamp("29/Feb/2024:13:55:36 -0700").has_value());
+}
+
+// invariant: CLF applies its zone offset after the calendar conversion, so a clock field out of
+// range is refused before any offset applies, and an offset out of range is refused itself.
+TEST(ParseCLF, ClockFieldOrZoneOffsetOutOfRangeIsRefused)
+{
+    for (const char* impossible :
+         {"15/Jan/2024:24:00:00 -0700", "15/Jan/2024:20:60:00 +0000", "15/Jan/2024:20:00:60 +0530",
+          "15/Jan/2024:-1:00:00 -0700", "15/Jan/2024:20:00:00 +2400", "15/Jan/2024:20:00:00 -0060",
+          "15/Jan/2024:20:00:00 +-100"})
+    {
+        const auto parsed{parse_clf_timestamp(impossible)};
+        EXPECT_FALSE(parsed.has_value())
+            << impossible << " is out of range, yet it parsed to epoch second " << to_tt(*parsed);
+    }
+    EXPECT_TRUE(parse_clf_timestamp("15/Jan/2024:23:59:59 +1400").has_value());
 }
 
 TEST(ParseCLF, NegativeTimezoneNormalisedToUTC)

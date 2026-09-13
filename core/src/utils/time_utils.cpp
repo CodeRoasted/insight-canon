@@ -81,8 +81,8 @@ namespace
         return true;
     }
 
-    // post: the UTC instant for `utc_tm` with no local-timezone offset applied, or nullopt when the
-    // month, the year or the day of that month is out of range, never a normalised wrong instant.
+    // post: the UTC instant for `utc_tm` with no local-timezone offset applied, or nullopt when a
+    // date or clock field is out of range, never a normalised wrong instant.
     // invariant: the refusal is an ABSENCE, never a sentinel value: every caller publishes what
     // this returns as a present timestamp, and a zone offset added to a sentinel is a real instant.
     std::optional<std::time_t> utc_mktime(const std::tm& utc_tm) noexcept
@@ -104,6 +104,12 @@ namespace
         const int days_in_month{kDaysInMonth[static_cast<std::size_t>(month - 1)] +
                                 (month == 2 && leap ? 1 : 0)};
         if (utc_tm.tm_mday < 1 || utc_tm.tm_mday > days_in_month)
+            return std::nullopt;
+        // invariant: a second of 60 is refused like 61: time_t counts no leap second, so 23:59:60
+        // could only publish the next day's 00:00:00, which is not the instant written.
+        if (utc_tm.tm_hour < 0 || utc_tm.tm_hour >= time_constants::kHoursPerDay ||
+            utc_tm.tm_min < 0 || utc_tm.tm_min >= time_constants::kMinutesPerHour ||
+            utc_tm.tm_sec < 0 || utc_tm.tm_sec >= time_constants::kSecondsPerMinute)
             return std::nullopt;
 
         // note: 492, 19 and 4 are floor(1969/4), floor(1969/100) and floor(1969/400).
@@ -130,6 +136,19 @@ namespace
         if (!utc_seconds.has_value())
             return std::nullopt;
         return std::chrono::system_clock::from_time_t(*utc_seconds);
+    }
+
+    // post: the seconds a `sign` zone offset of `hour`:`minute` adds to its local reading to reach
+    // UTC, or nullopt when either field is signed or out of range, never an offset applied anyway.
+    std::optional<std::int64_t> utc_correction(char sign, int hour, int minute) noexcept
+    {
+        if (hour < 0 || hour >= time_constants::kHoursPerDay || minute < 0 ||
+            minute >= time_constants::kMinutesPerHour)
+            return std::nullopt;
+        const std::int64_t offset{
+            (static_cast<std::int64_t>(hour) * time_constants::kSecondsPerHour) +
+            (static_cast<std::int64_t>(minute) * time_constants::kSecondsPerMinute)};
+        return (sign == '+') ? -offset : offset;
     }
 
     constexpr std::array<std::string_view, 12> kMonthNames{
@@ -236,8 +255,11 @@ std::optional<Timestamp> parse_iso8601(std::string_view timestamp_str) noexcept
                     static_cast<void>(
                         parse2d(timestamp_str.data() + minute_offset, timezone_minute));
                 }
-                const int offset_seconds{(timezone_hour * 3600) + (timezone_minute * 60)};
-                parsed_time += (timezone_designator == '+') ? -offset_seconds : offset_seconds;
+                const auto correction{
+                    utc_correction(timezone_designator, timezone_hour, timezone_minute)};
+                if (!correction.has_value())
+                    return std::nullopt;
+                parsed_time += *correction;
             }
         }
     }
@@ -355,8 +377,10 @@ std::optional<Timestamp> parse_clf_timestamp(std::string_view timestamp_str) noe
             int timezone_minute{0};
             parse_fixed(ptr + 22, 2, timezone_hour);
             parse_fixed(ptr + 24, 2, timezone_minute);
-            const int offset_seconds{(timezone_hour * 3600) + (timezone_minute * 60)};
-            parsed_time += (sign == '+') ? -offset_seconds : offset_seconds;
+            const auto correction{utc_correction(sign, timezone_hour, timezone_minute)};
+            if (!correction.has_value())
+                return std::nullopt;
+            parsed_time += *correction;
         }
     }
 
@@ -566,9 +590,8 @@ std::optional<Timestamp> parse_health_app_ts(std::string_view timestamp_str) noe
     if (ptr[8] != '-')
         return std::nullopt;
 
-    // assert: the digit test before from_chars is load-bearing - from_chars accepts a leading '-',
-    // which would publish a normalized wrong instant instead of refusing the field.
-    // note: two digits at most keeps the accepted language equal to is_health_app_prefix's.
+    // invariant: a field opens on a digit and holds two at most, which keeps the accepted language
+    // equal to is_health_app_prefix's; from_chars alone would also take a sign, and read -0 as 0.
     const char* time_ptr = ptr + 9;
     const char* const end_ptr = ptr + timestamp_str.size();
 
