@@ -134,6 +134,33 @@ TEST(ConformanceKitNonVacuity, TheDeterminismLegRedsAMarkerRowItCouldNotProbe)
         << every_check(subject);
 }
 
+// invariant: the dialect gate's own-medium leg tells an unpaired row the truth about itself — it
+// has no writer, so nothing was rendered — and never claims a paired emit row rendered its probe.
+TEST(ConformanceKitNonVacuity, TheDialectGateOwnLegNeverClaimsAWriterAnUnpairedRowLacks)
+{
+    const Report control{run(kPaired)};
+    const CheckResult* const measured{check_of(control, "dialect_gate")};
+    ASSERT_NE(measured, nullptr) << "run() pushed no dialect_gate check:\n" << every_check(control);
+    EXPECT_TRUE(measured->passed) << "the paired control must pass the dialect gate:\n"
+                                  << every_check(control);
+
+    const Report subject{run(kUnpaired)};
+    const CheckResult* const unpaired{check_of(subject, "dialect_gate")};
+    ASSERT_NE(unpaired, nullptr) << "run() pushed no dialect_gate check:\n" << every_check(subject);
+    EXPECT_FALSE(unpaired->passed) << every_check(subject);
+    EXPECT_EQ(unpaired->name, "dialect_gate.marker_own") << every_check(subject);
+    EXPECT_EQ(unpaired->detail.find("paired emit row rendered"), std::string::npos)
+        << "the diagnostic tells a row with NO writer that its own paired emit row rendered the "
+           "probe:\n"
+        << every_check(subject);
+    EXPECT_NE(unpaired->detail.find("has NO paired emit row"), std::string::npos)
+        << "the diagnostic must say the row has no writer:\n"
+        << every_check(subject);
+    EXPECT_NE(unpaired->detail.find("<KIT-step> "), std::string::npos)
+        << "the diagnostic must name the unpaired row's key:\n"
+        << every_check(subject);
+}
+
 TEST(ConformanceKitNonVacuity, TheOutcomeRoundTripNamesAPassThatMeasuredNothing)
 {
     const Report control{run(kTokensAndMarker)};

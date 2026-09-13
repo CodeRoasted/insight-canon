@@ -274,6 +274,15 @@ namespace
             if (row.dialect_gate == kAnyDialect)
                 continue;
             const std::string probe{marker_probe_for(row, manifest.emits)};
+            if (probe.empty())
+                return {.name = "dialect_gate.marker_own",
+                        .passed = false,
+                        .detail = "marker key \"" + std::string{row.prefix} + "\" (dialect \"" +
+                                  std::string{manifest.name} + "\", channel \"" +
+                                  std::string{row.channel_gate} +
+                                  "\") has NO paired emit row, so no probe could be rendered and "
+                                  "its OWN medium was never measured — the leak leg below cannot "
+                                  "measure it either (see grammar.unpaired_marker)."};
             const ComposedSemantics medium{composed.for_stream(manifest.name, row.channel_gate)};
             if (insight::tokenization::recognize(normalized_probe(probe, scratch), medium).kind !=
                 insight::tokenization::IntentMarkerKind::None)
