@@ -18,15 +18,19 @@ namespace
     constexpr std::array<char, 16> kHexDigits{'0', '1', '2', '3', '4', '5', '6', '7',
                                               '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
-    [[nodiscard]] std::uint8_t hex_nibble(char chr) noexcept
+    constexpr std::string_view kRenderedPrefix{"h:"};
+    constexpr unsigned kNibbleBits{4U};
+    constexpr std::uint8_t kFirstLetterNibble{10U};
+
+    // post: the nibble a lowercase hex digit names, or nothing for every other byte — render emits
+    // lowercase only, so an uppercase digit is not the rendered form.
+    [[nodiscard]] std::optional<std::uint8_t> lowercase_hex_nibble(char chr) noexcept
     {
         if (chr >= '0' && chr <= '9')
             return static_cast<std::uint8_t>(chr - '0');
         if (chr >= 'a' && chr <= 'f')
-            return static_cast<std::uint8_t>(chr - 'a' + 10);
-        if (chr >= 'A' && chr <= 'F')
-            return static_cast<std::uint8_t>(chr - 'A' + 10);
-        return 0;
+            return static_cast<std::uint8_t>(chr - 'a' + kFirstLetterNibble);
+        return std::nullopt;
     }
 } // namespace
 
@@ -54,16 +58,29 @@ std::string render(TemplateId template_id)
     return out;
 }
 
-TemplateId parse_template_id(std::string_view rendered)
+std::expected<TemplateId, TemplateIdParseError>
+parse_template_id(std::string_view rendered) noexcept
 {
+    if (!rendered.starts_with(kRenderedPrefix))
+        return std::unexpected{TemplateIdParseError::MissingPrefix};
+    const std::string_view hex{rendered.substr(kRenderedPrefix.size())};
+    if (hex.size() != 2 * kTemplateIdBytes)
+        return std::unexpected{TemplateIdParseError::WrongLength};
     TemplateId out;
-    std::string_view hex{rendered};
-    if (hex.size() >= 2 && hex[0] == 'h' && hex[1] == ':')
-        hex.remove_prefix(2);
-    for (std::size_t idx{0}; idx < kTemplateIdBytes && ((2 * idx) + 1) < hex.size(); ++idx)
-        out.bytes[idx] = static_cast<std::uint8_t>((hex_nibble(hex[2 * idx]) << 4) |
-                                                   hex_nibble(hex[(2 * idx) + 1]));
+    for (std::size_t idx{0}; idx < kTemplateIdBytes; ++idx)
+    {
+        const std::optional<std::uint8_t> high{lowercase_hex_nibble(hex[2 * idx])};
+        const std::optional<std::uint8_t> low{lowercase_hex_nibble(hex[(2 * idx) + 1])};
+        if (!high.has_value() || !low.has_value())
+            return std::unexpected{TemplateIdParseError::NotLowercaseHex};
+        out.bytes[idx] = static_cast<std::uint8_t>((unsigned{*high} << kNibbleBits) | *low);
+    }
     return out;
+}
+
+TemplateId template_id_of_label(std::string_view label) noexcept
+{
+    return template_id_of(label);
 }
 
 NgramId ngram_id_of(const std::vector<TemplateId>& sequence) noexcept

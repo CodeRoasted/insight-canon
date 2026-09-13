@@ -13,7 +13,9 @@ using insight::NgramId;
 using insight::parse_template_id;
 using insight::render;
 using insight::template_id_of;
+using insight::template_id_of_label;
 using insight::TemplateId;
+using insight::TemplateIdParseError;
 
 namespace
 {
@@ -57,7 +59,65 @@ TEST(TemplateIdInvariants, ParseIsInverseOfRender)
     for (const auto& sample : kSamples)
     {
         const TemplateId id{template_id_of(sample)};
-        EXPECT_EQ(parse_template_id(render(id)), id) << "round-trip failed for: " << sample;
+        const auto parsed{parse_template_id(render(id))};
+        ASSERT_TRUE(parsed.has_value())
+            << "the rendered form '" << render(id) << "' was refused, for: " << sample;
+        EXPECT_EQ(*parsed, id) << "round-trip failed for: " << sample;
+    }
+}
+
+// refs: ADR-16.D3
+// invariant: the parser FAILS CLOSED — every input that is not "h:" plus exactly 32 lowercase hex
+// digits is refused, with the reason, and never answered with a partial or defaulted id.
+TEST(TemplateIdInvariants, ParseRefusesEveryMalformedForm)
+{
+    const std::string valid_hex{render(template_id_of("GET <*> -> <*>")).substr(2)};
+    constexpr char kCaseOffset{'a' - 'A'};
+    std::string upper_hex{valid_hex};
+    std::ranges::transform(
+        upper_hex, upper_hex.begin(), [](char chr)
+        { return chr >= 'a' && chr <= 'f' ? static_cast<char>(chr - kCaseOffset) : chr; });
+    ASSERT_NE(upper_hex, valid_hex) << "the sample carries no hex letter to upper-case";
+    const std::vector<std::pair<std::string, TemplateIdParseError>> malformed{
+        {"", TemplateIdParseError::MissingPrefix},
+        {valid_hex, TemplateIdParseError::MissingPrefix},
+        {"H:" + valid_hex, TemplateIdParseError::MissingPrefix},
+        {" h:" + valid_hex, TemplateIdParseError::MissingPrefix},
+        {"h:", TemplateIdParseError::WrongLength},
+        {"h:abc", TemplateIdParseError::WrongLength},
+        {"h:" + valid_hex.substr(1), TemplateIdParseError::WrongLength},
+        {"h:" + valid_hex + "0", TemplateIdParseError::WrongLength},
+        {"h:" + upper_hex, TemplateIdParseError::NotLowercaseHex},
+        {"h:" + valid_hex.substr(0, 31) + "g", TemplateIdParseError::NotLowercaseHex},
+        {"h:" + valid_hex.substr(0, 31) + " ", TemplateIdParseError::NotLowercaseHex},
+    };
+    for (const auto& [input, reason] : malformed)
+    {
+        const auto parsed{parse_template_id(input)};
+        EXPECT_FALSE(parsed.has_value())
+            << "parse_template_id accepted the malformed input '" << input << "' as the id '"
+            << (parsed.has_value() ? render(*parsed) : std::string{}) << "'";
+        if (!parsed.has_value())
+            EXPECT_EQ(parsed.error(), reason)
+                << "'" << input << "' was refused as reason " << static_cast<int>(parsed.error())
+                << ", expected " << static_cast<int>(reason);
+    }
+}
+
+// refs: ADR-16.D3
+// invariant: the declared label constructor gives distinct short labels distinct ids — the fixture
+// tolerance lives here, where a label that is not a rendered id is never parsed.
+TEST(TemplateIdInvariants, LabelConstructorSeparatesShortLabels)
+{
+    const std::vector<std::string_view> labels{"h:abc", "h:abd", "h:ab", "h:", "abc"};
+    std::unordered_map<TemplateId, std::string_view> by_id;
+    for (const std::string_view label : labels)
+    {
+        EXPECT_EQ(template_id_of_label(label), template_id_of_label(label))
+            << "the label constructor is not deterministic for '" << label << "'";
+        const auto [slot, inserted]{by_id.try_emplace(template_id_of_label(label), label)};
+        EXPECT_TRUE(inserted) << "the labels '" << slot->second << "' and '" << label
+                              << "' collide on the id '" << render(slot->first) << "'";
     }
 }
 

@@ -72,9 +72,27 @@ struct NgramId
 [[nodiscard]] TemplateId template_id_of(std::string_view canonical_template) noexcept;
 // post: "h:" + 32 lowercase hex — the ONLY place the id string materialises.
 [[nodiscard]] std::string render(TemplateId template_id);
+// refs: ADR-16.D3
+// invariant: why a rendered id was refused; a malformed input is never a partial id.
+enum class TemplateIdParseError : std::uint8_t
+{
+    MissingPrefix,
+    WrongLength,
+    NotLowercaseHex,
+};
+
+// post: the id the rendered form names — "h:" then exactly 32 lowercase hex digits — or the
+// refusal, so parse_template_id(render(id)) == id for every id and nothing else is accepted.
 // note: a TEST and fixture helper only — no product path parses an id back.
-// refs: F-SRC-insight-canon:canon.api.cppm:TemplateId
-[[nodiscard]] TemplateId parse_template_id(std::string_view rendered);
+// refs: ADR-16.D3, F-SRC-insight-canon:canon.api.cppm:TemplateId
+[[nodiscard]] std::expected<TemplateId, TemplateIdParseError>
+parse_template_id(std::string_view rendered) noexcept;
+
+// post: a fixture id derived from the label's own bytes under template_id_of's content hash, so
+// distinct short labels such as "h:abc" and "h:abd" name distinct ids and no label is parsed.
+// note: a TEST and fixture constructor only — the declared home of a label-to-id tolerance.
+// refs: ADR-16.D3
+[[nodiscard]] TemplateId template_id_of_label(std::string_view label) noexcept;
 
 // post: a transient 128-bit content key over the sequence's id bytes — never serialized,
 // order-sensitive.
