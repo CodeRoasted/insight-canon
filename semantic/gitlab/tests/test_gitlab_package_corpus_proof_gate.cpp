@@ -41,7 +41,7 @@ namespace
 // invariant: the sidecar is the COMMITTED projection of the manifest's 627 trace rows and the delta
 // file is the standing harness's per-trace emission; this binary cannot see the JSON.
 // assert: that the sidecar equals projection(manifest) is the CORPORA repo's governance, and the
-// delta file's six eidos-side columns are read by nothing here — this gate reads canon's five.
+// delta file carries canon's five columns only, every one of them read here.
 // note: a `const char*`, not a string_view: it is handed to getenv, which needs the terminator
 constexpr const char* kCorpusVar{"CORPUS_GITLAB_MARKERS_DIR"};
 constexpr std::string_view kSidecarFile{"PROBE-v1.trace-sidecar.tsv"};
@@ -493,8 +493,7 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
                 return corpus;
             }
             constexpr std::string_view kOracleHeader{
-                "path\tleg\tstamped\tstudy_starts\tmarkers_canon\tmarkers_eidos_pre"
-                "\tmarkers_eidos_post\tlost_pre\tgained_pre\tlost_post\tgained_post"};
+                "path\tleg\tstamped\tstudy_starts\tmarkers_canon"};
             std::size_t line_no{0};
             for (std::size_t begin{0}; begin < oracle_text.size();)
             {
@@ -514,7 +513,7 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
                     continue;
                 }
                 const auto fields{split_tabs(line)};
-                bool row_ok{fields.size() == 11U};
+                bool row_ok{fields.size() == 5U};
                 if (row_ok)
                 {
                     OracleRow row{.leg = std::string{fields[1]}};
