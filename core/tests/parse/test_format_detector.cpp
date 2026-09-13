@@ -133,7 +133,7 @@ TEST_F(FormatDetectorTest, ReturnsNullForEmptyLine)
 
 TEST_F(FormatDetectorTest, BatchDetectsJSON)
 {
-    // invariant: the MAJORITY format wins a batch.
+    // invariant: three JSON lines give JSON both the highest confidence sum and the most claims.
     const std::vector<std::string_view> batch = {
         R"({"msg":"one"})",
         R"({"msg":"two"})",
@@ -172,6 +172,87 @@ TEST_F(FormatDetectorTest, BatchHandlesMixedFormats)
     auto* s{detector.detect_from_batch(batch)};
     ASSERT_NE(s, nullptr);
     EXPECT_EQ(s->format(), LogFormat::JSON);
+}
+
+// invariant: a strategy whose confidence is a FIXTURE CONSTANT on the lines carrying its prefix, so
+// the test chooses each line's score and with it every format's sum and count over a sample.
+// invariant: it parses every line it scores as whole content, so a non-zero score stays committed.
+class FixedConfidenceStrategy final : public IFormatStrategy
+{
+  public:
+    FixedConfidenceStrategy(LogFormat format, std::string_view claimed_prefix,
+                            double line_confidence) noexcept
+        : format_{format}, claimed_prefix_{claimed_prefix}, line_confidence_{line_confidence}
+    {
+    }
+
+    [[nodiscard]] std::expected<ParsedLine, std::string>
+    parse(std::string_view line, ArenaAllocator& /*arena*/) const override
+    {
+        ParsedLine parsed;
+        parsed.raw_line = line;
+        parsed.content = line;
+        return parsed;
+    }
+
+    [[nodiscard]] LogFormat format() const noexcept override
+    {
+        return format_;
+    }
+
+    [[nodiscard]] double confidence(std::string_view line) const noexcept override
+    {
+        return line.starts_with(claimed_prefix_) ? line_confidence_ : 0.0;
+    }
+
+  private:
+    LogFormat format_;
+    std::string_view claimed_prefix_;
+    double line_confidence_;
+};
+
+// invariant: three rules a batch vote could follow, separated on two samples: the MOST-CLAIMED
+// format, the STRONGEST single line, and the highest CUMULATIVE confidence, the shipped rule.
+// invariant: the first sample splits the sum from the count and the second splits the sum from the
+// strongest line, so an implementation of either other rule reds exactly one of the two.
+// invariant: both scores have exact binary values, so every sum is exact and no rounding or tie
+// decides a winner.
+TEST_F(FormatDetectorTest, TheBatchWinnerIsTheConfidenceSumNeitherTheCountNorTheStrongestLine)
+{
+    constexpr double kWeakLine{0.25};
+    constexpr double kStrongLine{0.625};
+    const std::vector<std::string_view> outweighed_majority{"~~ weak one", "~~ weak two",
+                                                            "^^ strong one"};
+    const std::vector<std::string_view> outweighing_majority{"~~ weak one", "~~ weak two",
+                                                             "~~ weak three", "^^ strong one"};
+
+    // pre: no built-in strategy scores the fixture lines, so the detector falls back to raw text
+    // and every score below is one of the two constants.
+    const IFormatStrategy* unscored{detector.detect_from_batch(outweighing_majority)};
+    ASSERT_NE(unscored, nullptr);
+    ASSERT_EQ(unscored->format(), LogFormat::RawText)
+        << "a built-in strategy scores the fixture lines (winner " << to_string(unscored->format())
+        << "), so the sums below would not be the fixture's own";
+
+    detector.register_strategy(
+        std::make_unique<FixedConfidenceStrategy>(LogFormat::HPC, "~~ ", kWeakLine));
+    detector.register_strategy(
+        std::make_unique<FixedConfidenceStrategy>(LogFormat::Proxifier, "^^ ", kStrongLine));
+
+    const IFormatStrategy* first{detector.detect_from_batch(outweighed_majority)};
+    ASSERT_NE(first, nullptr);
+    EXPECT_EQ(first->format(), LogFormat::Proxifier)
+        << "two HPC lines at 0.25 (count 2, sum 0.5) against one Proxifier line at 0.625 (count 1, "
+           "sum 0.625): the sum names Proxifier and the count names HPC; winner: "
+        << to_string(first->format());
+
+    const IFormatStrategy* second{detector.detect_from_batch(outweighing_majority)};
+    ASSERT_NE(second, nullptr);
+    EXPECT_EQ(second->format(), LogFormat::HPC)
+        << "three HPC lines at 0.25 (sum 0.75) against one Proxifier line at 0.625 (sum 0.625): "
+           "the "
+           "sum names HPC and the strongest single line names Proxifier; winner: "
+        << to_string(second->format());
 }
 
 TEST_F(FormatDetectorTest, NearTieKVBeatsWeakCLF)
