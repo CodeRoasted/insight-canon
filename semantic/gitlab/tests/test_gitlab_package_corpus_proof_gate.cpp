@@ -38,14 +38,14 @@ namespace
 {
 
 // refs: ADR-8
-// invariant: the sidecar is the COMMITTED projection of the manifest's 627 trace rows and the delta
-// file is the standing harness's per-trace emission; this binary cannot see the JSON.
+// invariant: the sidecar is the COMMITTED projection of the manifest's 627 trace rows and the
+// canon-recognition file is the standing harness's per-trace emission; this binary cannot see JSON.
 // assert: that the sidecar equals projection(manifest) is the CORPORA repo's governance, and the
-// delta file carries canon's five columns only, every one of them read here.
+// canon-recognition file carries canon's five columns only, every one of them read here.
 // note: a `const char*`, not a string_view: it is handed to getenv, which needs the terminator
 constexpr const char* kCorpusVar{"CORPUS_GITLAB_MARKERS_DIR"};
 constexpr std::string_view kSidecarFile{"PROBE-v1.trace-sidecar.tsv"};
-constexpr std::string_view kOracleFile{"PROBE-v1.recognition-delta.tsv"};
+constexpr std::string_view kOracleFile{"PROBE-v1.canon-recognition.tsv"};
 constexpr std::string_view kBytesRoot{"data/v1"};
 
 // invariant: the identifiers name the BANNER axis and the strings are the sidecar's own, verbatim
