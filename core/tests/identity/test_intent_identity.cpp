@@ -262,9 +262,11 @@ TEST(IntentTrim, TrimsExactlySpaceTabAndCarriageReturnFromBothEnds)
         // assert: the post promises a VIEW into the argument, so the result's bytes are the
         // argument's own and nothing was copied.
         if (!got.empty())
+        {
             EXPECT_TRUE(got.data() >= kase.input.data() &&
                         got.data() + got.size() <= kase.input.data() + kase.input.size())
                 << "trimmed_intent_name(\"" << spelled(kase.input)
                 << "\") returned bytes outside its argument";
+        }
     }
 }

@@ -457,8 +457,10 @@ TEST(RunOutcomeGrammar5, TheCarriageReturnAnchorDoesNotBecomeASubstringSearch)
         EXPECT_EQ(at_line_start.verdict.has_value(), after_carriage_return.verdict.has_value())
             << "segment '" << segment << "'";
         if (at_line_start.verdict.has_value() && after_carriage_return.verdict.has_value())
+        {
             EXPECT_EQ(*at_line_start.verdict, *after_carriage_return.verdict)
                 << "segment '" << segment << "'";
+        }
     }
 }
 

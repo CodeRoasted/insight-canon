@@ -28,7 +28,6 @@ namespace
 {
 
 constexpr std::int64_t kDeclaredUnixSeconds{1'777'024'800};
-constexpr std::int64_t kParsedUnixSeconds{1'777'039'200};
 
 [[nodiscard]] Timestamp stamp_at(std::int64_t unix_seconds)
 {

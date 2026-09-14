@@ -467,7 +467,7 @@ TEST(ArenaAllocator_Accessors, UsedNeverExceedsCapacity)
 // invariant: the SINGLE spelling of the remedy, so the two gated blocks cannot drift apart.
 // invariant: the three routes differ in WHAT THEY BUY and not only in price, which is why the
 // message states both halves.
-constexpr const char* kArmTheInstrument{
+[[maybe_unused]] constexpr const char* kArmTheInstrument{
     "ARM IT — three routes, and they do not buy the same thing. "
     "(1) Reconfigure THIS tree with -DINSIGHT_CANON_ARENA_POISON_MODE=ON: the poison alone, "
     "no new cache, cheapest if you are already built. "

@@ -18,6 +18,10 @@ namespace insight::tokenization
 
 namespace
 {
+    // invariant: resolved at compile time, so a catalog that lost the span duration key fails to
+    // build instead of silently dropping every span's duration.
+    constexpr const OrdinalFieldDescriptor& kSpanDurationField{
+        *match_ordinal_field("span_duration_ns")};
 
     // invariant: these are canon's OWN names for the four roles it reads, and they are deliberately
     // NOT a registry of vendor field names.
@@ -524,13 +528,11 @@ namespace
         const std::int64_t start_value{parse_span_nano(start_nano)};
         const std::int64_t end_value{parse_span_nano(end_nano)};
         const std::int64_t duration_ns{end_value > start_value ? end_value - start_value : 0};
-        if (const OrdinalFieldDescriptor* const descriptor{match_ordinal_field("span_duration_ns")})
-        {
-            const std::array<OrdinalObservation, 1> observation{{{.field_name = descriptor->key,
-                                                                  .schedule = descriptor->schedule,
-                                                                  .value = duration_ns}}};
-            parsed_line.ordinals = store_ordinals(observation, arena);
-        }
+        const std::array<OrdinalObservation, 1> observation{
+            {{.field_name = kSpanDurationField.key,
+              .schedule = kSpanDurationField.schedule,
+              .value = duration_ns}}};
+        parsed_line.ordinals = store_ordinals(observation, arena);
 
         parsed_line.linked_span_ids = store_span_ids(linked, arena);
         return true;

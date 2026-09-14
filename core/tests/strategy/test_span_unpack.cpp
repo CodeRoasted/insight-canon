@@ -196,10 +196,12 @@ TEST(SpanUnpack, RecordPathDiagnosesAConformantExportWhoseKeysAreNotInCanonicalO
                "well-parsed record. That is the silent-wrong-answer class, reached through the "
                "door built to stop it (ADR-29.D7's backstop).";
         if (!parsed->no_role_witness_key.empty())
+        {
             EXPECT_EQ(parsed->no_role_witness_key, "schemaUrl")
                 << "marked, but the witness is not a key that was actually present on the line, so "
                    "a reader cannot tell WHAT arrived. Got: "
                 << parsed->no_role_witness_key;
+        }
     }
 }
 

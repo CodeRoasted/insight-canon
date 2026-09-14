@@ -132,10 +132,8 @@ namespace
     }
 
     // refs: ADR-22
-    // invariant: the two differ in KIND — one is the caller declining to declare, which a
-    // kAnyDialect row must still survive, the other a real foreign package name.
-    // note: the foreign name must be one the manifest is not, or `for_stream` fatals.
-    constexpr std::string_view kUndeclaredDialect{};
+    // invariant: a real foreign package name, which the manifest must not be, or `for_stream`
+    // fatals.
     constexpr std::string_view kForeignDialect{"conformance-foreign-dialect"};
 
     // invariant: a role row's key is line-anchored and carries no payload grammar, so `key + "

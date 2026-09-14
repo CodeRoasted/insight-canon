@@ -98,9 +98,11 @@ TEST(TemplateIdInvariants, ParseRefusesEveryMalformedForm)
             << "parse_template_id accepted the malformed input '" << input << "' as the id '"
             << (parsed.has_value() ? render(*parsed) : std::string{}) << "'";
         if (!parsed.has_value())
+        {
             EXPECT_EQ(parsed.error(), reason)
                 << "'" << input << "' was refused as reason " << static_cast<int>(parsed.error())
                 << ", expected " << static_cast<int>(reason);
+        }
     }
 }
 
