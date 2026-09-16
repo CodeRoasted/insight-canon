@@ -4289,15 +4289,17 @@ only units whose codes are citations.
 
 The step's three-part branch (create the directory, a roster README **and** a superproject
 `ShelfRuling` row) does **not** apply here, and that was checked rather than taken on the brief's
-word. `scripts/docs_lint.py`'s `ShelfRuling("insight-canon", SHELF_TREE_PART, ROSTER, …)` covers the
+word. The `docs` check module's `ShelfRuling("insight-canon", SHELF_TREE_PART, ROSTER, …)` covers the
 whole `technical_docs` tree recursively, so a new `operations/` subdirectory holding one file needs
-no row — only a roster entry. Proven falsifiable: with the entry removed, `docs_lint` exits 1 and
+no row — only a roster entry. Proven falsifiable: with the entry removed, the `docs` check exits 1 and
 names the file (*"does not link `operations/ccc_migration.md`, which is tracked under this shelf"*);
 with it, exit 0. Tracked-doc population 142 → 143.
 
-**One trap worth adding to the step, met here:** these gates must be run from the workspace ROOT.
-Run from inside the repo, `python3 scripts/docs_lint.py` exits 2 for a missing file, and an operator
-reading only the exit code sees a red gate rather than a mistyped path.
+**One trap worth adding to the step, met here:** these gates must be run from the superproject
+ROOT, as `./pharos check --module docs`. Run from inside this repo, the same command has no `pharos`
+to find and fails as a mistyped path, and an operator reading only the exit code sees a red gate
+rather than a mistyped path. (At the time of this run the gate was the script `docs_lint.py`, since
+deleted; the `docs` check module is its whole content.)
 
 ## 7. The census token is a DIRECTIVE, not the string `NOLINT`
 
