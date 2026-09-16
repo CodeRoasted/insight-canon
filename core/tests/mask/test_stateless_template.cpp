@@ -81,7 +81,7 @@ TEST(StatelessTemplate, KillsThePhantomPair)
     // invariant: the accepted tradeoff — the region word is KEPT literal rather than wildcarded.
     // refs: ADR-16.D5
     EXPECT_NE(in_stream_a.find("eu-west"), std::string::npos)
-        << "a letter-leading word stays literal (F13 boundary): " << in_stream_a;
+        << "a letter-leading word stays literal (FLAW-13 boundary): " << in_stream_a;
 }
 
 TEST(StatelessTemplate, StatusValueKeptDistinct)

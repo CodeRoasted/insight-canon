@@ -41,7 +41,7 @@ the §2.4 gate by construction.
 
 ## `-1` — the stateless masker
 
-The stateless per-line masker plus the F13 class set. The first generation.
+The stateless per-line masker plus the FLAW-13 class set. The first generation.
 
 ## `-2` — OTEL awareness
 
