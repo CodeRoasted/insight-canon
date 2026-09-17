@@ -2295,7 +2295,7 @@ list, and the derivation found **three comment tokens read by live superproject 
 `OPS-8.S4` does not enumerate**: `LOG-SEAT-ALLOW` (`scripts/log_seat_routing_lint.py`'s opt-out,
 whose scan globs cover `.cpp`/`.cppm` and exclude only tests, benchmarks and build trees — so
 `core/tools/` is inside its surface), a closure-model declaration marker read by
-`scripts/closure_declaration_lint.py`, and a pin-mirror marker read by `scripts/pin_coherence.py`.
+`scripts/closure_declaration_lint.py`, and a pin-mirror marker read by the `pin_coherence` check module.
 **All three have a population of ZERO in this repo's source**, checked before the strip; they are
 recorded because the population is a fact about today, not a property of the repo.
 
@@ -2572,7 +2572,7 @@ and `/*name=*/`, `clang-format off/on`, `wall-clock:`, `DETERMINISM-ALLOW`, the
 `determinism-lint: allow(<reason>)` spelling `coderoast-server` found, `SPDX-License-Identifier:`,
 `registry-lint: allow`, plus the three superproject markers `OPS-8.S4` does not list — the seat
 opt-out of `scripts/log_seat_routing_lint.py`, the closure-model marker of
-`scripts/closure_declaration_lint.py` and the mirror marker of `scripts/pin_coherence.py`.
+`scripts/closure_declaration_lint.py` and the mirror marker of the `pin_coherence` check module.
 **Every token has a population of ZERO in these three files except the namespace closer**, which
 reads 1 in `bench_tokenization.cpp` and 1 in `test_package.cpp` before and after. Zero differences,
 so zero census decisions. Two of the three files also sit outside `malf lint` by the standing law
@@ -2827,7 +2827,7 @@ The census was derived from the gates rather than read off the step's list: ever
 in the superproject's `scripts/` that is read out of **comment text** — `DETERMINISM-ALLOW`
 (`random_determinism_lint.py`, `wallclock_lint.py`), `LOG-SEAT-ALLOW` (`log_seat_routing_lint.py`),
 `CLOSURE MODEL` (`closure_declaration_lint.py`), `pin-coherence: mirrors` and
-`INV-17-EXEMPT-OBJECT-STORE` (`pin_coherence.py`) — plus `clang-format off`, `wall-clock:`, SPDX and
+`INV-17-EXEMPT-OBJECT-STORE` (the `pin_coherence` check module) — plus `clang-format off`, `wall-clock:`, SPDX and
 the `/*name*/` forms. **Every one has a population of ZERO in these three files.**
 
 `NOLINT` before **2**, after **0**, and the decision is measured rather than argued.
@@ -3014,7 +3014,7 @@ The census was derived from the gates rather than read off the step's list: ever
 in the superproject's `scripts/` that is read out of **comment text** — `DETERMINISM-ALLOW`
 (`random_determinism_lint.py`, `wallclock_lint.py`), `LOG-SEAT-ALLOW` (`log_seat_routing_lint.py`),
 `CLOSURE MODEL` (`closure_declaration_lint.py`), `pin-coherence: mirrors` and
-`INV-17-EXEMPT-OBJECT-STORE` (`pin_coherence.py`), plus two this run added by enumerating the
+`INV-17-EXEMPT-OBJECT-STORE` (the `pin_coherence` check module), plus two this run added by enumerating the
 same directory — `retired-structure-lint: allow` (`retired_structure_lint.py`) and
 `registry-lint: allow` (`registry_grammar_lint.py`) — and `clang-format off`, `wall-clock:`, SPDX
 and the `/*name*/` forms. This repo's own five gate scripts were read too
@@ -4652,7 +4652,7 @@ fail once"* is what turned it up.
 Taken literally on `insight-canon` — enumerate `scripts/`, read each instrument's opt-out constant —
 it yields **three markers the list does not name**, all read from COMMENT TEXT by live superproject
 gates: `log_seat_routing_lint.py`'s seat opt-out, `closure_declaration_lint.py`'s closure-model
-declaration, and `pin_coherence.py`'s mirror marker. The first is the sharpest of the three, because
+declaration, and the `pin_coherence` check module's mirror marker. The first is the sharpest of the three, because
 its scan globs cover `.cpp`/`.cppm` and exclude only tests, benchmarks and build trees — a CCC unit
 under `src/`, `api/` or `tools/` sits squarely inside its surface, and the CCC grammar does not list
 its token, so a strip would delete it exactly as the determinism waiver was deleted.
