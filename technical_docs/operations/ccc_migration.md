@@ -2825,7 +2825,7 @@ count.
 
 The census was derived from the gates rather than read off the step's list: every marker constant
 in the superproject's `scripts/` that is read out of **comment text** — `DETERMINISM-ALLOW`
-(`random_determinism_lint.py`, `wallclock_lint.py`), `LOG-SEAT-ALLOW` (`log_seat_routing_lint.py`),
+(`random_determinism_lint.py`, the `wallclock` check module), `LOG-SEAT-ALLOW` (`log_seat_routing_lint.py`),
 `CLOSURE MODEL` (the `closure_declaration` check module), `pin-coherence: mirrors` and
 `INV-17-EXEMPT-OBJECT-STORE` (the `pin_coherence` check module) — plus `clang-format off`, `wall-clock:`, SPDX and
 the `/*name*/` forms. **Every one has a population of ZERO in these three files.**
@@ -3012,7 +3012,7 @@ After: **175 comment lines, 0 would-be violations** — `pre` 3 · `post` 4 · `
 
 The census was derived from the gates rather than read off the step's list: every marker constant
 in the superproject's `scripts/` that is read out of **comment text** — `DETERMINISM-ALLOW`
-(`random_determinism_lint.py`, `wallclock_lint.py`), `LOG-SEAT-ALLOW` (`log_seat_routing_lint.py`),
+(`random_determinism_lint.py`, the `wallclock` check module), `LOG-SEAT-ALLOW` (`log_seat_routing_lint.py`),
 `CLOSURE MODEL` (the `closure_declaration` check module), `pin-coherence: mirrors` and
 `INV-17-EXEMPT-OBJECT-STORE` (the `pin_coherence` check module), plus two this run added by enumerating the
 same directory — `retired-structure-lint: allow` (`retired_structure_lint.py`) and
@@ -5063,7 +5063,7 @@ easy to break while trying to be polite about a contended resource.
 
 ## Two census tokens checked in this repo on a sibling lane's measurement, both with a population of ZERO
 
-* **The determinism waiver token** that `wallclock_lint.py` and `random_determinism_lint.py` read —
+* **The determinism waiver token** that the `wallclock` check module and `random_determinism_lint.py` read —
   which the CCC grammar does not list, so the stripper deletes it silently, and a sibling lane
   measured a gate going from PASS to FAIL after one was stripped. **Swept over `insight-canon`'s
   whole source tree: zero occurrences**, so neither unit of this run could have deleted one. Census
