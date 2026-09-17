@@ -2295,7 +2295,7 @@ list, and the derivation found **three comment tokens read by live superproject 
 `OPS-8.S4` does not enumerate**: `LOG-SEAT-ALLOW` (`scripts/log_seat_routing_lint.py`'s opt-out,
 whose scan globs cover `.cpp`/`.cppm` and exclude only tests, benchmarks and build trees — so
 `core/tools/` is inside its surface), a closure-model declaration marker read by
-`scripts/closure_declaration_lint.py`, and a pin-mirror marker read by the `pin_coherence` check module.
+the `closure_declaration` check module (`scripts/closure_declaration_lint.py` then), and a pin-mirror marker read by the `pin_coherence` check module.
 **All three have a population of ZERO in this repo's source**, checked before the strip; they are
 recorded because the population is a fact about today, not a property of the repo.
 
@@ -2572,7 +2572,7 @@ and `/*name=*/`, `clang-format off/on`, `wall-clock:`, `DETERMINISM-ALLOW`, the
 `determinism-lint: allow(<reason>)` spelling `coderoast-server` found, `SPDX-License-Identifier:`,
 `registry-lint: allow`, plus the three superproject markers `OPS-8.S4` does not list — the seat
 opt-out of `scripts/log_seat_routing_lint.py`, the closure-model marker of
-`scripts/closure_declaration_lint.py` and the mirror marker of the `pin_coherence` check module.
+the `closure_declaration` check module and the mirror marker of the `pin_coherence` check module.
 **Every token has a population of ZERO in these three files except the namespace closer**, which
 reads 1 in `bench_tokenization.cpp` and 1 in `test_package.cpp` before and after. Zero differences,
 so zero census decisions. Two of the three files also sit outside `malf lint` by the standing law
@@ -2826,7 +2826,7 @@ count.
 The census was derived from the gates rather than read off the step's list: every marker constant
 in the superproject's `scripts/` that is read out of **comment text** — `DETERMINISM-ALLOW`
 (`random_determinism_lint.py`, `wallclock_lint.py`), `LOG-SEAT-ALLOW` (`log_seat_routing_lint.py`),
-`CLOSURE MODEL` (`closure_declaration_lint.py`), `pin-coherence: mirrors` and
+`CLOSURE MODEL` (the `closure_declaration` check module), `pin-coherence: mirrors` and
 `INV-17-EXEMPT-OBJECT-STORE` (the `pin_coherence` check module) — plus `clang-format off`, `wall-clock:`, SPDX and
 the `/*name*/` forms. **Every one has a population of ZERO in these three files.**
 
@@ -3013,7 +3013,7 @@ After: **175 comment lines, 0 would-be violations** — `pre` 3 · `post` 4 · `
 The census was derived from the gates rather than read off the step's list: every marker constant
 in the superproject's `scripts/` that is read out of **comment text** — `DETERMINISM-ALLOW`
 (`random_determinism_lint.py`, `wallclock_lint.py`), `LOG-SEAT-ALLOW` (`log_seat_routing_lint.py`),
-`CLOSURE MODEL` (`closure_declaration_lint.py`), `pin-coherence: mirrors` and
+`CLOSURE MODEL` (the `closure_declaration` check module), `pin-coherence: mirrors` and
 `INV-17-EXEMPT-OBJECT-STORE` (the `pin_coherence` check module), plus two this run added by enumerating the
 same directory — `retired-structure-lint: allow` (`retired_structure_lint.py`) and
 `registry-lint: allow` (`registry_grammar_lint.py`) — and `clang-format off`, `wall-clock:`, SPDX
@@ -4651,7 +4651,7 @@ fail once"* is what turned it up.
 `OPS-8.S4` says to derive the census from the gates the repo runs and calls its own list a floor.
 Taken literally on `insight-canon` — enumerate `scripts/`, read each instrument's opt-out constant —
 it yields **three markers the list does not name**, all read from COMMENT TEXT by live superproject
-gates: `log_seat_routing_lint.py`'s seat opt-out, `closure_declaration_lint.py`'s closure-model
+gates: `log_seat_routing_lint.py`'s seat opt-out, the `closure_declaration` check module's closure-model
 declaration, and the `pin_coherence` check module's mirror marker. The first is the sharpest of the three, because
 its scan globs cover `.cpp`/`.cppm` and exclude only tests, benchmarks and build trees — a CCC unit
 under `src/`, `api/` or `tools/` sits squarely inside its surface, and the CCC grammar does not list
