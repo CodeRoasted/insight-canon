@@ -156,7 +156,8 @@ try
     for (std::size_t index{0}; index < std::min(kTopTemplatesShown, by_count.size()); ++index)
         std::println("{}  {}", by_count[index].second,
                      std::string_view{by_count[index].first}.substr(0, kTemplatePreviewChars));
-    std::println("--- {} singleton samples (the FLAW-13 over-split tail) ---", kSingletonSamplesShown);
+    std::println("--- {} singleton samples (the FLAW-13 over-split tail) ---",
+                 kSingletonSamplesShown);
     std::size_t shown{0};
     for (auto iter{by_count.rbegin()}; iter != by_count.rend() && shown < kSingletonSamplesShown;
          ++iter)
