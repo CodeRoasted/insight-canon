@@ -88,7 +88,7 @@ namespace
                          .node = node,
                          .component = subsystem,
                          .content = fields,
-                         .declared_level = level};
+                         .column_level = level};
     }
 
     // post: the Thunderbird syslog tail — a BSD clock, a host, an optional bracketed tag, then
@@ -121,7 +121,7 @@ namespace
                          .node = node,
                          .component = daemon,
                          .content = tail,
-                         .declared_level = std::nullopt};
+                         .column_level = std::nullopt};
     }
 } // namespace
 
@@ -166,8 +166,8 @@ std::expected<ParsedLine, std::string> BGLStrategy::parse(std::string_view line,
     // invariant: that declared column is the reason the alert-labelled lines were worth claiming
     // — 348 460 of them, every one carrying a fatal-class word nothing was reading.
     // refs: ADR-16.D10
-    parsed_line.level = record->declared_level.has_value()
-                            ? EventLevel::declared(*record->declared_level)
+    parsed_line.level = record->column_level.has_value()
+                            ? EventLevel::declared(*record->column_level)
                             : utils::infer_leading_log_level(record->content);
     // invariant: the component is the low-card functional source and the node is the host identity,
     // which is deliberately hors-cube.
@@ -179,7 +179,7 @@ std::expected<ParsedLine, std::string> BGLStrategy::parse(std::string_view line,
                       "strategy=BGL parsed component={} host={} level={} declared={} "
                       "has_timestamp={}",
                       parsed_line.component, parsed_line.host, to_string(parsed_line.level.value()),
-                      record->declared_level.has_value(), parsed_line.timestamp.has_value());
+                      record->column_level.has_value(), parsed_line.timestamp.has_value());
     return std::expected<ParsedLine, std::string>{parsed_line};
 }
 

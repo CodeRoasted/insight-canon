@@ -364,7 +364,7 @@ struct BglRecord
     // invariant: the component is the subsystem on the RAS branch and the daemon tag on the
     // Thunderbird one, empty when there is none.
     // invariant: content is EVERY byte after the header — the total projection.
-    // invariant: the declared level is engaged on the RAS branch ONLY, because that grammar
+    // invariant: the column level is engaged on the RAS branch ONLY, because that grammar
     // DECLARES its severity in a fixed column, so the level is read rather than guessed.
     // invariant: the Thunderbird branch has no level column at all and infers from the message body
     // in the inferred species.
@@ -373,7 +373,7 @@ struct BglRecord
     std::string_view node;
     std::string_view component;
     std::string_view content;
-    std::optional<LogLevel> declared_level;
+    std::optional<LogLevel> column_level;
 };
 
 // post: nullopt means the line is not a record of either grammar.
