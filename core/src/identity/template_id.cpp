@@ -63,7 +63,8 @@ parse_template_id(std::string_view rendered) noexcept
 {
     if (!rendered.starts_with(kRenderedPrefix))
         return std::unexpected{TemplateIdParseError::MissingPrefix};
-    const std::string_view hex{rendered.substr(kRenderedPrefix.size())};
+    std::string_view hex{rendered};
+    hex.remove_prefix(kRenderedPrefix.size());
     if (hex.size() != 2 * kTemplateIdBytes)
         return std::unexpected{TemplateIdParseError::WrongLength};
     TemplateId out;

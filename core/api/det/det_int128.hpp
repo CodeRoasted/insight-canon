@@ -8,7 +8,7 @@
 
 #if (defined(__SIZEOF_INT128__) || defined(__GNUC__) || defined(__clang__)) &&                     \
     !defined(INSIGHT_DET_FORCE_PORTABLE_INT128)
-#define INSIGHT_DET_HAS_NATIVE_INT128 1
+#define INSIGHT_DET_HAS_NATIVE_INT128
 #endif
 
 namespace insight::det::detail

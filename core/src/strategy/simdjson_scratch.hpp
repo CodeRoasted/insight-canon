@@ -253,7 +253,8 @@ inline void skip_json_ws(std::string_view line, std::size_t& pos) noexcept
     const std::size_t dot{key.find('.')};
     if (dot == std::string_view::npos)
         return key;
-    const std::string_view tail{key.substr(dot + 1)};
+    std::string_view tail{key};
+    tail.remove_prefix(dot + 1);
     if (tail.find('.') != std::string_view::npos)
         return {};
     return tail;
@@ -320,7 +321,7 @@ inline void parse_number_ts(FastJsonResult& result, std::string_view key,
                ((line[pos] >= '0' && line[pos] <= '9') || line[pos] == '-' || line[pos] == '+' ||
                 line[pos] == '.' || line[pos] == 'e' || line[pos] == 'E'))
             ++pos;
-        const std::string_view num_text{line.substr(num_start, pos - num_start)};
+        const std::string_view num_text{line.data() + num_start, pos - num_start};
         parse_number_ts(result, key, num_text);
         // invariant: a numeric value is recorded as an ordinal CANDIDATE, matched against the
         // declared catalog by the caller.

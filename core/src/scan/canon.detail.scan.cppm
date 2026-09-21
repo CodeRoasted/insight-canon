@@ -817,8 +817,6 @@ inline void sv_skip_ws(std::string_view& str) noexcept
 // not opening `[`, or one whose brackets never balance, an empty result and `str` UNTOUCHED.
 // invariant: opt-in at the seat whose grammar is balanced — sv_take_bracketed_or_none stays
 // first-`]` for the syslog-family `[pid]` shape, which genuinely ends at the first close.
-// note: both substr positions are bounded by the index that closed depth 0 — cannot throw.
-// NOLINTNEXTLINE(bugprone-exception-escape)
 [[nodiscard]] constexpr std::string_view
 sv_take_balanced_bracketed_or_none(std::string_view& str) noexcept
 {
@@ -837,8 +835,8 @@ sv_take_balanced_bracketed_or_none(std::string_view& str) noexcept
         --depth;
         if (depth == 0U)
         {
-            const auto result = str.substr(1U, i - 1U);
-            str = str.substr(i + 1U);
+            const std::string_view result{str.data() + 1U, i - 1U};
+            str.remove_prefix(i + 1U);
             return result;
         }
     }
