@@ -2,9 +2,9 @@
 ###############################################################################
 # OPS-7.O9 disclosure-set lint — the accepted historic exposure is EXACT and CLOSED
 #
-# DISCLOSURE.md (Founder-signed, 2026-08-22) accepts that sixteen historic refs
-# of this repository carry the 17-file LogHub `corpora/loghub/slice/` tree, and
-# rules the boundary: no other ref carries any of it, and the set can never
+# DISCLOSURE.md (Founder-signed, 2026-08-22; set corrected 2026-09-04) accepts
+# that fifteen historic tags of this repository carry the 17-file LogHub
+# `corpora/loghub/slice/` tree, and rules the boundary: no other ref carries any of it, and the set can never
 # silently grow. Under OPS-7.O9, "disclosed" = that signed record in-tree
 # MATCHED EXACT-SET by a gate sitting in CI on every publication run. This
 # script is the gate half; the record is THE source.
@@ -29,8 +29,13 @@
 # The list here is a derived cache of the record. Before checking refs, the
 # script proves the cache still agrees with DISCLOSURE.md: the signature line
 # exists (unsigned = no disclosure, OPS-7.O9), and the record's stated
-# cardinality, range bounds, stray, boundary tag and file count all match the
-# enumeration. If the Founder re-signs a different boundary, this accord fails
+# cardinality, range bounds, stray set, boundary tag and file count all match
+# the enumeration. A stray (a declared ref outside the `v…` series) is
+# OPTIONAL in the record: a record naming none requires an enumeration holding
+# none, and a record naming one requires exactly that one — the stray set is
+# compared both ways, so neither side can carry a ref the other does not.
+# The record's file count must also add up on its own: N `*_2k.log` files +
+# the attribution == the stated M-file tree. If the Founder re-signs a different boundary, this accord fails
 # loudly until the enumeration is re-derived — the record stays the source.
 #
 # ── Fetch non-vacuity ──────────────────────────────────────────────────────────
@@ -44,7 +49,8 @@
 # ── Selftest (always on) ───────────────────────────────────────────────────────
 # Every run first proves all failure arms on a synthetic repo: green on a
 # conforming tag set, red on an out-of-set carrier, red on a declared ref gone
-# clean, red on a vanished declared ref, red on a record↔cache disaccord.
+# clean, red on a vanished declared ref, red on a record↔cache disaccord (in
+# cardinality, in the stray set, and in the record's own file arithmetic).
 # A gate whose red arms are never exercised is a gate that can't FAIL
 # (MEM:synthetic-gate-vacuity-vs-judgment) — here they fire on every run.
 ###############################################################################
@@ -60,8 +66,12 @@ DECLARED=(
   v1.5.4 v1.5.5 v1.5.6
   v1.6.0 v1.6.1 v1.6.2 v1.6.3 v1.6.4 v1.6.5
   v1.7.0 v1.7.1 v1.7.2 v1.7.3 v1.7.4 v1.7.5
-  1.6.4
 )
+
+# The declared refs outside the `v…` series, one per line, sorted (empty when none).
+declared_strays() {
+  printf '%s\n' "${DECLARED[@]}" | grep -v '^v' | sort || true
+}
 
 in_declared() {
   local ref="$1" d
@@ -85,20 +95,25 @@ accord_check() {
     return 2
   fi
 
-  # The exact-set sentence: "The <N> tags \`first\` … \`last\` plus the stray \`stray\`, …"
+  # The exact-set sentence: "The <N> tags \`first\` … \`last\` [plus the stray \`s\`] each carrying
+  # the <M>-file \`corpora/loghub/slice/\` tree (<K> \`*_2k.log\` files + attribution)." Every fact
+  # is read by its own phrase, never by backtick position: the slice path is backticked too, and a
+  # positional read took it for the stray the moment the record stopped naming one.
   local setline
   setline="$(grep -E 'The [0-9]+ tags' "$disclosure" | head -1 || true)"
-  local rec_count rec_first rec_last rec_stray rec_files rec_boundary
+  local rec_count rec_first rec_last rec_strays rec_files rec_logs rec_boundary
   rec_count="$(grep -oE 'The [0-9]+ tags' <<<"$setline" | grep -oE '[0-9]+' || true)"
-  mapfile -t _refs < <(grep -oE '`[^`]+`' <<<"$setline" | tr -d '`' || true)
-  rec_first="${_refs[0]:-}"; rec_last="${_refs[1]:-}"; rec_stray="${_refs[2]:-}"
-  rec_files="$(grep -oE '[0-9]+-file' "$disclosure" | head -1 | grep -oE '[0-9]+' || true)"
+  rec_first="$(grep -oE 'tags `[^`]+` … `[^`]+`' <<<"$setline" | cut -d'`' -f2 || true)"
+  rec_last="$(grep -oE 'tags `[^`]+` … `[^`]+`' <<<"$setline" | cut -d'`' -f4 || true)"
+  rec_strays="$(grep -oE 'plus the stray `[^`]+`' <<<"$setline" | cut -d'`' -f2 | sort || true)"
+  rec_files="$(grep -oE '[0-9]+-file' <<<"$setline" | head -1 | grep -oE '[0-9]+' || true)"
+  rec_logs="$(grep -oE '[0-9]+ `\*_2k\.log` files' <<<"$setline" | head -1 | grep -oE '^[0-9]+' || true)"
   rec_boundary="$(grep -oE 'newer than `v?[0-9][0-9.]*`' "$disclosure" | head -1 | tr -d '`' | awk '{print $3}' || true)"
 
-  if [ -z "$rec_count" ] || [ -z "$rec_first" ] || [ -z "$rec_last" ] || [ -z "$rec_stray" ] \
-     || [ -z "$rec_files" ] || [ -z "$rec_boundary" ]; then
+  if [ -z "$rec_count" ] || [ -z "$rec_first" ] || [ -z "$rec_last" ] \
+     || [ -z "$rec_files" ] || [ -z "$rec_logs" ] || [ -z "$rec_boundary" ]; then
     echo "::error::OPS-7.O9 accord — could not parse the exact-set facts out of ${disclosure}."
-    echo "The record's shape changed (count/range/stray/file-count/boundary sentence)."
+    echo "The record's shape changed (count/range/file-count/log-count/boundary sentence)."
     echo "Re-derive DECLARED in scripts/disclosure_set_lint.sh from the re-signed record, then re-accord."
     return 2
   fi
@@ -114,8 +129,12 @@ accord_check() {
     || { echo "accord: record range starts at ${rec_first}, enumeration starts at ${vmin}"; bad=1; }
   [ "$vmax" = "$rec_last" ] \
     || { echo "accord: record range ends at ${rec_last}, enumeration ends at ${vmax}"; bad=1; }
-  in_declared "$rec_stray" \
-    || { echo "accord: record's stray ${rec_stray} is not in the enumeration"; bad=1; }
+  local enum_strays
+  enum_strays="$(declared_strays)"
+  [ "$enum_strays" = "$rec_strays" ] \
+    || { echo "accord: record's stray set is [${rec_strays//$'\n'/ }], enumeration's is [${enum_strays//$'\n'/ }]"; bad=1; }
+  [ "$((rec_logs + 1))" -eq "$rec_files" ] \
+    || { echo "accord: record's tree is ${rec_files} files, but ${rec_logs} \`*_2k.log\` files + attribution is $((rec_logs + 1))"; bad=1; }
   [ "$vmax" = "$rec_boundary" ] \
     || { echo "accord: record's mechanical boundary is ${rec_boundary}, enumeration's newest is ${vmax}"; bad=1; }
 
@@ -205,7 +224,7 @@ run_check() {
     rc=1
   fi
   if [ "${#shape_drift[@]}" -ne 0 ]; then
-    echo "::error::OPS-7.O9 VIOLATION — declared ref(s) drifted from the recorded 17-file tree:"
+    echo "::error::OPS-7.O9 VIOLATION — declared ref(s) drifted from the recorded ${EXPECTED_FILES}-file tree:"
     printf '    %s\n' "${shape_drift[@]}"
     rc=1
   fi
@@ -251,31 +270,50 @@ selftest() {
     || { echo "selftest FAIL: v9.9.9 red did not name the ref:"; echo "$out"; return 3; }
   git -C "$R" "${GITC[@]}" tag -d v9.9.9 >/dev/null
   # Arm 2 — a declared ref gone clean is RED and NAMED.
-  local orig164; orig164="$(git -C "$R" rev-parse refs/tags/1.6.4)"
-  git -C "$R" update-ref refs/tags/1.6.4 "$(git -C "$R" rev-parse 'v1.9.6^{commit}')"
+  local probe="${DECLARED[$(( ${#DECLARED[@]} / 2 ))]}"
+  local probe_re="${probe//./\\.}"
+  local orig_probe; orig_probe="$(git -C "$R" rev-parse "refs/tags/${probe}")"
+  git -C "$R" update-ref "refs/tags/${probe}" "$(git -C "$R" rev-parse 'v1.9.6^{commit}')"
   if out="$( (run_check "$R" "$CANON/DISCLOSURE.md") 2>&1 )"; then
-    echo "selftest FAIL: declared ref 1.6.4 gone clean stayed green:"; echo "$out"; return 3
+    echo "selftest FAIL: declared ref ${probe} gone clean stayed green:"; echo "$out"; return 3
   fi
-  grep -q 'no longer carry the slice tree.*1\.6\.4' <<<"$out" \
-    || { echo "selftest FAIL: gone-clean red did not name 1.6.4:"; echo "$out"; return 3; }
-  git -C "$R" update-ref refs/tags/1.6.4 "$orig164"
+  grep -q "no longer carry the slice tree.*${probe_re}" <<<"$out" \
+    || { echo "selftest FAIL: gone-clean red did not name ${probe}:"; echo "$out"; return 3; }
+  git -C "$R" update-ref "refs/tags/${probe}" "$orig_probe"
   # Arm 3 — a vanished declared ref is RED as blindness, never green.
-  git -C "$R" "${GITC[@]}" tag -d 1.6.4 >/dev/null
+  git -C "$R" "${GITC[@]}" tag -d "$probe" >/dev/null
   if out="$( (run_check "$R" "$CANON/DISCLOSURE.md") 2>&1 )"; then
-    echo "selftest FAIL: vanished declared ref 1.6.4 stayed green:"; echo "$out"; return 3
+    echo "selftest FAIL: vanished declared ref ${probe} stayed green:"; echo "$out"; return 3
   fi
-  grep -q 'absent from this clone.*1\.6\.4' <<<"$out" \
-    || { echo "selftest FAIL: vanished-ref red did not name 1.6.4:"; echo "$out"; return 3; }
-  git -C "$R" update-ref refs/tags/1.6.4 "$orig164"
-  # Arm 4 — a record↔enumeration disaccord is RED (the record is the source).
-  sed 's/The 16 tags/The 15 tags/' "$CANON/DISCLOSURE.md" > "$T/disaccord.md"
+  grep -q "absent from this clone.*${probe_re}" <<<"$out" \
+    || { echo "selftest FAIL: vanished-ref red did not name ${probe}:"; echo "$out"; return 3; }
+  git -C "$R" update-ref "refs/tags/${probe}" "$orig_probe"
+  # Arm 4 — a cardinality disaccord is RED (the record is the source).
+  local n="${#DECLARED[@]}"
+  sed "s/The ${n} tags/The $((n + 1)) tags/" "$CANON/DISCLOSURE.md" > "$T/disaccord.md"
   if out="$( (run_check "$R" "$T/disaccord.md") 2>&1 )"; then
-    echo "selftest FAIL: record↔check disaccord stayed green:"; echo "$out"; return 3
+    echo "selftest FAIL: record↔check cardinality disaccord stayed green:"; echo "$out"; return 3
   fi
-  grep -q 'accord' <<<"$out" \
-    || { echo "selftest FAIL: disaccord red did not name the accord:"; echo "$out"; return 3; }
+  grep -q "accord: record says $((n + 1)) tags" <<<"$out" \
+    || { echo "selftest FAIL: cardinality disaccord red did not name the count:"; echo "$out"; return 3; }
+  # Arm 5 — a stray the record names and the enumeration lacks is RED: the stray set is compared,
+  # so a record that gains a stray cannot pass against an enumeration that has none (and the
+  # reverse is the same comparison).
+  sed 's/` each carrying/` plus the stray `0.0.0` each carrying/' "$CANON/DISCLOSURE.md" > "$T/stray.md"
+  if out="$( (run_check "$R" "$T/stray.md") 2>&1 )"; then
+    echo "selftest FAIL: a record naming stray 0.0.0 stayed green:"; echo "$out"; return 3
+  fi
+  grep -q "accord: record's stray set is \[0\.0\.0\]" <<<"$out" \
+    || { echo "selftest FAIL: stray disaccord red did not name the stray:"; echo "$out"; return 3; }
+  # Arm 6 — a record whose own file arithmetic does not add up is RED.
+  sed -E 's/\(([0-9]+) `\*_2k\.log` files/(1\1 `*_2k.log` files/' "$CANON/DISCLOSURE.md" > "$T/arith.md"
+  if out="$( (run_check "$R" "$T/arith.md") 2>&1 )"; then
+    echo "selftest FAIL: a record whose log count does not add up stayed green:"; echo "$out"; return 3
+  fi
+  grep -q 'accord: record.s tree is' <<<"$out" \
+    || { echo "selftest FAIL: file-arithmetic disaccord red did not name the arithmetic:"; echo "$out"; return 3; }
 
-  echo "selftest PASS: green arm + 4 red arms (out-of-set carrier, gone-clean, vanished ref, disaccord) all fire and name their subject."
+  echo "selftest PASS: green arm + 6 red arms (out-of-set carrier, gone-clean, vanished ref, cardinality, stray set, file arithmetic) all fire and name their subject."
   return 0
 }
 
