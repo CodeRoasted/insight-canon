@@ -4,7 +4,7 @@ packages:
   # core/ = the language, semantic/* = the vocabularies, benchmarks/ = the composed perf harness.
   insight_canon:
     path: core
-    version: 1.10.4
+    version: 1.10.5
     source_public: true
     release: true
     depends: []
@@ -16,25 +16,25 @@ packages:
   # and pin_coherence INV-20 checks it against `source_public` here.
   insight_semantic_github:
     path: semantic/github
-    version: 1.10.4
+    version: 1.10.5
     source_public: true
     release: true
     depends: [insight_canon]
   insight_semantic_jenkins:
     path: semantic/jenkins
-    version: 1.10.4
+    version: 1.10.5
     source_public: true
     release: true
     depends: [insight_canon]
   insight_semantic_gitlab:
     path: semantic/gitlab
-    version: 1.10.4
+    version: 1.10.5
     source_public: true
     release: true
     depends: [insight_canon]
   insight_semantic_test_frameworks:
     path: semantic/test_frameworks
-    version: 1.10.4
+    version: 1.10.5
     source_public: true
     release: true
     depends: [insight_canon]
@@ -44,7 +44,7 @@ packages:
   # and the on-tag measure-benchmark gate; never published as a release artifact.
   insight_canon_bench:
     path: benchmarks
-    version: 1.10.4
+    version: 1.10.5
     source_public: true
     release: false
     depends: [insight_canon, insight_semantic_github, insight_semantic_gitlab, insight_semantic_jenkins, insight_semantic_test_frameworks]
