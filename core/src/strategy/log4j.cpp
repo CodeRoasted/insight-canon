@@ -19,19 +19,19 @@ namespace insight::tokenization
 std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view line,
                                                             ArenaAllocator& /*arena*/) const
 {
-    std::size_t ts_start{0};
-    if (!find_log4j_ts_start(line, ts_start))
+    const std::optional<Log4jStamp> stamp{find_log4j_stamp(line)};
+    if (!stamp.has_value())
     {
         INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=Log4j parse miss (no ts)");
         return std::unexpected(
             std::string("Log4jStrategy: line does not match any Log4j/Python logging format"));
     }
 
-    std::string_view rest{line.substr(ts_start)};
-    const std::string_view ts_str{sv_take_n(rest, 23U)};
+    std::string_view rest{line.substr(stamp->ts_start)};
+    const std::string_view ts_str{sv_take_n(rest, kLog4jTimestampLen)};
 
-    // invariant: the variant is identified by peeking at the token after the timestamp, so the
-    // three layouts share one entry rather than three predicates.
+    // invariant: the three layouts share one entry rather than three predicates — the locator names
+    // the prefixed one, and the token after the timestamp tells the dash variant from the standard.
     sv_skip_ws(rest);
 
     if (rest.empty())
@@ -69,25 +69,14 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
         return std::expected<ParsedLine, std::string>{parsed_line};
     }
 
-    // invariant: a non-zero timestamp offset means a prefix token was skipped, which is what
-    // identifies the layout that carries a process id.
-    if (ts_start > 0U)
+    // invariant: the PREFIXED layout is the locator's verdict, never the stamp's offset — leading
+    // whitespace moves the offset without a prefix token.
+    // invariant: the locator admits a prefix only when a process id follows the stamp, so the first
+    // token here is always that id and the level is always the token after it.
+    if (stamp->prefixed)
     {
-        const std::string_view pid_or_level{sv_take_token(rest)};
-        bool is_pid{true};
-        for (const char chr : pid_or_level)
-            if (!is_digit(chr))
-            {
-                is_pid = false;
-                break;
-            }
-
-        std::string_view level_sv;
-        if (is_pid)
-            level_sv = sv_take_token(rest);
-        else
-            level_sv = pid_or_level;
-
+        (void)sv_take_token(rest);
+        const std::string_view level_sv{sv_take_token(rest)};
         const std::string_view component{sv_take_token(rest)};
         // invariant: the request-id section is a FLAT optional skip reaching no field, so an
         // unclosed one keeps its bytes rather than emptying content.
@@ -145,8 +134,7 @@ double Log4jStrategy::confidence(std::string_view line) const noexcept
 
     if (line.size() < kMinimumCandidateLength)
         return kNoConfidence;
-    std::size_t ts_start{0};
-    if (find_log4j_ts_start(line, ts_start))
+    if (find_log4j_stamp(line).has_value())
         return kLog4jConfidence;
     return kNoConfidence;
 }

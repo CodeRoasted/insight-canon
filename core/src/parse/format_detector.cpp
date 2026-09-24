@@ -125,12 +125,40 @@ namespace
                before == '.';
     }
 
+    // post: the claimants of a line an ISO date leads, or of one whose leading prefix precedes a
+    // Log4j stamp — the two are exclusive, so they share one seat in the candidate order.
+    void add_date_stamped_candidates(std::string_view line, CandidateList& candidates) noexcept
+    {
+        static constexpr std::size_t kTimestampSeparatorIndex{10};
+
+        if (!looks_like_yyyy_mm_dd(line))
+        {
+            // refs: ADR-16.D11
+            // invariant: the OpenStack layout puts a FILENAME before the stamp, so the date gate
+            // never offered Log4j and its OpenStack branch was unreachable from COLD detection.
+            // invariant: the same bounded locator Log4jStrategy uses decides here, so the gate
+            // and the claim cannot disagree about which lines the layout covers.
+            if (find_log4j_stamp(line).has_value())
+                candidates.add(LogFormat::Log4j);
+            return;
+        }
+        if (line.size() > kTimestampSeparatorIndex && line[kTimestampSeparatorIndex] == 'T')
+        {
+            // refs: ADR-16.D10
+            // note: the two RFC3339+T claimants are disjoint — the syslog header decides.
+            candidates.add(LogFormat::Syslog);
+            candidates.add(LogFormat::Rfc3339Text);
+            return;
+        }
+        candidates.add(LogFormat::WindowsCBS);
+        candidates.add(LogFormat::IISW3C);
+        candidates.add(LogFormat::Log4j);
+    }
+
     // invariant: a BUILTIN absent from this list is never probed, so every builtin claimant of a
     // shape must be offered here; a custom strategy is walked on every line regardless.
     [[nodiscard]] CandidateList candidates_for(std::string_view raw_line) noexcept
     {
-        static constexpr std::size_t kTimestampSeparatorIndex{10};
-
         CandidateList candidates;
         const std::string_view line = trim_left(raw_line);
         if (line.empty())
@@ -175,32 +203,7 @@ namespace
         if (looks_like_android_logcat(line))
             candidates.add(LogFormat::AndroidLogcat);
 
-        const bool iso_date_prefix{looks_like_yyyy_mm_dd(line)};
-        if (iso_date_prefix)
-        {
-            if (line.size() > kTimestampSeparatorIndex && line[kTimestampSeparatorIndex] == 'T')
-            {
-                // refs: ADR-16.D10
-                // note: the two RFC3339+T claimants are disjoint — the syslog header decides.
-                candidates.add(LogFormat::Syslog);
-                candidates.add(LogFormat::Rfc3339Text);
-            }
-            else
-            {
-                candidates.add(LogFormat::WindowsCBS);
-                candidates.add(LogFormat::IISW3C);
-                candidates.add(LogFormat::Log4j);
-            }
-        }
-
-        // refs: ADR-16.D11
-        // invariant: the OpenStack layout puts a FILENAME before the stamp, so the date-prefix gate
-        // above never offered Log4j and its OpenStack branch was unreachable from COLD detection.
-        // invariant: the same bounded locator Log4jStrategy uses decides here, so the gate and the
-        // claim cannot disagree about which lines the layout covers.
-        std::size_t log4j_ts_start{0};
-        if (!iso_date_prefix && find_log4j_ts_start(line, log4j_ts_start))
-            candidates.add(LogFormat::Log4j);
+        add_date_stamped_candidates(line, candidates);
 
         if (looks_like_clf(line))
             candidates.add(LogFormat::CLF);

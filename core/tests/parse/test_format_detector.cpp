@@ -15,7 +15,11 @@ class FormatDetectorTest : public ::testing::Test
     // REPRESENTATION-format strategies.
     // invariant: the dialect strategy is no longer a builtin — it arrives through the
     // composition, so its detection is that package's property and is tested in that suite.
-    FormatDetector detector{insight::test_support::degenerate_composition()};
+    // invariant: the composition is a MEMBER because LogParser BORROWS it — a temporary handed to
+    // its constructor dangles once the full-expression ends.
+    const insight::semantic::ComposedSemantics composed{
+        insight::test_support::degenerate_composition()};
+    FormatDetector detector{composed};
 };
 
 TEST_F(FormatDetectorTest, HasNineteenBuiltInRepresentationStrategies)
@@ -41,7 +45,7 @@ TEST_F(FormatDetectorTest, ABlankLineIsSkippedRatherThanCountedAsAParseFailure)
         << "every other line reaches the raw-text fallback, so nullptr means blank and only blank";
 
     ArenaAllocator arena{4096};
-    LogParser parser{arena, insight::test_support::degenerate_composition()};
+    LogParser parser{arena, composed};
     for (const std::string_view blank : {std::string_view{"   "}, std::string_view{"\t\t"},
                                          std::string_view{" \t \t "}, std::string_view{""}})
     {
@@ -320,6 +324,50 @@ TEST_F(FormatDetectorTest, DetectsTheOpenStackLayoutFromCold)
     EXPECT_TRUE(parsed.value().timestamp.has_value());
     EXPECT_NE(parsed.value().content, kOpenStack)
         << "the whole line reached content, so the door is still shut";
+}
+
+// invariant: the OpenStack layout's discriminator is the PROCESS ID after the stamp — without it a
+// leading token is any foreign prefix, and the branch read the first message word as component.
+// invariant: BOTH doors are driven, cold detection and a stream already latched onto Log4j, because
+// the latch asks the same locator through confidence().
+// invariant: the arm asserts the PROJECTION, so a claimant that keeps the level word and the first
+// message word in content passes and one that drops them fails, whichever strategy it is.
+// invariant: the Jenkins-stamped payload is the corpus-gates red of 2026-09-22, and the carrier
+// form is the neutral token its prefix-image exit gate prepends.
+// refs: ADR-16.D11
+TEST_F(FormatDetectorTest, APrefixedStampWithoutAProcessIdIsNotTheOpenStackLayout)
+{
+    static constexpr std::string_view kLatch{
+        "2015-10-18 18:01:47,978 INFO [main] org.apache.hadoop.Foo: started"};
+    static constexpr std::string_view kMessage{
+        "INFO NEM logging has been bootstrapped! (org.nem.deploy.LoggingBootstrapper bootstrap)"};
+    static constexpr std::array<std::string_view, 2> kPrefixed{
+        "[2026-07-09T07:49:08.059Z] 2026-07-09 07:49:07.847 INFO NEM logging has been "
+        "bootstrapped! (org.nem.deploy.LoggingBootstrapper bootstrap)",
+        "maskerprobe  2026-07-09 07:49:07.847 INFO NEM logging has been bootstrapped! "
+        "(org.nem.deploy.LoggingBootstrapper bootstrap)"};
+
+    for (const std::string_view line : kPrefixed)
+    {
+        const auto* cold{detector.detect(line)};
+        ASSERT_NE(cold, nullptr) << "line: " << line;
+        EXPECT_NE(cold->format(), LogFormat::Log4j)
+            << "cold detection routed a pid-less prefixed stamp to Log4j\n  line: " << line;
+
+        ArenaAllocator arena{4096};
+        LogParser parser{arena, composed};
+        ASSERT_TRUE(parser.parse_line(kLatch).has_value());
+        ASSERT_EQ(parser.routed_format(), LogFormat::Log4j)
+            << "the latch line routed to " << to_string(parser.routed_format());
+
+        const auto latched{parser.parse_line(line)};
+        ASSERT_TRUE(latched.has_value()) << latched.error();
+        EXPECT_NE(parser.routed_format(), LogFormat::Log4j)
+            << "the Log4j latch claimed a pid-less prefixed stamp\n  line: " << line;
+        EXPECT_NE(latched->content.find(kMessage), std::string_view::npos)
+            << "the level word or the first message word left content\n  content: \""
+            << latched->content << "\"\n  expected to contain: \"" << kMessage << "\"";
+    }
 }
 
 TEST_F(FormatDetectorTest, DetectsSparkHDFS)

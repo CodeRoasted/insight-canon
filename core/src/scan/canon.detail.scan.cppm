@@ -222,44 +222,61 @@ constexpr std::size_t kNginxTimestampLen{19U};
     return pos < str.size() && (str[pos] == '.' || str[pos] == ',');
 }
 
+// invariant: `YYYY-MM-DD HH:MM:SS.fff` is fixed width, and Log4jStrategy::parse takes exactly this
+// many bytes — one constant, so the locator's process-id read and the take cannot drift apart.
+constexpr std::size_t kLog4jTimestampLen{23U};
+
+// post: where a Log4j record's ISO datetime begins, and whether a leading prefix token precedes it.
+struct Log4jStamp
+{
+    std::size_t ts_start{0};
+    bool prefixed{false};
+};
+
+// refs: ADR-16.D11
+// post: the stamp at the first non-blank byte, which opens the standard or the dash layout; else
+// the first whitespace-preceded stamp, as the PREFIXED layout, when a process id follows it.
+// invariant: the process id is the prefixed layout's DISCRIMINATOR — without it the leading token
+// is any foreign prefix, and the token after the stamp is the level, never a process id.
+// invariant: leading whitespace is NOT a prefix — the detector's candidate gate trims it, so the
+// claim reads the line the gate read.
+// invariant: the search for the leading prefix is BOUNDED, so a line carrying no timestamp at all
+// costs a bounded scan rather than a whole-line one.
+// invariant: ONE reader for the detector's candidate gate, confidence() and parse() — a second copy
+// of this shape is how a gate and a claim come to disagree about which lines a layout covers.
+[[nodiscard]] constexpr std::optional<Log4jStamp> find_log4j_stamp(std::string_view line) noexcept
+{
+    static constexpr std::size_t kIsoTimestampMinLen{20U};
+    static constexpr std::size_t kLog4jPrefixScanLimit{96U};
+
+    const std::size_t first{skip_spaces(line, 0U)};
+    if (is_iso_datetime_space_prefix(line.substr(first), /*require_fraction=*/true))
+        return Log4jStamp{.ts_start = first, .prefixed = false};
+    const std::size_t limit{line.size() < kLog4jPrefixScanLimit ? line.size()
+                                                                : kLog4jPrefixScanLimit};
+    for (std::size_t i{first + 1U}; i + kIsoTimestampMinLen <= limit; ++i)
+    {
+        if (!is_space(line[i - 1U]) ||
+            !is_iso_datetime_space_prefix(line.substr(i), /*require_fraction=*/true))
+            continue;
+        // invariant: the id is read where parse() reads it — the token after the fixed-width stamp
+        // and its whitespace run — so the claim and the projection take the same bytes.
+        std::size_t pos{skip_spaces(line, i + kLog4jTimestampLen)};
+        const std::size_t pid_start{pos};
+        while (pos < line.size() && is_digit(line[pos]))
+            ++pos;
+        if (pos > pid_start && pos < line.size() && is_space(line[pos]))
+            return Log4jStamp{.ts_start = i, .prefixed = true};
+        return std::nullopt;
+    }
+    return std::nullopt;
+}
+
 // refs: DN-43.D11, ADR-16.D11
 // invariant: the level bracket is proven to be the NEXT token AND to close, so parse()'s take is
 // total and its level-empty exit — which DELETED the line — is gone.
 // invariant: the whitespace run is unbounded exactly as parse()'s sv_skip_ws is; the bounded scan
 // this replaces accepted a `[` that was not the next token at all.
-// refs: ADR-16.D11
-// post: true, with `ts_start` at the offset where the ISO datetime begins, when the line carries
-// one at byte 0 or after a whitespace-delimited leading token.
-// invariant: the search for the optional leading prefix is BOUNDED, so a line carrying no
-// timestamp at all costs a bounded scan rather than a whole-line one.
-// invariant: ONE reader for the detector's candidate gate and for Log4jStrategy — a second copy of
-// this shape is how a strategy branch becomes unreachable from COLD detection.
-[[nodiscard]] constexpr bool find_log4j_ts_start(std::string_view line,
-                                                 std::size_t& ts_start) noexcept
-{
-    static constexpr std::size_t kIsoTimestampMinLen{20U};
-    static constexpr std::size_t kLog4jPrefixScanLimit{96U};
-
-    if (is_iso_datetime_space_prefix(line, /*require_fraction=*/true))
-    {
-        ts_start = 0;
-        return true;
-    }
-    const std::size_t limit{line.size() < kLog4jPrefixScanLimit ? line.size()
-                                                                : kLog4jPrefixScanLimit};
-    for (std::size_t i{1U}; i + kIsoTimestampMinLen <= limit; ++i)
-    {
-        if (!is_space(line[i - 1U]))
-            continue;
-        if (is_iso_datetime_space_prefix(line.substr(i), /*require_fraction=*/true))
-        {
-            ts_start = i;
-            return true;
-        }
-    }
-    return false;
-}
-
 [[nodiscard]] constexpr bool is_nginx_error_prefix(std::string_view str) noexcept
 {
     static constexpr std::size_t kNginxMinLen{22U};

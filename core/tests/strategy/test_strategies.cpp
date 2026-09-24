@@ -1117,6 +1117,38 @@ TEST_F(Log4jStrategyTest, ColonlessStandardLineNamesNoComponentAndKeepsEveryByte
     EXPECT_TRUE(pl.timestamp.has_value()) << "and so is the event time";
 }
 
+// invariant: a PREFIXED stamp is the OpenStack layout only when a process id follows it; any other
+// leading token is a foreign prefix, and claiming it read the first message word as component.
+// invariant: confidence() and parse() answer through the same locator, so the claim is declined at
+// both doors and neither can accept what the other refuses.
+// refs: ADR-16.D11
+TEST_F(Log4jStrategyTest, APrefixedStampWithoutAProcessIdIsDeclined)
+{
+    static constexpr std::string_view kForeignPrefix{
+        "[2026-07-09T07:49:08.059Z] 2026-07-09 07:49:07.847 INFO NEM logging has been "
+        "bootstrapped! (org.nem.deploy.LoggingBootstrapper bootstrap)"};
+    EXPECT_EQ(strategy.confidence(kForeignPrefix), 0.0) << "line: " << kForeignPrefix;
+    const auto result{strategy.parse(kForeignPrefix, arena)};
+    EXPECT_FALSE(result.has_value()) << "claimed as component = \"" << result->component
+                                     << "\" content = \"" << result->content << "\"";
+}
+
+// invariant: LEADING WHITESPACE is not a prefix token — the detector trims it before offering
+// Log4j, so the stamp at the first non-blank byte opens the STANDARD layout, never the prefixed.
+// refs: ADR-16.D11
+TEST_F(Log4jStrategyTest, LeadingWhitespaceBeforeTheStampIsTheStandardLayout)
+{
+    static constexpr std::string_view kIndented{
+        "  2015-10-18 18:01:47,978 INFO [main] org.apache.hadoop.Foo: started"};
+    auto result{strategy.parse(kIndented, arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const auto& pl{result.value()};
+    EXPECT_EQ(pl.level, LogLevel::Info);
+    EXPECT_TRUE(pl.timestamp.has_value());
+    EXPECT_EQ(pl.component, "org.apache.hadoop.Foo") << "component = \"" << pl.component << "\"";
+    EXPECT_EQ(pl.content, "started") << "content = \"" << pl.content << "\"";
+}
+
 TEST_F(Log4jStrategyTest, RejectsNonLog4jLine)
 {
     EXPECT_FALSE(strategy.parse(kBSDLine, arena).has_value());
