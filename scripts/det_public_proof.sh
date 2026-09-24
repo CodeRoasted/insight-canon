@@ -299,7 +299,7 @@ for leg in "${LEGS[@]}"; do
         --build=missing -of "$legdir" >"$legdir.install.log" 2>&1; then
     echo "CONAN INSTALL FAIL: $cxx ($profile)" >&2; tail -4 "$legdir.install.log" | sed 's/^/   /' >&2; continue
   fi
-  toolchain="$(find "$legdir" -name conan_toolchain.cmake 2>/dev/null | head -1)"
+  toolchain="$(find "$legdir" -name conan_toolchain.cmake 2>/dev/null | sed -n 1p)"
   [ -f "$toolchain" ] || { echo "CONAN INSTALL FAIL: $cxx — no conan_toolchain.cmake under $legdir" >&2; continue; }
 
   for opt in -O0 -O3; do
@@ -321,7 +321,7 @@ for leg in "${LEGS[@]}"; do
       # lines. A hard exit, not a BUILD FAIL: a broken premise means the sweep silently lost
       # coverage it stopped claiming, which is not a condition to carry on through.
       assert_ffp_contract_forced_off "$bdir/compile_commands.json" "$tag" "$CANON" || exit 4
-      bin="$(find "$bdir" -name det_proof -type f -perm -u+x 2>/dev/null | head -1)"
+      bin="$(find "$bdir" -name det_proof -type f -perm -u+x 2>/dev/null | sed -n 1p)"
       if [ -x "$bin" ]; then builds+=("$tag"); BIN["$tag"]="$bin";
       else echo "BUILD FAIL: $tag (no det_proof binary)" >&2; fi
     else
@@ -335,7 +335,9 @@ done
 # ── Gate integrity: every REQUIRED compiler must have produced a build ─────────
 for req in ${DETERMINISM_REQUIRE_COMPILERS:-}; do
   pfx="${req//+/p}_"
-  printf '%s\n' "${builds[@]}" | grep -q "^$pfx" || {
+  # A here-string, never `printf | grep -q`: under pipefail grep exits at its first match while
+  # printf may still be writing, printf takes SIGPIPE, and a present compiler reads as absent.
+  grep -q "^$pfx" <<<"$(printf '%s\n' "${builds[@]}")" || {
     echo "GATE INTEGRITY FAIL: required compiler '$req' produced no successful build" >&2
     echo "  — the cross-compiler property is unverified; the gate would be hollow." >&2
     exit 3

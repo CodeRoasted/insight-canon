@@ -62,7 +62,7 @@ right_of() {   # $1 = a <corpus>/samples dir -> prints "SYNTHETIC" | "REDISTRIBU
   if [ -f "$slice" ] && grep -q '"synthetic"[[:space:]]*:[[:space:]]*true' "$slice"; then
     echo "SYNTHETIC"; return 0
   fi
-  attrib="$(find "$cdir" -type f -name 'ATTRIBUTION.md' | LC_ALL=C sort | head -1)"
+  attrib="$(find "$cdir" -type f -name 'ATTRIBUTION.md' | LC_ALL=C sort | sed -n 1p)"
   # The same licence vocabulary the warehouse gate accepts. Kept in step deliberately: a render
   # that claimed a right its source's gate would refuse is the failure one level down.
   if [ -n "$attrib" ] && grep -qiE 'CC-?BY|CC0|public[ -]?domain|MIT|Apache|BSD|permissive' "$attrib"; then
@@ -98,7 +98,7 @@ for cdir in "$SAMPLES"/*/samples; do
       echo "  two runs of the SAME binary on the SAME ${#logs[@]} logs disagree:"
       cmp "$OUT/$corpus.canon.txt" "$replay" || true
       echo "  first differing hunk (run 1 '<' vs run 2 '>'):"
-      diff "$OUT/$corpus.canon.txt" "$replay" | head -6 || true
+      diff "$OUT/$corpus.canon.txt" "$replay" | sed -n 1,6p || true
     } >&2
     exit 3
   fi

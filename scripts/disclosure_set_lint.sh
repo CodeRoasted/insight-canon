@@ -100,15 +100,15 @@ accord_check() {
   # is read by its own phrase, never by backtick position: the slice path is backticked too, and a
   # positional read took it for the stray the moment the record stopped naming one.
   local setline
-  setline="$(grep -E 'The [0-9]+ tags' "$disclosure" | head -1 || true)"
+  setline="$(grep -E 'The [0-9]+ tags' "$disclosure" | sed -n 1p || true)"
   local rec_count rec_first rec_last rec_strays rec_files rec_logs rec_boundary
   rec_count="$(grep -oE 'The [0-9]+ tags' <<<"$setline" | grep -oE '[0-9]+' || true)"
   rec_first="$(grep -oE 'tags `[^`]+` … `[^`]+`' <<<"$setline" | cut -d'`' -f2 || true)"
   rec_last="$(grep -oE 'tags `[^`]+` … `[^`]+`' <<<"$setline" | cut -d'`' -f4 || true)"
   rec_strays="$(grep -oE 'plus the stray `[^`]+`' <<<"$setline" | cut -d'`' -f2 | sort || true)"
-  rec_files="$(grep -oE '[0-9]+-file' <<<"$setline" | head -1 | grep -oE '[0-9]+' || true)"
-  rec_logs="$(grep -oE '[0-9]+ `\*_2k\.log` files' <<<"$setline" | head -1 | grep -oE '^[0-9]+' || true)"
-  rec_boundary="$(grep -oE 'newer than `v?[0-9][0-9.]*`' "$disclosure" | head -1 | tr -d '`' | awk '{print $3}' || true)"
+  rec_files="$(grep -oE '[0-9]+-file' <<<"$setline" | sed -n 1p | grep -oE '[0-9]+' || true)"
+  rec_logs="$(grep -oE '[0-9]+ `\*_2k\.log` files' <<<"$setline" | sed -n 1p | grep -oE '^[0-9]+' || true)"
+  rec_boundary="$(grep -oE 'newer than `v?[0-9][0-9.]*`' "$disclosure" | sed -n 1p | tr -d '`' | awk '{print $3}' || true)"
 
   if [ -z "$rec_count" ] || [ -z "$rec_first" ] || [ -z "$rec_last" ] \
      || [ -z "$rec_files" ] || [ -z "$rec_logs" ] || [ -z "$rec_boundary" ]; then
@@ -119,7 +119,7 @@ accord_check() {
   fi
 
   local vmin vmax
-  vmin="$(printf '%s\n' "${DECLARED[@]}" | grep '^v' | sort -V | head -1)"
+  vmin="$(printf '%s\n' "${DECLARED[@]}" | grep '^v' | sort -V | sed -n 1p)"
   vmax="$(printf '%s\n' "${DECLARED[@]}" | grep '^v' | sort -V | tail -1)"
 
   local bad=0
