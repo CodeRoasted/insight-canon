@@ -222,14 +222,28 @@ constexpr std::size_t kNginxTimestampLen{19U};
     return pos < str.size() && (str[pos] == '.' || str[pos] == ',');
 }
 
-// invariant: `YYYY-MM-DD HH:MM:SS.fff` is fixed width, and Log4jStrategy::parse takes exactly this
-// many bytes — one constant, so the locator's process-id read and the take cannot drift apart.
-constexpr std::size_t kLog4jTimestampLen{23U};
+// pre: an ISO datetime with a sub-second separator opens `line` at `start`.
+// post: one past the stamp — the fraction's digit run read WHOLE, however many digits it carries.
+// invariant: a fixed-width take cut a long fraction at its third digit, and the tail then posed as
+// the process id that proves the prefixed layout.
+[[nodiscard]] constexpr std::size_t log4j_stamp_end(std::string_view line,
+                                                    std::size_t start) noexcept
+{
+    static constexpr std::size_t kIsoDateLen{10U};
+    static constexpr std::size_t kTimeLen{8U};
+    static constexpr std::size_t kSeparatorLen{1U};
+    std::size_t pos{skip_spaces(line, start + kIsoDateLen) + kTimeLen + kSeparatorLen};
+    while (pos < line.size() && is_digit(line[pos]))
+        ++pos;
+    return pos;
+}
 
-// post: where a Log4j record's ISO datetime begins, and whether a leading prefix token precedes it.
+// post: where a Log4j record's ISO datetime begins and ends, and whether a leading prefix token
+// precedes it.
 struct Log4jStamp
 {
     std::size_t ts_start{0};
+    std::size_t ts_end{0};
     bool prefixed{false};
 };
 
@@ -251,7 +265,8 @@ struct Log4jStamp
 
     const std::size_t first{skip_spaces(line, 0U)};
     if (is_iso_datetime_space_prefix(line.substr(first), /*require_fraction=*/true))
-        return Log4jStamp{.ts_start = first, .prefixed = false};
+        return Log4jStamp{
+            .ts_start = first, .ts_end = log4j_stamp_end(line, first), .prefixed = false};
     const std::size_t limit{line.size() < kLog4jPrefixScanLimit ? line.size()
                                                                 : kLog4jPrefixScanLimit};
     for (std::size_t i{first + 1U}; i + kIsoTimestampMinLen <= limit; ++i)
@@ -259,14 +274,15 @@ struct Log4jStamp
         if (!is_space(line[i - 1U]) ||
             !is_iso_datetime_space_prefix(line.substr(i), /*require_fraction=*/true))
             continue;
-        // invariant: the id is read where parse() reads it — the token after the fixed-width stamp
-        // and its whitespace run — so the claim and the projection take the same bytes.
-        std::size_t pos{skip_spaces(line, i + kLog4jTimestampLen)};
+        // invariant: the id is read where parse() reads it — the token after the WHOLE stamp and
+        // its whitespace run — so the claim and the projection take the same bytes.
+        const std::size_t ts_end{log4j_stamp_end(line, i)};
+        std::size_t pos{skip_spaces(line, ts_end)};
         const std::size_t pid_start{pos};
         while (pos < line.size() && is_digit(line[pos]))
             ++pos;
         if (pos > pid_start && pos < line.size() && is_space(line[pos]))
-            return Log4jStamp{.ts_start = i, .prefixed = true};
+            return Log4jStamp{.ts_start = i, .ts_end = ts_end, .prefixed = true};
         return std::nullopt;
     }
     return std::nullopt;

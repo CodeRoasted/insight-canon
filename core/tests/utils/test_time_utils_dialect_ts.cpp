@@ -301,6 +301,17 @@ TEST(ParseLog4jTimestamp, SubSecondDigitsDoNotChangeTheInstant)
     EXPECT_EQ(epoch_of(*early), epoch_of(*late));
 }
 
+// invariant: the fraction is VARIABLE width and never read — the locator hands over the stamp
+// whole, so a short or a long fraction is the same instant as a three-digit one.
+// refs: ADR-16.D11
+TEST(ParseLog4jTimestamp, AFractionOfAnyWidthIsTheSameInstant)
+{
+    const auto expected{utc_epoch(2024, 1, 15, 10, 30, 0)};
+    EXPECT_PARSES_TO(parse_log4j_timestamp("2024-01-15 10:30:00,5"), expected);
+    EXPECT_PARSES_TO(parse_log4j_timestamp("2024-01-15 10:30:00.12"), expected);
+    EXPECT_PARSES_TO(parse_log4j_timestamp("2024-01-15 10:30:00.123456789"), expected);
+}
+
 TEST(ParseLog4jTimestamp, IgnoresTrailingLineContent)
 {
     EXPECT_PARSES_TO(parse_log4j_timestamp("2024-01-15 10:30:00,123 ERROR [main] boom"),
@@ -321,7 +332,7 @@ TEST(ParseLog4jTimestamp, MissingSubSecondSeparatorRefused)
 TEST(ParseLog4jTimestamp, MalformedInputRefused)
 {
     EXPECT_FALSE(parse_log4j_timestamp("").has_value());
-    EXPECT_FALSE(parse_log4j_timestamp("2024-01-15 10:30:0,123").has_value()) << "22 chars";
+    EXPECT_FALSE(parse_log4j_timestamp("2024-01-15 10:30:0,123").has_value()) << "1-digit second";
     EXPECT_FALSE(parse_log4j_timestamp("2024/01/15 10:30:00,123").has_value());
     EXPECT_FALSE(parse_log4j_timestamp("2024-01-15 10-30-00,123").has_value());
     EXPECT_FALSE(parse_log4j_timestamp("20x4-01-15 10:30:00,123").has_value());

@@ -92,6 +92,10 @@ class LogParser
     // refs: ADR-17
     // pre: `composed` is borrowed — the composed vocabulary must outlive the parser.
     LogParser(ArenaAllocator& arena, const insight::semantic::ComposedSemantics& composed);
+    // invariant: a temporary composition dangles once the full-expression ends, so binding one is a
+    // compile error rather than a use-after-free met in the first level lift.
+    LogParser(ArenaAllocator& arena,
+              const insight::semantic::ComposedSemantics&& composed) = delete;
 
     // post: auto-detection is off; a format no registered strategy carries re-enables it instead.
     void set_format(LogFormat fmt);

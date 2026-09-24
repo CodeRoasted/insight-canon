@@ -27,8 +27,8 @@ std::expected<ParsedLine, std::string> Log4jStrategy::parse(std::string_view lin
             std::string("Log4jStrategy: line does not match any Log4j/Python logging format"));
     }
 
-    std::string_view rest{line.substr(stamp->ts_start)};
-    const std::string_view ts_str{sv_take_n(rest, kLog4jTimestampLen)};
+    const std::string_view ts_str{line.substr(stamp->ts_start, stamp->ts_end - stamp->ts_start)};
+    std::string_view rest{line.substr(stamp->ts_end)};
 
     // invariant: the three layouts share one entry rather than three predicates — the locator names
     // the prefixed one, and the token after the timestamp tells the dash variant from the standard.

@@ -1439,8 +1439,9 @@ parse_apache_error_ts(std::string_view timestamp_str) noexcept;
 // millisecond terminator, so 15 characters is the FLOOR and no fixed width exists.
 [[nodiscard]] std::optional<Timestamp> parse_health_app_ts(std::string_view timestamp_str) noexcept;
 
-// post: an ISO-like timestamp with comma or dot milliseconds; unlike the ISO 8601 parser this
-// REQUIRES a space separator and REQUIRES the milliseconds.
+// post: an ISO-like timestamp with a comma or dot sub-second fraction; unlike the ISO 8601 parser
+// this REQUIRES a space separator and REQUIRES the sub-second separator.
+// invariant: the fraction is variable width and never read, so the instant has second grain.
 [[nodiscard]] std::optional<Timestamp>
 parse_log4j_timestamp(std::string_view timestamp_str) noexcept;
 

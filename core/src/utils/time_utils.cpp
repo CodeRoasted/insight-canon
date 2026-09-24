@@ -42,7 +42,10 @@ namespace time_constants
     // millisecond digits terminate the second field and are never read.
     // refs: DN-43.O5
     inline constexpr std::size_t kHealthAppMinLength{15};
-    inline constexpr std::size_t kLog4jMinLength{23};
+    // invariant: the date, one space, the clock and the sub-second separator; the fraction is
+    // variable width and never read, so no digit of it is required here.
+    // refs: ADR-16.D11
+    inline constexpr std::size_t kLog4jMinLength{20};
     inline constexpr std::size_t kNginxErrorMinLength{19};
 
 } // namespace time_constants

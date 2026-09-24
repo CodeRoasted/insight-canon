@@ -1149,6 +1149,66 @@ TEST_F(Log4jStrategyTest, LeadingWhitespaceBeforeTheStampIsTheStandardLayout)
     EXPECT_EQ(pl.content, "started") << "content = \"" << pl.content << "\"";
 }
 
+// invariant: the stamp's fraction is read WHOLE, so the digits past the third never pose as the
+// process id that proves the prefixed layout.
+// invariant: a real GitLab ghc unified-diff header — a pid-less prefix before a nine-digit fraction
+// — which the fixed-width take claimed with pid "125421", level "+0000" and no content.
+// refs: ADR-16.D11
+TEST_F(Log4jStrategyTest, ALongFractionTailIsNotAProcessId)
+{
+    static constexpr std::string_view kGhcDiffHeader{
+        "--- /dev/null\t2025-03-12 23:17:31.994125421 +0000"};
+    EXPECT_EQ(strategy.confidence(kGhcDiffHeader), 0.0) << "line: " << kGhcDiffHeader;
+    const auto result{strategy.parse(kGhcDiffHeader, arena)};
+    EXPECT_FALSE(result.has_value())
+        << "claimed as level = " << to_string(result->level.value()) << ", component = \""
+        << result->component << "\", content = \"" << result->content << "\"";
+}
+
+// invariant: a REAL process id after a long fraction is still the prefixed layout, read at the id's
+// own offset, so the level and component are the fields and not the fraction's tail.
+// refs: ADR-16.D11
+TEST_F(Log4jStrategyTest, AProcessIdAfterALongFractionIsTheOpenStackLayout)
+{
+    static constexpr std::string_view kOpenStackMicros{
+        "nova-compute.log.1.2017-05-16_13:55:31 2017-05-16 00:00:04.500123 2931 INFO "
+        "nova.compute.manager [req-3ea4052c-895d-4b64-9e2d-04d64c4d94ab - - - - -] VM Started"};
+    EXPECT_GT(strategy.confidence(kOpenStackMicros), 0.5) << "line: " << kOpenStackMicros;
+    auto result{strategy.parse(kOpenStackMicros, arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    const auto& pl{result.value()};
+    EXPECT_TRUE(pl.timestamp.has_value());
+    EXPECT_EQ(pl.level, LogLevel::Info) << "level = " << to_string(pl.level.value());
+    EXPECT_EQ(pl.component, "nova.compute.manager") << "component = \"" << pl.component << "\"";
+    EXPECT_NE(pl.content.find("VM Started"), std::string_view::npos)
+        << "content = \"" << pl.content << "\"";
+}
+
+// invariant: the standard layout takes the same whole stamp, so a long or a short fraction leaves
+// no digit and takes no letter of the level field.
+// invariant: the instant survives a short fraction — the take no longer borrows the level's first
+// bytes to reach a fixed width.
+// refs: ADR-16.D11
+TEST_F(Log4jStrategyTest, TheStandardLayoutReadsAnyFractionWhole)
+{
+    static constexpr std::array<std::string_view, 3> kLines{
+        "2016-09-28 04:30:30.123456 INFO [main] org.apache.hadoop.Foo: started",
+        "2016-09-28 04:30:30.123456789 INFO [main] org.apache.hadoop.Foo: started",
+        "2016-09-28 04:30:30,5 INFO [main] org.apache.hadoop.Foo: started"};
+    for (const std::string_view line : kLines)
+    {
+        auto result{strategy.parse(line, arena)};
+        ASSERT_TRUE(result.has_value()) << result.error() << "\n  line: " << line;
+        const auto& pl{result.value()};
+        EXPECT_TRUE(pl.timestamp.has_value()) << "line: " << line;
+        EXPECT_EQ(pl.level, LogLevel::Info)
+            << "level = " << to_string(pl.level.value()) << "\n  line: " << line;
+        EXPECT_EQ(pl.component, "org.apache.hadoop.Foo")
+            << "component = \"" << pl.component << "\"\n  line: " << line;
+        EXPECT_EQ(pl.content, "started") << "content = \"" << pl.content << "\"\n  line: " << line;
+    }
+}
+
 TEST_F(Log4jStrategyTest, RejectsNonLog4jLine)
 {
     EXPECT_FALSE(strategy.parse(kBSDLine, arena).has_value());

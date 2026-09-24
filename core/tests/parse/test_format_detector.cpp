@@ -3,10 +3,26 @@
 // and batch-weighted detection.
 #include <gtest/gtest.h>
 
+#include <type_traits>
+
 import insight.canon.test;
 
 using namespace insight;
 using namespace insight::tokenization;
+
+// invariant: LogParser BORROWS its composition, so a temporary one — dangling once the
+// full-expression ends — is a compile error, never a crash met in the first level lift.
+// invariant: pinned as constructibility traits, which run in every build of this unit and so cannot
+// be skipped the way a build-failing fixture can.
+static_assert(
+    !std::is_constructible_v<LogParser, ArenaAllocator&, insight::semantic::ComposedSemantics>,
+    "LogParser must refuse a temporary ComposedSemantics — it keeps a reference to it");
+static_assert(!std::is_constructible_v<LogParser, ArenaAllocator&,
+                                       const insight::semantic::ComposedSemantics>,
+              "a const temporary dangles exactly as a mutable one does");
+static_assert(std::is_constructible_v<LogParser, ArenaAllocator&,
+                                      const insight::semantic::ComposedSemantics&>,
+              "the borrowing door itself stays open to a named composition");
 
 class FormatDetectorTest : public ::testing::Test
 {
@@ -368,6 +384,75 @@ TEST_F(FormatDetectorTest, APrefixedStampWithoutAProcessIdIsNotTheOpenStackLayou
             << "the level word or the first message word left content\n  content: \""
             << latched->content << "\"\n  expected to contain: \"" << kMessage << "\"";
     }
+}
+
+// invariant: the stamp's fraction is read WHOLE, so the digits past the third are never taken for
+// the process id that proves the OpenStack layout.
+// invariant: the line is a real GitLab ghc unified-diff header — a pid-less prefix before a
+// nine-digit fraction — and BOTH doors are driven, cold detection and a Log4j-latched stream.
+// invariant: the arm asserts the PROJECTION keeps the header's path and zone, which the OpenStack
+// reading emptied (pid "125421", level "+0000", no content).
+// refs: ADR-16.D11
+TEST_F(FormatDetectorTest, ALongFractionTailIsNotAProcessId)
+{
+    static constexpr std::string_view kLatch{
+        "2015-10-18 18:01:47,978 INFO [main] org.apache.hadoop.Foo: started"};
+    static constexpr std::string_view kGhcDiffHeader{
+        "--- /dev/null\t2025-03-12 23:17:31.994125421 +0000"};
+
+    const auto* cold{detector.detect(kGhcDiffHeader)};
+    ASSERT_NE(cold, nullptr);
+    EXPECT_NE(cold->format(), LogFormat::Log4j)
+        << "cold detection read the fraction's tail as a process id and routed to "
+        << to_string(cold->format()) << "\n  line: " << kGhcDiffHeader;
+
+    ArenaAllocator arena{4096};
+    LogParser parser{arena, composed};
+    ASSERT_TRUE(parser.parse_line(kLatch).has_value());
+    ASSERT_EQ(parser.routed_format(), LogFormat::Log4j)
+        << "the latch line routed to " << to_string(parser.routed_format());
+
+    const auto latched{parser.parse_line(kGhcDiffHeader)};
+    ASSERT_TRUE(latched.has_value()) << latched.error();
+    EXPECT_NE(parser.routed_format(), LogFormat::Log4j)
+        << "the Log4j latch read the fraction's tail as a process id and routed to "
+        << to_string(parser.routed_format()) << "\n  line: " << kGhcDiffHeader;
+    EXPECT_NE(latched->content.find("--- /dev/null"), std::string_view::npos)
+        << "the header's path left content\n  content: \"" << latched->content << "\"";
+    EXPECT_NE(latched->content.find("+0000"), std::string_view::npos)
+        << "the header's zone left content\n  content: \"" << latched->content << "\"";
+}
+
+// invariant: a REAL process id after a long fraction still proves the OpenStack layout — the whole
+// fraction is skipped, and the id, level and component are read where they stand.
+// refs: ADR-16.D11
+TEST_F(FormatDetectorTest, AProcessIdAfterALongFractionIsStillTheOpenStackLayout)
+{
+    static constexpr std::string_view kOpenStackMicros{
+        "nova-compute.log.1.2017-05-16_13:55:31 2017-05-16 00:00:04.500123 2931 INFO "
+        "nova.compute.manager [req-3ea4052c-895d-4b64-9e2d-04d64c4d94ab - - - - -] "
+        "[instance: b9000564-fe1a-409b-b8cc-1e88b294cd1d] VM Started (Lifecycle Event)"};
+
+    auto* strategy{detector.detect(kOpenStackMicros)};
+    ASSERT_NE(strategy, nullptr);
+    ASSERT_EQ(strategy->format(), LogFormat::Log4j)
+        << "cold detection routed to " << to_string(strategy->format());
+
+    ArenaAllocator arena{4096};
+    auto parsed{strategy->parse(kOpenStackMicros, arena)};
+    ASSERT_TRUE(parsed.has_value()) << parsed.error();
+    EXPECT_EQ(parsed->level, LogLevel::Info)
+        << "the level was read off the fraction's tail, not the level field: "
+        << to_string(parsed->level.value());
+    EXPECT_EQ(parsed->component, "nova.compute.manager")
+        << "component = \"" << parsed->component << "\"";
+    EXPECT_NE(parsed->content.find(
+                  "[instance: b9000564-fe1a-409b-b8cc-1e88b294cd1d] VM Started (Lifecycle Event)"),
+              std::string_view::npos)
+        << "the message left content\n  content: \"" << parsed->content << "\"";
+    EXPECT_EQ(parsed->content.find("req-3ea4052c"), std::string_view::npos)
+        << "the request-id section stayed in content\n  content: \"" << parsed->content << "\"";
+    EXPECT_TRUE(parsed->timestamp.has_value());
 }
 
 TEST_F(FormatDetectorTest, DetectsSparkHDFS)
