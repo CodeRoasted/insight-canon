@@ -5,10 +5,26 @@
 // grouping, param extraction and batch processing.
 #include <gtest/gtest.h>
 
+#include <type_traits>
+
 import insight.canon.test;
 
 using namespace insight;
 using namespace insight::tokenization;
+
+// invariant: the Tokenizer BORROWS its composition through its Impl, so a temporary one —
+// dangling once the full-expression ends — is a compile error, never a crash met in the first line.
+// invariant: pinned as constructibility traits, which run in every build of this unit and so cannot
+// be skipped the way a build-failing fixture can.
+static_assert(!std::is_constructible_v<Tokenizer, ArenaAllocator&, MaskConfig,
+                                       insight::semantic::ComposedSemantics>,
+              "Tokenizer must refuse a temporary ComposedSemantics — it keeps a reference to it");
+static_assert(!std::is_constructible_v<Tokenizer, ArenaAllocator&, MaskConfig,
+                                       const insight::semantic::ComposedSemantics>,
+              "a const temporary dangles exactly as a mutable one does");
+static_assert(std::is_constructible_v<Tokenizer, ArenaAllocator&, MaskConfig,
+                                      const insight::semantic::ComposedSemantics&>,
+              "the borrowing door itself stays open to a named composition");
 
 class TokenizerTest : public ::testing::Test
 {

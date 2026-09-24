@@ -62,6 +62,10 @@ class Tokenizer
     // pre: `composed` outlives the Tokenizer, which does not own it.
     explicit Tokenizer(ArenaAllocator& arena, MaskConfig mask_config,
                        const insight::semantic::ComposedSemantics& composed);
+    // invariant: a temporary composition dangles once the full-expression ends, so binding one is a
+    // compile error rather than a use-after-free met in the first line.
+    Tokenizer(ArenaAllocator& arena, MaskConfig mask_config,
+              const insight::semantic::ComposedSemantics&& composed) = delete;
     ~Tokenizer();
 
     Tokenizer(const Tokenizer&) = delete;
