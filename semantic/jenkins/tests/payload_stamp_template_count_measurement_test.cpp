@@ -664,6 +664,19 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
                     return std::nullopt;
                 return std::string{tail.substr(1U)};
             }};
+        const auto carrier_sample{
+            [&](std::size_t line_index, std::size_t carrier_index) -> std::string
+            {
+                const auto shown{[](const LineOutcome& outcome) -> std::string
+                                 {
+                                     return outcome.produced ? "\"" + outcome.template_str + "\""
+                                                             : std::string{"<declined>"};
+                                 }};
+                return log_path + ":" + std::to_string(line_index) + " carrier=\"" +
+                       carrier_lines[carrier_index] + "\" -> " +
+                       shown(carrier_outcomes[carrier_index]) + " A=" + shown(arm_a[line_index]) +
+                       " B=" + shown(arm_b[line_index]);
+            }};
 
         for (const StampFacts& facts : stamps)
         {
@@ -672,7 +685,7 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
             {
                 ++carrier_failures;
                 if (carrier_samples.size() < kSampleTemplatesPrinted)
-                    carrier_samples.push_back(log_path + ":" + std::to_string(facts.line_index));
+                    carrier_samples.push_back(carrier_sample(facts.line_index, facts.m_rest_index));
                 continue;
             }
             const std::string expected_b{m_rest->empty() ? std::string{kBareNormalForm}
@@ -709,7 +722,8 @@ TEST(JenkinsPayloadStampMeasurement, PrefixImageExitGate)
             {
                 ++carrier_failures;
                 if (carrier_samples.size() < kSampleTemplatesPrinted)
-                    carrier_samples.push_back(log_path + ":" + std::to_string(facts.line_index));
+                    carrier_samples.push_back(
+                        carrier_sample(facts.line_index, facts.m_stripped_index));
                 continue;
             }
             m_stamped_stripped.insert(*m_stripped);
