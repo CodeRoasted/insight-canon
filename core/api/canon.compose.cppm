@@ -168,6 +168,7 @@ class ComposedSemantics
     // refs: ADR-22, ADR-22.D4
     // post: builds the vocabulary ONE stream declares, at stream open: dialect and channel,
     // filtered ONCE.
+    // post: the returned view borrows neither argument, so either may be a temporary string.
     // pre: both coordinates are the caller's provenance facts, never auto-detected — canon
     // VERIFIES, it does not infer.
     // note: a content heuristic decides from a PREFIX, so a later line can contradict it
@@ -234,7 +235,7 @@ class ComposedSemantics
 
   private:
     ComposedSemantics() = default;
-    friend ComposedSemantics compose(std::span<const SemanticPackageManifest>);
+    friend ComposedSemantics compose(std::span<const SemanticPackageManifest> packages);
 
     // refs: ADR-22
     // invariant: THE VIEW — what this stream's walkers see. Each of these five is already
@@ -264,6 +265,8 @@ class ComposedSemantics
     // invariant: the dialect this view was resolved for; empty means Unspecified.
     // invariant: it is here because `withholds_markers_for` needs it to ask its question about the
     // RIGHT dialect, now that the dialect has stopped being a per-call parameter.
+    // invariant: it views the matched `ComposedPackage::name`, in package static storage like every
+    // other byte this class points at, never the caller's argument, which may be a temporary.
     std::string_view declared_dialect_;
 
     // refs: ADR-22

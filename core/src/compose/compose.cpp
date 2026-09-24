@@ -287,10 +287,16 @@ bool ComposedSemantics::withholds_markers_for(std::string_view declared_channel)
 ComposedSemantics ComposedSemantics::for_stream(std::string_view declared_dialect,
                                                 std::string_view declared_channel) const
 {
-    if (!declared_dialect.empty() &&
-        std::ranges::none_of(packages_, [declared_dialect](const ComposedPackage& pkg) noexcept
-                             { return pkg.name == declared_dialect; }))
-        fail_unknown_dialect(declared_dialect, packages_);
+    // invariant: the view keeps the matched package's own name, never the caller's bytes, which
+    // may be a temporary; an empty declaration keeps the empty view, which is Unspecified.
+    std::string_view resolved_dialect;
+    if (!declared_dialect.empty())
+    {
+        const auto matched{std::ranges::find(packages_, declared_dialect, &ComposedPackage::name)};
+        if (matched == packages_.end())
+            fail_unknown_dialect(declared_dialect, packages_);
+        resolved_dialect = matched->name;
+    }
     if (!declared_channel.empty() &&
         std::ranges::find(channels_, declared_channel) == channels_.end())
         fail_unknown_channel(declared_channel, channels_);
@@ -312,10 +318,10 @@ ComposedSemantics ComposedSemantics::for_stream(std::string_view declared_dialec
     out.all_level_lifts_ = all_level_lifts_;
     out.all_outcome_tokens_ = all_outcome_tokens_;
     out.all_outcome_markers_ = all_outcome_markers_;
-    out.declared_dialect_ = declared_dialect;
+    out.declared_dialect_ = resolved_dialect;
 
-    const auto admits{[declared_dialect](std::string_view dialect_gate) noexcept
-                      { return dialect_admits(dialect_gate, declared_dialect); }};
+    const auto admits{[resolved_dialect](std::string_view dialect_gate) noexcept
+                      { return dialect_admits(dialect_gate, resolved_dialect); }};
 
     out.roles_.reserve(all_roles_.size());
     std::ranges::copy_if(all_roles_, std::back_inserter(out.roles_),

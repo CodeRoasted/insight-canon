@@ -30,9 +30,11 @@ using insight::semantic::ComposedSemantics;
 using insight::semantic::find_conflict;
 using insight::semantic::IntentMarkerRow;
 using insight::semantic::kAnyDialect;
+using insight::semantic::PayloadExtract;
 using insight::semantic::SemanticPackageManifest;
 using insight::semantic::StructuralRoleRow;
 using insight::tokenization::ArenaAllocator;
+using insight::tokenization::ChildOrder;
 using insight::tokenization::classify;
 using insight::tokenization::IntentMarkerKind;
 using insight::tokenization::MaskConfig;
@@ -195,6 +197,26 @@ constexpr std::array<std::string_view, 1> kRevisionsOne{{"v1"}};
 constexpr std::array<std::string_view, 2> kRevisionsTwo{{"v1", "v2"}};
 constexpr std::array<std::string_view, 1> kRevisionUnnamed{{""}};
 constexpr std::array<std::string_view, 2> kRevisionsRepeated{{"v1", "v1"}};
+
+// invariant: a dialect with TWO materializations — its one marker row is channel-gated — so a view
+// resolved for it withholds that row from a stream declaring no channel.
+// invariant: the name is longer than any standard library's small-string buffer, so a string
+// holding it owns HEAP bytes and a dangling view is a sanitizer-visible heap-use-after-free.
+constexpr std::string_view kChanneledDialect{"channel_gated_dialect_with_a_heap_name"};
+constexpr std::string_view kChanneledChannel{"annotated"};
+constexpr std::array<std::string_view, 1> kChanneledChannels{{kChanneledChannel}};
+constexpr std::array<IntentMarkerRow, 1> kChanneledMarkers{
+    {{.prefix = "<CH-step> ",
+      .kind = IntentMarkerKind::Step,
+      .child_order = ChildOrder::Ordered,
+      .dialect_gate = kChanneledDialect,
+      .extract = PayloadExtract::RemainderAfterPrefix,
+      .payload_excludes = {},
+      .channel_gate = kChanneledChannel}}};
+constexpr SemanticPackageManifest kChanneledPkg{.name = kChanneledDialect,
+                                                .version = "1.0.0",
+                                                .markers = kChanneledMarkers,
+                                                .channels = kChanneledChannels};
 } // namespace
 
 // invariant: the BUILD-TIME half — the conflict finder is constexpr, so a duplicate is caught in
@@ -380,4 +402,41 @@ TEST(Composition, SemanticIdentityIsReproducibleOrderIndependentAndContentSensit
     EXPECT_EQ(compose({}).identity(), compose({}).identity());
     EXPECT_NE(compose({}).identity(), compose(a).identity())
         << "core-only and core+alpha must not collide";
+}
+
+// invariant: a stream view OWNS its resolved dialect coordinate — the caller's dialect string may
+// be rewritten or destroyed the moment `for_stream` returns, and the view's question stays right.
+// invariant: the rewrite leg is the sanitizer-free witness: the caller's buffer is still alive,
+// so a view that kept it reads the rewritten bytes and answers for a dialect nobody declared.
+// invariant: the temporary leg is the dangling read itself; plain builds may pass it by luck, and
+// the address-sanitized build reports a heap-use-after-free on it.
+// invariant: the two controls keep the question non-vacuous: the declared channel releases the
+// withheld row, and an undeclared view withholds nothing.
+// refs: ADR-22
+TEST(Composition, AStreamViewOwnsItsDialectCoordinate)
+{
+    const std::array manifests{kChanneledPkg};
+    const ComposedSemantics vocabulary{compose(manifests)};
+
+    std::string declared{kChanneledDialect};
+    const ComposedSemantics rewritten{vocabulary.for_stream(declared, {})};
+    declared.assign(declared.size(), 'x');
+    EXPECT_TRUE(rewritten.withholds_markers_for({}))
+        << "a view resolved for \"" << kChanneledDialect
+        << "\" must still withhold its channel-gated marker after the caller rewrote its dialect "
+           "string to \""
+        << declared << "\" — false means the view kept a view of the CALLER's bytes";
+
+    const ComposedSemantics from_temporary{
+        vocabulary.for_stream(std::string{kChanneledDialect}, {})};
+    EXPECT_TRUE(from_temporary.withholds_markers_for({}))
+        << "a view resolved from a temporary dialect string must withhold the channel-gated "
+           "marker of \""
+        << kChanneledDialect << "\" — false means it read the destroyed string";
+
+    EXPECT_FALSE(from_temporary.withholds_markers_for(kChanneledChannel))
+        << "declaring the row's own channel \"" << kChanneledChannel
+        << "\" must release it, or the question is answered true for every channel";
+    EXPECT_FALSE(vocabulary.for_stream({}, {}).withholds_markers_for({}))
+        << "an undeclared view names no dialect, so it withholds nothing";
 }
