@@ -61,10 +61,10 @@ and are not shipped with this repo.
 
 ## Fetch / verify / freeze (reproducibility — private, trusted-runner only)
 
-All corpus tooling lives in the private warehouse **`coderoast-corpora`** (`ADR-7.D4`). The frozen
-artifact is produced by `coderoast-corpora/_shared/freeze_corpus.sh` (deterministic tar → `zstd -19`;
-emits the content manifest, the asset, its sha256, and a `.pin.txt`). To re-freeze a future version:
-`bash scripts/freeze_corpus.sh data/ci-revert/v1/full ci-revert vN`. `v1` was frozen and
+All corpus bytes live in the private warehouse **`coderoast-corpora`** (`ADR-7.D4`). A frozen
+artifact is produced by `./pharos corpora freeze ci-revert vN`, run from the private orchestration
+repository (deterministic tar → `zstd -19`; it emits the content manifest, the asset, its sha256, and
+a `.pin.txt`, freezing the warehouse's `data/vN/full` tree). `v1` was frozen and
 **round-trip-verified** (asset hash OK; all 8171 files byte-exact on extract).
 
 Consuming `v1` happens **only on a trusted runner with the Argos credential** (§2a) — the public CI
