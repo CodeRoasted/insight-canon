@@ -263,6 +263,11 @@ install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/api/utils/log_macros.hpp
 # without it the test_package / any downstream module rebuild fails "Cannot open det/det_int128.hpp".
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/api/det/det_int128.hpp
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/det)
+# utf8/well_formed.hpp is the third textual header, and the only one no canon module includes: the
+# JSON egress wrappers downstream `#include <utf8/well_formed.hpp>` before any `import`, because each
+# wrapper is itself a textual header (DN-43.D20). Same shipping shape as the two above.
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/api/utf8/well_formed.hpp
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/utf8)
 install(EXPORT insight_canonTargets
     NAMESPACE insight::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/insight_canon
