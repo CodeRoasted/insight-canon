@@ -34,8 +34,8 @@
 #
 # Requires conan + a prior canon dep resolution (fmt/spdlog/simdjson in the cache;
 # `malf test` / `conan create .` populates it). The compiler×stdlib axis is a conan
-# profile (linux-gcc16-release = ship gcc/libstdc++, linux-clang21-release =
-# clang-21/libstdc++); -O is appended per cell after the profile.
+# profile (linux-gcc16-release = ship gcc/libstdc++, linux-clang21-libcxx-release =
+# clang-21/libc++); -O is appended per cell after the profile.
 #
 # ── WHY THERE IS NO -ffp-contract AXIS HERE, and how that stays honest ─────────
 # This sweep used to run a third axis, -ffp-contract={off,fast}, doubling the cell
