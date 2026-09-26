@@ -33,7 +33,7 @@ namespace
 
 [[nodiscard]] std::int64_t epoch_of(Timestamp timestamp)
 {
-    return static_cast<std::int64_t>(std::chrono::system_clock::to_time_t(timestamp));
+    return std::chrono::duration_cast<std::chrono::seconds>(timestamp.time_since_epoch()).count();
 }
 
 // invariant: both sides are printed, because a timestamp test that fails with false-is-not-true
@@ -92,12 +92,20 @@ TEST(ParseUnixNanoTimestamp, EpochNanosParsedAsEventTime)
     EXPECT_PARSES_TO(parse_unix_nano_timestamp("0"), 0);
 }
 
-TEST(ParseUnixNanoTimestamp, SubSecondNanosTruncateTowardTheSecond)
+TEST(ParseUnixNanoTimestamp, SubSecondNanosAreCarriedWhole)
 {
-    // invariant: the integer duration cast truncates, and the producer emits millisecond-granular
-    // nanoseconds, so window membership stays bit-identical across standard libraries.
-    EXPECT_PARSES_TO(parse_unix_nano_timestamp("1705314600999000000"),
-                     utc_epoch(2024, 1, 15, 10, 30, 0));
+    // invariant: the second is the one the nanoseconds fall in, and not one nanosecond is dropped,
+    // so window membership stays bit-identical across standard libraries.
+    constexpr std::int64_t kNanosPerSecond{1'000'000'000};
+    constexpr std::int64_t kLastNanoOfTheSecond{999'999'999};
+    const auto parsed{parse_unix_nano_timestamp("1705314600999999999")};
+    EXPECT_PARSES_TO(parsed, utc_epoch(2024, 1, 15, 10, 30, 0));
+    ASSERT_TRUE(parsed.has_value());
+    const std::int64_t want{utc_epoch(2024, 1, 15, 10, 30, 0) * kNanosPerSecond +
+                            kLastNanoOfTheSecond};
+    EXPECT_EQ(parsed->time_since_epoch().count(), want)
+        << "parse_unix_nano_timestamp(\"1705314600999999999\") held "
+        << parsed->time_since_epoch().count() << " ns, expected " << want << " ns";
 }
 
 TEST(ParseUnixNanoTimestamp, OverflowingAndMalformedInputRefused)

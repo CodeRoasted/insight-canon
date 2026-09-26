@@ -115,9 +115,8 @@ void render_projection(const CanonicalEvent& event, ProjectionColumns& out)
         text.clear();
 
     append_integer(std::get<column("id")>(out), event.id);
-    append_integer(
-        std::get<column("timestamp")>(out),
-        std::chrono::floor<std::chrono::microseconds>(event.timestamp.time_since_epoch()).count());
+    append_integer(std::get<column("timestamp_ns")>(out),
+                   event.timestamp.time_since_epoch().count());
     append_flag(std::get<column("declared_timestamp")>(out), event.declared_timestamp);
     std::get<column("level")>(out).append(to_string(event.level));
     append_flag(std::get<column("declared_level")>(out), event.declared_level);

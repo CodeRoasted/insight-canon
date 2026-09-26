@@ -24,8 +24,8 @@ namespace time_constants
     inline constexpr std::int64_t kSecondsPerHour{kMinutesPerHour * kSecondsPerMinute};
     inline constexpr std::int64_t kHoursPerDay{24};
     inline constexpr std::int64_t kSecondsPerDay{kHoursPerDay * kSecondsPerHour};
-    // invariant: system_clock's int64 nanosecond duration reaches about 292 years either side of
-    // 1970, so a year outside this window would overflow the conversion.
+    // invariant: Timestamp's int64 nanosecond count reaches about 292 years either side of 1970,
+    // so a year outside this window would overflow the conversion.
     inline constexpr int kMinReprYear{1678};
     inline constexpr int kMaxReprYear{2261};
     inline constexpr std::size_t kIso8601MinLength{19};
@@ -408,9 +408,9 @@ std::optional<Timestamp> parse_epoch_timestamp(std::string_view timestamp_str) n
     return std::chrono::system_clock::from_time_t(static_cast<std::time_t>(epoch));
 }
 
-// invariant: integer only, never float - the duration_cast truncation is deterministic and the
-// producer's millisecond-granular nanos make it lossless.
-// refs: ADR-29.D5
+// invariant: integer only, never float, and the nanosecond count is carried whole, since Timestamp
+// is nanosecond-grained on every leg.
+// refs: ADR-29.D5, DN-108.D24
 std::optional<Timestamp> parse_unix_nano_timestamp(std::string_view timestamp_str) noexcept
 {
     if (timestamp_str.empty() || timestamp_str.size() > time_constants::kUnixNanoMaxDigits)
@@ -426,7 +426,7 @@ std::optional<Timestamp> parse_unix_nano_timestamp(std::string_view timestamp_st
     }
     if (nanos < 0)
         return std::nullopt;
-    return Timestamp{std::chrono::duration_cast<Duration>(std::chrono::nanoseconds{nanos})};
+    return Timestamp{std::chrono::nanoseconds{nanos}};
 }
 
 std::optional<Timestamp> parse_compact_date_time(std::string_view date,

@@ -10,7 +10,8 @@ using namespace insight::utils;
 
 static std::time_t to_tt(Timestamp ts)
 {
-    return std::chrono::system_clock::to_time_t(ts);
+    return static_cast<std::time_t>(
+        std::chrono::duration_cast<std::chrono::seconds>(ts.time_since_epoch()).count());
 }
 
 TEST(ParseISO8601, ValidUtcReturnsValue)

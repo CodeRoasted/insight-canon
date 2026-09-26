@@ -1,0 +1,3 @@
+{"timeUnixNano":"1700000000123456789","severityNumber":9,"severityText":"INFO","body":{"stringValue":"cache warmed in 12 ms"},"attributes":[{"key":"service.name","value":{"stringValue":"checkout"}}]}
+{"timeUnixNano":"1700000000123456001","severityNumber":13,"severityText":"WARN","body":{"stringValue":"retrying upstream call attempt 2"}}
+{"timeUnixNano":"1700000000999999999","severityNumber":17,"severityText":"ERROR","body":{"stringValue":"connection pool exhausted"}}

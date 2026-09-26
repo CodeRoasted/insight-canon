@@ -109,6 +109,38 @@ TEST(DeclaredTimeCopy, ASpanAndALogRecordAgreeSoProvenanceIsNotDerivedFromIsSpan
         << "the two shapes resolved different times from the same declared value";
 }
 
+// invariant: the declared time crosses at the producer's whole NANOSECOND on every build leg — a
+// grain that followed the standard library would hold a different instant per leg.
+// refs: DN-108.D24, ADR-29.D5
+TEST(DeclaredTimeCopy, AnOtelLogRecordKeepsEveryNanosecondOfItsDeclaredTime)
+{
+    constexpr std::int64_t kSubSecondNanos{1'700'000'000'123'456'789};
+    TokenizerFixture fx;
+    const std::string line{R"({"timeUnixNano":")" + std::to_string(kSubSecondNanos) +
+                           R"(","severityNumber":9,"severityText":"INFO",)"
+                           R"("body":{"stringValue":"cache warmed"}})"};
+
+    const auto event{fx.tokenizer.process_line(line)};
+    ASSERT_TRUE(event.has_value()) << "the OTLP log record did not parse at all";
+    const std::int64_t held{
+        std::chrono::duration_cast<std::chrono::nanoseconds>(event->timestamp.time_since_epoch())
+            .count()};
+    EXPECT_EQ(held, kSubSecondNanos)
+        << "timeUnixNano " << kSubSecondNanos << " crossed as " << held << " ns, "
+        << (kSubSecondNanos - held)
+        << " ns short: the event time is held at a grain coarser than the producer's nanosecond, "
+           "so this build leg stores a different instant from a leg that keeps it whole";
+
+    ProjectionColumns columns;
+    render_projection(*event, columns);
+    const auto slot{std::ranges::find(kProjectionMembers, std::string_view{"timestamp_ns"})};
+    ASSERT_NE(slot, kProjectionMembers.end()) << "the projection has no timestamp_ns member";
+    EXPECT_EQ(columns[static_cast<std::size_t>(slot - kProjectionMembers.begin())],
+              std::to_string(kSubSecondNanos))
+        << "the render the cross-leg proof and the cut's generation gate digest does not carry "
+           "the declared nanosecond whole";
+}
+
 // invariant: the OPPOSITE failure — provenance set TOO EAGERLY.
 // invariant: the arm above catches a site that FORGETS the flag; this catches one that sets it
 // always, which is invisible there because that arm only looks at inputs that SHOULD be declared.

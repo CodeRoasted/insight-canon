@@ -19,8 +19,11 @@ import insight.canon.internal;
 export namespace insight
 {
 
-using Timestamp = std::chrono::system_clock::time_point;
-using Duration = std::chrono::system_clock::duration;
+// invariant: whole NANOSECONDS since the Unix epoch on every build leg, never system_clock's own
+// grain, which is the standard library's (ns on libstdc++, us on libc++, 100 ns on MSVC).
+// refs: DN-108.D24
+using Timestamp = std::chrono::sys_time<std::chrono::nanoseconds>;
+using Duration = std::chrono::nanoseconds;
 
 using EventID = uint64_t;
 
@@ -1027,7 +1030,7 @@ struct CanonicalEvent
 // refs: DN-108.D24, ADR-2.D5, F-SRC-insight-canon:canon.api.cppm:kCanonicalizationVersion
 inline constexpr std::array kProjectionMembers{
     std::string_view{"id"},
-    std::string_view{"timestamp"},
+    std::string_view{"timestamp_ns"},
     std::string_view{"declared_timestamp"},
     std::string_view{"level"},
     std::string_view{"declared_level"},
@@ -1048,8 +1051,8 @@ using ProjectionColumns = std::array<std::string, kProjectionMembers.size()>;
 
 // post: out[i] holds member kProjectionMembers[i] as canonical text, overwritten: integers in
 // decimal, enums by name, booleans 0 or 1, a list as its count then each element after a '|'.
-// post: the timestamp is whole MICROSECONDS since the epoch, the finest grain every supported
-// standard library's system_clock carries, so the text is identical on every leg.
+// post: the timestamp is whole NANOSECONDS since the epoch, Timestamp's own grain, under the key
+// timestamp_ns that names the unit.
 // post: a string's bytes are verbatim except backslash, tab, newline, carriage return and '|',
 // each written as a backslash escape, so no column holds a separator it did not write.
 // invariant: the rendering is injective per member, which lets a digest of a column stand for it.
@@ -1453,8 +1456,7 @@ parse_epoch_timestamp(std::string_view timestamp_str) noexcept;
 
 // post: OTLP epoch NANOSECONDS as a digit string — the OTEL event-time channel, so OTEL inputs
 // window like any other format.
-// invariant: integer-only, no float; sub-duration resolution truncates deterministically per
-// stdlib, and a millisecond-granular producer is lossless on both.
+// invariant: integer-only, no float; the producer's nanosecond count is carried whole.
 // refs: ADR-29.D5
 [[nodiscard]] std::optional<Timestamp>
 parse_unix_nano_timestamp(std::string_view timestamp_str) noexcept;

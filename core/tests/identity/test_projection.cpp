@@ -43,8 +43,8 @@ TEST(Projection, RendersEveryMemberInItsOwnColumn)
     const std::array<SpanId, 2> linked{{{.value = 7}, {.value = 9}}};
     CanonicalEvent event{};
     event.id = 12;
-    event.timestamp = insight::Timestamp{std::chrono::duration_cast<insight::Duration>(
-        std::chrono::microseconds{kMicros} + std::chrono::nanoseconds{kSubMicroNanos})};
+    event.timestamp = insight::Timestamp{std::chrono::microseconds{kMicros} +
+                                         std::chrono::nanoseconds{kSubMicroNanos}};
     event.declared_timestamp = true;
     event.level = LogLevel::Warn;
     event.declared_level = true;
@@ -72,7 +72,7 @@ TEST(Projection, RendersEveryMemberInItsOwnColumn)
     const std::array<std::pair<std::string_view, std::string_view>, kProjectionMembers.size()> want{
         {
             {"id", "12"},
-            {"timestamp", "1700000000123456"},
+            {"timestamp_ns", "1700000000123456789"},
             {"declared_timestamp", "1"},
             {"level", "Warn"},
             {"declared_level", "1"},
@@ -100,6 +100,6 @@ TEST(Projection, EmptyListsAndDefaultsRenderTheirCountAndZero)
     EXPECT_EQ(out[column("ordinals")], "0");
     EXPECT_EQ(out[column("linked_span_ids")], "0");
     EXPECT_EQ(out[column("trace")], "0,0,0,0,0,0");
-    EXPECT_EQ(out[column("timestamp")], "0");
+    EXPECT_EQ(out[column("timestamp_ns")], "0");
     EXPECT_EQ(out[column("level")], "Unknown");
 }

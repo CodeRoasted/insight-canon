@@ -117,7 +117,7 @@ PROOF="$CANON/proof"
 # per argument — so corpus order IS digest order, and golden.yaml's MSVC leg sorts the same names
 # on the other side of a byte compare. A locale-aware collation treats punctuation as ignorable
 # (measured on pwsh 7.4.6: service.log / service_a.log / service-b.log come back in a different
-# order than byte order gives), so both sides pin byte order. Today's seven filenames agree under
+# order than byte order gives), so both sides pin byte order. Today's filenames agree under
 # either; this keeps that from being luck the first time a name mixes `_`, `.` or case.
 CORPUS="$(ls "$PROOF"/corpus/*.log 2>/dev/null | LC_ALL=C sort)"
 [ -n "$CORPUS" ] || { echo "error: no corpus under $PROOF/corpus" >&2; exit 2; }

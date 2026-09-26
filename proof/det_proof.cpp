@@ -139,7 +139,7 @@ int main(int argc, char** argv)
     // assert: ASCII only — a non-ASCII byte makes the prologue depend on the compiler's execution
     // charset, and one line of the digest diverged on MSVC while the rest matched.
     std::cout << (digest_mode ? "# canon generation digest -- v1\n"
-                              : "# canon public determinism proof -- v5\n");
+                              : "# canon public determinism proof -- v6\n");
 
     // invariant: the composition is loop-invariant — the same package set tokenizes every file.
     const std::array<insight::semantic::SemanticPackageManifest, 4> manifests{
