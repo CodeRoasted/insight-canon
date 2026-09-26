@@ -45,10 +45,13 @@ add_subdirectory(${CANON_ROOT}/semantic/gitlab gitlab_build)
 add_subdirectory(${CANON_ROOT}/semantic/jenkins jenkins_build)
 add_subdirectory(${CANON_ROOT}/semantic/test_frameworks testfw_build)
 
-# The constant fixture, consuming canon + the packages as external modules.
+# The constant fixture, consuming canon + the packages as external modules. picosha2 is canon's own
+# header-only SHA-256 dependency: `--digest` hashes each member column of canon's projection with it
+# (DN-108.D24, the cut's generation gate), and canon links it PRIVATE, so the fixture names it.
+find_package(picosha2 REQUIRED CONFIG)
 add_executable(det_proof det_proof.cpp)
 target_link_libraries(det_proof PRIVATE
     insight::canon insight::semantic_github insight::semantic_gitlab
-    insight::semantic_jenkins insight::semantic_test_frameworks)
+    insight::semantic_jenkins insight::semantic_test_frameworks picosha2::picosha2)
 target_compile_features(det_proof PRIVATE cxx_std_23)
 set_target_properties(det_proof PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)

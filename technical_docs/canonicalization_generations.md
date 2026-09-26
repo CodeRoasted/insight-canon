@@ -340,8 +340,9 @@ Jenkins) gave the same row, shown as level and template:
   pool resized to 8` — at `v1.10.4` and at `cc8bfbf`: `Unknown`, `DEBUG [main] com.acme.pool.Pool
   - pool resized to <*>`; after `81c69bf`: `Debug`, `com.acme.pool.Pool - pool resized to <*>`.
 
-`det_proof` renders no event time, so that half of `81c69bf`'s move rests on its commit record,
-not on these witnesses. `fb23b09` (a lifetime repair: a stream view keeps the matched package's own
+The `det_proof` of that date rendered no event time, so that half of `81c69bf`'s move rests on its
+commit record, not on these witnesses; it renders every `CanonicalEvent` member since `DN-108.D24`'s
+generation gate. `fb23b09` (a lifetime repair: a stream view keeps the matched package's own
 dialect name) and `7aba631` (a deleted overload, compile time only) move no output and owe nothing.
 
 **Why one step.** A consumer crossing the next cut pays exactly one comparability event: `v1.10.4`

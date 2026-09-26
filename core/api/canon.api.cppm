@@ -1020,6 +1020,43 @@ struct CanonicalEvent
     std::string_view no_role_witness_key;
 };
 
+// invariant: canon's OUTPUT for one event is every member above — the image of the rules function
+// kCanonicalizationVersion names, so an unrendered member could move under an unchanged token.
+// invariant: the public determinism proof and the cut's generation gate both render through
+// render_projection, so the two can never disagree about what canon's output is.
+// refs: DN-108.D24, ADR-2.D5, F-SRC-insight-canon:canon.api.cppm:kCanonicalizationVersion
+inline constexpr std::array kProjectionMembers{
+    std::string_view{"id"},
+    std::string_view{"timestamp"},
+    std::string_view{"declared_timestamp"},
+    std::string_view{"level"},
+    std::string_view{"declared_level"},
+    std::string_view{"format"},
+    std::string_view{"component"},
+    std::string_view{"host"},
+    std::string_view{"template_str"},
+    std::string_view{"params"},
+    std::string_view{"structural_role"},
+    std::string_view{"trace"},
+    std::string_view{"ordinals"},
+    std::string_view{"linked_span_ids"},
+    std::string_view{"echoed_source"},
+    std::string_view{"no_role_witness_key"},
+};
+
+using ProjectionColumns = std::array<std::string, kProjectionMembers.size()>;
+
+// post: out[i] holds member kProjectionMembers[i] as canonical text, overwritten: integers in
+// decimal, enums by name, booleans 0 or 1, a list as its count then each element after a '|'.
+// post: the timestamp is whole MICROSECONDS since the epoch, the finest grain every supported
+// standard library's system_clock carries, so the text is identical on every leg.
+// post: a string's bytes are verbatim except backslash, tab, newline, carriage return and '|',
+// each written as a backslash escape, so no column holds a separator it did not write.
+// invariant: the rendering is injective per member, which lets a digest of a column stand for it.
+// invariant: its unit pins CanonicalEvent's member count to kProjectionMembers at compile time, so
+// a new member does not compile until it is rendered.
+void render_projection(const CanonicalEvent& event, ProjectionColumns& out);
+
 } // namespace insight::tokenization
 
 export namespace insight::tokenization
