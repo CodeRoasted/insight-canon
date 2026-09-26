@@ -21,7 +21,7 @@
 # TO CHANGE A VALUE: you cannot, without first bumping `kCanonicalizationVersion` in
 # `core/api/canon.api.cppm`. The regenerator refuses otherwise. See the test file's header.
 #
-canonicalization_version = stateless-masks-15
+canonicalization_version = stateless-masks-16
 
 # ── rule 1 — status-value KEEP. The green->red split, the one collapse masking may never make.
 # One witness per declared status keyword; each is non-vacuous (remove the keyword, the value masks).

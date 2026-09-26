@@ -31,7 +31,7 @@ using EventID = uint64_t;
 // refs: ADR-2.D5, ADR-2.D9, F-SRC-insight-canon:canon.api.cppm:TemplateId
 // refs: F-SRC-insight-canon:mask.cpp:normalize_marker_number
 // note: the generation ledger is technical_docs/canonicalization_generations.md.
-inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-15"};
+inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-16"};
 
 // invariant: the first 16 bytes of SHA-256 over the masked template_str, carried as a fixed-size
 // POD; the 34-byte "h:"+hex string materialises only at the serialize seam.

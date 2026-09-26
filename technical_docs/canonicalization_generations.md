@@ -25,9 +25,10 @@ consumer crossing the generation needs and the code cannot say.
 
 Two recurring classes are named rather than re-argued at each entry:
 
-* **The identity class** (`-4`, `-8`, `-11`, `-12`, `-13`, and rider 2 of `-15`) — the masker
+* **The identity class** (`-4`, `-8`, `-11`, `-12`, `-13`, rider 2 of `-15`, and `-16`) — the masker
   itself moved, so `template_str` and `template_id` move.
-* **The classification class** (`-7`, `-9`, `-14`'s level half, `-15`'s rider 1) — the masker is
+* **The classification class** (`-7`, `-9`, `-14`'s level half, `-15`'s rider 1, `-16`'s level
+  half) — the masker is
   untouched and identity does not move, but a **serialized** field does (`dominant_level` gates
   NewErrorPattern and diff polarity; `component` is the cube's WHERE axis). That is still
   output-affecting, and it is the state a reader most easily mistakes for *nothing moved*.
@@ -290,6 +291,64 @@ or vector outside `insight-canon`'s own tests carries a HealthApp-format line, `
 three vector files included. The one PUBLISHED artifact that does is
 `coderoast-hub/showcase/canon/loghub.canon.txt`, which renders this corpus in four transport
 declarations; it is a release-cut surface and is deliberately not re-rendered there.
+
+## `-16` — the Log4j locator: a pid-less prefix is not OpenStack, and a stamp's fraction is read whole
+
+This generation is owed by the Founder's ruling of 2026-09-26 (`LEXICON.md` § *Rulings closed*):
+the token moves at most once per cut, and only if canon's serialized output changed for some input
+since the previous release tag — decided by bytes, never by intent. `-15` SHIPPED in `v1.10.4`
+(canon `dfbeddd`), and a generation is open only while no release tag carries it, so the two
+output-moving commits below could not ride it, although both commit messages say they do.
+`DN-108.D24` carries the analysis; this section is the record.
+
+**What changed.** One locator, `find_log4j_stamp`, is read by the detector's candidate gate,
+`Log4jStrategy::confidence()` and `Log4jStrategy::parse()` alike, so the three cannot disagree.
+
+* **`cc8bfbf` — the prefixed Log4j (OpenStack) layout requires its process id.** Since `bb3fd3a`,
+  which `v1.10.4` carries, the locator accepted any whitespace-preceded `YYYY-MM-DD HH:MM:SS.fff`
+  in the first 96 bytes, and the OpenStack branch then read a pid-less line's first token after
+  the stamp as the level and the next as the component — stamp, clock, level word and first
+  message word dropped from the template.
+* **`81c69bf` — the stamp's fraction is read to the end of its digit run.** The locator took a
+  fixed 23-byte stamp, so a longer fraction was cut at its third digit, and the leftover digits
+  posed as the process id `cc8bfbf` made mandatory. `parse_log4j_timestamp`'s floor drops from
+  23 bytes to 20, so a stamp with a fraction of any length parses, and its level and component
+  are read where they stand.
+
+**Which serialized fields move.** `template_str` / `template_id` (the identity class),
+`dominant_level` through the event `level` (the classification class), and the event time, for
+the Log4j-shaped lines those locators reach. Recorded at the commits against their parents on the
+gcc-16.2 leg, over private corpora: `cc8bfbf` moves 40 event rows of the Jenkins payload-stamped
+slice and 3 574 rows per view of the GitHub revert corpus's GitHub arm; `81c69bf` moves 1 281 of
+2 393 candidate files, 217 732 rows keep more bytes, 2 456 empty templates gain content, and
+207 548 levels move Unknown → Debug. The public hub samples and the determinism-golden corpus do
+not move under either commit.
+
+**Witness inputs.** Each line below was rendered by `det_proof` (`proof/det_proof.cpp`, the
+`linux-gcc16-release` profile) built from canon at `v1.10.4`, at `cc8bfbf` and at `e00f1cb`, on
+2026-09-26. Every one of its four arms (no dialect; GitHub with the RFC 3339 line prefix; GitLab;
+Jenkins) gave the same row, shown as level and template:
+
+* **For `cc8bfbf`:** `[2026-07-09T07:49:08.059Z] 2026-07-09 07:49:07.847 INFO NEM logging has
+  been bootstrapped! (took 12 ms)` — at `v1.10.4`: `Info`, `logging has been bootstrapped! (took
+  <*> ms)`; at `cc8bfbf` and after: `Info`, `[<*>] <*> <*> INFO NEM logging has been bootstrapped!
+  (took <*> ms)`.
+* **For `81c69bf`, identity:** `--- /dev/null<TAB>2025-03-12 23:17:31.994125421 +0000` — at
+  `v1.10.4` and at `cc8bfbf`: `Unknown`, the EMPTY template; after `81c69bf`: `Unknown`,
+  `--- /dev/null<TAB>2025-03-12 <*> <*>`.
+* **For `81c69bf`, classification:** `2025-03-12 23:17:31.994125 DEBUG [main] com.acme.pool.Pool -
+  pool resized to 8` — at `v1.10.4` and at `cc8bfbf`: `Unknown`, `DEBUG [main] com.acme.pool.Pool
+  - pool resized to <*>`; after `81c69bf`: `Debug`, `com.acme.pool.Pool - pool resized to <*>`.
+
+`det_proof` renders no event time, so that half of `81c69bf`'s move rests on its commit record,
+not on these witnesses. `fb23b09` (a lifetime repair: a stream view keeps the matched package's own
+dialect name) and `7aba631` (a deleted overload, compile time only) move no output and owe nothing.
+
+**Why one step.** A consumer crossing the next cut pays exactly one comparability event: `v1.10.4`
+ships `-15`, and every further output change before the next tag rides `-16`. The re-base cost is
+`-15`'s: `core/tests/mask/mask_rules.golden` and `insight-metalog`'s three committed vector files,
+whose only moved bytes are this string; the hub's published determinism golden is re-rendered at
+the cut.
 
 ---
 
