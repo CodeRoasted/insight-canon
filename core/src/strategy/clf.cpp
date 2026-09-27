@@ -89,7 +89,7 @@ std::expected<ParsedLine, std::string> CLFStrategy::parse(std::string_view line,
     // functional source.
     // invariant: a constant would be sound only for a grammar that is one server's, and this one is
     // emitted by every web server and load balancer, so a constant would be a fabricated fact.
-    // refs: ADR-19.D4, DN-43.D8
+    // refs: ADR-19.D4
     parsed_line.host = host;
     parsed_line.content = {buf.data(), clen};
 

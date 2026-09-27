@@ -124,7 +124,7 @@ namespace
             // invariant: no level-lift rows, so the level comes from the same leading-level /
             // failure-cue inference RawTextStrategy uses — byte-identical to that fallback.
             parsed.level = insight::utils::infer_leading_log_level(content);
-            // refs: DN-43.D8
+            // refs: ADR-19.D4
             // invariant: EMPTY is a positive statement that this layout declares no functional
             // source — a GitLab trace line carries no component or tag.
             parsed.component = {};

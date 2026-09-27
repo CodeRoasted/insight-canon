@@ -152,7 +152,7 @@ TEST_F(TokenizerTest, ProcessesCLFLine)
     // invariant: the component reaches the cube's WHERE axis UNMASKED, so a client address left
     // there was published RAW while the same octets in the content were masked.
     // invariant: it is a HOST, it goes in the host field, and it stays OFF the axis.
-    // refs: DN-43.D8
+    // refs: ADR-19.D4
     EXPECT_EQ(ev.host, "192.168.1.5");
     EXPECT_TRUE(ev.component.empty()) << "component = \"" << ev.component << "\"";
     EXPECT_NE(ev.template_str.find("GET"), std::string::npos);

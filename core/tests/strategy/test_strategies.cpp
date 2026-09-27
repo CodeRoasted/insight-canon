@@ -461,7 +461,7 @@ TEST_F(CLFStrategyTest, ParsesCommonLogFormat)
     // POSITIVELY — that this layout declares no functional source.
     // invariant: BOTH halves are asserted, because an arm that only checked component would pass on
     // a strategy that simply dropped the address.
-    // refs: DN-43.D8
+    // refs: ADR-19.D4
     EXPECT_EQ(pl.host, "127.0.0.1");
     EXPECT_TRUE(pl.component.empty()) << "component = \"" << pl.component << "\"";
     EXPECT_NE(pl.content.find("GET"), std::string::npos);
@@ -1333,7 +1333,7 @@ TEST_F(BGLStrategyTest, ParsesBGLLine)
     EXPECT_EQ(pl.level, LogLevel::Info);
     // invariant: component is the low-cardinality SUBSYSTEM, which is the cube dimension, and host
     // is the node identity.
-    // refs: DN-43.D8
+    // refs: ADR-19.D4
     EXPECT_EQ(pl.component, "KERNEL");
     EXPECT_EQ(pl.host, "R02-M1-N0-C:J12-U11");
     EXPECT_NE(pl.content.find("instruction cache parity error"), std::string::npos);
