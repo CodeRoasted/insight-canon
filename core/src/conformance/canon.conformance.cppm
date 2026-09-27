@@ -80,7 +80,7 @@ struct Report
 [[nodiscard]] Report round_trip_report(const SemanticPackageManifest& manifest,
                                        const ComposedSemantics& composed);
 
-// refs: DN-17.D21
+// refs: ADR-17.D10
 // post: one check per manifest member, locating WHERE two rulesets differ — which member, which
 // index, which field, and both values.
 // invariant: rows pair BY INDEX, matching the identity serializer, so two manifests holding the
@@ -1193,7 +1193,7 @@ namespace
                           " rhs=" + render_value(rhs)};
     }
 
-    // refs: DN-17.D21
+    // refs: ADR-17.D10
     // invariant: the check NAME carries `presence_only`, so the scope travels with the report into
     // a framework that shows nothing but names.
     // note: whether two present hooks AGREE is a separate obligation, not covered.

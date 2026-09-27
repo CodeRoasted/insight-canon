@@ -27,7 +27,7 @@
 // the can't-FAIL shape.
 // invariant: determinism — byte-only, no RNG, no clock, no float, and every fixture is a compile
 // time constant.
-// refs: DN-17.D21
+// refs: ADR-17.D10
 #include <gtest/gtest.h>
 
 import insight.canon.test;
