@@ -62,6 +62,13 @@ literal_keep | deadbeef | marker deadbeef seen | marker deadbeef seen
 literal_keep | bazel-out/k8-fastbuild/bin/app | built bazel-out/k8-fastbuild/bin/app ok | built bazel-out/k8-fastbuild/bin/app ok
 literal_keep | user=alice | login user=alice ok | login user=alice ok
 literal_keep | utf8 | decode utf8 stream | decode utf8 stream
+# The shape axis is closed for the opaque-identity class (ADR-16.D6): a word followed by a digit run
+# is a stable name as often as an instance, so these stay verbatim and stay DISTINCT from each other.
+# Each is a name the reverted opaque-identity rule collapsed; a shape rule re-entering reds here.
+literal_keep | VK_KHR_maintenance1 | enabling VK_KHR_maintenance1 now | enabling VK_KHR_maintenance1 now
+literal_keep | VK_KHR_maintenance7 | enabling VK_KHR_maintenance7 now | enabling VK_KHR_maintenance7 now
+literal_keep | -DQT_QUICKCONTROLS2_LIB | compile -DQT_QUICKCONTROLS2_LIB flag | compile -DQT_QUICKCONTROLS2_LIB flag
+literal_keep | libcc1plugin.so.0 | loading libcc1plugin.so.0 now | loading libcc1plugin.so.0 now
 
 # ── rule 2, the composite layer — one section per declared rule of kCompositeRules, in its
 # precedence order.
