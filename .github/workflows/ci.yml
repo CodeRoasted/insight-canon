@@ -11,7 +11,7 @@ jobs:
     permissions:
       contents: read
       actions: read
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-ci.yml@f748b5a320428c718a1c2a7f0563d054f5c6bf4b
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-ci.yml@2d42fa9153bd50047312563ef83e1bbe43e2941f
     with:
       # canon is a tower root (no first-party deps to vendor). Post-ADR-17 it is a MULTI-package
       # repo: the core under core/ (the logcraft/server layout — the repo root is the shelf), the three
@@ -45,7 +45,7 @@ jobs:
     permissions:
       pull-requests: write
       actions: read
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-sift-post.yml@f748b5a320428c718a1c2a7f0563d054f5c6bf4b
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-sift-post.yml@2d42fa9153bd50047312563ef83e1bbe43e2941f
     with:
       run-id: ${{ github.run_id }}
     secrets: inherit
