@@ -415,7 +415,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           # The predicate ranges over every ref: the gate itself fails closed on a partial
           # fetch (a declared tag absent, or no tag newer than the boundary, is an error).
@@ -426,7 +426,7 @@ jobs:
 
   release:
     needs: [attest, golden, disclosure-set]
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-release.yml@852e3f6383eaaab5fb2d147bc9198668f7776a23
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-release.yml@a18e1e6f5f8f7ec01911c43105d1efe79204b2a6
     with:
       tag: ${{ github.event.inputs.tag || github.ref_name }}
       # ADR-17.D8: the four semantic vocabulary packages ride the train on the SAME footing as canon
@@ -467,7 +467,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download the validated golden
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: determinism-golden
 

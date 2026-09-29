@@ -7,7 +7,7 @@ on:
 
 jobs:
   lint:
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-lint.yml@852e3f6383eaaab5fb2d147bc9198668f7776a23
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-lint.yml@a18e1e6f5f8f7ec01911c43105d1efe79204b2a6
     # PUBLIC repo: no runs-on passthrough — a self-hosted runner reachable from a fork PR is an RCE.
     # No `with:` at all: every gate in the reusable workflow defaults TRUE, so a caller that says
     # nothing is fully gated, and a hole would have to be a written line here.
@@ -23,7 +23,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: ADR-17.D1 — canon core carries no behavioral ecosystem literal
         run: bash scripts/sp1_semantic_unawareness_lint.sh
 
@@ -51,7 +51,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           # The predicate ranges over every ref: the gate itself fails closed on a partial
           # fetch (a declared tag absent, or no tag newer than the boundary, is an error).
