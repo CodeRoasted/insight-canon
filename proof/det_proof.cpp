@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <numeric>
 #include <optional>
 #include <picosha2.h>
 #include <span>
@@ -66,6 +67,7 @@ std::string basename_of(const std::string& path)
 constexpr std::size_t kColumnDigestBytes{16};
 constexpr std::size_t kSha256Bytes{32};
 constexpr std::string_view kDigestFlag{"--digest"};
+constexpr std::string_view kShowcaseFlag{"--showcase"};
 // note: what a line canon refused renders in every column — whether a line is refused is output.
 constexpr std::string_view kRefusedLine{"!"};
 constexpr std::string_view kRowEnd{"\n"};
@@ -87,6 +89,85 @@ std::string column_digest_hex(picosha2::hash256_one_by_one& hasher)
     return out;
 }
 
+// invariant: the flag column every text row opens with, named first in the `# columns` line.
+constexpr std::string_view kCuesColumn{"cues"};
+// note: it holds the values canon's templates mask; publishing it was refused on 2026-09-29.
+// refs: DN-121.D1
+constexpr std::string_view kMaskedValuesMember{"params"};
+
+// invariant: the public showcase's view — the projection members a showcase row prints after its
+// cues; a member outside it is named on the `# omits` line until someone chooses to publish it.
+// refs: DN-121.D1, DN-121.D2
+constexpr auto kShowcaseMembers{std::to_array<std::string_view>({
+    "id",
+    "timestamp_ns",
+    "declared_timestamp",
+    "level",
+    "declared_level",
+    "format",
+    "component",
+    "host",
+    "template_str",
+    "structural_role",
+    "trace",
+    "ordinals",
+    "linked_span_ids",
+    "echoed_source",
+    "no_role_witness_key",
+})};
+
+// post: the position of `name` in canon's projection, or the projection's size when it names no
+// member.
+constexpr std::size_t projection_index(std::string_view name)
+{
+    const auto& members{insight::tokenization::kProjectionMembers};
+    return static_cast<std::size_t>(std::ranges::find(members, name) - members.begin());
+}
+
+constexpr bool every_showcase_name_is_a_member()
+{
+    return std::ranges::all_of(
+        kShowcaseMembers, [](std::string_view name)
+        { return projection_index(name) < insight::tokenization::kProjectionMembers.size(); });
+}
+
+constexpr bool no_showcase_name_repeats()
+{
+    for (std::size_t first{0}; first < kShowcaseMembers.size(); ++first)
+        for (std::size_t second{first + 1}; second < kShowcaseMembers.size(); ++second)
+            if (kShowcaseMembers[first] == kShowcaseMembers[second])
+                return false;
+    return true;
+}
+
+static_assert(every_showcase_name_is_a_member(),
+              "kShowcaseMembers names a member canon's projection does not carry: a renamed or "
+              "removed member fails here, never drops out of the view (DN-121.D1)");
+static_assert(no_showcase_name_repeats(), "kShowcaseMembers names a member twice (DN-121.D1)");
+static_assert(std::ranges::is_sorted(kShowcaseMembers, std::ranges::less{}, projection_index),
+              "kShowcaseMembers is out of kProjectionMembers order, so a showcase row would not "
+              "be the whole row with columns cut (DN-121.D1)");
+static_assert(std::ranges::find(kShowcaseMembers, kMaskedValuesMember) == kShowcaseMembers.end(),
+              "the showcase never prints params, the values canon's templates mask (DN-121.D1)");
+
+// post: the projection positions a showcase row prints, in projection order.
+constexpr auto kShowcaseColumns{[]
+                                {
+                                    std::array<std::size_t, kShowcaseMembers.size()> out{};
+                                    std::ranges::transform(kShowcaseMembers, out.begin(),
+                                                           projection_index);
+                                    return out;
+                                }()};
+
+// post: every projection position, in order — the columns a whole-mode row prints.
+constexpr auto kWholeColumns{
+    []
+    {
+        std::array<std::size_t, insight::tokenization::kProjectionMembers.size()> out{};
+        std::ranges::iota(out, std::size_t{0});
+        return out;
+    }()};
+
 // post: the package list an arm's output can depend on, `-` when it composes none.
 std::string packages_label(const insight::semantic::ComposedSemantics& composition)
 {
@@ -106,6 +187,8 @@ std::string packages_label(const insight::semantic::ComposedSemantics& compositi
 // optimisation and stdlib leg the sweep builds.
 // post: under --digest it prints, per file and arm, a digest of each member's rendered column in
 // place of the rows — what the cut's generation gate banks and compares across two cuts.
+// post: under --showcase each row prints only kShowcaseMembers' columns, selected from the one
+// rendering, and the header names what it omits; with --digest it is a usage error, exit 2.
 // invariant: drives canon's public API only, over a public corpus — nothing here reveals the
 // moat.
 // refs: BIB:determinism_model, DN-108.D24
@@ -113,11 +196,24 @@ std::string packages_label(const insight::semantic::ComposedSemantics& compositi
 // NOLINTNEXTLINE(bugprone-exception-escape,readability-function-cognitive-complexity)
 int main(int argc, char** argv)
 {
-    const bool digest_mode{argc > 1 && std::string_view{argv[1]} == kDigestFlag};
-    const int first_file{digest_mode ? 2 : 1};
-    if (argc <= first_file)
+    bool digest_mode{false};
+    bool showcase_mode{false};
+    int first_file{1};
+    for (; first_file < argc; ++first_file)
     {
-        std::cerr << "usage: det_proof [--digest] <corpus-file> [<corpus-file> ...]\n";
+        const std::string_view word{argv[first_file]};
+        if (word == kDigestFlag)
+            digest_mode = true;
+        else if (word == kShowcaseFlag)
+            showcase_mode = true;
+        else
+            break;
+    }
+    // invariant: the digest is the whole-projection object the generation gate compares, and a
+    // view's digest has no reader.
+    if (argc <= first_file || (digest_mode && showcase_mode))
+    {
+        std::cerr << "usage: det_proof [--digest | --showcase] <corpus-file> [<corpus-file> ...]\n";
         return 2;
     }
 
@@ -137,11 +233,6 @@ int main(int argc, char** argv)
 
     namespace tk = insight::tokenization;
 
-    // assert: ASCII only — a non-ASCII byte makes the prologue depend on the compiler's execution
-    // charset, and one line of the digest diverged on MSVC while the rest matched.
-    std::cout << (digest_mode ? "# canon generation digest -- v1\n"
-                              : "# canon public determinism proof -- v6\n");
-
     // invariant: the composition is loop-invariant — the same package set tokenizes every file.
     const std::array<insight::semantic::SemanticPackageManifest, 4> manifests{
         insight::semantic::github::kManifest, insight::semantic::gitlab::kManifest,
@@ -151,23 +242,6 @@ int main(int argc, char** argv)
     // this arm is canon's whatever any package did.
     // note: the undeclared arm is not that — it composes every package's undeclared rows.
     const insight::semantic::ComposedSemantics no_packages{insight::semantic::compose({})};
-
-    // invariant: the composed identity hash carries no path, timestamp or link order, so it is
-    // bit-identical across builds and legs.
-    // note: the behavioural rows can match while the hash serialization itself diverges.
-    std::cout << "# semantic_identity " << composed.identity_hex() << '\n';
-    std::cout << "# semantic_packages";
-    for (const auto& pkg : composed.packages())
-        std::cout << ' ' << pkg.name << '@' << pkg.version;
-    std::cout << '\n';
-    if (digest_mode)
-    {
-        std::cout << "# token " << insight::kCanonicalizationVersion << '\n';
-        std::cout << "# members";
-        for (const std::string_view member : tk::kProjectionMembers)
-            std::cout << ' ' << member;
-        std::cout << '\n';
-    }
 
     // invariant: EVERY arm is applied to EVERY file — choosing an arm per file would be
     // inference, which is the per-line content dependence the declared-ingest cut deleted.
@@ -201,6 +275,56 @@ int main(int argc, char** argv)
             .stack = {},
             .composition = &composed},
     };
+    // invariant: the loop below prints exactly these projection columns, and the `# columns` line
+    // names them from this same span.
+    const std::span<const std::size_t> printed{showcase_mode
+                                                   ? std::span<const std::size_t>{kShowcaseColumns}
+                                                   : std::span<const std::size_t>{kWholeColumns}};
+
+    // assert: ASCII only — a non-ASCII byte makes the prologue depend on the compiler's execution
+    // charset, and one line of the digest diverged on MSVC while the rest matched.
+    std::cout << (digest_mode ? "# canon generation digest -- v1\n"
+                              : "# canon public determinism proof -- v7\n");
+    // invariant: a text output names its view, its arms and its columns from the arrays the loops
+    // read, so a reader recovers the row layout from the file alone.
+    // refs: DN-121.D1, DN-121.D2
+    if (!digest_mode)
+    {
+        std::cout << "# view " << (showcase_mode ? "showcase" : "whole") << '\n';
+        std::cout << "# arms";
+        for (const Arm& arm : arms)
+            std::cout << ' ' << arm.label;
+        std::cout << '\n';
+        std::cout << "# columns " << kCuesColumn;
+        for (const std::size_t member : printed)
+            std::cout << ' ' << tk::kProjectionMembers[member];
+        std::cout << '\n';
+        if (showcase_mode)
+        {
+            std::cout << "# omits";
+            for (std::size_t member{0}; member < tk::kProjectionMembers.size(); ++member)
+                if (std::ranges::find(printed, member) == printed.end())
+                    std::cout << ' ' << tk::kProjectionMembers[member];
+            std::cout << '\n';
+        }
+    }
+
+    // invariant: the composed identity hash carries no path, timestamp or link order, so it is
+    // bit-identical across builds and legs.
+    // note: the behavioural rows can match while the hash serialization itself diverges.
+    std::cout << "# semantic_identity " << composed.identity_hex() << '\n';
+    std::cout << "# semantic_packages";
+    for (const auto& pkg : composed.packages())
+        std::cout << ' ' << pkg.name << '@' << pkg.version;
+    std::cout << '\n';
+    if (digest_mode)
+    {
+        std::cout << "# token " << insight::kCanonicalizationVersion << '\n';
+        std::cout << "# members";
+        for (const std::string_view member : tk::kProjectionMembers)
+            std::cout << ' ' << member;
+        std::cout << '\n';
+    }
 
     tk::ProjectionColumns columns;
     for (int arg = first_file; arg < argc; ++arg)
@@ -292,10 +416,10 @@ int main(int argc, char** argv)
                 row.push_back(insight::utils::contains_warning_cue(lines[idx]) ? 'W' : '-');
                 // note: T when the peel extracted an observation time for this line.
                 row.push_back(observation.has_value() ? 'T' : '-');
-                for (const std::string& text : columns)
+                for (const std::size_t member : printed)
                 {
                     row.push_back('\t');
-                    row.append(event ? std::string_view{text} : kRefusedLine);
+                    row.append(event ? std::string_view{columns[member]} : kRefusedLine);
                 }
                 rows.push_back(std::move(row));
             }
@@ -323,7 +447,7 @@ int main(int argc, char** argv)
                 reducer.add_weighted_log2(count, count);
             }
 
-            // note: a row is the failure, warning and observation cues, then canon's projection.
+            // note: a row is the failure, warning and observation cues, then the view's columns.
             std::cout << "### events\n";
             for (const std::string& row : rows)
                 std::cout << row << '\n';

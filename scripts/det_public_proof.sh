@@ -89,6 +89,13 @@
 #                                                Determinism-Golden-Proof workflow to cross-compare
 #                                                against the other legs (no committed golden to rot)
 #
+# THE PUBLISHED VIEW IS PROVED ON EVERY CELL TOO (exit 6). `det_proof --showcase` is the view the
+# public canon showcase renders through (DN-121.D1), and this is the only place in CI that holds a
+# det_proof binary, so each cell built below also runs scripts/tests/showcase_view_test.sh over it:
+# the showcase rows are the whole rows with the omitted columns cut, a masked value never reaches a
+# render, and samples_showcase.sh pins the source, the invocation and the view. It runs after the
+# digest compare, so a determinism red is never masked by a view red.
+#
 # ITS OWN FAILURE PATHS ARE PROVED SEPARATELY, and in under a second:
 # scripts/tests/det_public_proof_reporting_test.sh (ctest gate `det_public_proof_reporting`) sources
 # this script — which returns early when sourced — and drives the three reporting functions against
@@ -390,6 +397,16 @@ if [ $rc -ne 0 ]; then
 fi
 echo "PASS: canon public digest byte-identical across ${#builds[@]} builds (compiler×stdlib × -O{0,3};" >&2
 echo "      -ffp-contract is NOT an axis of this sweep and is asserted forced-off per cell — header)." >&2
+
+# The published view on every cell (header). Exit 6 is this script's own, distinct from 1-5.
+for tag in "${builds[@]}"; do
+  if ! bash "$SCRIPT_DIR/tests/showcase_view_test.sh" "${BIN[$tag]}" >"$WORK/$tag.view.log" 2>&1; then
+    echo "SHOWCASE VIEW FAIL: cell $tag -- det_proof's published view does not hold on this build:" >&2
+    sed 's/^/  | /' "$WORK/$tag.view.log" >&2
+    exit 6
+  fi
+  echo "  $tag: $(tail -1 "$WORK/$tag.view.log")" >&2
+done
 
 digest_sha="$(sha256sum "$ref" | awk '{print $1}')"
 echo "canon public digest sha256=$digest_sha" >&2

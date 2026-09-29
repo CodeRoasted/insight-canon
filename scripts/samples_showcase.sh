@@ -6,16 +6,17 @@
 # CLIENT-FACING TRANSPARENCY, NOT A COVERAGE GATE. Eidos + Sift own the end-to-end;
 # this exists so an external reader can SEE, over the exact sample logs we publish,
 # what the open (Apache-2.0) canon core extracts: the templates it collapses lines
-# into, each event's level / failure / warning / structural-role, and the
-# deterministic det_math entropy term. It never asserts, never blocks a release.
+# into, each event's columns under the published VIEW, and the deterministic
+# det_math entropy term. It never asserts, never blocks a release.
 #
 #   samples_showcase.sh <det_proof-binary> <samples-root> <out-dir>
 #
 # <samples-root> is a coderoast-hub checkout's `samples/` tree, laid out as
 # `samples/<corpus>/samples/**/*.log` — the public, synthetic-or-CC-BY slices only
 # (the §2a real crawled bytes are private and never reach the hub). One det_proof
-# invocation per corpus; its canonical stdout (templates + events + det_math per
-# file) IS the showcase. A short README frames it for a non-engineer reader.
+# invocation per corpus, under `--showcase`; its canonical stdout (templates, events,
+# det_math and run_outcome per file and arm) IS the showcase. A short README frames it
+# for a non-engineer reader.
 ###############################################################################
 set -euo pipefail
 
@@ -26,6 +27,27 @@ OUT="${3:?usage: samples_showcase.sh <det_proof-binary> <samples-root> <out-dir>
 [ -x "$DET" ]      || { echo "error: det_proof '$DET' is not an executable" >&2; exit 2; }
 [ -d "$SAMPLES" ]  || { echo "error: samples-root '$SAMPLES' is not a directory" >&2; exit 2; }
 mkdir -p "$OUT"
+CANON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# THE VIEW IS det_proof's, NEVER THIS SCRIPT'S (DN-121.D1). `--showcase` prints canon's projection
+# through a declared allowlist compiled into the published tool — every member but `params`, the
+# values canon's templates mask — so the public page is a SELECTION of the one rendering, and a
+# reader who re-runs the tool gets these bytes without any filter of ours. ONE variable invokes
+# det_proof and is written into PINS.md as the invocation, so the pin cannot name a call this run
+# did not make.
+VIEW_ARGS=(--showcase)
+
+# The view pin (DN-121.D2): det_proof's version, `# view`, `# arms` and `# columns` header lines,
+# lifted from its own output and joined on one line, never typed — the line a disclosure binds with
+# its `**View:**` line. `# omits` is deliberately NOT part of it: a member canon adds is named there
+# until someone chooses to publish it, and it must not force a re-sign of a view it does not enter.
+view_of() {   # $1 = a det_proof text output -> its view pin; non-zero unless all four lines are there
+  local header
+  header="$(sed -n '/^## /q;p' "$1")"
+  grep -E '^# (canon public determinism proof -- v[0-9]+|view .+|arms .+|columns .+)$' <<<"$header" \
+    | sed 's/^# //' \
+    | awk 'NR > 1 { printf " · " } { printf "%s", $0 } END { if (NR != 4) exit 1; print "" }'
+}
 
 # THE REPLAY CHECK IS NOT CEREMONY. What this script publishes is a PUBLIC artifact whose whole
 # claim is "same input → same bytes", and a stale-but-reproducible page is strictly better than a
@@ -90,8 +112,8 @@ for cdir in "$SAMPLES"/*/samples; do
   fi
   rights+=("$corpus:$right")
   echo "showcase: $corpus (${#logs[@]} logs, RIGHT=${right%%|*})" >&2
-  "$DET" "${logs[@]}" > "$OUT/$corpus.canon.txt"
-  "$DET" "${logs[@]}" > "$replay"
+  "$DET" "${VIEW_ARGS[@]}" "${logs[@]}" > "$OUT/$corpus.canon.txt"
+  "$DET" "${VIEW_ARGS[@]}" "${logs[@]}" > "$replay"
   if ! cmp -s "$OUT/$corpus.canon.txt" "$replay"; then
     {
       echo "error: det_proof is NOT deterministic on corpus '$corpus' — refusing to publish."
@@ -102,16 +124,55 @@ for cdir in "$SAMPLES"/*/samples; do
     } >&2
     exit 3
   fi
+  # ONE VIEW PER RENDER. Every corpus of one run must print the same view header, or the render has
+  # no single view to pin and a disclosure bound to it would describe some of its files only. Exit 3,
+  # the replay class: both are "this run's output is not one reproducible object".
+  if ! corpus_view="$(view_of "$OUT/$corpus.canon.txt")"; then
+    echo "error: det_proof's output for corpus '$corpus' does not carry its four view header lines" >&2
+    echo "  (version, # view, # arms, # columns) — this det_proof predates the published view." >&2
+    exit 3
+  fi
+  if [ -z "${view:-}" ]; then
+    view="$corpus_view"
+  elif [ "$corpus_view" != "$view" ]; then
+    {
+      echo "error: corpus '$corpus' rendered under a different view than the corpora before it."
+      echo "  before: $view"
+      echo "  $corpus: $corpus_view"
+    } >&2
+    exit 3
+  fi
   corpora+=("$corpus:${#logs[@]}")
 done
 
 [ "${#corpora[@]}" -gt 0 ] || { echo "error: no corpora with *.log under $SAMPLES" >&2; exit 1; }
 
-# canon's composed-ruleset identity hash + package list are the first lines of any det_proof
-# output — lift them from the first corpus so the index states which canon vocabulary produced this.
+# canon's composed-ruleset identity hash + package list are header lines of any det_proof output —
+# lift them from the first corpus so the index states which canon vocabulary produced this.
 first_out="$OUT/${corpora[0]%%:*}.canon.txt"
 identity="$(grep -m1 '^# semantic_identity ' "$first_out"  | sed 's/^# semantic_identity /semantic_identity /' || true)"
 packages="$(grep -m1 '^# semantic_packages ' "$first_out" | sed 's/^# semantic_packages /packages: /' || true)"
+# What the README says a row carries is LIFTED FROM THE OUTPUT, as the identity above is (DN-121.D6):
+# a column list typed into prose went stale the day det_proof widened its rows, and nothing read it.
+header="$(sed -n '/^## /q;p' "$first_out")"
+columns="$(sed -n 's/^# columns //p' <<<"$header")"
+arm_labels="$(sed -n 's/^# arms //p' <<<"$header")"
+omitted="$(sed -n 's/^# omits //p' <<<"$header")"
+
+# The source the tool was built from (DN-121.D2): THIS script's own checkout, which is where a
+# reader's re-run starts. It must be insight-canon's own repository — a parent checkout's HEAD would
+# be a true commit of the wrong repository — and a modified tree is said, because its commit alone
+# does not reproduce the bytes. ABSENT IS STATED, never omitted, like the samples commit below.
+canon_ref=""
+if [ "$(git -C "$CANON_DIR" rev-parse --show-toplevel 2>/dev/null)" = "$CANON_DIR" ]; then
+  canon_ref="$(git -C "$CANON_DIR" rev-parse HEAD 2>/dev/null || true)"
+fi
+canon_modified=""
+if [ -n "$canon_ref" ] && [ -n "$(git -C "$CANON_DIR" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+  canon_modified=" — **with uncommitted changes to tracked files**, so this commit alone does not reproduce these bytes"
+fi
+# Where canon declares each member's meaning, at the source this run was built from when it is known.
+canon_api_url="https://github.com/CodeRoasted/insight-canon/blob/${canon_ref:-main}/core/api/canon.api.cppm"
 
 # ── The PINS: what a re-runner needs to land on THESE bytes ─────────────────────────────────────
 # OWED BY THE FOUNDER'S SIGNATURE, not by taste. ADR-33.D5 clause 2 grounds the derived-artifact
@@ -144,6 +205,14 @@ det_sha="$(sha256sum "$DET" | cut -d' ' -f1)"
   echo "## Tool"
   echo
   echo "- \`det_proof\` sha256: \`$det_sha\`"
+  if [ -n "$canon_ref" ]; then
+    echo "- insight-canon commit: \`$canon_ref\`$canon_modified"
+  else
+    echo "- insight-canon commit: **unavailable** — this script did not run from a git checkout of"
+    echo "  insight-canon, so the tool's source is identified only by the binary digest above."
+  fi
+  echo "- invocation: \`det_proof ${VIEW_ARGS[*]} <every *.log of one corpus, in the order listed below>\`"
+  echo "- view: \`$view\`"
   [ -n "$identity" ] && echo "- canon ruleset: \`$identity\`"
   [ -n "$packages" ] && echo "- canon $packages"
   echo
@@ -193,10 +262,10 @@ attributed=0
   echo "licence, that licence conditions this derivative too, and its notice is below."
   echo
   echo "The renders are **not** verbatim copies. Canon collapses each line to a template, emits one"
-  echo "event row per line, and computes an integer entropy term; the output is a new arrangement of"
-  echo "the source data, authored by CodeRoast. Line counts, ordering and content all differ from the"
-  echo "source logs. Treat every section below as *\"Changes: yes — rendered through canon\"*, whatever"
-  echo "the upstream declaration says about its own copy."
+  echo "event row per line under each declared arm, and computes an integer entropy term; the output is"
+  echo "a new arrangement of the source data, authored by CodeRoast. Line counts, ordering and content"
+  echo "all differ from the source logs. Treat every section below as *\"Changes: yes — rendered through"
+  echo "canon\"*, whatever the upstream declaration says about its own copy."
   for entry in "${rights[@]}"; do
     c="${entry%%:*}"; r="${entry#*:}"
     case "$r" in
@@ -261,14 +330,27 @@ echo "attribution: $attributed licensed corpus/corpora declared → $OUT/ATTRIBU
   echo
   echo "## What each \`*.canon.txt\` shows"
   echo
-  echo "Per source log, Canon emits three sections:"
+  echo "Every source log is rendered once under each of these declared arms, so one source line"
+  echo "appears once per arm: \`$arm_labels\`."
+  echo
+  echo "Per source log and per arm, Canon emits four sections:"
   echo
   echo "- **templates** — the distinct line shapes Canon collapsed the log into (variable"
   echo "  parts masked to \`<*>\`), with how many lines matched each."
-  echo "- **events** — one row per line: its severity level, a two-char \`failure/warning\`"
-  echo "  lexicon flag (\`F\`/\`W\`, \`-\` when absent), its structural role, and the template."
+  echo "- **events** — one tab-separated row per line. It opens with a three-character cue flag"
+  echo "  (\`F\` a failure cue, \`W\` a warning cue, \`T\` an observation time the transport peel"
+  echo "  extracted; \`-\` when absent), then members of canon's output. Columns, in row order:"
+  echo "  \`$columns\`."
+  echo "  Each member's meaning is stated where canon declares it:"
+  echo "  [\`core/api/canon.api.cppm\`]($canon_api_url)."
+  if [ -n "$omitted" ]; then
+    echo "  Omitted from every row: \`$omitted\` — canon's output carries these members, and this"
+    echo "  view does not print them."
+  fi
   echo "- **det_math** — the deterministic entropy term over the template distribution"
   echo "  (integer domain; identical on every compiler / OS / CPU — that is the whole point)."
+  echo "- **run_outcome** — whether the log carries a run-outcome marker, its token, and the"
+  echo "  outcome canon resolves from it."
   echo
   echo "## Corpora in this showcase"
   echo
@@ -308,11 +390,12 @@ echo "attribution: $attributed licensed corpus/corpora declared → $OUT/ATTRIBU
   echo "> **What this run checked, and what it did not.** The *right to redistribute* in the table"
   echo "> above was read from each source corpus during this run — a \`SLICE.json\` declaring it"
   echo "> fabricated, or an \`ATTRIBUTION.md\` naming a licence — and this page is not rendered at"
-  echo "> all when a corpus declares neither. **No identifying-content scan was computed for these"
-  echo "> rendered artifacts.** That scan is a separate axis, it runs outside this repository, and"
-  echo "> a redistribution licence says nothing about what is *in* the bytes. Read the table as a"
-  echo "> statement about our right to publish these renders, never as a statement about their"
-  echo "> contents. Our real third-party crawl corpora stay private."
+  echo "> all when a corpus declares neither. **This script computes no identifying-content scan.**"
+  echo "> That scan is a separate axis and runs outside this repository: the act that publishes this"
+  echo "> page records its own verdict in the \`DISCLOSURE.md\` beside it. A redistribution licence"
+  echo "> says nothing about what is *in* the bytes, so read the table as a statement about our right"
+  echo "> to publish these renders, never about their contents. Our real third-party crawl corpora"
+  echo "> stay private."
 } > "$OUT/README.md"
 
 echo "showcase rendered → $OUT (${#corpora[@]} corpora)" >&2
