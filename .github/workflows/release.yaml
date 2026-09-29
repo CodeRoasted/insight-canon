@@ -1,9 +1,10 @@
 name: Release
 
-# On a vX.Y.Z tag (or manual re-run): Lint -> CI -> Determinism Golden Proof (gate) -> Release ->
-# attach the golden. The golden gate runs the 5-leg cross-toolchain/ISA/OS matrix and only proceeds
-# if every leg's digest is byte-identical; the agreed digest (the validated golden) is then attached
-# to the Release as a per-release artifact (never committed). CI is the single tag entry point.
+# On a vX.Y.Z tag (or manual re-run): attest -> CI -> Determinism Golden Proof (gate) + the disclosure
+# set (gate) -> Release -> attach the golden. The golden gate runs the 5-leg cross-toolchain/ISA/OS
+# matrix and only proceeds if every leg's digest is byte-identical; the agreed digest (the validated
+# golden) is then attached to the Release as a per-release artifact (never committed). CI is the
+# single tag entry point. The lint is step 0's (ADR-2.D3): this tag re-runs none of it.
 
 on:
   push:
@@ -130,8 +131,8 @@ jobs:
         #
         # AND A DISPATCH FROM ANY OTHER COMMIT IS REFUSED, NOT NOTED. Attesting the tag's commit was
         # half of it: every job that checks out without naming the tag builds the commit the run
-        # was dispatched FROM, and this repository's own `ci.yml`, `golden.yaml` and `lint.yml` name
-        # no ref. So a re-dispatch from `main` after the tag gated `main` and published the tag —
+        # was dispatched FROM, and this repository's own `ci.yml` and `golden.yaml` name no
+        # ref. So a re-dispatch from `main` after the tag gated `main` and published the tag —
         # two trees under one attestation. Dispatched ON the tag (`--ref <tag>`), the two are one
         # commit, and that is the only dispatch this step admits.
         #
@@ -391,13 +392,8 @@ jobs:
       # INV-22-DELTA release-step
       # INV-22-DELTA-END release-step
 
-  lint:
-    needs: attest
-    uses: ./.github/workflows/lint.yml
-    secrets: inherit
-
   ci:
-    needs: [attest, lint]
+    needs: attest
     uses: ./.github/workflows/ci.yml
     secrets: inherit
 
@@ -406,8 +402,30 @@ jobs:
     needs: [attest, ci]
     uses: ./.github/workflows/golden.yaml
 
+  # OPS-7.O9's PUBLICATION-RUN SEAT. The disclosure bar is "signed record in-tree + exact-set gate in CI
+  # on every publication run", and the gate's subject is the REF SET — which refs carry the LogHub
+  # slice, the tag being published included, which does not exist when step 0 runs. So it is the
+  # one lint.yml job this tag still runs (ADR-2.D3: a gate whose subject is the published ref stays
+  # on the publication run), as a job of its own the release needs. The same script is also a job
+  # of lint.yml, where step 0's B4 and a pull request read it early: one script, two coordinates.
+  disclosure-set:
+    needs: attest
+    # PUBLIC repo: pinned to hosted — a self-hosted runner reachable from a fork PR is an RCE. Never vars.CI_RUNS_ON here.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The predicate ranges over every ref: the gate itself fails closed on a partial
+          # fetch (a declared tag absent, or no tag newer than the boundary, is an error).
+          fetch-depth: 0
+          fetch-tags: true
+      - name: OPS-7.O9 — the disclosed historic-exposure ref set is exact and closed
+        run: bash scripts/disclosure_set_lint.sh
+
   release:
-    needs: [attest, golden]
+    needs: [attest, golden, disclosure-set]
     uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-release.yml@2d42fa9153bd50047312563ef83e1bbe43e2941f
     with:
       tag: ${{ github.event.inputs.tag || github.ref_name }}
