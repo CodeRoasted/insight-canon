@@ -90,7 +90,7 @@
 #                                                against the other legs (no committed golden to rot)
 #
 # THE PUBLISHED VIEW IS PROVED ON EVERY CELL TOO (exit 6). `det_proof --showcase` is the view the
-# public canon showcase renders through (DN-121.D1), and this is the only place in CI that holds a
+# public canon showcase renders through (ADR-33.D5), and this is the only place in CI that holds a
 # det_proof binary, so each cell built below also runs scripts/tests/showcase_view_test.sh over it:
 # the showcase rows are the whole rows with the omitted columns cut, a masked value never reaches a
 # render, and samples_showcase.sh pins the source, the invocation and the view. It runs after the

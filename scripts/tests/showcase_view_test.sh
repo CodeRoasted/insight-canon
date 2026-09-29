@@ -2,7 +2,7 @@
 ###############################################################################
 # showcase view gate — the proof that the public canon showcase is a declared
 # VIEW of canon's projection, selected by the published tool and never filtered
-# after it (DN-121.D1, D2, D6; the arms H1–H5 of DN-121.D7).
+# after it (ADR-33.D5, D2, D6; the arms H1–H5 of DN-121.D7).
 #
 # WHY THIS EXISTS. `det_proof` prints the whole CanonicalEvent, and its `params`
 # member holds the very values canon's templates mask, so a render of the whole

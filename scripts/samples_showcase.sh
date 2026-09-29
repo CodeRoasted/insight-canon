@@ -29,7 +29,7 @@ OUT="${3:?usage: samples_showcase.sh <det_proof-binary> <samples-root> <out-dir>
 mkdir -p "$OUT"
 CANON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# THE VIEW IS det_proof's, NEVER THIS SCRIPT'S (DN-121.D1). `--showcase` prints canon's projection
+# THE VIEW IS det_proof's, NEVER THIS SCRIPT'S (ADR-33.D5). `--showcase` prints canon's projection
 # through a declared allowlist compiled into the published tool — every member but `params`, the
 # values canon's templates mask — so the public page is a SELECTION of the one rendering, and a
 # reader who re-runs the tool gets these bytes without any filter of ours. ONE variable invokes
@@ -37,7 +37,7 @@ CANON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # did not make.
 VIEW_ARGS=(--showcase)
 
-# The view pin (DN-121.D2): det_proof's version, `# view`, `# arms` and `# columns` header lines,
+# The view pin (ADR-33.D5): det_proof's version, `# view`, `# arms` and `# columns` header lines,
 # lifted from its own output and joined on one line, never typed — the line a disclosure binds with
 # its `**View:**` line. `# omits` is deliberately NOT part of it: a member canon adds is named there
 # until someone chooses to publish it, and it must not force a re-sign of a view it does not enter.
@@ -152,14 +152,14 @@ done
 first_out="$OUT/${corpora[0]%%:*}.canon.txt"
 identity="$(grep -m1 '^# semantic_identity ' "$first_out"  | sed 's/^# semantic_identity /semantic_identity /' || true)"
 packages="$(grep -m1 '^# semantic_packages ' "$first_out" | sed 's/^# semantic_packages /packages: /' || true)"
-# What the README says a row carries is LIFTED FROM THE OUTPUT, as the identity above is (DN-121.D6):
+# What the README says a row carries is LIFTED FROM THE OUTPUT, as the identity above is (ADR-33.D5):
 # a column list typed into prose went stale the day det_proof widened its rows, and nothing read it.
 header="$(sed -n '/^## /q;p' "$first_out")"
 columns="$(sed -n 's/^# columns //p' <<<"$header")"
 arm_labels="$(sed -n 's/^# arms //p' <<<"$header")"
 omitted="$(sed -n 's/^# omits //p' <<<"$header")"
 
-# The source the tool was built from (DN-121.D2): THIS script's own checkout, which is where a
+# The source the tool was built from (ADR-33.D5): THIS script's own checkout, which is where a
 # reader's re-run starts. It must be insight-canon's own repository — a parent checkout's HEAD would
 # be a true commit of the wrong repository — and a modified tree is said, because its commit alone
 # does not reproduce the bytes. ABSENT IS STATED, never omitted, like the samples commit below.

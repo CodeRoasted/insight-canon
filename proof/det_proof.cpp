@@ -92,12 +92,12 @@ std::string column_digest_hex(picosha2::hash256_one_by_one& hasher)
 // invariant: the flag column every text row opens with, named first in the `# columns` line.
 constexpr std::string_view kCuesColumn{"cues"};
 // note: it holds the values canon's templates mask; publishing it was refused on 2026-09-29.
-// refs: DN-121.D1
+// refs: ADR-33.D5
 constexpr std::string_view kMaskedValuesMember{"params"};
 
 // invariant: the public showcase's view — the projection members a showcase row prints after its
 // cues; a member outside it is named on the `# omits` line until someone chooses to publish it.
-// refs: DN-121.D1, DN-121.D2
+// refs: ADR-33.D5
 constexpr auto kShowcaseMembers{std::to_array<std::string_view>({
     "id",
     "timestamp_ns",
@@ -142,13 +142,13 @@ constexpr bool no_showcase_name_repeats()
 
 static_assert(every_showcase_name_is_a_member(),
               "kShowcaseMembers names a member canon's projection does not carry: a renamed or "
-              "removed member fails here, never drops out of the view (DN-121.D1)");
-static_assert(no_showcase_name_repeats(), "kShowcaseMembers names a member twice (DN-121.D1)");
+              "removed member fails here, never drops out of the view (ADR-33.D5)");
+static_assert(no_showcase_name_repeats(), "kShowcaseMembers names a member twice (ADR-33.D5)");
 static_assert(std::ranges::is_sorted(kShowcaseMembers, std::ranges::less{}, projection_index),
               "kShowcaseMembers is out of kProjectionMembers order, so a showcase row would not "
-              "be the whole row with columns cut (DN-121.D1)");
+              "be the whole row with columns cut (ADR-33.D5)");
 static_assert(std::ranges::find(kShowcaseMembers, kMaskedValuesMember) == kShowcaseMembers.end(),
-              "the showcase never prints params, the values canon's templates mask (DN-121.D1)");
+              "the showcase never prints params, the values canon's templates mask (ADR-33.D5)");
 
 // post: the projection positions a showcase row prints, in projection order.
 constexpr auto kShowcaseColumns{[]
@@ -287,7 +287,7 @@ int main(int argc, char** argv)
                               : "# canon public determinism proof -- v7\n");
     // invariant: a text output names its view, its arms and its columns from the arrays the loops
     // read, so a reader recovers the row layout from the file alone.
-    // refs: DN-121.D1, DN-121.D2
+    // refs: ADR-33.D5
     if (!digest_mode)
     {
         std::cout << "# view " << (showcase_mode ? "showcase" : "whole") << '\n';
