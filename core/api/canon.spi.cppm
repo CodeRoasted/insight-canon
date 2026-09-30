@@ -201,7 +201,7 @@ export namespace insight::semantic
 // invariant: distinct from the MASKING token kCanonicalizationVersion, whose value canon.api.cppm
 // owns; this one names the GRAMMAR's shape.
 // refs: ADR-2.D5, ADR-17.D4, ADR-22.D8
-inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-6"};
+inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-7"};
 
 // invariant: a DIALECT is a VOCABULARY over a HOST FORMAT — the format owns the layout rule, the
 // dialect owns the names inside a layout another layer already delimited.
@@ -358,6 +358,35 @@ struct StructuralRoleRow
     std::string_view dialect_gate{kAnyDialect};
 };
 
+// invariant: a CLOSED set of payload shapes a version coordinate applies to — the algorithm
+// lives in core and a new shape is a grammar-version bump, part of the identity.
+enum class VersionPayloadShape : std::uint8_t
+{
+    // invariant: the row declares no version coordinate.
+    None = 0,
+    // invariant: the payload is ONE token, holding no intent trim byte; the version is the bytes
+    // after its last introducer.
+    OneToken,
+};
+
+// invariant: where a unit's name holds its VERSION, declared by the dialect on the marker row
+// that names the unit's banner: the introducer byte sequence and the payload shape it applies to.
+// invariant: core applies it — the version is masked whole in the class and carried verbatim in
+// the discriminant — and knows no platform's reference syntax.
+// invariant: whole or absent: an empty introducer with shape None declares none, and any other
+// mix of the two is refused at composition.
+struct VersionCoordinate
+{
+    std::string_view introducer;
+    VersionPayloadShape shape{VersionPayloadShape::None};
+};
+
+// post: true when the coordinate is declared whole or not at all.
+[[nodiscard]] constexpr bool version_coordinate_whole(const VersionCoordinate& declared) noexcept
+{
+    return declared.introducer.empty() == (declared.shape == VersionPayloadShape::None);
+}
+
 // invariant: a prefix opens a behavioural quantum, carrying the dialect's kind and child_order —
 // the level-typed alignment declaration — and the payload extractor.
 // invariant: DIALECT-gated by construction: an intent marker names its own package and never fires
@@ -385,6 +414,11 @@ struct IntentMarkerRow
     // exactly as a prefix change does.
     // refs: ADR-22.D6
     std::string_view channel_gate{kAnyChannel};
+    // invariant: the payload's version coordinate; none by default, so a row that declares none
+    // derives the class and the discriminant exactly as before.
+    // invariant: serialized into semantic_identity, so declaring one moves the digest; a
+    // reader-side derivation with no generation dual, since the writer emits the payload verbatim.
+    VersionCoordinate version{};
 };
 
 // invariant: the WRITER dual of IntentMarkerRow — the same kind and child_order, and the same

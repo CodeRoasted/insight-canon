@@ -179,7 +179,7 @@ namespace
             const auto rhs{
                 insight::tokenization::recognize(normalized_probe(probe, scratch), second_view)};
             if (lhs.kind != rhs.kind || lhs.name != rhs.name ||
-                lhs.discriminant != rhs.discriminant)
+                lhs.discriminant != rhs.discriminant || lhs.version != rhs.version)
                 return {.name = "determinism.recognize",
                         .passed = false,
                         .detail = "recognize(\"" + probe +
@@ -866,6 +866,18 @@ namespace
         return std::string{extract_name(extract)};
     }
 
+    [[nodiscard]] std::string render_value(VersionPayloadShape shape)
+    {
+        switch (shape)
+        {
+        case VersionPayloadShape::None:
+            return "None";
+        case VersionPayloadShape::OneToken:
+            return "OneToken";
+        }
+        return "unknown";
+    }
+
     [[nodiscard]] std::string render_value(PayloadEmit emit)
     {
         return std::string{emit_name(emit)};
@@ -959,9 +971,11 @@ namespace
                                               const IntentMarkerRow& rhs)
     {
         const auto& [lhs_prefix, lhs_kind, lhs_order, lhs_dialect, lhs_extract, lhs_excludes,
-                     lhs_channel] = lhs;
+                     lhs_channel, lhs_version] = lhs;
         const auto& [rhs_prefix, rhs_kind, rhs_order, rhs_dialect, rhs_extract, rhs_excludes,
-                     rhs_channel] = rhs;
+                     rhs_channel, rhs_version] = rhs;
+        const auto& [lhs_introducer, lhs_shape] = lhs_version;
+        const auto& [rhs_introducer, rhs_shape] = rhs_version;
         FieldDiff diff;
         diff.field("prefix", lhs_prefix, rhs_prefix);
         diff.field("kind", lhs_kind, rhs_kind);
@@ -970,6 +984,8 @@ namespace
         diff.field("extract", lhs_extract, rhs_extract);
         diff.field("payload_excludes", lhs_excludes, rhs_excludes);
         diff.field("channel_gate", lhs_channel, rhs_channel);
+        diff.field("version.introducer", lhs_introducer, rhs_introducer);
+        diff.field("version.shape", lhs_shape, rhs_shape);
         return diff.text();
     }
 

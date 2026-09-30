@@ -351,6 +351,59 @@ ships `-15`, and every further output change before the next tag rides `-16`. Th
 whose only moved bytes are this string; the hub's published determinism golden is re-rendered at
 the cut.
 
+## `-17` — a unit's version is a coordinate its dialect declares
+
+`-16` SHIPPED in `v1.10.5`, so an output change after that tag rides a new value, and this is
+the one step this cut takes.
+
+**What changed.** The intent class and the instance discriminant of a unit are derived by the
+core from the marker's payload. Until now three rules that know no dialect did it all: a
+`v`-number or dotted number becomes `vX`, a run of two or more digits `N`, a parenthesis `(M)`.
+A reference that none of them claims, a commit hash or a branch name, stayed in the class, so one
+step pinned at two commits was two units.
+
+* **A marker row may declare its payload's version coordinate**: the introducer byte sequence
+  and the payload shape it applies to (`VersionCoordinate` on `IntentMarkerRow`, a closed shape
+  enum). The recognizer returns the declared version with the marker (`IntentMarker::version`).
+* **The core applies it as a mechanism.** `canonicalize_intent(marker)` masks the declared
+  version whole with the one version mask, and the marker's discriminant carries its bytes
+  verbatim. The core holds no introducer, no hash length and no reference grammar.
+* **The GitHub dialect declares it** on both Step rows: introducer `@`, on a payload that is one
+  token. Its ruleset version moves `1.4.0` to `1.5.0`, and the rule grammar, which gained a row
+  member and a closed enum, moves `semantic-grammar-6` to `semantic-grammar-7`.
+* **A dialect that declares none is unchanged**, byte for byte: the one-argument
+  `canonicalize_intent(name)` and `discriminant_of(name)` are the undeclared path and did not
+  move.
+
+**Which serialized fields move.** The intent class and the instance discriminant of a GitHub
+step whose banner is one token holding `@`, and every identity a consumer derives from them. No
+`CanonicalEvent` member moves: `template_str`, `template_id`, the level and the event time are
+what they were. A step at a major tag (`actions/checkout@v4`) keeps its class and its instance;
+what moves is a reference the three rules did not claim, or claimed in part.
+
+**Witness inputs.** The recognized marker of each line below, under the GitHub dialect and the
+annotated channel, shown as class and instance. `det_proof` renders `CanonicalEvent` members
+only and none of them moves, so these are witnessed by the recognizer, as
+`semantic/github/tests/test_github_version_coordinate.cpp` and
+`core/tests/identity/test_declared_version_coordinate.cpp` pin them.
+
+* `##[group]Run actions/checkout@c0f6160ff80057923ff50e5e5676a2dbcf6d9c3a` — at `v1.10.5`:
+  class `actions/checkout@c0f6160ff80057923ff50e5e5676a2dbcf6d9c3a`, no instance; now: class
+  `actions/checkout@vX`, instance `c0f6160ff80057923ff50e5e5676a2dbcf6d9c3a`.
+* `##[group]Run dtolnay/rust-toolchain@stable` — at `v1.10.5`: class
+  `dtolnay/rust-toolchain@stable`, no instance; now: class `dtolnay/rust-toolchain@vX`,
+  instance `stable`.
+* `##[group]Run pytorch/test-infra/.github/actions/setup-uv@release/2.13` — at `v1.10.5`: class
+  `pytorch/test-infra/.github/actions/setup-uv@release/vX`, instance `2.13`; now: class
+  `pytorch/test-infra/.github/actions/setup-uv@vX`, instance `release/2.13`.
+* Unmoved, the guard: `##[group]Run docker pull ghcr.io/acme/tool@c0f6160ff80057923ff50e5e5676a2dbcf6d9c3a`
+  holds `@` among several tokens, so it is outside the declared shape and keeps its class.
+
+**Why one step.** A consumer crossing the next cut pays exactly one comparability event:
+`v1.10.5` ships `-16`, and every further output change before the next tag rides `-17`. The
+re-base cost is this string in `core/tests/mask/mask_rules.golden` and in `insight-metalog`'s
+three committed vector files; the hub's published determinism golden is re-rendered at the cut.
+
 ---
 
 *See also: [masking.md](masking.md) (what the current generation's rules actually are) ·

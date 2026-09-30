@@ -17,7 +17,7 @@ TEST(GithubManifestShape, ShipsTheDeclaredRulesetShapeAndNothingElse)
     EXPECT_EQ(name, "github") << "the declared package name is the dialect coordinate every gated "
                                  "row carries and what a caller declares; actual: "
                               << name;
-    EXPECT_EQ(version, "1.4.0") << "ruleset version moved without this pin moving with it — if the "
+    EXPECT_EQ(version, "1.5.0") << "ruleset version moved without this pin moving with it — if the "
                                    "rows below changed, both edits belong in one pass (ADR-17.D3); "
                                    "actual: "
                                 << version;

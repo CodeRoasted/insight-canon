@@ -34,7 +34,7 @@ using EventID = uint64_t;
 // refs: ADR-2.D5, ADR-2.D9, F-SRC-insight-canon:canon.api.cppm:TemplateId
 // refs: F-SRC-insight-canon:mask.cpp:normalize_marker_number
 // note: the generation ledger is technical_docs/canonicalization_generations.md.
-inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-16"};
+inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-17"};
 
 // invariant: the first 16 bytes of SHA-256 over the masked template_str, carried as a fixed-size
 // POD; the 34-byte "h:"+hex string materialises only at the serialize seam.
@@ -132,6 +132,21 @@ parse_template_id(std::string_view rendered) noexcept;
 // discriminant keeps it.
 // refs: ADR-18, ADR-18.D1
 [[nodiscard]] std::string_view discriminant_of(std::string_view name) noexcept;
+
+// post: the VERSION of a one-token name: the bytes after the last `introducer`, as a view into
+// name; empty when the trimmed name holds an intent trim byte, no introducer, or nothing after it.
+// invariant: the MECHANISM of a version coordinate a dialect's marker row declares: the introducer
+// is the row's data, and no introducer, length or reference grammar is written here.
+[[nodiscard]] std::string_view one_token_version_of(std::string_view name,
+                                                    std::string_view introducer) noexcept;
+
+// pre: `version` is empty, or the trailing bytes of the trimmed name, as a recognizer returns it.
+// post: the discriminant of a name whose declared version is `version`: the envelope from the
+// first masked span to the END of the name, so the version's bytes are carried verbatim.
+// post: with an empty version, discriminant_of(name).
+// invariant: the complement of the class canonicalize_intent gives the same marker.
+[[nodiscard]] std::string_view discriminant_of(std::string_view name,
+                                               std::string_view version) noexcept;
 
 // post: byte-identical to template_id_of(canonicalize_intent(name)); one call keeps intent_id
 // co-located with its comparability version.
@@ -1150,11 +1165,28 @@ struct IntentMarker
     // refs: ADR-18, ADR-18.D1
     std::string_view discriminant;
     ChildOrder child_order{ChildOrder::Ordered};
+    // invariant: the unit's DECLARED version: the trailing bytes of the name its marker row's
+    // version coordinate selects, kept verbatim.
+    // invariant: empty when the row declares none or the payload is not the declared shape.
+    std::string_view version;
     auto operator<=>(const IntentMarker&) const = default;
     bool operator==(const IntentMarker&) const = default;
 };
 
 } // namespace insight::tokenization
+
+export namespace insight
+{
+
+// post: the intent CLASS of a recognized marker: canonicalize_intent of its name, with the
+// marker's declared version masked whole by the one version mask.
+// invariant: a marker with no declared version gives canonicalize_intent(marker.name), byte for
+// byte, so a dialect that declares no version coordinate is unchanged.
+// invariant: a tag, a branch and a commit of one unit are therefore ONE class, and the version's
+// bytes live in the marker's discriminant.
+[[nodiscard]] std::string canonicalize_intent(const tokenization::IntentMarker& marker);
+
+} // namespace insight
 
 export namespace insight::tokenization
 {

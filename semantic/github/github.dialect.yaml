@@ -17,7 +17,7 @@
 
 dialect:
   name: github
-  version: "1.4.0"
+  version: "1.5.0"
   why:
     - "ADR-17.D3 keys identity on CONTENT, not on spelling: `version:` moves when what this package"
     - "RECOGNIZES or EMITS moves — its rows, their gates, or its code tier — and never for a"
@@ -189,6 +189,23 @@ dialect:
         dialect_gate: self
         extract: RemainderAfterPrefix
         channel_gate: stripped
+        version_coordinate:
+          introducer: "@"
+          shape: OneToken
+          why:
+            - "A step whose banner is ONE token is a `uses:` step, and the runner prints its"
+            - "reference whole: `<owner>/<action>@<ref>`, or an image reference. The bytes after"
+            - "the LAST `@` are the version the workflow pinned: a tag, a branch or a commit."
+            - "Declared here so that canon masks it as a version and carries it as the step's"
+            - "instance: two pins of one action are then one unit at two versions, and a pin"
+            - "move is one replacement instead of a new step beside a disappeared one."
+            - ""
+            - "ONE TOKEN is the shape, and it is the guard: a `run:` banner is the command's"
+            - "first line, which holds spaces, so an `@` inside a shell command (an e-mail"
+            - "address, `docker pull image@digest`) is never read as a version."
+            - ""
+            - "The same declaration sits on the other channel's Step row: the two rows are one"
+            - "banner in two materializations, and they must give one identity."
         why:
           - "In the ANNOTATED channel a line starting with `Run ` is ordinary PROSE, so an ungated"
           - "row mints a phantom Step quantum out of it. Measured on REAL annotated bytes: 9.05 %"
@@ -204,6 +221,23 @@ dialect:
         dialect_gate: self
         extract: RemainderAfterPrefix
         channel_gate: annotated
+        version_coordinate:
+          introducer: "@"
+          shape: OneToken
+          why:
+            - "A step whose banner is ONE token is a `uses:` step, and the runner prints its"
+            - "reference whole: `<owner>/<action>@<ref>`, or an image reference. The bytes after"
+            - "the LAST `@` are the version the workflow pinned: a tag, a branch or a commit."
+            - "Declared here so that canon masks it as a version and carries it as the step's"
+            - "instance: two pins of one action are then one unit at two versions, and a pin"
+            - "move is one replacement instead of a new step beside a disappeared one."
+            - ""
+            - "ONE TOKEN is the shape, and it is the guard: a `run:` banner is the command's"
+            - "first line, which holds spaces, so an `@` inside a shell command (an e-mail"
+            - "address, `docker pull image@digest`) is never read as a version."
+            - ""
+            - "The same declaration sits on the other channel's Step row: the two rows are one"
+            - "banner in two materializations, and they must give one identity."
         why:
           - "The runner-wrapped materialization of the same step banner. Self-gating in principle —"
           - "`##[` never occurs in a stripped log — but gated anyway, so the declared channel"

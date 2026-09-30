@@ -100,6 +100,8 @@ namespace
             append_u8(out, static_cast<std::uint8_t>(row.extract));
             append_str_span(out, row.payload_excludes);
             append_str(out, row.channel_gate);
+            append_str(out, row.version.introducer);
+            append_u8(out, static_cast<std::uint8_t>(row.version.shape));
         }
         append_u32_le(out, static_cast<std::uint32_t>(pkg.level_lifts.size()));
         for (const LevelLiftRow& row : pkg.level_lifts)
@@ -191,6 +193,18 @@ namespace
         else
             std::cerr << "a duplicate rule has no deterministic resolution. Fix the package rows "
                          "or gate them.\n";
+        std::terminate();
+    }
+
+    // note: the message states the rule and the remedy and names no record: canon ships public.
+    [[noreturn]] void fail_version_coordinate(const SemanticPackageManifest& pkg,
+                                              const IntentMarkerRow& row)
+    {
+        std::cerr << "FATAL: insight::semantic::compose — package \"" << pkg.name
+                  << "\", marker row \"" << row.prefix
+                  << "\": a version coordinate is declared whole or not at all. An introducer "
+                     "needs a payload shape and a shape needs an introducer; declare both on the "
+                     "row, or neither.\n";
         std::terminate();
     }
 
@@ -360,6 +374,10 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
 
     if (const ConflictInfo conflict{find_conflict(packages)}; conflict.has_conflict)
         fail_closed(conflict);
+    for (const SemanticPackageManifest& pkg : packages)
+        for (const IntentMarkerRow& row : pkg.markers)
+            if (!version_coordinate_whole(row.version))
+                fail_version_coordinate(pkg, row);
 
     const std::vector<std::size_t> order{canonical_order(packages)};
 

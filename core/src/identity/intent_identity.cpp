@@ -145,6 +145,50 @@ TemplateId intent_id_of(std::string_view name)
     return template_id_of(canonicalize_intent(name));
 }
 
+std::string canonicalize_intent(const tokenization::IntentMarker& marker)
+{
+    const std::string_view name{trimmed_intent_name(marker.name)};
+    if (marker.version.empty() || marker.version.size() > name.size())
+        return canonicalize_intent(name);
+    // invariant: the head keeps its introducer and takes the three rules as any name does; the
+    // version is masked whole, whatever its bytes are.
+    std::string out{canonicalize_intent(name.substr(0, name.size() - marker.version.size()))};
+    out.append(kVersionMask);
+    return out;
+}
+
+std::string_view one_token_version_of(std::string_view name, std::string_view introducer) noexcept
+{
+    name = trimmed_intent_name(name);
+    if (introducer.empty())
+        return {};
+    for (const char byte : name)
+        if (is_intent_trim_byte(byte))
+            return {};
+    const std::size_t found{name.rfind(introducer)};
+    if (found == std::string_view::npos)
+        return {};
+    name.remove_prefix(found + introducer.size());
+    return name;
+}
+
+std::string_view discriminant_of(std::string_view name, std::string_view version) noexcept
+{
+    name = trimmed_intent_name(name);
+    if (version.empty() || version.size() > name.size())
+        return discriminant_of(name);
+    std::string_view head{name};
+    head.remove_suffix(version.size());
+    const std::string_view head_spans{discriminant_of(head)};
+    // invariant: the envelope opens at the head's first masked span when it has one, else at the
+    // version, and always closes at the end of the name.
+    const std::size_t first{head_spans.empty()
+                                ? head.size()
+                                : static_cast<std::size_t>(head_spans.data() - name.data())};
+    name.remove_prefix(first);
+    return name;
+}
+
 std::string_view discriminant_of(std::string_view name) noexcept
 {
     // refs: ADR-18, ADR-18.D1, ADR-16.D13

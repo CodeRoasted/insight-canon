@@ -237,6 +237,22 @@ namespace tokenization
             return std::nullopt;
         }
 
+        // post: the payload's version under the row's declared coordinate; empty when the row
+        // declares none or the payload is not the declared shape.
+        [[nodiscard]] std::string_view
+        declared_version(std::string_view payload,
+                         const insight::semantic::IntentMarkerRow& row) noexcept
+        {
+            switch (row.version.shape)
+            {
+            case insight::semantic::VersionPayloadShape::None:
+                return {};
+            case insight::semantic::VersionPayloadShape::OneToken:
+                return one_token_version_of(payload, row.version.introducer);
+            }
+            return {};
+        }
+
         // post: true when an entry equals the payload or is its leading space-delimited token.
         // refs: ADR-17.D6, STU-6
         [[nodiscard]] bool payload_excluded(std::string_view payload,
@@ -277,10 +293,12 @@ namespace tokenization
             return {};
         // note: the payload is the extractor's capture verbatim; the class is derived downstream.
         // refs: ADR-18.D5
+        const std::string_view version{declared_version(best_payload, *best)};
         return {.kind = best->kind,
                 .name = best_payload,
-                .discriminant = discriminant_of(best_payload),
-                .child_order = best->child_order};
+                .discriminant = discriminant_of(best_payload, version),
+                .child_order = best->child_order,
+                .version = version};
     }
 
 } // namespace tokenization
