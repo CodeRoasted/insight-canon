@@ -1,4 +1,4 @@
-// refs: DN-89.D21
+// refs: ADR-18.D1
 // invariant: a name canonicalized with NO declared version coordinate is byte-identical to what
 // canon gave it before the coordinate existed: a dialect declaring none moves no class.
 // invariant: the expected values are the classes and instances canon gives these names at
@@ -38,7 +38,7 @@ constexpr std::array kUndeclared{
 
 } // namespace
 
-// refs: DN-89.D21
+// refs: ADR-18.D1
 // invariant: the undeclared path masks no `@` suffix: a commit pin and a named ref stay in the
 // class, and a tag or dotted number is masked by the rules that always masked it.
 TEST(UndeclaredVersionCoordinate, TheCoresUndeclaredPathIsByteIdentical)

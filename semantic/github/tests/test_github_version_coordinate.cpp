@@ -1,4 +1,4 @@
-// refs: DN-89.D21
+// refs: ADR-18.D1
 // invariant: the GitHub dialect DECLARES where a step's name holds its version: on both Step rows,
 // the bytes after the last `@` of a one-token payload; the Job row declares none.
 // invariant: canon applies the declaration and holds no `@` of its own, so the recognized marker
@@ -58,7 +58,7 @@ constexpr std::array kProbes{
 
 } // namespace
 
-// refs: DN-89.D21
+// refs: ADR-18.D1
 // invariant: every Step row declares the introducer `@` on a one-token payload, and the Job row
 // declares no version coordinate.
 TEST(GithubVersionCoordinate, BothStepRowsDeclareItAndTheJobRowDeclaresNone)
@@ -83,7 +83,7 @@ TEST(GithubVersionCoordinate, BothStepRowsDeclareItAndTheJobRowDeclaresNone)
     EXPECT_EQ(step_rows, 2U) << "the dialect no longer carries its two Step rows";
 }
 
-// refs: DN-89.D21
+// refs: ADR-18.D1
 // invariant: in each channel a one-token payload's step carries the bytes after its last `@` as
 // its version and the whole payload as its name; any other payload carries no version.
 TEST(GithubVersionCoordinate, TheRecognizedStepCarriesTheVersionOfAOneTokenPayloadOnly)
@@ -105,7 +105,7 @@ TEST(GithubVersionCoordinate, TheRecognizedStepCarriesTheVersionOfAOneTokenPaylo
     }
 }
 
-// refs: DN-89.D21
+// refs: ADR-18.D1
 // invariant: a job banner holding `@` carries no version: the Job row declares none.
 TEST(GithubVersionCoordinate, AJobBannerHoldingAtCarriesNoVersion)
 {
