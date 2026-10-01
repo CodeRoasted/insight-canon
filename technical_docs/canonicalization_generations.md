@@ -404,6 +404,32 @@ only and none of them moves, so these are witnessed by the recognizer, as
 re-base cost is this string in `core/tests/mask/mask_rules.golden` and in `insight-metalog`'s
 three committed vector files; the hub's published determinism golden is re-rendered at the cut.
 
+### Rider — Apache 2.4's error-log line (`DN-43.D21`)
+
+**What changed.** `ApacheErrorLogStrategy` read a 2.4 line's level seat by its word prefix, so
+`[core:notice]` read `core`, an Unknown level, and `parse_apache_error_ts` required a space after
+the seconds, so 2.4's `HH:MM:SS.ffffff` clock (and LogCraft's `HH:MM:SS.mmm`) gave no event time.
+Now the seat (only the bracket right after the clock) splits at its LAST colon: the level is the
+word after it, the module before it becomes `component`. Apache's `trace1`–`trace8` read Trace in
+that seat only, never in the shared lexicon. The clock accepts a `.` and 1–9 digits before the
+year, checked and never read, so the event time keeps one-second grain.
+
+**Which serialized fields move.** `level`, `component` and the event time of an `ApacheError` line
+whose seat holds a colon or a trace word, or whose clock carries a fraction. `content` does not
+move: the seat and the clock were already outside it, so `template_str` and `template_id`, which
+are derived from it, do not move either. A 2.2 line (colon-free seat, fraction-free clock) moves
+nothing.
+
+**Witness inputs.** Measured through the public `Tokenizer::process_line` at a zero-package
+composition. On the first-party httpd 2.4.68 capture (coderoast-corpora `5515deb`, 21 lines):
+19 bracketed lines move from Unknown, `httpd` and no event time to the level, module and instant
+their bytes declare, for example `[mpm_event:notice]` gives Info and `mpm_event`; the 2 headerless
+`AH00558` lines stay RawText. On LogHub's 2.2 `Apache_2k.log` (the Zenodo 8196385 re-cut, 2 000
+lines, sha256 `22c51ca1…`) the projection digest is `9dad52ad…` before and after the change.
+
+**It rides `-17`** under the Founder's ruling of 2026-09-26 (`LEXICON.md` § *Rulings closed*):
+one move per cut, and `-17` is this cut's.
+
 ---
 
 *See also: [masking.md](masking.md) (what the current generation's rules actually are) ·

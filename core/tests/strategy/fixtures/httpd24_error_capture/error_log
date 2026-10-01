@@ -1,0 +1,21 @@
+[Thu Oct 01 13:54:26.070157 2026] [core:trace3] [pid 1:tid 1] core.c(3517): Setting LogLevel for module core.c to trace3
+AH00558: httpd: Could not reliably determine the server's fully qualified domain name, using 172.17.0.2. Set the 'ServerName' directive globally to suppress this message
+[Thu Oct 01 13:54:26.071865 2026] [mpm_event:notice] [pid 1:tid 1] AH00489: Apache/2.4.68 (Unix) configured -- resuming normal operations
+[Thu Oct 01 13:54:26.071871 2026] [mpm_event:info] [pid 1:tid 1] AH00490: Server built: Sep 19 2026 00:19:44
+[Thu Oct 01 13:54:26.071882 2026] [core:notice] [pid 1:tid 1] AH00094: Command line: 'httpd -D FOREGROUND'
+[Thu Oct 01 13:54:26.071885 2026] [core:debug] [pid 1:tid 1] log.c(1611): AH02639: Using SO_REUSEPORT: yes (1)
+[Thu Oct 01 13:54:26.078276 2026] [core:trace3] [pid 14:tid 23] request.c(360): [client 172.17.0.1:49528] request authorized without authentication by access_checker_ex hook: /
+[Thu Oct 01 13:54:27.086272 2026] [core:trace3] [pid 14:tid 30] request.c(360): [client 172.17.0.1:49544] request authorized without authentication by access_checker_ex hook: /
+[Thu Oct 01 13:54:28.093836 2026] [core:trace3] [pid 14:tid 35] request.c(360): [client 172.17.0.1:49556] request authorized without authentication by access_checker_ex hook: /missing.html
+[Thu Oct 01 13:54:28.093865 2026] [core:info] [pid 14:tid 35] [client 172.17.0.1:49556] AH00128: File does not exist: /usr/local/apache2/htdocs/missing.html
+[Thu Oct 01 13:54:29.101963 2026] [authz_core:error] [pid 14:tid 44] [client 172.17.0.1:49558] AH01630: client denied by server configuration: /usr/local/apache2/htdocs/denied
+[Thu Oct 01 13:54:29.101982 2026] [core:trace3] [pid 14:tid 44] request.c(120): [client 172.17.0.1:49558] auth phase 'check access' gave status 403: /denied
+[Thu Oct 01 13:54:30.237395 2026] [mpm_event:notice] [pid 1:tid 1] AH00493: SIGUSR1 received.  Doing graceful restart
+[Thu Oct 01 13:54:30.239585 2026] [core:trace3] [pid 1:tid 1] core.c(3517): Setting LogLevel for module core.c to trace3
+AH00558: httpd: Could not reliably determine the server's fully qualified domain name, using 172.17.0.2. Set the 'ServerName' directive globally to suppress this message
+[Thu Oct 01 13:54:30.240039 2026] [mpm_event:notice] [pid 1:tid 1] AH00489: Apache/2.4.68 (Unix) configured -- resuming normal operations
+[Thu Oct 01 13:54:30.240042 2026] [mpm_event:info] [pid 1:tid 1] AH00490: Server built: Sep 19 2026 00:19:44
+[Thu Oct 01 13:54:30.240045 2026] [core:notice] [pid 1:tid 1] AH00094: Command line: 'httpd -D FOREGROUND'
+[Thu Oct 01 13:54:30.240046 2026] [core:debug] [pid 1:tid 1] log.c(1611): AH02639: Using SO_REUSEPORT: yes (1)
+[Thu Oct 01 13:54:33.318694 2026] [core:info] [pid 1:tid 1] AH00096: removed PID file /usr/local/apache2/logs/httpd.pid (pid=1)
+[Thu Oct 01 13:54:33.318726 2026] [mpm_event:notice] [pid 1:tid 1] AH00492: caught SIGWINCH, shutting down gracefully

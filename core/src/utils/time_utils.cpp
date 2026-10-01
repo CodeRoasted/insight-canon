@@ -38,6 +38,13 @@ namespace time_constants
     inline constexpr std::size_t kCompactDateWidth{6};
     inline constexpr std::size_t kShortYearSlashMinLength{17};
     inline constexpr std::size_t kApacheErrorMinLength{24};
+    // invariant: the byte after the seconds, the year's first byte when that byte is the space, and
+    // the widest fraction 2.4's clock may carry before its space.
+    // refs: DN-43.D21
+    inline constexpr std::size_t kApacheErrorSecondsEnd{19};
+    inline constexpr std::size_t kApacheErrorYearOffset{20};
+    inline constexpr std::size_t kApacheErrorMaxFractionDigits{9};
+    inline constexpr std::size_t kApacheErrorYearDigits{4};
     // invariant: 8 date digits, the dash, three 1-digit clock fields and their three colons; the
     // millisecond digits terminate the second field and are never read.
     // refs: DN-43.O5
@@ -556,11 +563,31 @@ std::optional<Timestamp> parse_apache_error_ts(std::string_view timestamp_str) n
         return std::nullopt;
     if (!parse_fixed(ptr + 17, 2, second))
         return std::nullopt;
-    if (ptr[19] != ' ')
+
+    // invariant: after the seconds come one space and the year (2.2), or a `.`, 1 to 9 digits, one
+    // space and the year (2.4); the fraction is checked and never read, so the grain stays 1 s.
+    // refs: DN-43.D21
+    std::size_t year_offset{time_constants::kApacheErrorYearOffset};
+    if (timestamp_str[time_constants::kApacheErrorSecondsEnd] == '.')
+    {
+        std::size_t digits{0};
+        while (digits <= time_constants::kApacheErrorMaxFractionDigits &&
+               year_offset + digits < timestamp_str.size() &&
+               static_cast<unsigned>(timestamp_str[year_offset + digits]) - '0' <= 9U)
+            ++digits;
+        if (digits == 0 || digits > time_constants::kApacheErrorMaxFractionDigits)
+            return std::nullopt;
+        year_offset += digits + 1;
+        if (year_offset + time_constants::kApacheErrorYearDigits > timestamp_str.size() ||
+            timestamp_str[year_offset - 1] != ' ')
+            return std::nullopt;
+    }
+    else if (timestamp_str[time_constants::kApacheErrorSecondsEnd] != ' ')
         return std::nullopt;
 
     int year{0};
-    if (!parse_fixed(ptr + 20, 4, year))
+    if (!parse_fixed(ptr + year_offset, static_cast<int>(time_constants::kApacheErrorYearDigits),
+                     year))
         return std::nullopt;
 
     std::tm parsed_tm{};

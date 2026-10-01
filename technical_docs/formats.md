@@ -60,7 +60,7 @@ fall through to the level-inference path in [classification.md](classification.m
 | **CLF** | `10/Oct/2000:13:55:36 -0700` | HTTP status → level | (empty) | client IP / hostname | Common/Combined access logs. The client IP is a NODE identity, so it is `host`, never a cube dimension; the layout declares no functional source and says so. |
 | **IIS W3C** | `YYYY-MM-DD HH:MM:SS` | HTTP status → level | — | — | IIS extended format. |
 | **NginxError** | `YYYY/MM/DD HH:MM:SS` | `[level]` bracket | — | — | nginx error log. |
-| **ApacheError** | `[Wkd Mon DD HH:MM:SS YYYY]` | `[level]` bracket | `"httpd"` (constant) | — | apache error log. |
+| **ApacheError** | `[Wkd Mon DD HH:MM:SS YYYY]`, or 2.4's `[Wkd Mon DD HH:MM:SS.f YYYY]` (1–9 fraction digits, checked and never read) | the level seat, the bracket right after the clock: `[level]` (2.2) or `[module:level]` (2.4, split at the LAST colon); Apache's `trace1`–`trace8` read Trace in this seat only | the seat's module; `"httpd"` when the seat holds none | — | Apache httpd error log, 2.2 and 2.4 (`DN-43.D21`). A line with no clock bracket (httpd's startup `AH00558`) is not claimed. |
 | **AndroidLogcat** | `MM-DD HH:MM:SS.mmm` | priority letter → level | tag | — | Zero-copy fast scan. |
 | **WindowsCBS** | `YYYY-MM-DD HH:MM:SS` | explicit level word | component | — | Windows Component-Based Servicing. |
 | **SystemdJournal** | `__REALTIME_TIMESTAMP` (µs) | `PRIORITY` | `_COMM` | — | journal export (JSON-shaped). |

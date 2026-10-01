@@ -1502,7 +1502,8 @@ parse_unix_nano_timestamp(std::string_view timestamp_str) noexcept;
 [[nodiscard]] std::optional<Timestamp>
 parse_short_year_slash(std::string_view timestamp_str) noexcept;
 
-// post: an Apache error-log timestamp, 24 characters.
+// post: an Apache error-log timestamp, 24 characters, or 2.4's with a 1 to 9 digit fraction after
+// the seconds, checked and never read.
 [[nodiscard]] std::optional<Timestamp>
 parse_apache_error_ts(std::string_view timestamp_str) noexcept;
 

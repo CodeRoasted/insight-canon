@@ -392,7 +392,7 @@ if(INSIGHT_CANON_BUILD_TESTS)
         #
         # The suite list here is checked against `scripts/run_corpus_gates.sh`'s registry by that
         # script's `--census` arm, so the two cannot drift apart silently.
-        set(CORPUS_SUITES "TransportPeelEquivalenceGate.*:BracketPeelEquivalenceGate.*:LogHubProjectionPinGate.*")
+        set(CORPUS_SUITES "TransportPeelEquivalenceGate.*:BracketPeelEquivalenceGate.*:LogHubProjectionPinGate.*:ApacheTwoTwoProjectionPinGate.*")
         gtest_discover_tests(insight_canon_tests TEST_FILTER "-${CORPUS_SUITES}")
         gtest_discover_tests(insight_canon_tests TEST_FILTER "${CORPUS_SUITES}"
                              PROPERTIES LABELS corpus)
