@@ -36,3 +36,19 @@ Zenodo record and compare.
 **No ref newer than `v1.7.5` may carry the slice.** This is a checkable predicate over the tag
 set, enforced at publication time; the accepted exposure is the closed set above and can never
 silently grow.
+
+## Correction — 2026-10-01: these files are logpai/loghub's, not CC-BY, and LogHub is withdrawn
+
+Signed by the Founder, Emmanuel Prunet, on 2026-10-01.
+
+The 16 `*_2k.log` files of the `corpora/loghub/slice/` tree, in this repository's `main` from
+2026-06-17 (`3aed9e1`) to 2026-07-09 (`c2fea10`) and in its tags `v1.5.4` to `v1.7.5`, are
+logpai/loghub's own sample files (its commit `dd61d0952749ee7963bde24220d1be5ede023033`). They are
+not members of Zenodo record `8196385`, and they are not CC-BY-4.0: they are under logpai's notice
+(free for research or academic work, on condition that any use or distribution refers to
+https://github.com/logpai/loghub, cites the loghub paper and includes the notice), which they did
+not carry. In 15 of the 16, the carriage return of every CRLF line end was stripped when they were
+committed. The licence and byte-identity rows above are wrong on both counts.
+
+CodeRoast now publishes only its own logs, and LogHub has been withdrawn from every public surface.
+These refs are not rewritten; this note is their disclosure.
