@@ -153,9 +153,8 @@ namespace
         return insight::tokenization::normalize(probe, scratch).undeclared_suffix(0);
     }
 
-    // post: what the row's own walker recognizes on the content: `recognize` for a naming row,
-    // and for an opening row `recognize_opener`'s kind with an empty name, since it carries no
-    // identity.
+    // post: what the row's own walker recognizes on the content: `recognize` for a naming row;
+    // for an opening row, `recognize_opener`'s kind with an empty name, as it carries no identity.
     // refs: DN-89.D33
     [[nodiscard]] insight::tokenization::IntentMarker
     recognize_as(const IntentMarkerRow& row, insight::tokenization::NormalizedContent content,

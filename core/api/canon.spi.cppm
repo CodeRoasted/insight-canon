@@ -728,8 +728,8 @@ paired_writer_row(const IntentMarkerRow& reader, std::span<const IntentEmitRow> 
     for (const IntentEmitRow& emit : emits)
     {
         if (emit.prefix == reader.prefix && emit.kind == reader.kind &&
-            emit.dialect_gate == reader.dialect_gate &&
-            emit.channel_gate == reader.channel_gate && emit.role == reader.role)
+            emit.dialect_gate == reader.dialect_gate && emit.channel_gate == reader.channel_gate &&
+            emit.role == reader.role)
         {
             return &emit;
         }

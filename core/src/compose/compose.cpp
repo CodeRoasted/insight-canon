@@ -211,7 +211,8 @@ namespace
     }
 
     // note: the message states the rule and the remedy and names no record: canon ships public.
-    [[noreturn]] void fail_opening_row(const SemanticPackageManifest& pkg, const IntentMarkerRow& row)
+    [[noreturn]] void fail_opening_row(const SemanticPackageManifest& pkg,
+                                       const IntentMarkerRow& row)
     {
         std::cerr << "FATAL: insight::semantic::compose — package \"" << pkg.name
                   << "\", marker row \"" << row.prefix
