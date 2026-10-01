@@ -1,4 +1,8 @@
-# Corpus: `loghub`
+# Corpus: `loghub` — INTERNAL ONLY
+
+**Internal R&D only, never published** (the Founder, 2026-10-01): CodeRoast publishes only its own
+logs, and no LogHub byte, excerpt or rendering stands on a public surface. The bytes live in the
+private warehouse's byte root alone.
 
 Real-world log datasets from the academic **LogHub** collection — the structural ground truth for
 cube measurement, the cross-stdlib determinism measurement, and the rich-format AMI re-measure
@@ -25,7 +29,7 @@ governance (an internal CodeRoast record, not shipped here).
 - **License:** the record's licence field declares **CC-BY-4.0**; its description also carries
   logpai's notice — free for research or academic work, on condition that any use or distribution
   refers to https://github.com/logpai/loghub and cites the paper, the notice included in all
-  copies. Attribute in any published artifact derived from it, and carry the notice.
+  copies. Nothing derived from it is published.
 - **Class:** big · **re-acquirable** — zero bytes in git; the pins below make any (re)download
   verifiable. Every pin was verified 2026-10-01 by a run of `download_logs.sh` from these files.
 - **Byte root:** the warehouse's gitignored `coderoast-corpora/zenodo_corpora/loghub/data/`,
@@ -156,22 +160,14 @@ BGL / Thunderbird carry an **alert-label column 1** (`-` = normal; `KERNDTLB`/`A
 class). The loader strips col-1 **only** where the sentinel-rate detector confirms it exists (the 14
 message-leading formats keep col-1 as real message).
 
-## Published sample slice (`ADR-7.D7`)
+## Withdrawn from publication (2026-10-01)
 
-The 16 slices above, plus `ATTRIBUTION.md` (the record, the licence, the record's notice and the
-change: excerpted by the declared rule) and the signed `DISCLOSURE.md`, live at
-**`coderoast-corpora/zenodo_corpora/loghub/samples/`** and publish to the **public hub** via the
-corpora Sample Release workflow. The published files are byte-identical copies of
-`data/loghub/*_2k.log` and carry the same pins.
+The 16 slices above are for internal measurement only, in `data/loghub/`; the corpus has no
+published sample slice. A test that reads a slice mounts `data/loghub/` by the `loghub` registry id.
 
-From 2026-07-09 the hub published logpai/loghub's own `_2k` files instead — not members of the
-record, under logpai's licence, labelled CC-BY-4.0 in error, with the CR of every CRLF line end
-stripped in 15 of the 16. The ruling of 2026-10-01 replaced them with these slices as an adapted
-CC-BY-4.0 work, without rewriting history; the disclosure carries the dated correction. Until
-that replacement is published, the warehouse `samples/` tree still holds the earlier files.
-
-**Consumed by:** the **canon Samples Showcase** — `insight-canon/proof/det_proof` run over the hub
-samples for a client-facing "what Canon extracts" render (a showcase, **not** a gate: the determinism
-gate uses `proof/corpus/`, and the end-to-end is owned by Eidos + the playground e2e). No canon test
-resolves an in-git slice, so the LogHub `_2k` bytes were removed from canon git (`ADR-7.D7`, 2026-07-09).
-A test that reads a slice mounts `data/loghub/` by the `loghub` registry id, never the published copy.
+What was published before the withdrawal: logpai/loghub's own `_2k` files — not members of the
+record, under logpai's notice, labelled CC-BY-4.0 in error, with the CR of every CRLF line end
+stripped in 15 of the 16 — in this repository's `main` from 2026-06-17 to 2026-07-09 and in its tags
+`v1.5.4`–`v1.7.5`, then on the public hub from 2026-07-09 with canon's rendering over them. The
+ruling of 2026-10-01 withdrew them from every public surface without rewriting history; each
+public disclosure carries a dated correction note.
