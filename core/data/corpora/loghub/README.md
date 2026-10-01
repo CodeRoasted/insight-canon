@@ -24,6 +24,8 @@ governance (an internal CodeRoast record, not shipped here).
   - `BGL.zip` — 57,489,019 B · sha256 `d67fd82a711aea0157a9b83175892c6ee60e384a2ddf5bc51f39118453816da8` **(verified 2026-06-17)**; extracts to →
   - `BGL.log` — 743,185,031 B · 4,747,963 lines · sha256 `666130b15ef44eb32fd02bd053e6c6e007c37696b5e7e8b9d8e45b729876a5d2` (4.40 M normal + ~348 k alerts / ~30 classes, labels intact).
   - `Thunderbird_5M.log` — 868,147,617 B · 5,000,000 lines · sha256 `6e0f52d45d639c76fc2f430e6ef609a915072c2328b862cb097dc59ac5694580` (a 5 M-line head-extract of LogHub Thunderbird — extraction recipe under Acquisition below).
+- **Pin, the `_2k` population** (under the warehouse's gitignored `coderoast-corpora/zenodo_corpora/loghub/data/loghub/`, fetched from logpai/loghub commit `dd61d0952749ee7963bde24220d1be5ede023033`, the `_2k` files' own publication):
+  - `Apache_2k.log` — 171,239 B · 2,000 lines · 1,999 CRLF line ends, no final newline · sha256 `c7efa3eb686e3a96bd2f8f4457b2a7887e9cf2f3649327f1b4e87af841363ce8` **(verified 2026-10-01)** — the input of the Apache 2.2 error-log projection pin.
 - **Class:** big · **re-acquirable** (CC-BY, Zenodo `8196385`) — we store **zero bytes in git**; the pins make any (re)download verifiable.
 
 > Lesson baked into the pin: a "full" academic corpus can be silently reprocessed (labels dropped)
@@ -34,9 +36,10 @@ governance (an internal CodeRoast record, not shipped here).
 
 All tooling lives in the private warehouse **`coderoast-corpora`** (`ADR-7.D4`).
 
-- **`_2k` samples + structured-JSON mix:** `coderoast-corpora/zenodo_corpora/loghub/scripts/download_logs.sh` fetches the 16
-  `_2k` samples (logpai/loghub GitHub) under the warehouse's `data/logs/loghub/` and a structured-JSON
-  archive. (The published sample slice is the `_2k` set — see below.)
+- **`_2k` samples:** `coderoast-corpora/zenodo_corpora/loghub/scripts/download_logs.sh` → `fetch_loghub_2k`
+  fetches the 16 `_2k` samples from logpai/loghub commit `dd61d095` into the warehouse's
+  `zenodo_corpora/loghub/data/loghub/` and checks each against its sha256 pin in that script. (The
+  published sample slice is the same 16 files — see below.)
 - **Full corpus (`coderoast-corpora/zenodo_corpora/loghub/data/loghub-full/`):** `download_logs.sh` →
   `fetch_loghub_full` re-acquires it from Zenodo `8196385`: `BGL.zip` → verify → extract → `BGL.log`
   (verify); `Thunderbird.tar.gz` streamed through `tar -xzO Thunderbird.log | head -n 5000000` →
@@ -56,8 +59,10 @@ message-leading formats keep col-1 as real message).
 The LogHub per-format **`*_2k.log`** set (16 files, 2000 lines each) — the canonical small,
 deterministic, all-format input — plus `ATTRIBUTION.md` (CC-BY-4.0 credit + the "no changes / full
 corpus not committed" notice) lives at **`coderoast-corpora/zenodo_corpora/loghub/samples/`** and
-publishes to the **public hub** via the corpora Sample Release workflow. Extraction: the LogHub `_2k`
-distribution verbatim (or `head -n 2000` of each full format file, label column preserved).
+publishes to the **public hub** via the corpora Sample Release workflow. Extraction: none — the 16
+files are logpai/loghub's own `_2k` files at the pinned commit, byte for byte. They are not a
+`head -n 2000` of the Zenodo full logs: measured 2026-10-01, `Apache_2k.log` and `Linux_2k.log`
+differ from the first lines of `Apache.log` and `Linux.log`.
 
 **Consumed by:** the **canon Samples Showcase** — `insight-canon/proof/det_proof` run over the hub
 samples for a client-facing "what Canon extracts" render (a showcase, **not** a gate: the determinism
