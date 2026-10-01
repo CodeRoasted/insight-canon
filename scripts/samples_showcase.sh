@@ -67,7 +67,7 @@ trap 'rm -f "$replay"' EXIT
 # property of nobody.
 #
 # WHAT IT READS. Exactly the two declarations the warehouse gate reads on its RIGHT axis: a
-# `SLICE.json` with `"synthetic": true`, or an `ATTRIBUTION.md` naming a redistribution licence.
+# `SLICE.json` with `"synthetic": true`, or an `ATTRIBUTION.md` declaring a redistribution licence.
 # It does NOT re-implement the CONTENT axis — that predicate lives in the private warehouse and
 # this repo is public and anonymous, so it cannot run here. The README says so in as many words
 # rather than implying a scan nobody performed.
@@ -85,9 +85,16 @@ right_of() {   # $1 = a <corpus>/samples dir -> prints "SYNTHETIC" | "REDISTRIBU
     echo "SYNTHETIC"; return 0
   fi
   attrib="$(find "$cdir" -type f -name 'ATTRIBUTION.md' | LC_ALL=C sort | sed -n 1p)"
-  # The same licence vocabulary the warehouse gate accepts. Kept in step deliberately: a render
-  # that claimed a right its source's gate would refuse is the failure one level down.
-  if [ -n "$attrib" ] && grep -qiE 'CC-?BY|CC0|public[ -]?domain|MIT|Apache|BSD|permissive' "$attrib"; then
+  # A DECLARED LICENCE LINE, never a word anywhere in the file: `License:` or `Licence:` opening
+  # a line, its value one admitted SPDX id, bare or in parentheses after the licence's name. The
+  # pattern is the warehouse gate's own text (`LICENCE_OK`), and `./pharos check --module
+  # right_axis_divergence` reds when the two disagree on any probe: a render that claimed a right
+  # its source's gate would refuse is the failure one level down. Until 2026-10-01 both read an
+  # unanchored vocabulary, which passed "Redistribution not permitted." on `mit` and a file name
+  # `Apache_2k.log` on `Apache`. `tr` ends a line at a CR as the gate's universal newlines do;
+  # `LC_ALL=C` keeps the case-folding to ASCII as the gate's `re.A` does; a here-string, never a
+  # pipe, because under pipefail an early-exiting `grep -q` can SIGPIPE its producer.
+  if [ -n "$attrib" ] && LC_ALL=C grep -qiE '^ *([-*+] +)?(\*\*)?licen[cs]e(\*\*)? *:(\*\*)? *((CC-BY-([1-4]\.0|2\.5)|CC0-1\.0|PDDL-1\.0|MIT|Apache-2\.0|BSD-[23]-Clause)|[^()]*\((CC-BY-([1-4]\.0|2\.5)|CC0-1\.0|PDDL-1\.0|MIT|Apache-2\.0|BSD-[23]-Clause)\))[.,;]? *$' <<<"$(tr '\r' '\n' < "$attrib")"; then
     echo "REDISTRIBUTABLE|$attrib"; return 0
   fi
   return 1
@@ -105,8 +112,8 @@ for cdir in "$SAMPLES"/*/samples; do
     {
       echo "error: corpus '$corpus' declares no right to redistribute — refusing to publish."
       echo "  $cdir carries neither a SLICE.json with \"synthetic\": true nor an ATTRIBUTION.md"
-      echo "  naming a redistribution licence. A render of undeclared bytes is a publication we"
-      echo "  cannot stand behind, and this script will not emit one."
+      echo "  declaring a redistribution licence on a line of its own (License: <SPDX id>). A render of"
+      echo "  undeclared bytes is a publication we cannot stand behind, and this script will not emit one."
     } >&2
     exit 4
   fi
@@ -266,6 +273,12 @@ attributed=0
   echo "a new arrangement of the source data, authored by CodeRoast. Line counts, ordering and content"
   echo "all differ from the source logs. Treat every section below as *\"Changes: yes — rendered through"
   echo "canon\"*, whatever the upstream declaration says about its own copy."
+  echo
+  # THE RENDER'S OWN LICENCE, DECLARED. These renders are published in coderoast-hub, whose LICENSE
+  # puts its whole content, the showcase named, under CC-BY-4.0; this line states that licence in
+  # the declared-line form the warehouse gate reads when it judges this folder. Each licensed
+  # source below keeps its own licence, quoted, and the gate judges those sources separately.
+  echo "**Licence:** Creative Commons Attribution 4.0 International (CC-BY-4.0)"
   for entry in "${rights[@]}"; do
     c="${entry%%:*}"; r="${entry#*:}"
     case "$r" in
@@ -389,7 +402,7 @@ echo "attribution: $attributed licensed corpus/corpora declared → $OUT/ATTRIBU
   # machine prints.
   echo "> **What this run checked, and what it did not.** The *right to redistribute* in the table"
   echo "> above was read from each source corpus during this run — a \`SLICE.json\` declaring it"
-  echo "> fabricated, or an \`ATTRIBUTION.md\` naming a licence — and this page is not rendered at"
+  echo "> fabricated, or an \`ATTRIBUTION.md\` declaring a licence line — and this page is not rendered at"
   echo "> all when a corpus declares neither. **This script computes no identifying-content scan.**"
   echo "> That scan is a separate axis and runs outside this repository: the act that publishes this"
   echo "> page records its own verdict in the \`DISCLOSURE.md\` beside it. A redistribution licence"

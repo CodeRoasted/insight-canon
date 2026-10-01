@@ -26,6 +26,11 @@
 #   H5  PINS.md names the insight-canon commit, the invocation and ONE view line
 #       equal to the render's version, view, arms and columns header lines; the
 #       README's column list equals the `# columns` line.
+#   H6  the RIGHT axis reads a DECLARED licence line, never a word: a tree whose
+#       ATTRIBUTION.md says "Redistribution not permitted." or names a file
+#       `Apache_2k.log` is refused (exit 4) — both passed the unanchored
+#       vocabulary until 2026-10-01 — while each licence-line form a published
+#       tree carries renders; the render's own ATTRIBUTION.md declares its licence.
 #
 # WHAT IS AND IS NOT COVERED. Covered: the binary it is handed, over the public
 # proof corpus and one synthetic tree. NOT covered: that the binary is
@@ -179,6 +184,40 @@ render_columns="$(header_value "$RENDER" columns)"
 check "H5 the README's column list is the render's columns line" \
     "${render_columns:-<the render has no columns line>}" \
     "$(sed -n 's/^  `\(cues [^`]*\)`\.$/\1/p' "$OUT/README.md")"
+
+# ── H6 ────────────────────────────────────────────────────────────────────────
+# One licensed tree per case, no SLICE.json, so the ATTRIBUTION.md alone decides the right.
+OWN_LICENCE_LINE='**Licence:** Creative Commons Attribution 4.0 International (CC-BY-4.0)'
+h6_cases=0
+right_case() {   # <name> <expected exit> <ATTRIBUTION.md body, escapes read by %b>; sets h6_root
+    h6_cases=$((h6_cases + 1))
+    local root="$TMP/h6-$h6_cases"
+    h6_root="$root"
+    mkdir -p "$root/samples/licensed_probe/samples"
+    printf '%b' "$3" > "$root/samples/licensed_probe/samples/ATTRIBUTION.md"
+    printf 'worker 12 accepted connection on port 8443\n' > "$root/samples/licensed_probe/samples/a.log"
+    rc=0; bash "$SHOWCASE_SH" "$DET" "$root/samples" "$root/out" > "$root.log" 2>&1 || rc=$?
+    exited "H6 $1 exits $2" "$2" "$rc" "$root.log"
+}
+right_case "a refusal of the right (\"Redistribution not permitted.\")" 4 \
+    '# Attribution\n\nRedistribution not permitted.\n'
+right_case "a file name (\"Apache_2k.log\")" 4 '# Attribution\n\nSee Apache_2k.log.\n'
+right_case "a licence named in prose, not declared" 4 \
+    '# Attribution\n\nRendered by the open (Apache-2.0) canon core.\n'
+right_case "a quoted notice" 4 \
+    '# Attribution\n\n> License: The datasets are freely available for research or academic work,\n'
+right_case "a non-commercial licence" 4 '- **License:** CC-BY-NC-4.0\n'
+right_case "the committed LogHub licence line" 0 \
+    '# Attribution\n\n- **License:** Creative Commons Attribution 4.0 International (CC-BY-4.0).\n'
+committed_root="$h6_root"
+right_case "the re-cut LogHub licence line" 0 \
+    '- **Licence:** Creative Commons Attribution 4.0 International (CC-BY-4.0),\n  https://creativecommons.org/licenses/by/4.0/\n'
+right_case "the committed LogHub licence line with CRLF line ends" 0 \
+    '# Attribution\r\n\r\n- **License:** Creative Commons Attribution 4.0 International (CC-BY-4.0).\r\n'
+check "H6 the render's own ATTRIBUTION.md declares its licence on a line of its own" 1 \
+    "$(grep -cxF -- "$OWN_LICENCE_LINE" "$committed_root/out/ATTRIBUTION.md" 2>/dev/null || true)"
+check "H6 a synthetic-only render declares it too" 1 \
+    "$(grep -cxF -- "$OWN_LICENCE_LINE" "$OUT/ATTRIBUTION.md" 2>/dev/null || true)"
 
 echo "showcase view gate: $pass passed, $fail failed — $(basename "$DET") over ${#CORPUS[@]} proof corpus file(s) and one synthetic sample tree"
 [ "$fail" -eq 0 ]
