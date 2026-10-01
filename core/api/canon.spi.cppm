@@ -387,6 +387,18 @@ struct VersionCoordinate
     return declared.introducer.empty() == (declared.shape == VersionPayloadShape::None);
 }
 
+// invariant: what a marker row does to a unit of its kind, a CLOSED set whose algorithm lives in
+// core; a new role is a grammar-version bump, part of the identity.
+// refs: DN-89.D33
+enum class MarkerRole : std::uint8_t
+{
+    // invariant: the row opens a unit and names it with its payload, at its own line.
+    Names = 0,
+    // invariant: the row opens a unit of its kind and carries no identity; the unit starts at
+    // its line only when a naming row of its kind follows with no other marker row between.
+    Opens,
+};
+
 // invariant: a prefix opens a behavioural quantum, carrying the dialect's kind and child_order —
 // the level-typed alignment declaration — and the payload extractor.
 // invariant: DIALECT-gated by construction: an intent marker names its own package and never fires
@@ -419,7 +431,24 @@ struct IntentMarkerRow
     // invariant: serialized into semantic_identity, so declaring one moves the digest; a
     // reader-side derivation with no generation dual, since the writer emits the payload verbatim.
     VersionCoordinate version{};
+    // invariant: Names by default, so a row that declares no role names its unit as before.
+    // invariant: an Opens row carries no payload — extract None, no version, no exclusion — and
+    // its child_order is inert; composition refuses any other Opens row.
+    // invariant: `recognize` never returns an Opens row; `recognize_opener` returns only those.
+    // refs: DN-89.D33
+    MarkerRole role{MarkerRole::Names};
 };
+
+// post: true when the row names its unit, or opens one while carrying no identity — a kind, and
+// no extractor, version coordinate or payload exclusion.
+// refs: DN-89.D33
+[[nodiscard]] constexpr bool opening_row_carries_no_identity(const IntentMarkerRow& row) noexcept
+{
+    return row.role == MarkerRole::Names ||
+           (row.kind != insight::tokenization::IntentMarkerKind::None &&
+            row.extract == PayloadExtract::None && row.version.introducer.empty() &&
+            row.version.shape == VersionPayloadShape::None && row.payload_excludes.empty());
+}
 
 // invariant: the WRITER dual of IntentMarkerRow — the same kind and child_order, and the same
 // Medium, which is dialect times channel.
@@ -445,6 +474,10 @@ struct IntentEmitRow
     // channel_gate matches, never the first row that matches by array order.
     // refs: ADR-22.D6
     std::string_view channel_gate{kAnyChannel};
+    // invariant: the reader row's role, so a writer selecting a unit's banner selects its
+    // naming row and never the row that only opens it.
+    // refs: DN-89.D33
+    MarkerRole role{MarkerRole::Names};
 };
 
 // invariant: a prefix lifts the line's LogLevel, inside parse() and before raw-text inference,
@@ -683,7 +716,7 @@ inline constexpr std::string_view kPlaceholderNumericField{"0:"};
 }
 
 // post: the generation row that materializes into a line THAT reader row recognizes — the same
-// prefix, kind and MEDIUM.
+// prefix, kind, role and MEDIUM.
 // invariant: the Medium is dialect times IntentChannel, so the pairing matches on BOTH gates — a
 // reader row gated to one channel pairs only with a writer row gated to the same one.
 // post: nullptr when unpaired, and well-defined iff every reader row has exactly one paired writer
@@ -695,7 +728,8 @@ paired_writer_row(const IntentMarkerRow& reader, std::span<const IntentEmitRow> 
     for (const IntentEmitRow& emit : emits)
     {
         if (emit.prefix == reader.prefix && emit.kind == reader.kind &&
-            emit.dialect_gate == reader.dialect_gate && emit.channel_gate == reader.channel_gate)
+            emit.dialect_gate == reader.dialect_gate &&
+            emit.channel_gate == reader.channel_gate && emit.role == reader.role)
         {
             return &emit;
         }

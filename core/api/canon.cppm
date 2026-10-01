@@ -48,8 +48,19 @@ classify(NormalizedContent content, const insight::semantic::ComposedSemantics& 
 // payload, never declared by a package.
 // invariant: the returned marker's `name` and `discriminant` VIEW the handed content's bytes, so
 // the caller's storage must outlive them.
+// invariant: a row that only OPENS a unit is never returned here, so a line matching one reads
+// as no marker to every caller that does not ask `recognize_opener`.
 [[nodiscard]] IntentMarker recognize(NormalizedContent content,
                                      const insight::semantic::ComposedSemantics& composed) noexcept;
+
+// post: the kind of unit the longest-matching OPENING row of the view opens, and None when no
+// opening row matches.
+// invariant: an opening row carries no identity: the unit it opens is named by the naming row
+// of its kind that follows, and whether it takes effect is the segmenting caller's to decide.
+// refs: DN-89.D33
+[[nodiscard]] IntentMarkerKind
+recognize_opener(NormalizedContent content,
+                 const insight::semantic::ComposedSemantics& composed) noexcept;
 
 // invariant: phase 1 of the pipeline: one raw log line in, one `CanonicalEvent` out.
 // invariant: NOT thread-safe — one instance per thread or per strand.

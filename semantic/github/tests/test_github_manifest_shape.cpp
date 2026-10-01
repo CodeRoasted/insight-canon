@@ -17,14 +17,14 @@ TEST(GithubManifestShape, ShipsTheDeclaredRulesetShapeAndNothingElse)
     EXPECT_EQ(name, "github") << "the declared package name is the dialect coordinate every gated "
                                  "row carries and what a caller declares; actual: "
                               << name;
-    EXPECT_EQ(version, "1.5.0") << "ruleset version moved without this pin moving with it — if the "
+    EXPECT_EQ(version, "1.6.0") << "ruleset version moved without this pin moving with it — if the "
                                    "rows below changed, both edits belong in one pass (ADR-17.D3); "
                                    "actual: "
                                 << version;
 
     EXPECT_EQ(roles.size(), 6U) << "structural-role rows, actual: " << roles.size();
-    EXPECT_EQ(markers.size(), 3U) << "intent-marker rows, actual: " << markers.size();
-    EXPECT_EQ(emits.size(), 3U)
+    EXPECT_EQ(markers.size(), 4U) << "intent-marker rows, actual: " << markers.size();
+    EXPECT_EQ(emits.size(), 4U)
         << "generation-template rows — the writer dual, one per recognition row (ADR-18.D4), so "
            "this must equal markers.size() = "
         << markers.size() << "; actual: " << emits.size();

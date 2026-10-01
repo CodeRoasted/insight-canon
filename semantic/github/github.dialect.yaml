@@ -17,7 +17,7 @@
 
 dialect:
   name: github
-  version: "1.5.0"
+  version: "1.6.0"
   why:
     - "ADR-17.D3 keys identity on CONTENT, not on spelling: `version:` moves when what this package"
     - "RECOGNIZES or EMITS moves — its rows, their gates, or its code tier — and never for a"
@@ -172,6 +172,32 @@ dialect:
       - "generation projection is identity-bearing — a generation-side change moves the"
       - "comparability hash, so two writers can never claim one ruleset identity."
     rows:
+      - prefix: "Current runner version: "
+        kind: Job
+        role: Opens
+        dialect_gate: self
+        channel_gate: any
+        why:
+          - "A job's log does not START at the line that names it. The runner writes this line"
+          - "first, then its own preamble: the runner name, the machine or image, the token"
+          - "permissions, the action downloads. Only then comes `Complete job name: `. With the"
+          - "naming row alone, those lines belonged to whatever unit came before, so on an input"
+          - "holding several jobs they were the previous job's lines, and reordering the jobs"
+          - "moved them."
+          - ""
+          - "So this row OPENS a job and names nothing; the naming row below names it. It takes"
+          - "effect only when a naming row of its kind follows with no other marker row between,"
+          - "and its lines are then the named job's setup. Another opener, a step marker or the"
+          - "end of input first makes it void, and every line keeps the attribution it had."
+          - ""
+          - "Measured on 4 000 run-grain annotated logs: of 15 766 such lines, 15 765 are a job"
+          - "segment's first line and 15 209 are followed by a job name with no other marker"
+          - "between; the 557 that are not sit in segments whose middle was elided. The line is"
+          - "the same in both channels, so it needs no channel gate."
+          - ""
+          - "⚠ A DECLARED LIMITATION: with runner debug logging on, three `##[debug]` lines come"
+          - "before this one, and `##[debug]Starting: ` cannot open a job because it also opens"
+          - "every step. Those three lines stay with the previous unit."
       - prefix: "Complete job name: "
         kind: Job
         child_order: Unordered

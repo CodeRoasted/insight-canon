@@ -153,6 +153,19 @@ namespace
         return insight::tokenization::normalize(probe, scratch).undeclared_suffix(0);
     }
 
+    // post: what the row's own walker recognizes on the content: `recognize` for a naming row,
+    // and for an opening row `recognize_opener`'s kind with an empty name, since it carries no
+    // identity.
+    // refs: DN-89.D33
+    [[nodiscard]] insight::tokenization::IntentMarker
+    recognize_as(const IntentMarkerRow& row, insight::tokenization::NormalizedContent content,
+                 const ComposedSemantics& view) noexcept
+    {
+        if (row.role == MarkerRole::Opens)
+            return {.kind = insight::tokenization::recognize_opener(content, view)};
+        return insight::tokenization::recognize(content, view);
+    }
+
     CheckResult check_determinism(const SemanticPackageManifest& manifest)
     {
         const std::array<SemanticPackageManifest, 1> one{manifest};
@@ -174,10 +187,8 @@ namespace
             std::string scratch;
             const ComposedSemantics first_view{first.for_stream(manifest.name, row.channel_gate)};
             const ComposedSemantics second_view{second.for_stream(manifest.name, row.channel_gate)};
-            const auto lhs{
-                insight::tokenization::recognize(normalized_probe(probe, scratch), first_view)};
-            const auto rhs{
-                insight::tokenization::recognize(normalized_probe(probe, scratch), second_view)};
+            const auto lhs{recognize_as(row, normalized_probe(probe, scratch), first_view)};
+            const auto rhs{recognize_as(row, normalized_probe(probe, scratch), second_view)};
             if (lhs.kind != rhs.kind || lhs.name != rhs.name ||
                 lhs.discriminant != rhs.discriminant || lhs.version != rhs.version)
                 return {.name = "determinism.recognize",
@@ -282,11 +293,11 @@ namespace
                                   "its OWN medium was never measured — the leak leg below cannot "
                                   "measure it either (see grammar.unpaired_marker)."};
             const ComposedSemantics medium{composed.for_stream(manifest.name, row.channel_gate)};
-            if (insight::tokenization::recognize(normalized_probe(probe, scratch), medium).kind !=
+            if (recognize_as(row, normalized_probe(probe, scratch), medium).kind !=
                 insight::tokenization::IntentMarkerKind::None)
             {
-                if (insight::tokenization::recognize(normalized_probe(probe, scratch), foreign)
-                        .kind != insight::tokenization::IntentMarkerKind::None)
+                if (recognize_as(row, normalized_probe(probe, scratch), foreign).kind !=
+                    insight::tokenization::IntentMarkerKind::None)
                     return {.name = "dialect_gate.marker_leak",
                             .passed = false,
                             .detail = "marker key \"" + std::string{row.prefix} +
@@ -343,8 +354,8 @@ namespace
                                   "depth), never fall open."};
         for (const IntentMarkerRow& row : manifest.markers)
             if (row.dialect_gate != kAnyDialect &&
-                insight::tokenization::recognize(
-                    normalized_probe(marker_probe_for(row, manifest.emits), scratch), composed)
+                recognize_as(row, normalized_probe(marker_probe_for(row, manifest.emits), scratch),
+                             composed)
                         .kind != insight::tokenization::IntentMarkerKind::None)
                 return {.name = "dialect_gate.undeclared_leak",
                         .passed = false,
@@ -702,10 +713,14 @@ Report round_trip_report(const SemanticPackageManifest& manifest, const Composed
         const ComposedSemantics medium_view{
             composed.for_stream(writer->dialect_gate, writer->channel_gate)};
         const insight::tokenization::IntentMarker got{
-            insight::tokenization::recognize(normalized_probe(line, scratch), medium_view)};
+            recognize_as(reader, normalized_probe(line, scratch), medium_view)};
 
-        if (got.kind == reader.kind && got.child_order == reader.child_order &&
-            got.name == kProbePayload)
+        // invariant: an opening row renders its prefix alone and carries no payload, so its
+        // closure is its kind; its child_order is inert.
+        const bool opens{reader.role == MarkerRole::Opens};
+        const std::string_view expected_payload{opens ? std::string_view{} : kProbePayload};
+        if (got.kind == reader.kind && (opens || got.child_order == reader.child_order) &&
+            got.name == expected_payload)
         {
             report.checks.push_back({.name = "round_trip", .passed = true, .detail = {}});
             continue;
@@ -719,7 +734,7 @@ Report round_trip_report(const SemanticPackageManifest& manifest, const Composed
                        "\" did NOT recover the declared intent. expected {kind=" +
                        std::string{kind_name(reader.kind)} +
                        ", child_order=" + std::string{order_name(reader.child_order)} +
-                       ", payload=\"" + std::string{kProbePayload} +
+                       ", payload=\"" + std::string{expected_payload} +
                        "\"} got {kind=" + std::string{kind_name(got.kind)} +
                        ", child_order=" + std::string{order_name(got.child_order)} +
                        ", payload=\"" + std::string{got.name} + "\"}."});
@@ -878,6 +893,18 @@ namespace
         return "unknown";
     }
 
+    [[nodiscard]] std::string render_value(MarkerRole role)
+    {
+        switch (role)
+        {
+        case MarkerRole::Names:
+            return "Names";
+        case MarkerRole::Opens:
+            return "Opens";
+        }
+        return "unknown";
+    }
+
     [[nodiscard]] std::string render_value(PayloadEmit emit)
     {
         return std::string{emit_name(emit)};
@@ -971,9 +998,9 @@ namespace
                                               const IntentMarkerRow& rhs)
     {
         const auto& [lhs_prefix, lhs_kind, lhs_order, lhs_dialect, lhs_extract, lhs_excludes,
-                     lhs_channel, lhs_version] = lhs;
+                     lhs_channel, lhs_version, lhs_role] = lhs;
         const auto& [rhs_prefix, rhs_kind, rhs_order, rhs_dialect, rhs_extract, rhs_excludes,
-                     rhs_channel, rhs_version] = rhs;
+                     rhs_channel, rhs_version, rhs_role] = rhs;
         const auto& [lhs_introducer, lhs_shape] = lhs_version;
         const auto& [rhs_introducer, rhs_shape] = rhs_version;
         FieldDiff diff;
@@ -986,13 +1013,16 @@ namespace
         diff.field("channel_gate", lhs_channel, rhs_channel);
         diff.field("version.introducer", lhs_introducer, rhs_introducer);
         diff.field("version.shape", lhs_shape, rhs_shape);
+        diff.field("role", lhs_role, rhs_role);
         return diff.text();
     }
 
     [[nodiscard]] std::string row_differences(const IntentEmitRow& lhs, const IntentEmitRow& rhs)
     {
-        const auto& [lhs_prefix, lhs_kind, lhs_order, lhs_dialect, lhs_emit, lhs_channel] = lhs;
-        const auto& [rhs_prefix, rhs_kind, rhs_order, rhs_dialect, rhs_emit, rhs_channel] = rhs;
+        const auto& [lhs_prefix, lhs_kind, lhs_order, lhs_dialect, lhs_emit, lhs_channel,
+                     lhs_role] = lhs;
+        const auto& [rhs_prefix, rhs_kind, rhs_order, rhs_dialect, rhs_emit, rhs_channel,
+                     rhs_role] = rhs;
         FieldDiff diff;
         diff.field("prefix", lhs_prefix, rhs_prefix);
         diff.field("kind", lhs_kind, rhs_kind);
@@ -1000,6 +1030,7 @@ namespace
         diff.field("dialect_gate", lhs_dialect, rhs_dialect);
         diff.field("emit", lhs_emit, rhs_emit);
         diff.field("channel_gate", lhs_channel, rhs_channel);
+        diff.field("role", lhs_role, rhs_role);
         return diff.text();
     }
 

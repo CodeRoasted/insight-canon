@@ -280,7 +280,8 @@ namespace tokenization
         std::string_view best_payload;
         for (const insight::semantic::IntentMarkerRow& row : composed.markers())
         {
-            if (!content.starts_with(row.prefix) ||
+            if (row.role != insight::semantic::MarkerRole::Names ||
+                !content.starts_with(row.prefix) ||
                 (best != nullptr && row.prefix.size() <= best->prefix.size()))
                 continue;
             const std::optional<std::string_view> payload{extract_payload(content, row)};
@@ -299,6 +300,23 @@ namespace tokenization
                 .discriminant = discriminant_of(best_payload, version),
                 .child_order = best->child_order,
                 .version = version};
+    }
+
+    // pre: `composed` is a view already resolved for the stream; no dialect gate is tested here.
+    // post: the longest opening row's kind; an opening row has no extractor, so its prefix alone
+    // decides the match.
+    // refs: DN-89.D33
+    IntentMarkerKind recognize_opener(NormalizedContent normalized,
+                                      const insight::semantic::ComposedSemantics& composed) noexcept
+    {
+        const std::string_view content{normalized.bytes()};
+        const insight::semantic::IntentMarkerRow* best{nullptr};
+        for (const insight::semantic::IntentMarkerRow& row : composed.markers())
+            if (row.role == insight::semantic::MarkerRole::Opens &&
+                content.starts_with(row.prefix) &&
+                (best == nullptr || row.prefix.size() > best->prefix.size()))
+                best = &row;
+        return best == nullptr ? IntentMarkerKind::None : best->kind;
     }
 
 } // namespace tokenization
