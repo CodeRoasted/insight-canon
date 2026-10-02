@@ -11,7 +11,7 @@
 # `rule_id` is the rule the row exists to witness, and it is CHECKED, not merely declared:
 # `test_mask_rule_golden.cpp` routes each composite subject back through the same catalog the
 # dispatcher runs and reds if a different rule claims it. The population's coverage of the declared
-# rule set (the 9 composite rules, the 5 ephemeral roots, the 6 wrapper pairs, the 4 status
+# rule set (the 10 composite rules, the 5 ephemeral roots, the 6 wrapper pairs, the 4 status
 # keywords, the currency markers) is likewise read from those catalogs, so a rule or entry added
 # with no witness reds by NAME.
 #
@@ -107,6 +107,14 @@ embedded_identity | f7f63412-b7a7-468d-bd31-1a6ae1ca2680 | session f7f63412-b7a7
 embedded_identity | ~/.cache/gradle/f7f63412b7a7468dbd311a6ae1ca2680/lib.jar | reading ~/.cache/gradle/f7f63412b7a7468dbd311a6ae1ca2680/lib.jar ok | reading ~/.cache/gradle/<*>/lib.jar ok
 embedded_identity | (d41d8cd98f00b204e9800998ecf8427e) | digest (d41d8cd98f00b204e9800998ecf8427e) ok | digest (<*>) ok
 embedded_identity | /home/runner/work/_temp/2026-06-09T185733Z.json | wrote /home/runner/work/_temp/2026-06-09T185733Z.json ok | wrote /home/runner/work/_temp/<*>.json ok
+
+# sanitizer_pid — the sanitizer-family process tag: keep both fences, mask the pid. A
+# letter-leading tail glued to the closing fence is kept verbatim; a digit after it, or any byte
+# before the opening fence, declines, and the token stays literal.
+sanitizer_pid | ==4242== | ==4242== ERROR: harness timed out | ==<*>== ERROR: harness timed out
+sanitizer_pid | ==77==ABORTING | ==77==ABORTING now | ==<*>==ABORTING now
+literal_keep | ==77==3 | marker ==77==3 seen | marker ==77==3 seen
+literal_keep | pin==26==3 | require pin==26==3 here | require pin==26==3 here
 
 # kv_value — mask the value, keep the key.
 # The status carve-out in key=value form (`status=200` stays literal) is homed as a

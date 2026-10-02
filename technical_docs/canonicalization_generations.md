@@ -430,6 +430,30 @@ lines, sha256 `22c51ca1…`) the projection digest is `9dad52ad…` before and a
 **It rides `-17`** under the Founder's ruling of 2026-09-26 (`LEXICON.md` § *Rulings closed*):
 one move per cut, and `-17` is this cut's.
 
+### Rider — the sanitizer process tag
+
+**What changed.** AddressSanitizer, libFuzzer and valgrind open a line with `==<pid>==`. The token
+is not digit-leading and no composite rule claimed it, so it stayed literal and the same line made
+a new template in every process. A tenth composite rule, `sanitizer_pid`, placed after
+`embedded_identity` and before `kv_value`, keeps both fences and masks the pid: the tag must open
+the token, and what follows the closing fence is empty or letter-leading and kept verbatim. A digit
+after the closing fence, or any byte before the opening one, declines (a version pin such as
+`pin==26==3` stays literal).
+
+**Which serialized fields move.** `template_str` and `template_id` of a line holding such a token,
+and `params`, which gains the pid. Nothing else: a token claimed by an earlier rule today is still
+claimed by it.
+
+**Witness inputs.** `core/tests/mask/mask_rules.golden` pins the rule's rows
+(`==4242== ERROR: harness timed out` → `==<*>== ERROR: harness timed out`, and the glued tail
+`==77==ABORTING now` → `==<*>==ABORTING now`) and the two literal controls. Measured through the
+public `Tokenizer::process_line` at a zero-package composition over three private CI-log views
+(coderoast-corpora `8d97e14`, registered before the build): distinct templates 296 022 → 296 022,
+260 933 → 260 933 and 3 311 342 → 3 311 283; the 59 removed are 4 templates each split across
+15–16 pids, and in no log do two pids map to one normal form.
+
+**It rides `-17`**, as the rider above does.
+
 ---
 
 *See also: [masking.md](masking.md) (what the current generation's rules actually are) ·

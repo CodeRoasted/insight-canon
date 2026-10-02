@@ -739,6 +739,36 @@ namespace
         return masked;
     }
 
+    // invariant: the sanitizer-family process tag - AddressSanitizer, libFuzzer and valgrind open a
+    // line with `==<pid>==`, and the pid is a per-process instance by the convention itself.
+    constexpr std::string_view kPidTagFence{"=="};
+
+    // post: keeps both fences and masks the pid; the tag must open the token, and what follows it
+    // is empty or letter-leading and kept verbatim, so a digit after the closing fence declines.
+    // invariant: a DECIDABLE numeric - no low-cardinality keyword has the shape fence, digits,
+    // fence at a token's start, so a pid joins the numerics the first-byte test misses.
+    // refs: ADR-16.D5
+    [[nodiscard]] inline bool normalize_sanitizer_pid(std::string_view tok, std::string& out)
+    {
+        if (!tok.starts_with(kPidTagFence) || tok.size() <= kPidTagFence.size() ||
+            !is_digit(tok[kPidTagFence.size()]))
+            return false;
+        std::size_t cursor{kPidTagFence.size()};
+        while (cursor < tok.size() && is_digit(tok[cursor]))
+            ++cursor;
+        if (!tok.substr(cursor).starts_with(kPidTagFence))
+            return false;
+        cursor += kPidTagFence.size();
+        if (cursor < tok.size() && !is_alpha(tok[cursor]))
+            return false;
+        out.clear();
+        out.append(kPidTagFence);
+        out.append(kWildcard);
+        out.append(kPidTagFence);
+        out.append(tok.substr(cursor));
+        return true;
+    }
+
     // post: keeps the key and masks a digit-leading value; a status value and a value WORD are both
     // excluded, so a green-to-red flip stays distinct and a varying word stays literal.
     // refs: LSRC-14, ADR-16.D5
@@ -787,7 +817,7 @@ namespace
     // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
     // refs: F-SRC-insight-canon:mask.cpp:normalize_hash_counter
     // refs: LSRC-13, LSRC-14, F-SRC-insight-canon:mask.cpp:normalize_marker_number
-    constexpr std::array<CompositeRule, 9U> kCompositeRules{{
+    constexpr std::array<CompositeRule, 10U> kCompositeRules{{
         {.name = "diagnostic_composite", .normalize = normalize_diagnostic_composite},
         {.name = "ephemeral_root", .normalize = normalize_ephemeral_root},
         {.name = "versioned_ref", .normalize = normalize_versioned_ref},
@@ -796,6 +826,7 @@ namespace
         {.name = "hash_counter", .normalize = normalize_hash_counter},
         {.name = "marker_number", .normalize = normalize_marker_number},
         {.name = "embedded_identity", .normalize = normalize_embedded_identity},
+        {.name = "sanitizer_pid", .normalize = normalize_sanitizer_pid},
         {.name = "kv_value", .normalize = normalize_kv_value},
     }};
 
