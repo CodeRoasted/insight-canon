@@ -48,10 +48,18 @@ Each whitespace token is classified by the **first** matching rule:
 | 5 | **Digit-leading numeric** | MASK `<*>` — this also carries `0x`-hex: a `0x…` token starts with a digit |
 | 6 | **Literal** — none of the above | KEEP literal |
 
+Before the first token is read, a `content` that is, whole, one JSON object or array is given its **member-order
+normal form**: the members of every object are permuted into name order, every other byte staying where it was
+([formats.md](formats.md) § 5). Every other `content` is tokenized as it is.
+
 After rules 2 and 6 — on the token's **normal form**, the literal token or the form a composite gave it, and
-never on a token rules 3–5 masked whole — one further step runs, and only on a stream that declares a value
-under a key its dialect declares: the **declared-run** step (§4, last row). It replaces each maximal digit run
-equal to the declared value, directly behind a declared marker, by `<*>`, and contributes no param.
+never on a token rules 3–5 masked whole — two further steps run, in this order, and neither claims the token or
+contributes a param (§4, the last two rows):
+
+- the **`;`-segment** step: the form is cut at `;`, and each `<key>=<digit-leading value>` segment has its value
+  masked to the segment's end, the kv-value rule's disposition applied per segment;
+- the **declared-run** step, only on a stream that declares a value under a key its dialect declares: each
+  maximal digit run equal to the declared value, directly behind a declared marker, becomes `<*>`.
 
 Rule 1 wins first on purpose: it protects the **green→red distinction** that downstream diffing depends on —
 `exit code 0` and `exit code 1` must stay *different* templates, so a short status value after a status keyword
@@ -158,6 +166,7 @@ instance. Tried in order; first match wins.
 | **embedded-identity** | a UUID (`8-4-4-4-12`), a hex run ≥ 16, or a **compact UTC instant** (`YYYY-MM-DDTHHMMSSZ` — exactly 18 bytes, colon-free time, mandatory `Z`, non-alphanumeric on both sides), *inside* a larger token not under a declared ephemeral root — including one whose only structure is a wrapper shell (§3.2) | mask the id in place, keep surrounding structure | `~/.cache/gradle/f7f6…2680/lib.jar` → `~/.cache/gradle/<*>/lib.jar` · `(d41d…427e)` → `(<*>)` · `/home/runner/work/_temp/2026-06-09T185733Z.json` → `/home/runner/work/_temp/<*>.json` |
 | **sanitizer-pid** | `==<digits>==` opening the token, followed by nothing or by a letter (the process tag AddressSanitizer, libFuzzer and valgrind print) | keep both fences and a glued letter-leading tail, mask the pid; a digit after the closing fence, or any byte before the opening one, declines | `==4242==` → `==<*>==` · `==77==ABORTING` → `==<*>==ABORTING` |
 | **kv-value** | `<key>=<digit-leading-value>` (strips a leading currency marker first) | keep the key (+ marker), mask the value | `order=100000` → `order=<*>` · `total=$18` → `total=$<*>` |
+| **`;`-segment** | not a claiming rule: applied to the token's normal form after every rule above and before declared-run, when the form holds `;` and `=`. Each `;`-segment `<key>=<value>` whose key is a letter- or `_`-led run of `[A-Za-z0-9_.-]` opening the segment (the first segment may open with wrapper openers) and whose value is digit-leading after an optional currency marker | keep every key, every `;` and a word value, mask a digit-leading value to its segment's end; a short status value behind a status key stays literal per segment; no param. `,` is not a delimiter | `##[end-action id=build;outcome=success;duration_ms=12]` → `##[end-action id=build;outcome=success;duration_ms=<*>` · `item=book;total=$18` → `item=book;total=$<*>` · `id=build;status=200` and `id=build,duration_ms=12` stay literal |
 | **declared-run** | not a claiming rule: applied once to the token's normal form after every rule above, on a stream that declares a value V under a key its dialect declares. A digit run masks when it is the maximal run directly behind a declared marker, the marker opens the form or follows a byte that is neither a letter nor a digit, the run equals V byte for byte, and the byte after it is the form's end or neither a letter nor a digit | keep everything else in the token, mask the run; no param | V = 6656: `/stirling/V2-PR-6656/docker-compose.yml` → `/stirling/V2-PR-<*>/docker-compose.yml` · `PR#6656` → `PR#<*>` · `PR-6657`, `XPR-6656`, `PR-66560` and `python3` (V = 3) stay literal. The predicate is one exported function (`claim_declared_runs`); Sift's job and step instance key reads the same claims (`declared_discriminant_of`) |
 
 **The ephemeral-root catalog is also consulted from inside source-location.** A per-run instance directory in
@@ -175,7 +184,11 @@ The kv-value normalizer **declines** a status value rather than claiming it: on 
 rule 6, not this normalizer (the golden's `status=200` witness is a `literal_keep` row for exactly that reason). It masks
 **numeric** values only — `user=alice` (letter-leading) stays literal, because masking *all* values would
 collapse `status=ok` and `status=failed` (telling an instance key from a categorical key needs cardinality,
-which a stateless per-line masker cannot see — see §6).
+which a stateless per-line masker cannot see — see §6). The kv-value normalizer reads ONE `key=value` per token
+and declines when the first value is a word, so `id=build;outcome=success;duration_ms=12]` is not its; the
+`;`-segment step applies the same disposition to each segment of the token's normal form instead, the status
+carve-out included — and it also reaches a token `embedded-identity` already claimed
+(`id=__<*>.step;duration_ms=<*>`), because it reads the normal form after every claiming rule.
 
 ---
 

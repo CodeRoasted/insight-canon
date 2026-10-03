@@ -798,6 +798,78 @@ namespace
         return true;
     }
 
+    // invariant: the segment step's delimiter - `,` was measured and refused as a second one.
+    // refs: DN-134.D2
+    constexpr char kSegmentDelimiter{';'};
+
+    // post: true for a key opening with a letter or `_`, then letters, digits, `_`, `.` or `-`.
+    [[nodiscard]] constexpr bool is_segment_key(std::string_view key) noexcept
+    {
+        if (key.empty() || (!is_alpha(key.front()) && key.front() != '_'))
+            return false;
+        return std::ranges::all_of(
+            key, [](char chr)
+            { return is_alpha(chr) || is_digit(chr) || chr == '_' || chr == '.' || chr == '-'; });
+    }
+
+    // post: appends `seg` with a digit-led value masked to its end when it is `<key>=<value>`,
+    // the first segment's key optionally behind wrapper openers; true when the value masked.
+    // invariant: kv_value's disposition on one segment, its status carve-out included.
+    // refs: DN-134.D2, LSRC-14
+    [[nodiscard]] inline bool append_segment(std::string_view seg, bool first, std::string& out)
+    {
+        const std::size_t eq_pos{seg.find('=')};
+        if (eq_pos == 0 || eq_pos == std::string_view::npos)
+        {
+            out.append(seg);
+            return false;
+        }
+        std::size_t lead{0};
+        while (first && lead < eq_pos && is_wrapper_open(seg[lead]))
+            ++lead;
+        const std::string_view key{seg.substr(lead, eq_pos - lead)};
+        const std::string_view raw_value{seg.substr(eq_pos + 1)};
+        const std::size_t marker{marker_prefix_len(raw_value)};
+        const std::string_view value{raw_value.substr(marker)};
+        if (!is_segment_key(key) || value.empty() || !is_digit(value.front()) ||
+            (is_status_keyword(key) && is_all_digits(value) && value.size() <= kMaxStatusDigits))
+        {
+            out.append(seg);
+            return false;
+        }
+        out.append(seg.substr(0, eq_pos + 1));
+        out.append(raw_value.substr(0, marker));
+        out.append(kWildcard);
+        return true;
+    }
+
+    // refs: DN-134.D2
+    // post: true with `out` holding `form` whose `;`-segments each passed append_segment; false
+    // when no segment moved, `out` then unspecified.
+    // invariant: NOT a claiming rule - it reads a token's normal form after rules 2 and 6, before
+    // the declared-run step, and contributes no param.
+    [[nodiscard]] bool mask_segment_values(std::string_view form, std::string& out)
+    {
+        if (form.find(kSegmentDelimiter) == std::string_view::npos ||
+            form.find('=') == std::string_view::npos)
+            return false;
+        out.clear();
+        bool moved{false};
+        std::size_t seg_start{0};
+        for (;;)
+        {
+            const std::size_t delim{form.find(kSegmentDelimiter, seg_start)};
+            const std::size_t seg_end{delim == std::string_view::npos ? form.size() : delim};
+            moved =
+                append_segment(form.substr(seg_start, seg_end - seg_start), seg_start == 0, out) ||
+                moved;
+            if (delim == std::string_view::npos)
+                return moved;
+            out.push_back(kSegmentDelimiter);
+            seg_start = delim + 1;
+        }
+    }
+
     // invariant: the array ORDER IS THE PRECEDENCE - tried top to bottom, the first rule that
     // claims the token wins.
     // invariant: this catalog DEFINES the composite layer of the generation the canonicalization
@@ -895,6 +967,370 @@ namespace
         return true;
     }
 
+    // refs: DN-134.D3
+    // invariant: the JSON member-order normal form reads RFC 8259 text and nothing laxer: blanks
+    // are the four the grammar names, a string holds no raw control byte and only declared escapes.
+    namespace json_order
+    {
+
+        // invariant: the nesting bound past which a line is left as it is, so no line drives the
+        // recursion without limit; far beyond any measured CI line.
+        constexpr std::size_t kMaxDepth{128};
+        constexpr unsigned kFirstPrintable{0x20U};
+        constexpr std::size_t kUnicodeEscapeDigits{4};
+        constexpr unsigned kHexRadix{16U};
+        constexpr unsigned kHexLetterBase{10U};
+
+        [[nodiscard]] constexpr bool is_blank(char chr) noexcept
+        {
+            return chr == ' ' || chr == '\t' || chr == '\n' || chr == '\r';
+        }
+
+        [[nodiscard]] constexpr std::size_t skip_blanks(std::string_view src,
+                                                        std::size_t pos) noexcept
+        {
+            while (pos < src.size() && is_blank(src[pos]))
+                ++pos;
+            return pos;
+        }
+
+        // post: the value of one hex digit, or kHexRadix when `chr` is none.
+        [[nodiscard]] constexpr unsigned hex_value(char chr) noexcept
+        {
+            if (is_digit(chr))
+                return static_cast<unsigned>(chr - '0');
+            const unsigned lower{static_cast<unsigned>(static_cast<unsigned char>(chr)) |
+                                 kAsciiCaseMask};
+            return lower - 'a' < kHexLetterCount ? lower - 'a' + kHexLetterBase : kHexRadix;
+        }
+
+        // pre: `pos` is at a `"`.
+        // post: the index after the closing quote, or npos when the string is not RFC 8259.
+        [[nodiscard]] constexpr std::size_t string_end(std::string_view src,
+                                                       std::size_t pos) noexcept
+        {
+            for (++pos; pos < src.size(); ++pos)
+            {
+                const char chr{src[pos]};
+                if (chr == '"')
+                    return pos + 1U;
+                if (static_cast<unsigned>(static_cast<unsigned char>(chr)) < kFirstPrintable)
+                    return std::string_view::npos;
+                if (chr != '\\')
+                    continue;
+                if (++pos >= src.size())
+                    return std::string_view::npos;
+                const char esc{src[pos]};
+                if (esc == 'u')
+                {
+                    for (std::size_t digit{0}; digit < kUnicodeEscapeDigits; ++digit)
+                    {
+                        ++pos;
+                        if (pos >= src.size() || hex_value(src[pos]) == kHexRadix)
+                            return std::string_view::npos;
+                    }
+                }
+                else if (esc != '"' && esc != '\\' && esc != '/' && esc != 'b' && esc != 'f' &&
+                         esc != 'n' && esc != 'r' && esc != 't')
+                    return std::string_view::npos;
+            }
+            return std::string_view::npos;
+        }
+
+        // post: the index after an RFC 8259 number at `pos`, or npos.
+        [[nodiscard]] constexpr std::size_t number_end(std::string_view src,
+                                                       std::size_t pos) noexcept
+        {
+            const auto digits{[&]
+                              {
+                                  const std::size_t from{pos};
+                                  while (pos < src.size() && is_digit(src[pos]))
+                                      ++pos;
+                                  return pos - from;
+                              }};
+            if (pos < src.size() && src[pos] == '-')
+                ++pos;
+            if (pos < src.size() && src[pos] == '0')
+                ++pos;
+            else if (digits() == 0)
+                return std::string_view::npos;
+            if (pos < src.size() && src[pos] == '.')
+            {
+                ++pos;
+                if (digits() == 0)
+                    return std::string_view::npos;
+            }
+            if (pos < src.size() && (src[pos] == 'e' || src[pos] == 'E'))
+            {
+                ++pos;
+                if (pos < src.size() && (src[pos] == '+' || src[pos] == '-'))
+                    ++pos;
+                if (digits() == 0)
+                    return std::string_view::npos;
+            }
+            return pos;
+        }
+
+        // pre: `pos` is in `src` and not at `{` or `[`.
+        // post: the index after the string, literal word or number at `pos`, or npos.
+        [[nodiscard]] constexpr std::size_t scalar_end(std::string_view src,
+                                                       std::size_t pos) noexcept
+        {
+            if (src[pos] == '"')
+                return string_end(src, pos);
+            for (const std::string_view word : {"true", "false", "null"})
+                if (src.substr(pos).starts_with(word))
+                    return pos + word.size();
+            return number_end(src, pos);
+        }
+
+        // post: the index of the member's value after the name at `pos`, its colon and the blanks
+        // around it, or npos when `pos` opens no `"name" :`.
+        [[nodiscard]] constexpr std::size_t member_value_at(std::string_view src,
+                                                            std::size_t pos) noexcept
+        {
+            if (pos >= src.size() || src[pos] != '"')
+                return std::string_view::npos;
+            pos = skip_blanks(src, string_end(src, pos));
+            if (pos >= src.size() || src[pos] != ':')
+                return std::string_view::npos;
+            return skip_blanks(src, pos + 1U);
+        }
+
+        // post: the index after the value at `pos`, or npos when it is not one RFC 8259 value
+        // nested at most kMaxDepth deep.
+        // note: recursion is the grammar's own shape, and kMaxDepth bounds it.
+        // NOLINTNEXTLINE(misc-no-recursion)
+        [[nodiscard]] constexpr std::size_t value_end(std::string_view src, std::size_t pos,
+                                                      std::size_t depth) noexcept
+        {
+            if (pos >= src.size())
+                return std::string_view::npos;
+            const char open{src[pos]};
+            if (open != '{' && open != '[')
+                return scalar_end(src, pos);
+            if (depth >= kMaxDepth)
+                return std::string_view::npos;
+            const char close{open == '{' ? '}' : ']'};
+            pos = skip_blanks(src, pos + 1U);
+            if (pos < src.size() && src[pos] == close)
+                return pos + 1U;
+            for (;;)
+            {
+                if (open == '{')
+                    pos = member_value_at(src, pos);
+                const std::size_t end{value_end(src, pos, depth + 1U)};
+                if (end == std::string_view::npos)
+                    return end;
+                pos = skip_blanks(src, end);
+                if (pos < src.size() && src[pos] == close)
+                    return pos + 1U;
+                if (pos >= src.size() || src[pos] != ',')
+                    return std::string_view::npos;
+                pos = skip_blanks(src, pos + 1U);
+            }
+        }
+
+        constexpr unsigned kSurrogateFirst{0xD800U};
+        constexpr unsigned kLowSurrogateFirst{0xDC00U};
+        constexpr unsigned kSurrogateEnd{0xE000U};
+        constexpr unsigned kSurrogatePayloadBits{10U};
+        constexpr unsigned kSupplementaryBase{0x10000U};
+        constexpr unsigned kOneByteEnd{0x80U};
+        constexpr unsigned kTwoByteEnd{0x800U};
+        constexpr unsigned kThreeByteEnd{0x10000U};
+        constexpr unsigned kContinuationBits{6U};
+        constexpr unsigned kContinuationMask{0x3FU};
+        constexpr unsigned kContinuationTag{0x80U};
+        constexpr unsigned kTwoByteTag{0xC0U};
+        constexpr unsigned kThreeByteTag{0xE0U};
+        constexpr unsigned kFourByteTag{0xF0U};
+
+        // post: `code` appended as UTF-8; a lone surrogate takes its 3-byte form.
+        inline void append_utf8(unsigned code, std::string& out)
+        {
+            const auto byte{[&](unsigned value) { out.push_back(static_cast<char>(value)); }};
+            const auto tail{[&](unsigned shift)
+                            { byte(kContinuationTag | ((code >> shift) & kContinuationMask)); }};
+            if (code < kOneByteEnd)
+                byte(code);
+            else if (code < kTwoByteEnd)
+            {
+                byte(kTwoByteTag | (code >> kContinuationBits));
+                tail(0U);
+            }
+            else if (code < kThreeByteEnd)
+            {
+                byte(kThreeByteTag | (code >> (2U * kContinuationBits)));
+                tail(kContinuationBits);
+                tail(0U);
+            }
+            else
+            {
+                byte(kFourByteTag | (code >> (3U * kContinuationBits)));
+                tail(2U * kContinuationBits);
+                tail(kContinuationBits);
+                tail(0U);
+            }
+        }
+
+        // pre: `quoted` is one RFC 8259 string, quotes included.
+        // post: its unescaped bytes - the key members sort by.
+        [[nodiscard]] inline std::string unescaped(std::string_view quoted)
+        {
+            std::string out;
+            const std::string_view body{quoted.substr(1U, quoted.size() - 2U)};
+            const auto code_at{[&](std::size_t offset)
+                               {
+                                   unsigned code{0};
+                                   for (std::size_t digit{0}; digit < kUnicodeEscapeDigits; ++digit)
+                                       code = (code * kHexRadix) + hex_value(body[offset + digit]);
+                                   return code;
+                               }};
+            for (std::size_t pos{0}; pos < body.size(); ++pos)
+            {
+                if (body[pos] != '\\')
+                {
+                    out.push_back(body[pos]);
+                    continue;
+                }
+                const char esc{body[++pos]};
+                if (esc != 'u')
+                {
+                    static constexpr std::string_view kFrom{"bfnrt"};
+                    static constexpr std::string_view kTo{"\b\f\n\r\t"};
+                    const std::size_t idx{kFrom.find(esc)};
+                    out.push_back(idx == std::string_view::npos ? esc : kTo[idx]);
+                    continue;
+                }
+                unsigned code{code_at(pos + 1U)};
+                pos += kUnicodeEscapeDigits;
+                const std::size_t pair_at{pos + 1U};
+                // assert: the string passed string_end, so a `\u` here carries its four digits.
+                if (code >= kSurrogateFirst && code < kLowSurrogateFirst &&
+                    body.substr(pair_at).starts_with("\\u"))
+                {
+                    const unsigned low{code_at(pair_at + 2U)};
+                    if (low >= kLowSurrogateFirst && low < kSurrogateEnd)
+                    {
+                        code = kSupplementaryBase +
+                               ((code - kSurrogateFirst) << kSurrogatePayloadBits) +
+                               (low - kLowSurrogateFirst);
+                        pos = pair_at + 1U + kUnicodeEscapeDigits;
+                    }
+                }
+                append_utf8(code, out);
+            }
+            return out;
+        }
+
+        // pre: the value at `pos` passed value_end.
+        // post: appends the value with every object's members in name order and returns the index
+        // after it; npos when an object repeats a name.
+        // note: recursion is the grammar's own shape, bounded by the depth value_end checked.
+        // NOLINTNEXTLINE(misc-no-recursion)
+        [[nodiscard]] std::size_t emit(std::string_view src, std::size_t pos, std::string& out)
+        {
+            const char open{src[pos]};
+            if (open != '{' && open != '[')
+            {
+                const std::size_t end{value_end(src, pos, kMaxDepth)};
+                out.append(src.substr(pos, end - pos));
+                return end;
+            }
+            const char close{open == '{' ? '}' : ']'};
+            const std::size_t first{skip_blanks(src, pos + 1U)};
+            out.push_back(open);
+            out.append(src.substr(pos + 1U, first - pos - 1U));
+            if (src[first] == close)
+            {
+                out.push_back(close);
+                return first + 1U;
+            }
+            struct Member
+            {
+                std::string key;
+                std::string text;
+            };
+            std::vector<Member> members;
+            std::vector<std::string_view> separators;
+            pos = first;
+            for (;;)
+            {
+                Member member;
+                std::string& sink{open == '{' ? member.text : out};
+                if (open == '{')
+                {
+                    const std::size_t name_end{string_end(src, pos)};
+                    member.key = unescaped(src.substr(pos, name_end - pos));
+                    const std::size_t value_at{skip_blanks(src, skip_blanks(src, name_end) + 1U)};
+                    sink.append(src.substr(pos, value_at - pos));
+                    pos = value_at;
+                }
+                const std::size_t end{emit(src, pos, sink)};
+                if (end == std::string_view::npos)
+                    return end;
+                const std::size_t after{skip_blanks(src, end)};
+                const bool last{src[after] == close};
+                const std::size_t next{last ? after : skip_blanks(src, after + 1U)};
+                if (open == '{')
+                {
+                    members.push_back(std::move(member));
+                    separators.push_back(src.substr(end, next - end));
+                }
+                else
+                    out.append(src.substr(end, next - end));
+                if (last)
+                {
+                    pos = after + 1U;
+                    break;
+                }
+                pos = next;
+            }
+            if (open == '{')
+            {
+                std::ranges::sort(members, {}, &Member::key);
+                const auto repeated{std::ranges::adjacent_find(members, {}, &Member::key)};
+                if (repeated != members.end())
+                    return std::string_view::npos;
+                for (std::size_t idx{0}; idx < members.size(); ++idx)
+                {
+                    out.append(members[idx].text);
+                    out.append(separators[idx]);
+                }
+            }
+            out.push_back(close);
+            return pos;
+        }
+
+    } // namespace json_order
+
+    // refs: DN-134.D3
+    // post: true with `out` holding `content` whose objects have their members PERMUTED into
+    // ascending order of their unescaped names' bytes, recursively.
+    // post: every other byte keeps its position - a member's text moves whole, the separator text
+    // between the i-th and (i+1)-th member stays there, array elements never move.
+    // post: false, `out` unspecified, when `content` is not, whole, one RFC 8259 object or array
+    // (blanks around it allowed), when an object repeats a name, or when it is already in order.
+    // invariant: a function of the line's bytes, stateless; member order is presentation (RFC 8259
+    // section 4), and permuting rather than re-serializing keeps every whitespace token intact.
+    [[nodiscard]] bool json_member_order(std::string_view content, std::string& out)
+    {
+        const std::size_t first{json_order::skip_blanks(content, 0)};
+        if (first >= content.size() || (content[first] != '{' && content[first] != '['))
+            return false;
+        const std::size_t end{json_order::value_end(content, first, 0)};
+        if (end == std::string_view::npos ||
+            json_order::skip_blanks(content, end) != content.size())
+            return false;
+        out.clear();
+        out.append(content.substr(0, first));
+        if (json_order::emit(content, first, out) == std::string_view::npos)
+            return false;
+        out.append(content.substr(end));
+        return out != content;
+    }
+
 } // namespace
 
 // post: the joined per-token canonical forms; a masked position contributes a param, a kept or
@@ -907,26 +1343,39 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                                      const MaskConfig& config,
                                      std::span<const DeclaredRun> declared_runs)
 {
+    // assert: the JSON member-order normal form runs before tokenization; a rewritten line is
+    // stored in the arena, so every param views bytes that live as long as the template.
+    // refs: DN-134.D3
+    std::string reordered;
+    const std::string_view line{
+        json_member_order(content, reordered) ? out_arena.store_string(reordered) : content};
     std::string tmpl;
-    tmpl.reserve(content.size() + kWildcard.size());
+    tmpl.reserve(line.size() + kWildcard.size());
     std::vector<std::string_view> params;
     std::string composite;
+    std::string segmented;
     std::string declared;
     std::vector<ClaimedRun> declared_claims;
-    // post: true with `declared` holding `form` after the declared runs, false when none claims.
-    const auto apply_declared{[&](std::string_view form)
-                              {
-                                  return !declared_runs.empty() &&
-                                         replace_declared_runs(form, declared_runs, declared,
-                                                               declared_claims);
-                              }};
+    // post: `form` after the two non-claiming steps on a normal form, in order: the `;`-segment
+    // key-value step, then the declared runs.
+    // refs: DN-134.D2, DN-133.D1
+    const auto normal_form_steps{
+        [&](std::string_view form)
+        {
+            const std::string_view after_segments{
+                mask_segment_values(form, segmented) ? std::string_view{segmented} : form};
+            return !declared_runs.empty() && replace_declared_runs(after_segments, declared_runs,
+                                                                   declared, declared_claims)
+                       ? std::string_view{declared}
+                       : after_segments;
+        }};
     std::string_view prev{};
     bool first{true};
 
     // assert: the declared per-token classification in TOTAL precedence - the KEEP carve-outs win
     // first, then the masks.
     // refs: ADR-16.D5
-    for_each_token(content,
+    for_each_token(line,
                    [&](std::string_view tok)
                    {
                        if (!first)
@@ -953,11 +1402,10 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                        // array order with the first claim winning.
                        if (try_composite(tok, shape, composite, nullptr))
                        {
-                           // assert: the declared runs read the composite's NORMAL FORM, once,
-                           // after every claiming rule.
-                           // refs: DN-133.D1
-                           tmpl.append(apply_declared(composite) ? std::string_view{declared}
-                                                                 : std::string_view{composite});
+                           // assert: the non-claiming steps read the composite's NORMAL FORM,
+                           // once, after every claiming rule.
+                           // refs: DN-133.D1, DN-134.D2
+                           tmpl.append(normal_form_steps(composite));
                            prev = tok;
                            return;
                        }
@@ -973,7 +1421,7 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                        }
                        // assert: a token no rule claimed is its own normal form.
                        // refs: DN-133.D1
-                       tmpl.append(apply_declared(tok) ? std::string_view{declared} : tok);
+                       tmpl.append(normal_form_steps(tok));
                        prev = tok;
                    });
 

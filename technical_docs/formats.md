@@ -2,7 +2,9 @@
 
 How a raw line becomes structured fields. Three steps, in order: **normalize** (strip presentation escapes),
 **detect** (pick a format strategy), **extract** (the strategy fills `ParsedLine`). The result feeds masking
-([masking.md](masking.md)) and classification ([classification.md](classification.md)).
+([masking.md](masking.md)) and classification ([classification.md](classification.md)). Between extraction and
+masking, one normal form runs on the extracted `content`: a whole-line JSON value has its object members put in
+name order (§5).
 
 ---
 
@@ -120,6 +122,33 @@ carried as `OrdinalObservation { field_name, schedule, value }`:
 Parsing is **decimal-text → int64** scaled by a power of ten (exact fixed-point, **no float**); negative /
 overflow / exponent → omitted. Ordinals are **consumed by metalog** (distribution-drift binning) and are
 **never tokenized into the template** — so a varying latency value never fragments template identity.
+
+---
+
+## 5. Between extraction and masking — the JSON member-order normal form
+
+RFC 8259 § 4 makes an object an unordered collection, so the ORDER of its members is presentation, as an escape
+sequence is (§1). A producer that prints the same object from a map prints it in a different order run to run,
+and without a normal form each order is its own template. So when the `content` a strategy extracted is, whole,
+one RFC 8259 object or array (blanks around it allowed, nothing else), the masker's entry
+(`stateless_template`) first gives it its **member-order normal form**:
+
+- **What moves.** The members of every object, recursively, are **permuted** into ascending order of their
+  names' bytes, each name compared **after unescaping** (`\uXXXX` pairs as UTF-8, a lone surrogate as its 3-byte
+  form). A member's text (name, blanks, colon, value) moves whole; the separator text between the i-th and the
+  (i+1)-th member stays in that position; **array elements never move**. Permuting rather than re-serializing
+  keeps every whitespace token the masker reads, so no masking decision inside the line moves.
+- **What is left as it is, byte for byte.** A line already in order; a line that is not, whole, one strict RFC
+  8259 value (trailing text, a raw control byte or an undeclared escape in a string, a trailing comma); an
+  object that repeats a member name; a value nested past the declared bound (`kMaxDepth`, 128 levels), so no
+  line drives the parse without limit.
+- **Where it reaches.** The `content`, never the raw line: a line the JSON strategy claims gives the masker its
+  message field, so J reaches that field only when the field itself is a JSON value. A rewritten `content` is
+  stored in the event's arena and the masked values' `params` are views into it.
+
+It is a function of one line's bytes and holds no state, so it is part of the masking generation
+(`kCanonicalizationVersion`) and moves `template_str`, `template_id` and the order of `params`, never a field
+this document extracts.
 
 ---
 

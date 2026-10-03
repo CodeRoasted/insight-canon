@@ -62,16 +62,19 @@ namespace catalog = insight::tokenization::rule_catalog;
 namespace
 {
 
-// invariant: the six TOP-LEVEL dispositions of the masking precedence that are not the composite
-// layer, which is named by its own catalog instead; `declared_run` is the one a stream declares.
+// invariant: the TOP-LEVEL dispositions and steps of the masking precedence that are not the
+// composite layer, which is named by its own catalog instead.
+// invariant: `declared_run` is the one a stream declares, `segment_kv` the non-claiming segment
+// step, `json_member_order` the line's normal form before tokenization.
 // invariant: this list plus that catalog is the complete rule-id namespace.
 // invariant: it is hand-held because the dispatcher states these as a disjunction chain rather than
-// a table, and a sibling arm is what keeps a typo here from silently minting a sixth id.
-// refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
-constexpr std::array<std::string_view, 6> kTopLevelRuleIds{
+// a table, and a sibling arm is what keeps a typo here from silently minting another id.
+// refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate, DN-134.D2, DN-134.D3
+constexpr std::array<std::string_view, 8> kTopLevelRuleIds{
     {std::string_view{"status_keep"}, std::string_view{"uuid_or_hash"}, std::string_view{"ipv4"},
      std::string_view{"digit_leading"}, std::string_view{"literal_keep"},
-     std::string_view{"declared_run"}}};
+     std::string_view{"declared_run"}, std::string_view{"segment_kv"},
+     std::string_view{"json_member_order"}}};
 
 struct Row
 {
@@ -475,8 +478,8 @@ TEST(MaskRuleGolden, EveryGoldenRowNamesADeclaredRule)
     for (const Row& row : loaded().golden.rows)
         EXPECT_TRUE(is_composite_id(row.rule_id) || is_top_level_id(row.rule_id))
             << "golden line " << row.line_no << " names rule `" << row.rule_id
-            << "`, which is neither a declared composite rule nor one of the six top-level "
-               "dispositions.\n"
+            << "`, which is neither a declared composite rule nor one of the top-level "
+               "dispositions and steps.\n"
                "  Either it is a typo, or a rule was RENAMED or REMOVED and this witness was left "
                "addressed to it.";
 }
@@ -754,6 +757,72 @@ TEST(MaskRuleGolden, DeclaredRunRowsMoveOnlyUnderTheirOwnDeclaredValue)
             << "1\n  masked           : " << other_value << "\n  undeclared reads : " << undeclared;
     }
     EXPECT_GT(witnesses, 0U) << "the declared-run rule has no witness row in the golden";
+}
+
+// refs: DN-134.D2
+// invariant: a segment_kv row proves the STEP is the reason: the subject moves, keeps bytes the
+// claiming rules would not, and is not masked whole, so no whole-token rule reached it.
+TEST(MaskRuleGolden, SegmentKvRowsMoveByTheNonClaimingStep)
+{
+    if (!golden_is_readable())
+        return;
+    std::size_t witnesses{0};
+    for (const Row& row : loaded().golden.rows)
+    {
+        if (row.rule_id != "segment_kv")
+            continue;
+        ++witnesses;
+        bool okay{false};
+        const std::string got{masked_subject(row, MaskConfig{}, okay)};
+        if (!okay)
+            continue;
+        EXPECT_NE(got, row.subject)
+            << "golden line " << row.line_no
+            << ": a segment_kv witness must move.\n  subject: " << row.subject;
+        EXPECT_NE(got, "<*>") << "golden line " << row.line_no
+                              << ": masked WHOLE, so a whole-token rule reached it, not the "
+                                 "step.\n  subject: "
+                              << row.subject;
+        EXPECT_NE(got.find("<*>"), std::string::npos)
+            << "golden line " << row.line_no
+            << ": the step must reach the wildcard.\n  masked: " << got;
+        EXPECT_NE(got.find(';'), std::string::npos)
+            << "golden line " << row.line_no
+            << ": the segment delimiter must survive — the step masks values, never keys or "
+               "delimiters.\n  masked: "
+            << got;
+    }
+    EXPECT_GT(witnesses, 0U) << "the segment step has no witness row in the golden";
+}
+
+// refs: DN-134.D3
+// invariant: a json_member_order row proves the normal form is a PERMUTATION: its template holds
+// exactly the input's bytes, in another order, so no byte was masked, added or dropped.
+TEST(MaskRuleGolden, JsonMemberOrderRowsArePermutationsOfTheirInput)
+{
+    if (!golden_is_readable())
+        return;
+    std::size_t witnesses{0};
+    for (const Row& row : loaded().golden.rows)
+    {
+        if (row.rule_id != "json_member_order")
+            continue;
+        ++witnesses;
+        const std::string got{mask_row(row, MaskConfig{})};
+        std::string got_bytes{got};
+        std::string input_bytes{row.input};
+        std::ranges::sort(got_bytes);
+        std::ranges::sort(input_bytes);
+        EXPECT_NE(got, row.input) << "golden line " << row.line_no
+                                  << ": a json_member_order witness must move.\n  input: "
+                                  << row.input;
+        EXPECT_EQ(got_bytes, input_bytes)
+            << "golden line " << row.line_no
+            << ": the template must hold exactly the input's bytes — a permutation, never a "
+               "mask.\n  input:    "
+            << row.input << "\n  template: " << got;
+    }
+    EXPECT_GT(witnesses, 0U) << "the JSON member-order form has no witness row in the golden";
 }
 
 // invariant: each catalog arm reads the DECLARED table, never a list typed beside it.

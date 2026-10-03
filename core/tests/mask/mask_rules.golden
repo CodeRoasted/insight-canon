@@ -155,3 +155,17 @@ declared_run | /repos/o/r/pulls/6656/files | gh api /repos/o/r/pulls/6656/files 
 literal_keep | /repos/o/r/pulls/66560/files | gh api /repos/o/r/pulls/66560/files done | gh api /repos/o/r/pulls/66560/files done | pulls/=6656
 literal_keep | refs/pull/6656/merge | fetching refs/pull/6656/merge now | fetching refs/pull/6656/merge now | pulls/=6656
 literal_keep | /repos/o/r/issues/6656/comments | gh api /repos/o/r/issues/6656/comments done | gh api /repos/o/r/issues/6656/comments done | pulls/=6656
+
+# segment_kv — DN-134.D2: kv_value's disposition on each `;`-segment of a token's normal form, a
+# non-claiming step after the composites and the literal KEEP (beside declared_run). The literal
+# controls: a status value per segment, `,` (not a delimiter).
+segment_kv | id=build;outcome=success;duration_ms=12] | ##[end-action id=build;outcome=success;duration_ms=12] | ##[end-action id=build;outcome=success;duration_ms=<*>
+segment_kv | item=book;total=$18 | order item=book;total=$18 placed | order item=book;total=$<*> placed
+literal_keep | id=build;status=200 | finished id=build;status=200 now | finished id=build;status=200 now
+literal_keep | id=build,duration_ms=12 | finished id=build,duration_ms=12 now | finished id=build,duration_ms=12 now
+
+# json_member_order — DN-134.D3: a content that is, whole, one JSON value has the members of every
+# object permuted into name order before tokenization; arrays keep their order. Each witness holds
+# nothing a rule masks, so its template IS the permuted line.
+json_member_order | {"result":"ok","event":"done"} | {"result":"ok","event":"done"} | {"event":"done","result":"ok"}
+json_member_order | {"tags":["b","a"],"meta":{"z":true,"k":null}} | {"tags":["b","a"],"meta":{"z":true,"k":null}} | {"meta":{"k":null,"z":true},"tags":["b","a"]}

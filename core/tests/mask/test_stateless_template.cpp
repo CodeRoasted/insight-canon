@@ -1056,3 +1056,109 @@ TEST(StatelessTemplate, MaskingRelocatesTheValueIntoParamsRatherThanDeletingIt)
            "egress ruling (ADR-33.D12) rests on it NOT being one.\n  template : "
         << result.template_str << "\n  params   : " << result.params.size() << " entr(y|ies)";
 }
+
+// refs: DN-134.D2
+// invariant: kv_value's disposition applies to each `;`-segment of a token's normal form, a
+// non-claiming step after the composites and the literal KEEP.
+// invariant: it masks a digit-leading value to its segment's end and contributes no param.
+TEST(StatelessTemplate, TheSegmentStepMasksEachKeyValueSegmentOfANormalForm)
+{
+    ArenaAllocator arena{256U * 1024U};
+    const auto expect{[&](std::string_view line, std::string_view want)
+                      {
+                          arena.reset();
+                          const StatelessTemplate got{stateless_template(line, arena, cfg(), {})};
+                          EXPECT_EQ(got.template_str, want)
+                              << "the `;`-segment key-value step (DN-134.D2).\n  line:     " << line
+                              << "\n  expected: " << want << "\n  actual:   " << got.template_str;
+                          EXPECT_TRUE(got.params.empty())
+                              << "the segment step contributes no param.\n  line: " << line
+                              << "\n  params: " << got.params.size();
+                      }};
+    expect(
+        "##[end-action id=build-image-sha.set;outcome=success;conclusion=success;duration_ms=10]",
+        "##[end-action id=build-image-sha.set;outcome=success;conclusion=success;duration_ms=<*>");
+    expect("id=__f7f63412-b7a7-468d-bd31-1a6ae1ca2680.step;duration_ms=52]",
+           "id=__<*>.step;duration_ms=<*>");
+    expect("[n=5;id=f7f63412-b7a7-468d-bd31-1a6ae1ca2680", "[n=<*>;id=<*>");
+    expect("[mode=fast;count=5", "[mode=fast;count=<*>");
+    expect("item=book;total=$18", "item=book;total=$<*>");
+    expect("id=a;status=2000", "id=a;status=<*>");
+    // invariant: the controls — a status value per segment, a value word, `,` (not a delimiter),
+    // a key that is not letter- or underscore-led, a segment with no key.
+    for (const std::string_view keep : {"id=a;status=200", "id=a;code=1;outcome=success",
+                                        "id=a,duration_ms=5", "id=a;9x=5", "id=a;=5", "a;b"})
+        expect(keep, keep);
+    EXPECT_EQ(masked("x id=a;n=1 y", arena), masked("x id=a;n=77 y", arena));
+}
+
+// refs: DN-134.D3
+// invariant: a content that is, whole, one JSON value has the members of every object permuted into
+// ascending order of their unescaped names' bytes, recursively, before tokenization.
+// invariant: every other byte keeps its position and arrays keep their order.
+// invariant: a line that does not parse whole or repeats a name is left as it is.
+TEST(StatelessTemplate, AWholeLineJsonValueHasItsMembersInNameOrder)
+{
+    ArenaAllocator arena{256U * 1024U};
+    const auto expect{[&](std::string_view line, std::string_view want)
+                      {
+                          const std::string got{masked(line, arena)};
+                          EXPECT_EQ(got, want) << "the JSON member-order normal form (DN-134.D3).\n"
+                                               << "  line:     " << line << "\n  expected: " << want
+                                               << "\n  actual:   " << got;
+                      }};
+    expect(R"({"b":"x","a":"y"})", R"({"a":"y","b":"x"})");
+    expect(R"({ "b" : "x" , "a" : "y" })", R"({ "a" : "y" , "b" : "x" })");
+    expect(R"({"z":{"d":"u","c":"v"},"a":["q","p"]})", R"({"a":["q","p"],"z":{"c":"v","d":"u"}})");
+    expect(R"([{"b":"x","a":"y"},{"d":true,"c":null}])",
+           R"([{"a":"y","b":"x"},{"c":null,"d":true}])");
+    expect(R"({"b":"x","a":"y"})", R"({"a":"y","b":"x"})");
+    expect(R"({"b":"x","😀":"y","a":"z"})", R"({"a":"z","b":"x","😀":"y"})");
+    expect(R"(  {"b":"x","a":"y"}  )", R"({"a":"y","b":"x"})");
+    // invariant: the controls, each left byte for byte.
+    for (const std::string_view keep : {
+             R"(["b","a"])",
+             R"({"a":"y","b":"x"})",
+             R"({"b":"x","a":"y","b":"z"})",
+             R"({"a":"x","a":"y"})",
+             R"({"b":"x","a":"y"} trailing)",
+             R"(prefix {"b":"x","a":"y"})",
+             R"({"b":"\q","a":"y"})",
+             "{\"b\":\"\tx\",\"a\":\"y\"}",
+             R"({"b":"x","a":"y",})",
+             R"({"b":x,"a":"y"})",
+             R"({"b":"x" "a":"y"})",
+         })
+        expect(keep, keep);
+    // invariant: the masked values follow the permuted text, and the params are its tokens.
+    arena.reset();
+    const StatelessTemplate got{stateless_template(R"({"b": 7, "a": 9})", arena, cfg(), {})};
+    EXPECT_EQ(got.template_str, R"({"a": <*> "b": <*>)");
+    ASSERT_EQ(got.params.size(), 2U) << "template: " << got.template_str;
+    EXPECT_EQ(got.params[0], "9,");
+    EXPECT_EQ(got.params[1], "7}");
+    EXPECT_EQ(masked(R"({"b": 7, "a": 9})", arena), masked(R"({"a": 1, "b": 2})", arena));
+}
+
+// refs: DN-134.D3
+// invariant: the normal form is bounded — a value nested past the declared depth is left as it
+// is, so no line can drive the parser's recursion without limit.
+TEST(StatelessTemplate, TheJsonMemberOrderFormIsBoundedInNestingDepth)
+{
+    ArenaAllocator arena{4U * 1024U * 1024U};
+    constexpr std::size_t kShallow{32};
+    constexpr std::size_t kDeep{100'000};
+    constexpr std::string_view kUnordered{R"({"b":"x","a":"y"})"};
+    constexpr std::string_view kOrdered{R"({"a":"y","b":"x"})"};
+    const auto nested{[](std::size_t depth, std::string_view inner)
+                      {
+                          std::string line(depth, '[');
+                          line += inner;
+                          line.append(depth, ']');
+                          return line;
+                      }};
+    EXPECT_EQ(masked(nested(kShallow, kUnordered), arena), nested(kShallow, kOrdered))
+        << "a shallow nesting is rewritten";
+    const std::string deep{nested(kDeep, kUnordered)};
+    EXPECT_EQ(masked(deep, arena), deep) << "past the declared depth the line is left as it is";
+}

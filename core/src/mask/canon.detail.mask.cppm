@@ -9,7 +9,8 @@ export namespace insight::tokenization
 
 // post: the masked template plus the raw tokens at fully-masked positions, both arena-stable until
 // the arena is reset or destroyed.
-// pre: the caller keeps `content` alive for the params' lifetime - they are views into it.
+// pre: the caller keeps `content` alive for the params' lifetime - they are views into it, or into
+// the arena when the JSON member-order normal form rewrote the line (DN-134.D3).
 // invariant: a pure function of the line's OWN tokens - no cluster state and no cross-line
 // learning, so the same logical line templates identically in any run and any order.
 // refs: ADR-16.D5
@@ -80,10 +81,12 @@ struct StatelessTemplate
     std::span<const std::string_view> params;
 };
 
-// refs: DN-133.D1
-// post: with `declared_runs` empty, the template every earlier generation gave the line.
-// post: otherwise each token's NORMAL FORM — its literal bytes, or the form a composite rule gave
-// it — has every claimed run replaced by the wildcard; a whole-token mask wins over it.
+// refs: DN-133.D1, DN-134.D2, DN-134.D3
+// post: a `content` that is, whole, one JSON object or array is first given its member-order
+// normal form; every other `content` is tokenized as it is.
+// post: each token's NORMAL FORM — its literal bytes, or the form a composite rule gave it — has
+// each `;`-segment's digit-led value masked, then every claimed declared run replaced.
+// post: a whole-token mask wins over both steps.
 // invariant: a run is claimed exactly when `claim_declared_runs` claims it on that normal form.
 // invariant: a claimed run is a normalization inside a token and contributes no param, as a
 // composite rule's normalization does.

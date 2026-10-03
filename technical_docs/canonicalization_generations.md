@@ -509,6 +509,33 @@ within-log false merges.
 
 **It rides `-17`.**
 
+### Rider — a number behind `;` masks per segment, and a whole-line JSON value's member order is presentation (DN-134.D2, DN-134.D3)
+
+**What changed.** Two steps, neither a claiming rule. **K:** after every claiming rule and before the declared-run
+step, a token's normal form holding `;` and `=` is cut at `;`, and each `<key>=<digit-leading value>` segment has its
+value masked to the segment's end, the kv-value rule's disposition (status carve-out included) applied per segment.
+The kv-value rule reads one `key=value` per token and declines when the first value is a word, so the runner's
+`##[end-action id=build;outcome=success;duration_ms=12]` kept its duration and every run minted a new template.
+**J:** a `content` that is, whole, one strict RFC 8259 object or array has the members of every object permuted into
+the order of their unescaped names before tokenization; every other byte stays where it was, arrays never move, and a
+repeated name, a value nested past 128 levels or any non-strict text leaves the line as it is.
+
+**Which serialized fields move.** K: `template_str` and `template_id` of a line holding such a token, nothing else
+(`params` does not gain the segment value). J: `template_str` and `template_id` of a whole-line JSON value whose
+members were out of name order, and the ORDER of its `params`, which are then views into the event's arena rather
+than into the line. No extracted field moves.
+
+**Witness inputs.** `core/tests/mask/mask_rules.golden` pins K's rows (`##[end-action
+id=build;outcome=success;duration_ms=12]` → `##[end-action id=build;outcome=success;duration_ms=<*>`, `order
+item=book;total=$18 placed` → `order item=book;total=$<*> placed`) and literal controls (`id=build;status=200`, the
+`,`-delimited `id=build,duration_ms=12`), and J's two permutation rows (`{"result":"ok","event":"done"}` →
+`{"event":"done","result":"ok"}`, a nested object inside an array-carrying member). Measured through the public
+`Tokenizer::process_line` over the same three private CI-log views (coderoast-corpora `65b2b93` registered before the
+build, `c210757` measured): distinct templates over every non-empty line 295 919 → 294 801, 260 830 → 259 850 and
+3 295 874 → 3 269 858; J rewrites 386, 386 and 6 639 lines.
+
+**It rides `-17`.**
+
 ---
 
 *See also: [masking.md](masking.md) (what the current generation's rules actually are) ·
