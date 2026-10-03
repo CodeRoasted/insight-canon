@@ -79,10 +79,11 @@ TEST(GithubDeclaredPullRequest, AnotherNumberAndNoValueStayLiteral)
         << "a stream that declares no value is byte-identical to today";
 }
 
-TEST(GithubDeclaredPullRequest, EverySixMeasuredMarkerSpellingFires)
+// refs: DN-133.D7
+TEST(GithubDeclaredPullRequest, EveryEightMeasuredMarkerSpellingFires)
 {
-    constexpr std::array<std::string_view, 6> kSpellings{
-        {"PR-", "pr-", "Pr-", "pull-", "PULL-", "Pull-"}};
+    constexpr std::array<std::string_view, 8> kSpellings{
+        {"PR-", "pr-", "Pr-", "pull-", "PULL-", "Pull-", "PR#", "pulls/"}};
     const ComposedSemantics composed{github_composition()};
     const ResolvedStream stream{github_stream(composed)};
     ArenaAllocator arena{kArenaBytes};
@@ -94,6 +95,26 @@ TEST(GithubDeclaredPullRequest, EverySixMeasuredMarkerSpellingFires)
         EXPECT_EQ(template_of(tokenizer, arena, line), expected)
             << "the declared marker `" << marker << "` must fire on the run's own number";
     }
+}
+
+// refs: DN-133.D7
+// invariant: the set is closed: `pull/` and `issues/` were measured and refused, so the run's own
+// number behind them stays literal, as it does behind a declared marker inside a word.
+TEST(GithubDeclaredPullRequest, AnUndeclaredShapeAndAMarkerInsideAWordStayLiteral)
+{
+    const ComposedSemantics composed{github_composition()};
+    const ResolvedStream stream{github_stream(composed)};
+    ArenaAllocator arena{kArenaBytes};
+    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics, pull_request("6656")};
+    for (const std::string_view line :
+         {std::string_view{"fetching refs/pull/6656/merge now"},
+          std::string_view{"reading /repos/o/r/issues/6656/comments now"},
+          std::string_view{"label XPR#6656 applied"}, std::string_view{"label PR#66560 applied"}})
+        EXPECT_EQ(template_of(tokenizer, arena, line), line)
+            << "the run's own number behind no declared marker stays literal";
+    EXPECT_EQ(template_of(tokenizer, arena, "reading /repos/o/r/pulls/6656/files now"),
+              "reading /repos/o/r/pulls/<*>/files now")
+        << "behind the declared `pulls/` it masks";
 }
 
 TEST(GithubDeclaredPullRequest, AStreamThatDeclaresNoDialectAppliesTheValueNowhere)

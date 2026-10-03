@@ -387,9 +387,12 @@ dialect:
       - "value is unchanged byte for byte. The rule and its refusals are DN-133.D1's."
     rows:
       - key: pull_request
-        markers: ["PR-", "pr-", "Pr-", "pull-", "PULL-", "Pull-"]
+        markers: ["PR-", "pr-", "Pr-", "pull-", "PULL-", "Pull-", "PR#", "pulls/"]
         dialect_gate: self
         why:
-          - "The six spellings measured on the CI-log views before the build, byte-exact. The set"
-          - "is closed, and it is extended only on measured evidence: a marker nobody measured is"
-          - "a coincidence nobody read."
+          - "The six spellings measured on the CI-log views before the build, byte-exact, then"
+          - "`PR#` and `pulls/` (DN-133.D7): GitHub's own vocabulary, each collapsing ranked rows"
+          - "with 0 coincidences read. The set is closed, and it is extended only on measured"
+          - "evidence: a marker nobody measured is a coincidence nobody read. `pull/`, `issues/`"
+          - "and `prN` were measured and stay out. Sift masks its job and step instance key behind"
+          - "these same markers."

@@ -1141,6 +1141,40 @@ struct StreamContext
                                [](char byte) noexcept { return byte >= '0' && byte <= '9'; });
 }
 
+// invariant: the wildcard a masked span reads as in a template; one spelling for every reader.
+inline constexpr std::string_view kMaskWildcard{"<*>"};
+
+// refs: DN-133.D1
+// invariant: one declared value resolved against its row: the markers it is masked behind and the
+// value itself, both viewing storage that outlives every call reading them.
+struct DeclaredRun
+{
+    std::span<const std::string_view> markers;
+    std::string_view value;
+};
+
+// invariant: the byte range [first, last) of one digit run a declared run claims in a form.
+struct ClaimedRun
+{
+    std::size_t first;
+    std::size_t last;
+
+    [[nodiscard]] bool operator==(const ClaimedRun&) const = default;
+};
+
+// refs: DN-133.D1, DN-133.D7
+// post: `claims` holds every digit run of `form` some declared run claims, ascending and disjoint.
+// invariant: a run is claimed when it is the maximal digit run behind a declared run's marker and
+// equals that run's value.
+// invariant: the marker opens the form or follows a byte that is neither a letter nor a digit.
+// invariant: the byte after a claimed run is not a letter.
+// invariant: THE declared-run predicate — the masker's normal-form pass and an intent's instance
+// key both call it, so no second marker list and no copy of the rule exists anywhere.
+// invariant: a marker ends in a non-digit, so a claimed run's start is fixed by its marker and two
+// declared runs claiming one run claim the same bytes; each run is reported once.
+void claim_declared_runs(std::string_view form, std::span<const DeclaredRun> runs,
+                         std::vector<ClaimedRun>& claims);
+
 } // namespace insight::tokenization
 
 // invariant: canon core is semantic-unaware — it owns the recognition ALGORITHM and the semantic
@@ -1218,6 +1252,17 @@ export namespace insight
 // invariant: a tag, a branch and a commit of one unit are therefore ONE class, and the version's
 // bytes live in the marker's discriminant.
 [[nodiscard]] std::string canonicalize_intent(const tokenization::IntentMarker& marker);
+
+// refs: DN-133.D7, ADR-18.D1
+// post: discriminant_of(name, version), owned, with every run `claim_declared_runs` claims on the
+// trimmed name that lies inside that envelope and before the version tail read as the wildcard.
+// post: with `runs` empty, byte-identical to discriminant_of(name, version).
+// invariant: the envelope's bounds are the undeclared ones; only the claimed bytes inside it move,
+// so a run's own declared number is not a discriminant and every other byte still is.
+// invariant: the version tail stays verbatim, because the version stage reads it as printed.
+// pre: `version` is empty, or the trailing bytes of the trimmed name, as a recognizer returns it.
+[[nodiscard]] std::string declared_discriminant_of(std::string_view name, std::string_view version,
+                                                   std::span<const tokenization::DeclaredRun> runs);
 
 } // namespace insight
 

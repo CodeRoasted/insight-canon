@@ -45,11 +45,12 @@ TEST(GithubManifestShape, ShipsTheDeclaredRulesetShapeAndNothingElse)
         << "the key a caller declares the value under; actual: " << declared_values[0].key;
     const std::vector<std::string_view> markers_declared{declared_values[0].markers.begin(),
                                                          declared_values[0].markers.end()};
-    const std::vector<std::string_view> markers_measured{"PR-",   "pr-",   "Pr-",
-                                                         "pull-", "PULL-", "Pull-"};
+    // refs: DN-133.D7
+    const std::vector<std::string_view> markers_measured{"PR-",   "pr-",   "Pr-", "pull-",
+                                                         "PULL-", "Pull-", "PR#", "pulls/"};
     EXPECT_EQ(markers_declared, markers_measured)
-        << "the six spellings measured before the build, byte-exact and in declared order; the set "
-           "is extended only on measured evidence";
+        << "the eight spellings measured before their builds, byte-exact and in declared order; "
+           "the set is extended only on measured evidence";
 
     // assert: each absence is argued in the declaration, and asserting it POSITIVELY is what
     // separates a measured exclusion from a row kind silently dropped.

@@ -238,4 +238,88 @@ std::string_view discriminant_of(std::string_view name) noexcept
     return std::string_view{name.data() + first, last - first};
 }
 
+std::string declared_discriminant_of(std::string_view name, std::string_view version,
+                                     std::span<const tokenization::DeclaredRun> runs)
+{
+    name = trimmed_intent_name(name);
+    const std::string_view envelope{discriminant_of(name, version)};
+    if (runs.empty() || envelope.empty())
+        return std::string{envelope};
+    // invariant: the envelope is a view into the trimmed name, so its offsets are the name's.
+    const auto first{static_cast<std::size_t>(envelope.data() - name.data())};
+    const std::size_t last{first + envelope.size()};
+    const std::size_t tail{
+        version.empty() || version.size() > name.size() ? last : name.size() - version.size()};
+    std::vector<tokenization::ClaimedRun> claims;
+    tokenization::claim_declared_runs(name, runs, claims);
+    std::string out;
+    out.reserve(envelope.size());
+    std::size_t copied{first};
+    for (const tokenization::ClaimedRun& claim : claims)
+    {
+        if (claim.first < first || claim.last > tail)
+            continue;
+        out.append(name.substr(copied, claim.first - copied));
+        out.append(tokenization::kMaskWildcard);
+        copied = claim.last;
+    }
+    out.append(name.substr(copied, last - copied));
+    return out;
+}
+
 } // namespace insight
+
+namespace insight::tokenization
+{
+namespace
+{
+    [[nodiscard]] constexpr bool is_alpha(char chr) noexcept
+    {
+        return (chr >= 'a' && chr <= 'z') || (chr >= 'A' && chr <= 'Z');
+    }
+
+    // post: the position after the digit run a marker of `run` opens at `pos`, `claims` holding it
+    // when it is the run's value; `pos + 1` when no marker opens a digit run there.
+    // pre: `pos` is the form's start or follows a byte that is neither a letter nor a digit.
+    [[nodiscard]] std::size_t claim_at(std::string_view form, std::size_t pos,
+                                       const DeclaredRun& run, std::vector<ClaimedRun>& claims)
+    {
+        for (const std::string_view marker : run.markers)
+        {
+            if (!form.substr(pos).starts_with(marker))
+                continue;
+            const std::size_t first_digit{pos + marker.size()};
+            std::size_t end{first_digit};
+            while (end < form.size() && is_digit(form[end]))
+                ++end;
+            if (end == first_digit || (end < form.size() && is_alpha(form[end])))
+                continue;
+            if (form.substr(first_digit, end - first_digit) == run.value)
+                claims.push_back({.first = first_digit, .last = end});
+            return end;
+        }
+        return pos + 1;
+    }
+} // namespace
+
+void claim_declared_runs(std::string_view form, std::span<const DeclaredRun> runs,
+                         std::vector<ClaimedRun>& claims)
+{
+    claims.clear();
+    for (const DeclaredRun& run : runs)
+    {
+        // note: the whole cost of a form naming no declared value is this one search per run.
+        if (form.find(run.value) == std::string_view::npos)
+            continue;
+        std::size_t pos{0};
+        while (pos < form.size())
+            pos = pos == 0 || (!is_alpha(form[pos - 1]) && !is_digit(form[pos - 1]))
+                      ? claim_at(form, pos, run, claims)
+                      : pos + 1;
+    }
+    std::ranges::sort(claims, {}, &ClaimedRun::first);
+    const auto [dup_first, dup_last]{std::ranges::unique(claims)};
+    claims.erase(dup_first, dup_last);
+}
+
+} // namespace insight::tokenization

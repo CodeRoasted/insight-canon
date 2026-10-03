@@ -132,3 +132,45 @@ TEST(InstanceDiscriminant, SeparatesCellsSharingAFirstMaskedSpan)
                 << "\" — the aligner keys jobs on (class, instance) and will pair each of them "
                    "with the WRONG cell, in whatever order the legs happened to finish";
 }
+
+// refs: DN-133.D7, ADR-18.D1
+// invariant: a run's own declared number behind a declared marker is not a discriminant: it reads
+// as the wildcard inside the envelope, whose bounds do not move, and every other byte stays raw.
+TEST(InstanceDiscriminant, ADeclaredRunInsideTheEnvelopeReadsAsTheWildcard)
+{
+    constexpr std::array<std::string_view, 2> kMarkers{{"pulls/", "PR#"}};
+    const std::array<insight::tokenization::DeclaredRun, 1> own{
+        insight::tokenization::DeclaredRun{.markers = kMarkers, .value = "6656"}};
+    const std::array<insight::tokenization::DeclaredRun, 1> other{
+        insight::tokenization::DeclaredRun{.markers = kMarkers, .value = "6657"}};
+    constexpr std::string_view kFiles{"gh api repos/o/r/pulls/6656/files"};
+    EXPECT_EQ(insight::declared_discriminant_of(kFiles, {}, own), "<*>")
+        << "the envelope is the claimed run alone, so it reads as the wildcard";
+    EXPECT_EQ(insight::declared_discriminant_of(kFiles, {}, other), "6656")
+        << "another pull request's number stays raw";
+    EXPECT_EQ(insight::declared_discriminant_of(kFiles, {}, {}), discriminant_of(kFiles))
+        << "with no declared run the key is the undeclared discriminant, byte for byte";
+    constexpr std::string_view kSpan{"Test (ubuntu-22.04) for PR#6656 shard 12"};
+    EXPECT_EQ(insight::declared_discriminant_of(kSpan, {}, own),
+              "(ubuntu-22.04) for PR#<*> shard 12")
+        << "the bounds are the undeclared envelope's; only the claimed bytes inside it move";
+    constexpr std::string_view kNoSpan{"deploy PR#6656x"};
+    EXPECT_EQ(insight::declared_discriminant_of(kNoSpan, {}, own), "")
+        << "a run followed by a letter is no claim and no span: the key stays empty";
+}
+
+// refs: DN-133.D7, DN-89.D30
+// invariant: the declared version tail stays verbatim, because the version stage reads it as
+// printed; a run before it in the envelope still masks.
+TEST(InstanceDiscriminant, ADeclaredRunInTheVersionTailStaysVerbatim)
+{
+    constexpr std::array<std::string_view, 1> kMarkers{{"pr-"}};
+    const std::array<insight::tokenization::DeclaredRun, 1> own{
+        insight::tokenization::DeclaredRun{.markers = kMarkers, .value = "77"}};
+    constexpr std::string_view kTailOnly{"acme/action@pr-77"};
+    EXPECT_EQ(insight::declared_discriminant_of(kTailOnly, "pr-77", own), "pr-77")
+        << "the run lies in the version tail, so the key keeps it";
+    constexpr std::string_view kHeadAndTail{"acme/action-v2/pr-77/x@pr-77"};
+    EXPECT_EQ(insight::declared_discriminant_of(kHeadAndTail, "pr-77", own), "v2/pr-<*>/x@pr-77")
+        << "a run inside the envelope's head masks; the tail's stays";
+}

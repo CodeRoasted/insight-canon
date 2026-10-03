@@ -342,6 +342,28 @@ check_stream_context(const insight::tokenization::StreamContext& context,
     return {};
 }
 
+std::vector<insight::tokenization::DeclaredRun>
+declared_runs_of(const insight::tokenization::StreamContext& context,
+                 const ComposedSemantics& composed)
+{
+    if (const auto checked{check_stream_context(context, composed)}; !checked)
+    {
+        std::cerr << "FATAL: insight::semantic::declared_runs_of — " << checked.error()
+                  << " Validate a caller-supplied context with check_stream_context before it "
+                     "reaches a tokenizer or a segmentation.\n";
+        std::terminate();
+    }
+    std::vector<insight::tokenization::DeclaredRun> runs;
+    for (const DeclaredValueRow& row : composed.declared_values())
+    {
+        const auto entry{
+            std::ranges::find(context.values, row.key, &insight::tokenization::ContextValue::key)};
+        if (entry != context.values.end())
+            runs.push_back({.markers = row.markers, .value = entry->value});
+    }
+    return runs;
+}
+
 std::string ComposedSemantics::identity_hex() const
 {
     std::string out;

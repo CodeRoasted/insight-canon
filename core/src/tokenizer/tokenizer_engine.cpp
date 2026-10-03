@@ -64,22 +64,8 @@ struct Tokenizer::Impl
     // key the context declares; a key the view does not hold applies nothing.
     void declare(StreamContext declared)
     {
-        if (const auto checked{insight::semantic::check_stream_context(declared, composed)};
-            !checked)
-        {
-            std::cerr << "FATAL: insight::tokenization::Tokenizer — " << checked.error()
-                      << " Validate a caller-supplied context with check_stream_context before "
-                         "it reaches a tokenizer.\n";
-            std::terminate();
-        }
         context = std::move(declared);
-        runs.clear();
-        for (const insight::semantic::DeclaredValueRow& row : composed.declared_values())
-        {
-            const auto entry{std::ranges::find(context.values, row.key, &ContextValue::key)};
-            if (entry != context.values.end())
-                runs.push_back({.markers = row.markers, .value = entry->value});
-        }
+        runs = insight::semantic::declared_runs_of(context, composed);
         INSIGHT_LOG_DEBUG(logging::tokenizer_logger(), "context declared: values={} runs={}",
                           context.values.size(), runs.size());
     }

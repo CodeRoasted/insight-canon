@@ -17,7 +17,7 @@ namespace insight::tokenization
 namespace
 {
 
-    constexpr std::string_view kWildcard{"<*>"};
+    constexpr std::string_view kWildcard{kMaskWildcard};
 
     constexpr unsigned kDecimalBase{10U};
     constexpr unsigned kAsciiCaseMask{32U};
@@ -873,67 +873,26 @@ namespace
         }
     }
 
-    // refs: DN-133.D1
-    // post: true with `out` holding `form` whose claimed runs of `run` are replaced by the
-    // wildcard; false when `run` claims nothing in `form`, `out` then unspecified.
-    // invariant: a marker is tried only at a boundary — the form's start, or after a byte that is
-    // neither a letter nor a digit — so a marker inside a word never fires.
-    [[nodiscard]] bool replace_declared_run(std::string_view form, const DeclaredRun& run,
-                                            std::string& out)
-    {
-        // note: the whole cost of a token naming no declared value is this one search.
-        if (form.find(run.value) == std::string_view::npos)
-            return false;
-        out.clear();
-        bool claimed{false};
-        std::size_t copied{0};
-        std::size_t pos{0};
-        while (pos < form.size())
-        {
-            std::size_t next{pos + 1};
-            if (pos == 0 || (!is_alpha(form[pos - 1]) && !is_digit(form[pos - 1])))
-                for (const std::string_view marker : run.markers)
-                {
-                    if (!form.substr(pos).starts_with(marker))
-                        continue;
-                    const std::size_t first_digit{pos + marker.size()};
-                    std::size_t end{first_digit};
-                    while (end < form.size() && is_digit(form[end]))
-                        ++end;
-                    if (end == first_digit || (end < form.size() && is_alpha(form[end])))
-                        continue;
-                    if (form.substr(first_digit, end - first_digit) == run.value)
-                    {
-                        out.append(form.substr(copied, first_digit - copied));
-                        out.append(kWildcard);
-                        copied = end;
-                        claimed = true;
-                    }
-                    next = end;
-                    break;
-                }
-            pos = next;
-        }
-        out.append(form.substr(copied));
-        return claimed;
-    }
-
-    // refs: DN-133.D1
-    // post: true with `out` holding `form` after every declared run in declaration order; false
-    // when none claims anything, `out` then unspecified.
+    // refs: DN-133.D1, DN-133.D7
+    // post: true with `out` holding `form` whose claimed runs read as the wildcard; false when no
+    // declared run claims anything, `out` then unspecified.
     [[nodiscard]] bool replace_declared_runs(std::string_view form,
                                              std::span<const DeclaredRun> declared_runs,
-                                             std::string& out, std::string& scratch)
+                                             std::string& out, std::vector<ClaimedRun>& claims)
     {
-        bool claimed{false};
-        for (const DeclaredRun& run : declared_runs)
+        claim_declared_runs(form, declared_runs, claims);
+        if (claims.empty())
+            return false;
+        out.clear();
+        std::size_t copied{0};
+        for (const ClaimedRun& claim : claims)
         {
-            if (!replace_declared_run(claimed ? std::string_view{out} : form, run, scratch))
-                continue;
-            out.swap(scratch);
-            claimed = true;
+            out.append(form.substr(copied, claim.first - copied));
+            out.append(kWildcard);
+            copied = claim.last;
         }
-        return claimed;
+        out.append(form.substr(copied));
+        return true;
     }
 
 } // namespace
@@ -953,13 +912,13 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
     std::vector<std::string_view> params;
     std::string composite;
     std::string declared;
-    std::string declared_scratch;
+    std::vector<ClaimedRun> declared_claims;
     // post: true with `declared` holding `form` after the declared runs, false when none claims.
     const auto apply_declared{[&](std::string_view form)
                               {
                                   return !declared_runs.empty() &&
                                          replace_declared_runs(form, declared_runs, declared,
-                                                               declared_scratch);
+                                                               declared_claims);
                               }};
     std::string_view prev{};
     bool first{true};

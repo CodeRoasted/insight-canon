@@ -486,6 +486,29 @@ pair record's pull-request number (coderoast-corpora `9830858` registered before
 
 **It rides `-17`**, as the riders above do.
 
+### Rider — `PR#` and `pulls/` join the GitHub declared-value markers (DN-133.D7)
+
+**What moves.** The GitHub dialect's `pull_request` row declares eight markers instead of six: `PR#` (a
+changed-files action names the run's own request `PR#<n>`) and `pulls/` (GitHub's REST path for a pull request).
+The mechanism is unchanged; the predicate that claims a run is now one exported function,
+`claim_declared_runs`, which the masker's normal-form pass calls and which also keys a unit's instance
+(`declared_discriminant_of`, read by Sift's segmentation), so the two never disagree about a marker. The ruleset
+version stays `1.7.0` and the grammar stays `semantic-grammar-7`: both are the values of the release window
+still open, which already carries the rider above.
+
+**Which serialized fields move.** `template_str` and `template_id` of a line holding the run's own declared
+number behind `PR#` or `pulls/`, on a stream declaring it, and nothing else; `params` does not move. A stream
+that declares no value is byte-identical. The GitHub package's composed identity moves, because its row's marker
+list moved.
+
+**Witness inputs.** `core/tests/mask/mask_rules.golden` pins `PR#6656` and `/repos/o/r/pulls/6656/files` under
+6656 and the controls `PR#6657`, `XPR#6656`, `pulls/66560`, `pull/6656` and `issues/6656`. Measured through the
+public `Tokenizer::process_line` over the same three private CI-log views (coderoast-corpora `a69ffd3`, registered
+before the build): distinct templates 295 978 → 295 920, 260 889 → 260 831 and 3 301 177 → 3 295 875, with 0
+within-log false merges.
+
+**It rides `-17`.**
+
 ---
 
 *See also: [masking.md](masking.md) (what the current generation's rules actually are) ·

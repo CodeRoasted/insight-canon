@@ -337,6 +337,26 @@ resolve_stream(const ComposedSemantics& composed,
 check_stream_context(const insight::tokenization::StreamContext& context,
                      const ComposedSemantics& composed);
 
+// refs: DN-133.D2, DN-133.D7
+// post: one declared run per row of the composition's declared-value VIEW whose key the context
+// declares, in row order; a key the view does not hold applies nothing.
+// invariant: the ONE resolution of a context against a composition — the tokenizer's template and
+// Sift's instance key read the same runs, so neither can mask behind a marker the other does not.
+// pre: `context` passes `check_stream_context` against `composed`; one that does not terminates,
+// naming the refusal, since no log byte can produce it.
+// pre: `context` and `composed` outlive the returned runs, which view both.
+[[nodiscard]] std::vector<insight::tokenization::DeclaredRun>
+declared_runs_of(const insight::tokenization::StreamContext& context,
+                 const ComposedSemantics& composed);
+// invariant: a temporary context or composition dangles once the full-expression ends, so binding
+// one is a compile error.
+std::vector<insight::tokenization::DeclaredRun>
+declared_runs_of(const insight::tokenization::StreamContext&& context,
+                 const ComposedSemantics& composed) = delete;
+std::vector<insight::tokenization::DeclaredRun>
+declared_runs_of(const insight::tokenization::StreamContext& context,
+                 const ComposedSemantics&& composed) = delete;
+
 // refs: ADR-17.D2, ADR-17.D3
 // post: sorts packages by name into canonical order independent of the caller's argument order,
 // concatenates rows in declared order, and computes the identity over the serialization.

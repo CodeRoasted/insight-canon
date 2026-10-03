@@ -144,3 +144,14 @@ literal_keep | XPR-6656 | label XPR-6656 applied | label XPR-6656 applied | PR-=
 literal_keep | PR-66560 | label PR-66560 applied | label PR-66560 applied | PR-=6656
 declared_run | deploy/pr-6656/main.go:42 | failed at deploy/pr-6656/main.go:42 here | failed at deploy/pr-<*>/main.go:<*> here | pr-=6656
 digit_leading | 12-PR-6656 | build 12-PR-6656 queued | build <*> queued | PR-=6656
+#
+# The two markers DN-133.D7 admits, `PR#` and `pulls/`, each with the same one-condition controls:
+# another value, the marker inside a word, a run that is not maximal, and `pull/` and `issues/`,
+# shapes the set refuses, under the same value.
+declared_run | PR#6656 | fetching changed files for PR#6656 now | fetching changed files for PR#<*> now | PR#=6656
+literal_keep | PR#6656 | fetching changed files for PR#6656 now | fetching changed files for PR#6656 now | PR#=6657
+literal_keep | XPR#6656 | fetching changed files for XPR#6656 now | fetching changed files for XPR#6656 now | PR#=6656
+declared_run | /repos/o/r/pulls/6656/files | gh api /repos/o/r/pulls/6656/files done | gh api /repos/o/r/pulls/<*>/files done | pulls/=6656
+literal_keep | /repos/o/r/pulls/66560/files | gh api /repos/o/r/pulls/66560/files done | gh api /repos/o/r/pulls/66560/files done | pulls/=6656
+literal_keep | refs/pull/6656/merge | fetching refs/pull/6656/merge now | fetching refs/pull/6656/merge now | pulls/=6656
+literal_keep | /repos/o/r/issues/6656/comments | gh api /repos/o/r/issues/6656/comments done | gh api /repos/o/r/issues/6656/comments done | pulls/=6656
