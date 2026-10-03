@@ -1094,9 +1094,9 @@ struct MaskConfig
     // they never fossilise into the template identity.
     // invariant: there is deliberately NO hex knob — its acceptor required a leading 0, so every
     // token it accepted was already digit-leading and the knob was inert over ALL inputs.
-    // invariant: the IP knob stays because its grammar admits a leading bracket, and a bracketed
-    // token is not digit-leading, so it genuinely gates.
-    // refs: ADR-16.D5
+    // invariant: the IP knob decides rule 4's whole acceptance set - an IPv4 token bare or shelled
+    // masks when it is on and stays literal when it is off, before any numeric rule reads it.
+    // refs: ADR-16.D5, DN-134.D8
     bool mask_ip_addresses{true};
     // invariant: when set, a line whose NATIVE component is empty takes its recognized test-file as
     // component — populating the cube WHERE axis above the empty native tier, never faking it.

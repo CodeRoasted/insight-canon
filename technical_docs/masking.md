@@ -44,7 +44,7 @@ Each whitespace token is classified by the **first** matching rule:
 | 1 | **Status-value KEEP** — an all-digit token, ≤ 3 digits, immediately after a **status keyword** | KEEP literal |
 | 2 | **Composite** — the token carries a structural delimiter; one of the normalizers (§4) matches | KEEP normalized (embeds `<*>`) |
 | 3 | **UUID / long hash** | MASK `<*>` |
-| 4 | **IPv4** (when `mask_ip_addresses`), bare or inside a declared **wrapper shell** (§3.2) | MASK `<*>` |
+| 4 | **IPv4**, bare or inside a declared **wrapper shell** (§3.2), with at most two trailing closers or `,;:.` | MASK `<*>` when `mask_ip_addresses` is on; KEEP literal when it is off — rule 4 decides every token it accepts, so rule 5 never reaches one |
 | 5 | **Digit-leading numeric** | MASK `<*>` — this also carries `0x`-hex: a `0x…` token starts with a digit |
 | 6 | **Literal** — none of the above | KEEP literal |
 
@@ -85,9 +85,12 @@ data-learned. This is what keeps masking decidable and deterministic.
 | **Wildcard** | `<*>` | The mask placeholder. |
 | **Declared-value markers** | none in core: each key and its markers are a dialect's data (`DeclaredValueRow`); the GitHub dialect declares `pull_request` behind `PR-`, `pr-`, `Pr-`, `pull-`, `PULL-`, `Pull-`, `PR#`, `pulls/` | §4 declared-run — the markers a run's own declared value is masked behind. Core holds the mechanism and no marker. |
 
-`mask_ip_addresses` is the one `MaskConfig` knob (default **on**) gating a rule — rule 4. It gates for a
-reason the retired hex knob never did: its grammar admits a **wrapper shell** (§3.2), and a shell-led token
-is not digit-leading, so `(10.20.30.40)` masks with the knob on and stays **literal** with it off.
+`mask_ip_addresses` is the one `MaskConfig` knob (default **on**) gating a rule — rule 4 — and it decides
+rule 4's **whole** acceptance set: `10.20.30.40`, `(10.20.30.40)` and `[10.20.30.40],` mask with the knob on
+and all stay **literal** with it off. Rule 4 runs before rule 5, so the digit-leading rule, which would mask the
+bare form, cannot reach an address the switch keeps: a switch named for IP addresses that left some masked would
+break its own name. An address a composite claims first (`10.0.0.1:8080` as a location, a URL, `ip=10.0.0.1`)
+is rule 2's, outside the knob's domain, and is unchanged by it.
 
 ### 3.1 The ephemeral-root catalog — the root is the decidable thing
 
@@ -135,8 +138,8 @@ where a reader has been told the addresses are gone.
 Two facts about its shape, both measured rather than assumed:
 
 - **Only the OPENING byte was ever the defect.** A trailing closer leaves byte 0 a digit, so `10.0.0.1)`
-  was always masked by the digit-leading rule. An opener destroys digit-leading and leaves rule 4 the only
-  rule that can see the token. The closers matter as the shell's trailing half, never as an entry point.
+  was always masked by the digit-leading rule. An opener destroys digit-leading and left rule 4 the only
+  rule that could see the token. The closers matter as the shell's trailing half, never as an entry point.
 - **The hash class needed the *pre-gate*, not a second shell.** A hex run ≥ 16 inside `[…]` already
   normalized to `[<*>]` — not because rule 3 tolerates a shell (it requires the whole token) but because
   `[` sat in the pre-gate's separator set, so `embedded-identity` got a look. `(` did not, so the same hash

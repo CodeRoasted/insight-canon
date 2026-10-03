@@ -610,9 +610,8 @@ TEST(MaskRuleGolden, Ipv4RowsMaskOnlyBecauseOfTheKnobbedRule)
         // invariant: the IP knob gates its rule and nothing else.
         // invariant: a subject that still masks with the knob OFF is being claimed by some OTHER
         // rule and this rule is unwitnessed by that row.
-        // invariant: that is why every IP witness is OPENER-LED.
-        // invariant: a bare address is digit-leading, so the digit-leading rule masks it whatever
-        // the knob says, and a bare-address row would witness it.
+        // invariant: rule 4 decides its whole acceptance set before rule 5 reads a token, so a
+        // bare or closer-only address witnesses it as an opener-led one does (DN-134.D8).
         EXPECT_EQ(without_knob, row.subject)
             << "golden line " << row.line_no
             << ": with mask_ip_addresses OFF an ipv4 witness must stay LITERAL — otherwise "

@@ -36,9 +36,12 @@ status_keep | 2 | worker returned exit 2 | worker returned exit 2
 # rule 5 anyway, and the row would name the wrong rule.
 uuid_or_hash | deadbeefcafe0badf00d5678 | commit deadbeefcafe0badf00d5678 landed | commit <*> landed
 
-# ── rule 4 — IPv4, the only knob-gated rule. Every witness is OPENER-LED: a bare address is
-# digit-leading, so rule 5 masks it whatever the knob says. One per declared wrapper pair — the
-# shell whose absence once leaked a real address into a published render.
+# ── rule 4 — IPv4, the only knob-gated rule. It decides its WHOLE acceptance set (DN-134.D8): a bare
+# address, one per declared wrapper pair (the shell whose absence once leaked a real address into a
+# published render) and a closer-only form all mask with the knob ON and stay literal with it OFF,
+# because rule 4 runs before rule 5 and keeps what the switch keeps.
+ipv4 | 10.0.0.1 | client 10.0.0.1 connected | client <*> connected
+ipv4 | 10.0.0.1), | client 10.0.0.1), connected | client <*> connected
 ipv4 | (10.0.0.1) | client (10.0.0.1) connected | client <*> connected
 ipv4 | [10.0.0.1] | client [10.0.0.1] connected | client <*> connected
 ipv4 | {10.0.0.1} | client {10.0.0.1} connected | client <*> connected

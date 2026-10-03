@@ -1331,6 +1331,35 @@ namespace
         return out != content;
     }
 
+    // invariant: rules 3 to 5 as one decision on a token the status KEEP and the composites left.
+    enum class ValueDisposition : std::uint8_t
+    {
+        Mask,
+        KeepLiteral,
+        NotAValue
+    };
+
+    // pre: no status KEEP and no composite rule claimed `tok`.
+    // post: rule 3's, rule 4's or rule 5's disposition of `tok`; NotAValue when none reaches it.
+    // invariant: rule 4 decides its whole acceptance set, bare or shelled - MASK with the switch
+    // on, KEEP literal with it off - so rule 5 never reaches an address the switch keeps.
+    // refs: ADR-16.D5, DN-134.D8
+    [[nodiscard]] inline ValueDisposition value_disposition(std::string_view tok,
+                                                            const TokenShape& shape,
+                                                            const MaskConfig& config) noexcept
+    {
+        if (shape.empty || is_uuid_or_long_hash(tok))
+            return ValueDisposition::Mask;
+        if (is_ipv4_token(tok))
+            return config.mask_ip_addresses ? ValueDisposition::Mask
+                                            : ValueDisposition::KeepLiteral;
+        // assert: a hexadecimal-prefixed token needs no arm: it starts with a digit, so the
+        // digit-leading test carries it.
+        if (shape.digit_leading)
+            return ValueDisposition::Mask;
+        return ValueDisposition::NotAValue;
+    }
+
 } // namespace
 
 // post: the joined per-token canonical forms; a masked position contributes a param, a kept or
@@ -1409,19 +1438,20 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                            prev = tok;
                            return;
                        }
-                       // assert: a hexadecimal-prefixed token needs no arm: it starts with a digit,
-                       // so the digit-leading test carries it.
-                       // refs: ADR-16.D5
-                       if (shape.empty || is_uuid_or_long_hash(tok) ||
-                           (config.mask_ip_addresses && is_ipv4_token(tok)) || shape.digit_leading)
+                       switch (value_disposition(tok, shape, config))
                        {
+                       case ValueDisposition::Mask:
                            mask();
-                           prev = tok;
-                           return;
+                           break;
+                       case ValueDisposition::KeepLiteral:
+                           tmpl.append(tok);
+                           break;
+                       case ValueDisposition::NotAValue:
+                           // assert: a token no rule claimed is its own normal form.
+                           // refs: DN-133.D1
+                           tmpl.append(normal_form_steps(tok));
+                           break;
                        }
-                       // assert: a token no rule claimed is its own normal form.
-                       // refs: DN-133.D1
-                       tmpl.append(normal_form_steps(tok));
                        prev = tok;
                    });
 

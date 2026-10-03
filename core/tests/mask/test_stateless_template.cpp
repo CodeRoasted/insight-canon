@@ -637,19 +637,18 @@ TEST(StatelessTemplate, Ipv4KnobGatesTheBracketedFormThatDigitLeadingCannotReach
     EXPECT_EQ(off, kBracketed)
         << "the bracketed IPv4 must stay LITERAL with mask_ip_addresses OFF. If this masked "
            "anyway, rule 4 is inert exactly as rule 5 is — something upstream (a composite rule "
-           "reached through the `maybe_composite` pre-gate, which runs BEFORE this disjunction) is "
-           "claiming the token first, and the IP knob joins the rip.\n  token: "
+           "reached through the `maybe_composite` pre-gate, which runs BEFORE rule 4) is claiming "
+           "the token first, and the IP knob joins the rip.\n  token: "
         << kBracketed << "\n  expected: " << kBracketed << " (kept)\n  actual: " << off;
 
-    // invariant: THE CONTRAST that names which shape the knob governs — the BARE form is
-    // digit-leading, so it masks either way.
-    // invariant: a reader who saw only the bare form would conclude the knob works when it is doing
-    // nothing, so pinning both is what makes the decisive leg interpretable.
+    // invariant: THE CONTRAST that names the knob's whole domain — the BARE form is digit-leading,
+    // and rule 4 still decides it before rule 5 can (DN-134.D8).
+    // refs: DN-134.D8
     EXPECT_EQ(masked_with(kBare, arena, MaskConfig{}), "<*>");
-    EXPECT_EQ(masked_with(kBare, arena, cfg_without_ip_masking()), "<*>")
-        << "the BARE IPv4 is digit-leading, so it masks regardless of the knob — rule 4 is not "
-           "what catches it. If this ever KEEPS, digit-leading stopped covering the bare form and "
-           "the knob's domain just widened silently.";
+    EXPECT_EQ(masked_with(kBare, arena, cfg_without_ip_masking()), kBare)
+        << "with the knob OFF rule 4 keeps the BARE address too, before the digit-leading rule "
+           "reads it: a switch named for IP addresses that leaves one masked breaks its own "
+           "contract. If this masks, rule 5 reached an address the switch keeps.";
 }
 
 // invariant: THE WRAPPER SHELL — the IP grammar admitted ONE delimiter pair out of six, and the
@@ -729,11 +728,10 @@ TEST(StatelessTemplate, Ipv4MasksInsideEveryDeclaredWrapperPair)
     // invariant: NON-VACUITY — with the knob OFF every one of these must come back LITERAL.
     // invariant: if any masks anyway, something upstream of the rule's disjunction claimed the
     // token and the table above is no longer testing the IP grammar at all.
-    // invariant: ONLY opener-led tokens belong in this leg, and the reason is MEASURED — a
-    // trailing-closer form masks with the knob OFF, because byte 0 stays a digit.
-    // invariant: putting a closer-only form here would assert a falsehood about which rule is under
-    // test, so this leg must contain only shapes the digit-leading rule cannot reach.
-    for (const std::string_view tok : {"(10.20.30.40)", "\"10.20.30.40\"", "{10.20.30.40"})
+    // invariant: rule 4 decides before the digit-leading rule (DN-134.D8), so an opener-led, a
+    // closer-only and a bare form all belong in this leg.
+    for (const std::string_view tok :
+         {"(10.20.30.40)", "\"10.20.30.40\"", "{10.20.30.40", "10.20.30.40)", "10.20.30.40"})
     {
         const std::string off{masked_with(tok, arena, cfg_without_ip_masking())};
         EXPECT_EQ(off, tok)
@@ -1161,4 +1159,24 @@ TEST(StatelessTemplate, TheJsonMemberOrderFormIsBoundedInNestingDepth)
         << "a shallow nesting is rewritten";
     const std::string deep{nested(kDeep, kUnordered)};
     EXPECT_EQ(masked(deep, arena), deep) << "past the declared depth the line is left as it is";
+}
+
+// refs: DN-134.D8
+// invariant: rule 4 decides its WHOLE acceptance set - an IPv4 address bare, in a complete shell,
+// or with declared trailing bytes masks with the switch on and stays literal with it off.
+// invariant: rule 5 never reaches an address the switch keeps.
+TEST(StatelessTemplate, TheIpSwitchDecidesEveryAddressRuleFourAccepts)
+{
+    ArenaAllocator arena{256U * 1024U};
+    for (const std::string_view tok : {"10.20.30.40", "(10.20.30.40)", "[10.20.30.40],"})
+    {
+        const std::string on{masked_with(tok, arena, MaskConfig{})};
+        EXPECT_EQ(on, "<*>") << "with mask_ip_addresses ON rule 4 masks the address.\n  token:  "
+                             << tok << "\n  actual: " << on;
+        const std::string off{masked_with(tok, arena, cfg_without_ip_masking())};
+        EXPECT_EQ(off, tok) << "with mask_ip_addresses OFF the address must stay LITERAL: a switch "
+                               "named for IP addresses that leaves one masked breaks its own "
+                               "contract (DN-134.D8).\n  token:    "
+                            << tok << "\n  expected: " << tok << " (kept)\n  actual:   " << off;
+    }
 }

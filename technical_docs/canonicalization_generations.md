@@ -536,6 +536,26 @@ build, `c210757` measured): distinct templates over every non-empty line 295 919
 
 **It rides `-17`.**
 
+### Rider — a switched-off `mask_ip_addresses` keeps every address rule 4 accepts (DN-134.D8)
+
+**What changed.** Rule 4 decides its whole acceptance set (an IPv4 address, bare or inside a declared wrapper
+shell, with at most two trailing closers or `,;:.`) before rule 5 reads the token: with `mask_ip_addresses` on it
+masks, as before; with it off it stays literal. Until now a bare or closer-only address masked with the switch off
+anyway, because it is digit-leading and rule 5 claimed it, so the switch decided only the opener-led forms.
+
+**Which serialized fields move.** Nothing at the default configuration, where the switch is on: every template,
+`template_id` and param is byte-identical. With the switch off, `template_str`, `template_id` and `params` of a line
+holding a bare or closer-only IPv4 token, which is now kept rather than masked. No producer in the workspace turns
+the switch off outside insight-canon's own tests.
+
+**Witness inputs.** `core/tests/mask/mask_rules.golden`'s rule 4 rows now include a bare address (`client 10.0.0.1
+connected`) and a closer-only one (`client 10.0.0.1), connected`) beside the six shelled ones, each masked with the
+switch on and literal with it off; `StatelessTemplate.TheIpSwitchDecidesEveryAddressRuleFourAccepts` pins
+`10.20.30.40`, `(10.20.30.40)` and `[10.20.30.40],`. Measured on the 21 596-pair CI-log replay (coderoast-corpora
+`4e09766`): every report byte-identical to the build before it.
+
+**It rides `-17`.**
+
 ---
 
 *See also: [masking.md](masking.md) (what the current generation's rules actually are) ·
