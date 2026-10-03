@@ -225,10 +225,10 @@ namespace
     {
         std::cerr << "FATAL: insight::semantic::compose — package \"" << pkg.name
                   << "\", marker row \"" << row.prefix
-                  << "\": a row that only OPENS a unit carries no identity. It needs a unit "
-                     "kind, and no payload extractor, version coordinate or payload exclusion: "
-                     "the naming row of its kind that follows names the unit. Remove them from "
-                     "the row, or make it a naming row.\n";
+                  << "\": a row that only OPENS a unit opens a job and carries no identity. It "
+                     "needs kind Job, and no payload extractor, version coordinate or payload "
+                     "exclusion: the naming row of its kind that follows names the job. Fix the "
+                     "row, or make it a naming row.\n";
         std::terminate();
     }
 
@@ -479,7 +479,7 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
         {
             if (!version_coordinate_whole(row.version))
                 fail_version_coordinate(pkg, row);
-            if (!opening_row_carries_no_identity(row))
+            if (!opening_row_admitted(row))
                 fail_opening_row(pkg, row);
         }
     for (const SemanticPackageManifest& pkg : packages)

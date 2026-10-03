@@ -516,3 +516,44 @@ TEST(CompositionDeathTest, ADigitEndingMarkerFailsClosedAtRuntime)
 {
     EXPECT_DEATH((void)compose(kDigitEndingSet), R"(declared value "ticket")");
 }
+
+// refs: DN-89.D43, DN-89.D33
+// invariant: an opening row exists on kind Job only, so the unnamed unit an opener leaves has
+// one sentinel to name it; composition refuses one on any other kind, naming the row.
+namespace
+{
+using insight::semantic::MarkerRole;
+
+[[nodiscard]] SemanticPackageManifest opener_package(std::span<const IntentMarkerRow> markers)
+{
+    return SemanticPackageManifest{.name = "opener_probe", .version = "1.0.0", .markers = markers};
+}
+
+constexpr std::array<IntentMarkerRow, 1> kStepOpener{{{.prefix = "Step opened at ",
+                                                       .kind = IntentMarkerKind::Step,
+                                                       .child_order = ChildOrder::Ordered,
+                                                       .extract = PayloadExtract::None,
+                                                       .payload_excludes = {},
+                                                       .role = MarkerRole::Opens}}};
+constexpr std::array<IntentMarkerRow, 1> kJobOpener{{{.prefix = "Job opened at ",
+                                                      .kind = IntentMarkerKind::Job,
+                                                      .child_order = ChildOrder::Ordered,
+                                                      .extract = PayloadExtract::None,
+                                                      .payload_excludes = {},
+                                                      .role = MarkerRole::Opens}}};
+} // namespace
+
+TEST(CompositionDeathTest, AnOpeningRowOnKindStepFailsClosedAtRuntime)
+{
+    const std::array packages{opener_package(kStepOpener)};
+    EXPECT_DEATH((void)compose(packages), R"(marker row "Step opened at ".*needs kind Job)")
+        << "an opening row on kind Step must be refused, naming the row";
+}
+
+TEST(CompositionOpeningRow, AnOpeningRowOnKindJobComposes)
+{
+    const std::array packages{opener_package(kJobOpener)};
+    const ComposedSemantics composed{compose(packages)};
+    EXPECT_EQ(composed.markers().size(), 1U)
+        << "the control: the same row on kind Job composes, so only the kind decides the refusal";
+}

@@ -394,8 +394,9 @@ enum class MarkerRole : std::uint8_t
 {
     // invariant: the row opens a unit and names it with its payload, at its own line.
     Names = 0,
-    // invariant: the row opens a unit of its kind and carries no identity; the unit starts at
-    // its line only when a naming row of its kind follows with no other marker row between.
+    // invariant: the row opens a job at its own line and carries no identity; a naming row of
+    // its kind before any other marker row names it, and a job no row names stays unnamed.
+    // refs: DN-89.D33, DN-89.D43
     Opens,
 };
 
@@ -432,20 +433,21 @@ struct IntentMarkerRow
     // reader-side derivation with no generation dual, since the writer emits the payload verbatim.
     VersionCoordinate version{};
     // invariant: Names by default, so a row that declares no role names its unit as before.
-    // invariant: an Opens row carries no payload — extract None, no version, no exclusion — and
-    // its child_order is inert; composition refuses any other Opens row.
+    // invariant: an Opens row is of kind Job and carries no payload — extract None, no version, no
+    // exclusion — and its child_order is inert; composition refuses any other Opens row.
     // invariant: `recognize` never returns an Opens row; `recognize_opener` returns only those.
     // refs: DN-89.D33
     MarkerRole role{MarkerRole::Names};
 };
 
-// post: true when the row names its unit, or opens one while carrying no identity — a kind, and
-// no extractor, version coordinate or payload exclusion.
-// refs: DN-89.D33
-[[nodiscard]] constexpr bool opening_row_carries_no_identity(const IntentMarkerRow& row) noexcept
+// post: true when the row names its unit, or opens a job while carrying no identity — no
+// extractor, version coordinate or payload exclusion.
+// invariant: kind Job only, so the unnamed unit an opener leaves has one sentinel to name it.
+// refs: DN-89.D33, DN-89.D43
+[[nodiscard]] constexpr bool opening_row_admitted(const IntentMarkerRow& row) noexcept
 {
     return row.role == MarkerRole::Names ||
-           (row.kind != insight::tokenization::IntentMarkerKind::None &&
+           (row.kind == insight::tokenization::IntentMarkerKind::Job &&
             row.extract == PayloadExtract::None && row.version.introducer.empty() &&
             row.version.shape == VersionPayloadShape::None && row.payload_excludes.empty());
 }
