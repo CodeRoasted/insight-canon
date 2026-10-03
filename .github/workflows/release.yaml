@@ -426,7 +426,7 @@ jobs:
 
   release:
     needs: [attest, golden, disclosure-set]
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-release.yml@83ad808cb817f26451c18aeb452c33852016b3c5
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-release.yml@9f4c7b33acbe40461761884baffd60ae421e0922
     with:
       tag: ${{ github.event.inputs.tag || github.ref_name }}
       # ADR-17.D8: the four semantic vocabulary packages ride the train on the SAME footing as canon
