@@ -160,6 +160,15 @@ namespace
         // note: byte-identical rows under different declared generations are different claims.
         // refs: ADR-17.D9
         append_str_span(out, pkg.dialect_revisions);
+        // note: a declared key and its markers are what canon masks behind, so they are identity.
+        // refs: DN-133.D2
+        append_u32_le(out, static_cast<std::uint32_t>(pkg.declared_values.size()));
+        for (const DeclaredValueRow& row : pkg.declared_values)
+        {
+            append_str(out, row.key);
+            append_str_span(out, row.markers);
+            append_str(out, row.dialect_gate);
+        }
     }
 
     // post: one shadow note per pair whose shorter prefix properly prefixes the longer and whose
@@ -220,6 +229,20 @@ namespace
                      "kind, and no payload extractor, version coordinate or payload exclusion: "
                      "the naming row of its kind that follows names the unit. Remove them from "
                      "the row, or make it a naming row.\n";
+        std::terminate();
+    }
+
+    // note: the message states the rule and the remedy and names no record: canon ships public.
+    // refs: DN-133.D1
+    [[noreturn]] void fail_declared_value(const SemanticPackageManifest& pkg,
+                                          const DeclaredValueRow& row)
+    {
+        std::cerr << "FATAL: insight::semantic::compose — package \"" << pkg.name
+                  << "\", declared value \"" << row.key
+                  << "\": a declared value names a key and at least one marker, and every "
+                     "marker is non-empty and ends in a byte that is not a digit — a marker "
+                     "ending in a digit would make the digit run after it ambiguous. Fix the "
+                     "row.\n";
         std::terminate();
     }
 
@@ -286,6 +309,39 @@ ResolvedStream resolve_stream(const ComposedSemantics& composed,
                           .transport = insight::transport::resolve_transport_stack(declaration)};
 }
 
+// post: the first refusal in context order; a valid context returns nothing.
+// refs: DN-133.D1, DN-133.D2
+std::expected<void, std::string>
+check_stream_context(const insight::tokenization::StreamContext& context,
+                     const ComposedSemantics& composed)
+{
+    const std::span<const std::string_view> keys{composed.declared_value_keys()};
+    std::vector<std::string_view> seen;
+    for (const insight::tokenization::ContextValue& entry : context.values)
+    {
+        if (!std::ranges::contains(keys, entry.key))
+        {
+            std::string declared;
+            for (const std::string_view key : keys)
+                declared += (declared.empty() ? "\"" : ", \"") + std::string{key} + '"';
+            return std::unexpected("unknown context key \"" + entry.key +
+                                   "\"; the composed packages declare: " +
+                                   (declared.empty() ? std::string{"<none>"} : declared) +
+                                   ". A context value is declared under a key a dialect "
+                                   "declares, never guessed.");
+        }
+        if (std::ranges::contains(seen, entry.key))
+            return std::unexpected("context key \"" + entry.key +
+                                   "\" is declared twice; a stream declares one value per key.");
+        seen.push_back(entry.key);
+        if (!insight::tokenization::is_declarable_value(entry.value))
+            return std::unexpected("context value \"" + entry.value + "\" under key \"" +
+                                   entry.key +
+                                   "\" is not a run of decimal digits with no leading zero.");
+    }
+    return {};
+}
+
 std::string ComposedSemantics::identity_hex() const
 {
     std::string out;
@@ -334,6 +390,7 @@ ComposedSemantics ComposedSemantics::for_stream(std::string_view declared_dialec
     out.locations_ = locations_;
     out.value_classes_ = value_classes_;
     out.channels_ = channels_;
+    out.declared_value_keys_ = declared_value_keys_;
     out.strategies_ = strategies_;
     out.provenance_hooks_ = provenance_hooks_;
     out.packages_ = packages_;
@@ -347,6 +404,7 @@ ComposedSemantics ComposedSemantics::for_stream(std::string_view declared_dialec
     out.all_level_lifts_ = all_level_lifts_;
     out.all_outcome_tokens_ = all_outcome_tokens_;
     out.all_outcome_markers_ = all_outcome_markers_;
+    out.all_declared_values_ = all_declared_values_;
     out.declared_dialect_ = resolved_dialect;
 
     const auto admits{[resolved_dialect](std::string_view dialect_gate) noexcept
@@ -366,6 +424,11 @@ ComposedSemantics ComposedSemantics::for_stream(std::string_view declared_dialec
     out.outcome_markers_.reserve(all_outcome_markers_.size());
     std::ranges::copy_if(all_outcome_markers_, std::back_inserter(out.outcome_markers_),
                          [&admits](const OutcomeMarkerRow& row)
+                         { return admits(row.dialect_gate); });
+    // refs: DN-133.D2
+    out.declared_values_.reserve(all_declared_values_.size());
+    std::ranges::copy_if(all_declared_values_, std::back_inserter(out.declared_values_),
+                         [&admits](const DeclaredValueRow& row)
                          { return admits(row.dialect_gate); });
     // refs: ADR-22.D4
     out.markers_.reserve(all_markers_.size());
@@ -397,6 +460,10 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
             if (!opening_row_carries_no_identity(row))
                 fail_opening_row(pkg, row);
         }
+    for (const SemanticPackageManifest& pkg : packages)
+        for (const DeclaredValueRow& row : pkg.declared_values)
+            if (!declared_value_row_well_formed(row))
+                fail_declared_value(pkg, row);
 
     const std::vector<std::size_t> order{canonical_order(packages)};
 
@@ -445,6 +512,13 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
         for (const std::string_view channel : pkg.channels)
             if (std::ranges::find(composed.channels_, channel) == composed.channels_.end())
                 composed.channels_.push_back(channel);
+        composed.all_declared_values_.insert(composed.all_declared_values_.end(),
+                                             pkg.declared_values.begin(),
+                                             pkg.declared_values.end());
+        for (const DeclaredValueRow& row : pkg.declared_values)
+            if (std::ranges::find(composed.declared_value_keys_, row.key) ==
+                composed.declared_value_keys_.end())
+                composed.declared_value_keys_.push_back(row.key);
         if (pkg.strategy != nullptr)
             composed.strategies_.push_back(pkg.strategy);
         if (pkg.echoed_source != nullptr)

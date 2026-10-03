@@ -54,6 +54,7 @@
 import insight.canon.test;
 
 using insight::tokenization::ArenaAllocator;
+using insight::tokenization::DeclaredRun;
 using insight::tokenization::MaskConfig;
 using insight::tokenization::stateless_template;
 namespace catalog = insight::tokenization::rule_catalog;
@@ -61,15 +62,16 @@ namespace catalog = insight::tokenization::rule_catalog;
 namespace
 {
 
-// invariant: the five TOP-LEVEL dispositions of the masking precedence that are not the composite
-// layer, which is named by its own catalog instead.
+// invariant: the six TOP-LEVEL dispositions of the masking precedence that are not the composite
+// layer, which is named by its own catalog instead; `declared_run` is the one a stream declares.
 // invariant: this list plus that catalog is the complete rule-id namespace.
 // invariant: it is hand-held because the dispatcher states these as a disjunction chain rather than
 // a table, and a sibling arm is what keeps a typo here from silently minting a sixth id.
 // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
-constexpr std::array<std::string_view, 5> kTopLevelRuleIds{
+constexpr std::array<std::string_view, 6> kTopLevelRuleIds{
     {std::string_view{"status_keep"}, std::string_view{"uuid_or_hash"}, std::string_view{"ipv4"},
-     std::string_view{"digit_leading"}, std::string_view{"literal_keep"}}};
+     std::string_view{"digit_leading"}, std::string_view{"literal_keep"},
+     std::string_view{"declared_run"}}};
 
 struct Row
 {
@@ -78,6 +80,11 @@ struct Row
     std::string subject;
     std::string input;
     std::string expected;
+    // refs: DN-133.D1
+    // invariant: the row's declared value, `<marker>=<value>` in the file; both empty is a row
+    // masked with no declared value.
+    std::string declared_marker;
+    std::string declared_value;
     std::size_t line_no{0};
 };
 
@@ -106,7 +113,8 @@ constexpr std::string_view kFieldSep{" | "};
     return std::string{str.substr(first, last - first + 1)};
 }
 
-// invariant: exactly 3 or 4 fields, a 3-field row being a witness awaiting its expected value.
+// invariant: 3 to 5 fields, a 3-field row being a witness awaiting its expected value and a 5th
+// field the row's declared value, `<marker>=<value>`.
 // invariant: a field count outside that range is MALFORMED and is reported rather than guessed at,
 // because a separator inside a witness line would silently shift every column.
 [[nodiscard]] bool split_row(std::string_view text, std::size_t line_no, Row& out, std::string& why)
@@ -124,17 +132,29 @@ constexpr std::string_view kFieldSep{" | "};
         fields.emplace_back(text.substr(cursor, hit - cursor));
         cursor = hit + kFieldSep.size();
     }
-    if (fields.size() < 3 || fields.size() > 4)
+    if (fields.size() < 3 || fields.size() > 5)
     {
-        why = "expected 3 or 4 ` | `-separated fields, found " + std::to_string(fields.size()) +
+        why = "expected 3 to 5 ` | `-separated fields, found " + std::to_string(fields.size()) +
               " — a witness line may not contain the byte sequence ` | `";
         return false;
     }
     out.rule_id = trim(fields[0]);
     out.subject = fields[1];
     out.input = fields[2];
-    out.expected = fields.size() == 4 ? fields[3] : std::string{};
+    out.expected = fields.size() >= 4 ? fields[3] : std::string{};
     out.line_no = line_no;
+    if (fields.size() == 5)
+    {
+        const std::string declared{trim(fields[4])};
+        const std::size_t equals{declared.rfind('=')};
+        if (equals == std::string::npos || equals == 0 || equals + 1 == declared.size())
+        {
+            why = "the 5th field declares a value as `<marker>=<value>`, found `" + declared + "`";
+            return false;
+        }
+        out.declared_marker = declared.substr(0, equals);
+        out.declared_value = declared.substr(equals + 1);
+    }
     return true;
 }
 
@@ -176,15 +196,41 @@ constexpr std::string_view kFieldSep{" | "};
     return golden;
 }
 
-[[nodiscard]] std::string mask_line(std::string_view content, const MaskConfig& config)
+[[nodiscard]] std::string mask_line(std::string_view content, const MaskConfig& config,
+                                    std::span<const DeclaredRun> declared_runs)
 {
     ArenaAllocator arena{256U * 1024U};
-    return std::string{stateless_template(content, arena, config).template_str};
+    return std::string{stateless_template(content, arena, config, declared_runs).template_str};
 }
 
 [[nodiscard]] std::string mask_line(std::string_view content)
 {
-    return mask_line(content, {});
+    return mask_line(content, {}, {});
+}
+
+// post: `content` masked under one declared value, `marker` then `value`; an empty value declares
+// none.
+[[nodiscard]] std::string mask_line_declared(std::string_view content, const MaskConfig& config,
+                                             std::string_view marker, std::string_view value)
+{
+    if (value.empty())
+        return mask_line(content, config, {});
+    const std::array<std::string_view, 1> markers{marker};
+    const std::array<DeclaredRun, 1> runs{DeclaredRun{.markers = markers, .value = value}};
+    return mask_line(content, config, runs);
+}
+
+// post: the row's input masked under the row's own declared value, or none.
+[[nodiscard]] std::string mask_row(const Row& row, const MaskConfig& config)
+{
+    return mask_line_declared(row.input, config, row.declared_marker, row.declared_value);
+}
+
+// post: the row's declared value as the file spells it, empty when it declares none.
+[[nodiscard]] std::string declared_field(const Row& row)
+{
+    return row.declared_value.empty() ? std::string{}
+                                      : row.declared_marker + "=" + row.declared_value;
 }
 
 // invariant: the same split the masker performs, so a token index in one is a token index in the
@@ -235,7 +281,7 @@ constexpr std::string_view kFieldSep{" | "};
     okay = index != std::string::npos && occurrences == 1;
     if (!okay)
         return {};
-    const std::vector<std::string> masked{tokens_of(mask_line(row.input, config))};
+    const std::vector<std::string> masked{tokens_of(mask_row(row, config))};
     // invariant: the masker emits exactly one output token per input token, joining on a single
     // space and never gaining one, so the indices correspond.
     if (index >= masked.size())
@@ -352,7 +398,7 @@ TEST(MaskRuleGolden, GoldenTemplatesAreByteIdentical)
                           << kRegenCommand;
             continue;
         }
-        const std::string actual{mask_line(row.input)};
+        const std::string actual{mask_row(row, MaskConfig{})};
         if (actual == row.expected)
             continue;
         ++moved;
@@ -361,6 +407,8 @@ TEST(MaskRuleGolden, GoldenTemplatesAreByteIdentical)
             << "MASKED OUTPUT MOVED — golden line " << row.line_no << "\n"
             << "  rule       : " << row.rule_id << "\n"
             << "  input      : " << row.input << "\n"
+            << "  declared   : " << (row.declared_value.empty() ? "<none>" : declared_field(row))
+            << "\n"
             << "  expected   : " << row.expected << "\n"
             << "  actual     : " << actual << "\n"
             << (diff_at == std::string::npos
@@ -427,7 +475,7 @@ TEST(MaskRuleGolden, EveryGoldenRowNamesADeclaredRule)
     for (const Row& row : loaded().golden.rows)
         EXPECT_TRUE(is_composite_id(row.rule_id) || is_top_level_id(row.rule_id))
             << "golden line " << row.line_no << " names rule `" << row.rule_id
-            << "`, which is neither a declared composite rule nor one of the five top-level "
+            << "`, which is neither a declared composite rule nor one of the six top-level "
                "dispositions.\n"
                "  Either it is a typo, or a rule was RENAMED or REMOVED and this witness was left "
                "addressed to it.";
@@ -664,6 +712,50 @@ TEST(MaskRuleGolden, LiteralKeepRowsSurviveEveryRule)
     }
 }
 
+// refs: DN-133.D1
+// invariant: a declared_run row proves its OWN value is the reason: under it the subject moves,
+// under no value and under another value it reads exactly as undeclared.
+TEST(MaskRuleGolden, DeclaredRunRowsMoveOnlyUnderTheirOwnDeclaredValue)
+{
+    if (!golden_is_readable())
+        return;
+    std::size_t witnesses{0};
+    for (const Row& row : loaded().golden.rows)
+    {
+        if (row.rule_id != "declared_run")
+            continue;
+        ++witnesses;
+        if (row.declared_value.empty())
+        {
+            ADD_FAILURE() << "golden line " << row.line_no
+                          << ": a declared_run witness declares no value, so it cannot witness the "
+                             "rule a declared value drives.\n  input: "
+                          << row.input;
+            continue;
+        }
+        const std::string declared{mask_row(row, MaskConfig{})};
+        const std::string undeclared{mask_line(row.input)};
+        const std::string other_value{mask_line_declared(
+            row.input, MaskConfig{}, row.declared_marker, row.declared_value + "1")};
+        EXPECT_NE(declared, undeclared)
+            << "golden line " << row.line_no
+            << ": under its declared value the line must mask differently from undeclared.\n"
+            << "  input     : " << row.input << "\n  declared  : " << declared_field(row)
+            << "\n  masked    : " << declared;
+        EXPECT_NE(declared.find("<*>"), std::string::npos)
+            << "golden line " << row.line_no << ": the declared run must reach the wildcard.\n"
+            << "  masked: " << declared;
+        EXPECT_EQ(other_value, undeclared)
+            << "golden line " << row.line_no
+            << ": another pull request's number must stay literal — the run's OWN value is the "
+               "reason the subject moves, never the marker alone.\n"
+            << "  input            : " << row.input
+            << "\n  other value      : " << row.declared_value
+            << "1\n  masked           : " << other_value << "\n  undeclared reads : " << undeclared;
+    }
+    EXPECT_GT(witnesses, 0U) << "the declared-run rule has no witness row in the golden";
+}
+
 // invariant: each catalog arm reads the DECLARED table, never a list typed beside it.
 // invariant: that is the difference between covering the entries someone remembered and covering
 // the entries that EXIST.
@@ -760,7 +852,7 @@ TEST(MaskRuleGolden, DISABLED_RegenerateGolden)
 
     for (const Row& row : golden.rows)
     {
-        const std::string actual{mask_line(row.input)};
+        const std::string actual{mask_row(row, MaskConfig{})};
         if (row.expected.empty())
             filled.push_back(row.rule_id + " -> " + actual);
         else if (row.expected != actual)
@@ -772,9 +864,11 @@ TEST(MaskRuleGolden, DISABLED_RegenerateGolden)
                 rewritten.push_back("line " + std::to_string(row.line_no) + " (" + row.rule_id +
                                     "): " + row.expected + "  ->  " + actual);
         }
-        rebuilt_rows.push_back(row.rule_id + std::string{kFieldSep} + row.subject +
-                               std::string{kFieldSep} + row.input + std::string{kFieldSep} +
-                               actual);
+        rebuilt_rows.push_back(
+            row.rule_id + std::string{kFieldSep} + row.subject + std::string{kFieldSep} +
+            row.input + std::string{kFieldSep} + actual +
+            (row.declared_value.empty() ? std::string{}
+                                        : std::string{kFieldSep} + declared_field(row)));
     }
 
     // invariant: THE GUARD — a moved row may only be rewritten AFTER the version token has been

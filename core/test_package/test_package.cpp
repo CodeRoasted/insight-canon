@@ -41,7 +41,8 @@ TEST(InsightCanonPackage, TokenizesJsonLine)
 {
     insight::tokenization::ArenaAllocator arena{kArenaCapacity};
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};
-    insight::tokenization::Tokenizer tokenizer{arena, {}, composed};
+    insight::tokenization::Tokenizer tokenizer{
+        arena, {}, composed, insight::tokenization::StreamContext{}};
 
     constexpr std::string_view kLine{
         R"({"ts":"2024-01-15T10:30:00Z","level":"INFO","msg":"hello"})"};
@@ -58,7 +59,8 @@ TEST(InsightCanonPackage, TokenizesSyslogLine)
 {
     insight::tokenization::ArenaAllocator arena{kArenaCapacity};
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};
-    insight::tokenization::Tokenizer tokenizer{arena, {}, composed};
+    insight::tokenization::Tokenizer tokenizer{
+        arena, {}, composed, insight::tokenization::StreamContext{}};
 
     constexpr std::string_view kLine{"Jan 15 08:03:22 myhost sshd[1234]: Accepted password"};
 

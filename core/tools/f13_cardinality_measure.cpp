@@ -88,7 +88,7 @@ try
     // note: `composed` precedes `tokenizer` so it outlives the const-ref the Tokenizer holds.
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};
     ArenaAllocator arena{kArenaBytes};
-    Tokenizer tokenizer{arena, MaskConfig{}, composed};
+    Tokenizer tokenizer{arena, MaskConfig{}, composed, insight::tokenization::StreamContext{}};
 
     std::unordered_map<std::string, std::uint64_t> template_counts;
     std::vector<FileConsumption> consumed;

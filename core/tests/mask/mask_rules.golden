@@ -1,9 +1,11 @@
 # insight-canon — the masking-rule golden (ROADMAP N74)
 #
-# One row per WITNESS:   rule_id | subject_token | input_line | expected_template
+# One row per WITNESS:   rule_id | subject_token | input_line | expected_template [| declared]
 #
 # `expected_template` is the exact `StatelessTemplate::template_str` that
-# `stateless_template(input_line, arena, MaskConfig{})` must return. A masking rule that changes
+# `stateless_template(input_line, arena, MaskConfig{}, runs)` must return, where `runs` is the
+# row's optional fifth field, one declared value spelled `<marker>=<value>` (DN-133.D1), and
+# empty when the row has no fifth field. A masking rule that changes
 # what a line canonicalises to moves one of these rows, and the gate reds WITHOUT waiting for
 # anyone to remember `kCanonicalizationVersion` — which is the whole point: every other pin in the
 # workspace fires on the VERSION and none fires on the RULES.
@@ -127,3 +129,18 @@ literal_keep | pin==26==3 | require pin==26==3 here | require pin==26==3 here
 kv_value | order=100000 | checkout completed order=100000 | checkout completed order=<*>
 kv_value | total=$18 | order completed total=$18 | order completed total=$<*>
 literal_keep | status=200 | request status=200 returned | request status=200 returned
+
+# declared_run — a run's own pull-request number, masked only behind a declared marker and only
+# when it is the value the stream declares (DN-133.D1). Every literal control below differs from
+# the witness by exactly one condition: another value, no value, no marker, the marker inside a
+# word, a run that is not maximal. The composite row is the shadow case: a composite rule claims
+# the token first, and the declared run reads its normal form. The digit-leading row is the
+# whole-token mask winning over the declared run.
+declared_run | /stirling/V2-PR-6656/docker-compose.yml | compose up /stirling/V2-PR-6656/docker-compose.yml now | compose up /stirling/V2-PR-<*>/docker-compose.yml now | PR-=6656
+literal_keep | /stirling/V2-PR-6656/docker-compose.yml | compose up /stirling/V2-PR-6656/docker-compose.yml now | compose up /stirling/V2-PR-6656/docker-compose.yml now | PR-=6657
+literal_keep | /stirling/V2-PR-6656/docker-compose.yml | compose up /stirling/V2-PR-6656/docker-compose.yml now | compose up /stirling/V2-PR-6656/docker-compose.yml now
+literal_keep | python3 | interpreter python3 found | interpreter python3 found | PR-=3
+literal_keep | XPR-6656 | label XPR-6656 applied | label XPR-6656 applied | PR-=6656
+literal_keep | PR-66560 | label PR-66560 applied | label PR-66560 applied | PR-=6656
+declared_run | deploy/pr-6656/main.go:42 | failed at deploy/pr-6656/main.go:42 here | failed at deploy/pr-<*>/main.go:<*> here | pr-=6656
+digit_leading | 12-PR-6656 | build 12-PR-6656 queued | build <*> queued | PR-=6656

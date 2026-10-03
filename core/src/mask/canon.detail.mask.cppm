@@ -80,8 +80,27 @@ struct StatelessTemplate
     std::span<const std::string_view> params;
 };
 
-[[nodiscard]] StatelessTemplate
-stateless_template(std::string_view content, ArenaAllocator& out_arena, const MaskConfig& config);
+// refs: DN-133.D1
+// invariant: one declared value resolved against its row: the markers it is masked behind and the
+// value itself, both viewing storage that outlives the call.
+struct DeclaredRun
+{
+    std::span<const std::string_view> markers;
+    std::string_view value;
+};
+
+// refs: DN-133.D1
+// post: with `declared_runs` empty, the template every earlier generation gave the line.
+// post: otherwise each token's NORMAL FORM — its literal bytes, or the form a composite rule gave
+// it — has every claimed run replaced by the wildcard; a whole-token mask wins over it.
+// invariant: a run is claimed when it is the maximal digit run behind a declared marker, equals the
+// value, the marker opens the form or follows a non-alphanumeric byte, and so does the run's end.
+// invariant: a claimed run is a normalization inside a token and contributes no param, as a
+// composite rule's normalization does.
+[[nodiscard]] StatelessTemplate stateless_template(std::string_view content,
+                                                   ArenaAllocator& out_arena,
+                                                   const MaskConfig& config,
+                                                   std::span<const DeclaredRun> declared_runs);
 
 // invariant: every accessor returns a view DERIVED from the table the masker itself reads, never a
 // list restated beside it.

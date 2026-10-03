@@ -27,7 +27,7 @@ class OrdinalFieldTest : public ::testing::Test
     // invariant: the composition is declared BEFORE the tokenizer so it outlives the const-ref the
     // tokenizer holds.
     insight::semantic::ComposedSemantics composed{insight::test_support::degenerate_composition()};
-    Tokenizer tokenizer{arena, MaskConfig{}, composed};
+    Tokenizer tokenizer{arena, MaskConfig{}, composed, insight::tokenization::StreamContext{}};
 
     // invariant: verbose on failure — the caller asserts presence and prints the full ordinal
     // set.

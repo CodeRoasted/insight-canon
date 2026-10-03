@@ -73,7 +73,8 @@ TEST(WhereWiring, FlagOnPopulatesTestFileWhereOnEmptyComponentLine)
 {
     ArenaAllocator arena{kArenaSize};
     const ComposedSemantics sc{composed()};
-    Tokenizer tokenizer{arena, MaskConfig{.recognize_test_where = true}, sc};
+    Tokenizer tokenizer{arena, MaskConfig{.recognize_test_where = true}, sc,
+                        insight::tokenization::StreamContext{}};
     const auto result{tokenizer.process_line(kTestLine)};
     ASSERT_TRUE(result.has_value()) << result.error();
     const auto& ev{result.value()};
@@ -88,7 +89,7 @@ TEST(WhereWiring, FlagOffLeavesComponentEmpty)
 {
     ArenaAllocator arena{kArenaSize};
     const ComposedSemantics sc{composed()};
-    Tokenizer tokenizer{arena, MaskConfig{}, sc};
+    Tokenizer tokenizer{arena, MaskConfig{}, sc, insight::tokenization::StreamContext{}};
     const auto result{tokenizer.process_line(kTestLine)};
     ASSERT_TRUE(result.has_value()) << result.error();
     EXPECT_TRUE(result.value().component.empty())
@@ -105,7 +106,8 @@ TEST(WhereWiring, FlagOnWhereCarriesTheLocationWithoutTheGluedAnnotation)
 {
     ArenaAllocator arena{kArenaSize};
     const ComposedSemantics sc{composed()};
-    Tokenizer tokenizer{arena, MaskConfig{.recognize_test_where = true}, sc};
+    Tokenizer tokenizer{arena, MaskConfig{.recognize_test_where = true}, sc,
+                        insight::tokenization::StreamContext{}};
     const auto result{tokenizer.process_line(kAnnotatedTestLine)};
     ASSERT_TRUE(result.has_value()) << result.error();
     const auto& ev{result.value()};
@@ -120,7 +122,8 @@ TEST(WhereWiring, FlagOnNonTestLineStaysEmpty)
 {
     ArenaAllocator arena{kArenaSize};
     const ComposedSemantics sc{composed()};
-    Tokenizer tokenizer{arena, MaskConfig{.recognize_test_where = true}, sc};
+    Tokenizer tokenizer{arena, MaskConfig{.recognize_test_where = true}, sc,
+                        insight::tokenization::StreamContext{}};
     const auto result{tokenizer.process_line(kNonTestLine)};
     ASSERT_TRUE(result.has_value()) << result.error();
     EXPECT_TRUE(result.value().component.empty())

@@ -10,9 +10,14 @@ masks, what it keeps, and which markers it knows** (the rules generation named b
 
 ## 1. The model — stateless, per-line, keep-class / mask-instance
 
-- **Stateless & per-line.** A template is a pure function of **one line's own tokens** — no cross-line
-  learning, no clustering memory. The same logical line yields the same template in any run, any order, on any
-  machine. (This is why identity is reproducible and why a "phantom pair" from learned wildcards cannot occur.)
+- **Stateless & per-line.** A template is a pure function of **one line's own tokens**, given the stream's
+  declarations — no cross-line learning, no clustering memory. The same logical line under the same declarations
+  yields the same template in any run, any order, on any machine. (This is why identity is reproducible and why a
+  "phantom pair" from learned wildcards cannot occur.) The declarations are fixed before the line is read: the
+  composed dialect, the `MaskConfig`, and the stream's **declared context** — values the acquirer supplies about
+  the run, such as its own pull-request number (`StreamContext`). A declared value is a supplied
+  fact, never learned state; a stream that declares none templates byte-identically to one that has no context
+  at all.
 - **Keep-class / mask-instance.** The unifying idea behind every rule: keep the **stable class marker**, mask
   the **varying instance**. `#42 → #<*>` (keep the counter marker, mask the number); `file.cc:408 →
   file.cc:<*>` (keep the source file, mask the line); `order=123 → order=<*>` (keep the key, mask the value).
@@ -43,6 +48,11 @@ Each whitespace token is classified by the **first** matching rule:
 | 5 | **Digit-leading numeric** | MASK `<*>` — this also carries `0x`-hex: a `0x…` token starts with a digit |
 | 6 | **Literal** — none of the above | KEEP literal |
 
+After rules 2 and 6 — on the token's **normal form**, the literal token or the form a composite gave it, and
+never on a token rules 3–5 masked whole — one further step runs, and only on a stream that declares a value
+under a key its dialect declares: the **declared-run** step (§4, last row). It replaces each maximal digit run
+equal to the declared value, directly behind a declared marker, by `<*>`, and contributes no param.
+
 Rule 1 wins first on purpose: it protects the **green→red distinction** that downstream diffing depends on —
 `exit code 0` and `exit code 1` must stay *different* templates, so a short status value after a status keyword
 is never masked (see §3). The composite layer (rule 2) is gated by a cheap pre-check: a token is only tried
@@ -65,6 +75,7 @@ data-learned. This is what keeps masking decidable and deterministic.
 | **Min hash length** | `16` | Rule 3 / §4 embedded-identity — a hex-only run this long is an instance hash, not a word. |
 | **Wrapper pairs** | `[]` `()` `{}` `<>` `""` `''` | §3.2 — the punctuation shell a producer wraps a whole token in. Read by rule 4's grammar and by the rule-2 pre-gate. |
 | **Wildcard** | `<*>` | The mask placeholder. |
+| **Declared-value markers** | none in core: each key and its markers are a dialect's data (`DeclaredValueRow`); the GitHub dialect declares `pull_request` behind `PR-`, `pr-`, `Pr-`, `pull-`, `PULL-`, `Pull-` | §4 declared-run — the markers a run's own declared value is masked behind. Core holds the mechanism and no marker. |
 
 `mask_ip_addresses` is the one `MaskConfig` knob (default **on**) gating a rule — rule 4. It gates for a
 reason the retired hex knob never did: its grammar admits a **wrapper shell** (§3.2), and a shell-led token
@@ -147,6 +158,7 @@ instance. Tried in order; first match wins.
 | **embedded-identity** | a UUID (`8-4-4-4-12`), a hex run ≥ 16, or a **compact UTC instant** (`YYYY-MM-DDTHHMMSSZ` — exactly 18 bytes, colon-free time, mandatory `Z`, non-alphanumeric on both sides), *inside* a larger token not under a declared ephemeral root — including one whose only structure is a wrapper shell (§3.2) | mask the id in place, keep surrounding structure | `~/.cache/gradle/f7f6…2680/lib.jar` → `~/.cache/gradle/<*>/lib.jar` · `(d41d…427e)` → `(<*>)` · `/home/runner/work/_temp/2026-06-09T185733Z.json` → `/home/runner/work/_temp/<*>.json` |
 | **sanitizer-pid** | `==<digits>==` opening the token, followed by nothing or by a letter (the process tag AddressSanitizer, libFuzzer and valgrind print) | keep both fences and a glued letter-leading tail, mask the pid; a digit after the closing fence, or any byte before the opening one, declines | `==4242==` → `==<*>==` · `==77==ABORTING` → `==<*>==ABORTING` |
 | **kv-value** | `<key>=<digit-leading-value>` (strips a leading currency marker first) | keep the key (+ marker), mask the value | `order=100000` → `order=<*>` · `total=$18` → `total=$<*>` |
+| **declared-run** | not a claiming rule: applied once to the token's normal form after every rule above, on a stream that declares a value V under a key its dialect declares. A digit run masks when it is the maximal run directly behind a declared marker, the marker opens the form or follows a byte that is neither a letter nor a digit, the run equals V byte for byte, and the byte after it is the form's end or neither a letter nor a digit | keep everything else in the token, mask the run; no param | V = 6656: `/stirling/V2-PR-6656/docker-compose.yml` → `/stirling/V2-PR-<*>/docker-compose.yml` · `PR-6657`, `XPR-6656`, `PR-66560` and `python3` (V = 3) stay literal |
 
 **The ephemeral-root catalog is also consulted from inside source-location.** A per-run instance directory in
 a compiler diagnostic masks even though it is letter-leading (it would otherwise be *kept* as a class anchor),
@@ -191,6 +203,9 @@ a gap to be closed with more rules:
   versioned keyword (`arm64`, `gpt-4`, `utf-8`): same `<alpha><sep?><suffix>` shape. Only *cardinality*
   separates an id from a keyword, and a stateless masker cannot see cardinality. Masking these by a syntactic
   rule would either over-mask real keywords (`arm64 → arm<*>`) or require an ad-hoc prefix allow/deny list.
+  The one exception is a value the run **declares**: a run's own pull-request number behind a marker its
+  dialect declares is a supplied fact, not a cardinality guess, so the declared-run step (§4) masks it and
+  nothing else of the same shape.
 - **Categorical numbers that should split.** An HTTP `404` vs `500` is handled by **extending the status-KEEP
   context** (rule 1 / the kv carve-out), never by weakening the digit-leading mask.
 

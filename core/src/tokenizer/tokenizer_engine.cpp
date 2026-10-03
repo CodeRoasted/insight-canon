@@ -42,15 +42,46 @@ struct Tokenizer::Impl
     const insight::semantic::ComposedSemantics& composed;
     LogParser parser;
     MaskConfig config;
+    // refs: DN-133.D5
+    // invariant: `runs` views `context`'s values and the composition's rows, and is rebuilt
+    // whenever `context` is replaced, never left viewing a previous one.
+    StreamContext context;
+    std::vector<DeclaredRun> runs;
     EventID next_id{0};
     std::size_t produced{0};
     std::size_t empty_projections{0};
 
     Impl(ArenaAllocator& arena_ref, MaskConfig mask_config,
-         const insight::semantic::ComposedSemantics& composed_ref)
+         const insight::semantic::ComposedSemantics& composed_ref, StreamContext declared)
         : arena{arena_ref}, composed{composed_ref}, parser{arena_ref, composed_ref},
           config{mask_config}
     {
+        declare(std::move(declared));
+    }
+
+    // refs: DN-133.D2, DN-133.D5
+    // post: `context` replaced and `runs` resolved in the view's row order: one run per row whose
+    // key the context declares; a key the view does not hold applies nothing.
+    void declare(StreamContext declared)
+    {
+        if (const auto checked{insight::semantic::check_stream_context(declared, composed)};
+            !checked)
+        {
+            std::cerr << "FATAL: insight::tokenization::Tokenizer — " << checked.error()
+                      << " Validate a caller-supplied context with check_stream_context before "
+                         "it reaches a tokenizer.\n";
+            std::terminate();
+        }
+        context = std::move(declared);
+        runs.clear();
+        for (const insight::semantic::DeclaredValueRow& row : composed.declared_values())
+        {
+            const auto entry{std::ranges::find(context.values, row.key, &ContextValue::key)};
+            if (entry != context.values.end())
+                runs.push_back({.markers = row.markers, .value = entry->value});
+        }
+        INSIGHT_LOG_DEBUG(logging::tokenizer_logger(), "context declared: values={} runs={}",
+                          context.values.size(), runs.size());
     }
 
     [[nodiscard]] std::expected<CanonicalEvent, std::string>
@@ -85,7 +116,7 @@ struct Tokenizer::Impl
             }
         }
 
-        const StatelessTemplate match{stateless_template(parsed_line.content, arena, config)};
+        const StatelessTemplate match{stateless_template(parsed_line.content, arena, config, runs)};
 
         CanonicalEvent event;
         event.id = next_id++;
@@ -146,10 +177,15 @@ struct Tokenizer::Impl
 };
 
 Tokenizer::Tokenizer(ArenaAllocator& arena, MaskConfig mask_config,
-                     const insight::semantic::ComposedSemantics& composed)
-    : impl_{std::make_unique<Impl>(arena, mask_config, composed)}
+                     const insight::semantic::ComposedSemantics& composed, StreamContext context)
+    : impl_{std::make_unique<Impl>(arena, mask_config, composed, std::move(context))}
 {
     INSIGHT_LOG_INFO(logging::tokenizer_logger(), "tokenizer init");
+}
+
+void Tokenizer::declare_context(StreamContext context)
+{
+    impl_->declare(std::move(context));
 }
 
 Tokenizer::~Tokenizer() = default;

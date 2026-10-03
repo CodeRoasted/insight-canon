@@ -454,6 +454,38 @@ public `Tokenizer::process_line` at a zero-package composition over three privat
 
 **It rides `-17`**, as the rider above does.
 
+### Rider — a run's own pull-request number, declared by the acquirer
+
+**What changed.** A run's own pull-request number glued into a word (`/stirling/V2-PR-6656/docker-compose.yml`)
+stayed literal, so every pull request minted a new template and a diff of two runs that changed nothing read a
+line appeared and a line vanished. No per-line rule can mask it: the line alone cannot say whether `PR-6656` is
+this run's request or another one a ref listing names. Now a stream may carry a **declared context**
+(`StreamContext`, a required `Tokenizer` argument; `Tokenizer::declare_context` replaces it between windows),
+and a dialect may declare a key with the markers behind which its value is masked (`DeclaredValueRow` on the
+manifest, a new member, serialized into the composed identity). The masker's declared-run step reads each
+token's normal form after every claiming rule and replaces the maximal digit run equal to the declared value,
+directly behind a declared marker at a non-alphanumeric boundary, by `<*>`. The GitHub dialect declares
+`pull_request` behind `PR-`, `pr-`, `Pr-`, `pull-`, `PULL-`, `Pull-`; its ruleset version moves `1.6.0` to
+`1.7.0`, and the rule grammar, which gained a manifest member, rides `semantic-grammar-7`, the value of the
+release window still open.
+
+**Which serialized fields move.** `template_str` and `template_id` of a line holding such a token, on a stream
+that declares a value under a key its dialect declares, and nothing else: the run is a normalization inside a
+token, so `params` does not gain it, as a composite rule's normalization does not. A stream that declares no
+value — every MetaLog producer, the server, the hosted door, and Sift without its context flags — is
+byte-identical to the generation before this rider. The GitHub package's composed identity moves, because its
+manifest carries the new row.
+
+**Witness inputs.** `core/tests/mask/mask_rules.golden` pins the rule's rows under a declared value
+(`/stirling/V2-PR-6656/docker-compose.yml` with `PR-=6656` → `/stirling/V2-PR-<*>/docker-compose.yml`; the
+shadow case `deploy/pr-6656/main.go:42` with `pr-=6656` → `deploy/pr-<*>/main.go:<*>`) and its literal controls
+(another value, no value, `python3` with value 3, `XPR-6656`, `PR-66560`, and a digit-leading token masked whole).
+Measured through the public `Tokenizer::process_line` over three private CI-log views, each log under its own
+pair record's pull-request number (coderoast-corpora `9830858` registered before the build): distinct templates
+296 022 → 295 978, 260 933 → 260 889 and 3 311 283 → 3 301 177, with 0 within-log false merges.
+
+**It rides `-17`**, as the riders above do.
+
 ---
 
 *See also: [masking.md](masking.md) (what the current generation's rules actually are) ·

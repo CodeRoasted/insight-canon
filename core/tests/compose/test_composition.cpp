@@ -366,7 +366,7 @@ TEST(Composition, DegenerateCoreOnlyRuns)
     // invariant: the universal formats still tokenize, which is what makes the core runnable while
     // semantic-unaware.
     ArenaAllocator arena{64U * 1024U};
-    Tokenizer tokenizer{arena, MaskConfig{}, core};
+    Tokenizer tokenizer{arena, MaskConfig{}, core, insight::tokenization::StreamContext{}};
     const auto event{tokenizer.process_line(
         R"({"ts":"2024-01-15T10:30:00Z","level":"INFO","component":"auth","message":"hi"})")};
     ASSERT_TRUE(event.has_value()) << event.error();
@@ -439,4 +439,80 @@ TEST(Composition, AStreamViewOwnsItsDialectCoordinate)
         << "\" must release it, or the question is answered true for every channel";
     EXPECT_FALSE(vocabulary.for_stream({}, {}).withholds_markers_for({}))
         << "an undeclared view names no dialect, so it withholds nothing";
+}
+
+// refs: DN-133.D1, DN-133.D2
+// invariant: a declared value composes like every recognition row — gated, identity-bearing,
+// fail-closed on a duplicate key and on a malformed marker — over SYNTHETIC packages.
+namespace
+{
+constexpr std::array<std::string_view, 2> kTicketMarkers{{"TK-", "tk-"}};
+constexpr std::array<std::string_view, 1> kOtherMarkers{{"REQ-"}};
+constexpr std::array<std::string_view, 1> kDigitEndingMarkers{{"TK2"}};
+constexpr std::array<insight::semantic::DeclaredValueRow, 1> kTicketValue{
+    {{.key = "ticket", .markers = kTicketMarkers, .dialect_gate = "ticketing"}}};
+constexpr std::array<insight::semantic::DeclaredValueRow, 1> kTicketValueAgain{
+    {{.key = "ticket", .markers = kOtherMarkers, .dialect_gate = kAnyDialect}}};
+constexpr std::array<insight::semantic::DeclaredValueRow, 1> kDigitEndingValue{
+    {{.key = "ticket", .markers = kDigitEndingMarkers, .dialect_gate = "ticketing"}}};
+constexpr std::array<std::string_view, 1> kTicketingRevisions{{"v1"}};
+constexpr SemanticPackageManifest kTicketing{.name = "ticketing",
+                                             .version = "1.0.0",
+                                             .dialect_revisions = kTicketingRevisions,
+                                             .declared_values = kTicketValue};
+constexpr SemanticPackageManifest kTicketingAgain{.name = "zz_other",
+                                                  .version = "1.0.0",
+                                                  .dialect_revisions = kTicketingRevisions,
+                                                  .declared_values = kTicketValueAgain};
+constexpr SemanticPackageManifest kTicketingDigitEnding{.name = "ticketing",
+                                                        .version = "1.0.0",
+                                                        .dialect_revisions = kTicketingRevisions,
+                                                        .declared_values = kDigitEndingValue};
+constexpr SemanticPackageManifest kTicketingBare{
+    .name = "ticketing", .version = "1.0.0", .dialect_revisions = kTicketingRevisions};
+constexpr std::array<SemanticPackageManifest, 2> kDupDeclaredValueSet{
+    {kTicketing, kTicketingAgain}};
+constexpr std::array<SemanticPackageManifest, 1> kDigitEndingSet{{kTicketingDigitEnding}};
+} // namespace
+
+static_assert(find_conflict(kDupDeclaredValueSet).has_conflict &&
+                  find_conflict(kDupDeclaredValueSet).kind == "declared_value" &&
+                  find_conflict(kDupDeclaredValueSet).key == "ticket",
+              "two rows under one key with intersecting gates give one value two marker sets");
+static_assert(!insight::semantic::declared_value_row_well_formed(kDigitEndingValue[0]),
+              "a marker ending in a digit makes the run after it ambiguous and must be refused");
+static_assert(insight::semantic::declared_value_row_well_formed(kTicketValue[0]),
+              "a key with non-empty markers ending in a non-digit is well formed");
+
+TEST(CompositionDeclaredValues, TheViewHoldsAKeyOnlyUnderItsOwnDialectAndTheKeysListAll)
+{
+    const ComposedSemantics composed{compose(std::array{kTicketing})};
+    ASSERT_EQ(composed.declared_value_keys().size(), 1U);
+    EXPECT_EQ(composed.declared_value_keys()[0], "ticket");
+    EXPECT_TRUE(composed.declared_values().empty())
+        << "a fresh composition is the Unspecified view: a dialect-gated key is absent";
+    const ComposedSemantics declared{composed.for_stream("ticketing", {})};
+    ASSERT_EQ(declared.declared_values().size(), 1U)
+        << "declaring the owning dialect admits its key";
+    EXPECT_EQ(declared.declared_values()[0].key, "ticket");
+    EXPECT_EQ(declared.declared_value_keys().size(), 1U)
+        << "the key list is unfiltered on every view: validation reads it";
+}
+
+TEST(CompositionDeclaredValues, ADeclaredValueMovesTheIdentity)
+{
+    EXPECT_NE(compose(std::array{kTicketing}).identity_hex(),
+              compose(std::array{kTicketingBare}).identity_hex())
+        << "the key and its markers are what canon masks behind, so they are identity";
+}
+
+TEST(CompositionDeathTest, ADuplicateDeclaredKeyFailsClosedAtRuntime)
+{
+    EXPECT_DEATH((void)compose(kDupDeclaredValueSet),
+                 R"(exact-duplicate declared_value match key "ticket")");
+}
+
+TEST(CompositionDeathTest, ADigitEndingMarkerFailsClosedAtRuntime)
+{
+    EXPECT_DEATH((void)compose(kDigitEndingSet), R"(declared value "ticket")");
 }

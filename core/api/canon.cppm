@@ -71,12 +71,18 @@ class Tokenizer
     // invariant: core ships NO default composition: every binary names its package set and threads
     // the resulting `ComposedSemantics` in here.
     // pre: `composed` outlives the Tokenizer, which does not own it.
+    // refs: DN-133.D5
+    // invariant: the stream's declared context is REQUIRED and has no default, so every
+    // construction site states it; an undeclared stream spells the empty context.
+    // pre: `context` passes `check_stream_context` against `composed`; one that does not
+    // terminates, naming the refusal, since no log byte can produce it.
     explicit Tokenizer(ArenaAllocator& arena, MaskConfig mask_config,
-                       const insight::semantic::ComposedSemantics& composed);
+                       const insight::semantic::ComposedSemantics& composed, StreamContext context);
     // invariant: a temporary composition dangles once the full-expression ends, so binding one is a
     // compile error rather than a use-after-free met in the first line.
     Tokenizer(ArenaAllocator& arena, MaskConfig mask_config,
-              const insight::semantic::ComposedSemantics&& composed) = delete;
+              const insight::semantic::ComposedSemantics&& composed,
+              StreamContext context) = delete;
     ~Tokenizer();
 
     Tokenizer(const Tokenizer&) = delete;
@@ -130,6 +136,13 @@ class Tokenizer
     // caller scratch that the next document reuses.
     [[nodiscard]] static bool unpack_span_document(std::string_view raw_line,
                                                    std::vector<std::string>& records);
+
+    // refs: DN-133.D5
+    // post: `context` is in force for every later line, applied only through the composition's
+    // own declared keys; the composition, arena, mask config and per-stream counters are untouched.
+    // pre: `context` passes `check_stream_context` against the composition; one that does not
+    // terminates, naming the refusal.
+    void declare_context(StreamContext context);
 
     [[nodiscard]] std::size_t events_produced() const noexcept;
     [[nodiscard]] std::size_t lines_parsed() const noexcept;

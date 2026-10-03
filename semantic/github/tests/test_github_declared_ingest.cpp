@@ -94,7 +94,8 @@ TEST(GithubDeclaredIngest, LiftsDeclaredLevelsFromWorkflowCommands)
     const ComposedSemantics composed{github_composition()};
     const ResolvedStream stream{gha_stream(composed)};
     ArenaAllocator arena{64U * 1024U};
-    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
+    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics,
+                        insight::tokenization::StreamContext{}};
     for (const LiftCase& probe : kCases)
     {
         // assert: the body carries no level token and no failure cue, so a lift that stopped firing
@@ -131,7 +132,8 @@ TEST(GithubDeclaredIngest, AnUndeclaredStreamGetsNoDeclaredLift)
                                     .dialect = insight::semantic::kAnyDialect,
                                     .channel = insight::semantic::github::kChannelAnnotated})};
     ArenaAllocator arena{64U * 1024U};
-    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
+    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics,
+                        insight::tokenization::StreamContext{}};
     const auto event{tokenizer.process_line(
         stream.transport.peel_raw("2026-05-27T15:26:41.7842152Z ##[notice]the quick brown fox")
             .content)};
@@ -159,7 +161,8 @@ TEST(GithubDeclaredIngest, DeclaredLiftOutranksBodyInference)
     const ComposedSemantics composed{github_composition()};
     const ResolvedStream stream{gha_stream(composed)};
     ArenaAllocator arena{64U * 1024U};
-    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
+    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics,
+                        insight::tokenization::StreamContext{}};
 
     const auto lifted{tokenizer.process_line(
         stream.transport
@@ -185,7 +188,8 @@ TEST(GithubDeclaredIngest, InfersErrorFromBodyCueWhenUnmarked)
     const ComposedSemantics composed{github_composition()};
     const ResolvedStream stream{gha_stream(composed)};
     ArenaAllocator arena{64U * 1024U};
-    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
+    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics,
+                        insight::tokenization::StreamContext{}};
 
     const auto crash{tokenizer.process_line(stream.transport.peel_raw(kGHASegfault).content)};
     ASSERT_TRUE(crash.has_value()) << crash.error();

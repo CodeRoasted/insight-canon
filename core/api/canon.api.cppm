@@ -1108,6 +1108,39 @@ struct MaskConfig
     bool recognize_test_where{false};
 };
 
+// refs: DN-133.D2
+// invariant: one value a stream's acquirer DECLARES under a key a composed dialect declares; canon
+// never infers one.
+struct ContextValue
+{
+    std::string key;
+    std::string value;
+
+    [[nodiscard]] bool operator==(const ContextValue&) const = default;
+};
+
+// refs: DN-133.D2, DN-133.D5
+// invariant: a stream's declared context, fixed before the lines it applies to are read; empty is
+// the undeclared stream, whose templates are byte-identical to a context-free canon's.
+// invariant: a template is a pure function of the line and the context in force when it is read,
+// so the context is a declaration beside the composition and the mask config, never learned state.
+struct StreamContext
+{
+    std::vector<ContextValue> values;
+
+    [[nodiscard]] bool operator==(const StreamContext&) const = default;
+};
+
+// post: true when `value` is a non-empty run of decimal digits with no leading zero — the only
+// shape a declared value may take, since the mask compares it to a maximal digit run.
+// refs: DN-133.D1
+[[nodiscard]] constexpr bool is_declarable_value(std::string_view value) noexcept
+{
+    return !value.empty() && value.front() != '0' &&
+           std::ranges::all_of(value,
+                               [](char byte) noexcept { return byte >= '0' && byte <= '9'; });
+}
+
 } // namespace insight::tokenization
 
 // invariant: canon core is semantic-unaware — it owns the recognition ALGORITHM and the semantic

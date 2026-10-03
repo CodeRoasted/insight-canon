@@ -23,7 +23,7 @@ MaskConfig cfg()
 std::string masked(std::string_view content, ArenaAllocator& arena)
 {
     arena.reset();
-    return std::string{stateless_template(content, arena, cfg()).template_str};
+    return std::string{stateless_template(content, arena, cfg(), {}).template_str};
 }
 } // namespace
 
@@ -610,7 +610,7 @@ namespace
                                       const MaskConfig& conf)
 {
     arena.reset();
-    return std::string{stateless_template(content, arena, conf).template_str};
+    return std::string{stateless_template(content, arena, conf, {}).template_str};
 }
 
 [[nodiscard]] MaskConfig cfg_without_ip_masking()
@@ -1041,7 +1041,7 @@ TEST(StatelessTemplate, MaskingRelocatesTheValueIntoParamsRatherThanDeletingIt)
                            " after 3 retries"};
 
     arena.reset();
-    const StatelessTemplate result{stateless_template(line, arena, cfg())};
+    const StatelessTemplate result{stateless_template(line, arena, cfg(), {})};
 
     // invariant: HALF 1 — the identity no longer carries the instance.
     EXPECT_EQ(result.template_str, "connection refused from <*> after <*> retries")

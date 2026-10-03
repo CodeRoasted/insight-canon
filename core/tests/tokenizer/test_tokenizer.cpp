@@ -17,14 +17,23 @@ using namespace insight::tokenization;
 // invariant: pinned as constructibility traits, which run in every build of this unit and so cannot
 // be skipped the way a build-failing fixture can.
 static_assert(!std::is_constructible_v<Tokenizer, ArenaAllocator&, MaskConfig,
-                                       insight::semantic::ComposedSemantics>,
+                                       insight::semantic::ComposedSemantics,
+                                       insight::tokenization::StreamContext>,
               "Tokenizer must refuse a temporary ComposedSemantics — it keeps a reference to it");
 static_assert(!std::is_constructible_v<Tokenizer, ArenaAllocator&, MaskConfig,
-                                       const insight::semantic::ComposedSemantics>,
+                                       const insight::semantic::ComposedSemantics,
+                                       insight::tokenization::StreamContext>,
               "a const temporary dangles exactly as a mutable one does");
 static_assert(std::is_constructible_v<Tokenizer, ArenaAllocator&, MaskConfig,
-                                      const insight::semantic::ComposedSemantics&>,
+                                      const insight::semantic::ComposedSemantics&,
+                                      insight::tokenization::StreamContext>,
               "the borrowing door itself stays open to a named composition");
+// refs: DN-133.D5
+// invariant: the declared context has NO default, so a construction site that names none is a
+// compile error and the compiler, not a search, enumerates every site.
+static_assert(!std::is_constructible_v<Tokenizer, ArenaAllocator&, MaskConfig,
+                                       const insight::semantic::ComposedSemantics&>,
+              "a Tokenizer built without its stream's declared context must not compile");
 
 class TokenizerTest : public ::testing::Test
 {
@@ -37,7 +46,7 @@ class TokenizerTest : public ::testing::Test
     // invariant: the composition is declared BEFORE the tokenizer so it outlives the const-ref the
     // tokenizer holds.
     insight::semantic::ComposedSemantics composed{insight::test_support::degenerate_composition()};
-    Tokenizer tokenizer{arena, MaskConfig{}, composed};
+    Tokenizer tokenizer{arena, MaskConfig{}, composed, insight::tokenization::StreamContext{}};
 };
 
 // invariant: the level assertion here USED to read Unknown, on a body carrying neither a level word

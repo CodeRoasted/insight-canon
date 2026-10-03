@@ -210,7 +210,7 @@ class LogHubProjectionPinGate : public ::testing::Test
         Walked walked;
         const insight::semantic::ComposedSemantics composed{insight::semantic::compose({})};
         ArenaAllocator arena{kArenaBytes};
-        Tokenizer tokenizer{arena, MaskConfig{}, composed};
+        Tokenizer tokenizer{arena, MaskConfig{}, composed, insight::tokenization::StreamContext{}};
         std::ifstream input{file, std::ios::binary};
         std::string line;
         while (std::getline(input, line))

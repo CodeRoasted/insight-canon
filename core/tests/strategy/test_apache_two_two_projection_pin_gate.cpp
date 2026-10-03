@@ -99,7 +99,7 @@ TEST_F(ApacheTwoTwoProjectionPinGate, EveryTwoTwoLineProjectsAsAtHead)
     const insight::semantic::ComposedSemantics composed{
         insight::test_support::degenerate_composition()};
     ArenaAllocator arena{kArenaBytes};
-    Tokenizer tokenizer{arena, MaskConfig{}, composed};
+    Tokenizer tokenizer{arena, MaskConfig{}, composed, insight::tokenization::StreamContext{}};
     std::string projection;
     std::size_t lines{0};
     std::size_t claimed{0};

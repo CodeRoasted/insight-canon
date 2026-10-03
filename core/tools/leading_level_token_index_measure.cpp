@@ -1053,7 +1053,7 @@ measure_file(const std::filesystem::path& file, Outcome file_outcome, RootReport
 {
     std::array<NestedFileFlags, kNestedBandCount> flags{};
     // note: a fresh Tokenizer per file — the format latch is per stream, and a file is one.
-    Tokenizer tokenizer{arena, MaskConfig{}, composed};
+    Tokenizer tokenizer{arena, MaskConfig{}, composed, insight::tokenization::StreamContext{}};
     std::ifstream input{file, std::ios::binary};
     std::string raw;
     std::string scratch;

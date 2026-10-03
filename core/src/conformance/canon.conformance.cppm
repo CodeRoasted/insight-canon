@@ -1096,6 +1096,19 @@ namespace
         return diff.text();
     }
 
+    // refs: DN-133.D2
+    [[nodiscard]] std::string row_differences(const DeclaredValueRow& lhs,
+                                              const DeclaredValueRow& rhs)
+    {
+        const auto& [lhs_key, lhs_markers, lhs_dialect] = lhs;
+        const auto& [rhs_key, rhs_markers, rhs_dialect] = rhs;
+        FieldDiff diff;
+        diff.field("key", lhs_key, rhs_key);
+        diff.field("markers", lhs_markers, rhs_markers);
+        diff.field("dialect_gate", lhs_dialect, rhs_dialect);
+        return diff.text();
+    }
+
     // invariant: a LocationRow has no key of its own — it is an algorithm plus its vocabulary —
     // so it names its algorithm, the only field a reader can act on alone.
     [[nodiscard]] std::string_view row_key(const StructuralRoleRow& row) noexcept
@@ -1129,6 +1142,10 @@ namespace
     [[nodiscard]] std::string_view row_key(const OutcomeMarkerRow& row) noexcept
     {
         return row.prefix;
+    }
+    [[nodiscard]] std::string_view row_key(const DeclaredValueRow& row) noexcept
+    {
+        return row.key;
     }
 
     template <typename Row>
@@ -1263,14 +1280,16 @@ Report manifest_equivalence_report(const SemanticPackageManifest& lhs,
                                    const SemanticPackageManifest& rhs)
 {
     // refs: LSRC-6
-    // assert: fourteen members bound, so a fifteenth is a COMPILE ERROR here and forces the edit
+    // assert: fifteen members bound, so a sixteenth is a COMPILE ERROR here and forces the edit
     // — it does not force the matching check to be pushed.
     const auto& [lhs_name, lhs_version, lhs_roles, lhs_markers, lhs_emits, lhs_level_lifts,
                  lhs_locations, lhs_value_classes, lhs_outcome_tokens, lhs_outcome_markers,
-                 lhs_channels, lhs_dialect_revisions, lhs_strategy, lhs_echoed_source] = lhs;
+                 lhs_channels, lhs_dialect_revisions, lhs_declared_values, lhs_strategy,
+                 lhs_echoed_source] = lhs;
     const auto& [rhs_name, rhs_version, rhs_roles, rhs_markers, rhs_emits, rhs_level_lifts,
                  rhs_locations, rhs_value_classes, rhs_outcome_tokens, rhs_outcome_markers,
-                 rhs_channels, rhs_dialect_revisions, rhs_strategy, rhs_echoed_source] = rhs;
+                 rhs_channels, rhs_dialect_revisions, rhs_declared_values, rhs_strategy,
+                 rhs_echoed_source] = rhs;
 
     Report report;
     report.checks.push_back(compare_scalar("equivalence.name", "name", lhs_name, rhs_name));
@@ -1294,6 +1313,8 @@ Report manifest_equivalence_report(const SemanticPackageManifest& lhs,
         compare_vocabulary("equivalence.channels", "channels", lhs_channels, rhs_channels));
     report.checks.push_back(compare_vocabulary("equivalence.dialect_revisions", "dialect_revisions",
                                                lhs_dialect_revisions, rhs_dialect_revisions));
+    report.checks.push_back(compare_rows("equivalence.declared_values", "declared_values",
+                                         lhs_declared_values, rhs_declared_values));
     report.checks.push_back(compare_presence("equivalence.strategy_presence_only", "strategy",
                                              lhs_strategy != nullptr, rhs_strategy != nullptr));
     report.checks.push_back(compare_presence("equivalence.echoed_source_presence_only",

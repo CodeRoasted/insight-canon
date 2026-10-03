@@ -375,7 +375,7 @@ int main(int argc, char** argv)
             // pure function of that file's content and line order.
             constexpr std::size_t kArenaBytes{std::size_t{1} << 22};
             tk::ArenaAllocator arena{kArenaBytes};
-            tk::Tokenizer tokenizer{arena, tk::MaskConfig{}, stream.semantics};
+            tk::Tokenizer tokenizer{arena, tk::MaskConfig{}, stream.semantics, tk::StreamContext{}};
 
             // invariant: ordered, so iteration is by key and never by hash order — the
             // cross-stdlib std::hash hazard cannot appear.

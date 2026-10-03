@@ -17,7 +17,7 @@
 
 dialect:
   name: github
-  version: "1.6.0"
+  version: "1.7.0"
   why:
     - "ADR-17.D3 keys identity on CONTENT, not on spelling: `version:` moves when what this package"
     - "RECOGNIZES or EMITS moves — its rows, their gates, or its code tier — and never for a"
@@ -374,3 +374,22 @@ dialect:
       - "console path is correctly Unknown. This section is empty by MEASUREMENT, not by omission:"
       - "an exclusion and an omission must not look alike."
     rows: []
+
+  # ── the VALUES a run's acquirer declares, and the markers canon masks them behind ──
+  declared_values:
+    why:
+      - "A run's own pull-request number is glued into words (`/stirling/V2-PR-6656/...`), so"
+      - "every pull request mints a new template and Sift reads a line appeared and a line"
+      - "vanished on a pair that changed nothing. No per-line rule can mask it: the line alone"
+      - "cannot say whether `PR-6656` is this run's request or another one a ref listing names."
+      - "So the acquirer, who knows the run, declares the number, and canon masks that number and"
+      - "only that number, directly behind one of the markers below. A stream that declares no"
+      - "value is unchanged byte for byte. The rule and its refusals are DN-133.D1's."
+    rows:
+      - key: pull_request
+        markers: ["PR-", "pr-", "Pr-", "pull-", "PULL-", "Pull-"]
+        dialect_gate: self
+        why:
+          - "The six spellings measured on the CI-log views before the build, byte-exact. The set"
+          - "is closed, and it is extended only on measured evidence: a marker nobody measured is"
+          - "a coincidence nobody read."

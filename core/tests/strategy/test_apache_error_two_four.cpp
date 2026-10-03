@@ -177,7 +177,7 @@ TEST(ApacheErrorTwoFourCapture, EveryLineReadsAsTheTableWrittenFromItsBytes)
     const insight::semantic::ComposedSemantics composed{
         insight::test_support::degenerate_composition()};
     ArenaAllocator arena{kArenaBytes};
-    Tokenizer tokenizer{arena, MaskConfig{}, composed};
+    Tokenizer tokenizer{arena, MaskConfig{}, composed, insight::tokenization::StreamContext{}};
     std::size_t wrong_rows{0};
     for (std::size_t index{0}; index < lines.size(); ++index)
     {
@@ -309,7 +309,7 @@ TEST(ApacheErrorTwoFourClock, LogCraftsMillisecondLineIsClaimedWithItsEventTime)
     const insight::semantic::ComposedSemantics composed{
         insight::test_support::degenerate_composition()};
     ArenaAllocator arena{kArenaBytes};
-    Tokenizer tokenizer{arena, MaskConfig{}, composed};
+    Tokenizer tokenizer{arena, MaskConfig{}, composed, insight::tokenization::StreamContext{}};
     const auto event{tokenizer.process_line(kLine)};
     ASSERT_TRUE(event.has_value()) << event.error();
     EXPECT_EQ(event->format, LogFormat::ApacheError) << to_string(event->format);

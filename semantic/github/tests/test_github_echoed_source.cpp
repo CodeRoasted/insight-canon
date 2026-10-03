@@ -83,7 +83,8 @@ TEST(GithubEchoedSource, TokenizerDemotesEchoedFailureLevelToUnknown)
     ArenaAllocator arena{256U * 1024U};
     const ComposedSemantics gh{github_only()};
     const insight::semantic::ResolvedStream stream{gha_stream(gh)};
-    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
+    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics,
+                        insight::tokenization::StreamContext{}};
 
     const auto echoed{tokenizer.process_line(
         stream.transport
@@ -103,7 +104,8 @@ TEST(GithubEchoedSource, EchoedSourceDemotionOutranksTheDeclaredLevelLift)
     ArenaAllocator arena{256U * 1024U};
     const ComposedSemantics gh{github_only()};
     const insight::semantic::ResolvedStream stream{gha_stream(gh)};
-    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
+    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics,
+                        insight::tokenization::StreamContext{}};
 
     const auto echoed{tokenizer.process_line(
         stream.transport.peel_raw(gha("\x1b[36;1m##[error]deploy step failed\x1b[0m")).content)};
@@ -128,7 +130,8 @@ TEST(GithubEchoedSource, TokenizerKeepsRealColouredErrorAsError)
     ArenaAllocator arena{256U * 1024U};
     const ComposedSemantics gh{github_only()};
     const insight::semantic::ResolvedStream stream{gha_stream(gh)};
-    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
+    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics,
+                        insight::tokenization::StreamContext{}};
 
     const auto real{tokenizer.process_line(
         stream.transport.peel_raw(gha("\x1b[31mERROR\x1b[0m: db connection refused")).content)};

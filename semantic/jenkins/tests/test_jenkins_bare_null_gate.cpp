@@ -225,7 +225,8 @@ struct RecomputedRow
     std::set<std::string> distinct_templates;
     {
         ArenaAllocator arena{kArenaBlockBytes};
-        Tokenizer tokenizer{arena, MaskConfig{}, undeclared_view};
+        Tokenizer tokenizer{arena, MaskConfig{}, undeclared_view,
+                            insight::tokenization::StreamContext{}};
         for (std::size_t begin{0}; begin < bytes.size();)
         {
             std::size_t end{bytes.find('\n', begin)};

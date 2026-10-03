@@ -164,6 +164,20 @@ class ComposedSemantics
     {
         return channels_;
     }
+    // refs: DN-133.D2
+    // invariant: THE VIEW of the declared-value rows, filtered by the declared dialect: a key whose
+    // dialect this stream does not declare is absent, and a value under it applies nothing.
+    [[nodiscard]] std::span<const DeclaredValueRow> declared_values() const noexcept
+    {
+        return declared_values_;
+    }
+    // refs: DN-133.D2
+    // invariant: every key any composed package declares, unfiltered and in composition order:
+    // the closed set a caller's context is validated against, and the list a refusal names.
+    [[nodiscard]] std::span<const std::string_view> declared_value_keys() const noexcept
+    {
+        return declared_value_keys_;
+    }
 
     // refs: ADR-22, ADR-22.D4
     // post: builds the vocabulary ONE stream declares, at stream open: dialect and channel,
@@ -238,7 +252,7 @@ class ComposedSemantics
     friend ComposedSemantics compose(std::span<const SemanticPackageManifest> packages);
 
     // refs: ADR-22
-    // invariant: THE VIEW — what this stream's walkers see. Each of these five is already
+    // invariant: THE VIEW — what this stream's walkers see. Each of these six is already
     // filtered by the declared dialect and channel.
     // invariant: a freshly composed vocabulary is the UNSPECIFIED view on BOTH axes, so only
     // any-dialect, any-channel rows fire until a caller declares.
@@ -250,6 +264,7 @@ class ComposedSemantics
     std::vector<LevelLiftRow> level_lifts_;
     std::vector<OutcomeTokenRow> outcome_tokens_;
     std::vector<OutcomeMarkerRow> outcome_markers_;
+    std::vector<DeclaredValueRow> declared_values_;
 
     // invariant: THE UNFILTERED TABLES — every row the packages declared, gated or not. They are
     // the SOURCE `for_stream` re-derives each view from, and recognition never walks them.
@@ -260,6 +275,7 @@ class ComposedSemantics
     std::vector<LevelLiftRow> all_level_lifts_;
     std::vector<OutcomeTokenRow> all_outcome_tokens_;
     std::vector<OutcomeMarkerRow> all_outcome_markers_;
+    std::vector<DeclaredValueRow> all_declared_values_;
 
     // refs: ADR-22
     // invariant: the dialect this view was resolved for; empty means Unspecified.
@@ -275,6 +291,7 @@ class ComposedSemantics
     std::vector<LocationRow> locations_;
     std::vector<ValueClassRow> value_classes_;
     std::vector<std::string_view> channels_;
+    std::vector<std::string_view> declared_value_keys_;
     std::vector<StrategyFactory> strategies_;
     std::vector<ProvenanceHook> provenance_hooks_;
     std::vector<ComposedPackage> packages_;
@@ -310,6 +327,15 @@ struct ResolvedStream
 [[nodiscard]] ResolvedStream
 resolve_stream(const ComposedSemantics& composed,
                const insight::transport::IngestDeclaration& declaration);
+
+// refs: DN-133.D2
+// post: the context checked against a composition — every key declared by some composed package,
+// no key declared twice, every value declarable; the refusal names the declared keys.
+// invariant: an unknown key is a MISTAKE and is refused here; a known key whose dialect a stream
+// does not declare is legal and applies nothing on that stream, through the view.
+[[nodiscard]] std::expected<void, std::string>
+check_stream_context(const insight::tokenization::StreamContext& context,
+                     const ComposedSemantics& composed);
 
 // refs: ADR-17.D2, ADR-17.D3
 // post: sorts packages by name into canonical order independent of the caller's argument order,
@@ -423,6 +449,33 @@ namespace detail
     }
 } // namespace detail
 
+// refs: DN-133.D2
+// post: the key two declared-value rows share under intersecting gates, or nullopt.
+// invariant: two rows under one key would give one declared value two marker sets, and which
+// applied would be a function of row order.
+namespace detail
+{
+    [[nodiscard]] constexpr std::optional<std::string_view>
+    first_declared_value_dup(std::span<const SemanticPackageManifest> packages) noexcept
+    {
+        for (std::size_t pkg_a{0}; pkg_a < packages.size(); ++pkg_a)
+        {
+            const std::span<const DeclaredValueRow> rows_a{packages[pkg_a].declared_values};
+            for (std::size_t idx_i{0}; idx_i < rows_a.size(); ++idx_i)
+                for (std::size_t pkg_b{pkg_a}; pkg_b < packages.size(); ++pkg_b)
+                {
+                    const std::span<const DeclaredValueRow> rows_b{packages[pkg_b].declared_values};
+                    for (std::size_t idx_j{(pkg_b == pkg_a) ? idx_i + 1 : 0}; idx_j < rows_b.size();
+                         ++idx_j)
+                        if (rows_a[idx_i].key == rows_b[idx_j].key &&
+                            gates_intersect(rows_a[idx_i].dialect_gate, rows_b[idx_j].dialect_gate))
+                            return rows_a[idx_i].key;
+                }
+        }
+        return std::nullopt;
+    }
+} // namespace detail
+
 constexpr ConflictInfo find_conflict(std::span<const SemanticPackageManifest> packages) noexcept
 {
     // invariant: the package NAME is checked first: it is the only key whose collision makes every
@@ -445,6 +498,8 @@ constexpr ConflictInfo find_conflict(std::span<const SemanticPackageManifest> pa
     if (const auto key{detail::first_prefix_dup<OutcomeMarkerRow>(
             packages, &SemanticPackageManifest::outcome_markers)})
         return {.has_conflict = true, .kind = "outcome_marker", .key = *key};
+    if (const auto key{detail::first_declared_value_dup(packages)})
+        return {.has_conflict = true, .kind = "declared_value", .key = *key};
     // invariant: value classes are keyed by their `key` alone — there is no gate on that row
     // kind.
     for (std::size_t pkg_a{0}; pkg_a < packages.size(); ++pkg_a)

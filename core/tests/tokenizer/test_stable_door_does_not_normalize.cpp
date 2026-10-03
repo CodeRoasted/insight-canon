@@ -164,7 +164,7 @@ struct Door
     static constexpr std::size_t kArenaSize{1U << 20U};
     ArenaAllocator arena{kArenaSize};
     insight::semantic::ComposedSemantics composed{insight::test_support::degenerate_composition()};
-    Tokenizer tokenizer{arena, MaskConfig{}, composed};
+    Tokenizer tokenizer{arena, MaskConfig{}, composed, insight::tokenization::StreamContext{}};
 };
 
 // invariant: control characters are SPELLED OUT in failure output — a message that prints a raw

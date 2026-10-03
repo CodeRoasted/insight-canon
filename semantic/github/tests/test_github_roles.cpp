@@ -95,7 +95,8 @@ TEST(GithubRoles, DeclaredPeelThenTokenizerTagsTerminatorOnGhaError)
         insight::semantic::compose(std::array{insight::semantic::github::kManifest})};
     const insight::semantic::ResolvedStream stream{gha_stream(composed)};
     ArenaAllocator arena{64U * 1024U};
-    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
+    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics,
+                        insight::tokenization::StreamContext{}};
 
     const insight::transport::RawPeeledLine peeled{stream.transport.peel_raw(
         "2026-05-27T15:42:03.4000004Z ##[error]Process completed with exit code 2.")};
@@ -118,7 +119,8 @@ TEST(GithubRoles, DeclaredPeelThenTokenizerTagsGroupBoundary)
         insight::semantic::compose(std::array{insight::semantic::github::kManifest})};
     const insight::semantic::ResolvedStream stream{gha_stream(composed)};
     ArenaAllocator arena{64U * 1024U};
-    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
+    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics,
+                        insight::tokenization::StreamContext{}};
     const auto event{tokenizer.process_line(
         stream.transport.peel_raw("2026-05-27T15:42:03.4000004Z ##[group]Run cmake --build .")
             .content)};
@@ -132,7 +134,8 @@ TEST(GithubRoles, DeclaredPeelThenTokenizerPlainGhaLineHasNoRole)
         insight::semantic::compose(std::array{insight::semantic::github::kManifest})};
     const insight::semantic::ResolvedStream stream{gha_stream(composed)};
     ArenaAllocator arena{64U * 1024U};
-    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
+    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics,
+                        insight::tokenization::StreamContext{}};
     const auto event{tokenizer.process_line(
         stream.transport.peel_raw("2026-05-27T15:42:03.4000004Z compiling tokenizer.cpp object")
             .content)};
@@ -152,7 +155,8 @@ TEST(GithubRoles, TokenizerSeesTheStampWithoutADeclaration)
     const insight::semantic::ResolvedStream stream{
         insight::semantic::resolve_stream(composed, insight::transport::IngestDeclaration{})};
     ArenaAllocator arena{64U * 1024U};
-    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics};
+    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics,
+                        insight::tokenization::StreamContext{}};
     const auto event{tokenizer.process_line(
         stream.transport
             .peel_raw("2026-05-27T15:42:03.4000004Z ##[error]Process completed with exit code 2.")

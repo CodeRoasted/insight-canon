@@ -570,6 +570,31 @@ struct ValueClassRow
     std::int64_t scale;
 };
 
+// refs: DN-133.D1, DN-133.D2
+// invariant: a VALUE a stream's acquirer may declare under `key`, and the markers behind which
+// core masks a digit run equal to it; the package declares the key and the markers, never a value.
+// invariant: core applies it as a mechanism and holds no marker: a marker is this row's data.
+// invariant: every marker is non-empty and ends in a byte that is not a digit, or the maximal
+// digit run after it would not be the run the marker introduces; composition refuses any other.
+// invariant: dialect-gated like every recognition row, so a key applies only on a stream that
+// declares the owning dialect.
+struct DeclaredValueRow
+{
+    std::string_view key;
+    std::span<const std::string_view> markers;
+    std::string_view dialect_gate{kAnyDialect};
+};
+
+// post: true when the row names a key and every marker is non-empty and does not end in a digit.
+// refs: DN-133.D1
+[[nodiscard]] constexpr bool declared_value_row_well_formed(const DeclaredValueRow& row) noexcept
+{
+    return !row.key.empty() && !row.markers.empty() &&
+           std::ranges::all_of(
+               row.markers, [](std::string_view marker) noexcept
+               { return !marker.empty() && (marker.back() < '0' || marker.back() > '9'); });
+}
+
 // invariant: a package shipping a dialect format strategy exports a factory; a data-only package
 // leaves manifest.strategy empty.
 // invariant: the composition registers the produced strategy into the FormatDetector through the
@@ -638,6 +663,10 @@ struct SemanticPackageManifest
     // of the manifest preimage.
     // refs: ADR-17.D9, ADR-22.D8, ADR-17.D3
     std::span<const std::string_view> dialect_revisions;
+    // invariant: the keys a stream may declare a value under, each with its markers; empty for a
+    // package that declares none, and serialized into semantic_identity after the revisions.
+    // refs: DN-133.D2
+    std::span<const DeclaredValueRow> declared_values;
     // invariant: both code-tier hooks are nullable; a data-only package leaves each null.
     StrategyFactory strategy{nullptr};
     ProvenanceHook echoed_source{nullptr};
@@ -810,6 +839,9 @@ all_dialect_gates_owned(const SemanticPackageManifest& manifest) noexcept
                                { return owned(row.dialect_gate); }) &&
            std::ranges::all_of(manifest.outcome_markers,
                                [&owned](const OutcomeMarkerRow& row) noexcept
+                               { return owned(row.dialect_gate); }) &&
+           std::ranges::all_of(manifest.declared_values,
+                               [&owned](const DeclaredValueRow& row) noexcept
                                { return owned(row.dialect_gate); });
 }
 

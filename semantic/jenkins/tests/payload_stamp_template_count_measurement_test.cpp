@@ -102,7 +102,7 @@ struct LineOutcome
                                                const insight::semantic::ComposedSemantics& composed)
 {
     ArenaAllocator arena{kArenaBlockBytes};
-    Tokenizer tokenizer{arena, MaskConfig{}, composed};
+    Tokenizer tokenizer{arena, MaskConfig{}, composed, insight::tokenization::StreamContext{}};
     std::vector<LineOutcome> outcomes;
     outcomes.reserve(lines.size());
     for (const std::string& line : lines)
@@ -160,7 +160,7 @@ run_declared_peel_arm(const std::vector<std::string>& lines,
                       const insight::semantic::ComposedSemantics& composed)
 {
     ArenaAllocator arena{kArenaBlockBytes};
-    Tokenizer tokenizer{arena, MaskConfig{}, composed};
+    Tokenizer tokenizer{arena, MaskConfig{}, composed, insight::tokenization::StreamContext{}};
     constexpr std::string_view kPeelCarrier{"maskerprobe"};
     std::vector<LineOutcome> outcomes;
     outcomes.reserve(lines.size());

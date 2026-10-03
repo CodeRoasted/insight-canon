@@ -116,7 +116,7 @@ void run_throughput(benchmark::State& state, const insight::semantic::ComposedSe
     const auto corpus{make_corpus(n_templates, kLinesPerIter, 42)};
 
     tok::ArenaAllocator arena{1U << 20U};
-    tok::Tokenizer tokenizer{arena, tok::MaskConfig{}, composed};
+    tok::Tokenizer tokenizer{arena, tok::MaskConfig{}, composed, tok::StreamContext{}};
 
     for (const auto& line : corpus.lines)
     {
@@ -179,7 +179,7 @@ void BM_TokenizationThroughputNestedJson(benchmark::State& state)
     const auto corpus{make_nested_json_corpus(kLinesPerIter, 42)};
 
     tok::ArenaAllocator arena{1U << 22U};
-    tok::Tokenizer tokenizer{arena, tok::MaskConfig{}, composed};
+    tok::Tokenizer tokenizer{arena, tok::MaskConfig{}, composed, tok::StreamContext{}};
 
     for (const auto& line : corpus.lines)
         benchmark::DoNotOptimize(tokenizer.process_line(line));
