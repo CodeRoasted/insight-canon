@@ -1153,6 +1153,14 @@ struct StreamContext
 // invariant: the wildcard a masked span reads as in a template; one spelling for every reader.
 inline constexpr std::string_view kMaskWildcard{"<*>"};
 
+// refs: DN-128.D10, DN-134.D1, F-SRC-insight-canon:canon.detail.scan.cppm:kWrapperPairs
+// post: the core of `token` when it is a complete wrapper shell, nullopt otherwise.
+// invariant: a complete shell is a catalog opener at byte 0, a core holding neither byte of that
+// pair, the opener's own closer, then at most two bytes from `,;:.`.
+// invariant: the ONE complete-shell reader — rule 5 and every consumer reading a value through the
+// shell call it, so the catalog is never copied outside canon.
+[[nodiscard]] std::optional<std::string_view> complete_shell_core(std::string_view token) noexcept;
+
 // refs: DN-133.D1
 // invariant: one declared value resolved against its row: the markers it is masked behind and the
 // value itself, both viewing storage that outlives every call reading them.

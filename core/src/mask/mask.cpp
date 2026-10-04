@@ -45,26 +45,6 @@ namespace
         return true;
     }
 
-    // invariant: disjoint from the wrapper-pair closers - together the two sets are what the
-    // address rule tolerates after the address.
-    [[nodiscard]] constexpr bool is_trailing_punct(char chr) noexcept
-    {
-        return chr == ',' || chr == ';' || chr == ':' || chr == '.';
-    }
-
-    // assert: the disjointness is COMPILED rather than declared — an overlap would keep a byte
-    // retired from the wrapper catalog tolerated here, through the file-local set.
-    static_assert(std::ranges::none_of(kWrapperPairs, [](const WrapperPair& pair)
-                                       { return is_trailing_punct(pair.close); }),
-                  "a wrapper-pair closer is also a trailing-punctuation byte — the two sets the "
-                  "address rule tolerates after an address must stay disjoint");
-
-    // invariant: held at 2 so a repair widens WHICH bytes are tolerated, never HOW MANY - a longer
-    // punctuation run is a different token, not a wrapped value.
-    // invariant: ONE limit for both shell readers, the address rule and the shelled numeric.
-    // refs: DN-134.D1
-    constexpr std::size_t kMaxShellTrailBytes{2};
-
     // invariant: a STRICT SUPERSET of the retired grammar - every string that one accepted, this
     // one accepts, so no token that masked before can stop masking.
     [[nodiscard]] constexpr bool is_ipv4_token(std::string_view str) noexcept
@@ -91,8 +71,9 @@ namespace
             while (pos < str.size() && static_cast<unsigned>(str[pos]) - '0' < kDecimalBase)
                 ++pos;
         }
-        for (std::size_t taken{0}; taken < kMaxShellTrailBytes && pos < str.size() &&
-                                   (is_wrapper_close(str[pos]) || is_trailing_punct(str[pos]));
+        for (std::size_t taken{0};
+             taken < kMaxShellTrailBytes && pos < str.size() &&
+             (is_wrapper_close(str[pos]) || is_shell_trailing_punct(str[pos]));
              ++taken)
             ++pos;
         return pos == str.size();
@@ -139,44 +120,19 @@ namespace
                                    { return equals_ascii_lower(tok, keyword); });
     }
 
-    // post: the closer the wrapper catalog pairs with `open`; `open` must be a catalog opener.
-    [[nodiscard]] constexpr char wrapper_closer_of(char open) noexcept
-    {
-        for (const WrapperPair& pair : kWrapperPairs)
-            if (pair.open == open)
-                return pair.close;
-        return '\0';
-    }
-
-    // invariant: the shortest complete shell - an opener, one core byte, the opener's closer.
-    constexpr std::size_t kMinShellTokenLen{3};
-
-    // refs: DN-134.D1, ADR-16.D5
-    // post: true for a catalog opener at byte 0, a digit-led core holding neither byte of the pair,
-    // the opener's OWN closer and at most kMaxShellTrailBytes bytes from `,;:.` after it.
-    // post: false for a short status value behind a status keyword, as rule 1 keeps the bare form.
+    // refs: DN-134.D1, ADR-16.D5, F-SRC-insight-canon:canon.api.cppm:complete_shell_core
+    // post: true for a complete shell whose core is digit-led, false for a short status value
+    // behind a status keyword, as rule 1 keeps the bare form.
     // invariant: rule 5 read through the shell, as rule 4 reads an address - its acceptance set is
     // the set rule 5 masks bare, so it merges nothing canon does not merge without the shell.
     // pre: reached only for a token no composite claimed and rules 3-5 did not mask.
     [[nodiscard]] inline bool is_shelled_numeric(std::string_view tok,
                                                  std::string_view prev) noexcept
     {
-        if (tok.size() < kMinShellTokenLen || !is_wrapper_open(tok.front()))
+        const std::optional<std::string_view> core{complete_shell_core(tok)};
+        if (!core.has_value() || !is_digit(core->front()))
             return false;
-        const char open{tok.front()};
-        const char close{wrapper_closer_of(open)};
-        std::size_t end{tok.size()};
-        for (std::size_t taken{0}; taken < kMaxShellTrailBytes && is_trailing_punct(tok[end - 1U]);
-             ++taken)
-            --end;
-        if (end < kMinShellTokenLen || tok[end - 1U] != close)
-            return false;
-        std::string_view core{tok};
-        core.remove_suffix(tok.size() - end + 1U);
-        core.remove_prefix(1U);
-        if (!is_digit(core.front()) || core.contains(open) || core.contains(close))
-            return false;
-        return !is_status_keyword(prev) || !is_all_digits(core) || core.size() > kMaxStatusDigits;
+        return !is_status_keyword(prev) || !is_all_digits(*core) || core->size() > kMaxStatusDigits;
     }
 
     // invariant: the ROOT is the decidable thing - no length or alphabet rule separates an

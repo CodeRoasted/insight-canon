@@ -1124,6 +1124,29 @@ TEST(StatelessTemplate, ANumberInACompleteWrapperShellMasksAsItWouldBare)
     EXPECT_EQ(masked("Tests 5 passed (1000)", arena), "Tests <*> passed <*>");
 }
 
+// refs: DN-128.D10, DN-134.D1
+// assert: the exported reader returns the core of every complete shell the catalog declares, any
+// core and at most two trailing bytes from `,;:.`, and nothing for a token that is not one.
+// invariant: the shells are DERIVED from the catalog, so a pair added to it arrives witnessed.
+TEST(StatelessTemplate, TheCompleteShellReaderReturnsTheCoreOrNothing)
+{
+    for (const auto& pair : kWrapperPairs)
+        for (const std::string_view core : {"1.7s", "02:16:00", "anonymous", "x"})
+            for (const std::string_view trail : {"", ",", ".;", "::"})
+            {
+                const std::string tok{std::string{pair.open} + std::string{core} +
+                                      std::string{pair.close} + std::string{trail}};
+                const std::optional<std::string_view> got{complete_shell_core(tok)};
+                ASSERT_TRUE(got.has_value()) << "a complete shell yields its core: " << tok;
+                EXPECT_EQ(*got, core) << "token: " << tok;
+            }
+    for (const std::string_view tok : {"", "()", "1.7s", "(1.7s", "1.7s)", "(1.7s]",
+                                       "(1.7s),;:", "((1)", "(1))", "\"\"\"", "(25"})
+        EXPECT_FALSE(complete_shell_core(tok).has_value())
+            << "not a complete shell, so no core: `" << tok << "` read as `"
+            << complete_shell_core(tok).value_or("") << "`";
+}
+
 // refs: DN-134.D1
 // invariant: the rule's boundary, asserted as hard as its reach — the status KEEP reads through
 // the shell, an INCOMPLETE shell is no shell, a core holding its own pair is no number.

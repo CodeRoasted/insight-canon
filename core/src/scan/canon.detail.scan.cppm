@@ -88,6 +88,38 @@ inline constexpr std::array<WrapperPair, 6> kWrapperPairs{{
                                [chr](const WrapperPair& pair) { return pair.close == chr; });
 }
 
+// post: the closer the wrapper catalog pairs with `open`; `open` must be a catalog opener.
+[[nodiscard]] constexpr char wrapper_closer_of(char open) noexcept
+{
+    for (const WrapperPair& pair : kWrapperPairs)
+        if (pair.open == open)
+            return pair.close;
+    return '\0';
+}
+
+// invariant: disjoint from the wrapper-pair closers - together the two sets are what a shell
+// reader tolerates after the value it reads.
+[[nodiscard]] constexpr bool is_shell_trailing_punct(char chr) noexcept
+{
+    return chr == ',' || chr == ';' || chr == ':' || chr == '.';
+}
+
+// assert: the disjointness is COMPILED rather than declared — an overlap would keep a byte
+// retired from the wrapper catalog tolerated after a shell, through the trailing set.
+static_assert(std::ranges::none_of(kWrapperPairs, [](const WrapperPair& pair)
+                                   { return is_shell_trailing_punct(pair.close); }),
+              "a wrapper-pair closer is also a trailing-punctuation byte — the two sets a shell "
+              "reader tolerates after a value must stay disjoint");
+
+// invariant: held at 2 so a repair widens WHICH bytes are tolerated, never HOW MANY - a longer
+// punctuation run is a different token, not a wrapped value.
+// invariant: ONE limit for every shell reader: the address rule and the complete-shell reader.
+// refs: DN-134.D1
+inline constexpr std::size_t kMaxShellTrailBytes{2};
+
+// invariant: the shortest complete shell - an opener, one core byte, the opener's closer.
+inline constexpr std::size_t kMinShellTokenLen{3};
+
 // refs: ADR-16.D5, F-SRC-insight-canon:canon.api.cppm:TemplateId
 // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
 // invariant: each field is the byte-exact equivalent of the scan it replaces, so the

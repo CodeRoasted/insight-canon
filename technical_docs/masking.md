@@ -163,6 +163,11 @@ of at most 3 digits behind a status keyword stays literal (`exit code (1)`), and
 (`[42]` is the bracket index's `[<*>]`). Measured on 32 000 lines of real third-party
 logs across 16 producers, the repair moves **3 templates out of 6712**.
 
+**The complete-shell grammar is one reader, exported.** `complete_shell_core` (canon's public API) returns the core
+of a complete shell or nothing. Rule 5 calls it, and a consumer that classifies a param's value by its syntax
+(Sift's value-slot gates) calls the same function, so the shell is read one way on both sides of the package
+boundary and the catalog is never copied out of canon.
+
 ---
 
 ## 4. The composite normalizers (keep-class, mask-instance)
