@@ -24,6 +24,7 @@ import insight.canon;
 import insight.semantic.github;
 import insight.semantic.gitlab;
 import insight.semantic.jenkins;
+import insight.semantic.package_managers;
 import insight.semantic.test_frameworks;
 
 namespace
@@ -234,9 +235,10 @@ int main(int argc, char** argv)
     namespace tk = insight::tokenization;
 
     // invariant: the composition is loop-invariant — the same package set tokenizes every file.
-    const std::array<insight::semantic::SemanticPackageManifest, 4> manifests{
+    const std::array<insight::semantic::SemanticPackageManifest, 5> manifests{
         insight::semantic::github::kManifest, insight::semantic::gitlab::kManifest,
-        insight::semantic::jenkins::kManifest, insight::semantic::test_frameworks::kManifest};
+        insight::semantic::jenkins::kManifest, insight::semantic::package_managers::kManifest,
+        insight::semantic::test_frameworks::kManifest};
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose(manifests)};
     // invariant: canon's rules ALONE — no package row and no package strategy fires, so a move on
     // this arm is canon's whatever any package did.

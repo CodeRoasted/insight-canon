@@ -17,7 +17,7 @@
 
 dialect:
   name: github
-  version: "1.7.0"
+  version: "1.8.0"
   why:
     - "ADR-17.D3 keys identity on CONTENT, not on spelling: `version:` moves when what this package"
     - "RECOGNIZES or EMITS moves — its rows, their gates, or its code tier — and never for a"
@@ -134,6 +134,9 @@ dialect:
       - "is the same claim in the new vocabulary. Narrowing them to \"github\" would be a"
       - "RECOGNITION change riding a type change — a different decision, with its own gate, and not"
       - "that cut's."
+      - ""
+      - "The two Progress rows after them are a later and different claim, a toolkit's gauge"
+      - "matched by its whole shape, and they are gated to this package: each row says why."
     rows:
       - prefix: "##[group]"
         role: GroupBegin
@@ -153,6 +156,27 @@ dialect:
       - prefix: "::error::"
         role: Terminator
         dialect_gate: any
+      - shape: "Received {n} of {n} ({n}%), {n} MBs/sec"
+        role: Progress
+        dialect_gate: self
+        why:
+          - "The actions/cache toolkit's download gauge: printed once a second while a cache"
+          - "transfers, so its count is the transfer's duration and its values are instantaneous."
+          - "The event it samples is carried by content lines of its own (`Cache restored from"
+          - "key`, `Cache not found`), so leaving the samples out of a comparison drops no event."
+          - "The rule and the qualification test are DN-134.D9's."
+          - ""
+          - "A SHAPE, never a prefix: `Received ` opens unrelated lines (`Received 200 OK`,"
+          - "`Received 3 of 5 files`). Measured on the three CI-log views (26 234 logs): 204 958"
+          - "lines of this shape and its upload twin, every one inside a `uses:` step or after"
+          - "`Post job cleanup.`, none in a `run:` step body, and no line carries `MBs/sec` outside"
+          - "the exact shape. Gated to this package because the toolkit runs under GitHub's runner."
+      - shape: "Sent {n} of {n} ({n}%), {n} MBs/sec"
+        role: Progress
+        dialect_gate: self
+        why:
+          - "The same toolkit's upload gauge, the download row's twin: one sample a second while"
+          - "a cache is saved, its event carried by the save's own content lines."
 
   # ── intent-marker rows ──
   markers:

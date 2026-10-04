@@ -14,7 +14,7 @@ class InsightCanonBenchConan(ConanFile):
     url = "https://github.com/CodeRoasted/insight-canon"
     description = (
         "InSight Canon composed benchmark harness (ADR-17.D8 · LSRC-28). Measures the tokenization "
-        "hot path under the COMPOSED semantic set (github + gitlab + jenkins + test_frameworks) "
+        "hot path under the COMPOSED semantic set (github + gitlab + jenkins + package_managers + test_frameworks) "
         "against the "
         "degenerate core-only composition, in one binary — the per-line-cost gate for every "
         "composition-mechanism change. A leaf package by necessity: linking the vocabulary "
@@ -39,6 +39,7 @@ class InsightCanonBenchConan(ConanFile):
         self.requires("insight_semantic_github/1.10.6")
         self.requires("insight_semantic_gitlab/1.10.6")
         self.requires("insight_semantic_jenkins/1.10.6")
+        self.requires("insight_semantic_package_managers/1.10.6")
         self.requires("insight_semantic_test_frameworks/1.10.6")
         self.requires("benchmark/1.9.5")
 

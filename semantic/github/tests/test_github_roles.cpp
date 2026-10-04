@@ -75,6 +75,39 @@ TEST(GithubRoles, NoFalseRoleOnPlainContent)
     EXPECT_EQ(classify(norm_probe("error: undefined reference to foo"), gh), StructuralRole::None);
 }
 
+// invariant: the actions/cache toolkit's two transfer gauges take Progress on a stream declaring
+// github, and lines sharing their opening bytes stay content.
+// refs: DN-134.D9
+TEST(GithubRoles, TheCacheTransferGaugesTakeProgress)
+{
+    const ComposedSemantics gh{github_only()};
+    EXPECT_EQ(insight::to_string(
+                  classify(norm_probe("Received 75497472 of 157286400 (48.0%), 72.0 MBs/sec"), gh)),
+              std::string_view{"Progress"});
+    EXPECT_EQ(insight::to_string(classify(
+                  norm_probe("Received 157286400 of 157286400 (100.0%), 69.8 MBs/sec"), gh)),
+              std::string_view{"Progress"});
+    EXPECT_EQ(insight::to_string(
+                  classify(norm_probe("Sent 8388608 of 33554432 (25.0%), 8.0 MBs/sec"), gh)),
+              std::string_view{"Progress"});
+    for (const std::string_view content :
+         {"Received 200 OK", "Received 3 of 5 files",
+          "Received 75497472 of 157286400 (48.0%), 72.0 MBs/sec, retrying",
+          "Cache restored from key: Linux-node-abc"})
+        EXPECT_EQ(insight::to_string(classify(norm_probe(content), gh)), std::string_view{"None"})
+            << "content took a role: \"" << content << '"';
+}
+
+// invariant: the gauges are gated to this package, unlike the announced markers: a stream that
+// declares no dialect reads them as content.
+// refs: DN-134.D9, ADR-22.D6
+TEST(GithubRoles, TheCacheTransferGaugesAreGatedToGithub)
+{
+    EXPECT_EQ(insight::to_string(classify(norm_probe("Received 1 of 2 (50.0%), 3.0 MBs/sec"),
+                                          undeclared_stream())),
+              std::string_view{"None"});
+}
+
 namespace
 {
 constexpr std::array<std::string_view, 1> kGhaStack{{"api-rfc3339-line-prefix"}};

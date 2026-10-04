@@ -172,6 +172,7 @@ insight-canon/
 │   ├── github/             insight_semantic_github — GitHub Actions / Azure dialect (rows)
 │   ├── gitlab/             insight_semantic_gitlab — GitLab CI dialect (rows + strategy)
 │   ├── jenkins/            insight_semantic_jenkins — Jenkins dialect (rows)
+│   ├── package_managers/   insight_semantic_package_managers — package managers' progress shapes
 │   └── test_frameworks/    insight_semantic_test_frameworks — test-file location families
 ├── benchmarks/             insight_canon_bench — the composed perf harness (the LSRC-28 gate)
 ├── proof/                  Public determinism proof gate (composes core + every package)
@@ -233,7 +234,7 @@ clang-tidy -p build $(find src -name '*.cpp')
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `ci.yml` | PRs to main | Dependency-ordered `conan create` of all five packages (core → semantic/* → bench) + tests + the test_package smoke test |
+| `ci.yml` | PRs to main | Dependency-ordered `conan create` of all six packages (core → semantic/* → bench) + tests + the test_package smoke test |
 | `release.yaml` | Push of a `vX.Y.Z` tag (or manual dispatch) | Lint → CI → 5-leg determinism golden gate → measures the composed benchmark → verifies recipe versions, exports `conan cache save` tarballs, attaches them + the golden to the GitHub Release |
 | `workflow-lint.yml` | PR touching `.github/workflows/**` | Runs actionlint on all workflow files |
 

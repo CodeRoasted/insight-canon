@@ -55,7 +55,7 @@ One raw line in (`Tokenizer::process_line` / `process_stable_line`), one `Canoni
 | `host` | `string_view` | High-cardinality node / host identity (kept out of low-card grouping). |
 | `template_str` | `string_view` | The masked template (`"Connection from <*> port <*>"`) — see [masking.md](masking.md). |
 | `params` | `span<string_view>` | The raw values masked out of the template, in order. |
-| `structural_role` | `StructuralRole` | Announced section/outcome marker (`GroupBegin`/`GroupEnd`/`Terminator`/`None`). |
+| `structural_role` | `StructuralRole` | Announced section/outcome marker, or a declared progress gauge (`GroupBegin`/`GroupEnd`/`Terminator`/`Progress`/`None`). |
 | `trace` | `OtelTraceContext` | OTEL trace/span context when the input carried it — **in-memory only, never serialized.** |
 | `ordinals` | `span<OrdinalObservation>` | Declared numeric observations (latency/size) — **consumed by metalog, never tokenized into the template.** |
 

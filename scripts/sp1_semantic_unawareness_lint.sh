@@ -9,7 +9,7 @@
 #
 # The vocabulary — GitHub-Actions workflow-command markers, intent-marker prefixes,
 # test-framework file-naming suffixes — lives in the semantic PACKAGES
-# (semantic/github, semantic/test_frameworks). This gate asserts none of it has
+# (semantic/github, semantic/package_managers, semantic/test_frameworks). This gate asserts none of it has
 # leaked back into the core mechanism as a BEHAVIORAL string literal.
 #
 # ── Scope ──────────────────────────────────────────────────────────────────────
@@ -56,6 +56,8 @@ SCAN_ROOTS=(core/src core/api)
 #     pytest `"test_"` prefix literal; go/ruby `_test.go`/`_spec.rb`; cypress `.cy.`)
 #   - dialect/framework identifiers in code (`github_actions`, bare `github`/`gha`, jest/mocha/
 #     pytest/vitest/playwright/jenkins/gitlab, the retired `intent-gha` registry tag)
+#   - the declared Progress gauges' vocabulary (the actions/cache `MBs/sec` rate, pnpm's
+#     `Progress: resolved` and the `pnpm` identifier) — semantic/github and semantic/package_managers
 DENY=(
   '##\['                                              # GHA workflow-command bracket
   '::(group|endgroup|error|warning|notice|debug|set-output|save-state|add-mask|echo|add-matcher)::'
@@ -74,6 +76,8 @@ DENY=(
   '\b(github|gha)\b'                                  # bare dialect identifiers ("GitHubActions" has no \b after "github")
   '\b(jest|mocha|pytest|vitest|playwright|jenkins|gitlab)\b' # framework/dialect identifiers in code
   'section_start:|section_end:'                       # GitLab section-marker prefixes
+  'MBs/sec'                                           # actions/cache transfer-gauge rate unit
+  'Progress: resolved|\bpnpm\b'                       # pnpm install gauge and its identifier
 )
 
 # Build one alternation.
@@ -157,8 +161,8 @@ if [ "$violations" -ne 0 ]; then
   echo "::error::ADR-17.D1 VIOLATION — ${violations} ecosystem literal(s) fused into canon CORE (must live in a semantic package):"
   printf '%s' "$report"
   echo
-  echo "Core is semantic-unaware: the mechanism carries no ecosystem literal. Move the marker/prefix/suffix into semantic/github"
-  echo "or semantic/test_frameworks as a rule row (the closed grammar), or — if it is a documentation"
+  echo "Core is semantic-unaware: the mechanism carries no ecosystem literal. Move the marker/prefix/suffix into semantic/github,"
+  echo "semantic/package_managers or semantic/test_frameworks as a rule row (the closed grammar), or — if it is a documentation"
   echo "reference — keep it in a comment, not a code string literal."
   exit 1
 fi

@@ -160,10 +160,25 @@ not data-tuned exceptions.
 | `GroupBegin` | `##[group]` / `::group::` |
 | `GroupEnd` | `##[endgroup]` / `::endgroup::` |
 | `Terminator` | `##[error]` / `::error::` |
+| `Progress` | the whole line is a declared gauge shape: `Received {n} of {n} ({n}%), {n} MBs/sec` and its `Sent` twin (GitHub, the actions/cache toolkit), `Progress: resolved {n}, reused {n}, downloaded {n}, added {n}` (pnpm, any dialect) |
 | `None` | (the common case) |
 
-The role registry is a declared seed catalog (marker-based today; it grows only when a scenario surfaces a new
-announced marker that earns its place).
+A role row matches in one of two closed ways. A **prefix** row matches a line whose content starts with its bytes;
+the longest matching prefix wins. A **shape** row is literal bytes with `{n}` holes, each a decimal number
+(`[0-9]+(\.[0-9]+)?`), and matches only when the line's WHOLE content, its trailing whitespace trimmed, is the shape
+with every hole filled; a matching shape wins over every prefix row. A shape is refused at composition when a hole
+could border a digit, another hole or a decimal point leading into either, so a hole is always exactly the number the
+line prints and matching never backtracks.
+
+`Progress` names a line a platform, toolkit or tool prints **on a timer** as a sample of a quantity in progress, whose
+event its own content lines carry (`Cache restored from key`, pnpm's `, done` summary). It is declared by an exact
+shape only — never a prefix, because its samples share their opening bytes with lines that are content — in the
+package that owns the producer, and only on measured evidence. Canon emits the line and its template unchanged and
+only names the role; a consumer comparing content (Sift) leaves the line out, and the MetaLog carries it with its
+count. Work-paced progress (git, docker, pip, curl, apt) is not `Progress`: its count is work done, not time.
+
+The role registry is a declared seed catalog; it grows only when a scenario or a measured census surfaces a line
+that earns its place.
 
 ---
 

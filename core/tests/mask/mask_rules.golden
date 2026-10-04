@@ -31,6 +31,9 @@ status_keep | 0 | process exited with exit code 0 | process exited with exit cod
 status_keep | 404 | request finished status 404 | request finished status 404
 status_keep | 137 | container killed signal 137 | container killed signal 137
 status_keep | 2 | worker returned exit 2 | worker returned exit 2
+# DN-134.D1: the KEEP reads through a complete shell, exactly as the bare form.
+status_keep | (1) | process exited with exit code (1) | process exited with exit code (1)
+status_keep | (200), | request finished status (200), retrying | request finished status (200), retrying
 
 # ── rule 3 — UUID / long hash. Letter-leading on purpose: a digit-leading hash would be masked by
 # rule 5 anyway, and the row would name the wrong rule.
@@ -39,7 +42,7 @@ uuid_or_hash | deadbeefcafe0badf00d5678 | commit deadbeefcafe0badf00d5678 landed
 # ── rule 4 — IPv4, the only knob-gated rule. It decides its WHOLE acceptance set (DN-134.D8): a bare
 # address, one per declared wrapper pair (the shell whose absence once leaked a real address into a
 # published render) and a closer-only form all mask with the knob ON and stay literal with it OFF,
-# because rule 4 runs before rule 5 and keeps what the switch keeps.
+# because rule 4 runs before rule 5 and the shelled-numeric reader and keeps what the switch keeps.
 ipv4 | 10.0.0.1 | client 10.0.0.1 connected | client <*> connected
 ipv4 | 10.0.0.1), | client 10.0.0.1), connected | client <*> connected
 ipv4 | (10.0.0.1) | client (10.0.0.1) connected | client <*> connected
@@ -57,6 +60,13 @@ digit_leading | 31,260 | compiled 31,260 targets | compiled <*> targets
 digit_leading | 0xdeadbeef | fault at 0xdeadbeef now | fault at <*> now
 digit_leading | 1234 | worker exit code 1234 | worker exit code <*>
 digit_leading | 8080 | listening on port 8080 | listening on port <*>
+# DN-134.D1: rule 5 reads a digit-leading core through a COMPLETE declared wrapper shell (opener at
+# byte 0, the opener's own closer, at most two trailing bytes from `,;:.`), as rule 4 reads an
+# address. The status KEEP reads through it: see the status_keep rows below.
+digit_leading | (1.7s) | step finished in (1.7s) | step finished in <*>
+digit_leading | (96.4%), | coverage (96.4%), above floor | coverage <*> above floor
+digit_leading | [02:16:00] | [02:16:00] Starting deploy | <*> Starting deploy
+digit_leading | "2220" | orphan pid "2220" killed | orphan pid <*> killed
 
 # ── rule 6 — literal KEEP. The OVER-MASKING boundary: a rule that widened too far shows up here
 # and nowhere else, and over-masking destroys signal irrecoverably.
@@ -67,6 +77,10 @@ literal_keep | deadbeef | marker deadbeef seen | marker deadbeef seen
 literal_keep | bazel-out/k8-fastbuild/bin/app | built bazel-out/k8-fastbuild/bin/app ok | built bazel-out/k8-fastbuild/bin/app ok
 literal_keep | user=alice | login user=alice ok | login user=alice ok
 literal_keep | utf8 | decode utf8 stream | decode utf8 stream
+# DN-134.D1's boundary: an INCOMPLETE shell is no shell, so the count of `(25 warnings)` stays
+# literal, and a letter-led core is a word.
+literal_keep | (25 | build finished (25 warnings) | build finished (25 warnings)
+literal_keep | (v1.2.3) | toolchain (v1.2.3) found | toolchain (v1.2.3) found
 # The shape axis is closed for the opaque-identity class (ADR-16.D6): a word followed by a digit run
 # is a stable name as often as an instance, so these stay verbatim and stay DISTINCT from each other.
 # Each is a name the reverted opaque-identity rule collapsed; a shape rule re-entering reds here.

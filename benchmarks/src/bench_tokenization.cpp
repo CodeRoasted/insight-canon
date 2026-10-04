@@ -12,6 +12,7 @@ import insight.canon;
 import insight.semantic.github;
 import insight.semantic.gitlab;
 import insight.semantic.jenkins;
+import insight.semantic.package_managers;
 import insight.semantic.test_frameworks;
 
 namespace
@@ -150,9 +151,10 @@ void run_throughput(benchmark::State& state, const insight::semantic::ComposedSe
 // the array's hardcoded SIZE a double cascade trap.
 [[nodiscard]] const insight::semantic::ComposedSemantics& composed_vocabulary()
 {
-    static const std::array<insight::semantic::SemanticPackageManifest, 4> kManifests{
+    static const std::array<insight::semantic::SemanticPackageManifest, 5> kManifests{
         insight::semantic::github::kManifest, insight::semantic::gitlab::kManifest,
-        insight::semantic::jenkins::kManifest, insight::semantic::test_frameworks::kManifest};
+        insight::semantic::jenkins::kManifest, insight::semantic::package_managers::kManifest,
+        insight::semantic::test_frameworks::kManifest};
     static const insight::semantic::ComposedSemantics kComposed{
         insight::semantic::compose(kManifests)};
     return kComposed;

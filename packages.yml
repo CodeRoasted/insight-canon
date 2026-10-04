@@ -32,6 +32,14 @@ packages:
     source_public: true
     release: true
     depends: [insight_canon]
+  # The package managers' vocabulary (DN-134.D9): dialect-independent like test_frameworks, its rows
+  # projected from package_managers.dialect.yaml as github's are.
+  insight_semantic_package_managers:
+    path: semantic/package_managers
+    version: 1.10.6
+    source_public: true
+    release: true
+    depends: [insight_canon]
   insight_semantic_test_frameworks:
     path: semantic/test_frameworks
     version: 1.10.6
@@ -47,7 +55,7 @@ packages:
     version: 1.10.6
     source_public: true
     release: false
-    depends: [insight_canon, insight_semantic_github, insight_semantic_gitlab, insight_semantic_jenkins, insight_semantic_test_frameworks]
+    depends: [insight_canon, insight_semantic_github, insight_semantic_gitlab, insight_semantic_jenkins, insight_semantic_package_managers, insight_semantic_test_frameworks]
 
 # ── The build system's INVENTORY (ADR-3.D9) ─────────────────────────────────────────────────────
 # Projects that declare their own `project()` and belong to NO conan package. They are NOT

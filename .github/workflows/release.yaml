@@ -429,7 +429,7 @@ jobs:
     uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-release.yml@9f4c7b33acbe40461761884baffd60ae421e0922
     with:
       tag: ${{ github.event.inputs.tag || github.ref_name }}
-      # ADR-17.D8: the four semantic vocabulary packages ride the train on the SAME footing as canon
+      # ADR-17.D8: the five semantic vocabulary packages ride the train on the SAME footing as canon
       # (public + release, Apache-2.0). Dependency-ordered — canon first, so its `conan create`
       # populates the cache before each semantic package's create resolves `insight_canon/1.7.5`.
       # The release action verifies each recipe's version == tag and saves a per-package cache tarball.
@@ -438,6 +438,7 @@ jobs:
         insight_semantic_github:semantic/github
         insight_semantic_gitlab:semantic/gitlab
         insight_semantic_jenkins:semantic/jenkins
+        insight_semantic_package_managers:semantic/package_managers
         insight_semantic_test_frameworks:semantic/test_frameworks
       # The composed bench harness (benchmarks/ — insight_canon_bench, release:false) is BUILT + RUN by
       # measure-benchmark but never published; its first-party deps resolve as workspace editables

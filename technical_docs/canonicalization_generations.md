@@ -536,23 +536,27 @@ build, `c210757` measured): distinct templates over every non-empty line 295 919
 
 **It rides `-17`.**
 
-### Rider — a switched-off `mask_ip_addresses` keeps every address rule 4 accepts (DN-134.D8)
+### Rider — rule 5 reads a number through a complete wrapper shell, and rule 4 decides every address it accepts (DN-134.D1, DN-134.D8)
 
-**What changed.** Rule 4 decides its whole acceptance set (an IPv4 address, bare or inside a declared wrapper
-shell, with at most two trailing closers or `,;:.`) before rule 5 reads the token: with `mask_ip_addresses` on it
-masks, as before; with it off it stays literal. Until now a bare or closer-only address masked with the switch off
-anyway, because it is digit-leading and rule 5 claimed it, so the switch decided only the opener-led forms.
+**What changed.** **S:** a token rule 6 would keep, made of a wrapper-catalog opener at byte 0, a digit-leading core
+holding neither byte of that pair, the opener's own closer and at most two trailing bytes from `,;:.`, now takes
+rule 5's disposition: `(1.7s)`, `[02:16:00]`, `(96.4%),` and `"2220"` mask whole, as their bare forms always did. A
+core of at most 3 digits behind a status keyword stays literal through the shell, as rule 1 keeps the bare form, and
+an incomplete shell (`(25 warnings)` splits into `(25` and `warnings)`) is no shell. **D8:** rule 4 decides its
+whole acceptance set before rule 5 and S read the token: with `mask_ip_addresses` on an IPv4 address masks, bare or
+shelled, as before; with it off it stays literal, bare and complete-shelled forms included, where rule 5 used to
+mask them anyway.
 
-**Which serialized fields move.** Nothing at the default configuration, where the switch is on: every template,
-`template_id` and param is byte-identical. With the switch off, `template_str`, `template_id` and `params` of a line
-holding a bare or closer-only IPv4 token, which is now kept rather than masked. No producer in the workspace turns
-the switch off outside insight-canon's own tests.
+**Which serialized fields move.** S: `template_str` and `template_id` of a line holding such a token, and `params`,
+which gains the raw shelled token. D8: nothing at the default configuration (the switch is on); with the switch off,
+`template_str`, `template_id` and `params` of a line holding a bare or complete-shelled IPv4 token, which is now kept.
 
-**Witness inputs.** `core/tests/mask/mask_rules.golden`'s rule 4 rows now include a bare address (`client 10.0.0.1
-connected`) and a closer-only one (`client 10.0.0.1), connected`) beside the six shelled ones, each masked with the
-switch on and literal with it off; `StatelessTemplate.TheIpSwitchDecidesEveryAddressRuleFourAccepts` pins
-`10.20.30.40`, `(10.20.30.40)` and `[10.20.30.40],`. Measured on the 21 596-pair CI-log replay (coderoast-corpora
-`4e09766`): every report byte-identical to the build before it.
+**Witness inputs.** `core/tests/mask/mask_rules.golden` pins S's rows (`step finished in (1.7s)` → `step finished in
+<*>`, `[02:16:00] Starting deploy` → `<*> Starting deploy`), its status controls (`exit code (1)`, `status (200),`)
+and its literal boundary (`(25 warnings)`, `(v1.2.3)`), and rule 4's witnesses now include a bare and a closer-only
+address, each literal with the switch off. Measured through the public `Tokenizer::process_line` over the same three
+private CI-log views (coderoast-corpora `4e09766` registered before the build): distinct templates over every
+non-empty line 294 801 → 260 336, 259 850 → 226 500 and 3 269 858 → 2 845 664.
 
 **It rides `-17`.**
 

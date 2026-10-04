@@ -44,8 +44,8 @@ Each whitespace token is classified by the **first** matching rule:
 | 1 | **Status-value KEEP** — an all-digit token, ≤ 3 digits, immediately after a **status keyword** | KEEP literal |
 | 2 | **Composite** — the token carries a structural delimiter; one of the normalizers (§4) matches | KEEP normalized (embeds `<*>`) |
 | 3 | **UUID / long hash** | MASK `<*>` |
-| 4 | **IPv4**, bare or inside a declared **wrapper shell** (§3.2), with at most two trailing closers or `,;:.` | MASK `<*>` when `mask_ip_addresses` is on; KEEP literal when it is off — rule 4 decides every token it accepts, so rule 5 never reaches one |
-| 5 | **Digit-leading numeric** | MASK `<*>` — this also carries `0x`-hex: a `0x…` token starts with a digit |
+| 4 | **IPv4**, bare or inside a declared **wrapper shell** (§3.2), with at most two trailing closers or `,;:.` | MASK `<*>` when `mask_ip_addresses` is on; KEEP literal when it is off — rule 4 decides every token it accepts, so no later rule reaches one |
+| 5 | **Digit-leading numeric**, or a digit-leading core inside a **complete** wrapper shell (§3.2) | MASK `<*>` — this also carries `0x`-hex: a `0x…` token starts with a digit. The shelled form masks whole and its raw token is the param; a short status value behind a status keyword stays literal through the shell, as rule 1 keeps it bare |
 | 6 | **Literal** — none of the above | KEEP literal |
 
 Before the first token is read, a `content` that is, whole, one JSON object or array is given its **member-order
@@ -81,16 +81,17 @@ data-learned. This is what keeps masking decidable and deterministic.
 | **Currency markers** | `$` (ASCII; structured to add `€`/`£`/`¥` as declared byte sequences if a corpus shows them) | §4 marker-number — a leading currency symbol glued to a number. |
 | **Ephemeral roots** | `/tmp`, `/var/tmp`, `/var/folders`, `.conan2/p/b`, `/nix/store` — each carrying a declared **anchor** + **scope** (§3.1) | §4 ephemeral-root — a path segment directly under a per-run build/temp root is an instance and masks; the root is kept. |
 | **Min hash length** | `16` | Rule 3 / §4 embedded-identity — a hex-only run this long is an instance hash, not a word. |
-| **Wrapper pairs** | `[]` `()` `{}` `<>` `""` `''` | §3.2 — the punctuation shell a producer wraps a whole token in. Read by rule 4's grammar and by the rule-2 pre-gate. |
+| **Wrapper pairs** | `[]` `()` `{}` `<>` `""` `''` | §3.2 — the punctuation shell a producer wraps a whole token in. Read by rule 4's grammar, by rule 5's shelled form and by the rule-2 pre-gate. |
 | **Wildcard** | `<*>` | The mask placeholder. |
 | **Declared-value markers** | none in core: each key and its markers are a dialect's data (`DeclaredValueRow`); the GitHub dialect declares `pull_request` behind `PR-`, `pr-`, `Pr-`, `pull-`, `PULL-`, `Pull-`, `PR#`, `pulls/` | §4 declared-run — the markers a run's own declared value is masked behind. Core holds the mechanism and no marker. |
 
 `mask_ip_addresses` is the one `MaskConfig` knob (default **on**) gating a rule — rule 4 — and it decides
 rule 4's **whole** acceptance set: `10.20.30.40`, `(10.20.30.40)` and `[10.20.30.40],` mask with the knob on
-and all stay **literal** with it off. Rule 4 runs before rule 5, so the digit-leading rule, which would mask the
-bare form, cannot reach an address the switch keeps: a switch named for IP addresses that left some masked would
-break its own name. An address a composite claims first (`10.0.0.1:8080` as a location, a URL, `ip=10.0.0.1`)
-is rule 2's, outside the knob's domain, and is unchanged by it.
+and all stay **literal** with it off. Rule 4 runs before rule 5, so neither the digit-leading rule (which would
+mask the bare form) nor rule 5's shelled form (which would mask the complete shell) can reach an address the
+switch keeps: a switch named for IP addresses that left some masked would break its own name. An address a
+composite claims first (`10.0.0.1:8080` as a location, a URL, `ip=10.0.0.1`) is rule 2's, outside the knob's
+domain, and is unchanged by it.
 
 ### 3.1 The ephemeral-root catalog — the root is the decidable thing
 
@@ -148,7 +149,14 @@ Two facts about its shape, both measured rather than assumed:
   the bracketed and UUID forms already produced, instead of minting a second one for one class.
 
 The shell widens **which punctuation** a rule tolerates, never **what it matches**: `(anonymous)`,
-`(reserved)`, `(1.2.3)` and `(v1.2.3.4)` all stay literal. Measured on 32 000 lines of real third-party
+`(reserved)` and `(v1.2.3.4)` stay literal. **Rule 5 reads a COMPLETE shell too:** a token made of a catalog
+opener at byte 0, a digit-leading core holding neither byte of that pair, the opener's own closer, and at most
+two trailing bytes from `,;:.` takes rule 5's disposition, so `(1.7s)`, `[02:16:00]`, `(96.4%),`, `"2220"` and
+`(1.2.3)` mask as their bare forms do. Its acceptance set is, by construction, the set rule 5 masks bare, so it
+merges nothing canon does not already merge when the value is printed without the punctuation. The shell must be
+complete: `(25 warnings)` splits into `(25` and `warnings)`, neither a shell, so that count stays literal; a core
+of at most 3 digits behind a status keyword stays literal (`exit code (1)`), and a composite rule still wins
+(`[42]` is the bracket index's `[<*>]`). Measured on 32 000 lines of real third-party
 logs across 16 producers, the repair moves **3 templates out of 6712**.
 
 ---

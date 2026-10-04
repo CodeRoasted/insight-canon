@@ -1,0 +1,55 @@
+# The package managers' vocabulary, declared as DATA.
+#
+# This file IS the package: `dialect_package_codegen.py` (malf-toolchain) projects it into the
+# complete C++ content of the semantic package — the manifest, its rows and the compile-time
+# fences. Nothing about this vocabulary is stated anywhere else.
+#
+# THE `why:` KEY IS NOT DOCUMENTATION. It is where the argument lives, emitted verbatim as comment
+# lines above what it annotates and EXCLUDED from the content hash: editing an argument never moves
+# the identity of what this package recognizes.
+#
+# DECLARED ORDER IS CONTENT. The identity serializer walks every row in declared order, so
+# reordering a row changes the composed comparability hash. Nothing here is sorted, ever.
+
+dialect:
+  name: package_managers
+  version: "1.0.0"
+  why:
+    - "A package manager prints its own lines under every CI runner, so its vocabulary belongs"
+    - "to the producer's owner and not to whichever runner printed it (ADR-17.D1), as test-file"
+    - "naming belongs to the test_frameworks package. This package is therefore dialect-"
+    - "independent: no stream ever declares `package_managers`, and every row below fires on any"
+    - "dialect."
+
+  # ── the generation coordinate ──
+  revisions:
+    why:
+      - "This package has no vendor syntax generation: `v1` names OUR first generation of these"
+      - "rows and moves only when what a row family means changes shape. Core requires a"
+      - "non-empty coordinate on every manifest, so a reader comparing two identity digests finds"
+      - "the same field in each — the convention test_frameworks set (ADR-17.D9)."
+    names: [v1]
+
+  # ── structural-role rows ──
+  roles:
+    why:
+      - "Rows are extended only on measured evidence, as the GitHub dialect's markers are: a"
+      - "producer joins with the census that qualified it. Bazel's analysis progress and pnpm"
+      - "behind a task-runner or BuildKit prefix pass the Progress test but carry no row to"
+      - "remove, so they are not declared (DN-134.D9)."
+    rows:
+      - shape: "Progress: resolved {n}, reused {n}, downloaded {n}, added {n}"
+        role: Progress
+        dialect_gate: any
+        why:
+          - "pnpm's install gauge: printed once a second while it installs (median gap 1.0 s"
+          - "over 38 047 lines in 3 377 of the 26 234 CI logs measured), so its count is the"
+          - "install's duration and its values are instantaneous. The event is carried by pnpm's"
+          - "own content lines, the `, done` summary and `Packages:`, so leaving the samples out"
+          - "of a comparison drops no event. The rule and its qualification test are"
+          - "DN-134.D9's."
+          - ""
+          - "A SHAPE, never a prefix: the `, done` summary opens with the same bytes and is"
+          - "content. Every measured line of this shape sits in a step that installs with pnpm;"
+          - "that no other program prints it is inferred. A line behind a BuildKit or"
+          - "recursive-run prefix (`#12 3.4 Progress: ...`) is not this shape and takes no role."
