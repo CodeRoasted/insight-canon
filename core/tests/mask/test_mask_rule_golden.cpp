@@ -24,8 +24,9 @@
 // invariant: LIMB 2 IS WHAT STOPS THIS FILE BECOMING THE DEFECT ONE LEVEL UP — a golden over a
 // hand-picked handful stays green while a new arm ships unwitnessed.
 // invariant: WHAT IT DOES NOT COVER IS STATED, NOT LEFT IMPLICIT.
-// invariant: params are not pinned — a masked position contributes both a wildcard to the
-// template and its raw token to params, so which positions masked is already visible.
+// invariant: params are not pinned byte for byte — a whole-token wildcard is a param and every
+// param is one, so which positions masked is already visible.
+// invariant: one arm reads every witness's params against its whole-token wildcards.
 // invariant: the template id is not pinned — it is a digest of the template string, so pinning
 // the template pins the id up to a hash change, which is not a masking change.
 // invariant: THE COMPOSED PATH is not covered, and that boundary is what the homing call BUYS —
@@ -256,6 +257,37 @@ constexpr std::string_view kFieldSep{" | "};
     return out;
 }
 
+// post: empty when the row's masked output binds every whole-token wildcard to its param in order,
+// else what breaks the binding.
+// refs: DN-128.D6
+[[nodiscard]] std::string binding_violation(const Row& row)
+{
+    ArenaAllocator arena{256U * 1024U};
+    const std::array<std::string_view, 1> markers{row.declared_marker};
+    const std::array<DeclaredRun, 1> runs{
+        DeclaredRun{.markers = markers, .value = row.declared_value}};
+    const std::span<const DeclaredRun> declared{row.declared_value.empty()
+                                                    ? std::span<const DeclaredRun>{}
+                                                    : std::span<const DeclaredRun>{runs}};
+    const auto masked{stateless_template(row.input, arena, MaskConfig{}, declared)};
+    const std::vector<std::string> source{tokens_of(row.input)};
+    const std::vector<std::string> output{tokens_of(masked.template_str)};
+    std::vector<std::size_t> whole;
+    for (std::size_t pos{0}; pos < output.size(); ++pos)
+        if (output[pos] == insight::tokenization::kMaskWildcard)
+            whole.push_back(pos);
+    if (whole.size() != masked.params.size())
+        return std::format("{} whole-token wildcards, {} params", whole.size(),
+                           masked.params.size());
+    for (std::size_t index{0}; index < whole.size(); ++index)
+        if (source.size() != output.size() || source[whole[index]] != masked.params[index])
+            return std::format("param {} is `{}`, the source token under its wildcard is `{}`",
+                               index, masked.params[index],
+                               whole[index] < source.size() ? source[whole[index]]
+                                                            : std::string{"<none>"});
+    return {};
+}
+
 // invariant: the FIRST occurrence — a witness whose subject appears twice is testing an ambiguous
 // thing, and a sibling arm rejects it rather than picking one.
 [[nodiscard]] std::size_t subject_index(const Row& row, std::size_t& occurrences)
@@ -381,6 +413,28 @@ constexpr std::string_view kRegenCommand{
     "--gtest_filter='MaskRuleGolden.DISABLED_RegenerateGolden'"};
 
 } // namespace
+
+// assert: the binding holds on every witness: a whole-token wildcard is a param, every param is
+// one, and param i is the source token under the (i + 1)-th whole-token wildcard.
+// refs: DN-128.D6
+TEST(MaskRuleGolden, EveryWholeTokenWildcardIsBoundToItsParamOnEveryWitness)
+{
+    if (!golden_is_readable())
+        return;
+    std::size_t broken{0};
+    for (const Row& row : loaded().golden.rows)
+    {
+        const std::string why{binding_violation(row)};
+        if (why.empty())
+            continue;
+        ++broken;
+        ADD_FAILURE() << "golden line " << row.line_no << " (" << row.rule_id
+                      << ") breaks the binding: " << why << "\n  input    : " << row.input
+                      << "\n  template : " << mask_row(row, MaskConfig{});
+    }
+    EXPECT_EQ(broken, 0U) << broken << " of " << loaded().golden.rows.size()
+                          << " witness rows break the binding";
+}
 
 TEST(MaskRuleGolden, GoldenTemplatesAreByteIdentical)
 {

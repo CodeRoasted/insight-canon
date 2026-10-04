@@ -1183,6 +1183,56 @@ TEST(StatelessTemplate, TheIpSwitchDecidesEveryAddressRuleFourAccepts)
     }
 }
 
+// assert: a template token that is exactly the wildcard is a param and every param is one, so
+// param i is the (i + 1)-th whole-token wildcard.
+// invariant: a whole dashed UUID reaches the wildcard through the embedded-identity arm, and the
+// binding reads the normal form, so it is a param like any whole-token mask.
+// refs: DN-128.D6, ADR-16.D5
+TEST(StatelessTemplate, AWholeTokenWildcardIsAParamAndEveryParamIsOne)
+{
+    ArenaAllocator arena{256U * 1024U};
+    constexpr std::string_view kUuid{"f7f63412-b7a7-468d-bd31-1a6ae1ca2680"};
+    struct Case
+    {
+        std::string line;
+        std::string_view want_template;
+        std::vector<std::string_view> want_params;
+        std::string_view why;
+    };
+    const std::vector<Case> cases{
+        {.line = std::format("session {} opened", kUuid),
+         .want_template = "session <*> opened",
+         .want_params = {kUuid},
+         .why = "a whole dashed UUID is a masked value, so its token is its param"},
+        {.line = std::format("wrote run-{}.log", kUuid),
+         .want_template = "wrote run-<*>.log",
+         .want_params = {},
+         .why = "an EMBEDDED UUID is a normalization inside a token and carries no param"},
+        {.line = "value <*> seen",
+         .want_template = "value <*> seen",
+         .want_params = {"<*>"},
+         .why = "a source token that is literally the wildcard takes the mask path"},
+        {.line = std::format("run {} took 23 ms", kUuid),
+         .want_template = "run <*> took <*> ms",
+         .want_params = {kUuid, "23"},
+         .why = "the UUID is param 0 and the latency param 1, each under its own wildcard"},
+    };
+    for (const Case& each : cases)
+    {
+        arena.reset();
+        const StatelessTemplate result{stateless_template(each.line, arena, cfg(), {})};
+        const std::vector<std::string_view> params{result.params.begin(), result.params.end()};
+        std::string seen;
+        for (const std::string_view param : params)
+            seen += std::format(" `{}`", param);
+        EXPECT_EQ(result.template_str, each.want_template)
+            << each.why << "\n  input    : " << each.line;
+        EXPECT_EQ(params, each.want_params)
+            << each.why << "\n  input    : " << each.line
+            << "\n  template : " << result.template_str << "\n  params   :" << seen;
+    }
+}
+
 // refs: DN-134.D2
 // invariant: kv_value's disposition applies to each `;`-segment of a token's normal form, a
 // non-claiming step after the composites and the literal KEEP.

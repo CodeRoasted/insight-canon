@@ -560,6 +560,31 @@ non-empty line 294 801 → 260 336, 259 850 → 226 500 and 3 269 858 → 2 845 
 
 **It rides `-17`.**
 
+### Rider — a whole-token wildcard is a param, and every param is one (DN-128.D6)
+
+**What changed.** A token whose final normal form — after the composite step, the `;`-segment step and the
+declared runs — is exactly `<*>` takes the mask path: it contributes `<*>` and pushes its SOURCE token as a param.
+A source token that is literally `<*>` takes the same path. Until now the embedded-identity composite claimed a
+whole dashed UUID, wrote a bare `<*>` and pushed nothing, because a dash admits the token to the composite pre-gate
+before the whole-token UUID mask can reach it. So the template now states its own binding: a template token that is
+exactly `<*>` is a param, every param is one, and param *i* is the (*i* + 1)-th such token.
+
+**Which serialized fields move.** `template_str` and `template_id` move on no line. `params` move on a line holding a
+whole dashed UUID (or a literal `<*>` token): the UUID is pushed in its token order, so a param after it shifts one
+index. Through MetaLog, `param_histograms` of those templates gain an entry and re-index; a param pushed past the
+tracked width loses its histogram.
+
+**Witness inputs.** `core/tests/mask/mask_rules.golden`'s embedded-identity row `session <uuid> opened` now carries
+its UUID as a param, and `MaskRuleGolden.EveryWholeTokenWildcardIsBoundToItsParamOnEveryWitness` reads every
+witness's params against its whole-token wildcards; `StatelessTemplate.AWholeTokenWildcardIsAParamAndEveryParamIsOne`
+pins the whole UUID, an embedded one (`run-<uuid>.log`, no param), a literal `<*>` and a UUID before a latency.
+Measured through the public determinism proof over three private CI-log views (coderoast-corpora `4997b9a`, registered
+before the build, and re-measured on the base after `DN-134.D9` and `DN-134.D1` landed, `6f54f30`): every event's template byte-identical; 0 events breaking the binding, against 9 237, 9 234 and
+20 036 before; params moved on exactly the 63, 62 and 132 templates that carried a param-less whole-token `<*>`,
+each to the predicted list.
+
+**It rides `-17`.**
+
 ---
 
 *See also: [masking.md](masking.md) (what the current generation's rules actually are) ·

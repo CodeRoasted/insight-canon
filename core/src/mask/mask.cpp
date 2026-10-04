@@ -1407,9 +1407,11 @@ namespace
 
 // post: the joined per-token canonical forms; a masked position contributes a param, a kept or
 // normalized position does not.
+// post: a template token that is exactly the wildcard is a param and every param is one: param i
+// is the (i + 1)-th such token, and a wildcard inside a token is a normalization with no param.
 // invariant: a function of the content bytes only - no float, no map iteration, no state - so it is
 // bit-identical across standard libraries and independent of order and stream.
-// refs: ADR-16.D5, F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
+// refs: ADR-16.D5, DN-128.D6, F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
 // refs: F-SRC-insight-canon:canon.api.cppm:TemplateId
 StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& out_arena,
                                      const MaskConfig& config,
@@ -1460,6 +1462,16 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                                            tmpl.append(kWildcard);
                                            params.push_back(tok);
                                        }};
+                       // post: a normal form that is exactly the wildcard takes the mask path, so
+                       // its SOURCE token is the param; any other normal form is appended as is.
+                       // refs: DN-128.D6
+                       const auto append_normal_form{[&](std::string_view form)
+                                                     {
+                                                         if (form == kWildcard)
+                                                             mask();
+                                                         else
+                                                             tmpl.append(form);
+                                                     }};
 
                        // assert: the status-value KEEP, so an exit code stays distinct from its
                        // neighbour.
@@ -1477,7 +1489,7 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                            // assert: the non-claiming steps read the composite's NORMAL FORM,
                            // once, after every claiming rule.
                            // refs: DN-133.D1, DN-134.D2
-                           tmpl.append(normal_form_steps(composite));
+                           append_normal_form(normal_form_steps(composite));
                            prev = tok;
                            return;
                        }
@@ -1492,7 +1504,7 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                        case ValueDisposition::NotAValue:
                            // assert: a token no rule claimed is its own normal form.
                            // refs: DN-133.D1
-                           tmpl.append(normal_form_steps(tok));
+                           append_normal_form(normal_form_steps(tok));
                            break;
                        }
                        prev = tok;

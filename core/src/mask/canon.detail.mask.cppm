@@ -81,7 +81,7 @@ struct StatelessTemplate
     std::span<const std::string_view> params;
 };
 
-// refs: DN-133.D1, DN-134.D2, DN-134.D3
+// refs: DN-133.D1, DN-134.D2, DN-134.D3, DN-128.D6
 // post: a `content` that is, whole, one JSON object or array is first given its member-order
 // normal form; every other `content` is tokenized as it is.
 // post: each token's NORMAL FORM — its literal bytes, or the form a composite rule gave it — has
@@ -90,6 +90,8 @@ struct StatelessTemplate
 // invariant: a run is claimed exactly when `claim_declared_runs` claims it on that normal form.
 // invariant: a claimed run is a normalization inside a token and contributes no param, as a
 // composite rule's normalization does.
+// post: a token whose final normal form is exactly the wildcard is a param, its source token
+// pushed, so a template token that is exactly the wildcard is a param and every param is one.
 [[nodiscard]] StatelessTemplate stateless_template(std::string_view content,
                                                    ArenaAllocator& out_arena,
                                                    const MaskConfig& config,

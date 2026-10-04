@@ -31,7 +31,11 @@ The wildcard placeholder is **`<*>`**. Tokens are split on **whitespace only** f
 tokenizer used by classification is separate — see [classification.md](classification.md)). Kept/normalized
 tokens contribute their text to `template_str`; **fully-masked** tokens contribute a `<*>` *and* push their raw
 value into `params` (a normalized composite that embeds `<*>` contributes **no** param — it is a kept class,
-not a masked instance).
+not a masked instance). A token whose **final normal form is exactly `<*>`** — a whole dashed UUID the
+embedded-identity rule claims, a source token that is literally `<*>`, a form a later step reduces to the bare
+wildcard — is fully masked too: it contributes `<*>` and pushes its source token. So the template states the
+binding by itself: **a template token that is exactly `<*>` is a param and every param is one, param *i* being the
+(*i* + 1)-th such token**, and a `<*>` inside a token is a normalization with no param.
 
 ---
 
