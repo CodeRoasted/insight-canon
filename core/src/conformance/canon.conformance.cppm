@@ -143,6 +143,25 @@ namespace
         return std::string{prefix} + ' ' + std::string{kProbePayload};
     }
 
+    // post: a line the role row fires on: a prefix row's key plus the probe payload, or a shape
+    // row's bytes with every hole filled by one digit.
+    // refs: DN-134.D9
+    [[nodiscard]] std::string role_probe_for(const StructuralRoleRow& row)
+    {
+        if (row.match == RoleMatchKind::Prefix)
+            return probe_for(row.prefix);
+        std::string probe;
+        std::string_view shape{row.prefix};
+        for (std::size_t hole{shape.find(kShapeHole)}; hole != std::string_view::npos;
+             hole = shape.find(kShapeHole))
+        {
+            probe.append(shape.substr(0, hole)).push_back('1');
+            shape.remove_prefix(hole + kShapeHole.size());
+        }
+        probe.append(shape);
+        return probe;
+    }
+
     // refs: ADR-21.D4, LSRC-5
     // invariant: the kit's ONE door to the walkers' NormalizedContent, and stage 1 is a FIXED POINT
     // on its escape-free probes, so no count can move.
@@ -236,7 +255,7 @@ namespace
         std::string scratch;
         for (const StructuralRoleRow& row : manifest.roles)
         {
-            const std::string probe{probe_for(row.prefix)};
+            const std::string probe{role_probe_for(row)};
             if (row.dialect_gate == kAnyDialect)
             {
                 for (const auto& [view, label] :
@@ -429,6 +448,16 @@ namespace
                 return {.name = "grammar.empty_role",
                         .passed = false,
                         .detail = "a structural-role row has an empty prefix."};
+        // refs: DN-134.D9
+        for (const StructuralRoleRow& row : manifest.roles)
+            if (!role_row_well_formed(row))
+                return {.name = "grammar.role_row",
+                        .passed = false,
+                        .detail = "role row \"" + std::string{row.prefix} +
+                                  "\" cannot be composed: a Progress role on a prefix row, or a "
+                                  "shape with no {n} hole, another brace, trailing whitespace, or "
+                                  "a hole against a digit, a hole or a decimal point leading into "
+                                  "either."};
         for (const IntentMarkerRow& row : manifest.markers)
             if (row.prefix.empty())
                 return {.name = "grammar.empty_marker",
@@ -855,6 +884,11 @@ namespace
         return std::string{insight::to_string(role)};
     }
 
+    [[nodiscard]] std::string render_value(RoleMatchKind match)
+    {
+        return match == RoleMatchKind::Shape ? "Shape" : "Prefix";
+    }
+
     [[nodiscard]] std::string render_value(insight::LogLevel level)
     {
         return std::string{insight::to_string(level)};
@@ -984,12 +1018,13 @@ namespace
     [[nodiscard]] std::string row_differences(const StructuralRoleRow& lhs,
                                               const StructuralRoleRow& rhs)
     {
-        const auto& [lhs_prefix, lhs_role, lhs_dialect] = lhs;
-        const auto& [rhs_prefix, rhs_role, rhs_dialect] = rhs;
+        const auto& [lhs_prefix, lhs_role, lhs_dialect, lhs_match] = lhs;
+        const auto& [rhs_prefix, rhs_role, rhs_dialect, rhs_match] = rhs;
         FieldDiff diff;
         diff.field("prefix", lhs_prefix, rhs_prefix);
         diff.field("role", lhs_role, rhs_role);
         diff.field("dialect_gate", lhs_dialect, rhs_dialect);
+        diff.field("match", lhs_match, rhs_match);
         return diff.text();
     }
 

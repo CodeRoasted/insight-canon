@@ -36,8 +36,8 @@ export namespace insight::tokenization
 // invariant: the type does NOT prove the RIGHT stage 2 ran: the strip divergence stands and the
 // eidos/canon reconciliation still rides its own gate.
 // note: as prose this obligation was met by 1 of 3 consumers: 1 077 of 3 193 markers lost
-// post: `classify` returns the longest-matching role row's `StructuralRole`, and None when no row
-// of the view matches.
+// post: `classify` returns the matching shape row's `StructuralRole`, else the longest-matching
+// prefix row's, and None when no row of the view matches.
 [[nodiscard]] StructuralRole
 classify(NormalizedContent content, const insight::semantic::ComposedSemantics& composed) noexcept;
 

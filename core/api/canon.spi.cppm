@@ -345,10 +345,25 @@ enum class LocationMatchKind : std::uint8_t
     SuffixSet,
 };
 
-// invariant: one row kind per knowledge surface; a line-anchored prefix announces a StructuralRole.
+// invariant: a CLOSED enum selecting how a role row's bytes match a line; a new kind is a
+// grammar-version bump, part of the identity.
+// refs: ADR-17.D4, ADR-2.D7, DN-134.D9
+enum class RoleMatchKind : std::uint8_t
+{
+    // invariant: the line's content starts with the bytes.
+    Prefix = 0,
+    // invariant: the bytes are literal text with `{n}` holes, each a decimal number
+    // `[0-9]+(\.[0-9]+)?`, and they match the WHOLE content after a trailing-whitespace trim.
+    Shape,
+};
+
+// invariant: one row kind per knowledge surface; a line-anchored prefix, or a whole-line shape,
+// announces a StructuralRole.
 // refs: ADR-17
 struct StructuralRoleRow
 {
+    // invariant: the prefix, or the shape when `match` is Shape: one member for both, so a
+    // declaration of prefix rows alone emits the bytes it did before the kind existed.
     std::string_view prefix;
     insight::StructuralRole role;
     // invariant: kAnyDialect fires on any dialect — the pre-split ungated behaviour; otherwise
@@ -356,7 +371,119 @@ struct StructuralRoleRow
     // invariant: filtered into the stream view once, at resolution, and never consulted per line.
     // refs: ADR-22.D6
     std::string_view dialect_gate{kAnyDialect};
+    // refs: DN-134.D9
+    RoleMatchKind match{RoleMatchKind::Prefix};
 };
+
+// invariant: the one hole spelling a shape admits.
+inline constexpr std::string_view kShapeHole{"{n}"};
+
+namespace detail
+{
+    [[nodiscard]] constexpr bool shape_digit(char chr) noexcept
+    {
+        return chr >= '0' && chr <= '9';
+    }
+
+    [[nodiscard]] constexpr bool shape_trailing_space(char chr) noexcept
+    {
+        return chr == ' ' || chr == '\t' || chr == '\r' || chr == '\n' || chr == '\v' ||
+               chr == '\f';
+    }
+
+    // post: the length of the decimal number `[0-9]+(\.[0-9]+)?` opening `text`, or 0 when none
+    // does; a point is taken only when a digit follows it.
+    [[nodiscard]] constexpr std::size_t shape_number_length(std::string_view text) noexcept
+    {
+        std::size_t len{0};
+        while (len < text.size() && shape_digit(text[len]))
+            ++len;
+        if (len == 0)
+            return 0;
+        if (len + 1U < text.size() && text[len] == '.' && shape_digit(text[len + 1U]))
+        {
+            len += 2U;
+            while (len < text.size() && shape_digit(text[len]))
+                ++len;
+        }
+        return len;
+    }
+} // namespace detail
+
+// pre: `shape` is well-formed (`role_row_well_formed`), so a hole never borders a digit, another
+// hole or a decimal point leading into a digit, and a greedy hole is therefore exact.
+// post: whether `content`, its trailing whitespace trimmed, is `shape` with every hole replaced by
+// a decimal number; a scan without backtracking, linear in the content.
+// refs: DN-134.D9
+[[nodiscard]] constexpr bool shape_matches(std::string_view shape,
+                                           std::string_view content) noexcept
+{
+    while (!content.empty() && detail::shape_trailing_space(content.back()))
+        content.remove_suffix(1U);
+    while (!shape.empty())
+    {
+        if (shape.starts_with(kShapeHole))
+        {
+            const std::size_t number{detail::shape_number_length(content)};
+            if (number == 0)
+                return false;
+            shape.remove_prefix(kShapeHole.size());
+            content.remove_prefix(number);
+            continue;
+        }
+        const std::size_t literal{std::min(shape.find(kShapeHole), shape.size())};
+        if (!content.starts_with(shape.substr(0, literal)))
+            return false;
+        shape.remove_prefix(literal);
+        content.remove_prefix(literal);
+    }
+    return content.empty();
+}
+
+// post: whether the row can be composed: a non-empty prefix, and a Progress role on a shape row
+// only, its samples sharing their prefix with lines that are content.
+// post: a shape has a hole, no other brace, no trailing whitespace, and no hole against a digit,
+// a hole or a decimal point leading into either.
+// invariant: malf's dialect codegen refusals, held here for a package the generator never sees.
+// refs: DN-134.D9, ADR-17.D4
+[[nodiscard]] constexpr bool role_row_well_formed(const StructuralRoleRow& row) noexcept
+{
+    if (row.prefix.empty())
+        return false;
+    if (row.match == RoleMatchKind::Prefix)
+        return row.role != insight::StructuralRole::Progress;
+    const std::string_view shape{row.prefix};
+    if (shape.find(kShapeHole) == std::string_view::npos ||
+        detail::shape_trailing_space(shape.back()))
+        return false;
+    std::size_t cursor{0};
+    bool after_hole{false};
+    while (cursor < shape.size())
+    {
+        if (shape.substr(cursor).starts_with(kShapeHole))
+        {
+            const bool digit_before{cursor > 0 && detail::shape_digit(shape[cursor - 1U])};
+            const bool point_before{cursor > 1 && shape[cursor - 1U] == '.' &&
+                                    detail::shape_digit(shape[cursor - 2U])};
+            if (after_hole || digit_before || point_before)
+                return false;
+            cursor += kShapeHole.size();
+            after_hole = true;
+            continue;
+        }
+        const char chr{shape[cursor]};
+        if (chr == '{' || chr == '}')
+            return false;
+        if (after_hole && (detail::shape_digit(chr) ||
+                           (chr == '.' && (cursor + 1U == shape.size() ||
+                                           detail::shape_digit(shape[cursor + 1U]) ||
+                                           shape.substr(cursor + 1U).starts_with(kShapeHole)))))
+            return false;
+        after_hole = false;
+        ++cursor;
+    }
+    return true;
+}
 
 // invariant: a CLOSED set of payload shapes a version coordinate applies to — the algorithm
 // lives in core and a new shape is a grammar-version bump, part of the identity.

@@ -745,12 +745,19 @@ enum class LogFormat : uint8_t
 // orthogonal ontologies and two registries, which is what avoids conflating them.
 // invariant: these roles are ANNOUNCED by a marker the line carries, and are NEVER derived from
 // graph position, which is a structural-layer output rather than a role.
+// refs: ADR-2.D7
 enum class StructuralRole : uint8_t
 {
     None = 0,
     GroupBegin,
     GroupEnd,
-    Terminator
+    Terminator,
+    // invariant: a gauge reading a platform, toolkit or tool prints on a timer about a quantity in
+    // progress, whose event its own content lines carry; declared by an exact whole-line shape.
+    // invariant: canon emits the line and its template unchanged and only names the role; a
+    // consumer that compares content leaves the line out, and the MetaLog carries it.
+    // refs: DN-134.D9
+    Progress
 };
 
 [[nodiscard]] constexpr std::string_view to_string(StructuralRole role) noexcept
@@ -765,6 +772,8 @@ enum class StructuralRole : uint8_t
         return "GroupEnd"sv;
     case StructuralRole::Terminator:
         return "Terminator"sv;
+    case StructuralRole::Progress:
+        return "Progress"sv;
     default:
         return "None"sv;
     }

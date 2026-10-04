@@ -394,6 +394,8 @@ namespace detail
     // detects an intra-package duplicate AND two packages sharing one static row array.
     // invariant: keyed on the shared `prefix` and `dialect_gate` members, which roles, markers and
     // level-lifts all carry.
+    // invariant: a role row is keyed on its match kind too: a shape and a prefix are two rules.
+    // refs: DN-134.D9
     template <typename Row>
     [[nodiscard]] constexpr std::optional<std::string_view>
     first_prefix_dup(std::span<const SemanticPackageManifest> packages,
@@ -408,9 +410,14 @@ namespace detail
                     const std::span<const Row> rows_b{packages[pkg_b].*member};
                     for (std::size_t idx_j{(pkg_b == pkg_a) ? idx_i + 1 : 0}; idx_j < rows_b.size();
                          ++idx_j)
-                        if (rows_a[idx_i].prefix == rows_b[idx_j].prefix &&
+                    {
+                        bool same_match{true};
+                        if constexpr (std::same_as<Row, StructuralRoleRow>)
+                            same_match = rows_a[idx_i].match == rows_b[idx_j].match;
+                        if (same_match && rows_a[idx_i].prefix == rows_b[idx_j].prefix &&
                             gates_intersect(rows_a[idx_i].dialect_gate, rows_b[idx_j].dialect_gate))
                             return rows_a[idx_i].prefix;
+                    }
                 }
         }
         return std::nullopt;

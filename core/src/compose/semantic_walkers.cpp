@@ -163,20 +163,34 @@ namespace tokenization
 {
 
     // pre: `composed` is a view already resolved for the stream; no dialect gate is tested here.
-    // post: the row with the longest matching prefix wins; declaration order never decides.
-    // refs: ADR-17.D1, ADR-17.D4, ADR-22.D6
+    // post: a matching shape row wins over every prefix row, being a claim on the whole content;
+    // among rows of one kind the longest declared bytes win.
+    // invariant: two shape rows of one length both matching a line keep the first in composed
+    // order, which is canonical, so the answer never depends on declaration or link order.
+    // refs: ADR-17.D1, ADR-17.D4, ADR-22.D6, DN-134.D9
     StructuralRole classify(NormalizedContent normalized,
                             const insight::semantic::ComposedSemantics& composed) noexcept
     {
         const std::string_view content{normalized.bytes()};
         StructuralRole best{StructuralRole::None};
+        bool best_is_shape{false};
         std::size_t best_len{0};
         for (const insight::semantic::StructuralRoleRow& row : composed.roles())
-            if (content.starts_with(row.prefix) && row.prefix.size() > best_len)
+        {
+            const bool shape{row.match == insight::semantic::RoleMatchKind::Shape};
+            if (best_is_shape && !shape)
+                continue;
+            const bool longer{(shape && !best_is_shape) || row.prefix.size() > best_len};
+            if (!longer)
+                continue;
+            if (shape ? insight::semantic::shape_matches(row.prefix, content)
+                      : content.starts_with(row.prefix))
             {
                 best = row.role;
+                best_is_shape = shape;
                 best_len = row.prefix.size();
             }
+        }
         return best;
     }
 

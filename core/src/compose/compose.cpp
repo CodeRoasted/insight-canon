@@ -86,6 +86,7 @@ namespace
             append_str(out, row.prefix);
             append_u8(out, static_cast<std::uint8_t>(row.role));
             append_str(out, row.dialect_gate);
+            append_u8(out, static_cast<std::uint8_t>(row.match));
         }
         // note: the channel NAMES enter the digest, never the C++ spelling of their fields.
         // refs: ADR-22.D4
@@ -174,12 +175,18 @@ namespace
     // post: one shadow note per pair whose shorter prefix properly prefixes the longer and whose
     // gates intersect.
     // refs: ADR-17.D4
+    // invariant: a shape role row shadows nothing and is shadowed by nothing: it claims the whole
+    // content and wins over every prefix row, so a prefix relation between its bytes means nothing.
+    // refs: ADR-17.D4, DN-134.D9
     template <typename Row>
     void note_shadows(std::span<const Row> rows, std::string_view kind, CompositionReport& report)
     {
         for (const Row& lhs : rows)
             for (const Row& rhs : rows)
             {
+                if constexpr (std::same_as<Row, StructuralRoleRow>)
+                    if (lhs.match == RoleMatchKind::Shape || rhs.match == RoleMatchKind::Shape)
+                        continue;
                 if (&lhs == &rhs || lhs.prefix.size() >= rhs.prefix.size())
                     continue;
                 if (rhs.prefix.starts_with(lhs.prefix) &&
@@ -243,6 +250,21 @@ namespace
                      "marker is non-empty and ends in a byte that is not a digit — a marker "
                      "ending in a digit would make the digit run after it ambiguous. Fix the "
                      "row.\n";
+        std::terminate();
+    }
+
+    // note: the message states the rule and the remedy and names no record: canon ships public.
+    [[noreturn]] void fail_role_row(const SemanticPackageManifest& pkg,
+                                    const StructuralRoleRow& row)
+    {
+        std::cerr << "FATAL: insight::semantic::compose — package \"" << pkg.name
+                  << "\", role row \"" << row.prefix
+                  << "\": a role row is a non-empty prefix, or a whole-line shape of literal bytes "
+                     "with at least one {n} hole, no other brace, no trailing whitespace, and no "
+                     "hole against a digit, another hole or a decimal point leading into either, "
+                     "so that a hole is always exactly the number the line prints. The Progress "
+                     "role is declared by a shape only, because its samples share their prefix "
+                     "with lines that are content. Fix the row.\n";
         std::terminate();
     }
 
@@ -486,6 +508,10 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
         for (const DeclaredValueRow& row : pkg.declared_values)
             if (!declared_value_row_well_formed(row))
                 fail_declared_value(pkg, row);
+    for (const SemanticPackageManifest& pkg : packages)
+        for (const StructuralRoleRow& row : pkg.roles)
+            if (!role_row_well_formed(row))
+                fail_role_row(pkg, row);
 
     const std::vector<std::size_t> order{canonical_order(packages)};
 
