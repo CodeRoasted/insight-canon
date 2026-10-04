@@ -57,3 +57,10 @@ target_link_libraries(det_proof PRIVATE
     picosha2::picosha2)
 target_compile_features(det_proof PRIVATE cxx_std_23)
 set_target_properties(det_proof PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
+
+# The showcase view gate, registered so `malf test` runs it in this inventory cell every day
+# (DN-121.D9); `malf build` never runs it. det_public_proof.sh runs the same gate on every cell of
+# the determinism tower at the cut. Nested, canon and the semantic packages register no test.
+enable_testing()
+add_test(NAME showcase_view
+         COMMAND bash "${CANON_ROOT}/scripts/tests/showcase_view_test.sh" "$<TARGET_FILE:det_proof>")
