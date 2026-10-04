@@ -585,6 +585,48 @@ each to the predicted list.
 
 **It rides `-17`.**
 
+### Rider — the hash counter reads a complete wrapper shell (DN-136.D1)
+
+**What changed.** A hash counter inside a complete wrapper shell — a catalog opener at byte 0, a core the bare counter
+claims (`#`, a digit run, then no letter or digit) holding neither byte of that pair, the opener's own closer and at
+most two trailing bytes from `,;:.` — now takes the counter's normal form inside the kept shell: `(#9767):` →
+`(#<*>):`, `[#42]` → `[#<*>]`, `"#7",` → `"#<*>",`. It used to stay literal, so a logger's per-process tag made one
+template per process. The shell is read by `complete_shell_core`, the one exported reader. `(#42a)`, `(#42`,
+`fix(#123):` and `(#)` stay literal, and `[42]` stays the bracket index's `[<*>]`.
+
+**Which serialized fields move.** `template_str` and `template_id` of a line holding such a token. `params` move on
+none: the form embeds `<*>` inside the token, which is a normalization.
+
+**Witness inputs.** `core/tests/mask/mask_rules.golden` pins the four shelled rows, the bare `#9767):` and `[42]`
+controls and the four literal boundaries. Measured through the public determinism proof over every log of three
+private CI-log views (26 234 logs, 287 296 164 events; coderoast-corpora `d8903c9`, registered before the build): 309 910
+events move, every moved token is the rule's normal form of its base token and every token the rule reaches moves;
+params byte-identical on every event. Distinct templates holding such a token on the GitHub arm: 2 347 → 98,
+2 347 → 98 and 18 084 → 1 291.
+
+**It rides `-17`.**
+
+### Rider — a path starts after a declared lead, `\` separates path components, and three roots join the catalog (DN-136.D4)
+
+**What changed.** A `TokenStart` root now sits at the PATH's first component, and the path starts at byte 0 or right
+after a declared lead (a run of wrapper openers, an optional `<key>=`, an optional `file://`), so `file:///tmp/<run>`,
+`(/tmp/<run>/x.ts:12:5)`, `"/tmp/<run>/s.json",` and `TMPDIR=/tmp/<run>` mask their instance. For the root, a run of
+`\` separates components as `/` does, at both call sites; the source-location walk still segments at `:` and `/`
+only, and inside a segment only the component directly under a matched root masks. The catalog gains
+`AppData/Local/Temp` (`Floating`, `Subtree`), `/private/var/folders` and `/private/tmp` (`TokenStart`, `Subtree`).
+
+**Which serialized fields move.** `template_str` and `template_id` of a line holding such a path. `params` move on
+none.
+
+**Witness inputs.** `core/tests/mask/mask_rules.golden` pins the eight forms of `DN-136.D4`, a `/private/tmp` row and
+the eight literal boundaries (`/home/u/proj/tmp/x`, `build/tmp/x`, `user@host:/tmp/x`, `\"/tmp/x`, the runner's
+`_temp`, `(/tmp)`, `file://host/tmp/x`, `AppData\Local\Templates`). Measured as above, against the build with the
+rider before it: 360 747 events move, every moved token is the rule's normal form of its base token and every token
+the rule reaches moves; params byte-identical on every event. Distinct templates holding such a path on the GitHub
+arm: 3 617 → 263, 3 433 → 234 and 32 179 → 547.
+
+**It rides `-17`.**
+
 ---
 
 *See also: [masking.md](masking.md) (what the current generation's rules actually are) ·

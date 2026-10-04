@@ -143,7 +143,7 @@ namespace
     // refs: ADR-16.D2, ADR-17.D4
     enum class RootAnchor : std::uint8_t
     {
-        // note: the root's first component is the first component after a leading separator.
+        // note: the root's first component is the path's first component, behind a declared lead.
         TokenStart,
         // note: the root matches at ANY component boundary - a mid-path root.
         Floating,
@@ -175,10 +175,21 @@ namespace
         {std::string_view{".conan2"}, std::string_view{"p"}, std::string_view{"b"}}};
     inline constexpr std::array<std::string_view, 2> kRootNixStore{
         {std::string_view{"nix"}, std::string_view{"store"}}};
+    // note: the macOS real paths of `/var/folders` and `/tmp`.
+    // refs: DN-136.D4
+    inline constexpr std::array<std::string_view, 3> kRootPrivateVarFolders{
+        {std::string_view{"private"}, std::string_view{"var"}, std::string_view{"folders"}}};
+    inline constexpr std::array<std::string_view, 2> kRootPrivateTmp{
+        {std::string_view{"private"}, std::string_view{"tmp"}}};
+    // invariant: the run names the Windows per-user temp folder and nothing else; the drive and
+    // user components before it vary by machine.
+    // refs: DN-136.D4
+    inline constexpr std::array<std::string_view, 3> kRootWindowsUserTemp{
+        {std::string_view{"AppData"}, std::string_view{"Local"}, std::string_view{"Temp"}}};
 
     // invariant: a root whose component is the build CONFIGURATION is deliberately absent - it is
     // stable per config, carries no hash, and masking it would destroy signal to fix nothing.
-    inline constexpr std::array<EphemeralRoot, 5> kEphemeralRoots{{
+    inline constexpr std::array<EphemeralRoot, 8> kEphemeralRoots{{
         {.segments = kRootTmp, .anchor = RootAnchor::TokenStart, .scope = RootScope::Subtree},
         {.segments = kRootVarTmp, .anchor = RootAnchor::TokenStart, .scope = RootScope::Subtree},
         {.segments = kRootVarFolders,
@@ -186,13 +197,81 @@ namespace
          .scope = RootScope::Subtree},
         {.segments = kRootConan, .anchor = RootAnchor::Floating, .scope = RootScope::Instance},
         {.segments = kRootNixStore, .anchor = RootAnchor::TokenStart, .scope = RootScope::Instance},
+        {.segments = kRootPrivateVarFolders,
+         .anchor = RootAnchor::TokenStart,
+         .scope = RootScope::Subtree},
+        {.segments = kRootPrivateTmp,
+         .anchor = RootAnchor::TokenStart,
+         .scope = RootScope::Subtree},
+        {.segments = kRootWindowsUserTemp,
+         .anchor = RootAnchor::Floating,
+         .scope = RootScope::Subtree},
     }};
 
     // invariant: the longest declared root, so this is the look-back window the matcher needs.
     inline constexpr std::size_t kMaxRootSegments{3U};
+    static_assert(std::ranges::all_of(kEphemeralRoots, [](const EphemeralRoot& root)
+                                      { return root.segments.size() <= kMaxRootSegments; }),
+                  "a declared ephemeral root is longer than the matcher's look-back window");
+
+    // refs: DN-136.D4, ADR-16.D2
+    // post: true for a byte that separates path components for the root predicate - a run of `\`
+    // is one separator, as JSON escaping doubles it.
+    [[nodiscard]] constexpr bool is_root_separator(char chr) noexcept
+    {
+        return chr == '/' || chr == '\\';
+    }
+
+    // post: the offset just past the separator that starts at `pos` - one `/`, or a whole run of
+    // `\`.
+    // pre: `tok[pos]` is a root separator.
+    [[nodiscard]] constexpr std::size_t skip_root_separator(std::string_view tok,
+                                                            std::size_t pos) noexcept
+    {
+        if (tok[pos] == '/')
+            return pos + 1U;
+        while (pos < tok.size() && tok[pos] == '\\')
+            ++pos;
+        return pos;
+    }
+
+    // post: true for a byte of a lead's `<key>` - `[A-Za-z0-9_.-]`.
+    [[nodiscard]] constexpr bool is_lead_key_byte(char chr) noexcept
+    {
+        return is_alpha(chr) || is_digit(chr) || chr == '_' || chr == '.' || chr == '-';
+    }
+
+    // note: a file URL with an empty authority, whose path is the absolute path after it.
+    inline constexpr std::string_view kFileUrlScheme{"file://"};
+
+    // refs: DN-136.D4, F-SRC-insight-canon:canon.detail.scan.cppm:kWrapperPairs
+    // post: the offset of the PATH's first component - past the separator that opens the path at
+    // byte 0 or right after a declared lead - or npos when the token opens no path there.
+    // invariant: the lead grammar is closed - wrapper openers, then optionally `<key>=` and more
+    // openers, then optionally `file://`; a lead moves WHERE a root sits, never what it matches.
+    [[nodiscard]] constexpr std::size_t path_first_component(std::string_view tok) noexcept
+    {
+        std::size_t pos{0};
+        while (pos < tok.size() && is_wrapper_open(tok[pos]))
+            ++pos;
+        std::size_t key_end{pos};
+        while (key_end < tok.size() && is_lead_key_byte(tok[key_end]))
+            ++key_end;
+        if (key_end > pos && key_end < tok.size() && tok[key_end] == '=')
+        {
+            pos = key_end + 1U;
+            while (pos < tok.size() && is_wrapper_open(tok[pos]))
+                ++pos;
+        }
+        if (tok.substr(pos).starts_with(kFileUrlScheme))
+            pos += kFileUrlScheme.size();
+        if (pos >= tok.size() || !is_root_separator(tok[pos]))
+            return std::string_view::npos;
+        return skip_root_separator(tok, pos);
+    }
 
     // post: one component of a segment walk - its core text, the separator byte immediately before
-    // it, and whether it is the first component after a leading separator.
+    // it, and whether it is the path's first component.
     struct PathComponent
     {
         std::string_view text;
@@ -229,10 +308,10 @@ namespace
             if (!matched)
                 continue;
             // assert: consecutive AND separator-joined - every separator from the root's FIRST
-            // component onward must be the path separator, so a colon coincidence never matches.
-            // refs: ADR-16.D2
+            // component onward must be a path separator, so a colon coincidence never matches.
+            // refs: ADR-16.D2, DN-136.D4
             for (std::size_t idx{first}; idx < window.size(); ++idx)
-                if (window[idx].sep_before != '/')
+                if (!is_root_separator(window[idx].sep_before))
                 {
                     matched = false;
                     break;
@@ -278,6 +357,7 @@ namespace
         // assert: scope is CLAMPED to Instance here, so a file-and-line tail is never masked.
         // refs: F-SRC-insight-canon:mask.cpp:root_scope_ending_at
         bool mask_next{false};
+        const std::size_t first_comp{path_first_component(tok)};
         std::array<PathComponent, kMaxRootSegments> window{};
         std::size_t window_len{0};
         const auto push_component{[&](std::string_view text, char sep_before, bool at_token_start)
@@ -300,19 +380,63 @@ namespace
                                                                       window.data(), window_len})
                                           .has_value();
                                   }};
+        // post: the bounds `[lead, trail)` of the alphanumeric core of `part`, empty when it has
+        // none.
+        const auto core_bounds{
+            [](std::string_view part)
+            {
+                std::size_t lead{0};
+                while (lead < part.size() && !is_digit(part[lead]) && !is_alpha(part[lead]))
+                    ++lead;
+                std::size_t trail{part.size()};
+                while (trail > lead && !is_digit(part[trail - 1]) && !is_alpha(part[trail - 1]))
+                    --trail;
+                return std::pair{lead, trail};
+            }};
+        // refs: DN-136.D4
+        // post: appends a letter-led segment holding `\`, masking only a component directly under
+        // a root its `\`-separated components reach; with no such root the bytes are unchanged.
+        const auto append_backslash_segment{
+            [&](std::string_view seg, std::size_t abs_start)
+            {
+                std::size_t part_start{0};
+                while (true)
+                {
+                    const std::size_t found{seg.find('\\', part_start)};
+                    const std::size_t part_end{found == std::string_view::npos ? seg.size()
+                                                                               : found};
+                    const std::string_view part{seg.substr(part_start, part_end - part_start)};
+                    const auto [lead, trail]{core_bounds(part)};
+                    if (lead == trail || !mask_next)
+                        out.append(part);
+                    else
+                    {
+                        out.append(part.substr(0, lead));
+                        out.append(kWildcard);
+                        out.append(part.substr(trail));
+                        masked = true;
+                    }
+                    if (lead != trail)
+                    {
+                        const std::size_t abs{abs_start + part_start};
+                        push_component(part, abs == 0 ? '\0' : tok[abs - 1U], abs == first_comp);
+                        mask_next = root_ends_here();
+                    }
+                    if (part_end == seg.size())
+                        return;
+                    const std::size_t sep_end{skip_root_separator(seg, part_end)};
+                    out.append(seg.substr(part_end, sep_end - part_end));
+                    part_start = sep_end;
+                }
+            }};
         const auto flush_segment{
             [&](std::size_t end)
             {
                 const std::string_view seg{tok.substr(seg_start, end - seg_start)};
-                std::size_t lead{0};
-                while (lead < seg.size() && !is_digit(seg[lead]) && !is_alpha(seg[lead]))
-                    ++lead;
-                std::size_t trail{seg.size()};
-                while (trail > lead && !is_digit(seg[trail - 1]) && !is_alpha(seg[trail - 1]))
-                    --trail;
+                const auto [lead, trail]{core_bounds(seg)};
                 const std::string_view core{seg.substr(lead, trail - lead)};
                 const char sep_before{seg_start == 0 ? '\0' : tok[seg_start - 1U]};
-                const bool at_token_start{seg_start == 1U && !tok.empty() && tok.front() == '/'};
+                const bool at_token_start{seg_start == first_comp};
 
                 if (core.empty())
                 {
@@ -339,8 +463,14 @@ namespace
 
                 if (is_alpha(core.front()))
                 {
-                    out.append(seg);
                     has_letter_anchor = true;
+                    if (seg.contains('\\'))
+                    {
+                        prev_core = core;
+                        append_backslash_segment(seg, seg_start);
+                        return;
+                    }
+                    out.append(seg);
                 }
                 else if (is_status_keyword(prev_core) && is_all_digits(core) &&
                          core.size() <= kMaxStatusDigits)
@@ -369,69 +499,72 @@ namespace
         return masked && has_letter_anchor;
     }
 
+    struct RootHit
+    {
+        std::size_t end;
+        RootScope scope;
+    };
+
+    // post: where the token's first declared root ends - the offset just past its last component -
+    // and that root's scope, else nullopt.
+    // refs: F-SRC-insight-canon:mask.cpp:root_scope_ending_at, DN-136.D4
+    [[nodiscard]] inline std::optional<RootHit> first_root(std::string_view tok)
+    {
+        std::array<PathComponent, kMaxRootSegments> window{};
+        std::size_t window_len{0};
+        const std::size_t first_comp{path_first_component(tok)};
+        std::size_t comp_start{0};
+        for (std::size_t pos{0}; pos <= tok.size(); ++pos)
+        {
+            if (pos < tok.size() && !is_root_separator(tok[pos]))
+                continue;
+            const PathComponent comp{.text = tok.substr(comp_start, pos - comp_start),
+                                     .sep_before = comp_start == 0 ? '\0' : tok[comp_start - 1U],
+                                     .at_token_start = comp_start == first_comp};
+            if (window_len < kMaxRootSegments)
+                window[window_len++] = comp;
+            else
+            {
+                for (std::size_t idx{1}; idx < kMaxRootSegments; ++idx)
+                    window[idx - 1U] = window[idx];
+                window.back() = comp;
+            }
+            if (const std::optional<RootScope> hit{root_scope_ending_at(
+                    std::span<const PathComponent>{window.data(), window_len})};
+                hit.has_value())
+                return RootHit{.end = pos, .scope = *hit};
+            if (pos < tok.size())
+                pos = skip_root_separator(tok, pos) - 1U;
+            comp_start = pos + 1U;
+        }
+        return std::nullopt;
+    }
+
     // pre: reached only for a token the diagnostic composite did not claim.
     // post: honours the DECLARED scope - a subtree root collapses the whole remainder, an instance
     // root masks the one component under it and KEEPS the tail.
     // invariant: segment-anchored rather than prefix-matched, which is what lets a mid-path
     // floating root match; it is not a general absolute-path masker.
-    // refs: F-SRC-insight-canon:mask.cpp:root_scope_ending_at
+    // post: the instance keeps the separator before it verbatim, a `/` or a run of `\`.
+    // refs: F-SRC-insight-canon:mask.cpp:root_scope_ending_at, DN-136.D4
     [[nodiscard]] inline bool normalize_ephemeral_root(std::string_view tok, std::string& out)
     {
-        std::array<PathComponent, kMaxRootSegments> window{};
-        std::size_t window_len{0};
-        const auto push{[&](const PathComponent& comp)
-                        {
-                            if (window_len < kMaxRootSegments)
-                            {
-                                window[window_len++] = comp;
-                                return;
-                            }
-                            for (std::size_t idx{1}; idx < kMaxRootSegments; ++idx)
-                                window[idx - 1U] = window[idx];
-                            window[kMaxRootSegments - 1U] = comp;
-                        }};
-
-        std::size_t comp_start{0};
-        std::size_t root_end{std::string_view::npos};
-        RootScope scope{RootScope::Subtree};
-        for (std::size_t pos{0}; pos <= tok.size(); ++pos)
-            if (pos == tok.size() || tok[pos] == '/')
-            {
-                const std::string_view comp{tok.substr(comp_start, pos - comp_start)};
-                const char sep_before{comp_start == 0 ? '\0' : tok[comp_start - 1U]};
-                const bool at_token_start{comp_start == 1U && !tok.empty() && tok.front() == '/'};
-                push(PathComponent{
-                    .text = comp, .sep_before = sep_before, .at_token_start = at_token_start});
-                if (const std::optional<RootScope> hit{root_scope_ending_at(
-                        std::span<const PathComponent>{window.data(), window_len})};
-                    hit.has_value())
-                {
-                    root_end = pos;
-                    scope = *hit;
-                    break;
-                }
-                comp_start = pos + 1U;
-            }
-
-        if (root_end == std::string_view::npos)
-            return false;
-
+        const std::optional<RootHit> hit{first_root(tok)};
         // assert: a non-empty instance component directly under the root is required, so a bare
         // root and a doubled separator are not collapsed.
-        if (root_end >= tok.size() || tok[root_end] != '/')
+        if (!hit.has_value() || hit->end >= tok.size() || !is_root_separator(tok[hit->end]))
             return false;
-        const std::size_t inst_start{root_end + 1U};
-        if (inst_start >= tok.size() || tok[inst_start] == '/')
+        const std::size_t inst_start{skip_root_separator(tok, hit->end)};
+        if (inst_start >= tok.size() || is_root_separator(tok[inst_start]))
             return false;
 
         out.clear();
-        out.append(tok.substr(0, root_end));
-        out.push_back('/');
+        out.append(tok.substr(0, inst_start));
         out.append(kWildcard);
-        if (scope == RootScope::Instance)
+        if (hit->scope == RootScope::Instance)
         {
             std::size_t inst_end{inst_start};
-            while (inst_end < tok.size() && tok[inst_end] != '/')
+            while (inst_end < tok.size() && !is_root_separator(tok[inst_end]))
                 ++inst_end;
             out.append(tok.substr(inst_end));
         }
@@ -564,21 +697,45 @@ namespace
         return false;
     }
 
-    // post: keeps the counter marker and masks the index; the digit run must reach end or
-    // punctuation, so a marker followed by a word is not a counter.
-    [[nodiscard]] inline bool normalize_hash_counter(std::string_view tok, std::string& out)
+    // post: the end of the digit run when `tok` is a bare counter - `#`, a digit run, then no
+    // letter or digit - else nullopt, so a marker followed by a word is not a counter.
+    [[nodiscard]] inline std::optional<std::size_t>
+    bare_hash_counter_end(std::string_view tok) noexcept
     {
         if (tok.size() < 2U || tok[0] != '#' || !is_digit(tok[1]))
-            return false;
+            return std::nullopt;
         std::size_t cursor{1};
         while (cursor < tok.size() && is_digit(tok[cursor]))
             ++cursor;
         for (std::size_t pos{cursor}; pos < tok.size(); ++pos)
             if (is_digit(tok[pos]) || is_alpha(tok[pos]))
+                return std::nullopt;
+        return cursor;
+    }
+
+    // refs: DN-136.D1, F-SRC-insight-canon:canon.api.cppm:complete_shell_core
+    // post: keeps the counter marker and masks the index, bare or inside a complete wrapper shell
+    // whose core is a bare counter - the shell, its closer and the trailing bytes stay verbatim.
+    // invariant: the shelled acceptance set is the set the bare counter masks, so it merges
+    // nothing canon does not merge when the counter is printed without the punctuation.
+    [[nodiscard]] inline bool normalize_hash_counter(std::string_view tok, std::string& out)
+    {
+        std::size_t core_at{0};
+        std::optional<std::size_t> digits_end{bare_hash_counter_end(tok)};
+        if (!digits_end.has_value())
+        {
+            const std::optional<std::string_view> core{complete_shell_core(tok)};
+            if (!core.has_value())
                 return false;
+            digits_end = bare_hash_counter_end(*core);
+            if (!digits_end.has_value())
+                return false;
+            core_at = static_cast<std::size_t>(core->data() - tok.data());
+        }
         out.clear();
+        out.append(tok.substr(0, core_at));
         out.append("#<*>");
-        out.append(tok.substr(cursor));
+        out.append(tok.substr(core_at + *digits_end));
         return true;
     }
 

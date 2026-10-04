@@ -46,7 +46,7 @@ Each whitespace token is classified by the **first** matching rule:
 | # | Rule | Disposition |
 |---|---|---|
 | 1 | **Status-value KEEP** — an all-digit token, ≤ 3 digits, immediately after a **status keyword** | KEEP literal |
-| 2 | **Composite** — the token carries a structural delimiter; one of the normalizers (§4) matches | KEEP normalized (embeds `<*>`) |
+| 2 | **Composite** — the token carries a structural delimiter; one of the normalizers (§4) matches. The hash counter reads its token through a **complete** wrapper shell (§3.2), and the ephemeral-root reader finds a path behind a declared **lead** (§3.1) | KEEP normalized (embeds `<*>`, no param) |
 | 3 | **UUID / long hash** | MASK `<*>` |
 | 4 | **IPv4**, bare or inside a declared **wrapper shell** (§3.2), with at most two trailing closers or `,;:.` | MASK `<*>` when `mask_ip_addresses` is on; KEEP literal when it is off — rule 4 decides every token it accepts, so no later rule reaches one |
 | 5 | **Digit-leading numeric**, or a digit-leading core inside a **complete** wrapper shell (§3.2) | MASK `<*>` — this also carries `0x`-hex: a `0x…` token starts with a digit. The shelled form masks whole and its raw token is the param; a short status value behind a status keyword stays literal through the shell, as rule 1 keeps it bare |
@@ -83,9 +83,9 @@ data-learned. This is what keeps masking decidable and deterministic.
 | **Status keywords** | `code`, `status`, `exit`, `signal` (case-insensitive) | Rule 1 — the keyword before a short numeric value that must stay split (status codes, exit codes). |
 | **Max status digits** | `3` | Rule 1 — a status value masks if longer (it's an id, not a code). |
 | **Currency markers** | `$` (ASCII; structured to add `€`/`£`/`¥` as declared byte sequences if a corpus shows them) | §4 marker-number — a leading currency symbol glued to a number. |
-| **Ephemeral roots** | `/tmp`, `/var/tmp`, `/var/folders`, `.conan2/p/b`, `/nix/store` — each carrying a declared **anchor** + **scope** (§3.1) | §4 ephemeral-root — a path segment directly under a per-run build/temp root is an instance and masks; the root is kept. |
+| **Ephemeral roots** | `/tmp`, `/var/tmp`, `/var/folders`, `/private/var/folders`, `/private/tmp`, `.conan2/p/b`, `/nix/store`, `AppData/Local/Temp` — each carrying a declared **anchor** + **scope** (§3.1) | §4 ephemeral-root — a path segment directly under a per-run build/temp root is an instance and masks; the root is kept. |
 | **Min hash length** | `16` | Rule 3 / §4 embedded-identity — a hex-only run this long is an instance hash, not a word. |
-| **Wrapper pairs** | `[]` `()` `{}` `<>` `""` `''` | §3.2 — the punctuation shell a producer wraps a whole token in. Read by rule 4's grammar, by rule 5's shelled form and by the rule-2 pre-gate. |
+| **Wrapper pairs** | `[]` `()` `{}` `<>` `""` `''` | §3.2 — the punctuation shell a producer wraps a whole token in. Read by rule 4's grammar, by rule 5's shelled form, by the hash counter's shelled form, by the ephemeral-root lead (§3.1) and by the rule-2 pre-gate. |
 | **Wildcard** | `<*>` | The mask placeholder. |
 | **Declared-value markers** | none in core: each key and its markers are a dialect's data (`DeclaredValueRow`); the GitHub dialect declares `pull_request` behind `PR-`, `pr-`, `Pr-`, `pull-`, `PULL-`, `Pull-`, `PR#`, `pulls/` | §4 declared-run — the markers a run's own declared value is masked behind. Core holds the mechanism and no marker. |
 
@@ -106,8 +106,14 @@ is a per-run instance *by construction* (a conan build dir, a nix store hash, a 
 entry declares two axes; both are **explicit, never inferred** — a mis-declared root over-masks, and
 over-masking destroys signal irrecoverably, so the dangerous choices are named on purpose:
 
-- **anchor** — `TokenStart`: the root's first component is the token's first path component (a leading `/…`).
-  `Floating`: the root matches at **any** component boundary, so a mid-path root stays visible.
+- **anchor** — `TokenStart`: the root's first component is the **path's** first component. A path starts at byte 0
+  or right after a declared **lead**, and the byte where it starts is a separator. The lead grammar is closed: a run
+  of wrapper openers (§3.2, read from the same table), then optionally `<key>=` (the key one or more of
+  `[A-Za-z0-9_.-]`, optionally followed by more openers), then optionally `file://` (a file URL with an empty
+  authority, whose path is the absolute path). So `/tmp/run-a1`, `(/tmp/run-a1/x.ts:12:5)`, `"/tmp/run-a1/s.json",`,
+  `TMPDIR=/tmp/run-a1` and `file:///tmp/run-a1/x.ts` all start their path at `/tmp`. A lead moves **where** a root may
+  sit, never what it matches: `/home/u/proj/tmp/x` and `build/tmp/x` stay literal, because `tmp` is not the path's
+  first component. `Floating`: the root matches at **any** component boundary, so a mid-path root stays visible.
 - **scope** — `Subtree`: everything under the root is ephemeral, so the whole remainder collapses to `<*>` (a
   namespace of ephemeral *trees*). `Instance`: exactly the one component under the root masks and the tail
   resumes normal classification (a content-addressed *store* whose subtree is structurally stable).
@@ -115,23 +121,44 @@ over-masking destroys signal irrecoverably, so the dangerous choices are named o
 | Root | anchor | scope |
 |---|---|---|
 | `/tmp` · `/var/tmp` · `/var/folders` | `TokenStart` | `Subtree` |
+| `/private/var/folders` · `/private/tmp` (the macOS real paths of two roots above) | `TokenStart` | `Subtree` |
 | `.conan2/p/b` | `Floating` | `Instance` |
 | `/nix/store` | `TokenStart` | `Instance` |
+| `AppData/Local/Temp` (the Windows per-user temp folder; the drive and user before it vary by machine) | `Floating` | `Subtree` |
+
+**Separators.** For the root, `/` and a run of `\` both separate path components (JSON escaping doubles the
+backslash, so `C:\\Users\\u\\AppData\\Local\\Temp\\run-a1` reads as one path), and every separator from the root's first
+component onward must be one of them — a `:` never joins a root. The source-location walk still segments at `:` and
+`/`; inside a segment, the root reads the `\`-separated components, and only the one component directly under a
+matched root masks. Splitting that walk itself at `\` would also mask every digit-led component between backslashes
+(a tool version in a tool-cache path) and split a JSON escape glued after a location, so it is not done.
 
 The catalog is a **single source of truth** consulted from **two** call sites: the standalone ephemeral-root
 normalizer (§4) **and**, as a per-segment predicate, from inside the source-location normalizer's segment walk
 — so an instance directory inside a compiler diagnostic masks even though it is letter-leading, while the
 `file:line` tail survives (§4). `bazel-out` is deliberately **excluded**: its component is the build
 *configuration* (`k8-fastbuild`, `ppc-opt`), which is stable per config and carries drift signal we want
-surfaced — it holds no hash, so masking it would destroy signal to fix nothing. Adding a root is a **core**
-masking change (it is syntactic, not ecosystem vocabulary) and bumps `canonicalization_version`.
+surfaced — it holds no hash, so masking it would destroy signal to fix nothing. Three more forms stay literal
+beside it, each measured:
+
+- **The runner's own temp folder** (`$RUNNER_TEMP`: `…/work/_temp`, `…/_work/_temp`, `D:\a\_temp`,
+  `/github/runner_temp`) is not a per-run root: its children are tool-chosen, stable names (the runner's command
+  files, a setup action's cache folder, a code-scanning database), so masking it would merge distinct stable
+  folders. Its per-run children already mask, because their names carry a UUID that embedded-identity reads.
+- **`host:/tmp/…`** (a remote copy target): a `:` lead also ends a label or a location, so it is not a path start
+  by its bytes.
+- **`\"/tmp/…`** (a JSON string inside a JSON string): reading an escaped opener would be a second escaping layer in
+  the lead grammar.
+
+Adding a root is a **core** masking change (it is syntactic, not ecosystem vocabulary) and owes an entry in the
+generation ledger ([canonicalization_generations.md](canonicalization_generations.md)).
 
 ### 3.2 The wrapper-shell catalog — a shell is punctuation, never part of the value
 
 A producer wraps a whole token in punctuation and means nothing by it: `(10.100.0.250)`, `[10.20.30.40]`
 and `"10.0.0.1"` are one address in three dresses. The six pairs are the declared, frozen set, read from
-**one table** (`kWrapperPairs`) by both surfaces that need them — rule 4's grammar and rule 2's pre-gate —
-because a second copy is how two maskers diverge.
+**one table** (`kWrapperPairs`) by every surface that needs them — rule 4's grammar, rule 2's pre-gate, the
+complete-shell reader and the ephemeral-root lead (§3.1) — because a second copy is how two maskers diverge.
 
 **This catalog exists because its absence shipped.** Rule 4 had *already* decided a shell does not defeat
 the class — it spelled `\[?…\]?` — and then implemented that decision over the single pair the first corpus
@@ -163,10 +190,18 @@ of at most 3 digits behind a status keyword stays literal (`exit code (1)`), and
 (`[42]` is the bracket index's `[<*>]`). Measured on 32 000 lines of real third-party
 logs across 16 producers, the repair moves **3 templates out of 6712**.
 
+**The hash counter reads a complete shell too.** A token made of a catalog opener at byte 0, a core that the bare
+hash counter claims (`#`, a digit run, then no letter or digit) holding neither byte of that pair, the opener's own
+closer and at most two trailing bytes from `,;:.` takes the counter's normal form inside the kept shell:
+`(#9767):` → `(#<*>):`, `[#42]` → `[#<*>]`, `"#7",` → `"#<*>",`. It is a normalization, as `#42` → `#<*>` is bare,
+so no param is pushed. The acceptance set is the set the bare counter already masks, so it merges nothing the bare
+form does not. Its boundary: `(#42a)` (a letter follows the run), `(#42` (incomplete), `fix(#123):` (byte 0 is not an
+opener) and `(#)` stay literal, and `[42]` is still the bracket index's `[<*>]`, which runs first.
+
 **The complete-shell grammar is one reader, exported.** `complete_shell_core` (canon's public API) returns the core
-of a complete shell or nothing. Rule 5 calls it, and a consumer that classifies a param's value by its syntax
-(Sift's value-slot gates) calls the same function, so the shell is read one way on both sides of the package
-boundary and the catalog is never copied out of canon.
+of a complete shell or nothing. Rule 5 and the hash counter call it, and a consumer that classifies a param's value
+by its syntax (Sift's value-slot gates) calls the same function, so the shell is read one way on both sides of the
+package boundary and the catalog is never copied out of canon.
 
 ---
 
@@ -178,10 +213,10 @@ instance. Tried in order; first match wins.
 | Normalizer | Matches | Keeps / masks | Example |
 |---|---|---|---|
 | **source-location** | `<path-like>:<digits>[:<digits>]` (prefix contains `.` or `/`) | keep the file/path, mask each `:<digit-run>` | `tokenizer.cpp:4500:30:` → `tokenizer.cpp:<*>:<*>:` |
-| **ephemeral-root** | a path (`/`) whose segments match a declared ephemeral root (§3.1), reached only when no earlier rule claimed the token | keep the root, mask the instance component; **Subtree** collapses the whole remainder, **Instance** keeps the tail | `/tmp/pw-electron-userdata-Kw9v4a` → `/tmp/<*>` (Subtree) · `~/.conan2/p/b/insig247…/lib/x.so` → `~/.conan2/p/b/<*>/lib/x.so` (Instance) |
+| **ephemeral-root** | a path (components separated by `/` or a run of `\`) whose components match a declared ephemeral root (§3.1), a `TokenStart` root sitting at the path's start behind an optional declared lead; reached only when no earlier rule claimed the token | keep the root and the separator after it, mask the instance component; **Subtree** collapses the whole remainder, **Instance** keeps the tail | `/tmp/pw-electron-userdata-Kw9v4a` → `/tmp/<*>` (Subtree) · `~/.conan2/p/b/insig247…/lib/x.so` → `~/.conan2/p/b/<*>/lib/x.so` (Instance) · `file:///tmp/run-a1/x.ts` → `file:///tmp/<*>` · `TMPDIR=/tmp/run-a1` → `TMPDIR=/tmp/<*>` · `C:\Users\u\AppData\Local\Temp\run-a1\x.ts` → `C:\Users\u\AppData\Local\Temp\<*>` |
 | **versioned-ref** | `<name>/<numeric-version>` (digit after the last `/`, only punctuation may trail) | keep the name, mask the version | `zlib/1.3` → `zlib/<*>` |
 | **bracket-index** | `<word>[<short-alpha?><digits>]` | keep the word + class marker, mask the index | `make[2]:` → `make[<*>]:` · `[gw0]` → `[gw<*>]` |
-| **hash-counter** | `#<digits>` (no alnum may trail) | keep `#`, mask the index | `step #26` → `step #<*>` |
+| **hash-counter** | `#<digits>` (no alnum may trail), bare or inside a complete wrapper shell (§3.2) | keep `#` and the shell, mask the index; no param | `step #26` → `step #<*>` · `INFO (#9767): watcher` → `INFO (#<*>): watcher` · `[#42]` → `[#<*>]` |
 | **marker-number** | `<currency-marker><digit-core>[.<digits>]` | keep the marker, mask the number | `$463.50` → `$<*>` |
 | **embedded-identity** | a UUID (`8-4-4-4-12`), a hex run ≥ 16, or a **compact UTC instant** (`YYYY-MM-DDTHHMMSSZ` — exactly 18 bytes, colon-free time, mandatory `Z`, non-alphanumeric on both sides), *inside* a larger token not under a declared ephemeral root — including one whose only structure is a wrapper shell (§3.2) | mask the id in place, keep surrounding structure | `~/.cache/gradle/f7f6…2680/lib.jar` → `~/.cache/gradle/<*>/lib.jar` · `(d41d…427e)` → `(<*>)` · `/home/runner/work/_temp/2026-06-09T185733Z.json` → `/home/runner/work/_temp/<*>.json` |
 | **sanitizer-pid** | `==<digits>==` opening the token, followed by nothing or by a letter (the process tag AddressSanitizer, libFuzzer and valgrind print) | keep both fences and a glued letter-leading tail, mask the pid; a digit after the closing fence, or any byte before the opening one, declines | `==4242==` → `==<*>==` · `==77==ABORTING` → `==<*>==ABORTING` |
@@ -239,6 +274,12 @@ a gap to be closed with more rules:
   The one exception is a value the run **declares**: a run's own pull-request number behind a marker its
   dialect declares is a supplied fact, not a cardinality guess, so the declared-run step (§4) masks it and
   nothing else of the same shape.
+- **An instant printed across whitespace tokens.** An RFC 1123 or RFC 2822 date (`Thu, 02 Jul 2026 06:43:50 GMT`)
+  or a ctime date in a line's content keeps its weekday and month names literal while its numbers mask, so one line
+  kind spreads over one template per weekday and month. Masking decides each whitespace token from its own bytes,
+  and a weekday or month name is a word by its bytes (`May`, `Sat`, `Sun`); only its neighbours make it part of an
+  instant. Masking the names token by token would also spread one value over several params; treating the instant
+  as one value is a question about the masking unit (`ADR-16.D5`), not a missing rule.
 - **Categorical numbers that should split.** An HTTP `404` vs `500` is handled by **extending the status-KEEP
   context** (rule 1 / the kv carve-out), never by weakening the digit-leading mask.
 

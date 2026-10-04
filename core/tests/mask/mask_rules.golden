@@ -13,7 +13,7 @@
 # `rule_id` is the rule the row exists to witness, and it is CHECKED, not merely declared:
 # `test_mask_rule_golden.cpp` routes each composite subject back through the same catalog the
 # dispatcher runs and reds if a different rule claims it. The population's coverage of the declared
-# rule set (the 10 composite rules, the 5 ephemeral roots, the 6 wrapper pairs, the 4 status
+# rule set (the 10 composite rules, the 8 ephemeral roots, the 6 wrapper pairs, the 4 status
 # keywords, the currency markers) is likewise read from those catalogs, so a rule or entry added
 # with no witness reds by NAME.
 #
@@ -95,6 +95,10 @@ literal_keep | libcc1plugin.so.0 | loading libcc1plugin.so.0 now | loading libcc
 # diagnostic_composite — the general per-segment rule that subsumed source-location.
 diagnostic_composite | tokenizer.cpp:4500:30: | error at tokenizer.cpp:4500:30: bad token | error at tokenizer.cpp:<*>:<*>: bad token
 diagnostic_composite | [6226:0609/094020.430910:ERROR:dbus/bus.cc:408] | [6226:0609/094020.430910:ERROR:dbus/bus.cc:408] Failed to connect | [<*>:<*>/<*>:ERROR:dbus/bus.cc:<*>] Failed to connect
+# DN-136.D4: a root reached behind a declared lead, or through `\` separators, masks the one component under it
+# inside a location, and the file-and-line tail survives.
+diagnostic_composite | (/tmp/run-a1/x.ts:12:5) | at (/tmp/run-a1/x.ts:12:5) here | at (/tmp/<*>/x.ts:<*>:<*>) here
+diagnostic_composite | (C:\\Users\\u\\AppData\\Local\\Temp\\run-a1\\x.ts:12:5) | at (C:\\Users\\u\\AppData\\Local\\Temp\\run-a1\\x.ts:12:5) here | at (C:\\Users\\u\\AppData\\Local\\Temp\\<*>\\x.ts:<*>:<*>) here
 
 # ephemeral_root — one witness per DECLARED root, with its declared anchor and scope visible in the
 # expected value (Subtree collapses the remainder; Instance keeps the tail).
@@ -103,6 +107,26 @@ ephemeral_root | /var/tmp/build-a1b2c3/out.log | wrote /var/tmp/build-a1b2c3/out
 ephemeral_root | /var/folders/aB/cD/T/scratch | dir /var/folders/aB/cD/T/scratch ready | dir /var/folders/<*> ready
 ephemeral_root | /home/runner/.conan2/p/b/insig247e3d1dffc33/p/lib/libx.so | loading /home/runner/.conan2/p/b/insig247e3d1dffc33/p/lib/libx.so now | loading /home/runner/.conan2/p/b/<*>/p/lib/libx.so now
 ephemeral_root | /nix/store/abc123def456-glibc/lib/libc.so | mapping /nix/store/abc123def456-glibc/lib/libc.so now | mapping /nix/store/<*>/lib/libc.so now
+ephemeral_root | /private/var/folders/8j/a1/T/x | dir /private/var/folders/8j/a1/T/x ready | dir /private/var/folders/<*> ready
+ephemeral_root | /private/tmp/run-a1/x | dir /private/tmp/run-a1/x ready | dir /private/tmp/<*> ready
+ephemeral_root | C:\Users\u\AppData\Local\Temp\run-a1\x.ts | open C:\Users\u\AppData\Local\Temp\run-a1\x.ts ok | open C:\Users\u\AppData\Local\Temp\<*> ok
+# DN-136.D4: a path starts at byte 0 or right after a declared LEAD — a run of wrapper openers, an optional
+# `<key>=`, an optional `file://` — so a TokenStart root is the path's first component behind it, and `\`
+# separates components for the root predicate. A lead moves WHERE a root may sit, never what it matches.
+ephemeral_root | file:///tmp/run-a1/x.ts | loading file:///tmp/run-a1/x.ts now | loading file:///tmp/<*> now
+ephemeral_root | "/tmp/run-a1/s.json", | wrote "/tmp/run-a1/s.json", done | wrote "/tmp/<*> done
+ephemeral_root | TMPDIR=/tmp/run-a1 | export TMPDIR=/tmp/run-a1 now | export TMPDIR=/tmp/<*> now
+ephemeral_root | file:///C:/Users/u/AppData/Local/Temp/run-a1/x.ts | loading file:///C:/Users/u/AppData/Local/Temp/run-a1/x.ts now | loading file:///C:/Users/u/AppData/Local/Temp/<*> now
+# DN-136.D4's boundary: a root that is not the path's first component, a lead outside the grammar (a `:` label,
+# an escaped quote, a file URL with an authority), the runner's own temp folder, a bare root and a near-miss name.
+literal_keep | /home/u/proj/tmp/x | copied /home/u/proj/tmp/x ok | copied /home/u/proj/tmp/x ok
+literal_keep | build/tmp/x | copied build/tmp/x ok | copied build/tmp/x ok
+literal_keep | user@host:/tmp/x | copied user@host:/tmp/x ok | copied user@host:/tmp/x ok
+literal_keep | \"/tmp/x | copied \"/tmp/x ok | copied \"/tmp/x ok
+literal_keep | /home/runner/work/_temp/cache-dir | copied /home/runner/work/_temp/cache-dir ok | copied /home/runner/work/_temp/cache-dir ok
+literal_keep | (/tmp) | copied (/tmp) ok | copied (/tmp) ok
+literal_keep | file://host/tmp/x | copied file://host/tmp/x ok | copied file://host/tmp/x ok
+literal_keep | C:\Users\u\AppData\Local\Templates\x | copied C:\Users\u\AppData\Local\Templates\x ok | copied C:\Users\u\AppData\Local\Templates\x ok
 
 # versioned_ref — keep the name, mask the version.
 versioned_ref | zlib/1.3 | building zlib/1.3 from source | building zlib/<*> from source
@@ -116,6 +140,19 @@ bracket_index | [gw0] | [gw0] PASSED test_alpha | [gw<*>] PASSED test_alpha
 
 # hash_counter — keep the counter marker, mask the number.
 hash_counter | #26 | step #26 done | step #<*> done
+# DN-136.D1: the counter reads through a COMPLETE wrapper shell (§3.2 of masking.md), as rule 5 reads a number:
+# the shell, the closer and the trailing bytes are kept, only the digits mask, and no param is pushed.
+hash_counter | (#9767): | INFO (#9767): watcher | INFO (#<*>): watcher
+hash_counter | [#42] | queued [#42] job | queued [#<*>] job
+hash_counter | "#7", | tag "#7", ok | tag "#<*>", ok
+hash_counter | (#9767) | merged (#9767) today | merged (#<*>) today
+hash_counter | #9767): | INFO #9767): watcher | INFO #<*>): watcher
+bracket_index | [42] | queued [42] job | queued [<*>] job
+# DN-136.D1's boundary: a letter after the run, an incomplete shell, a byte before the opener, an empty core.
+literal_keep | (#42a) | merged (#42a) today | merged (#42a) today
+literal_keep | (#42 | merged (#42 today | merged (#42 today
+literal_keep | fix(#123): | fix(#123): bump parser | fix(#123): bump parser
+literal_keep | (#) | merged (#) today | merged (#) today
 
 # marker_number — one witness per declared currency marker.
 marker_number | $463.50 | charged $463.50 today | charged $<*> today
