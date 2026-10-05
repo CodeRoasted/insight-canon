@@ -8,7 +8,9 @@
 // invariant: that counter is legitimate in a test binary and NEVER in the shipped library.
 // invariant: determinism — byte-only, with no RNG, clock or float.
 // refs: LSRC-28
+#include <cstddef>
 #include <cstdlib>
+#include <limits>
 #include <new>
 
 #include <gtest/gtest.h>
@@ -47,8 +49,13 @@ using insight::tokenization::recognize;
 }
 
 // invariant: a global operator-new replacement counting allocations while ARMED.
-// invariant: the replacement is a plain passthrough unless a scoped guard is live, so it never
-// perturbs the rest of the test binary, and it is armed only around the recognizer probe path.
+// invariant: the replacement is a plain passthrough unless a scoped guard is live, and it is armed
+// only around the recognizer probe path.
+// invariant: the set is COMPLETE — all eight allocating forms and all twelve deallocating ones —
+// because a sanitizer runtime defines every form itself and none of its forms forwards to ours.
+// invariant: so a partial set pairs the runtime's nothrow `new[]` with this `free`, which ASan
+// reports as alloc-dealloc-mismatch at the thread-local simdjson scratch's exit-time destructor.
+// note: ASan therefore sees malloc and free for every new and delete in this binary.
 // invariant: this lives in the TEST binary, because a global new override must NEVER ship in the
 // canon library, where it would intercept every product allocation.
 // invariant: that is exactly why the no-allocation leg is homed HERE, in core, rather than in the
@@ -77,36 +84,110 @@ struct AllocGuard
         return g_alloc_count;
     }
 };
+
+// post: at least `size` bytes aligned to `alignment`, or nullptr; a live guard counts it.
+// invariant: every allocating form below passes through here, so no form escapes the counter.
+[[nodiscard]] void* counted_allocation(std::size_t size, std::size_t alignment) noexcept
+{
+    if (g_alloc_armed != 0)
+        ++g_alloc_count;
+    const std::size_t bytes{size != 0 ? size : 1};
+    if (alignment <= alignof(std::max_align_t))
+        return std::malloc(bytes);
+    if (bytes > std::numeric_limits<std::size_t>::max() - alignment)
+        return nullptr;
+    const std::size_t rounded{(bytes + alignment - 1) / alignment * alignment};
+    return std::aligned_alloc(alignment, rounded);
+}
+
+[[nodiscard]] void* throwing_allocation(std::size_t size, std::size_t alignment)
+{
+    void* block{counted_allocation(size, alignment)};
+    if (block == nullptr)
+        throw std::bad_alloc{};
+    return block;
+}
 } // namespace
 
 void* operator new(std::size_t size)
 {
-    if (g_alloc_armed != 0)
-        ++g_alloc_count;
-    void* ptr{std::malloc(size != 0 ? size : 1)};
-    if (ptr == nullptr)
-        throw std::bad_alloc{};
-    return ptr;
+    return throwing_allocation(size, alignof(std::max_align_t));
 }
 void* operator new[](std::size_t size)
 {
-    return ::operator new(size);
+    return throwing_allocation(size, alignof(std::max_align_t));
 }
-void operator delete(void* ptr) noexcept
+void* operator new(std::size_t size, const std::nothrow_t&) noexcept
 {
-    std::free(ptr);
+    return counted_allocation(size, alignof(std::max_align_t));
 }
-void operator delete[](void* ptr) noexcept
+void* operator new[](std::size_t size, const std::nothrow_t&) noexcept
 {
-    std::free(ptr);
+    return counted_allocation(size, alignof(std::max_align_t));
 }
-void operator delete(void* ptr, std::size_t) noexcept
+void* operator new(std::size_t size, std::align_val_t alignment)
 {
-    std::free(ptr);
+    return throwing_allocation(size, static_cast<std::size_t>(alignment));
 }
-void operator delete[](void* ptr, std::size_t) noexcept
+void* operator new[](std::size_t size, std::align_val_t alignment)
 {
-    std::free(ptr);
+    return throwing_allocation(size, static_cast<std::size_t>(alignment));
+}
+void* operator new(std::size_t size, std::align_val_t alignment, const std::nothrow_t&) noexcept
+{
+    return counted_allocation(size, static_cast<std::size_t>(alignment));
+}
+void* operator new[](std::size_t size, std::align_val_t alignment, const std::nothrow_t&) noexcept
+{
+    return counted_allocation(size, static_cast<std::size_t>(alignment));
+}
+void operator delete(void* block) noexcept
+{
+    std::free(block);
+}
+void operator delete[](void* block) noexcept
+{
+    std::free(block);
+}
+void operator delete(void* block, std::size_t) noexcept
+{
+    std::free(block);
+}
+void operator delete[](void* block, std::size_t) noexcept
+{
+    std::free(block);
+}
+void operator delete(void* block, const std::nothrow_t&) noexcept
+{
+    std::free(block);
+}
+void operator delete[](void* block, const std::nothrow_t&) noexcept
+{
+    std::free(block);
+}
+void operator delete(void* block, std::align_val_t) noexcept
+{
+    std::free(block);
+}
+void operator delete[](void* block, std::align_val_t) noexcept
+{
+    std::free(block);
+}
+void operator delete(void* block, std::size_t, std::align_val_t) noexcept
+{
+    std::free(block);
+}
+void operator delete[](void* block, std::size_t, std::align_val_t) noexcept
+{
+    std::free(block);
+}
+void operator delete(void* block, std::align_val_t, const std::nothrow_t&) noexcept
+{
+    std::free(block);
+}
+void operator delete[](void* block, std::align_val_t, const std::nothrow_t&) noexcept
+{
+    std::free(block);
 }
 
 // invariant: the synthetic vocabulary is deliberately NOT any real ecosystem's tokens, so a failure
