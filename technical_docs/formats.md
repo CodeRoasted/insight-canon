@@ -56,7 +56,7 @@ fall through to the level-inference path in [classification.md](classification.m
 | **KeyValue** | per-key `timestamp` value | per-key `level` value | first matched key value | — | `key=value` / logfmt. |
 | **Syslog** | BSD (yearless, see below) or RFC3339 prefix | inferred from the message body | daemon/tag (`tag[pid]:`) | — | Two prefix shapes. Claims a line only on the full syslog HEADER (`TIMESTAMP HOST TAG:`), never on the timestamp alone; the tag search is bounded to ONE token. |
 | **RFC5424** | RFC3339 | PRI value → level | APP-NAME | HOSTNAME | Structured syslog. |
-| **Log4j** | `YYYY-MM-DD HH:MM:SS,mmm` | explicit level word | thread/component (variant) | — | Hadoop/Zookeeper/OpenStack variants. |
+| **Log4j** | `YYYY-MM-DD HH:MM:SS,mmm` | explicit level word | thread/component (variant) | — | Hadoop/Zookeeper/OpenStack variants. Not claimed: a Log4j record behind Maven's `[INFO] ` / `[WARNING] ` / `[ERROR] ` prefix. Maven is a dialect, not a format, and canon declares no Maven dialect, so nothing removes the prefix before format detection. The line is templated whole as raw text, its stamp masked, its level read from the bracket; its logger is not a `component`. |
 | **SparkHDFS** | `YY/MM/DD` or `YYMMDD HHMMSS` | explicit level word | component | — | Spark + HDFS. |
 | **BGL** | decimal epoch | explicit level (else inferred) | subsystem (low-card) | node (high-card) | Splits low-card `component` from high-card `host`. |
 | **CLF** | `10/Oct/2000:13:55:36 -0700` | HTTP status → level | (empty) | client IP / hostname | Common/Combined access logs. The client IP is a NODE identity, so it is `host`, never a cube dimension; the layout declares no functional source and says so. |

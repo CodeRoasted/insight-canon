@@ -1140,6 +1140,48 @@ TEST_F(Log4jStrategyTest, APrefixedStampWithoutAProcessIdIsDeclined)
                                      << "\" content = \"" << result->content << "\"";
 }
 
+// invariant: a Log4j record behind Maven's `[LEVEL]` prefix is NOT claimed: Maven is a dialect,
+// canon declares none, so nothing peels the bracket before format detection.
+// invariant: the line templates whole as raw text, its stamp masked, its level read from the
+// bracket, and its logger never becomes a component.
+// invariant: the line is authored here, never corpus bytes; a locator admitting a `[LEVEL]` token
+// before the stamp is the prefix-shaped claim this pins against.
+// refs: DN-43.D22, DN-43.D1, ADR-16.D11
+TEST_F(Log4jStrategyTest, AMavenWrappedRecordIsNotClaimed)
+{
+    static constexpr std::string_view kMavenWrapped{
+        "[INFO] 2026-10-05 10:04:12,345 INFO  org.example.relay.Worker - relayed batch 7"};
+    EXPECT_EQ(strategy.confidence(kMavenWrapped), 0.0) << "line: " << kMavenWrapped;
+    const auto claimed{strategy.parse(kMavenWrapped, arena)};
+    EXPECT_FALSE(claimed.has_value()) << "claimed as component = \"" << claimed->component
+                                      << "\" content = \"" << claimed->content << "\"";
+    arena.reset();
+
+    const insight::semantic::ComposedSemantics composed{
+        insight::test_support::degenerate_composition()};
+    Tokenizer tokenizer{arena, MaskConfig{}, composed, StreamContext{}};
+    const auto event{tokenizer.process_line(kMavenWrapped)};
+    ASSERT_TRUE(event.has_value()) << event.error();
+    EXPECT_EQ(event->format, LogFormat::RawText) << "format = " << to_string(event->format);
+    EXPECT_EQ(event->level, LogLevel::Info) << "level = " << to_string(event->level);
+    EXPECT_TRUE(event->component.empty()) << "component = \"" << event->component << "\"";
+    EXPECT_FALSE(event->timestamp.has_value()) << "the record's stamp became an event time";
+    EXPECT_EQ(event->template_str.find("2026-10-05"), std::string_view::npos)
+        << "the stamp is not masked; template = \"" << event->template_str << "\"";
+    EXPECT_NE(event->template_str.find("[INFO]"), std::string_view::npos)
+        << "the bracket left the template; template = \"" << event->template_str << "\"";
+    EXPECT_NE(event->template_str.find("org.example.relay.Worker - relayed batch"),
+              std::string_view::npos)
+        << "the logger left the template; template = \"" << event->template_str << "\"";
+    arena.reset();
+
+    const auto raw{RawTextStrategy{}.parse(kMavenWrapped, arena)};
+    ASSERT_TRUE(raw.has_value()) << raw.error();
+    EXPECT_EQ(raw->content, kMavenWrapped) << "content = \"" << raw->content << "\"";
+    EXPECT_EQ(raw->level, LogLevel::Info);
+    EXPECT_TRUE(raw->component.empty()) << "component = \"" << raw->component << "\"";
+}
+
 // invariant: LEADING WHITESPACE is not a prefix token — the detector trims it before offering
 // Log4j, so the stamp at the first non-blank byte opens the STANDARD layout, never the prefixed.
 // refs: ADR-16.D11
