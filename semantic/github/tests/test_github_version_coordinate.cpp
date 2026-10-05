@@ -58,15 +58,15 @@ constexpr std::array kProbes{
 
 } // namespace
 
-// refs: ADR-18.D1
-// invariant: every Step row declares the introducer `@` on a one-token payload, and the Job row
-// declares no version coordinate.
+// refs: ADR-18.D1, DN-89.D40
+// invariant: every Step row that NAMES its unit declares the introducer `@` on a one-token
+// payload; the Job rows and the Step rows that close a job's steps declare no version coordinate.
 TEST(GithubVersionCoordinate, BothStepRowsDeclareItAndTheJobRowDeclaresNone)
 {
     std::size_t step_rows{0};
     for (const auto& row : insight::semantic::github::kManifest.markers)
     {
-        if (row.kind == IntentMarkerKind::Step)
+        if (row.kind == IntentMarkerKind::Step && row.role == insight::semantic::MarkerRole::Names)
         {
             ++step_rows;
             EXPECT_EQ(row.version.introducer, "@") << "Step row '" << row.prefix << "'";
@@ -80,7 +80,7 @@ TEST(GithubVersionCoordinate, BothStepRowsDeclareItAndTheJobRowDeclaresNone)
             EXPECT_TRUE(row.version.introducer.empty()) << "row '" << row.prefix << "'";
         }
     }
-    EXPECT_EQ(step_rows, 2U) << "the dialect no longer carries its two Step rows";
+    EXPECT_EQ(step_rows, 2U) << "the dialect no longer carries its two Step naming rows";
 }
 
 // refs: ADR-18.D1

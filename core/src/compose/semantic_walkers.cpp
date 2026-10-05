@@ -333,5 +333,20 @@ namespace tokenization
         return best == nullptr ? IntentMarkerKind::None : best->kind;
     }
 
+    // pre: `composed` is a view already resolved for the stream; no dialect gate is tested here.
+    // post: a closing row has no extractor, so its prefix alone decides the match.
+    // refs: DN-89.D40
+    bool recognize_closer(NormalizedContent content,
+                          const insight::semantic::ComposedSemantics& composed) noexcept
+    {
+        const std::string_view bytes{content.bytes()};
+        return std::ranges::any_of(composed.markers(),
+                                   [bytes](const insight::semantic::IntentMarkerRow& row) noexcept
+                                   {
+                                       return row.role == insight::semantic::MarkerRole::Closes &&
+                                              bytes.starts_with(row.prefix);
+                                   });
+    }
+
 } // namespace tokenization
 } // namespace insight

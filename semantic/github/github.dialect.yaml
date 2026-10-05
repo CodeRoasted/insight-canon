@@ -17,7 +17,7 @@
 
 dialect:
   name: github
-  version: "1.8.0"
+  version: "1.9.0"
   why:
     - "ADR-17.D3 keys identity on CONTENT, not on spelling: `version:` moves when what this package"
     - "RECOGNIZES or EMITS moves — its rows, their gates, or its code tier — and never for a"
@@ -298,6 +298,44 @@ dialect:
           - ""
           - "The two Step prefixes never shadow: neither is a proper prefix of the other, so the"
           - "composed longest-match note stays empty."
+      - prefix: "Post job cleanup."
+        kind: Step
+        role: Closes
+        dialect_gate: self
+        channel_gate: any
+        why:
+          - "A job's log does not END with its last declared step. After it the runner runs each"
+          - "action's post step, which prints this line and names no step, and then its own"
+          - "\"Complete job\" step. With no row here, every line from the first post step to the"
+          - "job's end was the last declared step's: a post step's warning was reported under, and"
+          - "folded with, an unrelated step, and a failing last step listed teardown lines among"
+          - "its failure evidence."
+          - ""
+          - "So this row CLOSES the job's declared steps: its line enters the job's epilogue, a"
+          - "unit the segmenter supplies and names, and a later closing row extends it. A post"
+          - "step is NOT attributed to its action: which steps register a post action is the"
+          - "action's metadata, never printed in the run, so any mapping would be inference."
+          - "A job-completed hook stays its own step: its banner names it, and the next closing"
+          - "row opens a second epilogue in the same job."
+          - ""
+          - "Measured on the three CI-log views (26 234 annotated logs and their stripped"
+          - "twins): no line starts with this text without being exactly it, and no step other"
+          - "than a runner hook opens after it. The line is the same in both channels, so it"
+          - "needs no channel gate."
+      - prefix: "Cleaning up orphan processes"
+        kind: Step
+        role: Closes
+        dialect_gate: self
+        channel_gate: any
+        why:
+          - "The runner prints this line in its \"Complete job\" step, the job's last, after any"
+          - "post step and any job-completed hook. It enters the job's epilogue as the post-step"
+          - "line does, so a job with no post step still gets one, and the lines after a hook"
+          - "leave the hook's step. It is job-level content like post-step output, so it shares"
+          - "their unit rather than a second one split on a boundary no line names."
+          - ""
+          - "Measured on the same views: every line starting with this text is exactly it, and it"
+          - "is the same line in both channels."
 
   # ── level-lift rows ──
   level_lifts:

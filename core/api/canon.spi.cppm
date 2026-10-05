@@ -540,7 +540,7 @@ struct VersionCoordinate
 
 // invariant: what a marker row does to a unit of its kind, a CLOSED set whose algorithm lives in
 // core; a new role is a grammar-version bump, part of the identity.
-// refs: DN-89.D33
+// refs: DN-89.D33, DN-89.D40
 enum class MarkerRole : std::uint8_t
 {
     // invariant: the row opens a unit and names it with its payload, at its own line.
@@ -549,6 +549,10 @@ enum class MarkerRole : std::uint8_t
     // its kind before any other marker row names it, and a job no row names stays unnamed.
     // refs: DN-89.D33, DN-89.D43
     Opens,
+    // invariant: the row ends its job's declared steps: its line enters the job's epilogue, a
+    // step-level unit the segmenter supplies, and it carries no identity; legal on kind Step only.
+    // refs: DN-89.D40
+    Closes,
 };
 
 // invariant: a prefix opens a behavioural quantum, carrying the dialect's kind and child_order —
@@ -584,23 +588,34 @@ struct IntentMarkerRow
     // reader-side derivation with no generation dual, since the writer emits the payload verbatim.
     VersionCoordinate version{};
     // invariant: Names by default, so a row that declares no role names its unit as before.
-    // invariant: an Opens row is of kind Job and carries no payload — extract None, no version, no
-    // exclusion — and its child_order is inert; composition refuses any other Opens row.
-    // invariant: `recognize` never returns an Opens row; `recognize_opener` returns only those.
-    // refs: DN-89.D33
+    // invariant: an Opens or Closes row carries no payload — extract None, no version, no
+    // exclusion — and its child_order is inert; composition refuses any other such row.
+    // invariant: `recognize` returns Names rows only; `recognize_opener` returns only Opens rows
+    // and `recognize_closer` only Closes rows.
+    // refs: DN-89.D33, DN-89.D40
     MarkerRole role{MarkerRole::Names};
 };
 
-// post: true when the row names its unit, or opens a job while carrying no identity — no
-// extractor, version coordinate or payload exclusion.
-// invariant: kind Job only, so the unnamed unit an opener leaves has one sentinel to name it.
-// refs: DN-89.D33, DN-89.D43
-[[nodiscard]] constexpr bool opening_row_admitted(const IntentMarkerRow& row) noexcept
+// post: true when the row names its unit, or opens a job or closes a job's steps while carrying
+// no identity — no extractor, version coordinate or payload exclusion.
+// invariant: an Opens row is of kind Job, so the unnamed unit an opener leaves has one sentinel
+// to name it; a Closes row is of kind Step, so the epilogue it enters is a step of its job.
+// refs: DN-89.D33, DN-89.D40, DN-89.D43
+[[nodiscard]] constexpr bool unit_role_row_admitted(const IntentMarkerRow& row) noexcept
 {
-    return row.role == MarkerRole::Names ||
-           (row.kind == insight::tokenization::IntentMarkerKind::Job &&
-            row.extract == PayloadExtract::None && row.version.introducer.empty() &&
-            row.version.shape == VersionPayloadShape::None && row.payload_excludes.empty());
+    const bool no_identity{row.extract == PayloadExtract::None && row.version.introducer.empty() &&
+                           row.version.shape == VersionPayloadShape::None &&
+                           row.payload_excludes.empty()};
+    switch (row.role)
+    {
+    case MarkerRole::Names:
+        return true;
+    case MarkerRole::Opens:
+        return no_identity && row.kind == insight::tokenization::IntentMarkerKind::Job;
+    case MarkerRole::Closes:
+        return no_identity && row.kind == insight::tokenization::IntentMarkerKind::Step;
+    }
+    return false;
 }
 
 // invariant: the WRITER dual of IntentMarkerRow — the same kind and child_order, and the same
@@ -628,8 +643,8 @@ struct IntentEmitRow
     // refs: ADR-22.D6
     std::string_view channel_gate{kAnyChannel};
     // invariant: the reader row's role, so a writer selecting a unit's banner selects its
-    // naming row and never the row that only opens it.
-    // refs: DN-89.D33
+    // naming row and never a row that only opens or closes one.
+    // refs: DN-89.D33, DN-89.D40
     MarkerRole role{MarkerRole::Names};
 };
 

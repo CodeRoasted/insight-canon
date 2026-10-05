@@ -48,8 +48,8 @@ classify(NormalizedContent content, const insight::semantic::ComposedSemantics& 
 // payload, never declared by a package.
 // invariant: the returned marker's `name` and `discriminant` VIEW the handed content's bytes, so
 // the caller's storage must outlive them.
-// invariant: a row that only OPENS a unit is never returned here, so a line matching one reads
-// as no marker to every caller that does not ask `recognize_opener`.
+// invariant: a row that only OPENS or CLOSES a unit is never returned here, so a line matching
+// one reads as no marker to every caller that does not ask its own walker.
 [[nodiscard]] IntentMarker recognize(NormalizedContent content,
                                      const insight::semantic::ComposedSemantics& composed) noexcept;
 
@@ -61,6 +61,14 @@ classify(NormalizedContent content, const insight::semantic::ComposedSemantics& 
 [[nodiscard]] IntentMarkerKind
 recognize_opener(NormalizedContent content,
                  const insight::semantic::ComposedSemantics& composed) noexcept;
+
+// post: true when a CLOSING row of the view matches: the line ends its job's declared steps and
+// enters the job's epilogue.
+// invariant: a closing row carries no identity and is of kind Step; what it does to the open
+// unit is the segmenting caller's to apply.
+// refs: DN-89.D40
+[[nodiscard]] bool recognize_closer(NormalizedContent content,
+                                    const insight::semantic::ComposedSemantics& composed) noexcept;
 
 // invariant: phase 1 of the pipeline: one raw log line in, one `CanonicalEvent` out.
 // invariant: NOT thread-safe — one instance per thread or per strand.

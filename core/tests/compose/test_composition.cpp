@@ -557,3 +557,50 @@ TEST(CompositionOpeningRow, AnOpeningRowOnKindJobComposes)
     EXPECT_EQ(composed.markers().size(), 1U)
         << "the control: the same row on kind Job composes, so only the kind decides the refusal";
 }
+
+// refs: DN-89.D40
+// invariant: a row that CLOSES a job's steps enters the job's epilogue, a step-level unit, so
+// composition admits it on kind Step and refuses it on any other kind, naming the row.
+namespace
+{
+constexpr std::array<IntentMarkerRow, 1> kStepCloser{
+    {{.prefix = "Teardown.",
+      .kind = IntentMarkerKind::Step,
+      .child_order = ChildOrder::Ordered,
+      .dialect_gate = "closing",
+      .extract = PayloadExtract::None,
+      .role = insight::semantic::MarkerRole::Closes}}};
+constexpr std::array<IntentMarkerRow, 1> kJobCloser{
+    {{.prefix = "Teardown.",
+      .kind = IntentMarkerKind::Job,
+      .child_order = ChildOrder::Ordered,
+      .dialect_gate = "closing",
+      .extract = PayloadExtract::None,
+      .role = insight::semantic::MarkerRole::Closes}}};
+constexpr std::array<std::string_view, 1> kClosingRevisions{{"v1"}};
+constexpr SemanticPackageManifest kStepClosing{.name = "closing",
+                                               .version = "1.0.0",
+                                               .markers = kStepCloser,
+                                               .dialect_revisions = kClosingRevisions};
+constexpr SemanticPackageManifest kJobClosing{.name = "closing",
+                                              .version = "1.0.0",
+                                              .markers = kJobCloser,
+                                              .dialect_revisions = kClosingRevisions};
+} // namespace
+
+TEST(CompositionClosingRow, AStepCloserComposesAndOnlyTheCloserWalkerReadsIt)
+{
+    const ComposedSemantics view{compose(std::array{kStepClosing}).for_stream("closing", {})};
+    std::string scratch;
+    const auto content{insight::tokenization::normalize("Teardown.", scratch).undeclared_suffix(0)};
+    EXPECT_TRUE(insight::tokenization::recognize_closer(content, view))
+        << "a Step closing row composed, but its own walker does not read it";
+    EXPECT_EQ(insight::tokenization::recognize(content, view).kind, IntentMarkerKind::None)
+        << "`recognize` returned a closing row";
+}
+
+TEST(CompositionDeathTest, AClosingRowOfKindJobFailsClosedAtRuntime)
+{
+    EXPECT_DEATH((void)compose(std::array{kJobClosing}),
+                 R"(marker row "Teardown.": a row that CLOSES its job's steps)");
+}

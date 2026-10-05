@@ -173,14 +173,24 @@ namespace
     }
 
     // post: what the row's own walker recognizes on the content: `recognize` for a naming row;
-    // for an opening row, `recognize_opener`'s kind with an empty name, as it carries no identity.
-    // refs: DN-89.D33
+    // `recognize_opener`'s kind for an opening row, and kind Step on a `recognize_closer` match.
+    // invariant: an opening or closing row's result has an empty name, as it carries no identity.
+    // refs: DN-89.D33, DN-89.D40
     [[nodiscard]] insight::tokenization::IntentMarker
     recognize_as(const IntentMarkerRow& row, insight::tokenization::NormalizedContent content,
                  const ComposedSemantics& view) noexcept
     {
-        if (row.role == MarkerRole::Opens)
+        switch (row.role)
+        {
+        case MarkerRole::Opens:
             return {.kind = insight::tokenization::recognize_opener(content, view)};
+        case MarkerRole::Closes:
+            return {.kind = insight::tokenization::recognize_closer(content, view)
+                                ? insight::tokenization::IntentMarkerKind::Step
+                                : insight::tokenization::IntentMarkerKind::None};
+        case MarkerRole::Names:
+            break;
+        }
         return insight::tokenization::recognize(content, view);
     }
 
@@ -743,11 +753,11 @@ Report round_trip_report(const SemanticPackageManifest& manifest, const Composed
         const insight::tokenization::IntentMarker got{
             recognize_as(reader, normalized_probe(line, scratch), medium_view)};
 
-        // invariant: an opening row renders its prefix alone and carries no payload, so its
-        // closure is its kind; its child_order is inert.
-        const bool opens{reader.role == MarkerRole::Opens};
-        const std::string_view expected_payload{opens ? std::string_view{} : kProbePayload};
-        if (got.kind == reader.kind && (opens || got.child_order == reader.child_order) &&
+        // invariant: an opening or closing row renders its prefix alone and carries no payload,
+        // so its closure is its kind; its child_order is inert.
+        const bool unnamed{reader.role != MarkerRole::Names};
+        const std::string_view expected_payload{unnamed ? std::string_view{} : kProbePayload};
+        if (got.kind == reader.kind && (unnamed || got.child_order == reader.child_order) &&
             got.name == expected_payload)
         {
             report.checks.push_back({.name = "round_trip", .passed = true, .detail = {}});
@@ -934,6 +944,8 @@ namespace
             return "Names";
         case MarkerRole::Opens:
             return "Opens";
+        case MarkerRole::Closes:
+            return "Closes";
         }
         return "unknown";
     }

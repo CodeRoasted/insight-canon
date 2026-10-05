@@ -227,15 +227,23 @@ namespace
     }
 
     // note: the message states the rule and the remedy and names no record: canon ships public.
-    [[noreturn]] void fail_opening_row(const SemanticPackageManifest& pkg,
-                                       const IntentMarkerRow& row)
+    [[noreturn]] void fail_unit_role_row(const SemanticPackageManifest& pkg,
+                                         const IntentMarkerRow& row)
     {
         std::cerr << "FATAL: insight::semantic::compose — package \"" << pkg.name
-                  << "\", marker row \"" << row.prefix
-                  << "\": a row that only OPENS a unit opens a job and carries no identity. It "
-                     "needs kind Job, and no payload extractor, version coordinate or payload "
-                     "exclusion: the naming row of its kind that follows names the job. Fix the "
-                     "row, or make it a naming row.\n";
+                  << "\", marker row \"" << row.prefix << "\": ";
+        if (row.role == MarkerRole::Closes)
+            std::cerr << "a row that CLOSES its job's steps carries no identity and is of the "
+                         "step kind. It needs kind Step, and no payload extractor, version "
+                         "coordinate or payload exclusion: the job's epilogue it enters is the "
+                         "segmenter's own unit. Make the row's kind Step and remove the rest, or "
+                         "make it a naming row.\n";
+        else
+            std::cerr
+                << "a row that only OPENS a unit opens a job and carries no identity. It "
+                   "needs kind Job, and no payload extractor, version coordinate or payload "
+                   "exclusion: the naming row of its kind that follows names the job. Fix the "
+                   "row, or make it a naming row.\n";
         std::terminate();
     }
 
@@ -501,8 +509,8 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
         {
             if (!version_coordinate_whole(row.version))
                 fail_version_coordinate(pkg, row);
-            if (!opening_row_admitted(row))
-                fail_opening_row(pkg, row);
+            if (!unit_role_row_admitted(row))
+                fail_unit_role_row(pkg, row);
         }
     for (const SemanticPackageManifest& pkg : packages)
         for (const DeclaredValueRow& row : pkg.declared_values)
