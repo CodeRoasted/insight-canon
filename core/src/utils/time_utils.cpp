@@ -688,6 +688,11 @@ std::optional<Timestamp> parse_apache_error_ts(std::string_view timestamp_str) n
     else if (timestamp_str[time_constants::kApacheErrorSecondsEnd] != ' ')
         return std::nullopt;
 
+    // invariant: the year closes the stamp: a digit run longer than four is refused, never read
+    // as its first four digits.
+    // refs: DN-17.D43, ADR-12.D2
+    if (year_offset + time_constants::kApacheErrorYearDigits != timestamp_str.size())
+        return std::nullopt;
     int year{0};
     if (!parse_fixed(ptr + year_offset, static_cast<int>(time_constants::kApacheErrorYearDigits),
                      year))

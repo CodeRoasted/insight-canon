@@ -22,6 +22,17 @@ namespace
     constexpr std::size_t kTimestampLen{19U};
     constexpr std::size_t kRestOffset{20U};
 
+    // post: Trace for `Verbose`, the lowest word of the Windows level family, the shared lexicon's
+    // reading for every other word.
+    // invariant: mapped in this seat only, never in parse_log_level, whose free-text walk would
+    // return on a line opening with "verbose" before it reached the failure cues.
+    // refs: DN-17.D43, DN-43.D21, ADR-16.D11
+    [[nodiscard]] LogLevel seat_level(std::string_view word) noexcept
+    {
+        static constexpr std::string_view kVerbose{"Verbose"};
+        return word == kVerbose ? LogLevel::Trace : utils::parse_log_level(word);
+    }
+
 } // namespace
 
 std::expected<ParsedLine, std::string> WindowsCBSStrategy::parse(std::string_view line,
@@ -58,7 +69,7 @@ std::expected<ParsedLine, std::string> WindowsCBSStrategy::parse(std::string_vie
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
     parsed_line.timestamp = EventTime::parsed(utils::parse_iso8601(ts_str));
-    parsed_line.level = EventLevel::declared(utils::parse_log_level(level_sv));
+    parsed_line.level = EventLevel::declared(seat_level(level_sv));
     parsed_line.component = component;
     parsed_line.content = rest;
 

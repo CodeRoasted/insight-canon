@@ -1816,6 +1816,19 @@ TEST_F(WindowsCBSStrategyTest, ParsesWindowsLine)
     EXPECT_NE(pl.content.find("Loaded Servicing Stack"), std::string::npos);
 }
 
+// refs: DN-17.D43, ADR-16.D11
+// assert: `Verbose` reads Trace in the CBS seat; the shared lexicon keeps `verbose` Unknown, which
+// test_time_utils.cpp pins on parse_log_level.
+TEST_F(WindowsCBSStrategyTest, VerboseReadsTraceInTheSeatOnly)
+{
+    static constexpr std::string_view kVerboseLine{
+        "2016-09-28 04:30:30, Verbose               CBS    Session initialized"};
+    auto result{strategy.parse(kVerboseLine, arena)};
+    ASSERT_TRUE(result.has_value()) << result.error();
+    EXPECT_EQ(result.value().level, LogLevel::Trace) << to_string(result.value().level.value());
+    EXPECT_EQ(result.value().component, "CBS");
+}
+
 TEST_F(WindowsCBSStrategyTest, RejectsNonMatchingLines)
 {
     EXPECT_FALSE(strategy.parse(kBSDLine, arena).has_value());

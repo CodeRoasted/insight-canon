@@ -212,6 +212,21 @@ TEST(ParseApacheErrorTs, MalformedInputRefused)
     EXPECT_FALSE(parse_apache_error_ts("Sun Dec 04 04:47:44_2005").has_value());
 }
 
+// refs: DN-17.D43, ADR-12.D2
+// assert: the year closes the stamp in both clock shapes: a longer digit run is refused, never
+// read as its first four digits.
+TEST(ParseApacheErrorTs, AYearLongerThanFourDigitsIsRefused)
+{
+    EXPECT_FALSE(parse_apache_error_ts("Fri Apr 16 12:41:00 209883305").has_value())
+        << "a nine-digit year read as 2098";
+    EXPECT_FALSE(parse_apache_error_ts("Fri Apr 16 12:41:00.000 209883305").has_value())
+        << "a nine-digit year behind 2.4's fraction read as 2098";
+    EXPECT_FALSE(parse_apache_error_ts("Sun Dec 04 04:47:44 20055").has_value())
+        << "a five-digit year read as 2005";
+    EXPECT_PARSES_TO(parse_apache_error_ts("Sun Dec 04 04:47:44.123 2005"),
+                     utc_epoch(2005, 12, 4, 4, 47, 44));
+}
+
 TEST(ParseHealthAppTs, ValidTimestampParsed)
 {
     EXPECT_PARSES_TO(parse_health_app_ts("20171223-22:15:29:606"),
