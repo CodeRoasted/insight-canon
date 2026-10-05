@@ -1513,6 +1513,7 @@ struct YearlessStamp
 
 // post: an ISO 8601 or RFC 3339 UTC timestamp — with or without a fraction, with a numeric zone,
 // or space-separated.
+// invariant: a fraction after the seconds is skipped, never read: the instant has second grain.
 [[nodiscard]] std::optional<Timestamp> parse_iso8601(std::string_view timestamp_str) noexcept;
 
 // post: the number of bytes consumed by a COMPLETE datetime starting at pos, or 0 when the bytes
@@ -1611,6 +1612,7 @@ parse_proxifier_stamp(std::string_view timestamp_str) noexcept;
                                                         Timestamp reference) noexcept;
 
 // post: a CLF or Combined-Log-Format timestamp.
+// invariant: the grammar carries no fraction, so the instant has second grain.
 [[nodiscard]] std::optional<Timestamp> parse_clf_timestamp(std::string_view timestamp_str) noexcept;
 
 // post: Unix epoch SECONDS as a digit string.
@@ -1625,11 +1627,13 @@ parse_epoch_timestamp(std::string_view timestamp_str) noexcept;
 parse_unix_nano_timestamp(std::string_view timestamp_str) noexcept;
 
 // post: an HDFS compact date and time, taken as two separate six-digit fields.
+// invariant: the grammar carries no fraction, so the instant has second grain.
 [[nodiscard]] std::optional<Timestamp> parse_compact_date_time(std::string_view date,
                                                                std::string_view time) noexcept;
 
 // post: a Spark-style short-year date and time, `YY/MM/DD HH:MM:SS` — 17 characters, which is a
 // FLOOR and not a fixed width: a longer input's tail is ignored.
+// invariant: the grammar carries no fraction, so the instant has second grain.
 [[nodiscard]] std::optional<Timestamp>
 parse_short_year_slash(std::string_view timestamp_str) noexcept;
 
@@ -1640,6 +1644,7 @@ parse_apache_error_ts(std::string_view timestamp_str) noexcept;
 
 // post: a HealthApp compact timestamp — `YYYYMMDD-` then three VARIABLE-width clock fields and a
 // millisecond terminator, so 15 characters is the FLOOR and no fixed width exists.
+// invariant: the millisecond terminator is never scanned or read: the instant has second grain.
 [[nodiscard]] std::optional<Timestamp> parse_health_app_ts(std::string_view timestamp_str) noexcept;
 
 // post: an ISO-like timestamp with a comma or dot sub-second fraction; unlike the ISO 8601 parser
@@ -1666,6 +1671,7 @@ parse_log4j_timestamp(std::string_view timestamp_str) noexcept;
 [[nodiscard]] EventLevel infer_leading_log_level(std::string_view line) noexcept;
 
 // post: an Nginx error-log timestamp — a slash-separated date and clock, 19 characters.
+// invariant: the grammar carries no fraction, so the instant has second grain.
 // invariant: NOT the Apache error-log layout, which is a weekday, a month name and a TRAILING
 // year; the two are byte-distinct and have separate parsers.
 [[nodiscard]] std::optional<Timestamp>

@@ -114,6 +114,9 @@ std::expected<ParsedLine, std::string> SystemdJournalStrategy::parse(std::string
                                        scratch_view.data() + scratch_view.size(), microsecs)};
         if (res.ec == std::errc{})
         {
+            // invariant: the producer's exact microsecond count is divided to whole seconds
+            // toward zero, its remainder dropped: this path's event time has second grain.
+            // refs: DN-17.D44, DN-43.D21
             const auto epoch_secs{static_cast<std::time_t>(microsecs / kMicrosecondsPerSecond)};
             parsed.timestamp =
                 EventTime::parsed(std::chrono::system_clock::from_time_t(epoch_secs));

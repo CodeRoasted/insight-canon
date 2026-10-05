@@ -59,6 +59,9 @@ std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_vie
             parsed.raw_line = line;
             if (fast.timestamp_ms != 0)
             {
+                // invariant: the producer's exact millisecond count is divided to whole seconds
+                // toward zero, its remainder dropped: this path's event time has second grain.
+                // refs: DN-17.D44, DN-43.D21
                 const auto epoch_secs{
                     static_cast<std::time_t>(fast.timestamp_ms / kMillisecondsPerSecond)};
                 parsed.timestamp =
@@ -106,6 +109,9 @@ std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_vie
     std::int64_t millis{};
     if (try_get_int64(root, kTimestampKeys, millis))
     {
+        // invariant: the producer's exact millisecond count is divided to whole seconds
+        // toward zero, its remainder dropped: this path's event time has second grain.
+        // refs: DN-17.D44, DN-43.D21
         const auto epoch_secs{static_cast<std::time_t>(millis / kMillisecondsPerSecond)};
         parsed.timestamp = EventTime::parsed(std::chrono::system_clock::from_time_t(epoch_secs));
     }
