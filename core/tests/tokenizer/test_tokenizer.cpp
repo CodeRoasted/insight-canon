@@ -208,8 +208,8 @@ TEST_F(TokenizerTest, Rfc3339ApplicationLinesTemplateDistinctlyAndKeepTheirStamp
         EXPECT_EQ(ev.level, kExpected[i]) << "line " << i << " level=" << to_string(ev.level)
                                           << " expected=" << to_string(kExpected[i]);
 
-        // invariant: the event time SURVIVES the split, and a missing timestamp lands as the epoch.
-        EXPECT_NE(ev.timestamp, Timestamp{}) << "line " << i << " lost its event time";
+        // invariant: the event time SURVIVES the split; a lost one would arrive absent.
+        EXPECT_TRUE(ev.timestamp.has_value()) << "line " << i << " lost its event time";
 
         // invariant: the layout names no functional source, and inventing one would be a FABRICATED
         // cube axis.

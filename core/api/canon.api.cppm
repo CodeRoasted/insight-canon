@@ -971,7 +971,10 @@ export namespace insight::tokenization
 struct CanonicalEvent
 {
     EventID id{};
-    Timestamp timestamp;
+    // invariant: nullopt iff the line carries no event time canon could read or resolve; a real
+    // 1970-01-01T00:00:00Z is a present value, never a sentinel for absent.
+    // refs: DN-137.D1, DN-137.D4
+    std::optional<Timestamp> timestamp;
     // invariant: true iff the producer DECLARED the time in a schema event-time field; false for
     // every line whose time was parsed from ambiguous bytes or absent.
     // invariant: a declared time outranks a transport observation stamp and a parsed one does not,
@@ -1489,12 +1492,21 @@ namespace detail
 export namespace insight::utils
 {
 
-// invariant: the deterministic-content path MUST NOT read the wall clock, so a yearless timestamp
-// takes an injected reference year defaulting to this constant.
-// invariant: a live consumer may pass the real current year read once at stream open; batch and
-// replay use the constant, so the parsed year is bit-identical across the year rollover.
-// refs: BIB:determinism_model
-inline constexpr int kDefaultReferenceYear{2024};
+// invariant: a month, a day and a clock read off a stamp that writes NO year — never an instant,
+// because building one would need a year the bytes do not carry.
+// invariant: the day exists in SOME year (Feb 29 is admitted, Feb 30 is not); whether it exists in
+// the year the stream resolves is decided by resolve_yearless.
+// invariant: the millisecond is the finest grain any yearless format here writes (logcat); BSD
+// syslog and Proxifier write whole seconds, so their remainder is 0.
+// refs: DN-137.D1
+struct YearlessStamp
+{
+    std::uint8_t month{0};
+    std::uint8_t day{0};
+    std::uint32_t millisecond_of_day{0};
+
+    [[nodiscard]] bool operator==(const YearlessStamp&) const = default;
+};
 
 // post: an ISO 8601 or RFC 3339 UTC timestamp — with or without a fraction, with a numeric zone,
 // or space-separated.
@@ -1568,11 +1580,32 @@ inline constexpr int kDefaultReferenceYear{2024};
     return pos - start;
 }
 
-// post: a yearless BSD syslog timestamp; the year is the INJECTED reference year, so no wall-clock
-// read enters.
-[[nodiscard]] std::optional<Timestamp>
-parse_bsd_syslog_ts(std::string_view timestamp_str,
-                    int reference_year = kDefaultReferenceYear) noexcept;
+// post: the month, day and clock of a BSD syslog (RFC 3164) stamp `Mmm dd hh:mm:ss`, which
+// carries no year; nullopt when the bytes are not one or name a day no year has.
+// refs: DN-137.D1
+[[nodiscard]] std::optional<YearlessStamp>
+parse_bsd_syslog_ts(std::string_view timestamp_str) noexcept;
+
+// post: the month, day and clock of an Android logcat stamp `MM-DD hh:mm:ss.mmm`, milliseconds
+// kept; nullopt when the bytes are not one or name a day no year has.
+// refs: DN-137.D1
+[[nodiscard]] std::optional<YearlessStamp>
+parse_logcat_stamp(std::string_view timestamp_str) noexcept;
+
+// post: the month, day and clock of a Proxifier stamp `[MM.DD hh:mm:ss]`, the bracket included;
+// nullopt when the bytes are not one or name a day no year has.
+// refs: DN-137.D1
+[[nodiscard]] std::optional<YearlessStamp>
+parse_proxifier_stamp(std::string_view timestamp_str) noexcept;
+
+// post: the instant of `stamp` in the year Y among year(reference) - 1, year(reference) and
+// year(reference) + 1, UTC, whose instant is nearest `reference`; on an exact tie the later year.
+// post: a candidate whose day does not exist in its year is excluded, and nullopt means none
+// exists or none is representable.
+// invariant: a pure function of its two operands — no clock, no state.
+// refs: DN-137.D2
+[[nodiscard]] std::optional<Timestamp> resolve_yearless(YearlessStamp stamp,
+                                                        Timestamp reference) noexcept;
 
 // post: a CLF or Combined-Log-Format timestamp.
 [[nodiscard]] std::optional<Timestamp> parse_clf_timestamp(std::string_view timestamp_str) noexcept;

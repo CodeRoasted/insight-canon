@@ -186,7 +186,8 @@ std::expected<ParsedLine, std::string> AndroidLogcatStrategy::parse(std::string_
     // calling, so they are already arena-stable.
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
-    parsed_line.timestamp = EventTime::parsed(std::nullopt);
+    // refs: DN-137.D1
+    parsed_line.timestamp = EventTime::yearless(utils::parse_logcat_stamp(line));
     parsed_line.level = EventLevel::declared(level);
     parsed_line.component = tag;
     parsed_line.content = message;

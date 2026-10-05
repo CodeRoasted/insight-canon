@@ -39,9 +39,10 @@ std::expected<ParsedLine, std::string> ProxifierStrategy::parse(std::string_view
 
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
-    // invariant: the timestamp is PARSED as absent rather than declared: the prefix carries a
-    // month-day pair and a clock, but NO YEAR, so no instant can be built without inventing one.
-    parsed_line.timestamp = EventTime::parsed(std::nullopt);
+    // invariant: the prefix carries a month-day pair and a clock but NO YEAR, so it is the yearless
+    // species and the stream decides its year, never this strategy.
+    // refs: DN-137.D1
+    parsed_line.timestamp = EventTime::yearless(utils::parse_proxifier_stamp(line));
     parsed_line.level = EventLevel{};
     parsed_line.component = process;
     parsed_line.content = rest;

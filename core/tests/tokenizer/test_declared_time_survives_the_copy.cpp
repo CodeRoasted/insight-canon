@@ -8,13 +8,8 @@ using namespace insight::tokenization;
 // invariant: provenance survives the copy from the parsed line into the canonical event.
 // invariant: HOMED at the TOKENIZER grain, and that is a correction to an earlier call — the
 // property is not about the parsed line, where the event-time type makes it hard to get wrong.
-// invariant: it is about the COPY, which represents the same fact as two fields, a timestamp and a
-// boolean, because ABSENCE changes representation across that boundary.
-// invariant: the optional becomes the zero sentinel that event-time resolution keys on.
-// invariant: that asymmetry is a DELIBERATE boundary and not a hole — pushing the richer type
-// across would drag the optional into every downstream consumer and retire the sentinel.
-// invariant: the alternative leaves the type with TWO representations of absence, which is worse
-// than two types with one each.
+// invariant: it is about the COPY, which represents the same fact as two fields, an optional
+// timestamp and a boolean, so the pair can drift apart there and nowhere upstream.
 // invariant: so the arm belongs where the copy happens, and it does NOT belong in the seam suite.
 // invariant: the test for a seam is whether the property needs a fact only the other instrument can
 // supply, NEVER whether it crosses a type boundary.
@@ -122,9 +117,10 @@ TEST(DeclaredTimeCopy, AnOtelLogRecordKeepsEveryNanosecondOfItsDeclaredTime)
 
     const auto event{fx.tokenizer.process_line(line)};
     ASSERT_TRUE(event.has_value()) << "the OTLP log record did not parse at all";
-    const std::int64_t held{
-        std::chrono::duration_cast<std::chrono::nanoseconds>(event->timestamp.time_since_epoch())
-            .count()};
+    const std::int64_t held{event->timestamp ? std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                                   event->timestamp->time_since_epoch())
+                                                   .count()
+                                             : 0};
     EXPECT_EQ(held, kSubSecondNanos)
         << "timeUnixNano " << kSubSecondNanos << " crossed as " << held << " ns, "
         << (kSubSecondNanos - held)
@@ -166,10 +162,9 @@ TEST(DeclaredTimeCopy, AParsedTimestampCrossesAsPARSEDAndStillCarriesItsTime)
 
     // invariant: the pair again, from the other side — NOT DECLARED must not be achieved by
     // losing the time.
-    // invariant: the sentinel is load-bearing, because event-time resolution keys on a non-zero
-    // value, so a zero here would silently drop this line to forward-fill.
-    EXPECT_NE(event->timestamp, Timestamp{})
-        << "the parsed time crossed as the ZERO sentinel, so the record reads as having no "
-           "parseable time at all and falls to forward-fill — the value was lost in the copy even "
+    // invariant: an absent time here would silently drop this line to forward-fill.
+    EXPECT_EQ(event->timestamp, std::optional<Timestamp>{stamp_at(1'777'032'000)})
+        << "the parsed time 2026-04-24T12:00:00Z did not cross whole, so the record reads as "
+           "having no parseable time at all, or another one — the value was lost in the copy even "
            "though the provenance was right";
 }

@@ -54,7 +54,7 @@ fall through to the level-inference path in [classification.md](classification.m
 |---|---|---|---|---|---|
 | **JSON** | `kTimestampKeys` | `kLevelKeys` (or OTEL `severityNumber`, which **overrides**) | `kComponentKeys` | — | OTEL- and ordinal-aware (§4). Fast path for escape-free input, simdjson slow path otherwise. |
 | **KeyValue** | per-key `timestamp` value | per-key `level` value | first matched key value | — | `key=value` / logfmt. |
-| **Syslog** | BSD or RFC3339 prefix | inferred from the message body | daemon/tag (`tag[pid]:`) | — | Two prefix shapes. Claims a line only on the full syslog HEADER (`TIMESTAMP HOST TAG:`), never on the timestamp alone; the tag search is bounded to ONE token. |
+| **Syslog** | BSD (yearless, see below) or RFC3339 prefix | inferred from the message body | daemon/tag (`tag[pid]:`) | — | Two prefix shapes. Claims a line only on the full syslog HEADER (`TIMESTAMP HOST TAG:`), never on the timestamp alone; the tag search is bounded to ONE token. |
 | **RFC5424** | RFC3339 | PRI value → level | APP-NAME | HOSTNAME | Structured syslog. |
 | **Log4j** | `YYYY-MM-DD HH:MM:SS,mmm` | explicit level word | thread/component (variant) | — | Hadoop/Zookeeper/OpenStack variants. |
 | **SparkHDFS** | `YY/MM/DD` or `YYMMDD HHMMSS` | explicit level word | component | — | Spark + HDFS. |
@@ -63,15 +63,27 @@ fall through to the level-inference path in [classification.md](classification.m
 | **IIS W3C** | `YYYY-MM-DD HH:MM:SS` | HTTP status → level | — | — | IIS extended format. |
 | **NginxError** | `YYYY/MM/DD HH:MM:SS` | `[level]` bracket | — | — | nginx error log. |
 | **ApacheError** | `[Wkd Mon DD HH:MM:SS YYYY]`, or 2.4's `[Wkd Mon DD HH:MM:SS.f YYYY]` (1–9 fraction digits, checked and never read) | the level seat, the bracket right after the clock: `[level]` (2.2) or `[module:level]` (2.4, split at the LAST colon); Apache's `trace1`–`trace8` read Trace in this seat only | the seat's module; `"httpd"` when the seat holds none | — | Apache httpd error log, 2.2 and 2.4 (`DN-43.D21`). A line with no clock bracket (httpd's startup `AH00558`) is not claimed. |
-| **AndroidLogcat** | `MM-DD HH:MM:SS.mmm` | priority letter → level | tag | — | Zero-copy fast scan. |
+| **AndroidLogcat** | `MM-DD HH:MM:SS.mmm` (yearless, see below) | priority letter → level | tag | — | Zero-copy fast scan. |
 | **WindowsCBS** | `YYYY-MM-DD HH:MM:SS` | explicit level word | component | — | Windows Component-Based Servicing. |
 | **SystemdJournal** | `__REALTIME_TIMESTAMP` (µs) | `PRIORITY` | `_COMM` | — | journal export (JSON-shaped). |
 | **CloudWatch** | millis field | (JSON path) | (JSON path) | — | AWS CloudWatch JSON. |
 | **HealthApp** | `YYYYMMDD-HH:MM:SS:mmm` | — | pipe-delimited field | — | |
 | **HPC** | decimal epoch | — | space-delimited field | — | |
-| **Proxifier** | (coarse → none) | — | process name | — | Timestamp too coarse → `Unknown`. |
+| **Proxifier** | `[MM.DD HH:MM:SS]` (yearless, see below) | — | process name | — | No level column → `Unknown`. |
 | **Rfc3339Text** | RFC3339 prefix token | inferred from the message body | (empty) | — | The leading-RFC-3339 LAYOUT: a stamp then free text, no vocabulary. Claims exactly the lines Syslog's header predicate rejects, so the two are disjoint. Keeps the event time; names no functional source. |
 | **RawText** | — | inferred from content | (empty) | — | Fallback; confidence always `0.0`. |
+
+> **Yearless stamps take their year from the stream, or have no time.** BSD syslog, logcat and
+> Proxifier write a month, a day and a clock but no year, and so does a BSD value in a JSON or KeyValue
+> timestamp field. The strategy never builds an instant from one: it returns a *yearless* `EventTime`, and the
+> `Tokenizer` resolves it against the event time of the stream's last line that had one — the year among that
+> line's year −1, +0 and +1 whose instant is nearest, the later year on an exact tie, a Feb 29 only in a leap
+> year — and the resolved instant becomes the next line's reference, so a chain crosses New Year with no new
+> anchor. Before any timed line, and after every `declare_context`, the time is **absent**: canon never writes a
+> year it did not read (no fixed year, no wall clock). A resolved time is parsed, never declared. A date inside
+> the message body is content and never an anchor. `CanonicalEvent::timestamp` is `std::optional<Timestamp>`,
+> so a real 1970-01-01T00:00:00Z is a time and absence is the empty optional; the projection prints both as
+> `timestamp_ns` `0`.
 
 `component` is the **low-cardinality functional source** (a subsystem/daemon, a small stable set — the useful
 grouping dimension); `host` is the **high-cardinality node identity**, kept separate so it never explodes the

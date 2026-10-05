@@ -111,9 +111,10 @@ std::expected<ParsedLine, std::string> SyslogStrategy::parse(std::string_view li
 
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
-    parsed_line.timestamp =
-        EventTime::parsed(header->bsd ? utils::parse_bsd_syslog_ts(header->stamp)
-                                      : utils::parse_iso8601(header->stamp));
+    // refs: DN-137.D1
+    parsed_line.timestamp = header->bsd
+                                ? EventTime::yearless(utils::parse_bsd_syslog_ts(header->stamp))
+                                : EventTime::parsed(utils::parse_iso8601(header->stamp));
     parsed_line.level = utils::infer_leading_log_level(header->body);
     parsed_line.component = header->tag;
     parsed_line.content = header->body;

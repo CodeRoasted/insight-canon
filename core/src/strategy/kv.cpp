@@ -86,11 +86,11 @@ std::expected<ParsedLine, std::string> KVStrategy::parse(std::string_view line,
 
     for (const auto& [key, value] : pairs)
     {
-        if (!parsed_line.timestamp.has_value())
+        if (!parsed_line.timestamp.has_stamp())
         {
             if (key == "ts" || key == "timestamp" || key == "time" || key == "@timestamp")
             {
-                parsed_line.timestamp = EventTime::parsed(try_parse_timestamp(value));
+                parsed_line.timestamp = try_parse_timestamp(value);
                 continue;
             }
         }
@@ -238,13 +238,12 @@ std::vector<KVStrategy::KVPair> KVStrategy::extract_pairs(std::string_view line)
     return pairs;
 }
 
-std::optional<Timestamp> KVStrategy::try_parse_timestamp(std::string_view value)
+// refs: DN-137.D1
+EventTime KVStrategy::try_parse_timestamp(std::string_view value)
 {
     if (auto parsed_ts{utils::parse_iso8601(value)})
-        return parsed_ts;
-    if (auto parsed_ts{utils::parse_bsd_syslog_ts(value)})
-        return parsed_ts;
-    return std::nullopt;
+        return EventTime::parsed(parsed_ts);
+    return EventTime::yearless(utils::parse_bsd_syslog_ts(value));
 }
 
 LogLevel KVStrategy::try_parse_level(std::string_view value)

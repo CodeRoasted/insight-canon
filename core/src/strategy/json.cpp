@@ -102,11 +102,11 @@ namespace
         switch (role)
         {
         case JsonRole::Timestamp:
-            if (!parsed_line.timestamp.has_value())
+            if (!parsed_line.timestamp.has_stamp())
             {
                 parsed_line.timestamp = EventTime::parsed(utils::parse_iso8601(value));
                 if (!parsed_line.timestamp)
-                    parsed_line.timestamp = EventTime::parsed(utils::parse_bsd_syslog_ts(value));
+                    parsed_line.timestamp = EventTime::yearless(utils::parse_bsd_syslog_ts(value));
             }
             break;
         case JsonRole::Level:
@@ -626,7 +626,7 @@ namespace
             parsed_line.timestamp = EventTime::parsed(utils::parse_iso8601(fast.timestamp_str));
             if (!parsed_line.timestamp)
                 parsed_line.timestamp =
-                    EventTime::parsed(utils::parse_bsd_syslog_ts(fast.timestamp_str));
+                    EventTime::yearless(utils::parse_bsd_syslog_ts(fast.timestamp_str));
         }
         if (!fast.level_str.empty())
             parsed_line.level = EventLevel::declared(utils::parse_log_level(fast.level_str));
@@ -744,7 +744,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     {
         parsed_line.timestamp = EventTime::parsed(utils::parse_iso8601(scratch_view));
         if (!parsed_line.timestamp)
-            parsed_line.timestamp = EventTime::parsed(utils::parse_bsd_syslog_ts(scratch_view));
+            parsed_line.timestamp = EventTime::yearless(utils::parse_bsd_syslog_ts(scratch_view));
     }
 
     if (try_get_string(root, kLevelKeys, scratch_view))
@@ -801,7 +801,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
         // still missing a role — never on a canon-named line.
         // refs: F-SRC-insight-canon:simdjson_scratch.hpp:compound_key_name
         if (parsed_line.component.empty() || parsed_line.level == LogLevel::Unknown ||
-            !parsed_line.timestamp.has_value() || !recognized_message)
+            !parsed_line.timestamp.has_stamp() || !recognized_message)
         {
             simdjson::ondemand::document compound_doc;
             simdjson::ondemand::object compound_root;
@@ -833,7 +833,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     // so an arm written against a log line goes green the day this code is deleted.
     // refs: ADR-29.D7, ADR-17.D12
     // refs: MEM:synthetic-gate-vacuity-vs-judgment
-    if (!is_otel && !parsed_line.timestamp.has_value() && parsed_line.level == LogLevel::Unknown &&
+    if (!is_otel && !parsed_line.timestamp.has_stamp() && parsed_line.level == LogLevel::Unknown &&
         parsed_line.component.empty() && !recognized_message)
     {
         // invariant: UNCONDITIONAL, and it must stay ABOVE the rate limit below — the marker is

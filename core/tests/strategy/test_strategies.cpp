@@ -55,11 +55,16 @@ TEST_F(SyslogStrategyTest, ParsesBSDLine)
     EXPECT_NE(pl.content.find("Accepted"), std::string::npos);
 }
 
-TEST_F(SyslogStrategyTest, ParsesBSDLineTimestamp)
+// invariant: the BSD stamp parses as the YEARLESS species — never an instant, which would need a
+// year the bytes do not carry; the stream resolves it.
+// refs: DN-137.D1
+TEST_F(SyslogStrategyTest, ParsesBSDLineTimestampAsYearless)
 {
     auto result{strategy.parse(kBSDLine, arena)};
     ASSERT_TRUE(result.has_value());
-    EXPECT_TRUE(result.value().timestamp.has_value());
+    EXPECT_FALSE(result.value().timestamp.has_value())
+        << "a BSD stamp became an instant, so a year was invented";
+    EXPECT_TRUE(result.value().timestamp.yearless_stamp().has_value());
 }
 
 TEST_F(SyslogStrategyTest, ParsesRFC3339Line)
@@ -633,7 +638,9 @@ TEST_F(SyslogStrategyTest, ParsesBSDLineWithSingleDigitDay)
     // two spaces.
     auto result{strategy.parse("Jan  1 08:03:22 host sshd[1]: service started", arena)};
     ASSERT_TRUE(result.has_value());
-    EXPECT_TRUE(result.value().timestamp.has_value());
+    const auto stamp{result.value().timestamp.yearless_stamp()};
+    ASSERT_TRUE(stamp.has_value());
+    EXPECT_EQ(stamp->day, 1U);
     EXPECT_EQ(result.value().component, "sshd");
     EXPECT_EQ(result.value().content, "service started");
 }
@@ -931,8 +938,8 @@ TEST_F(SyslogStrategyTest, InvalidDayLineParsesWithNoTimestamp)
     auto result{strategy.parse("Feb 30 12:00:00 myhost proc[1]: msg after invalid day", arena)};
     ASSERT_TRUE(result.has_value()) << result.error();
     EXPECT_EQ(result.value().content, "msg after invalid day");
-    EXPECT_FALSE(result.value().timestamp.has_value())
-        << "an impossible date published a timestamp";
+    EXPECT_FALSE(result.value().timestamp.has_stamp())
+        << "an impossible date published a timestamp or a yearless stamp";
 }
 
 TEST_F(JsonStrategyTest, NestedObjectMessageExtracted)

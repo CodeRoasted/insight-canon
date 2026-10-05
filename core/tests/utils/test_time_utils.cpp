@@ -154,14 +154,20 @@ TEST(ParseISO8601, CompactTimezoneWithoutColon)
     EXPECT_EQ(to_tt(*colon), to_tt(*nocolon));
 }
 
-TEST(ParseBSDSyslog, ValidTimestampParsed)
+TEST(ParseBSDSyslog, ValidTimestampParsedWithoutAYear)
 {
-    EXPECT_TRUE(parse_bsd_syslog_ts("Jan 15 08:03:22").has_value());
+    const auto stamp{parse_bsd_syslog_ts("Jan 15 08:03:22")};
+    ASSERT_TRUE(stamp.has_value());
+    const YearlessStamp expected{.month = 1, .day = 15, .millisecond_of_day = 29'002'000};
+    EXPECT_EQ(*stamp, expected) << "month=" << int{stamp->month} << " day=" << int{stamp->day}
+                                << " ms=" << stamp->millisecond_of_day;
 }
 
 TEST(ParseBSDSyslog, SingleDigitDayParsed)
 {
-    EXPECT_TRUE(parse_bsd_syslog_ts("Jan  1 08:03:22").has_value());
+    const auto stamp{parse_bsd_syslog_ts("Jan  1 08:03:22")};
+    ASSERT_TRUE(stamp.has_value());
+    EXPECT_EQ(stamp->day, 1U);
 }
 
 TEST(ParseBSDSyslog, TooShortReturnsNullopt)
@@ -175,18 +181,13 @@ TEST(ParseBSDSyslog, InvalidMonthReturnsNullopt)
     EXPECT_FALSE(parse_bsd_syslog_ts("Xxx 15 08:03:22").has_value());
 }
 
-// invariant: an impossible day is REFUSED as an absence, and Feb 29 follows the INJECTED reference
-// year's calendar, since RFC3164 carries no year of its own.
-TEST(ParseBSDSyslog, OutOfRangeDayIsRefused)
+// invariant: a day no year has is REFUSED as an absence; Feb 29 exists in some year, so the stamp
+// parses and its year decides later (resolve_yearless).
+TEST(ParseBSDSyslog, ADayNoYearHasIsRefusedAndFebTwentyNineParses)
 {
-    const auto feb30{parse_bsd_syslog_ts("Feb 30 12:00:00")};
-    EXPECT_FALSE(feb30.has_value()) << "Feb 30 parsed to epoch second " << to_tt(*feb30);
-    const auto apr31{parse_bsd_syslog_ts("Apr 31 12:00:00")};
-    EXPECT_FALSE(apr31.has_value()) << "Apr 31 parsed to epoch second " << to_tt(*apr31);
-    EXPECT_FALSE(parse_bsd_syslog_ts("Feb 29 12:00:00", 2023).has_value())
-        << "Feb 29 in the non-leap reference year 2023 parsed";
-    EXPECT_TRUE(parse_bsd_syslog_ts("Feb 29 12:00:00", 2024).has_value())
-        << "Feb 29 in the leap reference year 2024 was refused";
+    EXPECT_FALSE(parse_bsd_syslog_ts("Feb 30 12:00:00").has_value());
+    EXPECT_FALSE(parse_bsd_syslog_ts("Apr 31 12:00:00").has_value());
+    EXPECT_TRUE(parse_bsd_syslog_ts("Feb 29 12:00:00").has_value());
 }
 
 // invariant: an out-of-range or signed clock field is refused as an absence, never normalised into
@@ -195,11 +196,7 @@ TEST(ParseBSDSyslog, ClockFieldOutOfRangeIsRefused)
 {
     for (const char* impossible :
          {"Jun 15 24:00:00", "Jun 15 12:60:00", "Jun 15 12:00:60", "Jun 15 -1:00:00"})
-    {
-        const auto parsed{parse_bsd_syslog_ts(impossible)};
-        EXPECT_FALSE(parsed.has_value())
-            << impossible << " is out of range, yet it parsed to epoch second " << to_tt(*parsed);
-    }
+        EXPECT_FALSE(parse_bsd_syslog_ts(impossible).has_value()) << impossible;
     EXPECT_TRUE(parse_bsd_syslog_ts("Jun 15 23:59:59").has_value());
 }
 

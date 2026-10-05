@@ -30,6 +30,15 @@ namespace time_constants
     inline constexpr int kMaxReprYear{2261};
     inline constexpr std::size_t kIso8601MinLength{19};
     inline constexpr std::size_t kBsdSyslogMinLength{15};
+    // invariant: `MM-DD hh:mm:ss.mmm` and `[MM.DD hh:mm:ss]`, the two yearless stamps besides BSD.
+    // refs: DN-137.D1
+    inline constexpr std::size_t kLogcatStampLength{18};
+    inline constexpr std::size_t kProxifierStampLength{16};
+    inline constexpr std::int64_t kMillisPerSecond{1000};
+    // invariant: the longest month of any year, Feb counted at 29, so a day valid in SOME year
+    // passes and the year-specific check stays resolve_yearless's.
+    inline constexpr std::array<int, 12> kMaxDaysInMonth{31, 29, 31, 30, 31, 30,
+                                                         31, 31, 30, 31, 30, 31};
     inline constexpr std::size_t kClfMinLength{20};
     inline constexpr std::size_t kEpochTimestampMaxDigits{12};
     // invariant: 20 digits or more are refused here; a 19-digit value past int64 is refused by
@@ -174,6 +183,50 @@ namespace
         return -1;
     }
 
+    // post: the stamp the fields name, or nullopt when a clock field is out of range or the day
+    // exists in no year — a refusal, never a normalised neighbour.
+    // refs: DN-137.D1
+    std::optional<YearlessStamp> make_yearless(int month, int day, int hour, int minute, int second,
+                                               int millisecond) noexcept
+    {
+        if (month < 1 || month > time_constants::kMonthsPerYear)
+            return std::nullopt;
+        if (day < 1 || day > time_constants::kMaxDaysInMonth[static_cast<std::size_t>(month - 1)])
+            return std::nullopt;
+        if (hour < 0 || hour >= time_constants::kHoursPerDay || minute < 0 ||
+            minute >= time_constants::kMinutesPerHour || second < 0 ||
+            second >= time_constants::kSecondsPerMinute || millisecond < 0 ||
+            millisecond >= time_constants::kMillisPerSecond)
+            return std::nullopt;
+        const std::int64_t second_of_day{(hour * time_constants::kSecondsPerHour) +
+                                         (minute * time_constants::kSecondsPerMinute) + second};
+        return YearlessStamp{.month = static_cast<std::uint8_t>(month),
+                             .day = static_cast<std::uint8_t>(day),
+                             .millisecond_of_day = static_cast<std::uint32_t>(
+                                 (second_of_day * time_constants::kMillisPerSecond) + millisecond)};
+    }
+
+    // post: the instant of `stamp` in `year`, UTC, or nullopt when the day does not exist in that
+    // year or the year is outside Timestamp's range.
+    std::optional<Timestamp> yearless_in(YearlessStamp stamp, int year) noexcept
+    {
+        const auto second_of_day{
+            static_cast<std::int64_t>(stamp.millisecond_of_day / time_constants::kMillisPerSecond)};
+        std::tm utc_tm{};
+        utc_tm.tm_year = year - time_constants::kTmYearOffset;
+        utc_tm.tm_mon = stamp.month - 1;
+        utc_tm.tm_mday = stamp.day;
+        utc_tm.tm_hour = static_cast<int>(second_of_day / time_constants::kSecondsPerHour);
+        utc_tm.tm_min = static_cast<int>((second_of_day % time_constants::kSecondsPerHour) /
+                                         time_constants::kSecondsPerMinute);
+        utc_tm.tm_sec = static_cast<int>(second_of_day % time_constants::kSecondsPerMinute);
+        const auto instant{utc_timestamp(utc_tm)};
+        if (!instant.has_value())
+            return std::nullopt;
+        return *instant + std::chrono::milliseconds{stamp.millisecond_of_day %
+                                                    time_constants::kMillisPerSecond};
+    }
+
     // invariant: locale-independent - std::tolower reads the global C locale, which would make a
     // non-ASCII byte's fold ambient and the output cross-OS unstable.
     [[nodiscard]] constexpr char ascii_tolower(char character) noexcept
@@ -277,11 +330,8 @@ std::optional<Timestamp> parse_iso8601(std::string_view timestamp_str) noexcept
     return std::chrono::system_clock::from_time_t(parsed_time);
 }
 
-// pre: `reference_year` is supplied by the caller - RFC3164 carries no year.
-// invariant: no wall-clock read, so the parsed instant is reproducible across a year rollover.
-// refs: BIB:determinism_model
-std::optional<Timestamp> parse_bsd_syslog_ts(std::string_view timestamp_str,
-                                             int reference_year) noexcept
+// refs: DN-137.D1
+std::optional<YearlessStamp> parse_bsd_syslog_ts(std::string_view timestamp_str) noexcept
 {
     if (timestamp_str.size() < time_constants::kBsdSyslogMinLength)
         return std::nullopt;
@@ -318,16 +368,69 @@ std::optional<Timestamp> parse_bsd_syslog_ts(std::string_view timestamp_str,
         return std::nullopt;
     if (!parse_fixed(ptr + 13, 2, second))
         return std::nullopt;
+    return make_yearless(month, day, hour, minute, second, 0);
+}
 
-    std::tm parsed_tm{};
-    parsed_tm.tm_year = reference_year - time_constants::kTmYearOffset;
-    parsed_tm.tm_mon = month - 1;
-    parsed_tm.tm_mday = day;
-    parsed_tm.tm_hour = hour;
-    parsed_tm.tm_min = minute;
-    parsed_tm.tm_sec = second;
+// refs: DN-137.D1
+std::optional<YearlessStamp> parse_logcat_stamp(std::string_view timestamp_str) noexcept
+{
+    if (timestamp_str.size() < time_constants::kLogcatStampLength)
+        return std::nullopt;
+    const char* ptr = timestamp_str.data();
+    int month{0};
+    int day{0};
+    int hour{0};
+    int minute{0};
+    int second{0};
+    int millisecond{0};
+    if (!parse2d(ptr, month) || ptr[2] != '-' || !parse2d(ptr + 3, day) || ptr[5] != ' ' ||
+        !parse2d(ptr + 6, hour) || ptr[8] != ':' || !parse2d(ptr + 9, minute) || ptr[11] != ':' ||
+        !parse2d(ptr + 12, second) || ptr[14] != '.' || !parse_fixed(ptr + 15, 3, millisecond))
+        return std::nullopt;
+    return make_yearless(month, day, hour, minute, second, millisecond);
+}
 
-    return utc_timestamp(parsed_tm);
+// refs: DN-137.D1
+std::optional<YearlessStamp> parse_proxifier_stamp(std::string_view timestamp_str) noexcept
+{
+    if (timestamp_str.size() < time_constants::kProxifierStampLength)
+        return std::nullopt;
+    const char* ptr = timestamp_str.data();
+    int month{0};
+    int day{0};
+    int hour{0};
+    int minute{0};
+    int second{0};
+    if (ptr[0] != '[' || !parse2d(ptr + 1, month) || ptr[3] != '.' || !parse2d(ptr + 4, day) ||
+        ptr[6] != ' ' || !parse2d(ptr + 7, hour) || ptr[9] != ':' || !parse2d(ptr + 10, minute) ||
+        ptr[12] != ':' || !parse2d(ptr + 13, second) || ptr[15] != ']')
+        return std::nullopt;
+    return make_yearless(month, day, hour, minute, second, 0);
+}
+
+// refs: DN-137.D2
+std::optional<Timestamp> resolve_yearless(YearlessStamp stamp, Timestamp reference) noexcept
+{
+    const auto reference_day{std::chrono::floor<std::chrono::days>(reference)};
+    const int reference_year{static_cast<int>(std::chrono::year_month_day{reference_day}.year())};
+    std::optional<Timestamp> nearest;
+    Duration nearest_distance{};
+    // invariant: candidates are visited in ascending year, so `<=` lets the later of two equally
+    // near candidates win, which is the tie rule.
+    for (int year{reference_year - 1}; year <= reference_year + 1; ++year)
+    {
+        const auto candidate{yearless_in(stamp, year)};
+        if (!candidate.has_value())
+            continue;
+        const Duration distance{*candidate >= reference ? *candidate - reference
+                                                        : reference - *candidate};
+        if (!nearest.has_value() || distance <= nearest_distance)
+        {
+            nearest = candidate;
+            nearest_distance = distance;
+        }
+    }
+    return nearest;
 }
 
 std::optional<Timestamp> parse_clf_timestamp(std::string_view timestamp_str) noexcept

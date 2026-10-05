@@ -194,7 +194,8 @@ class KVStrategy final : public IFormatStrategy
         std::string_view value;
     };
     [[nodiscard]] static std::vector<KVPair> extract_pairs(std::string_view line);
-    [[nodiscard]] static std::optional<Timestamp> try_parse_timestamp(std::string_view value);
+    // post: an ISO 8601 value as an instant, else a BSD stamp as the yearless species, else absent.
+    [[nodiscard]] static EventTime try_parse_timestamp(std::string_view value);
     [[nodiscard]] static LogLevel try_parse_level(std::string_view value);
 };
 

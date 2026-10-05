@@ -43,6 +43,11 @@ constexpr std::size_t kArenaBytes{std::size_t{1} << 16U};
            " s";
 }
 
+[[nodiscard]] std::string render_time(const std::optional<Timestamp>& when)
+{
+    return when ? render_time(*when) : "none";
+}
+
 [[nodiscard]] std::string render(const ParsedLine& parsed)
 {
     return "{time=" + (parsed.timestamp.has_value() ? render_time(*parsed.timestamp) : "none") +
@@ -188,8 +193,9 @@ TEST(ApacheErrorTwoFourCapture, EveryLineReadsAsTheTableWrittenFromItsBytes)
         ASSERT_TRUE(event.has_value())
             << "line " << row.line << " produced no event: " << event.error()
             << "\n  bytes: " << line;
-        const Timestamp expected_time{row.event_seconds ? at_second(*row.event_seconds)
-                                                        : Timestamp{}};
+        const std::optional<Timestamp> expected_time{
+            row.event_seconds ? std::optional<Timestamp>{at_second(*row.event_seconds)}
+                              : std::nullopt};
         const bool row_ok{event->format == row.format && event->timestamp == expected_time &&
                           event->level == row.level &&
                           event->declared_level == row.declared_level &&

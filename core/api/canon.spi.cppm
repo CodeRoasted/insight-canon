@@ -46,6 +46,29 @@ class EventTime
         return out;
     }
 
+    // post: the YEARLESS species — a stamp whose format writes no year; it is not an instant, so
+    // has_value() is false and no reader can take it for one.
+    // invariant: the stream resolves it before the event is built, so it never leaves canon.
+    // refs: DN-137.D1, DN-137.D2
+    [[nodiscard]] static EventTime yearless(std::optional<utils::YearlessStamp> stamp) noexcept
+    {
+        EventTime out;
+        out.yearless_ = stamp;
+        return out;
+    }
+
+    [[nodiscard]] std::optional<utils::YearlessStamp> yearless_stamp() const noexcept
+    {
+        return yearless_;
+    }
+
+    // post: true when the bytes carried a stamp at all — an instant or a yearless one; the test a
+    // strategy uses for "this role was recognized", which has_value() no longer answers.
+    [[nodiscard]] bool has_stamp() const noexcept
+    {
+        return value_.has_value() || yearless_.has_value();
+    }
+
     [[nodiscard]] bool has_value() const noexcept
     {
         return value_.has_value();
@@ -87,6 +110,7 @@ class EventTime
 
   private:
     std::optional<Timestamp> value_;
+    std::optional<utils::YearlessStamp> yearless_;
     bool declared_{false};
 };
 

@@ -47,6 +47,10 @@ struct Tokenizer::Impl
     // whenever `context` is replaced, never left viewing a previous one.
     StreamContext context;
     std::vector<DeclaredRun> runs;
+    // refs: DN-137.D2
+    // invariant: the event time of the last line on this stream that had one — the year source of
+    // a yearless stamp; reset with the declared context, so one stream never reads another's.
+    std::optional<Timestamp> year_reference;
     EventID next_id{0};
     std::size_t produced{0};
     std::size_t empty_projections{0};
@@ -66,8 +70,24 @@ struct Tokenizer::Impl
     {
         context = std::move(declared);
         runs = insight::semantic::declared_runs_of(context, composed);
+        year_reference.reset();
         INSIGHT_LOG_DEBUG(logging::tokenizer_logger(), "context declared: values={} runs={}",
                           context.values.size(), runs.size());
+    }
+
+    // refs: DN-137.D2
+    // post: an instant passes through and becomes the reference; a yearless stamp takes the year
+    // nearest the reference and becomes it in turn.
+    // post: before any reference, or with no candidate, the time is absent and the reference stays.
+    // invariant: causal and one Timestamp of state: a line's time reads only earlier lines.
+    [[nodiscard]] std::optional<Timestamp> resolve_event_time(const EventTime& time) noexcept
+    {
+        std::optional<Timestamp> resolved{time.value()};
+        if (const auto stamp{time.yearless_stamp()}; stamp && year_reference)
+            resolved = utils::resolve_yearless(*stamp, *year_reference);
+        if (resolved)
+            year_reference = resolved;
+        return resolved;
     }
 
     [[nodiscard]] std::expected<CanonicalEvent, std::string>
@@ -109,7 +129,7 @@ struct Tokenizer::Impl
         // refs: ADR-29.D5
         // invariant: time and provenance are copied together off ONE EventTime, so no edit can set
         // a declared time here and forget the marker.
-        event.timestamp = parsed_line.timestamp.value_or(Timestamp{});
+        event.timestamp = resolve_event_time(parsed_line.timestamp);
         event.declared_timestamp = parsed_line.timestamp.is_declared();
         // refs: ADR-20.D19
         // invariant: level and provenance are copied together off ONE EventLevel — the level
