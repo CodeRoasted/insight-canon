@@ -82,8 +82,8 @@ fall through to the level-inference path in [classification.md](classification.m
 > anchor. Before any timed line, and after every `declare_context`, the time is **absent**: canon never writes a
 > year it did not read (no fixed year, no wall clock). A resolved time is parsed, never declared. A date inside
 > the message body is content and never an anchor. `CanonicalEvent::timestamp` is `std::optional<Timestamp>`,
-> so a real 1970-01-01T00:00:00Z is a time and absence is the empty optional; the projection prints both as
-> `timestamp_ns` `0`.
+> so a real 1970-01-01T00:00:00Z is a time and absence is the empty optional; the projection prints a present time
+> as its nanoseconds, the epoch as `0`, and an absent time as an empty `timestamp_ns` cell.
 
 `component` is the **low-cardinality functional source** (a subsystem/daemon, a small stable set — the useful
 grouping dimension); `host` is the **high-cardinality node identity**, kept separate so it never explodes the

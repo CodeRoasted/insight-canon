@@ -1078,13 +1078,16 @@ using ProjectionColumns = std::array<std::string, kProjectionMembers.size()>;
 
 // post: out[i] holds member kProjectionMembers[i] as canonical text, overwritten: integers in
 // decimal, enums by name, booleans 0 or 1, a list as its count then each element after a '|'.
-// post: the timestamp is whole NANOSECONDS since the epoch, Timestamp's own grain, under the key
-// timestamp_ns that names the unit.
+// post: the timestamp is whole NANOSECONDS since the epoch under the key timestamp_ns, which names
+// the unit; an absent time is the EMPTY cell, so the epoch instant renders 0 and absence nothing.
+// post: a reader splits a row of these cells on single tabs, never on whitespace runs, which would
+// drop an empty cell and shift every later column.
 // post: a string's bytes are verbatim except backslash, tab, newline, carriage return and '|',
 // each written as a backslash escape, so no column holds a separator it did not write.
 // invariant: the rendering is injective per member, which lets a digest of a column stand for it.
 // invariant: its unit pins CanonicalEvent's member count to kProjectionMembers at compile time, so
 // a new member does not compile until it is rendered.
+// refs: DN-137.D7
 void render_projection(const CanonicalEvent& event, ProjectionColumns& out);
 
 } // namespace insight::tokenization

@@ -100,6 +100,21 @@ TEST(Projection, EmptyListsAndDefaultsRenderTheirCountAndZero)
     EXPECT_EQ(out[column("ordinals")], "0");
     EXPECT_EQ(out[column("linked_span_ids")], "0");
     EXPECT_EQ(out[column("trace")], "0,0,0,0,0,0");
-    EXPECT_EQ(out[column("timestamp_ns")], "0");
+    EXPECT_EQ(out[column("timestamp_ns")], "");
     EXPECT_EQ(out[column("level")], "Unknown");
+}
+
+TEST(Projection, TheEpochInstantRendersZeroAndAnAbsentTimeRendersTheEmptyCell)
+{
+    CanonicalEvent at_epoch{};
+    at_epoch.timestamp = insight::Timestamp{};
+    ProjectionColumns out;
+    render_projection(at_epoch, out);
+    EXPECT_EQ(out[column("timestamp_ns")], "0") << "1970-01-01T00:00:00Z is a present time";
+
+    CanonicalEvent untimed{};
+    ASSERT_FALSE(untimed.timestamp.has_value());
+    render_projection(untimed, out);
+    EXPECT_EQ(out[column("timestamp_ns")], "")
+        << "an absent time must render as nothing, distinct from the epoch's 0";
 }
