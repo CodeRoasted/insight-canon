@@ -41,6 +41,11 @@ namespace time_constants
                                                          31, 31, 30, 31, 30, 31};
     inline constexpr std::size_t kClfMinLength{20};
     inline constexpr std::size_t kEpochTimestampMaxDigits{12};
+    // invariant: the last whole second Timestamp's int64 nanosecond count holds,
+    // 2262-04-11T23:47:16Z; one second more overflows the seconds-to-nanoseconds conversion.
+    inline constexpr std::int64_t kMaxReprEpochSeconds{
+        std::chrono::duration_cast<std::chrono::seconds>(Timestamp::max().time_since_epoch())
+            .count()};
     // invariant: 20 digits or more are refused here; a 19-digit value past int64 is refused by
     // from_chars, which reports out-of-range.
     inline constexpr std::size_t kUnixNanoMaxDigits{19};
@@ -513,9 +518,9 @@ std::optional<Timestamp> parse_epoch_timestamp(std::string_view timestamp_str) n
     {
         return std::nullopt;
     }
-    if (epoch < 0)
+    if (epoch < 0 || epoch > time_constants::kMaxReprEpochSeconds)
         return std::nullopt;
-    return std::chrono::system_clock::from_time_t(static_cast<std::time_t>(epoch));
+    return Timestamp{std::chrono::seconds{epoch}};
 }
 
 // invariant: integer only, never float, and the nanosecond count is carried whole, since Timestamp

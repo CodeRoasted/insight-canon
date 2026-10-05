@@ -58,7 +58,7 @@ fall through to the level-inference path in [classification.md](classification.m
 | **RFC5424** | RFC3339 | PRI value → level | APP-NAME | HOSTNAME | Structured syslog. |
 | **Log4j** | `YYYY-MM-DD HH:MM:SS,mmm` | explicit level word | thread/component (variant) | — | Hadoop/Zookeeper/OpenStack variants. Not claimed: a Log4j record behind Maven's `[INFO] ` / `[WARNING] ` / `[ERROR] ` prefix. Maven is a dialect, not a format, and canon declares no Maven dialect, so nothing removes the prefix before format detection. The line is templated whole as raw text, its stamp masked, its level read from the bracket; its logger is not a `component`. |
 | **SparkHDFS** | `YY/MM/DD` or `YYMMDD HHMMSS` | explicit level word | component | — | Spark + HDFS. |
-| **BGL** | decimal epoch | explicit level (else inferred) | subsystem (low-card) | node (high-card) | Splits low-card `component` from high-card `host`. |
+| **BGL** | decimal epoch seconds, absent past 2262-04-11T23:47:16Z (the last second `Timestamp` holds) | explicit level (else inferred) | subsystem (low-card) | node (high-card) | Splits low-card `component` from high-card `host`. |
 | **CLF** | `10/Oct/2000:13:55:36 -0700` | HTTP status → level | (empty) | client IP / hostname | Common/Combined access logs. The client IP is a NODE identity, so it is `host`, never a cube dimension; the layout declares no functional source and says so. |
 | **IIS W3C** | `YYYY-MM-DD HH:MM:SS` | HTTP status → level | — | — | IIS extended format. |
 | **NginxError** | `YYYY/MM/DD HH:MM:SS` | `[level]` bracket | — | — | nginx error log. |
@@ -68,7 +68,7 @@ fall through to the level-inference path in [classification.md](classification.m
 | **SystemdJournal** | `__REALTIME_TIMESTAMP` (µs) | `PRIORITY` | `_COMM` | — | journal export (JSON-shaped). |
 | **CloudWatch** | millis field | (JSON path) | (JSON path) | — | AWS CloudWatch JSON. |
 | **HealthApp** | `YYYYMMDD-HH:MM:SS:mmm` | — | pipe-delimited field | — | |
-| **HPC** | decimal epoch | — | space-delimited field | — | |
+| **HPC** | decimal epoch seconds, absent past 2262-04-11T23:47:16Z | — | space-delimited field | — | |
 | **Proxifier** | `[MM.DD HH:MM:SS]` (yearless, see below) | — | process name | — | No level column → `Unknown`. |
 | **Rfc3339Text** | RFC3339 prefix token | inferred from the message body | (empty) | — | The leading-RFC-3339 LAYOUT: a stamp then free text, no vocabulary. Claims exactly the lines Syslog's header predicate rejects, so the two are disjoint. Keeps the event time; names no functional source. |
 | **RawText** | — | inferred from content | (empty) | — | Fallback; confidence always `0.0`. |

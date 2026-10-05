@@ -62,12 +62,31 @@ TEST(ParseEpochTimestamp, MillisecondEpochIsRefusedNotSilentlyReadAsSeconds)
 {
     // invariant: thirteen digits is the MILLISECOND epoch, the commonest way a timestamp column
     // arrives wrong; read as seconds it would place the record millennia away.
-    // invariant: the twelve-digit cap must refuse it, and twelve digits reaches far enough that no
-    // real log second is lost.
     EXPECT_FALSE(parse_epoch_timestamp("1705312200000").has_value())
         << "a 13-digit millisecond epoch was accepted as SECONDS";
-    EXPECT_TRUE(parse_epoch_timestamp("170531220000").has_value())
-        << "12 digits is the documented maximum and must still parse";
+    // invariant: twelve digits passes the width cap but lies past the last second Timestamp holds,
+    // so it is absent; it used to overflow the nanosecond conversion and fabricate an instant.
+    EXPECT_FALSE(parse_epoch_timestamp("170531220000").has_value())
+        << "a 12-digit epoch past 2262 was accepted instead of refused";
+}
+
+TEST(ParseEpochTimestamp, TheLastRepresentableSecondParsesAndTheNextIsRefused)
+{
+    // invariant: the bound is Timestamp's own maximum, checked against the standard library's
+    // civil calendar, so no copied literal can drift from the type.
+    const std::int64_t last_second{
+        std::chrono::duration_cast<std::chrono::seconds>(Timestamp::max().time_since_epoch())
+            .count()};
+    ASSERT_EQ(last_second, utc_epoch(2262, 4, 11, 23, 47, 16))
+        << "Timestamp's last whole second is not 2262-04-11T23:47:16Z";
+    EXPECT_PARSES_TO(parse_epoch_timestamp(std::to_string(last_second - 1)), last_second - 1);
+    EXPECT_PARSES_TO(parse_epoch_timestamp(std::to_string(last_second)), last_second);
+    EXPECT_FALSE(parse_epoch_timestamp(std::to_string(last_second + 1)).has_value())
+        << "epoch " << (last_second + 1) << " is one second past Timestamp's range and parsed";
+    // invariant: a zero-padded column keeps its value, so the value is judged, never the width.
+    EXPECT_PARSES_TO(parse_epoch_timestamp("00" + std::to_string(last_second)), last_second);
+    EXPECT_FALSE(parse_epoch_timestamp("00" + std::to_string(last_second + 1)).has_value())
+        << "zero-padded epoch 00" << (last_second + 1) << " is past Timestamp's range and parsed";
 }
 
 TEST(ParseEpochTimestamp, MalformedInputRefused)

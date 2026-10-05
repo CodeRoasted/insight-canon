@@ -1615,7 +1615,9 @@ parse_proxifier_stamp(std::string_view timestamp_str) noexcept;
 // invariant: the grammar carries no fraction, so the instant has second grain.
 [[nodiscard]] std::optional<Timestamp> parse_clf_timestamp(std::string_view timestamp_str) noexcept;
 
-// post: Unix epoch SECONDS as a digit string.
+// post: Unix epoch SECONDS written as one to twelve decimal digits, leading zeros allowed.
+// post: nullopt past the last second Timestamp holds, 2262-04-11T23:47:16Z, so an epoch the type
+// cannot represent is absent and never a wrapped instant.
 [[nodiscard]] std::optional<Timestamp>
 parse_epoch_timestamp(std::string_view timestamp_str) noexcept;
 
