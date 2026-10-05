@@ -2218,6 +2218,70 @@ TEST_F(CloudWatchStrategyTest, ConfidenceZeroForPlainJSON)
     EXPECT_EQ(strategy.confidence(kJSONLine), 0.0);
 }
 
+[[nodiscard]] static std::int64_t epoch_seconds_of(const ParsedLine& parsed)
+{
+    return std::chrono::duration_cast<std::chrono::seconds>(parsed.timestamp->time_since_epoch())
+        .count();
+}
+
+// post: a CloudWatch line whose timestamp literal is `millis`; the escaped message forces the
+// simdjson path when `escaped` is true, and the escape-free fast path otherwise.
+[[nodiscard]] static std::string cloudwatch_line(std::string_view millis, bool escaped)
+{
+    return std::string{R"({"timestamp":)"} + std::string{millis} +
+           (escaped ? R"(,"message":"a\"b","logGroup":"/aws/x"})"
+                    : R"(,"message":"ab","logGroup":"/aws/x"})");
+}
+
+// invariant: the event time is the millisecond count divided to whole seconds toward zero, and a
+// second outside Timestamp's range is absent on BOTH paths, never a wrapped instant.
+// invariant: the bound is Timestamp's own, 9 223 372 036 s either side of the epoch, so the last
+// accepted count is 9 223 372 036 999 ms and the first refused is one more.
+TEST_F(CloudWatchStrategyTest, AMillisecondCountPastTimestampsRangeIsAbsentOnBothPaths)
+{
+    for (const bool escaped : {false, true})
+    {
+        const char* const path{escaped ? "simdjson path" : "fast path"};
+        for (const auto& [millis, expected_seconds] :
+             {std::pair{std::string_view{"9223372036999"}, std::int64_t{9223372036}},
+              std::pair{std::string_view{"-9223372036999"}, std::int64_t{-9223372036}}})
+        {
+            const std::string line{cloudwatch_line(millis, escaped)};
+            const auto result{strategy.parse(line, arena)};
+            ASSERT_TRUE(result.has_value()) << path << ": " << line;
+            ASSERT_TRUE(result->timestamp.has_value())
+                << path << ": " << millis << " ms is inside Timestamp's range and lost its time";
+            EXPECT_EQ(epoch_seconds_of(*result), expected_seconds)
+                << path << ": " << millis
+                << " ms\n  actual seconds  : " << epoch_seconds_of(*result)
+                << "\n  expected seconds: " << expected_seconds;
+        }
+        for (const std::string_view millis : {"9223372037000", "-9223372037000"})
+        {
+            const std::string line{cloudwatch_line(millis, escaped)};
+            const auto result{strategy.parse(line, arena)};
+            ASSERT_TRUE(result.has_value()) << path << ": " << line;
+            EXPECT_FALSE(result->timestamp.has_value())
+                << path << ": " << millis << " ms is past Timestamp's range and carried a time";
+        }
+    }
+}
+
+// invariant: a literal past int64 is refused by the fast path's reader instead of wrapping in its
+// digit loop; the simdjson path's get_int64 already refuses it.
+TEST_F(CloudWatchStrategyTest, ALiteralPastInt64CarriesNoTime)
+{
+    for (const bool escaped : {false, true})
+    {
+        const std::string line{cloudwatch_line("99999999999999999999", escaped)};
+        const auto result{strategy.parse(line, arena)};
+        ASSERT_TRUE(result.has_value()) << line;
+        EXPECT_FALSE(result->timestamp.has_value())
+            << (escaped ? "simdjson path" : "fast path")
+            << ": a 20-digit timestamp literal carried a time";
+    }
+}
+
 static constexpr std::string_view kSystemdJournalLine{
     R"({"__REALTIME_TIMESTAMP":"1705312200000000","PRIORITY":"6","_COMM":"nginx","MESSAGE":"Worker process started","_PID":"1234","_SYSTEMD_UNIT":"nginx.service"})"};
 
@@ -2275,6 +2339,36 @@ TEST_F(SystemdJournalStrategyTest, ConfidenceHigherThanCloudWatch)
 TEST_F(SystemdJournalStrategyTest, ConfidenceZeroForPlainJSON)
 {
     EXPECT_EQ(strategy.confidence(kJSONLine), 0.0);
+}
+
+[[nodiscard]] static std::string journal_line(std::string_view micros)
+{
+    return std::string{R"({"__REALTIME_TIMESTAMP":")"} + std::string{micros} +
+           R"(","PRIORITY":"6","_COMM":"nginx","MESSAGE":"m"})";
+}
+
+// invariant: the microsecond count is divided to whole seconds toward zero, and a second past
+// Timestamp's range is absent, never a wrapped instant.
+// invariant: the export format defines the count as unsigned, so a negative count is refused.
+TEST_F(SystemdJournalStrategyTest, AMicrosecondCountPastTimestampsRangeOrNegativeIsAbsent)
+{
+    {
+        const std::string line{journal_line("9223372036999999")};
+        const auto result{strategy.parse(line, arena)};
+        ASSERT_TRUE(result.has_value()) << line;
+        ASSERT_TRUE(result->timestamp.has_value())
+            << "9223372036999999 us is inside Timestamp's range and lost its time";
+        EXPECT_EQ(epoch_seconds_of(*result), 9223372036)
+            << "actual seconds: " << epoch_seconds_of(*result);
+    }
+    for (const std::string_view micros : {"9223372037000000", "-1000000", "-1"})
+    {
+        const std::string line{journal_line(micros)};
+        const auto result{strategy.parse(line, arena)};
+        ASSERT_TRUE(result.has_value()) << line;
+        EXPECT_FALSE(result->timestamp.has_value())
+            << micros << " us is past Timestamp's range or negative and carried a time";
+    }
 }
 
 // invariant: the last-resort catch-all for unstructured application stdout.

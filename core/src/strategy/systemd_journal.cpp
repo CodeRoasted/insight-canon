@@ -112,14 +112,16 @@ std::expected<ParsedLine, std::string> SystemdJournalStrategy::parse(std::string
         std::int64_t microsecs{};
         const auto res{std::from_chars(scratch_view.data(),
                                        scratch_view.data() + scratch_view.size(), microsecs)};
-        if (res.ec == std::errc{})
+        // invariant: the export format defines the count as unsigned microseconds since the
+        // epoch, so a negative count is no time this format writes and is refused.
+        if (res.ec == std::errc{} && microsecs >= 0)
         {
             // invariant: the producer's exact microsecond count is divided to whole seconds
             // toward zero, its remainder dropped: this path's event time has second grain.
+            // invariant: a second past Timestamp's range leaves the time absent.
             // refs: DN-17.D44, DN-43.D21
-            const auto epoch_secs{static_cast<std::time_t>(microsecs / kMicrosecondsPerSecond)};
-            parsed.timestamp =
-                EventTime::parsed(std::chrono::system_clock::from_time_t(epoch_secs));
+            parsed.timestamp = EventTime::parsed(
+                utils::epoch_seconds_to_timestamp(microsecs / kMicrosecondsPerSecond));
         }
     }
 

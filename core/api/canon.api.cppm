@@ -1621,6 +1621,11 @@ parse_proxifier_stamp(std::string_view timestamp_str) noexcept;
 [[nodiscard]] std::optional<Timestamp>
 parse_epoch_timestamp(std::string_view timestamp_str) noexcept;
 
+// post: the instant `seconds` whole seconds after the Unix epoch, negative before it.
+// post: nullopt outside Timestamp's range, 1677-09-21T00:12:44Z to 2262-04-11T23:47:16Z, so a time
+// the type cannot represent is absent and never a wrapped instant.
+[[nodiscard]] std::optional<Timestamp> epoch_seconds_to_timestamp(std::int64_t seconds) noexcept;
+
 // post: OTLP epoch NANOSECONDS as a digit string — the OTEL event-time channel, so OTEL inputs
 // window like any other format.
 // invariant: integer-only, no float; the producer's nanosecond count is carried whole.

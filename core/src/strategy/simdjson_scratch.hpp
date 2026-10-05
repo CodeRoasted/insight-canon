@@ -6,6 +6,7 @@
 #pragma once
 
 #include <array>
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -226,8 +227,6 @@ struct FastJsonResult
     bool has_result{false};
 };
 
-inline constexpr std::int64_t kDecimalBase{10};
-
 // post: the position advanced past any JSON whitespace.
 inline void skip_json_ws(std::string_view line, std::size_t& pos) noexcept
 {
@@ -292,13 +291,11 @@ inline void parse_number_ts(FastJsonResult& result, std::string_view key,
     if (!no_ts || (key != "timestamp" && key != "ts"))
         return;
     std::int64_t millis{0};
-    std::size_t digit_idx{0};
-    const bool neg = !num.empty() && num[0] == '-';
-    if (neg)
-        ++digit_idx;
-    for (; digit_idx < num.size() && num[digit_idx] >= '0' && num[digit_idx] <= '9'; ++digit_idx)
-        millis = (millis * kDecimalBase) + static_cast<std::int64_t>(num[digit_idx] - '0');
-    result.timestamp_ms = neg ? -millis : millis;
+    // invariant: the integer prefix of the literal is read and a literal past int64 leaves the
+    // field unset, so the time is absent rather than wrapped.
+    if (std::from_chars(num.data(), num.data() + num.size(), millis).ec != std::errc{})
+        return;
+    result.timestamp_ms = millis;
 }
 
 // post: one JSON value consumed at the position, dispatched by type; false when the caller should

@@ -61,11 +61,10 @@ std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_vie
             {
                 // invariant: the producer's exact millisecond count is divided to whole seconds
                 // toward zero, its remainder dropped: this path's event time has second grain.
+                // invariant: a second outside Timestamp's range leaves the time absent.
                 // refs: DN-17.D44, DN-43.D21
-                const auto epoch_secs{
-                    static_cast<std::time_t>(fast.timestamp_ms / kMillisecondsPerSecond)};
-                parsed.timestamp =
-                    EventTime::parsed(std::chrono::system_clock::from_time_t(epoch_secs));
+                parsed.timestamp = EventTime::parsed(
+                    utils::epoch_seconds_to_timestamp(fast.timestamp_ms / kMillisecondsPerSecond));
             }
             else if (!fast.timestamp_str.empty())
             {
@@ -111,9 +110,10 @@ std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_vie
     {
         // invariant: the producer's exact millisecond count is divided to whole seconds
         // toward zero, its remainder dropped: this path's event time has second grain.
+        // invariant: a second outside Timestamp's range leaves the time absent.
         // refs: DN-17.D44, DN-43.D21
-        const auto epoch_secs{static_cast<std::time_t>(millis / kMillisecondsPerSecond)};
-        parsed.timestamp = EventTime::parsed(std::chrono::system_clock::from_time_t(epoch_secs));
+        parsed.timestamp =
+            EventTime::parsed(utils::epoch_seconds_to_timestamp(millis / kMillisecondsPerSecond));
     }
 
     std::string_view scratch_view;

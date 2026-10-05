@@ -89,6 +89,28 @@ TEST(ParseEpochTimestamp, TheLastRepresentableSecondParsesAndTheNextIsRefused)
         << "zero-padded epoch 00" << (last_second + 1) << " is past Timestamp's range and parsed";
 }
 
+TEST(EpochSecondsToTimestamp, BothEndsOfTimestampsRangeConvertAndOneSecondBeyondIsAbsent)
+{
+    // invariant: the bounds are Timestamp's own, checked against the civil calendar.
+    const std::int64_t first_second{
+        std::chrono::duration_cast<std::chrono::seconds>(Timestamp::min().time_since_epoch())
+            .count()};
+    const std::int64_t last_second{
+        std::chrono::duration_cast<std::chrono::seconds>(Timestamp::max().time_since_epoch())
+            .count()};
+    ASSERT_EQ(first_second, utc_epoch(1677, 9, 21, 0, 12, 44));
+    ASSERT_EQ(last_second, utc_epoch(2262, 4, 11, 23, 47, 16));
+    EXPECT_PARSES_TO(epoch_seconds_to_timestamp(first_second), first_second);
+    EXPECT_PARSES_TO(epoch_seconds_to_timestamp(last_second), last_second);
+    EXPECT_PARSES_TO(epoch_seconds_to_timestamp(0), 0);
+    EXPECT_FALSE(epoch_seconds_to_timestamp(first_second - 1).has_value())
+        << "second " << (first_second - 1) << " is before Timestamp's range and converted";
+    EXPECT_FALSE(epoch_seconds_to_timestamp(last_second + 1).has_value())
+        << "second " << (last_second + 1) << " is past Timestamp's range and converted";
+    EXPECT_FALSE(epoch_seconds_to_timestamp(std::numeric_limits<std::int64_t>::min()).has_value());
+    EXPECT_FALSE(epoch_seconds_to_timestamp(std::numeric_limits<std::int64_t>::max()).has_value());
+}
+
 TEST(ParseEpochTimestamp, MalformedInputRefused)
 {
     EXPECT_FALSE(parse_epoch_timestamp("").has_value());
