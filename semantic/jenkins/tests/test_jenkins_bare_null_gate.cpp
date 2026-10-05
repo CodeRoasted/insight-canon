@@ -1,16 +1,16 @@
 // refs: ADR-8, BIB:jenkins_dialect
 // invariant: this gate change-detects the whole surface of the 82 bare Jenkins traces against a
 // COMMITTED baseline that sits beside this TU.
-// invariant: the claim was NARROWED by ruling on 2026-08-26 and the old one cannot be re-armed: 7
-// of the 82 rows were re-emitted from the current chain, whose `pre` side is not recomputable.
-// invariant: a green therefore means `nothing has moved on the 82 bare traces since 2026-08-26`,
+// invariant: the claim was NARROWED by ruling on 2026-08-26 and the old one cannot be re-armed: 27
+// of the 82 rows are re-emitted from the current chain, whose `pre` side is not recomputable.
+// invariant: a green therefore means `nothing has moved on the 82 bare traces since 2026-10-05`,
 // and the purification null it was born to carry is now history the baseline's header witnesses.
 // invariant: what it still proves is a byte-exact regression fence over the SHIPPED tokenizer,
 // recognizer and manifest, on 82 real third-party traces, at line grain.
 // invariant: the standing rule is unchanged — an UNATTRIBUTED movement is the abort wire, never a
-// re-pin — and the 2026-08-26 movement was attributed CLOSED by causal experiment.
-// invariant: both attributed commits were judged CORRECT defect repairs and neither could be
-// reverted to satisfy a frozen file, which is the only condition under which this baseline moves.
+// re-pin — and each re-emission's movement was attributed CLOSED by causal experiment.
+// invariant: every attributed commit was judged a CORRECT change that could not be reverted to
+// satisfy a frozen file, which is the only condition under which this baseline moves.
 // invariant: the ruled re-baseline procedure is attribute, judge, re-run and apply the emitted
 // patch rows verbatim, append a dated provenance line, then re-run to zero and re-prove red.
 // invariant: there is no in-place rewrite mode and there must not be one — a change detector that

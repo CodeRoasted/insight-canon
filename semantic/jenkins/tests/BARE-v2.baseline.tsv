@@ -4,12 +4,13 @@
 # claim this file supports and the RULED procedure by which any row here may move.
 #
 # ── WHAT THIS FILE CLAIMS, AND WHAT IT NO LONGER CLAIMS ───────────────────────────────────────
-# 75 of the 82 rows are still the ORIGINAL PRE-CUT emission and carry the T5 purification's
-# before/after null for those traces. 7 rows were RE-EMITTED on 2026-08-26 from the CURRENT
-# purified chain, on the Founder's explicit ruling. Their "pre" side is GONE and NOT RECOMPUTABLE:
-# the JenkinsStrategy that produced it is deleted, so the re-emission could not restore the
-# comparison — it re-froze the current surface as a new baseline. For those 7 traces this file
-# therefore proves "nothing has moved since 2026-08-26" and NOTHING about the purification itself.
+# 55 of the 82 rows are still the ORIGINAL PRE-CUT emission and carry the T5 purification's
+# before/after null for those traces. 27 rows were RE-EMITTED from the CURRENT purified chain: 7
+# on 2026-08-26 on the Founder's explicit ruling, and 26 on 2026-10-05 (6 of them among the 7, so
+# 20 new) under the same procedure. Their "pre" side is GONE and NOT RECOMPUTABLE: the
+# JenkinsStrategy that produced it is deleted, so a re-emission cannot restore the comparison — it
+# re-freezes the current surface as a new baseline. For those 27 traces this file therefore proves
+# "nothing has moved since the latest re-emission" and NOTHING about the purification itself.
 # A whole-file green means: the bare surface is byte-identical to this file. It does NOT mean
 # "the T5 purification moved nothing on the bare class" any more. Do not read the old promise off
 # this file.
@@ -36,6 +37,24 @@
 #     builds_apache_org/job_Camel_..._Build_20and_20test_job_camel_4_14_x__218.log (f6169f0)
 #     builds_apache_org/job_Camel_..._Build_20and_20test_job_camel_4_14_x__219.log (f6169f0)
 #     ibmz_ci_osuosl_org/job_TensorFlow_IBMZ_CI_test__13.log                      (fb2bfd5)
+# re-emitted 2026-10-05: 26 rows, from the CURRENT purified chain at insight-canon abd841f on
+#   linux-gcc16-release, via the gate's own REBASELINE-ROW patch output (corpus-gates run
+#   37285909951 at insight-canon ab6ffb2, reproduced row-for-row at ab6ffb2 and abd841f). Same
+#   corpus, same REGISTRY pin ae5f19f1, byte-attestation re-verified on all 82 traces in the same
+#   run. CONDITION MET: attributed CLOSED by causal experiment, one build per code commit from
+#   7a20b19 (last green, 0 of 82 moved) to abd841f, with each trace's per-line template surface
+#   diffed commit to commit: 325493d (DN-134.D1, rule S: a digit-leading core in a complete
+#   wrapper shell takes rule 5's disposition, so `(1)`, `[2.1]`, `"5.15.0-164-generic",`,
+#   `(2.35-0ubuntu3.8)` mask whole as their bare forms already did) moved all 26; a1e07d2
+#   (DN-134.D2, rule K: a number behind `;` masks per segment) also moved
+#   builds_apache_org/job_Brooklyn_job_brooklyn_dist_job_PR_145__56.log; f86abdb (DN-136.D4: a
+#   path after a declared `"` lead masks under its ephemeral root) also moved
+#   debbie_postgis_net/job_PostGIS_multipipeline_extra_job_check_functions_ownership_on_upgrade_5165__2.log.
+#   No other commit moved a byte. Every moved line read against the three rules' masking.md
+#   statements and golden rows and judged a CORRECT application of a ruled mask, so none can be
+#   reverted to satisfy this file. The rows re-emitted are the 26 the patch named; the counts
+#   columns are unchanged on 22 and distinct_templates falls by 2 to 4 on 4 (lines that differed
+#   only in a shelled number now share a template).
 #
 # ── HOW A ROW MAY MOVE AGAIN ──────────────────────────────────────────────────────────────────
 # Only through the 5-step procedure written at the head of test_jenkins_bare_null_gate.cpp:
@@ -45,21 +64,21 @@
 # movement is the abort wire, never a re-pin. This file is never rewritten wholesale and no code
 # may write it in place.
 path	stages	steps	finished	produced_lines	distinct_templates	surface_sha256
-builds_apache_org/job_Accumulo_job_2_1__496.log	0	0	SUCCESS	4114	2630	e8090df5f5fcac249516f8dc47f7fe9eea90a2920948dd6ab3c3293b408028fd
-builds_apache_org/job_Accumulo_job_2_1__497.log	0	0	ABORTED	3342	2125	63c3f80ec3ca4fce46d5483224b6aed5b92cd8d49b1102c7cfcecd6bcc8ccdb8
-builds_apache_org/job_Accumulo_job_2_1__498.log	0	0	ABORTED	83519	2143	2eddb25fff81d13f6c4c4f51bce986648f67b5f873225e513c954340d049eca7
-builds_apache_org/job_Accumulo_job_4_0__473.log	0	0	UNSTABLE	3280	1900	283bdf9172562657081d3ecf0f9fe1d58881976b29a7a1bf68cefe9c492f1ffb
-builds_apache_org/job_Accumulo_job_4_0__474.log	0	0	SUCCESS	3270	1892	ffa5d6c4a4d21a6d4f6c0031d64b41a91d0dd05df1eb84b1b2d3719181c2125a
-builds_apache_org/job_Accumulo_job_4_0__475.log	0	0	SUCCESS	3269	1890	ecb3c00a402ef76207f8ebf6c8477d13b69ca37a46c89df610dd82edb6516ce6
+builds_apache_org/job_Accumulo_job_2_1__496.log	0	0	SUCCESS	4114	2630	74cd29f971c2a99176e1d6824935be9a974c5c6b3bf38492a9838c251d555a8a
+builds_apache_org/job_Accumulo_job_2_1__497.log	0	0	ABORTED	3342	2125	12dc76ab8d2a4766cfb3c5b9ab64aa490a035cd9539bf029851e264171713e8b
+builds_apache_org/job_Accumulo_job_2_1__498.log	0	0	ABORTED	83519	2143	876de35a2f8329258b710c2488fe232343032805834547af8e705e428bb84d1d
+builds_apache_org/job_Accumulo_job_4_0__473.log	0	0	UNSTABLE	3280	1900	a09fe56e69dd1748ea8934e5ecaf70d8a308fa610ca6f0247849ea152f1e0cbb
+builds_apache_org/job_Accumulo_job_4_0__474.log	0	0	SUCCESS	3270	1892	84ee7c7d5ef6c0841808b982e7f422a818841125353c96506b151401ceb5827a
+builds_apache_org/job_Accumulo_job_4_0__475.log	0	0	SUCCESS	3269	1890	8b08dd557997e6b0758649f1cfa3419c716a68db5f396062492f2d1cf4792f3a
 builds_apache_org/job_Aries_job_website_build__29.log	2	13	SUCCESS	912	892	1b1cf34bf287f595d1a613bc5226163671af8e8f5018498cf3f864f506d28e37
-builds_apache_org/job_BigTop_job_pipeline_site__87.log	4	30	SUCCESS	706	270	1863bee732ea6fd0467cf757720b29098820b5a8e54a6ae4e0dbd3cc2d643c99
-builds_apache_org/job_Brooklyn_job_brooklyn_client_job_PR_102__4.log	4	20	SUCCESS	18374	9045	0b072ae85813c3835830fab2e4a4012746f732f487d9fdfaacf9a090a454a94b
-builds_apache_org/job_Brooklyn_job_brooklyn_dist_job_PR_145__56.log	4	20	SUCCESS	52570	22209	aac231d657413230f7592af53e62f73cd0769d55ce14ca1f9242edbf703d25c4
+builds_apache_org/job_BigTop_job_pipeline_site__87.log	4	30	SUCCESS	706	270	3a05eb1250badba24bc17f26f679502b1db287ed922b03a1954f054cac0e5d56
+builds_apache_org/job_Brooklyn_job_brooklyn_client_job_PR_102__4.log	4	20	SUCCESS	18374	9045	babf4377108efdb63c9e76815bfb1f27626bcce115f097245522bd4ddc030d0e
+builds_apache_org/job_Brooklyn_job_brooklyn_dist_job_PR_145__56.log	4	20	SUCCESS	52570	22209	19edbff2ebd8974538326472dd911f3d1cad8b76fd930c414f08c9a7f8504739
 builds_apache_org/job_Brooklyn_job_brooklyn_server_job_PR_1003__361.log	2	7	FAILURE	184	93	da3813793b8eb2941def0d12fa379daa0d2365902edb12f4bb4c16f8ab5173a8
-builds_apache_org/job_Camel_job_Camel_20Core_20_20JDK26_job_main__12.log	9	26	UNSTABLE	32462	9560	b9b819869f07f8671d57fb23e81a959334c46e61d2d760744e1591a758114b46
-builds_apache_org/job_Camel_job_Camel_20Core_20_20JDK26_job_main__13.log	10	28	FAILURE	31206	9309	09980b1ad12d5d49300deba3bfdd9da533abf4ca3ba1e0bb54da5b20337b9a9b
-builds_apache_org/job_Camel_job_Camel_20Core_20_Build_20and_20test_job_camel_4_14_x__218.log	11	26	FAILURE	21709	7236	822337b3f0d26af04dea704069874bd2938016e0144d1fe5a90758516566b713
-builds_apache_org/job_Camel_job_Camel_20Core_20_Build_20and_20test_job_camel_4_14_x__219.log	11	26	UNSTABLE	22077	7394	1c2b768ddb3edc69a6c1f402bc4c594ea963c2d9b7f3edfc132c87fee1cbd2ee
+builds_apache_org/job_Camel_job_Camel_20Core_20_20JDK26_job_main__12.log	9	26	UNSTABLE	32462	9560	8912c64a835d64ebe3994d4d2bfb63ffe60db5113c17d35eb67c73472da53854
+builds_apache_org/job_Camel_job_Camel_20Core_20_20JDK26_job_main__13.log	10	28	FAILURE	31206	9309	a558f6267e38e14e01eb2cf99affd71a59790d7a408ae89f0d8ccd6141fc655c
+builds_apache_org/job_Camel_job_Camel_20Core_20_Build_20and_20test_job_camel_4_14_x__218.log	11	26	FAILURE	21709	7236	48a579d7465f7be89818338ad394a776a1f2d91f5dc3ee30430d9c234aaf9193
+builds_apache_org/job_Camel_job_Camel_20Core_20_Build_20and_20test_job_camel_4_14_x__219.log	11	26	UNSTABLE	22077	7394	eed6fe3ebf5ee2522932b4f0400d7bed14715e70d6a3c979c9afb438c61006b9
 ci_codemc_io/job_4drian3d_job_AuthMeVelocity__96.log	0	0	SUCCESS	153	153	1aa88f980792a85a140279c4d590e99533c1d892556788daa24f91b5c3573cd8
 ci_codemc_io/job_4drian3d_job_AuthMeVelocity__97.log	0	0	SUCCESS	152	152	348844a4d891714f3a83c10de7d22a66e35b68025474dabed9fa459173a39002
 ci_codemc_io/job_4drian3d_job_AuthMeVelocity__98.log	0	0	SUCCESS	152	152	e45545083373577c2e5e1b1d55ecb0a190e2f875db882a6091c8c3e84dd03c24
@@ -67,12 +86,12 @@ ci_codemc_io/job_4drian3d_job_ChatRegulator__102.log	0	0	SUCCESS	741	294	3789d9d
 ci_codemc_io/job_4drian3d_job_ChatRegulator__103.log	0	0	SUCCESS	740	293	35ce401929852cae7943fa3b53316d07ad405fdc5dd9f98b172403fa70fdf78c
 ci_codemc_io/job_4drian3d_job_ChatRegulator__104.log	0	0	SUCCESS	740	293	2998cdb02e9300dc84b63768d482acc2b260266e0a0b8eddd88ff427567a112f
 ci_codemc_io/job_PlazmaMC_job_CI_20Test_job_old_252F1_19_4__1.log	9	18	FAILURE	163	109	b0535a3814a8cbad6efe0ef8b892b9fa9960f7c26963dffb8d42a605a0c66352
-ci_codemc_io/job_RelativityMC_job_VMP_forge_job_ver_252F1_19_2__1.log	3	13	SUCCESS	203	148	2bb685efaeb35eefa4428ce56d54eb50fa4258ba47223786ad3e66fca1d31c90
+ci_codemc_io/job_RelativityMC_job_VMP_forge_job_ver_252F1_19_2__1.log	3	13	SUCCESS	203	146	616934e7896615f3e53fff5e53f33a2f74648527f9554f3570952162fad91f3e
 ci_codemc_io/job_RelativityMC_job_VMP_forge_job_ver_252F1_19_2__2.log	3	13	SUCCESS	132	100	c2a5b1e704d85bb7c63e47e3cffc752ba5fe0ca28efb83584f7e282ba6f28892
 ci_codemc_io/job_RelativityMC_job_VMP_forge_job_ver_252F1_19_2__3.log	3	13	SUCCESS	132	100	6e14d396f433a6ee2c9cfe09742ff57e4b6c8623c35118a486d0ac0e1c4bfb59
-ci_jenkins_io/job_Core_job_jenkins_test_harness_job_2_41_x__1.log	2	8	SUCCESS	8285	3802	e732a6406a195ac52962c1431c88c23dbe4cd6df4ac8bd09d48258edd8fc216a
-ci_jenkins_io/job_Core_job_jenkins_test_harness_job_2_41_x__2.log	2	8	SUCCESS	8346	3804	88c400d4b2d70330002d8b578aaefd2237702acc4d5af52e68cc33f0f4a0e5e8
-ci_jenkins_io/job_Core_job_remoting_job_3_10_x_backup__1.log	0	69	ABORTED	14478	4408	f9b16c0db79c8cdb4fcc12bd2409720743fe074916ddd7e44ed923ae41e91844
+ci_jenkins_io/job_Core_job_jenkins_test_harness_job_2_41_x__1.log	2	8	SUCCESS	8285	3802	736059596680aae7637a48395f762958a475c474d64519ca115bdc8bd9600ec9
+ci_jenkins_io/job_Core_job_jenkins_test_harness_job_2_41_x__2.log	2	8	SUCCESS	8346	3804	74b5cc516cd94c30666d60da5b26d767185317313a000fd94779dfe00432244c
+ci_jenkins_io/job_Core_job_remoting_job_3_10_x_backup__1.log	0	69	ABORTED	14478	4408	6fdb262134e99e2a11e7e46719b38ebeb9cb51a111b8071884f1e877389ab5c3
 debbie_postgis_net/job_GDAL_Branch_2_0__189.log	0	0	FAILURE	5778	5751	6919a897fb43c9557877254e4b4e2d5b6f8944e492367654509c9270daa93271
 debbie_postgis_net/job_GDAL_Branch_2_1__340.log	0	0	FAILURE	3006	659	f937fdec77a4860ab973fa1c2cb6eca2c6b301e4ce165db487cb6a5e533039e2
 debbie_postgis_net/job_GEOS_Pull_Request_WIP__1.log	0	0	FAILURE	6	6	decaae5536b42c3509a1642ca8615cf1a8d18051e730f06813624e1eab45f484
@@ -92,8 +111,8 @@ debbie_postgis_net/job_PG_Version_Git_Reallie__256.log	0	0	SUCCESS	27	27	39c29a8
 debbie_postgis_net/job_PostGIS_build_env__672.log	0	0	SUCCESS	26	26	42e26f8609e338f33b93e3f9d52dfb18bc9f1880959df96938d886997d902c64
 debbie_postgis_net/job_PostGIS_docker__123.log	0	0	SUCCESS	22	22	15b6880f526e51ac7aa06c6c0cddd79748f8a4759bf5d1a578368b86b136dd84
 debbie_postgis_net/job_PostGIS_docker__124.log	0	0	FAILURE	22	22	a8b6915343a8ee14ad61a30d2c3bdbfd230cb70479f40f0878eda749174a91c6
-debbie_postgis_net/job_PostGIS_multipipeline_extra_job_check_functions_ownership_on_upgrade_5165__1.log	7	17	FAILURE	8101	3317	e4115a4b36d7869f27742e3c9770c8bc0fcdd2c6abd886f74c70461ef3f2cb83
-debbie_postgis_net/job_PostGIS_multipipeline_extra_job_check_functions_ownership_on_upgrade_5165__2.log	7	16	FAILURE	1072	779	9bdfdd3057ec02c108256ae14ca4aa10e1b984b403335a22c14caf0bd32d194c
+debbie_postgis_net/job_PostGIS_multipipeline_extra_job_check_functions_ownership_on_upgrade_5165__1.log	7	17	FAILURE	8101	3313	603d915c28d141fc7ac606746bc34e4f0595f1fc1bb5479d191789a9731cb973
+debbie_postgis_net/job_PostGIS_multipipeline_extra_job_check_functions_ownership_on_upgrade_5165__2.log	7	16	FAILURE	1072	779	b92c19fd7012ed2985c0ff528b50394d3e42e4e910c1658a1b4c5f52d0eac0cf
 debbie_postgis_net/job_pgRouting_GitHubHook_Push__2367.log	0	0	SUCCESS	8	8	07e3f4814cfe0c13aa0832c9e66ff95226631e835883a817ba4b3f79dfbab8e2
 debbie_postgis_net/job_pgRouting_GitHubHook_Push_master__1.log	0	0	SUCCESS	9	9	cc45f6cd640f9682b37b1736b82cb9b37697731baf7578e46df89f5e13f1f35e
 ibmz_ci_osuosl_org/job_Envoy_IBMZ_CI_test__1.log	4	11	FAILURE	81	61	ec708e5830391e6f7bcb312869e1217d6a3b5f5d4d08eca4a2d0450265cd7964
@@ -102,9 +121,9 @@ ibmz_ci_osuosl_org/job_Strimzi_Kafka_Operator_IBMZ_CI_test__443.log	4	25	FAILURE
 ibmz_ci_osuosl_org/job_TensorFlow_IBMZ_CI_test__12.log	4	14	SUCCESS	142	88	6f37b990c28dfcbfd7e19fa16825299c168dffab22d12caa913e3495e71f6580
 ibmz_ci_osuosl_org/job_TensorFlow_IBMZ_CI_test__13.log	4	11	ABORTED	148	95	d83730708a85accfa90989b803ce4d6ca7977c9a2b0ce1429363e5e09ef547f5
 ibmz_ci_osuosl_org/job_TensorFlow_IBMZ_CI_test__26.log	1	2	ABORTED	29	28	da50502709ba69cea437c84d3fdc4b261026b4e4d0e2c7e9dfaba0658effa57e
-ibmz_ci_osuosl_org/job_TensorFlow_IBMZ_CI_test__27.log	4	14	FAILURE	37286	22153	a844259aec6fa0b3c7472c54e82e21b0067f8fbb3f7e76a76fa1b039a1e8bae5
-ibmz_ci_osuosl_org/job_che_machine_exec_IBMZ_CI__7.log	0	0	FAILURE	874	697	5cc5407d8b55d1200329b7bd0e4dcfe7efa6a92e3eaf1162b24df07bb4b87517
-ibmz_ci_osuosl_org/job_che_machine_exec_IBMZ_CI__8.log	0	0	SUCCESS	1018	806	e263313db82db1d2dc4994a174d1819cdebf12b1f6f8457a5917899fba1189f2
+ibmz_ci_osuosl_org/job_TensorFlow_IBMZ_CI_test__27.log	4	14	FAILURE	37286	22151	bce2cef94b79292ff78344152576c3e2fdd3af64b2687c93f401ae52801bcd1d
+ibmz_ci_osuosl_org/job_che_machine_exec_IBMZ_CI__7.log	0	0	FAILURE	874	697	7946eedf84d42c1d5ccd042adb45078a04b106c2dd87de21dcdf4fd7c40affbc
+ibmz_ci_osuosl_org/job_che_machine_exec_IBMZ_CI__8.log	0	0	SUCCESS	1018	806	4915b8b524aeea806f95dc71a5e4eaf43623b9f95a14f5efc976179f25dd3fb6
 ibmz_ci_osuosl_org/job_che_machine_exec_IBMZ_CI__9.log	0	0	FAILURE	21	21	b2d11831c798d917482e8e10f3d52eadcd782b77eabe4b22af57e0accbd3e261
 ibmz_ci_osuosl_org/job_dumb_init__63.log	0	0	FAILURE	31	31	2d50a48dd6aa665af82335bc453128afaa602622e8c81296692ea3951d20b243
 ibmz_ci_osuosl_org/job_dumb_init__64.log	0	0	FAILURE	31	31	2d50a48dd6aa665af82335bc453128afaa602622e8c81296692ea3951d20b243
@@ -116,11 +135,11 @@ jenkins_symbolsyndicate_us/job_Nem_job_NEM_20monorepo_20seed_job_nem_job_PR_826_
 jenkins_symbolsyndicate_us/job_Nem_job_generated_job_nem_job_core_job_PR_826__49.log	0	1	ABORTED	37	34	96e5eab9d8f41e51205e38dd9c482bfaa94ce94676f3f184a3a312b77e34262f
 jenkins_symbolsyndicate_us/job_Nem_job_generated_job_nem_job_deploy_job_PR_826__49.log	0	1	ABORTED	37	34	777261b164ec0265ce2bea56385db220e7141107672768e2feb9acb6852f5f5e
 jenkins_symbolsyndicate_us/job_Nem_job_generated_job_nem_job_gocrypto_job_PR_826__49.log	1	3	ABORTED	49	45	be4f4677ee7ac97b352833d7dd9ebf044d1e70eadb60f4f214f56ed945a883eb
-jenkins_symbolsyndicate_us/job_Symbol_job_Symbol_mobile_job_symbol_mobile_optin_android_dev_01__110.log	0	0	SUCCESS	2695	1325	917c1a02716d15923693323dfe6c48a5d5b88d5755c26a1c4298f0938ac13302
+jenkins_symbolsyndicate_us/job_Symbol_job_Symbol_mobile_job_symbol_mobile_optin_android_dev_01__110.log	0	0	SUCCESS	2695	1321	1c417d9322dcf9a4ff0e6f1eb73a8c0680a09bcf673728ace79f85ae91dfd366
 powerci_osuosl_org/job_Horovod_PPC64LE_GPU_PIPELINE_job_PR_1092__1.log	2	3	FAILURE	96	81	3f8c84cf009895a0aa4443c9e824dd9e1b2b198b5b46f9626ad01a49286c56bd
-powerci_osuosl_org/job_build_envoy_master__439.log	3	4	SUCCESS	6222	1851	0ba993a6f0738759855fabf19b61d9ceb08bc1edcd0b7fa464e075d03e925824
-powerci_osuosl_org/job_build_envoy_master__440.log	3	4	SUCCESS	6189	1854	31d9087e349e7e3d157646bc1f3f29ce02379e6e21bb78b95ffc5d29a326d93c
-powerci_osuosl_org/job_build_envoy_master__441.log	3	4	SUCCESS	6195	1853	8746f4e016ce3fdea97b8a5df1cb32d012a8ecf564745d09102006199a73a7b6
+powerci_osuosl_org/job_build_envoy_master__439.log	3	4	SUCCESS	6222	1851	cb6da15762d7ba2fbf631efeea84110d67d6237e7a6dccd3aa2fcde45373a172
+powerci_osuosl_org/job_build_envoy_master__440.log	3	4	SUCCESS	6189	1854	e6a0673722598643465ac07acd1f4d7001cfa297dcde39855dba16adb3cba988
+powerci_osuosl_org/job_build_envoy_master__441.log	3	4	SUCCESS	6195	1853	ad85ba734c3e4d17625bca3ddc138e1dd7a81cdabb0ed980c05a72d973d766f1
 powerci_osuosl_org/job_build_envoy_static_branch__1.log	0	0	ABORTED	13	13	c58c682b710c79bedc0fdb33377d47c406927b9e6838f952abd27798618e5285
 powerci_osuosl_org/job_build_envoy_static_branch__2.log	0	0	SUCCESS	44039	7432	20e18e454184138e4b16a26d188f8c0ad5730d9fe55e2c070af4095eeb626645
 powerci_osuosl_org/job_build_envoy_static_branch__3.log	0	0	FAILURE	43	39	4e8bb0ea6df16e888cf2863342c3c273d7894c921b42569ca6ca25eb78042265
