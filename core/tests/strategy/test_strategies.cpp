@@ -2371,6 +2371,27 @@ TEST_F(SystemdJournalStrategyTest, AMicrosecondCountPastTimestampsRangeOrNegativ
     }
 }
 
+// invariant: the export format writes the count as unsigned decimal digits, so a field that is
+// not digits from its first byte to its last carries no time rather than its digit prefix.
+TEST_F(SystemdJournalStrategyTest, ARealtimeFieldThatIsNotWhollyDigitsCarriesNoTime)
+{
+    {
+        const std::string line{journal_line("123")};
+        const auto result{strategy.parse(line, arena)};
+        ASSERT_TRUE(result.has_value()) << line;
+        ASSERT_TRUE(result->timestamp.has_value()) << "an all-digit field lost its time";
+        EXPECT_EQ(epoch_seconds_of(*result), 0) << "actual seconds: " << epoch_seconds_of(*result);
+    }
+    for (const std::string_view micros : {"123abc", " 123", "+1", "-0", ""})
+    {
+        const std::string line{journal_line(micros)};
+        const auto result{strategy.parse(line, arena)};
+        ASSERT_TRUE(result.has_value()) << line;
+        EXPECT_FALSE(result->timestamp.has_value())
+            << "field \"" << micros << "\" is not wholly decimal digits and carried a time";
+    }
+}
+
 // invariant: the last-resort catch-all for unstructured application stdout.
 // invariant: a bare LEADING level word is lifted — the dominant-level signal that lets the
 // downstream tiers rank a raw stream.

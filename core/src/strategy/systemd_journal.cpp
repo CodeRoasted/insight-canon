@@ -10,6 +10,8 @@ import insight.canon.detail.scan;
 
 // post: a systemd journal JSON export record — a microsecond realtime stamp, a priority, a
 // command name and the message.
+// post: the event time is absent unless `__REALTIME_TIMESTAMP` is decimal digits from its first
+// byte to its last and its whole second lies inside Timestamp's range.
 // invariant: the hot path uses simdjson on-demand through the shared scratch helpers.
 // invariant: the log macros and the simdjson entities stay TEXTUAL in the global module fragment
 // and are TU-local, so no first-party declaration leaks through it.
@@ -110,11 +112,12 @@ std::expected<ParsedLine, std::string> SystemdJournalStrategy::parse(std::string
     if (try_get_string(root, kRealtimeKeys, scratch_view))
     {
         std::int64_t microsecs{};
-        const auto res{std::from_chars(scratch_view.data(),
-                                       scratch_view.data() + scratch_view.size(), microsecs)};
-        // invariant: the export format defines the count as unsigned microseconds since the
-        // epoch, so a negative count is no time this format writes and is refused.
-        if (res.ec == std::errc{} && microsecs >= 0)
+        const char* const field_end{scratch_view.data() + scratch_view.size()};
+        const auto res{std::from_chars(scratch_view.data(), field_end, microsecs)};
+        // invariant: the export format writes unsigned decimal microseconds since the epoch, so
+        // only a field of digits from first byte to last is read and anything else is no time.
+        if (!scratch_view.empty() && is_digit(scratch_view.front()) && res.ec == std::errc{} &&
+            res.ptr == field_end)
         {
             // invariant: the producer's exact microsecond count is divided to whole seconds
             // toward zero, its remainder dropped: this path's event time has second grain.
