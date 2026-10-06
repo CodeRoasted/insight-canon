@@ -534,6 +534,20 @@ item=book;total=$18 placed` → `order item=book;total=$<*> placed`) and literal
 build, `c210757` measured): distinct templates over every non-empty line 295 919 → 294 801, 260 830 → 259 850 and
 3 295 874 → 3 269 858; J rewrites 386, 386 and 6 639 lines.
 
+**K's extent (DN-134.D11), a further change in the same window.** K no longer masks a value to its segment's end: it
+masks the value's EXTENT, from its first digit over `[A-Za-z0-9._+%-]` and any `<*>` an earlier composite wrote,
+across one `,` `:` or `/` directly followed by a digit or `<*>`. The rest of the segment is swallowed when it is only
+wrapper closers, `,;:.` and at most one carriage return as the token's last byte, and is otherwise kept byte for byte
+behind `<*>`; the status carve-out reads the extent. Fields moved: `template_str` and `template_id` of a line holding
+such a token, nothing else. Witness inputs: the golden's `segment_kv` row `bundle
+Import-Package=okio;version=1.15,javax.annotation;version=1.3,* resolved` → `bundle
+Import-Package=okio;version=<*>,javax.annotation;version=<*>,* resolved`, and the segment-step unit rows (a CRLF
+end-action line masking as its LF twin, `id=a;t=12:30:01` and `id=a;r=7/8` through their composites' normal forms,
+`id=a;status=200]` literal). Measured through the public `Tokenizer::process_line` over the same three private CI-log
+views and the Jenkins marker corpus v2 (coderoast-corpora `72398a7` registered before the build): 0, 0 and 127 lines
+move (10 templates renamed, 0 split, 0 merged; distinct templates 254 756, 221 075 and 2 797 262 unchanged), and
+1 Jenkins line; `JenkinsBareNullGate` moves 1 of 82 traces.
+
 **It rides `-17`.**
 
 ### Rider — rule 5 reads a number through a complete wrapper shell, and rule 4 decides every address it accepts (DN-134.D1, DN-134.D8)

@@ -114,6 +114,12 @@ namespace rule_catalog
     // note: not noexcept: it allocates, and that would turn an allocation failure into a terminate.
     [[nodiscard]] std::string_view composite_rule_claiming(std::string_view token);
 
+    // post: the normal form the claiming composite rule gives `token`, before the non-claiming
+    // steps; empty when the layer declines it.
+    // note: exposed so a witness asserts the form a later step reads instead of restating it.
+    // refs: DN-134.D11
+    [[nodiscard]] std::string composite_normal_form(std::string_view token);
+
     // post: the status lexicon that gates the KEEP carve-out and its key-value form, lowercase.
     [[nodiscard]] std::span<const std::string_view> status_keywords() noexcept;
 

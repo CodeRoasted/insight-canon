@@ -1256,10 +1256,10 @@ TEST(StatelessTemplate, AWholeTokenWildcardIsAParamAndEveryParamIsOne)
     }
 }
 
-// refs: DN-134.D2
+// refs: DN-134.D2, DN-134.D11
 // invariant: kv_value's disposition applies to each `;`-segment of a token's normal form, a
 // non-claiming step after the composites and the literal KEEP.
-// invariant: it masks a digit-leading value to its segment's end and contributes no param.
+// invariant: it masks a digit-leading value over its number's extent and contributes no param.
 TEST(StatelessTemplate, TheSegmentStepMasksEachKeyValueSegmentOfANormalForm)
 {
     ArenaAllocator arena{256U * 1024U};
@@ -1283,12 +1283,66 @@ TEST(StatelessTemplate, TheSegmentStepMasksEachKeyValueSegmentOfANormalForm)
     expect("[mode=fast;count=5", "[mode=fast;count=<*>");
     expect("item=book;total=$18", "item=book;total=$<*>");
     expect("id=a;status=2000", "id=a;status=<*>");
-    // invariant: the controls — a status value per segment, a value word, `,` (not a delimiter),
-    // a key that is not letter- or underscore-led, a segment with no key.
-    for (const std::string_view keep : {"id=a;status=200", "id=a;code=1;outcome=success",
-                                        "id=a,duration_ms=5", "id=a;9x=5", "id=a;=5", "a;b"})
+    // invariant: a value masks over its number's EXTENT, and a remainder that is not only closers,
+    // trailing punctuation and a token-final CR stays literal behind the wildcard (DN-134.D11).
+    expect("Import-Package=okio;version=1.15,javax.annotation;version=1.3,*",
+           "Import-Package=okio;version=<*>,javax.annotation;version=<*>,*");
+    expect(R"("FREQ=DAILY;BYSECOND=0"\nmodel)", R"("FREQ=DAILY;BYSECOND=<*>"\nmodel)");
+    expect("id=a;n=5&amp;m=6", "id=a;n=<*>&amp;m=<*>");
+    // invariant: the extent controls — closers, `,;:.` and a token-final CR are swallowed, a list
+    // stays one value, and a CR that is not the token's last byte stays literal.
+    expect("##[end-action id=build;outcome=success;duration_ms=12]\r",
+           "##[end-action id=build;outcome=success;duration_ms=<*>");
+    expect("id=a;q=0.9,", "id=a;q=<*>");
+    expect("FREQ=WEEKLY;BYHOUR=8,11,14;BYMINUTE=0", "FREQ=WEEKLY;BYHOUR=<*>;BYMINUTE=<*>");
+    expect("id=a;n=5]\r,", "id=a;n=<*>]\r,");
+    // invariant: kv_value claims a token whose first `=` carries a number, and masks it whole -
+    // the extent is the segment step's, not kv_value's (DN-134.O4).
+    expect("a;version=1.15,javax.x", "a;version=<*>");
+    // invariant: the controls — a status value per segment (read on the extent, a closer or CR
+    // behind it), a value word, `,` (not a delimiter), a key not letter-led, a segment with no key.
+    for (const std::string_view keep :
+         {"id=a;status=200", "id=a;status=200]", "id=a;status=200\r", "id=a;code=1;outcome=success",
+          "id=a,duration_ms=5", "id=a;9x=5", "id=a;=5", "a;b"})
         expect(keep, keep);
     EXPECT_EQ(masked("x id=a;n=1 y", arena), masked("x id=a;n=77 y", arena));
+    // invariant: a clock and a ratio reach the step as a composite's normal form holding a
+    // wildcard, and the extent reads across it, so each stays one value (DN-134.D11).
+    struct ThroughComposite
+    {
+        std::string_view token;
+        std::string_view rule;
+        std::string_view normal_form;
+        std::string_view want;
+    };
+    for (const ThroughComposite& each : {ThroughComposite{.token = "id=a;t=12:30:01",
+                                                          .rule = "diagnostic_composite",
+                                                          .normal_form = "id=a;t=12:<*>:<*>",
+                                                          .want = "id=a;t=<*>"},
+                                         ThroughComposite{.token = "id=a;r=7/8",
+                                                          .rule = "versioned_ref",
+                                                          .normal_form = "id=a;r=7/<*>",
+                                                          .want = "id=a;r=<*>"}})
+    {
+        EXPECT_EQ(rule_catalog::composite_rule_claiming(each.token), each.rule)
+            << "the composite the step reads behind.\n  token: " << each.token;
+        EXPECT_EQ(rule_catalog::composite_normal_form(each.token), each.normal_form)
+            << "the normal form the step reads.\n  token: " << each.token;
+        expect(each.token, each.want);
+    }
+    // invariant: the false-merge witnesses — the imported package name separates two lines, the
+    // version number does not — and the line-ending witness: a CRLF line masks as its LF twin.
+    const std::string annotation{
+        masked("x Import-Package=okio;version=1.15,javax.annotation y", arena)};
+    const std::string inject{masked("x Import-Package=okio;version=1.15,javax.inject y", arena)};
+    const std::string bumped{masked("x Import-Package=okio;version=2.0,javax.annotation y", arena)};
+    EXPECT_NE(annotation, inject) << "two imported packages share one template: " << annotation;
+    EXPECT_EQ(annotation, bumped) << "a version bump split the template:\n  1.15: " << annotation
+                                  << "\n  2.0:  " << bumped;
+    const std::string crlf{masked("##[end-action id=build;duration_ms=12]\r", arena)};
+    const std::string lf{masked("##[end-action id=build;duration_ms=12]", arena)};
+    EXPECT_EQ(crlf, lf) << "a CRLF line split from its LF twin:\n  CRLF: " << crlf
+                        << "\n  LF:   " << lf;
 }
 
 // refs: DN-134.D3

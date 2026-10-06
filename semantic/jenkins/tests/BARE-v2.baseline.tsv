@@ -55,6 +55,16 @@
 #   reverted to satisfy this file. The rows re-emitted are the 26 the patch named; the counts
 #   columns are unchanged on 22 and distinct_templates falls by 2 to 4 on 4 (lines that differed
 #   only in a shelled number now share a template).
+# re-emitted 2026-10-06: 1 row, from the CURRENT purified chain at the W471 commit (the child of
+#   insight-canon d9db026 that lands DN-134.D11: a rule-K value masks over its number's extent, not to
+#   its `;`-segment's end) on linux-clang21-libcxx-release, via the gate's own REBASELINE-ROW patch output. Same corpus,
+#   same REGISTRY pin ae5f19f1. CONDITION MET: the movement was REGISTERED before the code
+#   (coderoast-corpora 72398a7, kv_value_extent_build_w471/REGISTRATION_CR.md R2: exactly this trace,
+#   one line, produced_lines and distinct_templates unchanged) and measured so: 1 of 82 moved, 81
+#   byte-identical, 52570/52570 lines, 22209/22209 templates; gcc16-release green on the same file.
+#   The one line carries a bundle `Import-Package` header whose imported package names the K step
+#   masked into `version=<*>`; DN-134.D11 keeps them, judged a CORRECT repair of a false merge. The row
+#   re-emitted is builds_apache_org/job_Brooklyn_job_brooklyn_dist_job_PR_145__56.log.
 #
 # ── HOW A ROW MAY MOVE AGAIN ──────────────────────────────────────────────────────────────────
 # Only through the 5-step procedure written at the head of test_jenkins_bare_null_gate.cpp:
@@ -73,7 +83,7 @@ builds_apache_org/job_Accumulo_job_4_0__475.log	0	0	SUCCESS	3269	1890	8b08dd5579
 builds_apache_org/job_Aries_job_website_build__29.log	2	13	SUCCESS	912	892	1b1cf34bf287f595d1a613bc5226163671af8e8f5018498cf3f864f506d28e37
 builds_apache_org/job_BigTop_job_pipeline_site__87.log	4	30	SUCCESS	706	270	3a05eb1250badba24bc17f26f679502b1db287ed922b03a1954f054cac0e5d56
 builds_apache_org/job_Brooklyn_job_brooklyn_client_job_PR_102__4.log	4	20	SUCCESS	18374	9045	babf4377108efdb63c9e76815bfb1f27626bcce115f097245522bd4ddc030d0e
-builds_apache_org/job_Brooklyn_job_brooklyn_dist_job_PR_145__56.log	4	20	SUCCESS	52570	22209	19edbff2ebd8974538326472dd911f3d1cad8b76fd930c414f08c9a7f8504739
+builds_apache_org/job_Brooklyn_job_brooklyn_dist_job_PR_145__56.log	4	20	SUCCESS	52570	22209	9ee99d1b6425cd039fd681edbb6fbab9101cc53f44cfe1c4802fb3ee02c76ce1
 builds_apache_org/job_Brooklyn_job_brooklyn_server_job_PR_1003__361.log	2	7	FAILURE	184	93	da3813793b8eb2941def0d12fa379daa0d2365902edb12f4bb4c16f8ab5173a8
 builds_apache_org/job_Camel_job_Camel_20Core_20_20JDK26_job_main__12.log	9	26	UNSTABLE	32462	9560	8912c64a835d64ebe3994d4d2bfb63ffe60db5113c17d35eb67c73472da53854
 builds_apache_org/job_Camel_job_Camel_20Core_20_20JDK26_job_main__13.log	10	28	FAILURE	31206	9309	a558f6267e38e14e01eb2cf99affd71a59790d7a408ae89f0d8ccd6141fc655c
