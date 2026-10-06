@@ -924,35 +924,6 @@ namespace
         return true;
     }
 
-    // post: keeps the key and masks a digit-leading value; a status value and a value WORD are both
-    // excluded, so a green-to-red flip stays distinct and a varying word stays literal.
-    // refs: LSRC-14, ADR-16.D5
-    [[nodiscard]] inline bool normalize_kv_value(std::string_view tok, std::string& out)
-    {
-        const std::size_t eq_pos{tok.find('=')};
-        if (eq_pos == 0 || eq_pos == std::string_view::npos || eq_pos + 1 >= tok.size())
-            return false;
-        const std::string_view key{tok.substr(0, eq_pos)};
-        const std::string_view raw_value{tok.substr(eq_pos + 1)};
-        // assert: a declared currency marker is stripped off the value before the digit-leading
-        // gate, so the key AND the marker are kept while the amount masks.
-        // refs: F-SRC-insight-canon:mask.cpp:normalize_marker_number
-        const std::size_t marker{marker_prefix_len(raw_value)};
-        const std::string_view value{raw_value.substr(marker)};
-        if (!is_digit_leading(value))
-            return false;
-        // assert: the status-value KEEP in its key-value form, on the same keyword-and-size gate as
-        // the space-separated carve-out.
-        if (is_status_keyword(key) && is_all_digits(value) && value.size() <= kMaxStatusDigits)
-            return false;
-        out.clear();
-        out.append(key);
-        out.push_back('=');
-        out.append(raw_value.substr(0, marker));
-        out.append(kWildcard);
-        return true;
-    }
-
     // invariant: the segment step's delimiter - `,` was measured and refused as a second one.
     // refs: DN-134.D2
     constexpr char kSegmentDelimiter{';'};
@@ -993,7 +964,7 @@ namespace
         bool swallows_remainder{false};
     };
 
-    // pre: `value` is digit-leading.
+    // pre: `value` is digit-leading after an optional sign (is_digit_leading).
     // post: the extent's length from the value's first byte, and whether the bytes after it are
     // swallowed into the mask; any other remainder stays literal behind the wildcard.
     // invariant: a wildcard an earlier composite wrote is a number already masked, so the run reads
@@ -1023,12 +994,53 @@ namespace
                     { return is_wrapper_close(chr) || is_shell_trailing_punct(chr); })};
     }
 
-    // post: appends `seg` with a digit-led value masked over its extent when it is `<key>=<value>`,
-    // the first segment's key optionally behind wrapper openers; true when the value masked.
-    // invariant: kv_value's disposition on one segment, its status carve-out read on the extent.
+    // post: true with `head`, the value's marker, the wildcard and any kept remainder appended to
+    // `out`; false with `out` untouched when the value is not digit-leading after its marker.
+    // post: false with `out` untouched for a status key whose extent is a short integer, so a
+    // green-to-red flip stays distinct.
+    // invariant: THE one value disposition - kv_value and the segment step locate their key and
+    // value and call it, so the two rules give the same bytes after `=` for the same value.
     // invariant: a remainder the extent leaves unswallowed is appended byte for byte after the
     // wildcard, so a word behind a number stays in the template.
-    // refs: DN-134.D2, DN-134.D11, LSRC-14
+    // refs: DN-134.D15, DN-134.D11, LSRC-14, ADR-16.D5
+    [[nodiscard]] inline bool append_masked_value(std::string_view key, std::string_view head,
+                                                  std::string_view raw_value, std::string& out)
+    {
+        // assert: a declared currency marker is stripped off the value before the digit-leading
+        // gate, so the key AND the marker are kept while the amount masks.
+        // refs: F-SRC-insight-canon:mask.cpp:normalize_marker_number
+        const std::size_t marker{marker_prefix_len(raw_value)};
+        const std::string_view value{raw_value.substr(marker)};
+        if (!is_digit_leading(value))
+            return false;
+        const ValueExtent extent{value_extent(value)};
+        const std::string_view number{value.substr(0, extent.length)};
+        if (is_status_keyword(key) && is_all_digits(number) && number.size() <= kMaxStatusDigits)
+            return false;
+        out.append(head);
+        out.append(raw_value.substr(0, marker));
+        out.append(kWildcard);
+        if (!extent.swallows_remainder)
+            out.append(value.substr(extent.length));
+        return true;
+    }
+
+    // post: keeps every byte before the token's first `=` as the key and masks the value through
+    // append_masked_value; a value WORD stays literal.
+    // refs: DN-134.D15, LSRC-14, ADR-16.D5
+    [[nodiscard]] inline bool normalize_kv_value(std::string_view tok, std::string& out)
+    {
+        const std::size_t eq_pos{tok.find('=')};
+        if (eq_pos == 0 || eq_pos == std::string_view::npos)
+            return false;
+        out.clear();
+        return append_masked_value(tok.substr(0, eq_pos), tok.substr(0, eq_pos + 1),
+                                   tok.substr(eq_pos + 1), out);
+    }
+
+    // post: appends `seg`, its value masked through append_masked_value when it is `<key>=<value>`
+    // with an identifier key (wrapper openers may lead the first segment); true when it masked.
+    // refs: DN-134.D2, DN-134.D15
     [[nodiscard]] inline bool append_segment(std::string_view seg, bool first, std::string& out)
     {
         const std::size_t eq_pos{seg.find('=')};
@@ -1041,27 +1053,11 @@ namespace
         while (first && lead < eq_pos && is_wrapper_open(seg[lead]))
             ++lead;
         const std::string_view key{seg.substr(lead, eq_pos - lead)};
-        const std::string_view raw_value{seg.substr(eq_pos + 1)};
-        const std::size_t marker{marker_prefix_len(raw_value)};
-        const std::string_view value{raw_value.substr(marker)};
-        if (!is_segment_key(key) || value.empty() || !is_digit(value.front()))
-        {
-            out.append(seg);
-            return false;
-        }
-        const ValueExtent extent{value_extent(value)};
-        const std::string_view number{value.substr(0, extent.length)};
-        if (is_status_keyword(key) && is_all_digits(number) && number.size() <= kMaxStatusDigits)
-        {
-            out.append(seg);
-            return false;
-        }
-        out.append(seg.substr(0, eq_pos + 1));
-        out.append(raw_value.substr(0, marker));
-        out.append(kWildcard);
-        if (!extent.swallows_remainder)
-            out.append(value.substr(extent.length));
-        return true;
+        if (is_segment_key(key) &&
+            append_masked_value(key, seg.substr(0, eq_pos + 1), seg.substr(eq_pos + 1), out))
+            return true;
+        out.append(seg);
+        return false;
     }
 
     // refs: DN-134.D2

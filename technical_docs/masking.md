@@ -66,8 +66,8 @@ never on a token rules 3–5 masked whole — two further steps run, in this ord
 contributes a param (§4, the last two rows):
 
 - the **`;`-segment** step: the form is cut at `;`, and each `<key>=<digit-leading value>` segment has its value
-  masked over its number's **extent** (§4), the kv-value rule's disposition applied per segment: a remainder of
-  closers and `,;:.` is swallowed, any other remainder stays literal behind `<*>`;
+  masked over its number's **extent** (§4) by the ONE value disposition the kv-value rule also reads: a remainder
+  of closers and `,;:.` is swallowed, any other remainder stays literal behind `<*>`;
 - the **declared-run** step, only on a stream that declares a value under a key its dialect declares: each
   maximal digit run equal to the declared value, directly behind a declared marker, becomes `<*>`.
 
@@ -226,8 +226,8 @@ instance. Tried in order; first match wins.
 | **marker-number** | `<currency-marker><digit-core>[.<digits>]` | keep the marker, mask the number | `$463.50` → `$<*>` |
 | **embedded-identity** | a UUID (`8-4-4-4-12`), a hex run ≥ 16, or a **compact UTC instant** (`YYYY-MM-DDTHHMMSSZ` — exactly 18 bytes, colon-free time, mandatory `Z`, non-alphanumeric on both sides), *inside* a larger token not under a declared ephemeral root — including one whose only structure is a wrapper shell (§3.2) | mask the id in place, keep surrounding structure | `~/.cache/gradle/f7f6…2680/lib.jar` → `~/.cache/gradle/<*>/lib.jar` · `(d41d…427e)` → `(<*>)` · `/home/runner/work/_temp/2026-06-09T185733Z.json` → `/home/runner/work/_temp/<*>.json` |
 | **sanitizer-pid** | `==<digits>==` opening the token, followed by nothing or by a letter (the process tag AddressSanitizer, libFuzzer and valgrind print) | keep both fences and a glued letter-leading tail, mask the pid; a digit after the closing fence, or any byte before the opening one, declines | `==4242==` → `==<*>==` · `==77==ABORTING` → `==<*>==ABORTING` |
-| **kv-value** | `<key>=<digit-leading-value>` (strips a leading currency marker first) | keep the key (+ marker), mask the value | `order=100000` → `order=<*>` · `total=$18` → `total=$<*>` |
-| **`;`-segment** | not a claiming rule: applied to the token's normal form after every rule above and before declared-run, when the form holds `;` and `=`. Each `;`-segment `<key>=<value>` whose key is a letter- or `_`-led run of `[A-Za-z0-9_.-]` opening the segment (the first segment may open with wrapper openers) and whose value is digit-leading after an optional currency marker | keep every key, every `;` and a word value; mask a digit-leading value over its **extent**: from its first digit over `[A-Za-z0-9._+%-]` and any `<*>` an earlier rule wrote, across one `,` `:` or `/` directly followed by a digit or `<*>`. The **remainder** after the extent is decided whole: swallowed when it is empty or only wrapper closers and `,;:.`, else kept byte for byte behind `<*>`; a carriage return is content (§1). A short status value behind a status key stays literal per segment, read on the extent; no param. `,` is not a delimiter | `##[end-action id=build;outcome=success;duration_ms=12]` → `##[end-action id=build;outcome=success;duration_ms=<*>` · `item=book;total=$18` → `item=book;total=$<*>` · `Import-Package=okio;version=1.15,javax.annotation;version=1.3,*` → `Import-Package=okio;version=<*>,javax.annotation;version=<*>,*` · `id=a;n=5&amp;m=6` → `id=a;n=<*>&amp;m=<*>` · `FREQ=WEEKLY;BYHOUR=8,11,14;BYMINUTE=0` → `FREQ=WEEKLY;BYHOUR=<*>;BYMINUTE=<*>` · `id=a;t=12:30:01` (normal form `id=a;t=12:<*>:<*>`) → `id=a;t=<*>` · `id=a;n=5]`+CR keeps `]`+CR and `id=a;n=5]`+CR+`,` keeps `]`+CR+`,` · `id=build;status=200`, `id=a;status=200]` and `id=build,duration_ms=12` stay literal |
+| **kv-value** | `<key>=<value>`, the key every byte before the token's first `=`, the value digit-leading after an optional currency marker and an optional sign | keep the key (+ marker); mask the value over its number's **extent** (the `;`-segment row's, read by the same disposition): a remainder of only wrapper closers and `,;:.` is swallowed, any other remainder is kept byte for byte behind `<*>`. A short status value behind a status key declines, read on the extent; no param | `order=100000` → `order=<*>` · `total=$18` → `total=$<*>` · `off=-5` → `off=<*>` · `[pid=2152]` → `[pid=<*>` · `n=8,11,14` → `n=<*>` · `size=10.5MB` → `size=<*>` · `[pid=2152][err]` → `[pid=<*>][err]` · `?a=1&b=2` → `?a=<*>&b=2` · `pkg>=1.2->dep==3.4)` → `pkg>=<*>>dep==3.4)` · `a=1;b=x2` → `a=<*>;b=x2` · `exit=1]` and `status=200)` stay literal |
+| **`;`-segment** | not a claiming rule: applied to the token's normal form after every rule above and before declared-run, when the form holds `;` and `=`. Each `;`-segment `<key>=<value>` whose key is a letter- or `_`-led run of `[A-Za-z0-9_.-]` opening the segment (the first segment may open with wrapper openers) and whose value is digit-leading after an optional currency marker and an optional sign | keep every key, every `;` and a word value; mask a digit-leading value over its **extent**: from its first byte (a sign or a digit) over `[A-Za-z0-9._+%-]` and any `<*>` an earlier rule wrote, across one `,` `:` or `/` directly followed by a digit or `<*>`. The **remainder** after the extent is decided whole: swallowed when it is empty or only wrapper closers and `,;:.`, else kept byte for byte behind `<*>`; a carriage return is content (§1). A short status value behind a status key stays literal per segment, read on the extent; no param. `,` is not a delimiter | `##[end-action id=build;outcome=success;duration_ms=12]` → `##[end-action id=build;outcome=success;duration_ms=<*>` · `item=book;total=$18` → `item=book;total=$<*>` · `Import-Package=okio;version=1.15,javax.annotation;version=1.3,*` → `Import-Package=okio;version=<*>,javax.annotation;version=<*>,*` · `id=a;n=5&amp;m=6` → `id=a;n=<*>&amp;m=<*>` · `FREQ=WEEKLY;BYHOUR=8,11,14;BYMINUTE=0` → `FREQ=WEEKLY;BYHOUR=<*>;BYMINUTE=<*>` · `id=a;t=12:30:01` (normal form `id=a;t=12:<*>:<*>`) → `id=a;t=<*>` · `id=a;n=5]`+CR keeps `]`+CR and `id=a;n=5]`+CR+`,` keeps `]`+CR+`,` · `id=build;status=200`, `id=a;status=200]` and `id=build,duration_ms=12` stay literal |
 | **declared-run** | not a claiming rule: applied once to the token's normal form after every rule above, on a stream that declares a value V under a key its dialect declares. A digit run masks when it is the maximal run directly behind a declared marker, the marker opens the form or follows a byte that is neither a letter nor a digit, the run equals V byte for byte, and the byte after it is the form's end or neither a letter nor a digit | keep everything else in the token, mask the run; no param | V = 6656: `/stirling/V2-PR-6656/docker-compose.yml` → `/stirling/V2-PR-<*>/docker-compose.yml` · `PR#6656` → `PR#<*>` · `PR-6657`, `XPR-6656`, `PR-66560` and `python3` (V = 3) stay literal. The predicate is one exported function (`claim_declared_runs`); Sift's job and step instance key reads the same claims (`declared_discriminant_of`) |
 
 **The ephemeral-root catalog is also consulted from inside source-location.** A per-run instance directory in
@@ -242,18 +242,23 @@ regardless of what the entry declares, so the location tail is never masked.
 The kv-value normalizer **declines** a status value rather than claiming it: on `status=200` / `code=0`
 (a status keyword + short numeric value) `normalize_kv_value` returns *no match*, the token falls through to
 **rule 6** and stays literal — so the green→red flip survives in `key=value` form, but the rule that keeps it is
-rule 6, not this normalizer (the golden's `status=200` witness is a `literal_keep` row for exactly that reason). It masks
-**numeric** values only — `user=alice` (letter-leading) stays literal, because masking *all* values would
-collapse `status=ok` and `status=failed` (telling an instance key from a categorical key needs cardinality,
-which a stateless per-line masker cannot see — see §6). The kv-value normalizer reads ONE `key=value` per token
-and declines when the first value is a word, so `id=build;outcome=success;duration_ms=12]` is not its; the
-`;`-segment step applies the same disposition to each segment of the token's normal form instead, the status
-carve-out included — and it also reaches a token `embedded-identity` already claimed
-(`id=__<*>.step;duration_ms=<*>`), because it reads the normal form after every claiming rule. The step masks a
-value over its number's extent, where the kv-value normalizer masks to the TOKEN's end. So the same bytes mask
-differently by which rule reaches them: `version=1.15,javax.x` is the kv-value normalizer's (`version=<*>`), while
-`x;version=1.15,javax.x` declines it and reaches the step (`x;version=<*>,javax.x`). The asymmetry is deterministic,
-a pure function of the token.
+rule 6, not this normalizer (the golden's `status=200` witness is a `literal_keep` row for exactly that reason). The
+carve-out reads the number's extent, not the whole value, so `exit=1]` and `status=200)` decline too and `exit=1]`
+and `exit=2]` stay two templates. It masks **numeric** values only — `user=alice` (letter-leading) stays literal,
+because masking *all* values would collapse `status=ok` and `status=failed` (telling an instance key from a
+categorical key needs cardinality, which a stateless per-line masker cannot see — see §6).
+
+**One value disposition, two key grammars.** The kv-value normalizer and the `;`-segment step call ONE function
+for the value: the currency marker, the digit-leading gate (an optional sign admitted), the extent, the status
+carve-out read on the extent, and the bytes written (marker, `<*>`, kept remainder). Each caller only locates its
+key and value, and the KEY's grammar is the one thing that differs: the kv-value normalizer claims a raw token and
+its key is every byte before the first `=`; the step reads a normal form, cut at `;`, and its key is an identifier
+(behind wrapper openers on the first segment). The kv-value normalizer declines when the first value is a word, so
+`id=build;outcome=success;duration_ms=12]` is the step's, and the step also reaches a token `embedded-identity`
+already claimed (`id=__<*>.step;duration_ms=<*>`), because it reads the normal form after every claiming rule.
+A kept remainder that holds a `;`-segment is the step's next: `a=1;b=2` → `a=<*>;b=<*>`. So the same value masks
+to the same bytes by whichever rule reaches it: `version=1.15,javax.x` → `version=<*>,javax.x` and
+`x;version=1.15,javax.x` → `x;version=<*>,javax.x`.
 
 ---
 

@@ -61,16 +61,18 @@ rules use. It absorbs the retired form-2 code TID-13b (2026-09-09).
 ***************************************************************************************************/
 /**************************************************************************************************
 D-LSRC-14 — a key=value pair masks the VALUE and keeps the KEY
-A token of the form key, `=`, digit-leading value normalizes to the key, `=`, wildcard. The key is
-the field's NAME and is low-cardinality; the value is the instance. Without the rule a key whose
-value is an identifier over-splits once per value, and on an error line that reintroduces the
-singleton false-diff the stateless masker exists to kill - a run's distinct transaction ids each
-become their own template and each produces a phantom new-and-vanished pair. Two exclusions are
-part of the rule. A status value is NOT masked, on the same keyword-and-size gate as the
-space-separated carve-out, so a green-to-red flip stays distinct. A value that is a WORD is not
-masked either: it is not digit-leading, and equating two spellings of a varying word would require
-cross-line learning, which is the unbuilt registry's job and never this masker's. It absorbs
-the retired form-2 code TID-17 (2026-09-09).
+A token of the form key, `=`, digit-leading value normalizes to the key, `=`, wildcard, the wildcard
+covering the value's number; text after the number that is not only closers and trailing punctuation
+stays literal behind it, as the `;`-segment step keeps it, through the one value disposition both
+read. The key is the field's NAME and is low-cardinality; the value is the instance. Without the
+rule a key whose value is an identifier over-splits once per value, and on an error line that
+reintroduces the singleton false-diff the stateless masker exists to kill - a run's distinct
+transaction ids each become their own template and each produces a phantom new-and-vanished pair.
+Two exclusions are part of the rule. A status value is NOT masked, on the same keyword-and-size gate
+as the space-separated carve-out read on the number, so a green-to-red flip stays distinct. A value
+that is a WORD is not masked either: it is not digit-leading, and equating two spellings of a
+varying word would require cross-line learning, which is the unbuilt registry's job and never this
+masker's. It absorbs the retired form-2 code TID-17 (2026-09-09).
 ***************************************************************************************************/
 // refs: ADR-16.D2, F-SRC-insight-canon:mask.cpp:normalize_ephemeral_root
 // refs: F-SRC-insight-canon:mask.cpp:root_scope_ending_at

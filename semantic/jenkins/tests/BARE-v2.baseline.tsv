@@ -65,6 +65,25 @@
 #   The one line carries a bundle `Import-Package` header whose imported package names the K step
 #   masked into `version=<*>`; DN-134.D11 keeps them, judged a CORRECT repair of a false merge. The row
 #   re-emitted is builds_apache_org/job_Brooklyn_job_brooklyn_dist_job_PR_145__56.log.
+# re-emitted 2026-10-06: 5 rows, from the CURRENT purified chain at the W476 commit (the child of
+#   insight-canon 245e93a that lands DN-134.D15: the kv_value rule masks its value over the number's
+#   extent through the one value disposition rule K reads, and keeps any other remainder literal behind
+#   <*>) on linux-clang21-libcxx-release, via the gate's own REBASELINE-ROW patch output. Same corpus,
+#   same REGISTRY pin ae5f19f1. CONDITION MET: the movement was REGISTERED before the code
+#   (coderoast-corpora 57c620d, kv_value_extent_w476/r2_registered.tsv: exactly these 5 traces, these 5
+#   rows byte for byte, produced_lines unchanged, distinct_templates 3802 -> 3803 and 3804 -> 3805 on
+#   the two jenkins-test-harness traces) and measured so: 5 of 82 moved, 77 byte-identical. The moved
+#   lines (1 + 1152 + 505 + 578 + 577 = 2813) are the registration's Jenkins v2 moved set: text behind
+#   a kv_value number that the rule dropped (2733 of them predicted token by token by its model, 80 in
+#   projected formats). DN-134.D15 keeps that text, judged a CORRECT repair of a false merge on the
+#   Founder's ruling of 2026-10-06 (DN-134.O6 option B). The rows re-emitted are
+#   builds_apache_org/job_Camel_job_Camel_20Core_20_20JDK26_job_main__13.log,
+#   builds_apache_org/job_Camel_job_Camel_20Core_20_Build_20and_20test_job_camel_4_14_x__218.log,
+#   builds_apache_org/job_Camel_job_Camel_20Core_20_Build_20and_20test_job_camel_4_14_x__219.log,
+#   ci_jenkins_io/job_Core_job_jenkins_test_harness_job_2_41_x__1.log and
+#   ci_jenkins_io/job_Core_job_jenkins_test_harness_job_2_41_x__2.log, all five already among the 27
+#   re-emitted rows (the three Camel rows on 2026-08-26, the two harness rows on 2026-10-05), so the
+#   55 original rows are untouched.
 #
 # ── HOW A ROW MAY MOVE AGAIN ──────────────────────────────────────────────────────────────────
 # Only through the 5-step procedure written at the head of test_jenkins_bare_null_gate.cpp:
@@ -86,9 +105,9 @@ builds_apache_org/job_Brooklyn_job_brooklyn_client_job_PR_102__4.log	4	20	SUCCES
 builds_apache_org/job_Brooklyn_job_brooklyn_dist_job_PR_145__56.log	4	20	SUCCESS	52570	22209	9ee99d1b6425cd039fd681edbb6fbab9101cc53f44cfe1c4802fb3ee02c76ce1
 builds_apache_org/job_Brooklyn_job_brooklyn_server_job_PR_1003__361.log	2	7	FAILURE	184	93	da3813793b8eb2941def0d12fa379daa0d2365902edb12f4bb4c16f8ab5173a8
 builds_apache_org/job_Camel_job_Camel_20Core_20_20JDK26_job_main__12.log	9	26	UNSTABLE	32462	9560	8912c64a835d64ebe3994d4d2bfb63ffe60db5113c17d35eb67c73472da53854
-builds_apache_org/job_Camel_job_Camel_20Core_20_20JDK26_job_main__13.log	10	28	FAILURE	31206	9309	a558f6267e38e14e01eb2cf99affd71a59790d7a408ae89f0d8ccd6141fc655c
-builds_apache_org/job_Camel_job_Camel_20Core_20_Build_20and_20test_job_camel_4_14_x__218.log	11	26	FAILURE	21709	7236	48a579d7465f7be89818338ad394a776a1f2d91f5dc3ee30430d9c234aaf9193
-builds_apache_org/job_Camel_job_Camel_20Core_20_Build_20and_20test_job_camel_4_14_x__219.log	11	26	UNSTABLE	22077	7394	eed6fe3ebf5ee2522932b4f0400d7bed14715e70d6a3c979c9afb438c61006b9
+builds_apache_org/job_Camel_job_Camel_20Core_20_20JDK26_job_main__13.log	10	28	FAILURE	31206	9309	fd4f4a49d620bd10c862f1c642ee55fdb7bcf51e7d787b432a3961ad07a1941b
+builds_apache_org/job_Camel_job_Camel_20Core_20_Build_20and_20test_job_camel_4_14_x__218.log	11	26	FAILURE	21709	7236	2edffee84a2f68d359798254724d25605c585c355fe88c2759b491dbd43fc41e
+builds_apache_org/job_Camel_job_Camel_20Core_20_Build_20and_20test_job_camel_4_14_x__219.log	11	26	UNSTABLE	22077	7394	afc374be34b742213b8d75b7a0026472f69fe2d421f9c66c7bf92a1ba89006fb
 ci_codemc_io/job_4drian3d_job_AuthMeVelocity__96.log	0	0	SUCCESS	153	153	1aa88f980792a85a140279c4d590e99533c1d892556788daa24f91b5c3573cd8
 ci_codemc_io/job_4drian3d_job_AuthMeVelocity__97.log	0	0	SUCCESS	152	152	348844a4d891714f3a83c10de7d22a66e35b68025474dabed9fa459173a39002
 ci_codemc_io/job_4drian3d_job_AuthMeVelocity__98.log	0	0	SUCCESS	152	152	e45545083373577c2e5e1b1d55ecb0a190e2f875db882a6091c8c3e84dd03c24
@@ -99,8 +118,8 @@ ci_codemc_io/job_PlazmaMC_job_CI_20Test_job_old_252F1_19_4__1.log	9	18	FAILURE	1
 ci_codemc_io/job_RelativityMC_job_VMP_forge_job_ver_252F1_19_2__1.log	3	13	SUCCESS	203	146	616934e7896615f3e53fff5e53f33a2f74648527f9554f3570952162fad91f3e
 ci_codemc_io/job_RelativityMC_job_VMP_forge_job_ver_252F1_19_2__2.log	3	13	SUCCESS	132	100	c2a5b1e704d85bb7c63e47e3cffc752ba5fe0ca28efb83584f7e282ba6f28892
 ci_codemc_io/job_RelativityMC_job_VMP_forge_job_ver_252F1_19_2__3.log	3	13	SUCCESS	132	100	6e14d396f433a6ee2c9cfe09742ff57e4b6c8623c35118a486d0ac0e1c4bfb59
-ci_jenkins_io/job_Core_job_jenkins_test_harness_job_2_41_x__1.log	2	8	SUCCESS	8285	3802	736059596680aae7637a48395f762958a475c474d64519ca115bdc8bd9600ec9
-ci_jenkins_io/job_Core_job_jenkins_test_harness_job_2_41_x__2.log	2	8	SUCCESS	8346	3804	74b5cc516cd94c30666d60da5b26d767185317313a000fd94779dfe00432244c
+ci_jenkins_io/job_Core_job_jenkins_test_harness_job_2_41_x__1.log	2	8	SUCCESS	8285	3803	68298aef74e2bbfb5e57bb5b37f0dcadafccb8873b45f0f799297acc36f387ed
+ci_jenkins_io/job_Core_job_jenkins_test_harness_job_2_41_x__2.log	2	8	SUCCESS	8346	3805	124d3deacfa959d184aa88526188c7e30b04a94163f5bbc38c1910dbb58e2ec1
 ci_jenkins_io/job_Core_job_remoting_job_3_10_x_backup__1.log	0	69	ABORTED	14478	4408	6fdb262134e99e2a11e7e46719b38ebeb9cb51a111b8071884f1e877389ab5c3
 debbie_postgis_net/job_GDAL_Branch_2_0__189.log	0	0	FAILURE	5778	5751	6919a897fb43c9557877254e4b4e2d5b6f8944e492367654509c9270daa93271
 debbie_postgis_net/job_GDAL_Branch_2_1__340.log	0	0	FAILURE	3006	659	f937fdec77a4860ab973fa1c2cb6eca2c6b301e4ce165db487cb6a5e533039e2

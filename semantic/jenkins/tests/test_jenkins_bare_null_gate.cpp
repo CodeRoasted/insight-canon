@@ -3,8 +3,8 @@
 // COMMITTED baseline that sits beside this TU.
 // invariant: the claim was NARROWED by ruling on 2026-08-26 and the old one cannot be re-armed: 27
 // of the 82 rows are re-emitted from the current chain, whose `pre` side is not recomputable.
-// invariant: a green therefore means `nothing has moved on the 82 bare traces since 2026-10-05`,
-// and the purification null it was born to carry is now history the baseline's header witnesses.
+// invariant: a green means nothing moved on the 82 bare traces since the provenance's latest
+// re-emission, and the purification null it was born to carry is history its header witnesses.
 // invariant: what it still proves is a byte-exact regression fence over the SHIPPED tokenizer,
 // recognizer and manifest, on 82 real third-party traces, at line grain.
 // invariant: the standing rule is unchanged — an UNATTRIBUTED movement is the abort wire, never a

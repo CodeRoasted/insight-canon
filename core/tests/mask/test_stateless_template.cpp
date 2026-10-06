@@ -1297,9 +1297,9 @@ TEST(StatelessTemplate, TheSegmentStepMasksEachKeyValueSegmentOfANormalForm)
     expect("FREQ=WEEKLY;BYHOUR=8,11,14;BYMINUTE=0", "FREQ=WEEKLY;BYHOUR=<*>;BYMINUTE=<*>");
     expect("id=a;n=5]\r", "id=a;n=<*>]\r");
     expect("id=a;n=5]\r,", "id=a;n=<*>]\r,");
-    // invariant: kv_value claims a token whose first `=` carries a number, and masks it whole -
-    // the extent is the segment step's, not kv_value's (DN-134.O4).
-    expect("a;version=1.15,javax.x", "a;version=<*>");
+    // invariant: kv_value claims a token whose first `=` carries a number, and reads the one value
+    // disposition the step reads, so its remainder stays literal as the step's does (DN-134.D15).
+    expect("a;version=1.15,javax.x", "a;version=<*>,javax.x");
     // invariant: the controls — a status value per segment (read on the extent, a closer or CR
     // behind it), a value word, `,` (not a delimiter), a key not letter-led, a segment with no key.
     for (const std::string_view keep :
@@ -1341,6 +1341,74 @@ TEST(StatelessTemplate, TheSegmentStepMasksEachKeyValueSegmentOfANormalForm)
     EXPECT_NE(annotation, inject) << "two imported packages share one template: " << annotation;
     EXPECT_EQ(annotation, bumped) << "a version bump split the template:\n  1.15: " << annotation
                                   << "\n  2.0:  " << bumped;
+}
+
+// refs: DN-134.D15, DN-134.D11, LSRC-14
+// invariant: kv_value masks its value over the number's extent through the one disposition the
+// segment step reads, and a remainder that is not only closers and `,;:.` stays literal.
+// invariant: the status carve-out reads the extent, and the rule contributes no param.
+TEST(StatelessTemplate, KvValueMasksOverItsNumbersExtentThroughTheOneDisposition)
+{
+    ArenaAllocator arena{256U * 1024U};
+    const auto expect{
+        [&](std::string_view line, std::string_view want)
+        {
+            arena.reset();
+            const StatelessTemplate got{stateless_template(line, arena, cfg(), {})};
+            EXPECT_EQ(got.template_str, want)
+                << "kv_value over its number's extent (DN-134.D15).\n  line:     " << line
+                << "\n  expected: " << want << "\n  actual:   " << got.template_str;
+            EXPECT_TRUE(got.params.empty()) << "kv_value contributes no param.\n  line: " << line
+                                            << "\n  params: " << got.params.size();
+        }};
+    // invariant: the positives - text behind the number comes back, and a `;`-segment behind it
+    // is the step's.
+    expect("[pid=2152][err]", "[pid=<*>][err]");
+    expect("a=1;b=x2", "a=<*>;b=x2");
+    expect("a=1;b=2", "a=<*>;b=<*>");
+    expect("?a=1&b=2", "?a=<*>&b=2");
+    expect("pkg>=1.2->dep==3.4)", "pkg>=<*>>dep==3.4)");
+    expect("off=-5", "off=<*>");
+    // invariant: the controls - the golden rows, a swallowed remainder, and the masking status
+    // value.
+    expect("order=100000", "order=<*>");
+    expect("total=$18", "total=$<*>");
+    expect("[pid=2152]", "[pid=<*>");
+    expect("n=5,", "n=<*>");
+    expect("ms=12)", "ms=<*>");
+    expect("n=8,11,14", "n=<*>");
+    expect("size=10.5MB", "size=<*>");
+    expect("status=2000", "status=<*>");
+    // invariant: the decline set - a short status value, bare or behind a closer, a value word, a
+    // token with no key and one with no value.
+    for (const std::string_view keep :
+         {"status=200", "code=0", "exit=1", "exit=1]", "status=200)", "user=alice", "=5", "a="})
+        expect(keep, keep);
+    // invariant: the false-merge witness - the tag behind the number separates two lines, the
+    // number does not.
+    const std::string err{masked("x [pid=5][err] y", arena)};
+    EXPECT_NE(err, masked("x [pid=5][out] y", arena))
+        << "two tags behind one pid share a template: " << err;
+    EXPECT_EQ(err, masked("x [pid=6][err] y", arena))
+        << "a pid split the template: " << err << " vs " << masked("x [pid=6][err] y", arena);
+    // invariant: the one-disposition witness - the bytes after `=` kv_value writes for `k=<value>`
+    // equal those the step writes for `id=a;k=<value>`.
+    for (const std::string_view value : {"1.15,javax.x", "5]", "8,11,14", "200]", "$18", "-5"})
+    {
+        const std::string alone{std::format("k={}", value)};
+        const std::string segment{std::format("id=a;k={}", value)};
+        EXPECT_EQ(rule_catalog::composite_rule_claiming(alone), "kv_value")
+            << "the rule the witness reads.\n  token: " << alone;
+        const std::string by_kv_value{masked(alone, arena)};
+        const std::string by_step{masked(segment, arena)};
+        const std::string_view after_kv{std::string_view{by_kv_value}.substr(
+            std::min(by_kv_value.find('=') + 1, by_kv_value.size()))};
+        const std::string_view after_step{
+            std::string_view{by_step}.substr(std::min(by_step.rfind("k=") + 2, by_step.size()))};
+        EXPECT_EQ(after_kv, after_step)
+            << "kv_value and the segment step disagree on one value (DN-134.D15).\n  value:    "
+            << value << "\n  kv_value: " << by_kv_value << "\n  step:     " << by_step;
+    }
 }
 
 // refs: DN-134.D3

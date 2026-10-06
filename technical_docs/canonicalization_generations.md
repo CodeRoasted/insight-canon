@@ -548,6 +548,24 @@ views and the Jenkins marker corpus v2 (coderoast-corpora `72398a7` registered b
 move (10 templates renamed, 0 split, 0 merged; distinct templates 254 756, 221 075 and 2 797 262 unchanged), and
 1 Jenkins line; `JenkinsBareNullGate` moves 1 of 82 traces.
 
+**The kv-value rule's extent (DN-134.D15), a further change in the same window.** The kv-value rule no longer masks a
+value to its token's end: it masks the value over the same EXTENT as K, through ONE value disposition both rules call
+(the currency marker, the digit-leading gate with its optional sign, the extent, the status carve-out read on the
+extent, and the bytes written). A remainder of only wrapper closers and `,;:.` is swallowed as before; any other
+remainder is kept byte for byte behind `<*>`, and a `;`-segment in it is then K's. A short status value behind a
+closer (`exit=1]`) now declines and stays literal, and K admits a signed value as the kv-value rule always did. Only
+the key's grammar still differs between the two rules. Fields moved: `template_str` and `template_id` of a line
+holding such a token, nothing else; no param is added. Witness inputs: the segment-step unit row
+`a;version=1.15,javax.x` → `a;version=<*>,javax.x` (it pinned the old disposition), and
+`StatelessTemplate.KvValueMasksOverItsNumbersExtentThroughTheOneDisposition` (`[pid=2152][err]` →
+`[pid=<*>][err]`, `a=1;b=x2` → `a=<*>;b=x2`, `a=1;b=2` → `a=<*>;b=<*>`, `exit=1]` and `status=200)` literal, the
+golden's `order=100000` and `total=$18` rows unchanged, and the same bytes after `=` from both rules for six values).
+Measured through the public `Tokenizer::process_line` over the same three private CI-log views (final CR run removed)
+and the Jenkins marker corpus v2 (coderoast-corpora `57c620d` registered before the build): 784, 724, 35 959 and
+2 813 lines move; distinct templates 201 302 → 201 306, 169 662 → 169 665, 2 620 167 → 2 620 525 and
+116 235 → 116 236; 4, 3, 102 and 1 base templates split (a false merge undone), 0 merged; `JenkinsBareNullGate`
+moves 5 of 82 traces.
+
 **It rides `-17`.**
 
 ### Rider — rule 5 reads a number through a complete wrapper shell, and rule 4 decides every address it accepts (DN-134.D1, DN-134.D8)
