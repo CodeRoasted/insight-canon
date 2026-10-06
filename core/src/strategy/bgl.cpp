@@ -43,10 +43,7 @@ namespace
     {
         if (token.empty() || !is_upper(token.front()))
             return false;
-        for (const char chr : token)
-            if (!is_bgl_identifier_byte(chr))
-                return false;
-        return true;
+        return std::ranges::all_of(token, [](char chr) { return is_bgl_identifier_byte(chr); });
     }
 
     // pre: the remainder starts at the secondary timestamp, which the caller has already proved

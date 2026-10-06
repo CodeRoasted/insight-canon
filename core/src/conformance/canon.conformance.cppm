@@ -588,6 +588,54 @@ namespace
         return {.name = "code_tier", .passed = true, .detail = {}};
     }
 
+    insight::RunOutcomeScan scan_outcome_line(const std::string& line, const ComposedSemantics& own)
+    {
+        const std::array<std::string, 1> lines{line};
+        return insight::scan_run_outcome(lines, own);
+    }
+
+    // post: nullopt when the scan recovers a PrefixIsVerdict row's own verdict from the line
+    // `render_outcome` materializes for it, else the failing result.
+    std::optional<CheckResult> prefix_verdict_round_trip(const OutcomeMarkerRow& row,
+                                                         const ComposedSemantics& own)
+    {
+        const insight::RunOutcomeScan scan{scan_outcome_line(render_outcome(row, {}), own)};
+        if (scan.marker_present && scan.verdict.has_value() && *scan.verdict == row.outcome)
+            return std::nullopt;
+        return CheckResult{.name = "outcome.round_trip",
+                           .passed = false,
+                           .detail = "PrefixIsVerdict row \"" + std::string{row.prefix} +
+                                     "\": scan_run_outcome(render_outcome(row)) did not recover "
+                                     "the row's own verdict (marker_present=" +
+                                     (scan.marker_present ? "true" : "false") +
+                                     ") — the two projections of the run-verdict line disagree."};
+    }
+
+    // post: nullopt when the token scanned back from a RemainderToken row's rendered line maps to
+    // the token's own verdict, else the failing result.
+    std::optional<CheckResult> token_round_trip(const OutcomeMarkerRow& row,
+                                                const OutcomeTokenRow& token,
+                                                const ComposedSemantics& own)
+    {
+        const std::string line{render_outcome(row, token.token)};
+        const insight::RunOutcomeScan scan{scan_outcome_line(line, own)};
+        const std::optional<insight::RunOutcome> mapped{
+            scan.marker_present && !scan.token.empty() ? insight::map_outcome_token(scan.token, own)
+                                                       : std::nullopt};
+        if (mapped.has_value() && *mapped == token.outcome)
+            return std::nullopt;
+        return CheckResult{.name = "outcome.round_trip",
+                           .passed = false,
+                           .detail = "RemainderToken row \"" + std::string{row.prefix} +
+                                     "\" + token \"" + std::string{token.token} +
+                                     "\": scan_run_outcome(render_outcome(row, token)) over \"" +
+                                     line +
+                                     "\" did not map back to the token's own verdict "
+                                     "(marker_present=" +
+                                     (scan.marker_present ? "true" : "false") +
+                                     ", scanned token \"" + scan.token + "\")."};
+    }
+
     // refs: ADR-27.D4
     // post: for every outcome-marker row, the line `render_outcome` materializes is recognized back
     // by the shipped scan under the package's OWN declaration.
@@ -602,46 +650,17 @@ namespace
         std::size_t measured{0};
         for (const OutcomeMarkerRow& row : manifest.outcome_markers)
         {
-            const auto scan_one{[&own](const std::string& line)
-                                {
-                                    const std::array<std::string, 1> lines{line};
-                                    return insight::scan_run_outcome(lines, own);
-                                }};
             if (row.shape == OutcomeMarkerShape::PrefixIsVerdict)
             {
-                const std::string line{render_outcome(row, {})};
-                const insight::RunOutcomeScan scan{scan_one(line)};
-                if (!scan.marker_present || !scan.verdict.has_value() ||
-                    *scan.verdict != row.outcome)
-                    return {.name = "outcome.round_trip",
-                            .passed = false,
-                            .detail = "PrefixIsVerdict row \"" + std::string{row.prefix} +
-                                      "\": scan_run_outcome(render_outcome(row)) did not recover "
-                                      "the row's own verdict (marker_present=" +
-                                      (scan.marker_present ? "true" : "false") +
-                                      ") — the two projections of the run-verdict line disagree."};
+                if (std::optional<CheckResult> failure{prefix_verdict_round_trip(row, own)})
+                    return *std::move(failure);
                 ++measured;
                 continue;
             }
             for (const OutcomeTokenRow& token : manifest.outcome_tokens)
             {
-                const std::string line{render_outcome(row, token.token)};
-                const insight::RunOutcomeScan scan{scan_one(line)};
-                const std::optional<insight::RunOutcome> mapped{
-                    scan.marker_present && !scan.token.empty()
-                        ? insight::map_outcome_token(scan.token, own)
-                        : std::nullopt};
-                if (!mapped.has_value() || *mapped != token.outcome)
-                    return {.name = "outcome.round_trip",
-                            .passed = false,
-                            .detail = "RemainderToken row \"" + std::string{row.prefix} +
-                                      "\" + token \"" + std::string{token.token} +
-                                      "\": scan_run_outcome(render_outcome(row, token)) over \"" +
-                                      line +
-                                      "\" did not map back to the token's own verdict "
-                                      "(marker_present=" +
-                                      (scan.marker_present ? "true" : "false") +
-                                      ", scanned token \"" + scan.token + "\")."};
+                if (std::optional<CheckResult> failure{token_round_trip(row, token, own)})
+                    return *std::move(failure);
                 ++measured;
             }
         }

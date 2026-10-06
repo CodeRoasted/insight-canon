@@ -68,10 +68,7 @@ namespace
     [[nodiscard]] constexpr bool name_in(std::string_view name,
                                          std::span<const std::string_view> vocabulary) noexcept
     {
-        for (const std::string_view candidate : vocabulary)
-            if (name == candidate)
-                return true;
-        return false;
+        return std::ranges::contains(vocabulary, name);
     }
 
     // post: the role a BARE name carries, or None; the order matches the parse's own precedence.
@@ -129,6 +126,27 @@ namespace
         }
     }
 
+    // post: each string value of the descended object whose BARE name carries a role fills that
+    // role if it is still missing; the descent goes no deeper.
+    // invariant: bare name only — a dotted key inside the descent would be a SECOND level of
+    // compounding and is deliberately not read.
+    void route_descended_object(simdjson::ondemand::object& child, ParsedLine& parsed_line,
+                                ArenaAllocator& arena, bool& recognized_message)
+    {
+        for (auto sub : child)
+        {
+            std::string_view sub_key;
+            if (sub.unescaped_key().get(sub_key) != simdjson::SUCCESS)
+                continue;
+            if (const JsonRole role{role_of(sub_key)}; role != JsonRole::None)
+            {
+                std::string_view sub_value;
+                if (sub.value().get_string().get(sub_value) == simdjson::SUCCESS)
+                    fill_missing_role(role, sub_value, parsed_line, arena, recognized_message);
+            }
+        }
+    }
+
     // invariant: ONE forward walk over the root object — each string value is offered under its
     // single-dot resolved name, each object value is descended EXACTLY ONCE.
     // invariant: no key NAME is consulted to decide whether to descend; the VALUE's type decides,
@@ -152,23 +170,8 @@ namespace
             if (type == simdjson::ondemand::json_type::object)
             {
                 simdjson::ondemand::object child;
-                if (value.get_object().get(child) != simdjson::SUCCESS)
-                    continue;
-                for (auto sub : child)
-                {
-                    std::string_view sub_key;
-                    if (sub.unescaped_key().get(sub_key) != simdjson::SUCCESS)
-                        continue;
-                    // invariant: bare name only — a dotted key inside the descent would be a
-                    // SECOND level of compounding and is deliberately not read.
-                    if (const JsonRole role{role_of(sub_key)}; role != JsonRole::None)
-                    {
-                        std::string_view sub_value;
-                        if (sub.value().get_string().get(sub_value) == simdjson::SUCCESS)
-                            fill_missing_role(role, sub_value, parsed_line, arena,
-                                              recognized_message);
-                    }
-                }
+                if (value.get_object().get(child) == simdjson::SUCCESS)
+                    route_descended_object(child, parsed_line, arena, recognized_message);
                 continue;
             }
 
@@ -373,6 +376,118 @@ namespace
         return std::span<const SpanId>{dst, ids.size()};
     }
 
+    // invariant: the depth-0 fields a span record is mapped from, gathered in one forward pass.
+    struct SpanFields
+    {
+        std::string_view start_nano;
+        std::string_view end_nano;
+        std::string_view name_view;
+        std::string_view service_name;
+        bool is_error{false};
+        std::vector<SpanId> linked;
+    };
+
+    // post: `is_error` is set from the status object's `code` (ERROR anywhere in it); an
+    // unreadable status or code leaves it untouched.
+    void read_span_status(simdjson::simdjson_result<simdjson::ondemand::value> value,
+                          bool& is_error) noexcept
+    {
+        simdjson::ondemand::object status_obj;
+        if (value.get_object().get(status_obj) != simdjson::SUCCESS)
+            return;
+        std::string_view code;
+        if (status_obj.find_field_unordered("code").get_string().get(code) == simdjson::SUCCESS)
+            is_error = code.contains("ERROR");
+    }
+
+    // post: the `stringValue` of every readable `service.name` attribute, in order, the last one
+    // winning; anything unreadable is skipped.
+    void read_service_name(simdjson::simdjson_result<simdjson::ondemand::value> value,
+                           std::string_view& service_name) noexcept
+    {
+        simdjson::ondemand::array attributes;
+        if (value.get_array().get(attributes) != simdjson::SUCCESS)
+            return;
+        for (auto element : attributes)
+        {
+            simdjson::ondemand::object attr;
+            if (element.get_object().get(attr) != simdjson::SUCCESS)
+                continue;
+            std::string_view attr_key;
+            if (attr.find_field_unordered("key").get_string().get(attr_key) != simdjson::SUCCESS ||
+                attr_key != "service.name")
+                continue;
+            simdjson::ondemand::object value_obj;
+            if (attr.find_field_unordered("value").get_object().get(value_obj) == simdjson::SUCCESS)
+                read_string_or_keep(value_obj.find_field_unordered("stringValue"), service_name);
+        }
+    }
+
+    // invariant: each link declares a cross-trace edge to another span; metalog
+    // resolves them by span id ACROSS traces into the distilled service topology.
+    // invariant: the link's own trace id and attributes are consumed-not-retained, like
+    // the parent context.
+    // refs: ADR-29.D2
+    void read_link_span_ids(simdjson::simdjson_result<simdjson::ondemand::value> value,
+                            std::vector<SpanId>& linked)
+    {
+        simdjson::ondemand::array links_array;
+        if (value.get_array().get(links_array) != simdjson::SUCCESS)
+            return;
+        for (auto element : links_array)
+        {
+            simdjson::ondemand::object link;
+            if (element.get_object().get(link) != simdjson::SUCCESS)
+                continue;
+            std::string_view link_span_hex;
+            if (link.find_field_unordered("spanId").get_string().get(link_span_hex) ==
+                simdjson::SUCCESS)
+                linked.push_back(span_id_from_hex(link_span_hex));
+        }
+    }
+
+    // post: one depth-0 span field read into `fields` or the trace context by its key; a key the
+    // span mapping does not name, or a value of the wrong type, changes nothing.
+    void read_span_field(std::string_view key,
+                         simdjson::simdjson_result<simdjson::ondemand::value> value,
+                         SpanFields& fields, OtelTraceContext& trace)
+    {
+        std::string_view hex;
+        if (key == "startTimeUnixNano")
+            read_string_or_keep(value, fields.start_nano);
+        else if (key == "endTimeUnixNano")
+            read_string_or_keep(value, fields.end_nano);
+        else if (key == "name")
+            read_string_or_keep(value, fields.name_view);
+        else if (key == "traceId")
+        {
+            if (value.get_string().get(hex) == simdjson::SUCCESS)
+            {
+                trace.present = true;
+                trace.trace_id = trace_id_from_hex(hex);
+            }
+        }
+        else if (key == "spanId")
+        {
+            if (value.get_string().get(hex) == simdjson::SUCCESS)
+                trace.span_id = span_id_from_hex(hex);
+        }
+        else if (key == "parentSpanId")
+        {
+            if (value.get_string().get(hex) == simdjson::SUCCESS)
+            {
+                trace.has_parent = true;
+                trace.parent_span_id = span_id_from_hex(hex);
+            }
+        }
+        else if (key == "status")
+            read_span_status(value, fields.is_error);
+        else if (key == "attributes")
+            read_service_name(value, fields.service_name);
+        else if (key == "links")
+            read_link_span_ids(value, fields.linked);
+    }
+
     // post: FALSE when the nomination was wrong — a cheap probe NOMINATES and the parser it
     // routes to CONFIRMS its own precondition or DECLINES.
     // invariant: ONE forward pass over the span object — the on-demand idiom that descends into
@@ -395,106 +510,12 @@ namespace
     [[nodiscard]] bool parse_otel_span(simdjson::ondemand::object& root, ParsedLine& parsed_line,
                                        ArenaAllocator& arena)
     {
-        std::string_view start_nano;
-        std::string_view end_nano;
-        std::string_view name_view;
-        std::string_view service_name;
-        bool is_error{false};
-        std::vector<SpanId> linked;
-
+        SpanFields fields;
         for (auto field : root)
         {
             std::string_view key;
-            if (field.unescaped_key().get(key) != simdjson::SUCCESS)
-                continue;
-            std::string_view hex;
-            if (key == "startTimeUnixNano")
-            {
-                read_string_or_keep(field.value(), start_nano);
-            }
-            else if (key == "endTimeUnixNano")
-            {
-                read_string_or_keep(field.value(), end_nano);
-            }
-            else if (key == "name")
-            {
-                read_string_or_keep(field.value(), name_view);
-            }
-            else if (key == "traceId")
-            {
-                if (field.value().get_string().get(hex) == simdjson::SUCCESS)
-                {
-                    parsed_line.trace.present = true;
-                    parsed_line.trace.trace_id = trace_id_from_hex(hex);
-                }
-            }
-            else if (key == "spanId")
-            {
-                if (field.value().get_string().get(hex) == simdjson::SUCCESS)
-                    parsed_line.trace.span_id = span_id_from_hex(hex);
-            }
-            else if (key == "parentSpanId")
-            {
-                if (field.value().get_string().get(hex) == simdjson::SUCCESS)
-                {
-                    parsed_line.trace.has_parent = true;
-                    parsed_line.trace.parent_span_id = span_id_from_hex(hex);
-                }
-            }
-            else if (key == "status")
-            {
-                simdjson::ondemand::object status_obj;
-                if (field.value().get_object().get(status_obj) == simdjson::SUCCESS)
-                {
-                    std::string_view code;
-                    if (status_obj.find_field_unordered("code").get_string().get(code) ==
-                        simdjson::SUCCESS)
-                        is_error = code.contains("ERROR");
-                }
-            }
-            else if (key == "attributes")
-            {
-                simdjson::ondemand::array attributes;
-                if (field.value().get_array().get(attributes) == simdjson::SUCCESS)
-                {
-                    for (auto element : attributes)
-                    {
-                        simdjson::ondemand::object attr;
-                        if (element.get_object().get(attr) != simdjson::SUCCESS)
-                            continue;
-                        std::string_view attr_key;
-                        if (attr.find_field_unordered("key").get_string().get(attr_key) !=
-                                simdjson::SUCCESS ||
-                            attr_key != "service.name")
-                            continue;
-                        simdjson::ondemand::object value_obj;
-                        if (attr.find_field_unordered("value").get_object().get(value_obj) ==
-                            simdjson::SUCCESS)
-                            read_string_or_keep(value_obj.find_field_unordered("stringValue"),
-                                                service_name);
-                    }
-                }
-            }
-            else if (key == "links")
-            {
-                // invariant: each link declares a cross-trace edge to another span; metalog
-                // resolves them by span id ACROSS traces into the distilled service topology.
-                // invariant: the link's own trace id and attributes are consumed-not-retained, like
-                // the parent context.
-                // refs: ADR-29.D2
-                simdjson::ondemand::array links_array;
-                if (field.value().get_array().get(links_array) == simdjson::SUCCESS)
-                    for (auto element : links_array)
-                    {
-                        simdjson::ondemand::object link;
-                        if (element.get_object().get(link) != simdjson::SUCCESS)
-                            continue;
-                        std::string_view link_span_hex;
-                        if (link.find_field_unordered("spanId").get_string().get(link_span_hex) ==
-                            simdjson::SUCCESS)
-                            linked.push_back(span_id_from_hex(link_span_hex));
-                    }
-            }
+            if (field.unescaped_key().get(key) == simdjson::SUCCESS)
+                read_span_field(key, field.value(), fields, parsed_line.trace);
         }
 
         // invariant: the confirmation is FREE — the start value is empty exactly when the key the
@@ -503,7 +524,7 @@ namespace
         // is how an unparsed line acquires a plausible event time.
         // invariant: a span with no declared event time is not a span we parsed.
         // refs: ADR-29.D5
-        if (start_nano.empty())
+        if (fields.start_nano.empty())
             return false;
 
         parsed_line.trace.is_span = true;
@@ -512,21 +533,22 @@ namespace
         // invariant: the span flag is set here too: DECLARED causality routes the record to the
         // observed DAG rather than to the adjacency ring.
         // refs: ADR-29.D5, F-SRC-insight-metalog:metalog.cppm:record_span
-        if (const auto declared_start{utils::parse_unix_nano_timestamp(start_nano)})
+        if (const auto declared_start{utils::parse_unix_nano_timestamp(fields.start_nano)})
             parsed_line.timestamp = EventTime::declared(*declared_start);
         else
             parsed_line.timestamp = EventTime::parsed(std::nullopt);
-        parsed_line.level = EventLevel::declared(is_error ? LogLevel::Error : LogLevel::Info);
-        if (!service_name.empty())
-            parsed_line.component = arena.store_string(service_name);
+        parsed_line.level =
+            EventLevel::declared(fields.is_error ? LogLevel::Error : LogLevel::Info);
+        if (!fields.service_name.empty())
+            parsed_line.component = arena.store_string(fields.service_name);
         parsed_line.content =
-            arena.store_string(name_view.empty() ? parsed_line.raw_line : name_view);
+            arena.store_string(fields.name_view.empty() ? parsed_line.raw_line : fields.name_view);
 
         // invariant: the duration becomes the declared ordinal; an end before the start yields a
         // ZERO duration, the smallest bin, and never a negative one.
         // refs: F-SRC-insight-canon:canon.api.cppm:DurationLog2Ns
-        const std::int64_t start_value{parse_span_nano(start_nano)};
-        const std::int64_t end_value{parse_span_nano(end_nano)};
+        const std::int64_t start_value{parse_span_nano(fields.start_nano)};
+        const std::int64_t end_value{parse_span_nano(fields.end_nano)};
         const std::int64_t duration_ns{end_value > start_value ? end_value - start_value : 0};
         const std::array<OrdinalObservation, 1> observation{
             {{.field_name = kSpanDurationField.key,
@@ -534,7 +556,7 @@ namespace
               .value = duration_ns}}};
         parsed_line.ordinals = store_ordinals(observation, arena);
 
-        parsed_line.linked_span_ids = store_span_ids(linked, arena);
+        parsed_line.linked_span_ids = store_span_ids(fields.linked, arena);
         return true;
     }
 
@@ -642,6 +664,94 @@ namespace
         return parsed_line;
     }
 
+    // post: the timestamp, level and component a record carries under their exact canon names;
+    // a role whose name is absent is left as it was.
+    void read_named_roles(simdjson::ondemand::object& root, ParsedLine& parsed_line,
+                          ArenaAllocator& arena)
+    {
+        std::string_view scratch_view;
+        if (try_get_string(root, kTimestampKeys, scratch_view))
+        {
+            parsed_line.timestamp = EventTime::parsed(utils::parse_iso8601(scratch_view));
+            if (!parsed_line.timestamp)
+                parsed_line.timestamp =
+                    EventTime::yearless(utils::parse_bsd_syslog_ts(scratch_view));
+        }
+        if (try_get_string(root, kLevelKeys, scratch_view))
+            parsed_line.level = EventLevel::declared(utils::parse_log_level(scratch_view));
+        if (try_get_string(root, kComponentKeys, scratch_view))
+            parsed_line.component = arena.store_string(scratch_view);
+    }
+
+    // post: the content of a record that is not OTEL: the message role when one is named, else the
+    // whole line; true iff the message role was recognized, by name or by the compound walk.
+    bool read_record_content(simdjson::ondemand::object& root, std::string_view line,
+                             simdjson::padded_string_view padded, ParsedLine& parsed_line,
+                             ArenaAllocator& arena)
+    {
+        std::string_view scratch_view;
+        bool recognized_message{false};
+        if (try_get_string(root, kMessageKeys, scratch_view))
+        {
+            parsed_line.content = arena.store_string(scratch_view);
+            recognized_message = true;
+        }
+        else
+        {
+            parsed_line.content = arena.store_string(line);
+        }
+
+        // invariant: this pass runs ONLY when a role is still missing after the exact-name lookups,
+        // so an already-readable line never reaches it.
+        // invariant: that is what makes it additive — it closes a blindness, it does not
+        // re-decide anything.
+        // invariant: the predecessor descended into ONE literally-named object, which read one
+        // producer's namespacing convention by enumeration; the shape does it by structure.
+        // invariant: net effect on core's vocabulary is one name REMOVED and none added.
+        // invariant: a fresh cursor is required and is not free, and it is paid ONLY on a line
+        // still missing a role — never on a canon-named line.
+        // refs: F-SRC-insight-canon:simdjson_scratch.hpp:compound_key_name
+        if (parsed_line.component.empty() || parsed_line.level == LogLevel::Unknown ||
+            !parsed_line.timestamp.has_stamp() || !recognized_message)
+        {
+            simdjson::ondemand::document compound_doc;
+            simdjson::ondemand::object compound_root;
+            if (json_scratch().parser.iterate(padded).get(compound_doc) == simdjson::SUCCESS &&
+                compound_doc.get_object().get(compound_root) == simdjson::SUCCESS)
+                route_compound_keys(compound_root, parsed_line, arena, recognized_message);
+        }
+        return recognized_message;
+    }
+
+    // post: the record carries its first top-level key as the no-role witness, and the console is
+    // told, rate-limited per thread.
+    void mark_roleless_record(ParsedLine& parsed_line, std::string_view line)
+    {
+        // invariant: UNCONDITIONAL, and it must stay ABOVE the rate limit below — the marker is
+        // set on EVERY role-less record and the sampling governs ONLY the log emission.
+        // invariant: moving it inside the sampled branch would leave almost every role-less event
+        // carrying an EMPTY marker, indistinguishable from a well-parsed record.
+        // invariant: two statements about one condition, and only the console's may be sampled.
+        // refs: ADR-29.D7
+        parsed_line.no_role_witness_key = first_top_level_key(line);
+
+        // invariant: ERGONOMICS, never the contract, and no test may assert against it.
+        // invariant: rate-limited because a per-event warn floods from the hot path; thread-local
+        // because parse is const and a strategy instance is per-tokenizer, so per thread.
+        // invariant: the consequence of the thread-local is that first occurrence fires once per
+        // WORKER, so diagnostic VOLUME varies with worker count.
+        // invariant: that is fine for a log and is not deterministic content, but no test may
+        // assert on the LINE COUNT here — assert on the marker, which is per-record and exact.
+        thread_local std::uint64_t roleless_count{0};
+        ++roleless_count;
+        if (roleless_count == 1 || roleless_count % kWarnEveryNRoleless == 0)
+            INSIGHT_LOG_WARN(logging::strategy_logger(),
+                             "JSON object yielded NO recognized role (no timestamp, level, "
+                             "component or message) — the event is emitted and MARKED, not "
+                             "dropped. Top-level keys: [{}] (total such lines={})",
+                             top_level_keys_for_diagnosis(line), roleless_count);
+    }
+
 } // namespace
 
 // invariant: the strategy entry — a fast-path byte scan, then a guarded simdjson slow path
@@ -733,25 +843,12 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
         }
     }
 
-    std::string_view scratch_view;
     // invariant: the fourth role probe's own result — the other three are readable off the parsed
     // line, but content is set on BOTH branches.
     // invariant: a recognized message and the raw-line fallback are indistinguishable afterwards,
     // and treating the fallback as a role would silence the marker on its own input.
     bool recognized_message{false};
-
-    if (try_get_string(root, kTimestampKeys, scratch_view))
-    {
-        parsed_line.timestamp = EventTime::parsed(utils::parse_iso8601(scratch_view));
-        if (!parsed_line.timestamp)
-            parsed_line.timestamp = EventTime::yearless(utils::parse_bsd_syslog_ts(scratch_view));
-    }
-
-    if (try_get_string(root, kLevelKeys, scratch_view))
-        parsed_line.level = EventLevel::declared(utils::parse_log_level(scratch_view));
-
-    if (try_get_string(root, kComponentKeys, scratch_view))
-        parsed_line.component = arena.store_string(scratch_view);
+    read_named_roles(root, parsed_line, arena);
 
     // invariant: the severity number becomes the level band and the trace keys become consumed
     // structural metadata; the trace keys are top-level, so they are never tokenized.
@@ -779,37 +876,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
             parsed_line.content = arena.store_string(line);
     }
     else
-    {
-        if (try_get_string(root, kMessageKeys, scratch_view))
-        {
-            parsed_line.content = arena.store_string(scratch_view);
-            recognized_message = true;
-        }
-        else
-        {
-            parsed_line.content = arena.store_string(line);
-        }
-
-        // invariant: this pass runs ONLY when a role is still missing after the exact-name lookups,
-        // so an already-readable line never reaches it.
-        // invariant: that is what makes it additive — it closes a blindness, it does not
-        // re-decide anything.
-        // invariant: the predecessor descended into ONE literally-named object, which read one
-        // producer's namespacing convention by enumeration; the shape does it by structure.
-        // invariant: net effect on core's vocabulary is one name REMOVED and none added.
-        // invariant: a fresh cursor is required and is not free, and it is paid ONLY on a line
-        // still missing a role — never on a canon-named line.
-        // refs: F-SRC-insight-canon:simdjson_scratch.hpp:compound_key_name
-        if (parsed_line.component.empty() || parsed_line.level == LogLevel::Unknown ||
-            !parsed_line.timestamp.has_stamp() || !recognized_message)
-        {
-            simdjson::ondemand::document compound_doc;
-            simdjson::ondemand::object compound_root;
-            if (scratch.parser.iterate(padded).get(compound_doc) == simdjson::SUCCESS &&
-                compound_doc.get_object().get(compound_root) == simdjson::SUCCESS)
-                route_compound_keys(compound_root, parsed_line, arena, recognized_message);
-        }
-    }
+        recognized_message = read_record_content(root, line, padded, parsed_line, arena);
 
     // invariant: the independent backstop against a SILENT wrong answer — the hard refusal above
     // can only refuse what it RECOGNISES, via a dated premise about the top-level key.
@@ -836,29 +903,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     if (!is_otel && !parsed_line.timestamp.has_stamp() && parsed_line.level == LogLevel::Unknown &&
         parsed_line.component.empty() && !recognized_message)
     {
-        // invariant: UNCONDITIONAL, and it must stay ABOVE the rate limit below — the marker is
-        // set on EVERY role-less record and the sampling governs ONLY the log emission.
-        // invariant: moving it inside the sampled branch would leave almost every role-less event
-        // carrying an EMPTY marker, indistinguishable from a well-parsed record.
-        // invariant: two statements about one condition, and only the console's may be sampled.
-        // refs: ADR-29.D7
-        parsed_line.no_role_witness_key = first_top_level_key(line);
-
-        // invariant: ERGONOMICS, never the contract, and no test may assert against it.
-        // invariant: rate-limited because a per-event warn floods from the hot path; thread-local
-        // because parse is const and a strategy instance is per-tokenizer, so per thread.
-        // invariant: the consequence of the thread-local is that first occurrence fires once per
-        // WORKER, so diagnostic VOLUME varies with worker count.
-        // invariant: that is fine for a log and is not deterministic content, but no test may
-        // assert on the LINE COUNT here — assert on the marker, which is per-record and exact.
-        thread_local std::uint64_t roleless_count{0};
-        ++roleless_count;
-        if (roleless_count == 1 || roleless_count % kWarnEveryNRoleless == 0)
-            INSIGHT_LOG_WARN(logging::strategy_logger(),
-                             "JSON object yielded NO recognized role (no timestamp, level, "
-                             "component or message) — the event is emitted and MARKED, not "
-                             "dropped. Top-level keys: [{}] (total such lines={})",
-                             top_level_keys_for_diagnosis(line), roleless_count);
+        mark_roleless_record(parsed_line, line);
     }
 
     INSIGHT_LOG_TRACE(logging::strategy_logger(),

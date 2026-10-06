@@ -318,10 +318,8 @@ namespace detail
     // refs: ADR-8.D12
     [[nodiscard]] bool is_failure_lexicon_word(std::string_view token) noexcept
     {
-        for (const FailureWord& entry : kFailureLexicon)
-            if (iequals(token, entry.word))
-                return true;
-        return false;
+        return std::ranges::any_of(kFailureLexicon, [token](const FailureWord& entry)
+                                   { return iequals(token, entry.word); });
     }
 
     // post: true iff a pass glyph leads the head, or a pass word is its first significant token.
@@ -441,7 +439,7 @@ namespace detail
                                              std::size_t message_at) noexcept
     {
         return message_at != std::string_view::npos &&
-               static_cast<std::size_t>(token.data() - line.data()) >= message_at;
+               std::cmp_greater_equal(token.data() - line.data(), message_at);
     }
 
     // pre: cold path - reached only once contains_failure_cue has returned false.

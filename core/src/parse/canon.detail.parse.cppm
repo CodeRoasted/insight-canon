@@ -70,6 +70,8 @@ extern "C++"
         class LogParserPasskey
         {
           public:
+            // note: the passkey OBJECT is the authority; a static mint would need no LogParser.
+            // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
             [[nodiscard]] NormalizedContent mint(std::string_view stage1_bytes) const noexcept
             {
                 return NormalizedContent{stage1_bytes};

@@ -37,6 +37,81 @@ void print_usage(std::string_view program_name)
         "  <corpus-dir>  root of a *.log tree (the population; walked RECURSIVELY, sorted)");
     std::println(stderr, "  [max-lines]   line budget (default {})", kDefaultMaxLines);
 }
+// post: the line budget a `[max-lines]` argument names, or nullopt after saying on stderr why it is
+// not a positive integer.
+std::optional<std::size_t> parse_max_lines(std::string_view budget_arg)
+{
+    std::size_t max_lines{0};
+    const auto [parse_end, parse_err]{
+        std::from_chars(budget_arg.data(), budget_arg.data() + budget_arg.size(), max_lines)};
+    if (parse_err != std::errc{} || parse_end != budget_arg.data() + budget_arg.size() ||
+        max_lines == 0)
+    {
+        std::println(stderr, "max-lines must be a positive integer, got '{}'", budget_arg);
+        return std::nullopt;
+    }
+    return max_lines;
+}
+
+// post: the files tokenized in order until the budget is spent, one record per file reached;
+// returns the number of non-empty lines consumed.
+std::size_t consume_population(std::span<const std::filesystem::path> files, std::size_t max_lines,
+                               Tokenizer& tokenizer, ArenaAllocator& arena,
+                               std::unordered_map<std::string, std::uint64_t>& template_counts,
+                               std::vector<FileConsumption>& consumed)
+{
+    std::size_t total_lines{0};
+    for (const auto& file : files)
+    {
+        if (total_lines >= max_lines)
+            break;
+        FileConsumption record{.path = file};
+        std::ifstream input{file};
+        std::string raw;
+        while (std::getline(input, raw))
+        {
+            if (total_lines >= max_lines)
+            {
+                record.truncated_by_cap = true;
+                break;
+            }
+            if (raw.empty())
+                continue;
+            // assert: `event->template_str` views arena bytes that the reset below frees.
+            if (const auto event{tokenizer.process_line(raw)}; event.has_value())
+                ++template_counts[std::string{event->template_str}];
+            arena.reset();
+            ++record.lines_consumed;
+            ++total_lines;
+        }
+        consumed.push_back(std::move(record));
+    }
+    return total_lines;
+}
+
+// post: the most frequent templates, then singleton samples from the tail of the same ranking.
+void print_template_ranking(const std::unordered_map<std::string, std::uint64_t>& template_counts)
+{
+    std::vector<std::pair<std::string, std::uint64_t>> by_count{template_counts.begin(),
+                                                                template_counts.end()};
+    std::ranges::sort(
+        by_count, [](const auto& lhs, const auto& rhs)
+        { return lhs.second != rhs.second ? lhs.second > rhs.second : lhs.first < rhs.first; });
+    std::println("--- top {} by count ---", kTopTemplatesShown);
+    for (std::size_t index{0}; index < std::min(kTopTemplatesShown, by_count.size()); ++index)
+        std::println("{}  {}", by_count[index].second,
+                     std::string_view{by_count[index].first}.substr(0, kTemplatePreviewChars));
+    std::println("--- {} singleton samples (the FLAW-13 over-split tail) ---",
+                 kSingletonSamplesShown);
+    std::size_t shown{0};
+    for (auto iter{by_count.rbegin()}; iter != by_count.rend() && shown < kSingletonSamplesShown;
+         ++iter)
+        if (iter->second == 1)
+        {
+            std::println("{}", std::string_view{iter->first}.substr(0, kTemplatePreviewChars));
+            ++shown;
+        }
+}
 } // namespace
 
 // post: prints a population block; a number from this report is citable only beside it.
@@ -52,19 +127,11 @@ try
 
     namespace fs = std::filesystem;
     const fs::path corpus_dir{arguments[1]};
-    std::size_t max_lines{kDefaultMaxLines};
-    if (arguments.size() == 3)
-    {
-        const std::string_view budget_arg{arguments[2]};
-        const auto [parse_end, parse_err]{
-            std::from_chars(budget_arg.data(), budget_arg.data() + budget_arg.size(), max_lines)};
-        if (parse_err != std::errc{} || parse_end != budget_arg.data() + budget_arg.size() ||
-            max_lines == 0)
-        {
-            std::println(stderr, "max-lines must be a positive integer, got '{}'", budget_arg);
-            return kExitUsage;
-        }
-    }
+    const std::optional<std::size_t> budget{arguments.size() == 3 ? parse_max_lines(arguments[2])
+                                                                  : kDefaultMaxLines};
+    if (!budget.has_value())
+        return kExitUsage;
+    const std::size_t max_lines{*budget};
 
     std::error_code dir_error;
     if (!fs::is_directory(corpus_dir, dir_error))
@@ -93,33 +160,8 @@ try
     std::unordered_map<std::string, std::uint64_t> template_counts;
     std::vector<FileConsumption> consumed;
     consumed.reserve(files.size());
-    std::size_t total_lines{0};
-
-    for (const auto& file : files)
-    {
-        if (total_lines >= max_lines)
-            break;
-        FileConsumption record{.path = file};
-        std::ifstream input{file};
-        std::string raw;
-        while (std::getline(input, raw))
-        {
-            if (total_lines >= max_lines)
-            {
-                record.truncated_by_cap = true;
-                break;
-            }
-            if (raw.empty())
-                continue;
-            // assert: `event->template_str` views arena bytes that the reset below frees.
-            if (const auto event{tokenizer.process_line(raw)}; event.has_value())
-                ++template_counts[std::string{event->template_str}];
-            arena.reset();
-            ++record.lines_consumed;
-            ++total_lines;
-        }
-        consumed.push_back(std::move(record));
-    }
+    const std::size_t total_lines{
+        consume_population(files, max_lines, tokenizer, arena, template_counts, consumed)};
 
     std::println("=== Stateless template_id cardinality (FLAW-13 re-measure) ===");
     std::println("population       : {} of {} *.log files under {} (recursive, sorted walk)",
@@ -147,25 +189,7 @@ try
                      ? 100.0 * static_cast<double>(singletons) / static_cast<double>(distinct)
                      : 0.0);
 
-    std::vector<std::pair<std::string, std::uint64_t>> by_count{template_counts.begin(),
-                                                                template_counts.end()};
-    std::ranges::sort(
-        by_count, [](const auto& lhs, const auto& rhs)
-        { return lhs.second != rhs.second ? lhs.second > rhs.second : lhs.first < rhs.first; });
-    std::println("--- top {} by count ---", kTopTemplatesShown);
-    for (std::size_t index{0}; index < std::min(kTopTemplatesShown, by_count.size()); ++index)
-        std::println("{}  {}", by_count[index].second,
-                     std::string_view{by_count[index].first}.substr(0, kTemplatePreviewChars));
-    std::println("--- {} singleton samples (the FLAW-13 over-split tail) ---",
-                 kSingletonSamplesShown);
-    std::size_t shown{0};
-    for (auto iter{by_count.rbegin()}; iter != by_count.rend() && shown < kSingletonSamplesShown;
-         ++iter)
-        if (iter->second == 1)
-        {
-            std::println("{}", std::string_view{iter->first}.substr(0, kTemplatePreviewChars));
-            ++shown;
-        }
+    print_template_ranking(template_counts);
 
     return kExitOk;
 }

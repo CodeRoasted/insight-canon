@@ -326,6 +326,52 @@ namespace
         std::terminate();
     }
 
+    // post: returns only when every package is named, the set holds no conflict, and every
+    // marker, declared-value and role row is well formed; otherwise fails closed naming the row.
+    // note: the unnamed-package fence answers first: every other diagnostic names the package.
+    void fence_manifests(std::span<const SemanticPackageManifest> packages)
+    {
+        for (std::size_t index{0}; index < packages.size(); ++index)
+            if (packages[index].name.empty())
+                fail_unnamed_package(index, packages.size());
+
+        if (const ConflictInfo conflict{find_conflict(packages)}; conflict.has_conflict)
+            fail_closed(conflict);
+        for (const SemanticPackageManifest& pkg : packages)
+            for (const IntentMarkerRow& row : pkg.markers)
+            {
+                if (!version_coordinate_whole(row.version))
+                    fail_version_coordinate(pkg, row);
+                if (!unit_role_row_admitted(row))
+                    fail_unit_role_row(pkg, row);
+            }
+        for (const SemanticPackageManifest& pkg : packages)
+            for (const DeclaredValueRow& row : pkg.declared_values)
+                if (!declared_value_row_well_formed(row))
+                    fail_declared_value(pkg, row);
+        for (const SemanticPackageManifest& pkg : packages)
+            for (const StructuralRoleRow& row : pkg.roles)
+                if (!role_row_well_formed(row))
+                    fail_role_row(pkg, row);
+    }
+
+    // post: appends the transport catalog's row count, then each row's name, kind, extract,
+    // prefix width and leading-space flag, in catalog order.
+    void append_transport_catalog(std::string& serialized)
+    {
+        append_u32_le(serialized,
+                      static_cast<std::uint32_t>(insight::transport::kTransportCatalogRows.size()));
+        for (const insight::transport::TransportTransformRow& row :
+             insight::transport::kTransportCatalogRows)
+        {
+            append_str(serialized, row.name);
+            append_u8(serialized, static_cast<std::uint8_t>(row.kind));
+            append_u8(serialized, static_cast<std::uint8_t>(row.extract));
+            append_u32_le(serialized, row.prefix_width);
+            append_u8(serialized, row.strip_leading_space ? 1U : 0U);
+        }
+    }
+
 } // namespace
 
 // post: both declared coordinates are verified and applied in ONE construction; nothing below the
@@ -497,29 +543,7 @@ ComposedSemantics ComposedSemantics::for_stream(std::string_view declared_dialec
 // refs: ADR-17.D2, DN-17.D17
 ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
 {
-    // note: the unnamed-package fence answers first: every other diagnostic names the package.
-    for (std::size_t index{0}; index < packages.size(); ++index)
-        if (packages[index].name.empty())
-            fail_unnamed_package(index, packages.size());
-
-    if (const ConflictInfo conflict{find_conflict(packages)}; conflict.has_conflict)
-        fail_closed(conflict);
-    for (const SemanticPackageManifest& pkg : packages)
-        for (const IntentMarkerRow& row : pkg.markers)
-        {
-            if (!version_coordinate_whole(row.version))
-                fail_version_coordinate(pkg, row);
-            if (!unit_role_row_admitted(row))
-                fail_unit_role_row(pkg, row);
-        }
-    for (const SemanticPackageManifest& pkg : packages)
-        for (const DeclaredValueRow& row : pkg.declared_values)
-            if (!declared_value_row_well_formed(row))
-                fail_declared_value(pkg, row);
-    for (const SemanticPackageManifest& pkg : packages)
-        for (const StructuralRoleRow& row : pkg.roles)
-            if (!role_row_well_formed(row))
-                fail_role_row(pkg, row);
+    fence_manifests(packages);
 
     const std::vector<std::size_t> order{canonical_order(packages)};
 
@@ -534,17 +558,7 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
     // note: the transform GRAMMAR is identity; a run's declared stack rides the document unhashed.
     // refs: ADR-23.D4
     append_str(serialized, insight::transport::kTransportCatalogVersion);
-    append_u32_le(serialized,
-                  static_cast<std::uint32_t>(insight::transport::kTransportCatalogRows.size()));
-    for (const insight::transport::TransportTransformRow& row :
-         insight::transport::kTransportCatalogRows)
-    {
-        append_str(serialized, row.name);
-        append_u8(serialized, static_cast<std::uint8_t>(row.kind));
-        append_u8(serialized, static_cast<std::uint8_t>(row.extract));
-        append_u32_le(serialized, row.prefix_width);
-        append_u8(serialized, row.strip_leading_space ? 1U : 0U);
-    }
+    append_transport_catalog(serialized);
 
     for (const std::size_t idx : order)
     {

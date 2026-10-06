@@ -1518,6 +1518,38 @@ struct YearlessStamp
 // invariant: a fraction after the seconds is skipped, never read: the instant has second grain.
 [[nodiscard]] std::optional<Timestamp> parse_iso8601(std::string_view timestamp_str) noexcept;
 
+namespace detail
+{
+    // post: true iff `offset` is inside `text` and the byte there is an ASCII digit.
+    [[nodiscard]] constexpr bool ascii_digit_at(std::string_view text, std::size_t offset) noexcept
+    {
+        constexpr unsigned kDecimalBase{10U};
+        return offset < text.size() && static_cast<unsigned>(text[offset]) - '0' < kDecimalBase;
+    }
+
+    // post: the byte length of the RFC 3339 zone at `pos` — 1 for `Z`, a signed `hh:mm` or `hhmm`
+    // offset's own — 0 when no zone starts there, and nullopt when a signed offset is malformed.
+    [[nodiscard]] constexpr std::optional<std::size_t> rfc3339_zone_length(std::string_view text,
+                                                                           std::size_t pos) noexcept
+    {
+        if (pos >= text.size())
+            return 0U;
+        if (text[pos] == 'Z')
+            return 1U;
+        if (text[pos] != '+' && text[pos] != '-')
+            return 0U;
+        std::size_t cursor{pos + 1U};
+        if (!ascii_digit_at(text, cursor) || !ascii_digit_at(text, cursor + 1U))
+            return std::nullopt;
+        cursor += 2U;
+        if (cursor < text.size() && text[cursor] == ':')
+            ++cursor;
+        if (!ascii_digit_at(text, cursor) || !ascii_digit_at(text, cursor + 1U))
+            return std::nullopt;
+        return cursor + 2U - pos;
+    }
+} // namespace detail
+
 // post: the number of bytes consumed by a COMPLETE datetime starting at pos, or 0 when the bytes
 // there do not carry one.
 // invariant: ONE owner for the RFC3339 full-datetime byte grammar, and its CONSUMER SET is the
@@ -1539,51 +1571,30 @@ struct YearlessStamp
 [[nodiscard]] constexpr std::size_t rfc3339_datetime_length(std::string_view text,
                                                             std::size_t pos) noexcept
 {
-    constexpr std::size_t kDateLen{10U};
-    constexpr std::size_t kTimeLen{8U};
-    constexpr unsigned kDecimalBase{10U};
-    const auto digit_at{
-        [&text](std::size_t at) noexcept
-        { return at < text.size() && static_cast<unsigned>(text[at]) - '0' < kDecimalBase; }};
+    constexpr std::string_view kStampShape{"dddd-dd-ddTdd:dd:dd"};
     const std::size_t start{pos};
-    if (pos + kDateLen + 1U + kTimeLen > text.size())
+    if (pos + kStampShape.size() > text.size())
         return 0;
-    if (!(digit_at(pos) && digit_at(pos + 1U) && digit_at(pos + 2U) && digit_at(pos + 3U) &&
-          text[pos + 4U] == '-' && digit_at(pos + 5U) && digit_at(pos + 6U) &&
-          text[pos + 7U] == '-' && digit_at(pos + 8U) && digit_at(pos + 9U)))
-        return 0;
-    pos += kDateLen;
-    if (text[pos] != 'T')
-        return 0;
-    ++pos;
-    if (!(digit_at(pos) && digit_at(pos + 1U) && text[pos + 2U] == ':' && digit_at(pos + 3U) &&
-          digit_at(pos + 4U) && text[pos + 5U] == ':' && digit_at(pos + 6U) && digit_at(pos + 7U)))
-        return 0;
-    pos += kTimeLen;
+    for (const char shape : kStampShape)
+    {
+        if (shape == 'd' ? !detail::ascii_digit_at(text, pos) : text[pos] != shape)
+            return 0;
+        ++pos;
+    }
     if (pos < text.size() && text[pos] == '.')
     {
-        ++pos;
-        const std::size_t frac_start{pos};
-        while (digit_at(pos))
-            ++pos;
-        if (pos == frac_start)
+        const std::size_t fraction_start{pos + 1U};
+        std::size_t fraction_end{fraction_start};
+        while (detail::ascii_digit_at(text, fraction_end))
+            ++fraction_end;
+        if (fraction_end == fraction_start)
             return 0;
+        pos = fraction_end;
     }
-    if (pos < text.size() && text[pos] == 'Z')
-        ++pos;
-    else if (pos < text.size() && (text[pos] == '+' || text[pos] == '-'))
-    {
-        ++pos;
-        if (!digit_at(pos) || !digit_at(pos + 1U))
-            return 0;
-        pos += 2U;
-        if (pos < text.size() && text[pos] == ':')
-            ++pos;
-        if (!digit_at(pos) || !digit_at(pos + 1U))
-            return 0;
-        pos += 2U;
-    }
-    return pos - start;
+    const std::optional<std::size_t> zone{detail::rfc3339_zone_length(text, pos)};
+    if (!zone.has_value())
+        return 0;
+    return pos + *zone - start;
 }
 
 // post: the month, day and clock of a BSD syslog (RFC 3164) stamp `Mmm dd hh:mm:ss`, which

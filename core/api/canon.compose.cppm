@@ -388,6 +388,19 @@ namespace detail
 
 namespace detail
 {
+    // post: true when two rows are one rule: the same prefix under intersecting gates, and for a
+    // role row the same match kind.
+    template <typename Row>
+    [[nodiscard]] constexpr bool prefix_rows_collide(const Row& lhs, const Row& rhs) noexcept
+    {
+        if constexpr (std::same_as<Row, StructuralRoleRow>)
+        {
+            if (lhs.match != rhs.match)
+                return false;
+        }
+        return lhs.prefix == rhs.prefix && gates_intersect(lhs.dialect_gate, rhs.dialect_gate);
+    }
+
     // post: visits every unordered (package, row) pair exactly ONCE and returns the duplicated
     // prefix, or nullopt.
     // invariant: never a row against itself, and address-independent — position is the key, so it
@@ -410,14 +423,8 @@ namespace detail
                     const std::span<const Row> rows_b{packages[pkg_b].*member};
                     for (std::size_t idx_j{(pkg_b == pkg_a) ? idx_i + 1 : 0}; idx_j < rows_b.size();
                          ++idx_j)
-                    {
-                        bool same_match{true};
-                        if constexpr (std::same_as<Row, StructuralRoleRow>)
-                            same_match = rows_a[idx_i].match == rows_b[idx_j].match;
-                        if (same_match && rows_a[idx_i].prefix == rows_b[idx_j].prefix &&
-                            gates_intersect(rows_a[idx_i].dialect_gate, rows_b[idx_j].dialect_gate))
+                        if (prefix_rows_collide(rows_a[idx_i], rows_b[idx_j]))
                             return rows_a[idx_i].prefix;
-                    }
                 }
         }
         return std::nullopt;
@@ -503,6 +510,24 @@ namespace detail
     }
 } // namespace detail
 
+// invariant: value classes are keyed by their `key` alone — there is no gate on that row kind.
+namespace detail
+{
+    [[nodiscard]] constexpr std::optional<std::string_view>
+    first_value_class_dup(std::span<const SemanticPackageManifest> packages) noexcept
+    {
+        for (std::size_t pkg_a{0}; pkg_a < packages.size(); ++pkg_a)
+            for (std::size_t idx_i{0}; idx_i < packages[pkg_a].value_classes.size(); ++idx_i)
+                for (std::size_t pkg_b{pkg_a}; pkg_b < packages.size(); ++pkg_b)
+                    for (std::size_t idx_j{(pkg_b == pkg_a) ? idx_i + 1 : 0};
+                         idx_j < packages[pkg_b].value_classes.size(); ++idx_j)
+                        if (packages[pkg_a].value_classes[idx_i].key ==
+                            packages[pkg_b].value_classes[idx_j].key)
+                            return packages[pkg_a].value_classes[idx_i].key;
+        return std::nullopt;
+    }
+} // namespace detail
+
 constexpr ConflictInfo find_conflict(std::span<const SemanticPackageManifest> packages) noexcept
 {
     // invariant: the package NAME is checked first: it is the only key whose collision makes every
@@ -527,18 +552,8 @@ constexpr ConflictInfo find_conflict(std::span<const SemanticPackageManifest> pa
         return {.has_conflict = true, .kind = "outcome_marker", .key = *key};
     if (const auto key{detail::first_declared_value_dup(packages)})
         return {.has_conflict = true, .kind = "declared_value", .key = *key};
-    // invariant: value classes are keyed by their `key` alone — there is no gate on that row
-    // kind.
-    for (std::size_t pkg_a{0}; pkg_a < packages.size(); ++pkg_a)
-        for (std::size_t idx_i{0}; idx_i < packages[pkg_a].value_classes.size(); ++idx_i)
-            for (std::size_t pkg_b{pkg_a}; pkg_b < packages.size(); ++pkg_b)
-                for (std::size_t idx_j{(pkg_b == pkg_a) ? idx_i + 1 : 0};
-                     idx_j < packages[pkg_b].value_classes.size(); ++idx_j)
-                    if (packages[pkg_a].value_classes[idx_i].key ==
-                        packages[pkg_b].value_classes[idx_j].key)
-                        return {.has_conflict = true,
-                                .kind = "value_class",
-                                .key = packages[pkg_a].value_classes[idx_i].key};
+    if (const auto key{detail::first_value_class_dup(packages)})
+        return {.has_conflict = true, .kind = "value_class", .key = *key};
     return {};
 }
 

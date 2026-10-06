@@ -247,7 +247,7 @@ inline void skip_json_ws(std::string_view line, std::size_t& pos) noexcept
 // resolves to NOTHING and is claimed by no role.
 // invariant: taking the last segment at any depth would make the dotted spelling resolve while the
 // equivalent nested spelling refused it — one logical document read two ways.
-[[nodiscard]] inline constexpr std::string_view compound_key_name(std::string_view key) noexcept
+[[nodiscard]] constexpr std::string_view compound_key_name(std::string_view key) noexcept
 {
     const std::size_t dot{key.find('.')};
     if (dot == std::string_view::npos)

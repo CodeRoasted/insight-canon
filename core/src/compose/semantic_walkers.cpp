@@ -131,23 +131,23 @@ namespace
 } // namespace
 
 // refs: ADR-17.D1
-std::string_view recognize_location(insight::tokenization::NormalizedContent normalized,
+std::string_view recognize_location(insight::tokenization::NormalizedContent content,
                                     const insight::semantic::ComposedSemantics& composed) noexcept
 {
-    const std::string_view content{normalized.bytes()};
+    const std::string_view bytes{content.bytes()};
     const std::span<const insight::semantic::LocationRow> rows{composed.locations()};
     std::size_t cursor{0};
-    const std::size_t len{content.size()};
+    const std::size_t len{bytes.size()};
     while (cursor < len)
     {
-        while (cursor < len && loc_is_space(content[cursor]))
+        while (cursor < len && loc_is_space(bytes[cursor]))
             ++cursor;
         if (cursor >= len)
             break;
         const std::size_t start{cursor};
-        while (cursor < len && !loc_is_space(content[cursor]))
+        while (cursor < len && !loc_is_space(bytes[cursor]))
             ++cursor;
-        const std::string_view tok{loc_slice(content, start, cursor - start)};
+        const std::string_view tok{loc_slice(bytes, start, cursor - start)};
         if (const std::size_t end{test_file_end(tok, rows)}; end != std::string_view::npos)
         {
             std::size_t begin{end};
@@ -168,10 +168,10 @@ namespace tokenization
     // invariant: two shape rows of one length both matching a line keep the first in composed
     // order, which is canonical, so the answer never depends on declaration or link order.
     // refs: ADR-17.D1, ADR-17.D4, ADR-22.D6, DN-134.D9
-    StructuralRole classify(NormalizedContent normalized,
+    StructuralRole classify(NormalizedContent content,
                             const insight::semantic::ComposedSemantics& composed) noexcept
     {
-        const std::string_view content{normalized.bytes()};
+        const std::string_view bytes{content.bytes()};
         StructuralRole best{StructuralRole::None};
         bool best_is_shape{false};
         std::size_t best_len{0};
@@ -183,8 +183,8 @@ namespace tokenization
             const bool longer{(shape && !best_is_shape) || row.prefix.size() > best_len};
             if (!longer)
                 continue;
-            if (shape ? insight::semantic::shape_matches(row.prefix, content)
-                      : content.starts_with(row.prefix))
+            if (shape ? insight::semantic::shape_matches(row.prefix, bytes)
+                      : bytes.starts_with(row.prefix))
             {
                 best = row.role;
                 best_is_shape = shape;
@@ -286,19 +286,19 @@ namespace tokenization
     // post: the longest VALID match wins — a row whose extractor fails or whose payload is
     // excluded falls through.
     // refs: ADR-17.D1, ADR-17.D4, ADR-22.D6
-    IntentMarker recognize(NormalizedContent normalized,
+    IntentMarker recognize(NormalizedContent content,
                            const insight::semantic::ComposedSemantics& composed) noexcept
     {
-        const std::string_view content{normalized.bytes()};
+        const std::string_view bytes{content.bytes()};
         const insight::semantic::IntentMarkerRow* best{nullptr};
         std::string_view best_payload;
         for (const insight::semantic::IntentMarkerRow& row : composed.markers())
         {
             if (row.role != insight::semantic::MarkerRole::Names ||
-                !content.starts_with(row.prefix) ||
+                !bytes.starts_with(row.prefix) ||
                 (best != nullptr && row.prefix.size() <= best->prefix.size()))
                 continue;
-            const std::optional<std::string_view> payload{extract_payload(content, row)};
+            const std::optional<std::string_view> payload{extract_payload(bytes, row)};
             if (!payload || payload_excluded(*payload, row))
                 continue;
             best = &row;
@@ -320,14 +320,13 @@ namespace tokenization
     // post: the longest opening row's kind; an opening row has no extractor, so its prefix alone
     // decides the match.
     // refs: DN-89.D33
-    IntentMarkerKind recognize_opener(NormalizedContent normalized,
+    IntentMarkerKind recognize_opener(NormalizedContent content,
                                       const insight::semantic::ComposedSemantics& composed) noexcept
     {
-        const std::string_view content{normalized.bytes()};
+        const std::string_view bytes{content.bytes()};
         const insight::semantic::IntentMarkerRow* best{nullptr};
         for (const insight::semantic::IntentMarkerRow& row : composed.markers())
-            if (row.role == insight::semantic::MarkerRole::Opens &&
-                content.starts_with(row.prefix) &&
+            if (row.role == insight::semantic::MarkerRole::Opens && bytes.starts_with(row.prefix) &&
                 (best == nullptr || row.prefix.size() > best->prefix.size()))
                 best = &row;
         return best == nullptr ? IntentMarkerKind::None : best->kind;

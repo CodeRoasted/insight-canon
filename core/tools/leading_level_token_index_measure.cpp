@@ -459,7 +459,7 @@ struct NestedLine
     LogLevel stable{LogLevel::Unknown};
     bool promoted{false};
     bool promoted_by_word{false};
-    std::string_view lexeme{};
+    std::string_view lexeme;
     // invariant: the product's own predicate, never a re-listing — a local copy goes stale in
     // silence the day a word is added.
     // refs: ADR-8.D12
@@ -1279,27 +1279,32 @@ void print_budget_table(const IndexStats& stats)
 
 void print_unread_partition(const NestedResidual& nested)
 {
-    const std::uint64_t r1{nested.by_unread_class[static_cast<std::size_t>(UnreadClass::R1)]};
-    const std::uint64_t r2{nested.by_unread_class[static_cast<std::size_t>(UnreadClass::R2)]};
-    const std::uint64_t r3{nested.by_unread_class[static_cast<std::size_t>(UnreadClass::R3)]};
+    const std::uint64_t unread_r1{
+        nested.by_unread_class[static_cast<std::size_t>(UnreadClass::R1)]};
+    const std::uint64_t unread_r2{
+        nested.by_unread_class[static_cast<std::size_t>(UnreadClass::R2)]};
+    const std::uint64_t unread_r3{
+        nested.by_unread_class[static_cast<std::size_t>(UnreadClass::R3)]};
     std::println("    -- DN-54.D23: the UNREAD population (error-class inner word, line NOT "
                  "Error/Fatal), partitioned by WHICH of Stage 2's three conditions fails --");
     std::println("      unread total : {}   (identity r1+r2+r3 == unread: {})", nested.unread,
-                 (r1 + r2 + r3 == nested.unread) ? "holds" : "BROKEN — do not cite this run");
+                 (unread_r1 + unread_r2 + unread_r3 == nested.unread)
+                     ? "holds"
+                     : "BROKEN — do not cite this run");
     std::println("      R3 past the {}-byte cue head, condition (a), checked FIRST : {} ({:.2f}%)"
                  "  — a BUDGET, already owned by ADR-16.D7; by outcome:{}",
-                 kQuotedCueHead, r3, percent(r3, nested.unread),
+                 kQuotedCueHead, unread_r3, percent(unread_r3, nested.unread),
                  outcome_cells(nested.r3_by_outcome));
     std::println("      R1 not in Stage 2's lexicon, condition (b)                  : {} ({:.2f}%)"
                  "  — reaches NO register: declined by nothing, invisible; by outcome:{}",
-                 r1, percent(r1, nested.unread), outcome_cells(nested.r1_by_outcome));
+                 unread_r1, percent(unread_r1, nested.unread), outcome_cells(nested.r1_by_outcome));
     std::println("      R2 in the lexicon, still unread, condition (c)              : {} ({:.2f}%)"
                  "  — the REGISTER RULE's population (the kind-slot rule); by outcome:{}",
-                 r2, percent(r2, nested.unread), outcome_cells(nested.r2_by_outcome));
+                 unread_r2, percent(unread_r2, nested.unread), outcome_cells(nested.r2_by_outcome));
     std::println("        of the {} R2 — kind-slot walk REFUSED the anchor: {}; verdict-anchored "
                  "yet still unread (a count / NOTE register, or a leading pass glyph — NOT the "
                  "register rule): {}",
-                 r2, nested.r2_register_declined, nested.r2_anchored_yet_unread);
+                 unread_r2, nested.r2_register_declined, nested.r2_anchored_yet_unread);
     std::println("        of the {} R3 — ADR-16.D8's DISCHARGE CONDITION, report-only: in Stage "
                  "2's lexicon (b): {} ({:.2f}%); verdict-anchored (c): {} ({:.2f}%); BOTH — the "
                  "share a longer kKeywordHead would actually read: {} ({:.2f}%). A material share "
@@ -1307,9 +1312,10 @@ void print_unread_partition(const NestedResidual& nested)
                  "question; a negligible one closes the last lever on measurement. (b) and (c) are "
                  "never ASKED of R3 by the product path — (a) is checked first — so these are "
                  "counterfactuals, and the CONJUNCTION is the figure the condition turns on",
-                 r3, nested.r3_in_stage2_lexicon, percent(nested.r3_in_stage2_lexicon, r3),
-                 nested.r3_verdict_anchored, percent(nested.r3_verdict_anchored, r3),
-                 nested.r3_in_lexicon_and_anchored, percent(nested.r3_in_lexicon_and_anchored, r3));
+                 unread_r3, nested.r3_in_stage2_lexicon,
+                 percent(nested.r3_in_stage2_lexicon, unread_r3), nested.r3_verdict_anchored,
+                 percent(nested.r3_verdict_anchored, unread_r3), nested.r3_in_lexicon_and_anchored,
+                 percent(nested.r3_in_lexicon_and_anchored, unread_r3));
     std::println("      lexeme histograms (casefolded; membership by the SHIPPED "
                  "kFailureLexicon test, never a re-listing — ADR-8.D12)");
     std::println("        R1:{}", lexeme_cells(nested.r1_lexemes));

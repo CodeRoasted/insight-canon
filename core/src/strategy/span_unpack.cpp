@@ -104,6 +104,19 @@ namespace
         return {};
     }
 
+    // post: `status` becomes the normalized code of the status object; an unreadable status or
+    // code leaves it untouched.
+    void read_status_code(simdjson::simdjson_result<simdjson::ondemand::value> value,
+                          std::string_view& status)
+    {
+        simdjson::ondemand::object status_obj;
+        if (value.get_object().get(status_obj) != simdjson::SUCCESS)
+            return;
+        simdjson::ondemand::value code;
+        if (status_obj.find_field_unordered("code").get(code) == simdjson::SUCCESS)
+            status = read_enum(code, status_code_name, "STATUS_CODE_UNSET");
+    }
+
     // invariant: field order and serialization match the lab's own span seam EXACTLY — string
     // ids, name and times pass through as their raw JSON, quotes and escaping byte-preserved.
     // invariant: kind and status are normalized to the string enum; the resource service name is
@@ -144,15 +157,7 @@ namespace
             else if (key == "kind")
                 kind = read_enum(field.value(), span_kind_name, "SPAN_KIND_INTERNAL");
             else if (key == "status")
-            {
-                simdjson::ondemand::object status_obj;
-                if (field.value().get_object().get(status_obj) == simdjson::SUCCESS)
-                {
-                    simdjson::ondemand::value code;
-                    if (status_obj.find_field_unordered("code").get(code) == simdjson::SUCCESS)
-                        status = read_enum(code, status_code_name, "STATUS_CODE_UNSET");
-                }
-            }
+                read_status_code(field.value(), status);
             else if (key == "attributes")
                 read_raw_json_or_keep(field.value(), span_attributes);
             else if (key == "links")
@@ -278,10 +283,8 @@ bool is_otel_span_document(std::string_view line) noexcept
     // invariant: the key came back from a non-npos find, so it is within the line and the tail is
     // well-formed.
     const std::string_view first_key{line.data() + key, line.size() - key};
-    for (const std::string_view accepted : kExportFirstKeys)
-        if (first_key.starts_with(accepted))
-            return true;
-    return false;
+    return std::ranges::any_of(kExportFirstKeys, [first_key](std::string_view accepted)
+                               { return first_key.starts_with(accepted); });
 }
 
 // invariant: one coherent traversal of the export nesting, emitting one line per span; splitting
@@ -307,6 +310,50 @@ bool is_otel_span_document(std::string_view line) noexcept
     return document.contains(R"("resourceSpans")");
 }
 
+namespace
+{
+    // post: every span of one resourceSpans element appended to `out` as one canonical line, its
+    // resource service name injected; returns how many were appended.
+    std::size_t append_resource_spans(simdjson::ondemand::object& resource_span,
+                                      std::vector<std::string>& out)
+    {
+        std::size_t emitted{0};
+        // invariant: the resource service name is read FIRST because it precedes the scope spans in
+        // the export, so the walk stays forward-only.
+        std::string service_name;
+        if (simdjson::ondemand::object resource;
+            resource_span.find_field_unordered("resource").get_object().get(resource) ==
+            simdjson::SUCCESS)
+            service_name = resource_service_name(resource);
+
+        simdjson::ondemand::array scope_spans;
+        if (resource_span.find_field_unordered("scopeSpans").get_array().get(scope_spans) !=
+            simdjson::SUCCESS)
+            return 0;
+        for (auto ss_element : scope_spans)
+        {
+            simdjson::ondemand::object scope_span;
+            if (ss_element.get_object().get(scope_span) != simdjson::SUCCESS)
+                continue;
+            simdjson::ondemand::array spans;
+            if (scope_span.find_field_unordered("spans").get_array().get(spans) !=
+                simdjson::SUCCESS)
+                continue;
+            for (auto span_element : spans)
+            {
+                simdjson::ondemand::object span;
+                if (span_element.get_object().get(span) != simdjson::SUCCESS)
+                    continue;
+                std::string line;
+                append_canonical_span(span, service_name, line);
+                out.push_back(std::move(line));
+                ++emitted;
+            }
+        }
+        return emitted;
+    }
+} // namespace
+
 std::size_t unpack_otel_spans(std::string_view document, std::vector<std::string>& out)
 {
     if (!is_otel_span_document_broad(document))
@@ -329,40 +376,8 @@ std::size_t unpack_otel_spans(std::string_view document, std::vector<std::string
     for (auto rs_element : resource_spans)
     {
         simdjson::ondemand::object resource_span;
-        if (rs_element.get_object().get(resource_span) != simdjson::SUCCESS)
-            continue;
-        // invariant: the resource service name is read FIRST because it precedes the scope spans in
-        // the export, so the walk stays forward-only.
-        std::string service_name;
-        if (simdjson::ondemand::object resource;
-            resource_span.find_field_unordered("resource").get_object().get(resource) ==
-            simdjson::SUCCESS)
-            service_name = resource_service_name(resource);
-
-        simdjson::ondemand::array scope_spans;
-        if (resource_span.find_field_unordered("scopeSpans").get_array().get(scope_spans) !=
-            simdjson::SUCCESS)
-            continue;
-        for (auto ss_element : scope_spans)
-        {
-            simdjson::ondemand::object scope_span;
-            if (ss_element.get_object().get(scope_span) != simdjson::SUCCESS)
-                continue;
-            simdjson::ondemand::array spans;
-            if (scope_span.find_field_unordered("spans").get_array().get(spans) !=
-                simdjson::SUCCESS)
-                continue;
-            for (auto span_element : spans)
-            {
-                simdjson::ondemand::object span;
-                if (span_element.get_object().get(span) != simdjson::SUCCESS)
-                    continue;
-                std::string line;
-                append_canonical_span(span, service_name, line);
-                out.push_back(std::move(line));
-                ++emitted;
-            }
-        }
+        if (rs_element.get_object().get(resource_span) == simdjson::SUCCESS)
+            emitted += append_resource_spans(resource_span, out);
     }
     return emitted;
 }
