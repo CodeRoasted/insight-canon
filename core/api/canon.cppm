@@ -104,9 +104,11 @@ class Tokenizer
     [[nodiscard]] std::expected<CanonicalEvent, std::string>
     process_line(std::string_view raw_line);
 
-    // refs: ADR-21.D1, ADR-21.D4
+    // refs: ADR-21.D1, ADR-21.D4, DN-134.D13
     // invariant: THE STABLE DOOR performs NO stage 1 at all, deliberately, so its answers — the
     // projection, the level lift, the role, the marker — are functions of the caller's bytes.
+    // invariant: it removes their line ending, as every door does, so the engine's streaming ingest
+    // and a stage-1 consumer read one line.
     // invariant: it exists so the echoed-source demotion can read the SGR command-echo wrapper that
     // stage 1 destroys, on a path that holds ONE view and hands it to strategy and detector alike.
     // note: routing this through `process_line` restores stage 1, silently killing echoed-source

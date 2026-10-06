@@ -1,6 +1,7 @@
 # Formats — ingest normalization, detection & field extraction
 
-How a raw line becomes structured fields. Three steps, in order: **normalize** (strip presentation escapes),
+How a raw line becomes structured fields. Three steps, in order: **normalize** (remove the line's ending, strip
+presentation escapes),
 **detect** (pick a format strategy), **extract** (the strategy fills `ParsedLine`). The result feeds masking
 ([masking.md](masking.md)) and classification ([classification.md](classification.md)). Between extraction and
 masking, one normal form runs on the extracted `content`: a whole-line JSON value has its object members put in
@@ -8,10 +9,25 @@ name order (§5).
 
 ---
 
-## 1. Ingest normalization — escape stripping (before everything)
+## 1. Ingest normalization — the line's ending, then escape stripping (before everything)
 
-The **first** thing canon does to a line, *before* format detection and *before* tokenization, is strip
-terminal escape sequences (`LogParser::parse_line` → `normalize`, the stage-1 factory returning a
+**A line and its ending.** A line is the bytes a consumer hands canon in one call, framed however the consumer
+frames (on LF, on CRLF, through a block reader). Its **ending** is the maximal run of carriage returns (`0x0D`) at
+the end of those bytes, and it is never content. Canon removes it, through
+one exported function, `without_line_ending`, at every door a line enters: inside `normalize` on the raw bytes,
+before the escape scan; at the entry of `LogParser::parse_line`, so the echoed-source hook reads the raw line
+less its ending; and at the entry of `LogParser::parse_stable`, the stable door, which runs no other stage-1
+step. So format detection, the strategy, the level lift, the marker and role walkers, the masker and the
+provenance hooks all see the line without its ending, and a CRLF line and its LF twin are one line. The removal
+shortens a view and never copies. A line that is only its ending is an empty line: no event, counted as skipped.
+
+- **What stays:** a carriage return followed by any byte is content — a progress redraw, GitLab's
+  `section_start:…` CR `ESC [0K` header. The decision is taken on the raw bytes, so a CR that an erase sequence
+  follows (CR `ESC [K`) is a terminal redraw and stays, even after the sequence behind it is stripped.
+- **Declared limit:** CR-only framing (classic Mac line endings) is a consumer's framing, which canon never sees;
+  such a file reaches canon as one line, and its carriage returns are interior.
+
+Then canon strips terminal escape sequences (`LogParser::parse_line` → `normalize`, the stage-1 factory returning a
 `NormalizedLine` — the type that carries the proof stage 1 ran, and the only road to the
 `NormalizedContent` the recognition walkers accept):
 

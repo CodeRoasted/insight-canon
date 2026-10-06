@@ -98,7 +98,7 @@ TEST(DeclaredVersionCoordinate, OnlyAOneTokenNameWithBytesAfterItsIntroducerHasA
     EXPECT_EQ(insight::one_token_version_of("owner/action", "#"), "") << "no introducer";
     EXPECT_EQ(insight::one_token_version_of("owner/action#", "#"), "") << "nothing after it";
     EXPECT_EQ(insight::one_token_version_of("owner/action#abc", ""), "") << "an empty introducer";
-    EXPECT_EQ(insight::one_token_version_of("  owner/action#abc\r", "#"), "abc")
+    EXPECT_EQ(insight::one_token_version_of("  owner/action#abc\t", "#"), "abc")
         << "trim bytes around a one-token name";
 }
 

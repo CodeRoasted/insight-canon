@@ -341,8 +341,6 @@ int main(int argc, char** argv)
         std::string line;
         while (std::getline(input, line))
         {
-            if (!line.empty() && line.back() == '\r')
-                line.pop_back();
             lines.push_back(std::move(line));
             line.clear();
         }

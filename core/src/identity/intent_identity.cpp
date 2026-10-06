@@ -72,13 +72,13 @@ namespace
             return NumericClaim{.mask = kDigitMask, .end = pos};
         return std::nullopt;
     }
-    // refs: ADR-20.D12
+    // refs: ADR-20.D12, DN-134.D13
     // invariant: ONE definition, because the class and the discriminant are complements —
     // different trim sets would disagree about where a name starts.
-    // note: CR is a materialization artifact — a Windows runner emits CRLF into banners.
+    // invariant: no CR: canon removes a line's ending at its doors, so a CR in a name is content.
     [[nodiscard]] constexpr bool is_intent_trim_byte(char byte) noexcept
     {
-        return byte == ' ' || byte == '\t' || byte == '\r';
+        return byte == ' ' || byte == '\t';
     }
 } // namespace
 

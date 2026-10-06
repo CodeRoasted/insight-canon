@@ -1256,7 +1256,7 @@ TEST(StatelessTemplate, AWholeTokenWildcardIsAParamAndEveryParamIsOne)
     }
 }
 
-// refs: DN-134.D2, DN-134.D11
+// refs: DN-134.D2, DN-134.D11, DN-134.D13
 // invariant: kv_value's disposition applies to each `;`-segment of a token's normal form, a
 // non-claiming step after the composites and the literal KEEP.
 // invariant: it masks a digit-leading value over its number's extent and contributes no param.
@@ -1283,18 +1283,19 @@ TEST(StatelessTemplate, TheSegmentStepMasksEachKeyValueSegmentOfANormalForm)
     expect("[mode=fast;count=5", "[mode=fast;count=<*>");
     expect("item=book;total=$18", "item=book;total=$<*>");
     expect("id=a;status=2000", "id=a;status=<*>");
-    // invariant: a value masks over its number's EXTENT, and a remainder that is not only closers,
-    // trailing punctuation and a token-final CR stays literal behind the wildcard (DN-134.D11).
+    // invariant: a value masks over its number's EXTENT, and a remainder that is not only closers
+    // and trailing punctuation stays literal behind the wildcard (DN-134.D11).
     expect("Import-Package=okio;version=1.15,javax.annotation;version=1.3,*",
            "Import-Package=okio;version=<*>,javax.annotation;version=<*>,*");
     expect(R"("FREQ=DAILY;BYSECOND=0"\nmodel)", R"("FREQ=DAILY;BYSECOND=<*>"\nmodel)");
     expect("id=a;n=5&amp;m=6", "id=a;n=<*>&amp;m=<*>");
-    // invariant: the extent controls — closers, `,;:.` and a token-final CR are swallowed, a list
-    // stays one value, and a CR that is not the token's last byte stays literal.
-    expect("##[end-action id=build;outcome=success;duration_ms=12]\r",
+    // invariant: the extent controls — closers and `,;:.` are swallowed, a list stays one value,
+    // and a CR handed to the masker is content: the line's ending never reaches it (DN-134.D13).
+    expect("##[end-action id=build;outcome=success;duration_ms=12]",
            "##[end-action id=build;outcome=success;duration_ms=<*>");
     expect("id=a;q=0.9,", "id=a;q=<*>");
     expect("FREQ=WEEKLY;BYHOUR=8,11,14;BYMINUTE=0", "FREQ=WEEKLY;BYHOUR=<*>;BYMINUTE=<*>");
+    expect("id=a;n=5]\r", "id=a;n=<*>]\r");
     expect("id=a;n=5]\r,", "id=a;n=<*>]\r,");
     // invariant: kv_value claims a token whose first `=` carries a number, and masks it whole -
     // the extent is the segment step's, not kv_value's (DN-134.O4).
@@ -1331,7 +1332,8 @@ TEST(StatelessTemplate, TheSegmentStepMasksEachKeyValueSegmentOfANormalForm)
         expect(each.token, each.want);
     }
     // invariant: the false-merge witnesses — the imported package name separates two lines, the
-    // version number does not — and the line-ending witness: a CRLF line masks as its LF twin.
+    // version number does not.
+    // note: the line-ending witness is a whole line through process_line (`LineEnding`).
     const std::string annotation{
         masked("x Import-Package=okio;version=1.15,javax.annotation y", arena)};
     const std::string inject{masked("x Import-Package=okio;version=1.15,javax.inject y", arena)};
@@ -1339,10 +1341,6 @@ TEST(StatelessTemplate, TheSegmentStepMasksEachKeyValueSegmentOfANormalForm)
     EXPECT_NE(annotation, inject) << "two imported packages share one template: " << annotation;
     EXPECT_EQ(annotation, bumped) << "a version bump split the template:\n  1.15: " << annotation
                                   << "\n  2.0:  " << bumped;
-    const std::string crlf{masked("##[end-action id=build;duration_ms=12]\r", arena)};
-    const std::string lf{masked("##[end-action id=build;duration_ms=12]", arena)};
-    EXPECT_EQ(crlf, lf) << "a CRLF line split from its LF twin:\n  CRLF: " << crlf
-                        << "\n  LF:   " << lf;
 }
 
 // refs: DN-134.D3

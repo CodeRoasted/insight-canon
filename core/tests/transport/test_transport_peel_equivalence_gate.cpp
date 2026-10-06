@@ -849,9 +849,11 @@ struct CounterSplitPins
 };
 
 // invariant: CHARACTERIZATION pins, measured by this arm on both slices and never guessed.
+// note: re-pinned for the line ending: a CR-only line is now no-event, 211 and 60 330 lines.
+// refs: DN-134.D13, DN-134.D14
 constexpr std::array<CounterSplitPins, 2> kCounterSplitPins{{
-    {.logs = 60, .parsed = 293'955, .failed = 160, .no_event = 11'737},
-    {.logs = 4'082, .parsed = 21'841'845, .failed = 87'283, .no_event = 561'809},
+    {.logs = 60, .parsed = 293'744, .failed = 160, .no_event = 11'948},
+    {.logs = 4'082, .parsed = 21'781'515, .failed = 87'283, .no_event = 622'139},
 }};
 
 // note: the parse arena of InsightPipeline, reset after every line as that pipeline does.

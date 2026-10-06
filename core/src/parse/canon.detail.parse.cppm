@@ -60,8 +60,8 @@ class LogParser;
 // refs: F-SRC-insight-canon:test_normalized_content_doors.cpp
 // invariant: THE one non-public producer of `NormalizedContent` — the passkey's friend list is
 // pinned at ONE by the door census, and growing it deletes the mechanism.
-// invariant: the conformance kit must never mint here; its probes are escape-free by construction,
-// so `normalize()` is a fixed point on them and the public factory serves.
+// invariant: the conformance kit must never mint here; its probes are escape-free and end in no CR
+// by construction, so `normalize()` is a fixed point on them and the public factory serves.
 // note: `extern "C++"` puts the class on the GLOBAL module so api and this shard name ONE entity.
 extern "C++"
 {

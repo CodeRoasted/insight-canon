@@ -984,20 +984,16 @@ namespace
         return chr == ',' || chr == ':' || chr == '/';
     }
 
-    // invariant: a CR is the line terminator canon did not peel ONLY as the token's last byte;
-    // anywhere else it is content and stays literal.
-    // refs: DN-134.D11
-    constexpr char kCarriageReturn{'\r'};
-
     // invariant: the remainder is decided WHOLE - swallowed when every byte of it is a wrapper
-    // closer or trailing punctuation, or one CR as the token's last byte.
+    // closer or trailing punctuation.
+    // invariant: a CR is content: the line's ending never reaches the masker (DN-134.D13).
     struct ValueExtent
     {
         std::size_t length{0};
         bool swallows_remainder{false};
     };
 
-    // pre: `value` is digit-leading; `token_final` is true when `value` ends the token.
+    // pre: `value` is digit-leading.
     // post: the extent's length from the value's first byte, and whether the bytes after it are
     // swallowed into the mask; any other remainder stays literal behind the wildcard.
     // invariant: a wildcard an earlier composite wrote is a number already masked, so the run reads
@@ -1005,8 +1001,7 @@ namespace
     // invariant: one forward pass over fixed ASCII classes and the literal wildcard, so the extent
     // is a pure function of the value's bytes, bit-identical across standard libraries.
     // refs: DN-134.D11, F-SRC-insight-canon:canon.detail.scan.cppm:kWrapperPairs
-    [[nodiscard]] constexpr ValueExtent value_extent(std::string_view value,
-                                                     bool token_final) noexcept
+    [[nodiscard]] constexpr ValueExtent value_extent(std::string_view value) noexcept
     {
         std::string_view remainder{value};
         while (!remainder.empty())
@@ -1022,10 +1017,7 @@ namespace
             else
                 break;
         }
-        const std::size_t pos{value.size() - remainder.size()};
-        if (token_final && remainder.ends_with(kCarriageReturn))
-            remainder.remove_suffix(1);
-        return {.length = pos,
+        return {.length = value.size() - remainder.size(),
                 .swallows_remainder = std::ranges::all_of(
                     remainder, [](char chr)
                     { return is_wrapper_close(chr) || is_shell_trailing_punct(chr); })};
@@ -1033,13 +1025,11 @@ namespace
 
     // post: appends `seg` with a digit-led value masked over its extent when it is `<key>=<value>`,
     // the first segment's key optionally behind wrapper openers; true when the value masked.
-    // pre: `last` is true when `seg` ends the token's normal form.
     // invariant: kv_value's disposition on one segment, its status carve-out read on the extent.
     // invariant: a remainder the extent leaves unswallowed is appended byte for byte after the
     // wildcard, so a word behind a number stays in the template.
     // refs: DN-134.D2, DN-134.D11, LSRC-14
-    [[nodiscard]] inline bool append_segment(std::string_view seg, bool first, bool last,
-                                             std::string& out)
+    [[nodiscard]] inline bool append_segment(std::string_view seg, bool first, std::string& out)
     {
         const std::size_t eq_pos{seg.find('=')};
         if (eq_pos == 0 || eq_pos == std::string_view::npos)
@@ -1059,7 +1049,7 @@ namespace
             out.append(seg);
             return false;
         }
-        const ValueExtent extent{value_extent(value, last)};
+        const ValueExtent extent{value_extent(value)};
         const std::string_view number{value.substr(0, extent.length)};
         if (is_status_keyword(key) && is_all_digits(number) && number.size() <= kMaxStatusDigits)
         {
@@ -1091,9 +1081,9 @@ namespace
         {
             const std::size_t delim{form.find(kSegmentDelimiter, seg_start)};
             const std::size_t seg_end{delim == std::string_view::npos ? form.size() : delim};
-            moved = append_segment(form.substr(seg_start, seg_end - seg_start), seg_start == 0,
-                                   delim == std::string_view::npos, out) ||
-                    moved;
+            moved =
+                append_segment(form.substr(seg_start, seg_end - seg_start), seg_start == 0, out) ||
+                moved;
             if (delim == std::string_view::npos)
                 return moved;
             out.push_back(kSegmentDelimiter);

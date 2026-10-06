@@ -537,12 +537,12 @@ build, `c210757` measured): distinct templates over every non-empty line 295 919
 **K's extent (DN-134.D11), a further change in the same window.** K no longer masks a value to its segment's end: it
 masks the value's EXTENT, from its first digit over `[A-Za-z0-9._+%-]` and any `<*>` an earlier composite wrote,
 across one `,` `:` or `/` directly followed by a digit or `<*>`. The rest of the segment is swallowed when it is only
-wrapper closers, `,;:.` and at most one carriage return as the token's last byte, and is otherwise kept byte for byte
-behind `<*>`; the status carve-out reads the extent. Fields moved: `template_str` and `template_id` of a line holding
+wrapper closers and `,;:.`, and is otherwise kept byte for byte behind `<*>`; the status carve-out reads the extent.
+As built it also swallowed one carriage return as the token's last byte; the line-ending rider below made that clause
+unreachable and deleted it. Fields moved: `template_str` and `template_id` of a line holding
 such a token, nothing else. Witness inputs: the golden's `segment_kv` row `bundle
 Import-Package=okio;version=1.15,javax.annotation;version=1.3,* resolved` → `bundle
-Import-Package=okio;version=<*>,javax.annotation;version=<*>,* resolved`, and the segment-step unit rows (a CRLF
-end-action line masking as its LF twin, `id=a;t=12:30:01` and `id=a;r=7/8` through their composites' normal forms,
+Import-Package=okio;version=<*>,javax.annotation;version=<*>,* resolved`, and the segment-step unit rows (`id=a;t=12:30:01` and `id=a;r=7/8` through their composites' normal forms,
 `id=a;status=200]` literal). Measured through the public `Tokenizer::process_line` over the same three private CI-log
 views and the Jenkins marker corpus v2 (coderoast-corpora `72398a7` registered before the build): 0, 0 and 127 lines
 move (10 templates renamed, 0 split, 0 merged; distinct templates 254 756, 221 075 and 2 797 262 unchanged), and
@@ -638,6 +638,36 @@ the eight literal boundaries (`/home/u/proj/tmp/x`, `build/tmp/x`, `user@host:/t
 rider before it: 360 747 events move, every moved token is the rule's normal form of its base token and every token
 the rule reaches moves; params byte-identical on every event. Distinct templates holding such a path on the GitHub
 arm: 3 617 → 263, 3 433 → 234 and 32 179 → 547.
+
+**It rides `-17`.**
+
+### Rider — a line's ending is removed at canon's doors, and is never content (DN-134.D13)
+
+**What changed.** A line is the bytes a consumer hands canon in one call; its ending is the maximal run of carriage
+returns closing them. Canon removes it, through the one exported `without_line_ending`, at its three doors: inside
+`normalize` on the raw bytes before the escape scan, at the entry of `LogParser::parse_line`, and at the entry of
+`LogParser::parse_stable`. A carriage return followed by any byte, an escape byte included, is content and stays. K's
+token-final carriage-return clause (`DN-134.D11`) became unreachable and is deleted, and the carriage return leaves the
+intent trim set, since no name ends in a line ending any more.
+
+**Which serialized fields move.** None for a consumer that already framed a line without one final carriage return,
+as Sift's splitter did. For a consumer that frames on LF alone, a CRLF line now reads as its LF twin, so every
+projected member can move: `template_str` and `template_id` (a literal last token loses its carriage return; a mask
+the carriage return blocked now fires — a complete wrapper shell, the long hash, the address and the hash counter;
+the status KEEP holds again for `exit 1` + CR, which rule 5 masked, so `exit 0` and `exit 1` no longer share a
+template), `params` (a masked value loses the carriage return it carried), `format` (a `KEY=` + CR line), and a line
+that is only its ending stops being an event.
+
+**Witness inputs.** `core/tests/tokenizer/test_line_ending.cpp` pins the definition, the three doors, a CR before an
+escape and an interior CR kept, the end-action line equal to its LF twin through `process_line`, the exit-code status,
+a shelled duration masking, a lone carriage return on the skip counter and a `KEY=` + CR line routing as `KEY=`; the
+segment-step rows keep `id=a;n=5]` + CR literal behind `<*>`. Measured through the public `Tokenizer::process_line`
+over every LF-framed line of the three private CI-log views and the Jenkins marker corpus v2 (coderoast-corpora
+`b3d6343` registered before the build): 249 290, 242 616, 3 483 005 and 0 lines move, every one ending in a carriage
+return; distinct templates 254 756 → 201 302, 221 075 → 169 662, 2 797 262 → 2 620 167 and 116 235 unchanged;
+9 373, 9 287, 191 382 and 0 lines stop being events; 3, 3, 1 and 0 base templates split, each an exit code; every
+merge is a carriage-return line into its LF twin. Under Sift's framing 0 lines move, and the 21 596-pair Sift replay
+is byte-identical.
 
 **It rides `-17`.**
 

@@ -164,7 +164,7 @@ namespace
 
     // refs: ADR-21.D4, LSRC-5
     // invariant: the kit's ONE door to the walkers' NormalizedContent, and stage 1 is a FIXED POINT
-    // on its escape-free probes, so no count can move.
+    // on its escape-free probes, which end in no CR, so no count can move.
     // note: never the LogParser mint here — that would grow its friend list to two.
     [[nodiscard]] insight::tokenization::NormalizedContent normalized_probe(std::string_view probe,
                                                                             std::string& scratch)

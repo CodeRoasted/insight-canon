@@ -119,9 +119,11 @@ parse_template_id(std::string_view rendered) noexcept;
 // verbatim: no allocation, no masking, no normalization.
 // invariant: THREE consumers need that one byte set and the set may have exactly one definition —
 // the class masks, the instance keeps, and a report renders.
-// invariant: a carriage return is in the trim set because a Windows runner emits CRLF, not for
-// tidiness; a report trimming a different set would show one intent two ways.
-// refs: ADR-20.D12
+// invariant: the set is space and tab; a report trimming a different set would show one intent
+// two ways.
+// invariant: a Windows runner's CRLF never reaches a name: the CR is the line's ending, which
+// canon removes at its doors, so a CR a name still holds is content.
+// refs: ADR-20.D12, DN-134.D13
 [[nodiscard]] std::string_view trimmed_intent_name(std::string_view name) noexcept;
 
 // post: the matrix tuple rendered into the display name, returned VERBATIM as a view; empty when
@@ -1966,6 +1968,20 @@ class NormalizedLine;
 // note: declared first so the in-class friend names THIS exported entity.
 [[nodiscard]] NormalizedLine normalize(std::string_view raw_line, std::string& scratch);
 
+// post: `line` without its ending, the maximal run of CR bytes closing it, as a view of `line`:
+// the removal shortens and never copies.
+// invariant: a line is the bytes a consumer hands canon in one call, and its ending is that run;
+// a CR followed by any byte, an escape byte included, is content and stays.
+// invariant: ONE definition, called at canon's three doors (`normalize`, the parser's line door
+// and its stable door) and by a consumer that frames its own lines, so every reader agrees.
+// refs: DN-134.D13
+[[nodiscard]] constexpr std::string_view without_line_ending(std::string_view line) noexcept
+{
+    while (line.ends_with('\r'))
+        line.remove_suffix(1);
+    return line;
+}
+
 // invariant: the type MEANS stage 1 ran on these bytes — canon's universal ANSI ingest
 // normalization, the exact grammar the factory below owns.
 // invariant: produced ONLY by that factory; there is deliberately NO constructor from a
@@ -2046,10 +2062,13 @@ constexpr NormalizedContent NormalizedLine::undeclared_suffix(std::size_t offset
     return NormalizedContent{std::string_view{bytes_.data() + clamped, bytes_.size() - clamped}};
 }
 
-// post: a NormalizedLine over the stripped bytes — CSI, SGR, OSC and bare-ESC sequences removed
-// as an UNCONDITIONAL content normalization at ingest, before tokenization.
-// post: a line with no ESC byte is a FIXED POINT, so the result BORROWS raw_line with no copy and
-// scratch is not touched; only an ESC-bearing line rewrites into scratch.
+// post: a NormalizedLine over the stripped bytes — the line's ending removed, then CSI, SGR, OSC
+// and bare-ESC sequences removed — as an UNCONDITIONAL content normalization at ingest.
+// invariant: the ending is removed from the RAW bytes before the escape scan, so a CR an escape
+// sequence follows is a terminal redraw and stays.
+// refs: DN-134.D13
+// post: a line with no ESC byte BORROWS raw_line, less its ending, with no copy, and scratch is
+// not touched; only an ESC-bearing line rewrites into scratch.
 // invariant: the returned line, every content narrowed from it, and every coordinate a walker
 // slices out of THAT borrow raw_line or scratch, so both must outlive every such view.
 // invariant: stage 1 is a CONSUMER's obligation and never a package's — a package that normalized
@@ -2062,6 +2081,7 @@ constexpr NormalizedContent NormalizedLine::undeclared_suffix(std::size_t offset
 // refs: ADR-17, ADR-21, ADR-20.D5
 [[nodiscard]] inline NormalizedLine normalize(std::string_view raw_line, std::string& scratch)
 {
+    raw_line = without_line_ending(raw_line);
     if (raw_line.find(static_cast<char>(kEsc)) == std::string_view::npos)
         return NormalizedLine{raw_line};
     scratch.clear();

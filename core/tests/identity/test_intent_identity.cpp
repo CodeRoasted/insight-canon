@@ -228,29 +228,30 @@ namespace
 }
 } // namespace
 
-// refs: ADR-20.D12
+// refs: ADR-20.D12, DN-134.D13
 // invariant: canon's intent trim is ONE definition with three consumers, so its byte set is pinned
 // at the definition's own suite — a consumer that calls it can no longer guard it by comparison.
-// invariant: exactly space, tab and carriage return, from BOTH ends and nowhere else — an interior
-// byte of the set and every other whitespace byte stay verbatim.
-// invariant: the carriage return case is the load-bearing row: a Windows runner emits CRLF into
-// banners, so a trim without it names one intent two ways.
-TEST(IntentTrim, TrimsExactlySpaceTabAndCarriageReturnFromBothEnds)
+// invariant: exactly space and tab, from BOTH ends and nowhere else — an interior byte of the set
+// and every other byte, the carriage return included, stay verbatim.
+// invariant: the carriage return left the set when canon began removing a line's ending at its
+// doors: a name no longer ends in one, and a CR a name still holds is content.
+TEST(IntentTrim, TrimsExactlySpaceAndTabFromBothEnds)
 {
     struct TrimCase
     {
         std::string_view input;
         std::string_view expected;
     };
-    constexpr std::array<TrimCase, 9> kCases{{
-        {.input = "build\r", .expected = "build"},
-        {.input = "\rbuild", .expected = "build"},
-        {.input = " \t\rbuild\r\t ", .expected = "build"},
+    constexpr std::array<TrimCase, 10> kCases{{
+        {.input = " \tbuild\t ", .expected = "build"},
+        {.input = "build\r", .expected = "build\r"},
+        {.input = "\rbuild", .expected = "\rbuild"},
+        {.input = " \t\rbuild\r\t ", .expected = "\rbuild\r"},
         {.input = "build \r\t step", .expected = "build \r\t step"},
         {.input = "build\n", .expected = "build\n"},
         {.input = "\vbuild\f", .expected = "\vbuild\f"},
         {.input = "build", .expected = "build"},
-        {.input = " \t\r", .expected = ""},
+        {.input = " \t", .expected = ""},
         {.input = "", .expected = ""},
     }};
     for (const TrimCase& kase : kCases)

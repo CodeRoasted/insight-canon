@@ -128,9 +128,9 @@ namespace
             // invariant: EMPTY is a positive statement that this layout declares no functional
             // source — a GitLab trace line carries no component or tag.
             parsed.component = {};
-            // post: content is stored VERBATIM after the peel, CR included — a trailing `\r`
-            // survives on 4.96 % of non-marker stamped lines and is CONTENT there, not a delimiter.
-            // note: measured 170 735 of 3 440 982; normalizing it away is an unmeasured claim
+            // post: content is stored VERBATIM after the peel; the line's ending never reaches
+            // the strategy, and a CR inside the line is content.
+            // refs: DN-134.D13
             parsed.content = arena.store_string(content);
             return std::expected<insight::tokenization::ParsedLine, std::string>{parsed};
         }

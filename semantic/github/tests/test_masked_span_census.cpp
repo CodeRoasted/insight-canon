@@ -311,11 +311,10 @@ TEST(MaskedSpanCensusControl, TheRenderDeltaPredicateAndTheRiskDetectorBothFireA
            "is noise.";
     EXPECT_TRUE(risk_of("Tests \xE2\x9C\x93").non_ascii) << "the non-ASCII flag does not fire";
     EXPECT_TRUE(risk_of("build\rtest").interior_control)
-        << "the interior-control flag does not fire on a CR between two words — and an end-trimmed "
-           "CR is NOT this case: canon's trim set removes those, this flag is for the ones it "
-           "cannot reach.";
-    EXPECT_FALSE(risk_of(trimmed_intent_name("build \r")).interior_control)
-        << "the interior-control flag fires on a CR the trim already removed, so it would charge "
+        << "the interior-control flag does not fire on a CR between two words — a CR a name holds "
+           "is content, since canon removes a line's ending before any name exists (DN-134.D13).";
+    EXPECT_FALSE(risk_of(trimmed_intent_name("build \t")).interior_control)
+        << "the interior-control flag fires on a tab the trim already removed, so it would charge "
            "`ADR-20.D12` clause 1 for a byte clause 1 never renders.";
     EXPECT_TRUE(
         risk_of(std::string{"build"} + std::string{kPhaseSeparator} + "test").carries_separator)
