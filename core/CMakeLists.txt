@@ -148,9 +148,13 @@ add_library(insight::canon ALIAS insight_canon)
 
 # src/ on the private include path so impl units resolve the textual macro layer
 # (#include "insight/utils/log_macros.hpp") and log_macros' fmt/spdlog includes.
+# src/ is BUILD-ONLY, so $<BUILD_INTERFACE:> is load-bearing: bare, install(EXPORT) ships this build
+# folder's absolute path in IMPORTED_CXX_MODULES_INCLUDE_DIRECTORIES, and a gcc consumer under another
+# account fails "Permission denied" on it (1.10.6). The one exported #include (det/) resolves
+# under the installed include/.
 target_include_directories(insight_canon
     PUBLIC  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/api> $<INSTALL_INTERFACE:include>
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>)
 # Public textual macro layer: INSIGHT_LOG_* live in a header (macros can't be exported from a module);
 # downstream consumers `#include <insight/utils/log_macros.hpp>` + `import insight.canon` (accessors).
 
