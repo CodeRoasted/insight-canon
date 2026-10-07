@@ -41,7 +41,7 @@ std::expected<ParsedLine, std::string> ProxifierStrategy::parse(std::string_view
     parsed_line.raw_line = line;
     // invariant: the prefix carries a month-day pair and a clock but NO YEAR, so it is the yearless
     // species and the stream decides its year, never this strategy.
-    // refs: DN-137.D1
+    // refs: ADR-16.D16
     parsed_line.timestamp = EventTime::yearless(utils::parse_proxifier_stamp(line));
     parsed_line.level = EventLevel{};
     parsed_line.component = process;

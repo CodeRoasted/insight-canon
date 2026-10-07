@@ -238,7 +238,7 @@ std::vector<KVStrategy::KVPair> KVStrategy::extract_pairs(std::string_view line)
     return pairs;
 }
 
-// refs: DN-137.D1
+// refs: ADR-16.D16
 EventTime KVStrategy::try_parse_timestamp(std::string_view value)
 {
     if (auto parsed_ts{utils::parse_iso8601(value)})

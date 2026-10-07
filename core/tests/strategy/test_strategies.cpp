@@ -57,7 +57,7 @@ TEST_F(SyslogStrategyTest, ParsesBSDLine)
 
 // invariant: the BSD stamp parses as the YEARLESS species — never an instant, which would need a
 // year the bytes do not carry; the stream resolves it.
-// refs: DN-137.D1
+// refs: ADR-16.D16
 TEST_F(SyslogStrategyTest, ParsesBSDLineTimestampAsYearless)
 {
     auto result{strategy.parse(kBSDLine, arena)};

@@ -975,7 +975,7 @@ struct CanonicalEvent
     EventID id{};
     // invariant: nullopt iff the line carries no event time canon could read or resolve; a real
     // 1970-01-01T00:00:00Z is a present value, never a sentinel for absent.
-    // refs: DN-137.D1, DN-137.D4
+    // refs: ADR-16.D16
     std::optional<Timestamp> timestamp;
     // invariant: true iff the producer DECLARED the time in a schema event-time field; false for
     // every line whose time was parsed from ambiguous bytes or absent.
@@ -1089,7 +1089,7 @@ using ProjectionColumns = std::array<std::string, kProjectionMembers.size()>;
 // invariant: the rendering is injective per member, which lets a digest of a column stand for it.
 // invariant: its unit pins CanonicalEvent's member count to kProjectionMembers at compile time, so
 // a new member does not compile until it is rendered.
-// refs: DN-137.D7
+// refs: ADR-16.D16
 void render_projection(const CanonicalEvent& event, ProjectionColumns& out);
 
 } // namespace insight::tokenization
@@ -1503,7 +1503,7 @@ export namespace insight::utils
 // the year the stream resolves is decided by resolve_yearless.
 // invariant: the millisecond is the finest grain any yearless format here writes (logcat); BSD
 // syslog and Proxifier write whole seconds, so their remainder is 0.
-// refs: DN-137.D1
+// refs: ADR-16.D16
 struct YearlessStamp
 {
     std::uint8_t month{0};
@@ -1599,19 +1599,19 @@ namespace detail
 
 // post: the month, day and clock of a BSD syslog (RFC 3164) stamp `Mmm dd hh:mm:ss`, which
 // carries no year; nullopt when the bytes are not one or name a day no year has.
-// refs: DN-137.D1
+// refs: ADR-16.D16
 [[nodiscard]] std::optional<YearlessStamp>
 parse_bsd_syslog_ts(std::string_view timestamp_str) noexcept;
 
 // post: the month, day and clock of an Android logcat stamp `MM-DD hh:mm:ss.mmm`, milliseconds
 // kept; nullopt when the bytes are not one or name a day no year has.
-// refs: DN-137.D1
+// refs: ADR-16.D16
 [[nodiscard]] std::optional<YearlessStamp>
 parse_logcat_stamp(std::string_view timestamp_str) noexcept;
 
 // post: the month, day and clock of a Proxifier stamp `[MM.DD hh:mm:ss]`, the bracket included;
 // nullopt when the bytes are not one or name a day no year has.
-// refs: DN-137.D1
+// refs: ADR-16.D16
 [[nodiscard]] std::optional<YearlessStamp>
 parse_proxifier_stamp(std::string_view timestamp_str) noexcept;
 
@@ -1620,7 +1620,7 @@ parse_proxifier_stamp(std::string_view timestamp_str) noexcept;
 // post: a candidate whose day does not exist in its year is excluded, and nullopt means none
 // exists or none is representable.
 // invariant: a pure function of its two operands — no clock, no state.
-// refs: DN-137.D2
+// refs: ADR-16.D16
 [[nodiscard]] std::optional<Timestamp> resolve_yearless(YearlessStamp stamp,
                                                         Timestamp reference) noexcept;
 

@@ -1,6 +1,6 @@
 // invariant: the two halves of a yearless stamp's reading that need no stream — the stamp parsers
 // and the nearest-candidate rule — each asserted on literal values, no clock, no RNG.
-// refs: DN-137.D1, DN-137.D2
+// refs: ADR-16.D16
 #include <gtest/gtest.h>
 
 import insight.canon.test;

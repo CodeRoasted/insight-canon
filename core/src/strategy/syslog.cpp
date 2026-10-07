@@ -111,7 +111,7 @@ std::expected<ParsedLine, std::string> SyslogStrategy::parse(std::string_view li
 
     ParsedLine parsed_line;
     parsed_line.raw_line = line;
-    // refs: DN-137.D1
+    // refs: ADR-16.D16
     parsed_line.timestamp = header->bsd
                                 ? EventTime::yearless(utils::parse_bsd_syslog_ts(header->stamp))
                                 : EventTime::parsed(utils::parse_iso8601(header->stamp));

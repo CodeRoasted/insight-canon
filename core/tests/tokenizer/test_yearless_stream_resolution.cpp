@@ -1,7 +1,7 @@
 // invariant: a yearless stamp takes its year from the stream's previous event time and is absent
 // before one — asserted at the TOKENIZER grain, the one object that holds a stream's state.
 // invariant: determinism — literal lines, one tokenizer per case, no wall clock, no RNG.
-// refs: DN-137.D2
+// refs: ADR-16.D16
 #include <gtest/gtest.h>
 
 import insight.canon.test;

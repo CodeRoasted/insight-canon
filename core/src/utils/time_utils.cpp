@@ -31,7 +31,7 @@ namespace time_constants
     inline constexpr std::size_t kIso8601MinLength{19};
     inline constexpr std::size_t kBsdSyslogMinLength{15};
     // invariant: `MM-DD hh:mm:ss.mmm` and `[MM.DD hh:mm:ss]`, the two yearless stamps besides BSD.
-    // refs: DN-137.D1
+    // refs: ADR-16.D16
     inline constexpr std::size_t kLogcatStampLength{18};
     inline constexpr std::size_t kProxifierStampLength{16};
     inline constexpr std::int64_t kMillisPerSecond{1000};
@@ -193,7 +193,7 @@ namespace
 
     // post: the stamp the fields name, or nullopt when a clock field is out of range or the day
     // exists in no year — a refusal, never a normalised neighbour.
-    // refs: DN-137.D1
+    // refs: ADR-16.D16
     std::optional<YearlessStamp> make_yearless(int month, int day, int hour, int minute, int second,
                                                int millisecond) noexcept
     {
@@ -338,7 +338,7 @@ std::optional<Timestamp> parse_iso8601(std::string_view timestamp_str) noexcept
     return std::chrono::system_clock::from_time_t(parsed_time);
 }
 
-// refs: DN-137.D1
+// refs: ADR-16.D16
 std::optional<YearlessStamp> parse_bsd_syslog_ts(std::string_view timestamp_str) noexcept
 {
     if (timestamp_str.size() < time_constants::kBsdSyslogMinLength)
@@ -379,7 +379,7 @@ std::optional<YearlessStamp> parse_bsd_syslog_ts(std::string_view timestamp_str)
     return make_yearless(month, day, hour, minute, second, 0);
 }
 
-// refs: DN-137.D1
+// refs: ADR-16.D16
 std::optional<YearlessStamp> parse_logcat_stamp(std::string_view timestamp_str) noexcept
 {
     if (timestamp_str.size() < time_constants::kLogcatStampLength)
@@ -398,7 +398,7 @@ std::optional<YearlessStamp> parse_logcat_stamp(std::string_view timestamp_str) 
     return make_yearless(month, day, hour, minute, second, millisecond);
 }
 
-// refs: DN-137.D1
+// refs: ADR-16.D16
 std::optional<YearlessStamp> parse_proxifier_stamp(std::string_view timestamp_str) noexcept
 {
     if (timestamp_str.size() < time_constants::kProxifierStampLength)
@@ -416,7 +416,7 @@ std::optional<YearlessStamp> parse_proxifier_stamp(std::string_view timestamp_st
     return make_yearless(month, day, hour, minute, second, 0);
 }
 
-// refs: DN-137.D2
+// refs: ADR-16.D16
 std::optional<Timestamp> resolve_yearless(YearlessStamp stamp, Timestamp reference) noexcept
 {
     const auto reference_day{std::chrono::floor<std::chrono::days>(reference)};

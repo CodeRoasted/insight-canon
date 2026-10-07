@@ -47,7 +47,7 @@ struct Tokenizer::Impl
     // whenever `context` is replaced, never left viewing a previous one.
     StreamContext context;
     std::vector<DeclaredRun> runs;
-    // refs: DN-137.D2
+    // refs: ADR-16.D16
     // invariant: the event time of the last line on this stream that had one — the year source of
     // a yearless stamp; reset with the declared context, so one stream never reads another's.
     std::optional<Timestamp> year_reference;
@@ -75,7 +75,7 @@ struct Tokenizer::Impl
                           context.values.size(), runs.size());
     }
 
-    // refs: DN-137.D2
+    // refs: ADR-16.D16
     // post: an instant passes through and becomes the reference; a yearless stamp takes the year
     // nearest the reference and becomes it in turn.
     // post: before any reference, or with no candidate, the time is absent and the reference stays.

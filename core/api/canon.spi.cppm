@@ -49,7 +49,7 @@ class EventTime
     // post: the YEARLESS species — a stamp whose format writes no year; it is not an instant, so
     // has_value() is false and no reader can take it for one.
     // invariant: the stream resolves it before the event is built, so it never leaves canon.
-    // refs: DN-137.D1, DN-137.D2
+    // refs: ADR-16.D16
     [[nodiscard]] static EventTime yearless(std::optional<utils::YearlessStamp> stamp) noexcept
     {
         EventTime out;
