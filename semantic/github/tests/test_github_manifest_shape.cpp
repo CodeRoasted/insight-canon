@@ -24,7 +24,7 @@ TEST(GithubManifestShape, ShipsTheDeclaredRulesetShapeAndNothingElse)
         << version;
 
     EXPECT_EQ(roles.size(), 8U) << "structural-role rows — six announced markers and two Progress "
-                                   "shapes (DN-134.D9), actual: "
+                                   "shapes (ADR-17.D14), actual: "
                                 << roles.size();
     EXPECT_EQ(markers.size(), 7U) << "intent-marker rows, actual: " << markers.size();
     EXPECT_EQ(emits.size(), 7U)

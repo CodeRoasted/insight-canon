@@ -1,7 +1,7 @@
 // invariant: the SHAPE role-row kind over SYNTHETIC rows, so the mechanism is vocabulary-free:
 // its matcher, its precedence, its fence, its place in the identity and the duplicate check.
 // invariant: the declared shapes are proven in the github and package_managers suites.
-// refs: DN-134.D9, ADR-17.D4
+// refs: ADR-17.D14, ADR-17.D4
 #include <gtest/gtest.h>
 
 import insight.canon.test;

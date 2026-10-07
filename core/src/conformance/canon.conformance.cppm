@@ -145,7 +145,7 @@ namespace
 
     // post: a line the role row fires on: a prefix row's key plus the probe payload, or a shape
     // row's bytes with every hole filled by one digit.
-    // refs: DN-134.D9
+    // refs: ADR-17.D14
     [[nodiscard]] std::string role_probe_for(const StructuralRoleRow& row)
     {
         if (row.match == RoleMatchKind::Prefix)
@@ -458,7 +458,7 @@ namespace
                 return {.name = "grammar.empty_role",
                         .passed = false,
                         .detail = "a structural-role row has an empty prefix."};
-        // refs: DN-134.D9
+        // refs: ADR-17.D14
         for (const StructuralRoleRow& row : manifest.roles)
             if (!role_row_well_formed(row))
                 return {.name = "grammar.role_row",

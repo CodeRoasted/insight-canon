@@ -371,7 +371,7 @@ enum class LocationMatchKind : std::uint8_t
 
 // invariant: a CLOSED enum selecting how a role row's bytes match a line; a new kind is a
 // grammar-version bump, part of the identity.
-// refs: ADR-17.D4, ADR-2.D7, DN-134.D9
+// refs: ADR-17.D4, ADR-2.D7, ADR-17.D14
 enum class RoleMatchKind : std::uint8_t
 {
     // invariant: the line's content starts with the bytes.
@@ -395,7 +395,7 @@ struct StructuralRoleRow
     // invariant: filtered into the stream view once, at resolution, and never consulted per line.
     // refs: ADR-22.D6
     std::string_view dialect_gate{kAnyDialect};
-    // refs: DN-134.D9
+    // refs: ADR-17.D14
     RoleMatchKind match{RoleMatchKind::Prefix};
 };
 
@@ -438,7 +438,7 @@ namespace detail
 // hole or a decimal point leading into a digit, and a greedy hole is therefore exact.
 // post: whether `content`, its trailing whitespace trimmed, is `shape` with every hole replaced by
 // a decimal number; a scan without backtracking, linear in the content.
-// refs: DN-134.D9
+// refs: ADR-17.D14
 [[nodiscard]] constexpr bool shape_matches(std::string_view shape,
                                            std::string_view content) noexcept
 {
@@ -469,7 +469,7 @@ namespace detail
 // post: a shape has a hole, no other brace, no trailing whitespace, and no hole against a digit,
 // a hole or a decimal point leading into either.
 // invariant: malf's dialect codegen refusals, held here for a package the generator never sees.
-// refs: DN-134.D9, ADR-17.D4
+// refs: ADR-17.D14, ADR-17.D4
 [[nodiscard]] constexpr bool role_row_well_formed(const StructuralRoleRow& row) noexcept
 {
     if (row.prefix.empty())

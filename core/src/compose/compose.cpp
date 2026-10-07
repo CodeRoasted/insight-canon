@@ -177,7 +177,7 @@ namespace
     // refs: ADR-17.D4
     // invariant: a shape role row shadows nothing and is shadowed by nothing: it claims the whole
     // content and wins over every prefix row, so a prefix relation between its bytes means nothing.
-    // refs: ADR-17.D4, DN-134.D9
+    // refs: ADR-17.D4, ADR-17.D14
     template <typename Row>
     void note_shadows(std::span<const Row> rows, std::string_view kind, CompositionReport& report)
     {

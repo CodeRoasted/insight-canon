@@ -164,7 +164,7 @@ dialect:
           - "transfers, so its count is the transfer's duration and its values are instantaneous."
           - "The event it samples is carried by content lines of its own (`Cache restored from"
           - "key`, `Cache not found`), so leaving the samples out of a comparison drops no event."
-          - "The rule and the qualification test are DN-134.D9's."
+          - "The rule and the qualification test are ADR-17.D14's."
           - ""
           - "A SHAPE, never a prefix: `Received ` opens unrelated lines (`Received 200 OK`,"
           - "`Received 3 of 5 files`). Measured on the three CI-log views (26 234 logs): 204 958"

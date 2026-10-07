@@ -408,7 +408,7 @@ namespace detail
     // invariant: keyed on the shared `prefix` and `dialect_gate` members, which roles, markers and
     // level-lifts all carry.
     // invariant: a role row is keyed on its match kind too: a shape and a prefix are two rules.
-    // refs: DN-134.D9
+    // refs: ADR-17.D14
     template <typename Row>
     [[nodiscard]] constexpr std::optional<std::string_view>
     first_prefix_dup(std::span<const SemanticPackageManifest> packages,

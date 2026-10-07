@@ -32,7 +32,7 @@ packages:
     source_public: true
     release: true
     depends: [insight_canon]
-  # The package managers' vocabulary (DN-134.D9): dialect-independent like test_frameworks, its rows
+  # The package managers' vocabulary (ADR-17.D14): dialect-independent like test_frameworks, its rows
   # projected from package_managers.dialect.yaml as github's are.
   insight_semantic_package_managers:
     path: semantic/package_managers

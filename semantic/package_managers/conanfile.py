@@ -14,7 +14,7 @@ class InsightSemanticPackageManagersConan(ConanFile):
     url = "https://github.com/CodeRoasted/insight-canon"
     description = (
         "InSight Canon semantic package: the package managers' vocabulary (ADR-17.D1, "
-        "DN-134.D9). Dialect-independent structural-role rows in the closed canon rule grammar "
+        "ADR-17.D14). Dialect-independent structural-role rows in the closed canon rule grammar "
         "(pnpm's install-progress gauge as a Progress shape), data only, no code tier. "
         "Statically composed into a binary via insight::semantic::compose()."
     )

@@ -2,7 +2,7 @@
 // take the Progress role, and which lines sharing its bytes stay content, home with the row.
 // invariant: every row is dialect-independent, so each arm holds on a stream declaring nothing and
 // on one declaring a CI dialect alike.
-// refs: DN-134.D9
+// refs: ADR-17.D14
 #include <gtest/gtest.h>
 
 import std;

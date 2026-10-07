@@ -758,7 +758,7 @@ enum class StructuralRole : uint8_t
     // progress, whose event its own content lines carry; declared by an exact whole-line shape.
     // invariant: canon emits the line and its template unchanged and only names the role; a
     // consumer that compares content leaves the line out, and the MetaLog carries it.
-    // refs: DN-134.D9
+    // refs: ADR-17.D14
     Progress
 };
 

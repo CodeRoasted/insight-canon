@@ -36,7 +36,7 @@ dialect:
       - "Rows are extended only on measured evidence, as the GitHub dialect's markers are: a"
       - "producer joins with the census that qualified it. Bazel's analysis progress and pnpm"
       - "behind a task-runner or BuildKit prefix pass the Progress test but carry no row to"
-      - "remove, so they are not declared (DN-134.D9)."
+      - "remove, so they are not declared (ADR-17.D14)."
     rows:
       - shape: "Progress: resolved {n}, reused {n}, downloaded {n}, added {n}"
         role: Progress
@@ -47,7 +47,7 @@ dialect:
           - "install's duration and its values are instantaneous. The event is carried by pnpm's"
           - "own content lines, the `, done` summary and `Packages:`, so leaving the samples out"
           - "of a comparison drops no event. The rule and its qualification test are"
-          - "DN-134.D9's."
+          - "ADR-17.D14's."
           - ""
           - "A SHAPE, never a prefix: the `, done` summary opens with the same bytes and is"
           - "content. Every measured line of this shape sits in a step that installs with pnpm;"

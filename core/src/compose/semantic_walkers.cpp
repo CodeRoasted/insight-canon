@@ -167,7 +167,7 @@ namespace tokenization
     // among rows of one kind the longest declared bytes win.
     // invariant: two shape rows of one length both matching a line keep the first in composed
     // order, which is canonical, so the answer never depends on declaration or link order.
-    // refs: ADR-17.D1, ADR-17.D4, ADR-22.D6, DN-134.D9
+    // refs: ADR-17.D1, ADR-17.D4, ADR-22.D6, ADR-17.D14
     StructuralRole classify(NormalizedContent content,
                             const insight::semantic::ComposedSemantics& composed) noexcept
     {

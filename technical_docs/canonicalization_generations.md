@@ -611,7 +611,7 @@ its UUID as a param, and `MaskRuleGolden.EveryWholeTokenWildcardIsBoundToItsPara
 witness's params against its whole-token wildcards; `StatelessTemplate.AWholeTokenWildcardIsAParamAndEveryParamIsOne`
 pins the whole UUID, an embedded one (`run-<uuid>.log`, no param), a literal `<*>` and a UUID before a latency.
 Measured through the public determinism proof over three private CI-log views (coderoast-corpora `4997b9a`, registered
-before the build, and re-measured on the base after `DN-134.D9` and `DN-134.D1` landed, `6f54f30`): every event's template byte-identical; 0 events breaking the binding, against 9 237, 9 234 and
+before the build, and re-measured on the base after `ADR-17.D14` and `DN-134.D1` landed, `6f54f30`): every event's template byte-identical; 0 events breaking the binding, against 9 237, 9 234 and
 20 036 before; params moved on exactly the 63, 62 and 132 templates that carried a param-less whole-token `<*>`,
 each to the predicted list.
 

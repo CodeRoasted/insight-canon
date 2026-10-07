@@ -1,6 +1,6 @@
 ###########################################################
 #  insight_semantic_package_managers — the package managers' vocabulary, a dialect-independent
-#  data-only semantic package (ADR-17.D8, DN-134.D9). ONE module interface unit
+#  data-only semantic package (ADR-17.D8, ADR-17.D14). ONE module interface unit
 #  (insight.semantic.package_managers, a thin wrapper around the projection of
 #  package_managers.dialect.yaml), no code tier, and NO partitions (the
 #  cross-package BMI closure must not deepen — ADR-17.D8 / the named-modules hazard family).

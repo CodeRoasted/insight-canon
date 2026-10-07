@@ -77,7 +77,7 @@ TEST(GithubRoles, NoFalseRoleOnPlainContent)
 
 // invariant: the actions/cache toolkit's two transfer gauges take Progress on a stream declaring
 // github, and lines sharing their opening bytes stay content.
-// refs: DN-134.D9
+// refs: ADR-17.D14
 TEST(GithubRoles, TheCacheTransferGaugesTakeProgress)
 {
     const ComposedSemantics gh{github_only()};
@@ -100,7 +100,7 @@ TEST(GithubRoles, TheCacheTransferGaugesTakeProgress)
 
 // invariant: the gauges are gated to this package, unlike the announced markers: a stream that
 // declares no dialect reads them as content.
-// refs: DN-134.D9, ADR-22.D6
+// refs: ADR-17.D14, ADR-22.D6
 TEST(GithubRoles, TheCacheTransferGaugesAreGatedToGithub)
 {
     EXPECT_EQ(insight::to_string(classify(norm_probe("Received 1 of 2 (50.0%), 3.0 MBs/sec"),

@@ -1,4 +1,4 @@
-// refs: ADR-17, ADR-17.D1, DN-134.D9
+// refs: ADR-17, ADR-17.D1, ADR-17.D14
 // invariant: the ruleset is `package_managers.dialect.yaml`; this unit is its module purview and
 // declares no row of its own, and the package has no code tier.
 // refs: DN-17.D19
