@@ -534,7 +534,7 @@ item=book;total=$18 placed` → `order item=book;total=$<*> placed`) and literal
 build, `c210757` measured): distinct templates over every non-empty line 295 919 → 294 801, 260 830 → 259 850 and
 3 295 874 → 3 269 858; J rewrites 386, 386 and 6 639 lines.
 
-**K's extent (DN-134.D11), a further change in the same window.** K no longer masks a value to its segment's end: it
+**K's extent (ADR-16.D15), a further change in the same window.** K no longer masks a value to its segment's end: it
 masks the value's EXTENT, from its first digit over `[A-Za-z0-9._+%-]` and any `<*>` an earlier composite wrote,
 across one `,` `:` or `/` directly followed by a digit or `<*>`. The rest of the segment is swallowed when it is only
 wrapper closers and `,;:.`, and is otherwise kept byte for byte behind `<*>`; the status carve-out reads the extent.
@@ -548,7 +548,7 @@ views and the Jenkins marker corpus v2 (coderoast-corpora `72398a7` registered b
 move (10 templates renamed, 0 split, 0 merged; distinct templates 254 756, 221 075 and 2 797 262 unchanged), and
 1 Jenkins line; `JenkinsBareNullGate` moves 1 of 82 traces.
 
-**The kv-value rule's extent (DN-134.D15), a further change in the same window.** The kv-value rule no longer masks a
+**The kv-value rule's extent (ADR-16.D15), a further change in the same window.** The kv-value rule no longer masks a
 value to its token's end: it masks the value over the same EXTENT as K, through ONE value disposition both rules call
 (the currency marker, the digit-leading gate with its optional sign, the extent, the status carve-out read on the
 extent, and the bytes written). A remainder of only wrapper closers and `,;:.` is swallowed as before; any other
@@ -659,13 +659,13 @@ arm: 3 617 → 263, 3 433 → 234 and 32 179 → 547.
 
 **It rides `-17`.**
 
-### Rider — a line's ending is removed at canon's doors, and is never content (DN-134.D13)
+### Rider — a line's ending is removed at canon's doors, and is never content (ADR-21.D6)
 
 **What changed.** A line is the bytes a consumer hands canon in one call; its ending is the maximal run of carriage
 returns closing them. Canon removes it, through the one exported `without_line_ending`, at its three doors: inside
 `normalize` on the raw bytes before the escape scan, at the entry of `LogParser::parse_line`, and at the entry of
 `LogParser::parse_stable`. A carriage return followed by any byte, an escape byte included, is content and stays. K's
-token-final carriage-return clause (`DN-134.D11`) became unreachable and is deleted, and the carriage return leaves the
+token-final carriage-return clause (`ADR-16.D15`) became unreachable and is deleted, and the carriage return leaves the
 intent trim set, since no name ends in a line ending any more.
 
 **Which serialized fields move.** None for a consumer that already framed a line without one final carriage return,

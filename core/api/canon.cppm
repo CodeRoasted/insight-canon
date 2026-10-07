@@ -104,7 +104,7 @@ class Tokenizer
     [[nodiscard]] std::expected<CanonicalEvent, std::string>
     process_line(std::string_view raw_line);
 
-    // refs: ADR-21.D1, ADR-21.D4, DN-134.D13
+    // refs: ADR-21.D1, ADR-21.D4, ADR-21.D6
     // invariant: THE STABLE DOOR performs NO stage 1 at all, deliberately, so its answers — the
     // projection, the level lift, the role, the marker — are functions of the caller's bytes.
     // invariant: it removes their line ending, as every door does, so the engine's streaming ingest

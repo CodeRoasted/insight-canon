@@ -228,7 +228,7 @@ namespace
 }
 } // namespace
 
-// refs: ADR-20.D12, DN-134.D13
+// refs: ADR-20.D12, ADR-21.D6
 // invariant: canon's intent trim is ONE definition with three consumers, so its byte set is pinned
 // at the definition's own suite — a consumer that calls it can no longer guard it by comparison.
 // invariant: exactly space and tab, from BOTH ends and nowhere else — an interior byte of the set

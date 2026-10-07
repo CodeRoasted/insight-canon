@@ -72,7 +72,7 @@ namespace
             return NumericClaim{.mask = kDigitMask, .end = pos};
         return std::nullopt;
     }
-    // refs: ADR-20.D12, DN-134.D13
+    // refs: ADR-20.D12, ADR-21.D6
     // invariant: ONE definition, because the class and the discriminant are complements —
     // different trim sets would disagree about where a name starts.
     // invariant: no CR: canon removes a line's ending at its doors, so a CR in a name is content.

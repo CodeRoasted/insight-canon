@@ -1256,7 +1256,7 @@ TEST(StatelessTemplate, AWholeTokenWildcardIsAParamAndEveryParamIsOne)
     }
 }
 
-// refs: DN-134.D2, DN-134.D11, DN-134.D13
+// refs: DN-134.D2, ADR-16.D15, ADR-21.D6
 // invariant: kv_value's disposition applies to each `;`-segment of a token's normal form, a
 // non-claiming step after the composites and the literal KEEP.
 // invariant: it masks a digit-leading value over its number's extent and contributes no param.
@@ -1284,13 +1284,13 @@ TEST(StatelessTemplate, TheSegmentStepMasksEachKeyValueSegmentOfANormalForm)
     expect("item=book;total=$18", "item=book;total=$<*>");
     expect("id=a;status=2000", "id=a;status=<*>");
     // invariant: a value masks over its number's EXTENT, and a remainder that is not only closers
-    // and trailing punctuation stays literal behind the wildcard (DN-134.D11).
+    // and trailing punctuation stays literal behind the wildcard (ADR-16.D15).
     expect("Import-Package=okio;version=1.15,javax.annotation;version=1.3,*",
            "Import-Package=okio;version=<*>,javax.annotation;version=<*>,*");
     expect(R"("FREQ=DAILY;BYSECOND=0"\nmodel)", R"("FREQ=DAILY;BYSECOND=<*>"\nmodel)");
     expect("id=a;n=5&amp;m=6", "id=a;n=<*>&amp;m=<*>");
     // invariant: the extent controls — closers and `,;:.` are swallowed, a list stays one value,
-    // and a CR handed to the masker is content: the line's ending never reaches it (DN-134.D13).
+    // and a CR handed to the masker is content: the line's ending never reaches it (ADR-21.D6).
     expect("##[end-action id=build;outcome=success;duration_ms=12]",
            "##[end-action id=build;outcome=success;duration_ms=<*>");
     expect("id=a;q=0.9,", "id=a;q=<*>");
@@ -1298,7 +1298,7 @@ TEST(StatelessTemplate, TheSegmentStepMasksEachKeyValueSegmentOfANormalForm)
     expect("id=a;n=5]\r", "id=a;n=<*>]\r");
     expect("id=a;n=5]\r,", "id=a;n=<*>]\r,");
     // invariant: kv_value claims a token whose first `=` carries a number, and reads the one value
-    // disposition the step reads, so its remainder stays literal as the step's does (DN-134.D15).
+    // disposition the step reads, so its remainder stays literal as the step's does (ADR-16.D15).
     expect("a;version=1.15,javax.x", "a;version=<*>,javax.x");
     // invariant: the controls — a status value per segment (read on the extent, a closer or CR
     // behind it), a value word, `,` (not a delimiter), a key not letter-led, a segment with no key.
@@ -1308,7 +1308,7 @@ TEST(StatelessTemplate, TheSegmentStepMasksEachKeyValueSegmentOfANormalForm)
         expect(keep, keep);
     EXPECT_EQ(masked("x id=a;n=1 y", arena), masked("x id=a;n=77 y", arena));
     // invariant: a clock and a ratio reach the step as a composite's normal form holding a
-    // wildcard, and the extent reads across it, so each stays one value (DN-134.D11).
+    // wildcard, and the extent reads across it, so each stays one value (ADR-16.D15).
     struct ThroughComposite
     {
         std::string_view token;
@@ -1343,7 +1343,7 @@ TEST(StatelessTemplate, TheSegmentStepMasksEachKeyValueSegmentOfANormalForm)
                                   << "\n  2.0:  " << bumped;
 }
 
-// refs: DN-134.D15, DN-134.D11, LSRC-14
+// refs: ADR-16.D15, LSRC-14
 // invariant: kv_value masks its value over the number's extent through the one disposition the
 // segment step reads, and a remainder that is not only closers and `,;:.` stays literal.
 // invariant: the status carve-out reads the extent, and the rule contributes no param.
@@ -1356,7 +1356,7 @@ TEST(StatelessTemplate, KvValueMasksOverItsNumbersExtentThroughTheOneDisposition
             arena.reset();
             const StatelessTemplate got{stateless_template(line, arena, cfg(), {})};
             EXPECT_EQ(got.template_str, want)
-                << "kv_value over its number's extent (DN-134.D15).\n  line:     " << line
+                << "kv_value over its number's extent (ADR-16.D15).\n  line:     " << line
                 << "\n  expected: " << want << "\n  actual:   " << got.template_str;
             EXPECT_TRUE(got.params.empty()) << "kv_value contributes no param.\n  line: " << line
                                             << "\n  params: " << got.params.size();
@@ -1406,7 +1406,7 @@ TEST(StatelessTemplate, KvValueMasksOverItsNumbersExtentThroughTheOneDisposition
         const std::string_view after_step{
             std::string_view{by_step}.substr(std::min(by_step.rfind("k=") + 2, by_step.size()))};
         EXPECT_EQ(after_kv, after_step)
-            << "kv_value and the segment step disagree on one value (DN-134.D15).\n  value:    "
+            << "kv_value and the segment step disagree on one value (ADR-16.D15).\n  value:    "
             << value << "\n  kv_value: " << by_kv_value << "\n  step:     " << by_step;
     }
 }

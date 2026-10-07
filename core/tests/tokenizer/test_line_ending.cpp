@@ -3,7 +3,7 @@
 // invariant: the doors are `normalize()` on the raw bytes before its escape scan, the entry of
 // `LogParser::parse_line`, and the entry of `LogParser::parse_stable`.
 // invariant: a CR followed by any byte, an escape byte included, is content and stays.
-// refs: DN-134.D13, DN-134.D14
+// refs: ADR-21.D6, DN-134.D14
 #include <gtest/gtest.h>
 
 import insight.canon.test;

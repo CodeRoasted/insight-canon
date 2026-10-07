@@ -130,7 +130,7 @@ namespace
             parsed.component = {};
             // post: content is stored VERBATIM after the peel; the line's ending never reaches
             // the strategy, and a CR inside the line is content.
-            // refs: DN-134.D13
+            // refs: ADR-21.D6
             parsed.content = arena.store_string(content);
             return std::expected<insight::tokenization::ParsedLine, std::string>{parsed};
         }

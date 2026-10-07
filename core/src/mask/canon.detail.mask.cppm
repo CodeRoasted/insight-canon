@@ -119,7 +119,7 @@ namespace rule_catalog
     // post: the normal form the claiming composite rule gives `token`, before the non-claiming
     // steps; empty when the layer declines it.
     // note: exposed so a witness asserts the form a later step reads instead of restating it.
-    // refs: DN-134.D11
+    // refs: ADR-16.D15
     [[nodiscard]] std::string composite_normal_form(std::string_view token);
 
     // post: the status lexicon that gates the KEEP carve-out and its key-value form, lowercase.

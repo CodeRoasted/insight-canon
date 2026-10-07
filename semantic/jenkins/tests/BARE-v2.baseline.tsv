@@ -56,17 +56,17 @@
 #   columns are unchanged on 22 and distinct_templates falls by 2 to 4 on 4 (lines that differed
 #   only in a shelled number now share a template).
 # re-emitted 2026-10-06: 1 row, from the CURRENT purified chain at the W471 commit (the child of
-#   insight-canon d9db026 that lands DN-134.D11: a rule-K value masks over its number's extent, not to
+#   insight-canon d9db026 that lands ADR-16.D15: a rule-K value masks over its number's extent, not to
 #   its `;`-segment's end) on linux-clang21-libcxx-release, via the gate's own REBASELINE-ROW patch output. Same corpus,
 #   same REGISTRY pin ae5f19f1. CONDITION MET: the movement was REGISTERED before the code
 #   (coderoast-corpora 72398a7, kv_value_extent_build_w471/REGISTRATION_CR.md R2: exactly this trace,
 #   one line, produced_lines and distinct_templates unchanged) and measured so: 1 of 82 moved, 81
 #   byte-identical, 52570/52570 lines, 22209/22209 templates; gcc16-release green on the same file.
 #   The one line carries a bundle `Import-Package` header whose imported package names the K step
-#   masked into `version=<*>`; DN-134.D11 keeps them, judged a CORRECT repair of a false merge. The row
+#   masked into `version=<*>`; ADR-16.D15 keeps them, judged a CORRECT repair of a false merge. The row
 #   re-emitted is builds_apache_org/job_Brooklyn_job_brooklyn_dist_job_PR_145__56.log.
 # re-emitted 2026-10-06: 5 rows, from the CURRENT purified chain at the W476 commit (the child of
-#   insight-canon 245e93a that lands DN-134.D15: the kv_value rule masks its value over the number's
+#   insight-canon 245e93a that lands ADR-16.D15: the kv_value rule masks its value over the number's
 #   extent through the one value disposition rule K reads, and keeps any other remainder literal behind
 #   <*>) on linux-clang21-libcxx-release, via the gate's own REBASELINE-ROW patch output. Same corpus,
 #   same REGISTRY pin ae5f19f1. CONDITION MET: the movement was REGISTERED before the code
@@ -75,7 +75,7 @@
 #   the two jenkins-test-harness traces) and measured so: 5 of 82 moved, 77 byte-identical. The moved
 #   lines (1 + 1152 + 505 + 578 + 577 = 2813) are the registration's Jenkins v2 moved set: text behind
 #   a kv_value number that the rule dropped (2733 of them predicted token by token by its model, 80 in
-#   projected formats). DN-134.D15 keeps that text, judged a CORRECT repair of a false merge on the
+#   projected formats). ADR-16.D15 keeps that text, judged a CORRECT repair of a false merge on the
 #   Founder's ruling of 2026-10-06 (DN-134.O6 option B). The rows re-emitted are
 #   builds_apache_org/job_Camel_job_Camel_20Core_20_20JDK26_job_main__13.log,
 #   builds_apache_org/job_Camel_job_Camel_20Core_20_Build_20and_20test_job_camel_4_14_x__218.log,

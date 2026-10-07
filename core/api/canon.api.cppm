@@ -123,7 +123,7 @@ parse_template_id(std::string_view rendered) noexcept;
 // two ways.
 // invariant: a Windows runner's CRLF never reaches a name: the CR is the line's ending, which
 // canon removes at its doors, so a CR a name still holds is content.
-// refs: ADR-20.D12, DN-134.D13
+// refs: ADR-20.D12, ADR-21.D6
 [[nodiscard]] std::string_view trimmed_intent_name(std::string_view name) noexcept;
 
 // post: the matrix tuple rendered into the display name, returned VERBATIM as a view; empty when
@@ -1985,7 +1985,7 @@ class NormalizedLine;
 // a CR followed by any byte, an escape byte included, is content and stays.
 // invariant: ONE definition, called at canon's three doors (`normalize`, the parser's line door
 // and its stable door) and by a consumer that frames its own lines, so every reader agrees.
-// refs: DN-134.D13
+// refs: ADR-21.D6
 [[nodiscard]] constexpr std::string_view without_line_ending(std::string_view line) noexcept
 {
     while (line.ends_with('\r'))
@@ -2077,7 +2077,7 @@ constexpr NormalizedContent NormalizedLine::undeclared_suffix(std::size_t offset
 // and bare-ESC sequences removed — as an UNCONDITIONAL content normalization at ingest.
 // invariant: the ending is removed from the RAW bytes before the escape scan, so a CR an escape
 // sequence follows is a terminal redraw and stays.
-// refs: DN-134.D13
+// refs: ADR-21.D6
 // post: a line with no ESC byte BORROWS raw_line, less its ending, with no copy, and scratch is
 // not touched; only an ESC-bearing line rewrites into scratch.
 // invariant: the returned line, every content narrowed from it, and every coordinate a walker

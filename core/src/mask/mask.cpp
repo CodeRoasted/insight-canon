@@ -940,7 +940,7 @@ namespace
 
     // post: true for a byte a number's extent runs over: an ASCII letter or digit, `.`, `_`, `+`,
     // `%` or `-`.
-    // refs: DN-134.D11
+    // refs: ADR-16.D15
     [[nodiscard]] constexpr bool is_extent_byte(char chr) noexcept
     {
         return is_alpha(chr) || is_digit(chr) || chr == '.' || chr == '_' || chr == '+' ||
@@ -949,7 +949,7 @@ namespace
 
     // post: true for a byte the extent crosses only when a digit or a wildcard directly follows it,
     // so a number list, a clock and a ratio stay one value.
-    // refs: DN-134.D11
+    // refs: ADR-16.D15
     [[nodiscard]] constexpr bool is_extent_joint(char chr) noexcept
     {
         return chr == ',' || chr == ':' || chr == '/';
@@ -957,7 +957,7 @@ namespace
 
     // invariant: the remainder is decided WHOLE - swallowed when every byte of it is a wrapper
     // closer or trailing punctuation.
-    // invariant: a CR is content: the line's ending never reaches the masker (DN-134.D13).
+    // invariant: a CR is content: the line's ending never reaches the masker (ADR-21.D6).
     struct ValueExtent
     {
         std::size_t length{0};
@@ -971,7 +971,7 @@ namespace
     // it whole and crosses a joint into it.
     // invariant: one forward pass over fixed ASCII classes and the literal wildcard, so the extent
     // is a pure function of the value's bytes, bit-identical across standard libraries.
-    // refs: DN-134.D11, F-SRC-insight-canon:canon.detail.scan.cppm:kWrapperPairs
+    // refs: ADR-16.D15, F-SRC-insight-canon:canon.detail.scan.cppm:kWrapperPairs
     [[nodiscard]] constexpr ValueExtent value_extent(std::string_view value) noexcept
     {
         std::string_view remainder{value};
@@ -1002,7 +1002,7 @@ namespace
     // value and call it, so the two rules give the same bytes after `=` for the same value.
     // invariant: a remainder the extent leaves unswallowed is appended byte for byte after the
     // wildcard, so a word behind a number stays in the template.
-    // refs: DN-134.D15, DN-134.D11, LSRC-14, ADR-16.D5
+    // refs: ADR-16.D15, LSRC-14, ADR-16.D5
     [[nodiscard]] inline bool append_masked_value(std::string_view key, std::string_view head,
                                                   std::string_view raw_value, std::string& out)
     {
@@ -1027,7 +1027,7 @@ namespace
 
     // post: keeps every byte before the token's first `=` as the key and masks the value through
     // append_masked_value; a value WORD stays literal.
-    // refs: DN-134.D15, LSRC-14, ADR-16.D5
+    // refs: ADR-16.D15, LSRC-14, ADR-16.D5
     [[nodiscard]] inline bool normalize_kv_value(std::string_view tok, std::string& out)
     {
         const std::size_t eq_pos{tok.find('=')};
@@ -1040,7 +1040,7 @@ namespace
 
     // post: appends `seg`, its value masked through append_masked_value when it is `<key>=<value>`
     // with an identifier key (wrapper openers may lead the first segment); true when it masked.
-    // refs: DN-134.D2, DN-134.D15
+    // refs: DN-134.D2, ADR-16.D15
     [[nodiscard]] inline bool append_segment(std::string_view seg, bool first, std::string& out)
     {
         const std::size_t eq_pos{seg.find('=')};

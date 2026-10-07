@@ -212,7 +212,7 @@ literal_keep | /repos/o/r/issues/6656/comments | gh api /repos/o/r/issues/6656/c
 
 # segment_kv — DN-134.D2: kv_value's disposition on each `;`-segment of a token's normal form, a
 # non-claiming step after the composites and the literal KEEP (beside declared_run). A value masks
-# over its number's extent (DN-134.D11): a remainder of closers, `,;:.` and a token-final carriage
+# over its number's extent (ADR-16.D15): a remainder of closers, `,;:.` and a token-final carriage
 # return is swallowed, any other stays literal behind the wildcard. The literal controls: a status
 # value per segment, `,` (not a delimiter).
 segment_kv | id=build;outcome=success;duration_ms=12] | ##[end-action id=build;outcome=success;duration_ms=12] | ##[end-action id=build;outcome=success;duration_ms=<*>

@@ -103,7 +103,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_line(std::string_view ra
 {
     // invariant: the line's ending is removed before anything reads the line, the echoed-source
     // hook included, so a line that is only its ending is an empty line.
-    // refs: DN-134.D13
+    // refs: ADR-21.D6
     raw_line = without_line_ending(raw_line);
     // invariant: an empty line is ordinary input, not a failure — counted as skipped, and still
     // returned as `unexpected` so the caller learns it produced no event.
@@ -207,7 +207,7 @@ std::expected<ParsedLine, std::string> LogParser::parse_stable(std::string_view 
 {
     // invariant: the stable door runs no stage 1 but removes the line's ending, so it reads the
     // line every other door reads; the removal shortens the caller's view and copies nothing.
-    // refs: DN-134.D13, ADR-21.D4
+    // refs: ADR-21.D6, ADR-21.D4
     stable_line = without_line_ending(stable_line);
     if (stable_line.empty())
     {
