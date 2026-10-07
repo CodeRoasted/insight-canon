@@ -239,11 +239,10 @@ namespace
                          "segmenter's own unit. Make the row's kind Step and remove the rest, or "
                          "make it a naming row.\n";
         else
-            std::cerr
-                << "a row that only OPENS a unit opens a job and carries no identity. It "
-                   "needs kind Job, and no payload extractor, version coordinate or payload "
-                   "exclusion: the naming row of its kind that follows names the job. Fix the "
-                   "row, or make it a naming row.\n";
+            std::cerr << "a row that only OPENS a unit opens a job or a step and carries no "
+                         "identity. It needs kind Job or Step, and no payload extractor, version "
+                         "coordinate or payload exclusion: the naming row of its kind that follows "
+                         "names the unit. Fix the row, or make it a naming row.\n";
         std::terminate();
     }
 

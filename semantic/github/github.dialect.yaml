@@ -17,7 +17,7 @@
 
 dialect:
   name: github
-  version: "1.9.0"
+  version: "1.10.0"
   why:
     - "ADR-17.D3 keys identity on CONTENT, not on spelling: `version:` moves when what this package"
     - "RECOGNIZES or EMITS moves — its rows, their gates, or its code tier — and never for a"
@@ -209,10 +209,13 @@ dialect:
           - "holding several jobs they were the previous job's lines, and reordering the jobs"
           - "moved them."
           - ""
-          - "So this row OPENS a job and names nothing; the naming row below names it. It takes"
-          - "effect only when a naming row of its kind follows with no other marker row between,"
-          - "and its lines are then the named job's setup. Another opener, a step marker or the"
-          - "end of input first makes it void, and every line keeps the attribution it had."
+          - "So this row OPENS a job and names nothing; the naming row below names it. A naming"
+          - "row of its kind that follows with no other marker row and no declared error line"
+          - "between names the job from this line on, and its lines are the named job's setup."
+          - "Another opener, a step marker, a declared error line or the end of input first leaves"
+          - "the job it opened UNNAMED: `<unnamed-job>`, origin Opened, holding its lines, so a job"
+          - "that dies before it is named is its own unit and never the previous job's lines"
+          - "(DN-89.D43, DN-89.D47)."
           - ""
           - "Measured on 4 000 run-grain annotated logs: of 15 766 such lines, 15 765 are a job"
           - "segment's first line and 15 209 are followed by a job name with no other marker"
@@ -298,6 +301,41 @@ dialect:
           - ""
           - "The two Step prefixes never shadow: neither is a proper prefix of the other, so the"
           - "composed longest-match note stays empty."
+      - prefix: "Prepare all required actions"
+        kind: Step
+        role: Opens
+        dialect_gate: self
+        channel_gate: annotated
+        why:
+          - "A step's log does not always START at its banner. A step that uses an action the"
+          - "runner has not yet fetched (a local composite action, `uses: ./.github/actions/x`)"
+          - "first prints this line, then `Getting action download info` and `Download action"
+          - "repository …`, and only then its `##[group]Run ` banner. With no row here those lines"
+          - "were the PREVIOUS step's. When the download failed (HTTP 429 / 500 from codeload) the"
+          - "step printed its `##[error]` lines and NO banner, so its failure was reported under"
+          - "the step before it, which the platform lists as passed, or under the next banner,"
+          - "a later step that never ran it."
+          - ""
+          - "So this row OPENS a step and names nothing. Inside a named job, the next step banner,"
+          - "with no other marker row and no declared error line between, names the step from"
+          - "this line on. A declared error line, another marker row or the end of input first"
+          - "leaves it `<unnamed-step>`, origin Opened: a step whose preparation failed is its own"
+          - "unit. Before a job's naming row, or inside `<unnamed-job>`, the line is that job's"
+          - "setup content, as it always was: the runner prints it there for every job."
+          - ""
+          - "Gated to the ANNOTATED channel, and the gate is load-bearing: the stripped channel"
+          - "prints this line but not the `##[error]` marker that tells a failed preparation from a"
+          - "successful one, so an ungated opener would name a failed preparation for the next"
+          - "step there: the same wrong-name defect, one step later."
+          - ""
+          - "Measured on the three CI-log views (26 234 annotated logs and their stripped twins)"
+          - "and the 73 920 annotated logs of the bank: no line starts with this text without"
+          - "being exactly it once the line ending is removed; inside a named job its next marker"
+          - "row is a step banner or `Post job cleanup.`, at most 11 lines later, and the lines"
+          - "between are runner download lines, warnings, errors and the Node-runtime notice."
+          - ""
+          - "⚠ A DECLARED LIMITATION: two different failed preparations in one job pair in order,"
+          - "so the second reads as already failing."
       - prefix: "Post job cleanup."
         kind: Step
         role: Closes

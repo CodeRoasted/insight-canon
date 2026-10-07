@@ -596,11 +596,12 @@ struct IntentMarkerRow
     MarkerRole role{MarkerRole::Names};
 };
 
-// post: true when the row names its unit, or opens a job or closes a job's steps while carrying
-// no identity — no extractor, version coordinate or payload exclusion.
-// invariant: an Opens row is of kind Job, so the unnamed unit an opener leaves has one sentinel
-// to name it; a Closes row is of kind Step, so the epilogue it enters is a step of its job.
-// refs: DN-89.D33, DN-89.D40, DN-89.D43
+// post: true when the row names its unit, or opens a job or a step, or closes a job's steps, while
+// carrying no identity — no extractor, version coordinate or payload exclusion.
+// invariant: an Opens row is of kind Job or Step, so the unnamed unit an opener leaves has one
+// sentinel per kind to name it.
+// invariant: a Closes row is of kind Step, so the epilogue it enters is a step of its job.
+// refs: DN-89.D33, DN-89.D40, DN-89.D43, DN-89.D47
 [[nodiscard]] constexpr bool unit_role_row_admitted(const IntentMarkerRow& row) noexcept
 {
     const bool no_identity{row.extract == PayloadExtract::None && row.version.introducer.empty() &&
@@ -611,7 +612,8 @@ struct IntentMarkerRow
     case MarkerRole::Names:
         return true;
     case MarkerRole::Opens:
-        return no_identity && row.kind == insight::tokenization::IntentMarkerKind::Job;
+        return no_identity && (row.kind == insight::tokenization::IntentMarkerKind::Job ||
+                               row.kind == insight::tokenization::IntentMarkerKind::Step);
     case MarkerRole::Closes:
         return no_identity && row.kind == insight::tokenization::IntentMarkerKind::Step;
     }

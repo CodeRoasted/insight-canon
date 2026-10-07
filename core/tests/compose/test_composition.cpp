@@ -517,9 +517,10 @@ TEST(CompositionDeathTest, ADigitEndingMarkerFailsClosedAtRuntime)
     EXPECT_DEATH((void)compose(kDigitEndingSet), R"(declared value "ticket")");
 }
 
-// refs: DN-89.D43, DN-89.D33
-// invariant: an opening row exists on kind Job only, so the unnamed unit an opener leaves has
-// one sentinel to name it; composition refuses one on any other kind, naming the row.
+// refs: DN-89.D43, DN-89.D33, DN-89.D47
+// invariant: an opening row exists on kind Job and on kind Step, so the unnamed unit an opener
+// leaves has one sentinel per kind to name it.
+// invariant: composition refuses one on any other kind, or one carrying identity, naming the row.
 namespace
 {
 using insight::semantic::MarkerRole;
@@ -541,13 +542,26 @@ constexpr std::array<IntentMarkerRow, 1> kJobOpener{{{.prefix = "Job opened at "
                                                       .extract = PayloadExtract::None,
                                                       .payload_excludes = {},
                                                       .role = MarkerRole::Opens}}};
+constexpr std::array<IntentMarkerRow, 1> kKindlessOpener{{{.prefix = "Unit opened at ",
+                                                           .kind = IntentMarkerKind::None,
+                                                           .child_order = ChildOrder::Ordered,
+                                                           .extract = PayloadExtract::None,
+                                                           .payload_excludes = {},
+                                                           .role = MarkerRole::Opens}}};
+constexpr std::array<IntentMarkerRow, 1> kNamingStepOpener{
+    {{.prefix = "Step opened as ",
+      .kind = IntentMarkerKind::Step,
+      .child_order = ChildOrder::Ordered,
+      .extract = PayloadExtract::RemainderAfterPrefix,
+      .payload_excludes = {},
+      .role = MarkerRole::Opens}}};
 } // namespace
 
-TEST(CompositionDeathTest, AnOpeningRowOnKindStepFailsClosedAtRuntime)
+TEST(CompositionOpeningRow, AnOpeningRowOnKindStepComposes)
 {
     const std::array packages{opener_package(kStepOpener)};
-    EXPECT_DEATH((void)compose(packages), R"(marker row "Step opened at ".*needs kind Job)")
-        << "an opening row on kind Step must be refused, naming the row";
+    const ComposedSemantics composed{compose(packages)};
+    EXPECT_EQ(composed.markers().size(), 1U) << "an opening row on kind Step must compose";
 }
 
 TEST(CompositionOpeningRow, AnOpeningRowOnKindJobComposes)
@@ -556,6 +570,20 @@ TEST(CompositionOpeningRow, AnOpeningRowOnKindJobComposes)
     const ComposedSemantics composed{compose(packages)};
     EXPECT_EQ(composed.markers().size(), 1U)
         << "the control: the same row on kind Job composes, so only the kind decides the refusal";
+}
+
+TEST(CompositionDeathTest, AnOpeningRowOnAKindOtherThanJobAndStepFailsClosedAtRuntime)
+{
+    const std::array packages{opener_package(kKindlessOpener)};
+    EXPECT_DEATH((void)compose(packages), R"(marker row "Unit opened at ".*needs kind Job or Step)")
+        << "an opening row on neither kind Job nor kind Step must be refused, naming the row";
+}
+
+TEST(CompositionDeathTest, AStepOpeningRowCarryingIdentityFailsClosedAtRuntime)
+{
+    const std::array packages{opener_package(kNamingStepOpener)};
+    EXPECT_DEATH((void)compose(packages), R"(marker row "Step opened as ".*needs kind Job or Step)")
+        << "an opening row names nothing, so one with a payload extractor must be refused";
 }
 
 // refs: DN-89.D40
