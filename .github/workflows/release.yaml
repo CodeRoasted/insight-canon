@@ -31,7 +31,7 @@ jobs:
   # release path takes no self-hosted runner it does not need. `BUILD_RECORD_READ_TOKEN` is a
   # fine-grained PAT whose only grant is `Actions: Read-only` on CodeRoasted/coderoast.
   attest:
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-attest.yml@830c46f71e22cd55154dc6c60d896cd56dd0bdd7
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-attest.yml@0286321e46929467f836bbe6259e551155955ccc
     secrets:
       BUILD_RECORD_READ_TOKEN: ${{ secrets.BUILD_RECORD_READ_TOKEN }}
 
@@ -53,23 +53,16 @@ jobs:
   # of lint.yml, where step 0's B4 and a pull request read it early: one script, two coordinates.
   disclosure-set:
     needs: attest
-    # PUBLIC repo: pinned to hosted — a self-hosted runner reachable from a fork PR is an RCE. Never vars.CI_RUNS_ON here.
-    runs-on: ubuntu-latest
     permissions:
       contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # The predicate ranges over every ref: the gate itself fails closed on a partial
-          # fetch (a declared tag absent, or no tag newer than the boundary, is an error).
-          fetch-depth: 0
-          fetch-tags: true
-      - name: OPS-7.O9 — the disclosed historic-exposure ref set is exact and closed
-        run: bash scripts/disclosure_set_lint.sh
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-script-gate.yml@0286321e46929467f836bbe6259e551155955ccc
+    with:
+      gates: bash scripts/disclosure_set_lint.sh
+      full-history: true
 
   release:
     needs: [attest, golden, disclosure-set]
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-release.yml@830c46f71e22cd55154dc6c60d896cd56dd0bdd7
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-release.yml@0286321e46929467f836bbe6259e551155955ccc
     with:
       tag: ${{ github.event.inputs.tag || github.ref_name }}
       # ADR-17.D8: the five semantic vocabulary packages ride the train on the SAME footing as canon
@@ -107,6 +100,6 @@ jobs:
   # Attach the validated golden (produced by the golden gate) to the Release — per-release, not committed.
   attach-golden:
     needs: [attest, release, golden]
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-attach-golden.yml@830c46f71e22cd55154dc6c60d896cd56dd0bdd7
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-attach-golden.yml@0286321e46929467f836bbe6259e551155955ccc
     with:
       asset: canon.det_proof.txt

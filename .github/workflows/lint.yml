@@ -7,55 +7,40 @@ on:
 
 jobs:
   lint:
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-lint.yml@830c46f71e22cd55154dc6c60d896cd56dd0bdd7
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-lint.yml@0286321e46929467f836bbe6259e551155955ccc
     # PUBLIC repo: no runs-on passthrough — a self-hosted runner reachable from a fork PR is an RCE.
     # No `with:` at all: every gate in the reusable workflow defaults TRUE, so a caller that says
     # nothing is fully gated, and a hole would have to be a written line here.
 
-  # ADR-17.D1: canon core is semantic-unaware — no ecosystem literal fused into the
-  # mechanism. Canon-repo-local (the deny-list is canon-specific, so it stays here, not in the shared
-  # reusable lint). Gates PRs directly, and every cut through step 0's B4, which runs this file's
-  # jobs before any tag (ADR-2.D3). Runs no package code — a pure greppable scrub over src/ + api/ —
-  # so it needs only checkout + perl (preinstalled).
+  # canon's own gate scripts, through malf-toolchain's script-gate job (ROADMAP N357). PUBLIC repo: no
+  # runs-on passthrough — the reusable workflow's hosted default.
+  #
+  # ADR-17.D1: canon core is semantic-unaware — no ecosystem literal fused into the mechanism (the
+  # deny-list is canon-specific, so the script stays here). ADR-29.D5 / ADR-20.D19: on both
+  # provenance pairs the seam keeps the plain datum + a separate bool, so each pairing is held by ONE
+  # write site; a second write site fails on the commit that adds it. Every gate runs and each red is
+  # named. Gates PRs directly, and every cut through step 0's B4, which runs this file's jobs before
+  # any tag (ADR-2.D3).
   sp1-semantic-unawareness:
-    # PUBLIC repo: pinned to hosted — a self-hosted runner reachable from a fork PR is an RCE. Never vars.CI_RUNS_ON here.
-    runs-on: ubuntu-latest
     permissions:
       contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: ADR-17.D1 — canon core carries no behavioral ecosystem literal
-        run: bash scripts/sp1_semantic_unawareness_lint.sh
-
-      # ADR-29.D5 / ADR-20.D19 — on both provenance pairs the seam keeps the plain datum + a separate
-      # bool (EventTime/EventLevel deliberately do not cross it), so each pairing is held by ONE
-      # write site. Armed here, not left to review: a second write site fails on the commit that
-      # adds it. Two steps, not a loop — a red must name WHICH pair broke in its own step title.
-      - name: ADR-29.D5 — declared_timestamp has exactly one write site
-        run: bash scripts/provenance_one_write_site_lint.sh declared_timestamp
-      - name: ADR-20.D19 — declared_level has exactly one write site
-        run: bash scripts/provenance_one_write_site_lint.sh declared_level
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-script-gate.yml@0286321e46929467f836bbe6259e551155955ccc
+    with:
+      gates: |
+        bash scripts/sp1_semantic_unawareness_lint.sh
+        bash scripts/provenance_one_write_site_lint.sh declared_timestamp
+        bash scripts/provenance_one_write_site_lint.sh declared_level
 
   # OPS-7.O9: DISCLOSURE.md accepts a CLOSED set of historic refs carrying the LogHub slice; the
-  # disclosure bar is "signed record in-tree + exact-set gate in CI on every publication run".
-  # This is the gate half, and it has two coordinates running one script: release.yaml runs it as a
-  # job of its own on every publication run (its subject is the ref set, the tag being published
-  # included, so ADR-2.D3 keeps it there), and this job gives pull requests and step 0's B4 the
-  # early signal. Exact-set, both directions: a ref outside the set carrying the slice (the
-  # exposure grew) AND a declared ref gone clean (record no longer matches reality) both fail,
-  # naming the ref. The script selftests its red arms on every run. Plain `run:` — never
-  # `if { … } | tee`, which disarms set -e.
+  # disclosure bar is "signed record in-tree + exact-set gate in CI on every publication run". This is
+  # the gate half, at two coordinates running one script: release.yaml runs it on every publication
+  # run (its subject is the ref set, the tag being published included, so ADR-2.D3 keeps it there),
+  # and this job gives pull requests and step 0's B4 the early signal. Exact-set, both directions;
+  # the script selftests its red arms on every run, and fails closed on a partial fetch.
   disclosure-set:
-    # PUBLIC repo: pinned to hosted — a self-hosted runner reachable from a fork PR is an RCE. Never vars.CI_RUNS_ON here.
-    runs-on: ubuntu-latest
     permissions:
       contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # The predicate ranges over every ref: the gate itself fails closed on a partial
-          # fetch (a declared tag absent, or no tag newer than the boundary, is an error).
-          fetch-depth: 0
-          fetch-tags: true
-      - name: OPS-7.O9 — the disclosed historic-exposure ref set is exact and closed
-        run: bash scripts/disclosure_set_lint.sh
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-script-gate.yml@0286321e46929467f836bbe6259e551155955ccc
+    with:
+      gates: bash scripts/disclosure_set_lint.sh
+      full-history: true
