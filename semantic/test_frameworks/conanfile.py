@@ -24,7 +24,7 @@ class InsightSemanticTestFrameworksConan(ConanFile):
     options = {"shared": [True, False], "fPIC": [True, False]}
     default_options = {"shared": False, "fPIC": True}
 
-    exports_sources = "CMakeLists.txt", "src/*"
+    exports_sources = "CMakeLists.txt", "src/*", "tests/*"
 
     def export_sources(self):
         # The export is the TRACKED files under exports_sources, never the disk's (DN-142.D4 (b)):
@@ -63,6 +63,7 @@ class InsightSemanticTestFrameworksConan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+        runpy.run_path(self.conf.get("user.malf:recipe_tests"))["run_tests"](self)
 
     def package(self):
         cmake = CMake(self)

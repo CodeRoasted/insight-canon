@@ -22,7 +22,14 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(INSIGHT_SEMANTIC_GITHUB_BUILD_TESTS "Build unit tests" ${PROJECT_IS_TOP_LEVEL})
+# The test and bench switches default OFF when BUILD_TESTING is defined false, which conan does under
+# tools.build:skip_test: then no test or bench target is configured and no test requirement is looked
+# up (DN-142.D5). Otherwise they follow PROJECT_IS_TOP_LEVEL, as on the desk.
+set(INSIGHT_SEMANTIC_GITHUB_TEST_DEFAULT ${PROJECT_IS_TOP_LEVEL})
+if(DEFINED BUILD_TESTING AND NOT BUILD_TESTING)
+    set(INSIGHT_SEMANTIC_GITHUB_TEST_DEFAULT OFF)
+endif()
+option(INSIGHT_SEMANTIC_GITHUB_BUILD_TESTS "Build unit tests" ${INSIGHT_SEMANTIC_GITHUB_TEST_DEFAULT})
 
 # Pulled in here rather than beside the install rules: CMAKE_INSTALL_INCLUDEDIR is read by the
 # module target's install interface (target_include_directories below), which is declared with the

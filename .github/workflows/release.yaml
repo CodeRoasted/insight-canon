@@ -31,7 +31,7 @@ jobs:
   # release path takes no self-hosted runner it does not need. `BUILD_RECORD_READ_TOKEN` is a
   # fine-grained PAT whose only grant is `Actions: Read-only` on CodeRoasted/coderoast.
   attest:
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-attest.yml@8fbc11ef5350f417ef29294990ebb4d8ffcaa4b2
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-attest.yml@bb2f29950572dd950d6c2056721c7f4bd7a64d9c
     secrets:
       BUILD_RECORD_READ_TOKEN: ${{ secrets.BUILD_RECORD_READ_TOKEN }}
 
@@ -55,14 +55,14 @@ jobs:
     needs: attest
     permissions:
       contents: read
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-script-gate.yml@8fbc11ef5350f417ef29294990ebb4d8ffcaa4b2
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-script-gate.yml@bb2f29950572dd950d6c2056721c7f4bd7a64d9c
     with:
       gates: bash scripts/disclosure_set_lint.sh
       full-history: true
 
   release:
     needs: [attest, golden, disclosure-set]
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-release.yml@8fbc11ef5350f417ef29294990ebb4d8ffcaa4b2
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-release.yml@bb2f29950572dd950d6c2056721c7f4bd7a64d9c
     with:
       tag: ${{ github.event.inputs.tag || github.ref_name }}
       # ADR-17.D8: the five semantic vocabulary packages ride the train on the SAME footing as canon
@@ -100,6 +100,6 @@ jobs:
   # Attach the validated golden (produced by the golden gate) to the Release — per-release, not committed.
   attach-golden:
     needs: [attest, release, golden]
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-attach-golden.yml@8fbc11ef5350f417ef29294990ebb4d8ffcaa4b2
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-attach-golden.yml@bb2f29950572dd950d6c2056721c7f4bd7a64d9c
     with:
       asset: canon.det_proof.txt
