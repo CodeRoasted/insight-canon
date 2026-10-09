@@ -112,13 +112,12 @@ struct Tokenizer::Impl
             if (empty_projections == 1 || empty_projections % kEmptyProjectionWarnEvery == 0)
             {
                 // refs: ADR-16.D11
-                // note: `component` separates the two readings only on a syslog-shaped grammar.
-                INSIGHT_LOG_WARN(
-                    logging::tokenizer_logger(),
-                    "empty projection: format={} kept 0 content bytes of {} component=\"{}\" "
-                    "(total={})",
-                    to_string(parser.routed_format()), parsed_line.raw_line.size(),
-                    parsed_line.component, empty_projections);
+                // invariant: no byte of the line is quoted, because a host journal keeps this log.
+                INSIGHT_LOG_WARN(logging::tokenizer_logger(),
+                                 "empty projection: format={} kept 0 content bytes of {} "
+                                 "(total={})",
+                                 to_string(parser.routed_format()), parsed_line.raw_line.size(),
+                                 empty_projections);
             }
         }
 

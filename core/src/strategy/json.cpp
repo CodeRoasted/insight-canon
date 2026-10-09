@@ -293,12 +293,10 @@ namespace
     // behind the rate limit, so the re-walk is never paid where it would matter.
     // invariant: it uses its OWN parser rather than the thread-local scratch, whose cursor is still
     // held by the caller's live document.
-    // invariant: output is bounded in BOTH key count and key length — a diagnostic that its own
-    // input can make arbitrarily large is a second defect, not an aid.
-    [[nodiscard]] std::string top_level_keys_for_diagnosis(std::string_view line)
+    // invariant: it gives a COUNT and never a key, because a host journal keeps this log and a key
+    // is a byte of the input.
+    [[nodiscard]] std::string top_level_key_count_for_diagnosis(std::string_view line)
     {
-        constexpr std::size_t kMaxKeys{8};
-        constexpr std::size_t kMaxKeyChars{40};
         simdjson::ondemand::parser parser;
         simdjson::padded_string padded{line};
         simdjson::ondemand::document doc;
@@ -307,24 +305,10 @@ namespace
         simdjson::ondemand::object root;
         if (doc.get_object().get(root) != simdjson::SUCCESS)
             return "<not a JSON object>";
-        std::string out;
-        std::size_t shown{0};
-        for (auto field : root)
-        {
-            std::string_view key;
-            if (field.unescaped_key().get(key) != simdjson::SUCCESS)
-                continue;
-            if (shown == kMaxKeys)
-            {
-                out += ", ...";
-                break;
-            }
-            if (shown > 0)
-                out += ", ";
-            out += key.substr(0, kMaxKeyChars);
-            ++shown;
-        }
-        return out;
+        std::size_t count{0};
+        if (root.count_fields().get(count) != simdjson::SUCCESS)
+            return "<uncountable>";
+        return std::to_string(count);
     }
 
     // note: a forward declaration; the definition sits below with the other ordinal helpers.
@@ -735,7 +719,7 @@ namespace
         // refs: ADR-29.D7
         parsed_line.no_role_witness_key = first_top_level_key(line);
 
-        // invariant: ERGONOMICS, never the contract, and no test may assert against it.
+        // invariant: ERGONOMICS, not the contract: a test asserts only that it quotes no input.
         // invariant: rate-limited because a per-event warn floods from the hot path; thread-local
         // because parse is const and a strategy instance is per-tokenizer, so per thread.
         // invariant: the consequence of the thread-local is that first occurrence fires once per
@@ -748,8 +732,8 @@ namespace
             INSIGHT_LOG_WARN(logging::strategy_logger(),
                              "JSON object yielded NO recognized role (no timestamp, level, "
                              "component or message) — the event is emitted and MARKED, not "
-                             "dropped. Top-level keys: [{}] (total such lines={})",
-                             top_level_keys_for_diagnosis(line), roleless_count);
+                             "dropped. Top-level keys: {} (total such lines={})",
+                             top_level_key_count_for_diagnosis(line), roleless_count);
     }
 
 } // namespace
@@ -896,8 +880,8 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     // vocabulary we do not read yet, and refusing it would convert a reading gap into data loss.
     // invariant: the DISCHARGE is the assignment below, never the log line: a warning desilences
     // the console while a caller would still receive an indistinguishable value.
-    // invariant: it is also untestable through the log, because canon has no test-observable sink,
-    // so an arm written against a log line goes green the day this code is deleted.
+    // invariant: it is asserted on the marker and never through the log line, which the rate limit
+    // samples per thread.
     // refs: ADR-29.D7, ADR-17.D12
     // refs: MEM:synthetic-gate-vacuity-vs-judgment
     if (!is_otel && !parsed_line.timestamp.has_stamp() && parsed_line.level == LogLevel::Unknown &&
