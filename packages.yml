@@ -56,6 +56,17 @@ packages:
     source_public: true
     release: false
     depends: [insight_canon, insight_semantic_github, insight_semantic_gitlab, insight_semantic_jenkins, insight_semantic_package_managers, insight_semantic_test_frameworks]
+  # The determinism proof's ship-leg STEP (DN-142.D5 (4)): det_proof linked against the stored canon
+  # and semantic packages, the showcase view gate and the proof driver's reporting gate run in its
+  # one `conan create`. An application package, never published. proof/CMakeLists.txt serves it and
+  # the inventory cell below: the step consumes the packages, the cell (and the 8-cell matrix of
+  # scripts/det_public_proof.sh) recompiles canon in its own tree.
+  insight_canon_proof:
+    path: proof
+    version: 1.10.7
+    source_public: true
+    release: false
+    depends: [insight_canon, insight_semantic_github, insight_semantic_gitlab, insight_semantic_jenkins, insight_semantic_package_managers, insight_semantic_test_frameworks]
 
 # ── The build system's INVENTORY (ADR-3.D9) ─────────────────────────────────────────────────────
 # Projects that declare their own `project()` and belong to NO conan package. They are NOT

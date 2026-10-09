@@ -44,9 +44,9 @@ class InsightCanonConan(ConanFile):
     # (the malf one-compile-surface rule: a tool excluded from the package build rots unseen).
     # An unconditional target whose sources miss this allowlist configures fine as an editable
     # and dies at `conan create` generate-time — the conan-create-only class malf cut-verify exists
-    # to catch. tests/ is deliberately absent: its target is guarded by INSIGHT_CANON_BUILD_TESTS,
-    # which the recipe leaves OFF.
-    exports_sources = "CMakeLists.txt", "src/*", "api/*", "tools/*"
+    # to catch. tests/ is exported because the create builds and runs the tests (DN-142.D5 (1)),
+    # with the committed captures and goldens they read.
+    exports_sources = "CMakeLists.txt", "src/*", "api/*", "tools/*", "tests/*"
 
     def export_sources(self):
         # The export is the TRACKED files under exports_sources, never the disk's (DN-142.D4 (b)):
@@ -115,6 +115,7 @@ class InsightCanonConan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+        runpy.run_path(self.conf.get("user.malf:recipe_tests"))["run_tests"](self)
 
     def package(self):
         cmake = CMake(self)

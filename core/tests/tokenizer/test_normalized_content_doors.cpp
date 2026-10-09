@@ -130,12 +130,9 @@ TEST(NormalizedContentDoors, DeclaredPeelYieldsTypedContentAndObservationTime)
     return found;
 }
 
-// invariant: the census is anchored to the SOURCE TREE by the compiler's own file macro, so it runs
-// wherever the repo is checked out.
-// invariant: the desk and CI both build from source, and there is no installed-only execution of
-// this suite.
-const std::filesystem::path kThisFile{__FILE__};
-const std::filesystem::path kCoreRoot{kThisFile.parent_path().parent_path().parent_path()};
+// invariant: the census is anchored to the SOURCE TREE through the build's source-root definition,
+// so it runs on the desk and inside `conan create`, whose export carries api/ and src/.
+const std::filesystem::path kCoreRoot{INSIGHT_CANON_CORE_SOURCE_ROOT};
 
 TEST(NormalizedContentDoors, NormalizedContentHasExactlyTheTwoAuditedFriends)
 {

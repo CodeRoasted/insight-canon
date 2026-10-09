@@ -21,7 +21,14 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(INSIGHT_CANON_BUILD_TESTS  "Build unit and regression tests" ${PROJECT_IS_TOP_LEVEL})
+# The test switch defaults OFF when BUILD_TESTING is defined false, which conan does under
+# tools.build:skip_test: then no test target is configured and no test requirement is looked up
+# (DN-142.D5). Otherwise it follows PROJECT_IS_TOP_LEVEL, as on the desk.
+set(INSIGHT_CANON_TEST_DEFAULT ${PROJECT_IS_TOP_LEVEL})
+if(DEFINED BUILD_TESTING AND NOT BUILD_TESTING)
+    set(INSIGHT_CANON_TEST_DEFAULT OFF)
+endif()
+option(INSIGHT_CANON_BUILD_TESTS  "Build unit and regression tests" ${INSIGHT_CANON_TEST_DEFAULT})
 # OFF by default: libnuma is LGPL-2.1, so NUMA is opt-in (conanfile.py drives this
 # from the `with_numa` option — default False — and a raw cmake build stays safe).
 option(INSIGHT_CANON_ENABLE_NUMA  "Enable NUMA-aware arena allocation (libnuma, LGPL-2.1, vendored via conan)" OFF)
@@ -365,6 +372,11 @@ if(INSIGHT_CANON_BUILD_TESTS)
         # makes the gate independent of the working directory ctest happens to launch it from.
         target_compile_definitions(insight_canon_tests PRIVATE
             INSIGHT_CANON_MASK_GOLDEN_PATH="${CMAKE_CURRENT_SOURCE_DIR}/tests/mask/mask_rules.golden")
+        # The package's source root, for the tests that read a committed capture or the package's
+        # own source text. Never __FILE__: inside `conan create` malf's path map makes a
+        # translation unit's own name an identifier, not a path (DN-142.D13 (3)).
+        target_compile_definitions(insight_canon_tests PRIVATE
+            INSIGHT_CANON_CORE_SOURCE_ROOT="${CMAKE_CURRENT_SOURCE_DIR}")
         # The test target RECOMPILES arena_allocator.cpp (white-box, above), so it needs the switch
         # in its own right — inheriting the library's PRIVATE define is not a thing. Without this
         # the arena's own instrument test would read `arena_poisons_on_reset() == false` inside a
@@ -400,29 +412,6 @@ if(INSIGHT_CANON_BUILD_TESTS)
         gtest_discover_tests(insight_canon_tests TEST_FILTER "-${CORPUS_SUITES}")
         gtest_discover_tests(insight_canon_tests TEST_FILTER "${CORPUS_SUITES}"
                              PROPERTIES LABELS corpus)
-
-        # The determinism proof's REPORTING gate — the desk-runnable proof that a failing fixture
-        # reds scripts/det_public_proof.sh, and that its -ffp-contract premise assertion refuses a
-        # vacuous pass. Those paths were demonstrated once, by hand, by building the four-cell
-        # module tower with a corpus file made unreadable; at minutes of compile per assertion
-        # nothing re-checked them, so the gate's RED was unproven and its green read for more than
-        # it was worth. The script sources the proof (which returns early when sourced) and drives
-        # the reporting functions against hand-made files: no build, no compiler, well under a
-        # second.
-        #
-        # IT LIVES IN core/ BECAUSE THIS IS THE TREE THAT ACTUALLY RUNS. proof/ is the proof's own
-        # harness and is driven only by det_public_proof.sh — it is outside the package sweep, and
-        # that is exactly how insight-canon/proof/ once rotted unseen for a full release cycle.
-        #
-        # NOT ON WINDOWS, and the absence is declared rather than incidental: the subject is a bash
-        # script, and the MSVC determinism leg does not run it (.github/workflows/golden.yaml drives
-        # that leg through its own PowerShell path). A `find_program(bash)`-conditional registration
-        # would make the same absence silent, which is the failure this comment exists to avoid.
-        if(NOT WIN32)
-            add_test(NAME det_public_proof_reporting
-                COMMAND "${CMAKE_COMMAND}" -E env "bash"
-                        "${CMAKE_CURRENT_SOURCE_DIR}/../scripts/tests/det_public_proof_reporting_test.sh")
-        endif()
     endif()
 endif()
 

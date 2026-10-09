@@ -112,6 +112,12 @@ if(INSIGHT_SEMANTIC_JENKINS_BUILD_TESTS)
             CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
         target_compile_options(insight_semantic_jenkins_tests PRIVATE
             $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-ffp-contract=off>)
+        # The committed baselines the gates read sit in tests/, which the recipe exports. A test
+        # locates them through this definition, never through __FILE__: inside `conan create`
+        # malf's path map makes a translation unit's own name an identifier, not a path
+        # (DN-142.D13 (3)).
+        target_compile_definitions(insight_semantic_jenkins_tests PRIVATE
+            INSIGHT_SEMANTIC_JENKINS_TESTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests")
         include(GoogleTest)
         # THE CORPUS POPULATION IS SPLIT OUT BY LABEL, NEVER MIXED INTO THE DEFAULT RUN
         # (Founder, 2026-09-04: "I also dont want to mix up big corpus tests/gates with regular

@@ -171,9 +171,18 @@ done
 
 # ── H5 ────────────────────────────────────────────────────────────────────────
 PINS="$OUT/PINS.md"
-canon_commit="$(git -C "$CANON" rev-parse HEAD 2>/dev/null || echo '<not a checkout>')"
-check "H5 PINS.md names the insight-canon commit the script ran from" "$canon_commit" \
-    "$(sed -n 's/^- insight-canon commit: `\([0-9a-f]*\)`.*$/\1/p' "$PINS")"
+# The script names a commit only when it runs from insight-canon's OWN checkout (its toplevel is
+# CANON); anywhere else — the insight_canon_proof package step builds from an export, which is no
+# checkout, or a tree nested in another repository — it states the commit unavailable. The arm
+# holds whichever the run is, by the script's own rule.
+if [ "$(git -C "$CANON" rev-parse --show-toplevel 2>/dev/null)" = "$CANON" ]; then
+  check "H5 PINS.md names the insight-canon commit the script ran from" \
+      "$(git -C "$CANON" rev-parse HEAD)" \
+      "$(sed -n 's/^- insight-canon commit: `\([0-9a-f]*\)`.*$/\1/p' "$PINS")"
+else
+  check "H5 PINS.md states the insight-canon commit unavailable outside insight-canon's checkout" 1 \
+      "$(grep -c '^- insight-canon commit: \*\*unavailable\*\*' "$PINS")"
+fi
 check "H5 PINS.md names the invocation" "det_proof --showcase" \
     "$(sed -n 's/^- invocation: `\(det_proof --showcase\) .*$/\1/p' "$PINS")"
 check "H5 PINS.md carries exactly one view line" 1 "$(grep -c '^- view:' "$PINS")"

@@ -323,10 +323,10 @@ TEST_F(JenkinsBareNullGate, TheBareSurfaceIsByteIdenticalToTheCommittedBaseline)
                              return std::move(buffer).str();
                          }};
 
-    // invariant: the committed baseline is found beside this TU, relative to the source file, so
-    // the gate needs no second environment variable.
-    const std::filesystem::path oracle_path{std::filesystem::path{__FILE__}.parent_path() /
-                                            kOracleFile};
+    // invariant: the committed baseline is found in the exported tests/ directory the build
+    // names, so the gate needs no second environment variable.
+    const std::filesystem::path oracle_path{
+        std::filesystem::path{INSIGHT_SEMANTIC_JENKINS_TESTS_DIR} / kOracleFile};
     const std::string oracle_text{read_file(oracle_path)};
     // invariant: `.string()` is load-bearing: libstdc++ spells the path stream operator through a
     // header template this TU never sees, so streaming the string sidesteps the module/header seam.
