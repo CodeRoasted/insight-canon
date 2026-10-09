@@ -1,4 +1,5 @@
 import os
+import runpy
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain
 
@@ -30,6 +31,12 @@ class InsightSemanticPackageManagersConan(ConanFile):
     # it is a broken one — a row-less manifest still compiles, still composes and still
     # publishes a `semantic_identity`.
     exports_sources = "CMakeLists.txt", "src/*", "package_managers.dialect.yaml"
+
+    def export_sources(self):
+        # The export is the TRACKED files under exports_sources, never the disk's (DN-142.D4 (b)):
+        # malf's helper, staged in the conan home and named by global.conf, drops every file git
+        # does not track. Without it the export fails; it never falls back to the disk silently.
+        runpy.run_path(self.conf.get("user.malf:recipe_exports"))["narrow_to_tracked"](self)
 
     def config_options(self):
         if self.settings.os == "Windows":
