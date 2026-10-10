@@ -1,5 +1,5 @@
 module;
-#if defined(__linux__)
+#ifdef __linux__
 #include <dlfcn.h>
 #endif
 // refs: ADR-3.D4
@@ -18,7 +18,8 @@ namespace
     inline constexpr bool kSanitizerBuild{
 #if defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_THREAD__)
         true
-#elif defined(__has_feature)
+#else
+#ifdef __has_feature
 #if __has_feature(address_sanitizer) || __has_feature(memory_sanitizer) ||                         \
     __has_feature(thread_sanitizer)
         true
@@ -28,12 +29,13 @@ namespace
 #else
         false
 #endif
+#endif
     };
 
     // invariant: the soname, never `libnuma.so`, which only a `-dev` package installs.
     inline constexpr const char* kSystemSoname{"libnuma.so.1"};
 
-#if defined(__linux__)
+#ifdef __linux__
     // post: dlerror()'s pending text, or a fixed word when the loader recorded none.
     [[nodiscard]] std::string loader_error()
     {
@@ -94,7 +96,7 @@ std::string_view outcome_name(LoadOutcome outcome) noexcept
 
 Library load(const char* soname)
 {
-#if defined(__linux__)
+#ifdef __linux__
     static_cast<void>(::dlerror());
     void* handle{::dlopen(soname, RTLD_NOW | RTLD_LOCAL)};
     if (handle == nullptr)
