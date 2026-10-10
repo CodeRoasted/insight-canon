@@ -33,7 +33,7 @@ class InsightCanonConan(ConanFile):
     # `tools/` is here because CMakeLists.txt builds f13_cardinality_measure UNCONDITIONALLY
     # (the malf one-compile-surface rule: a tool excluded from the package build rots unseen).
     # An unconditional target whose sources miss this allowlist configures fine as an editable
-    # and dies at `conan create` generate-time — the conan-create-only class malf cut-verify exists
+    # and dies at `conan create` generate-time — the conan-create-only class malf store-create exists
     # to catch. tests/ is exported because the create builds and runs the tests (DN-142.D5 (1)),
     # with the committed captures and goldens they read.
     exports_sources = "CMakeLists.txt", "src/*", "api/*", "tools/*", "tests/*"
