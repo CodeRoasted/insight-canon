@@ -29,9 +29,6 @@ if(DEFINED BUILD_TESTING AND NOT BUILD_TESTING)
     set(INSIGHT_CANON_TEST_DEFAULT OFF)
 endif()
 option(INSIGHT_CANON_BUILD_TESTS  "Build unit and regression tests" ${INSIGHT_CANON_TEST_DEFAULT})
-# OFF by default: libnuma is LGPL-2.1, so NUMA is opt-in (conanfile.py drives this
-# from the `with_numa` option — default False — and a raw cmake build stays safe).
-option(INSIGHT_CANON_ENABLE_NUMA  "Enable NUMA-aware arena allocation (libnuma, LGPL-2.1, vendored via conan)" OFF)
 
 # Arena reset poison — a DEBUG-BUILD INSTRUMENT (arena_allocator.cpp explains what and why).
 # Default ON for Debug, which is also what the ASan/MSan profiles set (malf/profiles/*-asan,
@@ -128,6 +125,9 @@ set(CANON_DETAIL_MODULE_UNITS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/strategy/canon.detail.strategy.cppm
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mask/canon.detail.mask.cppm
     ${CMAKE_CURRENT_SOURCE_DIR}/src/parse/canon.detail.parse.cppm
+    # The run-time libnuma binding the arena allocates through (DN-142.D16): sealed, so no consumer
+    # sees a libnuma name and the white-box tests reach the loader directly.
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/arena/canon.detail.numa.cppm
 )
 file(GLOB_RECURSE CANON_IMPL_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
@@ -237,21 +237,13 @@ set(INSIGHT_CANON_SWITCH_TOTALITY
 target_compile_options(insight_canon PRIVATE ${INSIGHT_CANON_SWITCH_TOTALITY})
 
 ###########################################################
-#  Optional NUMA support (arena allocator)
+#  NUMA-aware arena: libnuma LOADED at run time, never linked (DN-142.D16)
 ###########################################################
-# libnuma is vendored via conan (libnuma/2.0.19 on Linux, mirrors logcraft) — hermetic, so
-# CI/release builds get NUMA without a system libnuma-dev. numa.h is included only under
-# INSIGHT_HAS_NUMA (arena_allocator.cpp), so a non-Linux / NUMA-off build needs no libnuma.
-if(INSIGHT_CANON_ENABLE_NUMA)
-    find_package(libnuma CONFIG QUIET)
-    if(libnuma_FOUND)
-        target_compile_definitions(insight_canon PRIVATE INSIGHT_HAS_NUMA)
-        target_link_libraries(insight_canon PRIVATE libnuma::libnuma)
-        message(STATUS "libnuma found via conan (libnuma::libnuma) — NUMA-aware arena enabled")
-    else()
-        message(STATUS "INSIGHT_CANON_ENABLE_NUMA=ON but libnuma not found — arena uses the portable allocator")
-    endif()
-endif()
+# One configuration: src/arena/numa_library.cpp dlopen()s `libnuma.so.1` and binds the five
+# functions the arena calls, so no build needs a libnuma header or a -dev package and no binary
+# carries a libnuma NEEDED entry. dlopen lives in libc from glibc 2.34; CMAKE_DL_LIBS names libdl
+# for an older libc and is empty where none is needed.
+target_link_libraries(insight_canon PRIVATE ${CMAKE_DL_LIBS})
 
 ###########################################################
 #  Install rules  (used by `conan create`)
@@ -292,16 +284,13 @@ install(EXPORT insight_canonTargets
 export(EXPORT insight_canonTargets
     NAMESPACE insight::
     FILE ${CMAKE_CURRENT_BINARY_DIR}/insight_canonTargets.cmake)
-# canon is a STATIC lib, so even PRIVATE link deps (libnuma) appear in its Targets.cmake and
-# must resolve in the consumer — add find_dependency(libnuma) ONLY when it was actually linked.
+# canon is a STATIC lib, so even PRIVATE link deps appear in its Targets.cmake and must resolve in
+# the consumer.
 set(_canon_find_deps "find_dependency(fmt)
 find_dependency(spdlog)
 find_dependency(simdjson)
 find_dependency(picosha2)
 ")
-if(INSIGHT_CANON_ENABLE_NUMA AND libnuma_FOUND)
-    string(APPEND _canon_find_deps "find_dependency(libnuma)\n")
-endif()
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/insight_canon-config.cmake
 "include(CMakeFindDependencyMacro)
 ${_canon_find_deps}include(\"\${CMAKE_CURRENT_LIST_DIR}/insight_canonTargets.cmake\")
@@ -359,7 +348,7 @@ if(INSIGHT_CANON_BUILD_TESTS)
                 FILES    ${CANON_PUBLIC_MODULE_UNITS} ${CANON_DETAIL_MODULE_UNITS}
                          tests/canon.test.cppm)
         target_link_libraries(insight_canon_tests PRIVATE
-            fmt::fmt spdlog::spdlog simdjson::simdjson picosha2::picosha2
+            fmt::fmt spdlog::spdlog simdjson::simdjson picosha2::picosha2 ${CMAKE_DL_LIBS}
             GTest::gtest GTest::gtest_main)
         target_include_directories(insight_canon_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/api ${CMAKE_CURRENT_SOURCE_DIR}/src)
         target_compile_features(insight_canon_tests PRIVATE cxx_std_23)
@@ -412,6 +401,14 @@ if(INSIGHT_CANON_BUILD_TESTS)
         gtest_discover_tests(insight_canon_tests TEST_FILTER "-${CORPUS_SUITES}")
         gtest_discover_tests(insight_canon_tests TEST_FILTER "${CORPUS_SUITES}"
                              PROPERTIES LABELS corpus)
+        # libnuma is loaded, never linked (DN-142.D16): the test executable carries canon's whole
+        # arena, so it is the subject — no `libnuma` NEEDED entry and no `numa_` symbol, defined or
+        # undefined. ELF only; a missing readelf or nm fails the test rather than passing it.
+        if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+            add_test(NAME canon_never_links_libnuma
+                COMMAND ${CMAKE_COMMAND} -DSUBJECT=$<TARGET_FILE:insight_canon_tests>
+                        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/arena/never_links_libnuma.cmake)
+        endif()
     endif()
 endif()
 

@@ -1294,6 +1294,9 @@ export namespace insight
 export namespace insight::tokenization
 {
 
+// invariant: the default is `Auto`, node-local to the allocating thread via a run-time libnuma;
+// it resolves to `Disabled` where libnuma is absent or unavailable, and in a sanitizer build.
+// refs: DN-142.D16
 struct ArenaNumaPolicy
 {
     enum class Kind : std::uint8_t
@@ -1303,7 +1306,7 @@ struct ArenaNumaPolicy
         Auto,
     };
 
-    Kind kind{Kind::Disabled};
+    Kind kind{Kind::Auto};
     int node{-1};
 
     [[nodiscard]] constexpr bool active() const noexcept
@@ -1336,6 +1339,9 @@ class ArenaAllocator
     [[nodiscard]] std::size_t capacity() const noexcept;
     [[nodiscard]] std::size_t initial_block_size() const noexcept;
     [[nodiscard]] std::size_t block_count() const noexcept;
+    // post: how many of `block_count()` blocks libnuma allocated.
+    [[nodiscard]] std::size_t numa_block_count() const noexcept;
+    // post: the policy as resolved at construction, never the one requested.
     [[nodiscard]] const ArenaNumaPolicy& numa_policy() const noexcept;
     [[nodiscard]] bool owns(const void* ptr) const noexcept;
 

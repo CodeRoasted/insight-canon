@@ -430,10 +430,12 @@ TEST(ArenaAllocator_Accessors, CapacityMatchesConstructorArgument)
     EXPECT_EQ(arena.capacity(), cap);
 }
 
-TEST(ArenaAllocator_Accessors, NumaPolicyDefaultsDisabled)
+// refs: DN-142.D16
+TEST(ArenaAllocator_Accessors, NumaPolicyDefaultsAuto)
 {
-    ArenaAllocator arena{256};
-    EXPECT_EQ(arena.numa_policy().kind, insight::tokenization::ArenaNumaPolicy::Kind::Disabled);
+    EXPECT_EQ(insight::tokenization::ArenaNumaPolicy{}.kind,
+              insight::tokenization::ArenaNumaPolicy::Kind::Auto);
+    EXPECT_EQ(insight::tokenization::ArenaNumaPolicy{}.node, -1);
     EXPECT_GE(insight::tokenization::arena_numa_node_count(), 1);
 }
 

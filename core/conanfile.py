@@ -23,21 +23,11 @@ class InsightCanonConan(ConanFile):
     options = {
         "shared": [True, False],
         "fPIC": [True, False],
-        # NUMA-aware arena allocation links libnuma (LGPL-2.1-or-later). It is
-        # OPT-IN — off by default — so no distributed artifact ships copyleft by
-        # accident (it rode silently into the proprietary `sift` binary at 1.5.1).
-        # NUMA-off is BIT-IDENTICAL to NUMA-on (det_public_proof golden c88e8e9a)
-        # and a no-op on single-socket hosts (numa_available() short-circuits to
-        # the portable allocator). A consumer that genuinely runs multi-socket iron
-        # — and accepts the LGPL-2.1 §6 static-link obligations for ITS artifact —
-        # opts in with `insight_canon/*:with_numa=True`. Linux-only effect.
-        "with_numa": [True, False],
     }
 
     default_options = {
         "shared": False,
         "fPIC": True,
-        "with_numa": False,
     }
 
     # `tools/` is here because CMakeLists.txt builds f13_cardinality_measure UNCONDITIONALLY
@@ -83,18 +73,9 @@ class InsightCanonConan(ConanFile):
         # picosha2 — header-only SHA-256 for template_id_of (impl-only; the TemplateId POD (F-SRC-insight-canon:canon.api.cppm:TemplateId) moved the
         # hash here from metalog). Not in any public header → no transitive_headers.
         self.requires("picosha2/1.0.0")
-        # NUMA-aware arena allocation (hot path). OPT-IN (see the `with_numa` option):
-        # libnuma is LGPL-2.1, so it enters the graph ONLY when explicitly enabled.
-        # When on it is **dynamically** linked (shared=True), NEVER statically: LGPL-2.1
-        # §6(b) permits a proprietary work to use the library via a replaceable shared
-        # object, whereas a STATIC link triggers the §6 relink obligation (ship object
-        # files / written offer) we will not meet. So NUMA-on is compliant by
-        # construction — the distributing artifact (the server) still owes the LGPL-2.1
-        # text + a "uses libnuma" notice + a source pointer (see SBOM.md § NUMA). Off by
-        # default ⇒ zero copyleft in the proprietary `sift` binary.
-        if self.settings.os == "Linux" and self.options.with_numa:
-            self.requires("libnuma/2.0.19", transitive_headers=True, transitive_libs=True,
-                          options={"shared": True})
+        # No libnuma requirement in any graph: the NUMA-aware arena LOADS `libnuma.so.1` at run time
+        # and never links it, so the package has one configuration and no LGPL component
+        # (DN-142.D16). A host without libnuma runs the portable allocator from the same binary.
 
     def build_requirements(self):
         self.test_requires("gtest/1.17.0")
@@ -102,10 +83,6 @@ class InsightCanonConan(ConanFile):
     def generate(self):
         tc = CMakeToolchain(self)
         tc.generator = "Ninja"
-        # Drive the CMake switch from the conan option so the two never drift: the
-        # libnuma require above and the INSIGHT_HAS_NUMA compile path are armed
-        # together or not at all.
-        tc.cache_variables["INSIGHT_CANON_ENABLE_NUMA"] = bool(self.options.with_numa)
         tc.generate()
 
         deps = CMakeDeps(self)
@@ -132,8 +109,6 @@ class InsightCanonConan(ConanFile):
             "simdjson::simdjson",
             "picosha2::picosha2"
         ]
-        if self.settings.os == "Linux" and self.options.with_numa:
-            self.cpp_info.requires.append("libnuma::libnuma")
         # Cross-package C++ modules (§10.7): defer to the package's OWN cmake config
         # (it carries FILE_SET CXX_MODULES; conan's generator does not emit it).
         # Editable build-tree config dir + create install path both listed.

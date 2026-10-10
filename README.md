@@ -211,7 +211,12 @@ ctest --test-dir build --output-on-failure
 | Option | Default | Description |
 |---|---|---|
 | `INSIGHT_CANON_BUILD_TESTS` | `ON` when top-level | Build unit and regression tests |
-| `INSIGHT_CANON_ENABLE_NUMA` | `OFF` | Link libnuma (LGPL-2.1) for NUMA-aware arena allocation. Opt-in via the conan `with_numa` option; off keeps the package's dep tree all-permissive. NUMA-off is bit-identical to NUMA-on and a no-op on single-socket hosts. |
+
+NUMA is not an option. The arena's default policy is `Auto`: on Linux it loads `libnuma.so.1` at
+run time (`dlopen`), never linking it, and allocates its blocks node-local to the allocating thread.
+Where libnuma is absent or reports itself unavailable, and in every sanitizer build, the same binary
+uses the portable allocator. No build needs a libnuma header, and no binary carries a libnuma
+dependency.
 
 ---
 

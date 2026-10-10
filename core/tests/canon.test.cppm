@@ -10,6 +10,7 @@ export import insight.canon.detail.scan;
 export import insight.canon.detail.strategy;
 export import insight.canon.detail.mask;
 export import insight.canon.detail.parse;
+export import insight.canon.detail.numa;
 // invariant: the PROVIDER CONTRACT between core and the vocabulary packages — core tests build
 // SYNTHETIC manifests and rows to exercise the algorithms VOCABULARY-FREE.
 // invariant: the facade does not surface the provider interface, and a white-box core test
