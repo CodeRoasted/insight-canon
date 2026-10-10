@@ -83,6 +83,15 @@ get_filename_component(CANON_PROOF_REPO "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUT
 enable_testing()
 add_test(NAME showcase_view
          COMMAND bash "${CANON_PROOF_REPO}/scripts/tests/showcase_view_test.sh" "$<TARGET_FILE:det_proof>")
+# The digest memory gate (DN-108.D24): `det_proof --digest` streams, so its peak RSS does not grow
+# with the file — the cut's B3b renders LogHub's 2 GB archives with it. Registered where the
+# showcase gate is, over the same binary; not on Windows, for the reason the reporting gate below
+# states.
+if(NOT WIN32)
+    add_test(NAME det_proof_digest_memory
+             COMMAND bash "${CANON_PROOF_REPO}/scripts/tests/det_proof_digest_memory_test.sh"
+                     "$<TARGET_FILE:det_proof>")
+endif()
 
 if(NOT CANON_PROOF_IN_TREE)
     # The determinism proof's REPORTING gate — the desk-runnable proof that a failing fixture

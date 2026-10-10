@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <numeric>
 #include <optional>
 #include <picosha2.h>
@@ -182,6 +183,125 @@ std::string packages_label(const insight::semantic::ComposedSemantics& compositi
     }
     return out.empty() ? std::string{"-"} : out;
 }
+
+// invariant: EVERY arm is applied to EVERY file — choosing an arm per file would be inference,
+// which is the per-line content dependence the declared-ingest cut deleted.
+// note: it also buys the negative cells: a Jenkins file read as github fires no gated row.
+// refs: ADR-22, ADR-23
+struct Arm
+{
+    // note: what the `## file` header records; "-" is the undeclared stream.
+    std::string_view label;
+    std::string_view dialect;
+    std::span<const std::string_view> stack;
+    const insight::semantic::ComposedSemantics* composition;
+};
+
+// note: the first arena block; a line larger than it grows the arena by canon's own rule.
+constexpr std::size_t kArenaBytes{std::size_t{1} << 22};
+
+namespace tk = insight::tokenization;
+
+// invariant: one arm's whole state over one file in digest mode: its resolved stream, a fresh
+// arena and Tokenizer, and one hasher per projection member; none of it grows with the file.
+// invariant: a fresh arena and Tokenizer per file and per arm, so the column digests are a pure
+// function of that file's content and line order.
+// note: never copied or moved: the Tokenizer holds the arena and the semantics beside it.
+class ArmDigest
+{
+  public:
+    // assert: one call at stream open resolves both semantic coordinates and the transport stack,
+    // before the first line, so nothing downstream can depend on content.
+    // refs: ADR-23
+    explicit ArmDigest(const Arm& arm)
+        : arm_{&arm}, stream_{insight::semantic::resolve_stream(
+                          *arm.composition,
+                          insight::transport::IngestDeclaration{
+                              .stack = arm.stack, .dialect = arm.dialect, .channel = {}})},
+          arena_{kArenaBytes},
+          tokenizer_{arena_, tk::MaskConfig{}, stream_.semantics, tk::StreamContext{}}
+    {
+    }
+    ArmDigest(const ArmDigest&) = delete;
+    ArmDigest& operator=(const ArmDigest&) = delete;
+    ArmDigest(ArmDigest&&) = delete;
+    ArmDigest& operator=(ArmDigest&&) = delete;
+    ~ArmDigest() = default;
+
+    // post: the line's rendered columns are folded into every member's digest and the arena is
+    // rewound, so no byte the line put in the arena outlives the call.
+    // assert: the rewind cannot move a digest: a template is a pure function of its own line, and
+    // what the Tokenizer carries across lines (year reference, ids, counters) is values, not views.
+    void feed(std::string_view raw, tk::ProjectionColumns& columns)
+    {
+        {
+            // assert: the peel runs at the CALLER and only `content` crosses, once per line.
+            const insight::transport::RawPeeledLine peeled{stream_.transport.peel_raw(raw)};
+            auto event{tokenizer_.process_line(peeled.content)};
+            // assert: an OBSERVATION time the caller injects, never an ordering key or a replay
+            // input.
+            // refs: ADR-22, ADR-23
+            if (event && peeled.observation_time)
+                event->timestamp = *peeled.observation_time;
+            if (event)
+                tk::render_projection(*event, columns);
+            ++events_;
+            for (std::size_t member{0}; member < hashers_.size(); ++member)
+            {
+                const std::string_view text{event ? std::string_view{columns[member]}
+                                                  : kRefusedLine};
+                hashers_[member].process(text.begin(), text.end());
+                hashers_[member].process(kRowEnd.begin(), kRowEnd.end());
+            }
+        }
+        arena_.reset();
+    }
+
+    // post: the arm's line, then one `<member> <digest>` line per projection member.
+    void print()
+    {
+        std::cout << "### arm " << arm_->label << " packages " << packages_label(*arm_->composition)
+                  << " identity " << stream_.semantics.identity_hex() << " rows " << events_
+                  << '\n';
+        for (std::size_t member{0}; member < hashers_.size(); ++member)
+            std::cout << tk::kProjectionMembers[member] << ' '
+                      << column_digest_hex(hashers_[member]) << '\n';
+    }
+
+  private:
+    const Arm* arm_;
+    insight::semantic::ResolvedStream stream_;
+    tk::ArenaAllocator arena_;
+    tk::Tokenizer tokenizer_;
+    std::array<picosha2::hash256_one_by_one, tk::kProjectionMembers.size()> hashers_{};
+    std::uint64_t events_{0};
+};
+
+// post: the `## file` header, then each arm's rows and member digests in arm order; false, with
+// nothing printed, when the file cannot be opened.
+// invariant: the file is read ONCE, line by line, and every arm consumes a line before the next is
+// read, so memory is bounded by the longest line and never by the file.
+// note: a whole-file read held 4 to 6 times the file and was killed over the 2 GB LogHub archives.
+// refs: DN-108.D24
+bool digest_file(const char* path, std::span<const Arm> arms, tk::ProjectionColumns& columns)
+{
+    std::ifstream input{path, std::ios::binary};
+    if (!input)
+        return false;
+    std::vector<std::unique_ptr<ArmDigest>> states;
+    states.reserve(arms.size());
+    for (const Arm& arm : arms)
+        states.push_back(std::make_unique<ArmDigest>(arm));
+    std::string line;
+    while (std::getline(input, line))
+        for (const auto& state : states)
+            state->feed(line, columns);
+    // note: the digest names the file as it was handed over, the only name its caller can map.
+    std::cout << "## file " << path << '\n';
+    for (const auto& state : states)
+        state->print();
+    return true;
+}
 } // namespace
 
 // post: a canonical, integer-domain text digest that must be byte-identical across every compiler,
@@ -232,8 +352,6 @@ int main(int argc, char** argv)
     // note: info rather than off — the destination was the defect, never the diagnostics.
     insight::logging::init_logging(spdlog::level::info);
 
-    namespace tk = insight::tokenization;
-
     // invariant: the composition is loop-invariant — the same package set tokenizes every file.
     const std::array<insight::semantic::SemanticPackageManifest, 5> manifests{
         insight::semantic::github::kManifest, insight::semantic::gitlab::kManifest,
@@ -245,19 +363,7 @@ int main(int argc, char** argv)
     // note: the undeclared arm is not that — it composes every package's undeclared rows.
     const insight::semantic::ComposedSemantics no_packages{insight::semantic::compose({})};
 
-    // invariant: EVERY arm is applied to EVERY file — choosing an arm per file would be
-    // inference, which is the per-line content dependence the declared-ingest cut deleted.
-    // note: it also buys the negative cells: a Jenkins file read as github fires no gated row.
-    // refs: ADR-22, ADR-23
     // note: GitHub's serving API stamps every line it returns, so the peel is declared here.
-    struct Arm
-    {
-        // note: what the `## file` header records; "-" is the undeclared stream.
-        std::string_view label;
-        std::string_view dialect;
-        std::span<const std::string_view> stack;
-        const insight::semantic::ComposedSemantics* composition;
-    };
     static constexpr std::array<std::string_view, 1> kRfc3339Stack{{"api-rfc3339-line-prefix"}};
     const std::array<Arm, 5> arms{
         Arm{.label = "no-packages", .dialect = {}, .stack = {}, .composition = &no_packages},
@@ -331,6 +437,18 @@ int main(int argc, char** argv)
     tk::ProjectionColumns columns;
     for (int arg = first_file; arg < argc; ++arg)
     {
+        if (digest_mode)
+        {
+            if (!digest_file(argv[arg], arms, columns))
+            {
+                std::cerr << "cannot open " << argv[arg] << "\n";
+                return 2;
+            }
+            continue;
+        }
+
+        // invariant: the whole mode buffers the file, because its templates print before its rows
+        // and its run-outcome scan reads every line; the digest mode streams instead.
         std::ifstream input{argv[arg], std::ios::binary};
         if (!input)
         {
@@ -344,10 +462,6 @@ int main(int argc, char** argv)
             lines.push_back(std::move(line));
             line.clear();
         }
-
-        // note: the digest names the file as it was handed over, the only name its caller can map.
-        if (digest_mode)
-            std::cout << "## file " << argv[arg] << '\n';
 
         for (const Arm& arm : arms)
         {
@@ -373,7 +487,6 @@ int main(int argc, char** argv)
 
             // invariant: a fresh arena and Tokenizer per file and per arm, so the template set is a
             // pure function of that file's content and line order.
-            constexpr std::size_t kArenaBytes{std::size_t{1} << 22};
             tk::ArenaAllocator arena{kArenaBytes};
             tk::Tokenizer tokenizer{arena, tk::MaskConfig{}, stream.semantics, tk::StreamContext{}};
 
@@ -381,8 +494,6 @@ int main(int argc, char** argv)
             // cross-stdlib std::hash hazard cannot appear.
             std::map<std::string, std::uint64_t> templates;
             std::vector<std::string> rows;
-            std::array<picosha2::hash256_one_by_one, tk::kProjectionMembers.size()> hashers;
-            std::uint64_t events{0};
 
             for (std::size_t idx{0}; idx < peeled_lines.size(); ++idx)
             {
@@ -395,19 +506,6 @@ int main(int argc, char** argv)
                     event->timestamp = *observation;
                 if (event)
                     tk::render_projection(*event, columns);
-                ++events;
-
-                if (digest_mode)
-                {
-                    for (std::size_t member{0}; member < hashers.size(); ++member)
-                    {
-                        const std::string_view text{event ? std::string_view{columns[member]}
-                                                          : kRefusedLine};
-                        hashers[member].process(text.begin(), text.end());
-                        hashers[member].process(kRowEnd.begin(), kRowEnd.end());
-                    }
-                    continue;
-                }
 
                 ++templates[event ? std::string{event->template_str}
                                   : std::string{"<<parse-error>>"}];
@@ -422,17 +520,6 @@ int main(int argc, char** argv)
                     row.append(event ? std::string_view{columns[member]} : kRefusedLine);
                 }
                 rows.push_back(std::move(row));
-            }
-
-            if (digest_mode)
-            {
-                std::cout << "### arm " << arm.label << " packages "
-                          << packages_label(*arm.composition) << " identity "
-                          << stream.semantics.identity_hex() << " rows " << events << '\n';
-                for (std::size_t member{0}; member < hashers.size(); ++member)
-                    std::cout << tk::kProjectionMembers[member] << ' '
-                              << column_digest_hex(hashers[member]) << '\n';
-                continue;
             }
 
             std::cout << "## file " << basename_of(argv[arg]) << " declared=" << arm.label << "\n";
