@@ -301,9 +301,10 @@ for leg in "${LEGS[@]}"; do
 
   # One conan install per leg → toolchain + dep configs for building canon from source.
   # $CANON = the repo root; the core recipe lives at core/ (the multi-package layout).
+  [ -f "${MALF_TOOLCHAIN_DIR:-}/conan.lock" ] || { echo "no conan.lock under MALF_TOOLCHAIN_DIR='${MALF_TOOLCHAIN_DIR:-}': the install resolves only against <malf-toolchain>/conan.lock" >&2; exit 1; }
   legdir="$WORK/conan-${cxx//+/p}"
   if ! conan install "$CANON/core" --profile:host="$profile" --profile:build="$profile" \
-        --build=missing -of "$legdir" >"$legdir.install.log" 2>&1; then
+        --build=missing --lockfile="$MALF_TOOLCHAIN_DIR/conan.lock" -of "$legdir" >"$legdir.install.log" 2>&1; then
     echo "CONAN INSTALL FAIL: $cxx ($profile)" >&2; tail -4 "$legdir.install.log" | sed 's/^/   /' >&2; continue
   fi
   toolchain="$(find "$legdir" -name conan_toolchain.cmake 2>/dev/null | sed -n 1p)"

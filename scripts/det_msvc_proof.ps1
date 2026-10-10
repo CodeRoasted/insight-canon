@@ -15,11 +15,12 @@ $PSNativeCommandUseErrorActionPreference = $true
 $workspace = $env:GITHUB_WORKSPACE
 Set-Location $workspace
 
+if (-not $env:MALF_TOOLCHAIN_DIR) { Write-Error "MALF_TOOLCHAIN_DIR is unset: the install resolves only against <malf-toolchain>/conan.lock"; exit 1 }
 $proofBuild = "build-msvc-proof"
 conan install core `
   --profile:host="$env:CONAN_HOME/profiles/windows-msvc-release" `
   --profile:build="$env:CONAN_HOME/profiles/windows-msvc-release" `
-  --build=missing -of $proofBuild
+  --build=missing --lockfile="$env:MALF_TOOLCHAIN_DIR/conan.lock" -of $proofBuild
 $toolchain = Get-ChildItem -Path $proofBuild -Recurse -Filter conan_toolchain.cmake | Select-Object -First 1
 if (-not $toolchain) { Write-Error "no conan_toolchain.cmake under $proofBuild"; exit 1 }
 # CELL_FLAGS = SPDLOG off (the digest is det_proof's stdout) + /O2 /fp:fast (ship optimization +
