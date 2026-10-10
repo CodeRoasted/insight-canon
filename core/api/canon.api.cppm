@@ -1294,7 +1294,7 @@ export namespace insight
 export namespace insight::tokenization
 {
 
-// invariant: the default is `Auto`, node-local to the allocating thread via a run-time libnuma;
+// invariant: the default is `Auto`: blocks of 32 MiB and more node-local through libnuma;
 // it resolves to `Disabled` where libnuma is absent or unavailable, and in a sanitizer build.
 // refs: DN-142.D16
 struct ArenaNumaPolicy

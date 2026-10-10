@@ -213,7 +213,9 @@ ctest --test-dir build --output-on-failure
 | `INSIGHT_CANON_BUILD_TESTS` | `ON` when top-level | Build unit and regression tests |
 
 NUMA is not an option. The arena's default policy is `Auto`: on Linux it loads `libnuma.so.1` at
-run time (`dlopen`), never linking it, and allocates its blocks node-local to the allocating thread.
+run time (`dlopen`), never linking it, and allocates each block of at least 32 MiB node-local to the
+allocating thread; a smaller block takes the portable allocator, because on the one-node desk bench
+(`benchmarks/src/bench_arena.cpp`) a libnuma block below that size cost up to 127 times a portable one.
 Where libnuma is absent or reports itself unavailable, and in every sanitizer build, the same binary
 uses the portable allocator. No build needs a libnuma header, and no binary carries a libnuma
 dependency.

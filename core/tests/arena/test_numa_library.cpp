@@ -29,6 +29,7 @@ inline constexpr bool kTestCompiledUnderSanitizer{
 };
 
 inline constexpr std::size_t kBlockBytes{4096};
+inline constexpr std::size_t kNumaBlockBytes{numa::kMinimumBlockBytes};
 
 [[nodiscard]] std::string describe(const numa::Library& library)
 {
@@ -144,25 +145,35 @@ TEST(NumaLibrary, AFixedNodeTheLibraryDoesNotReportResolvesDisabled)
 TEST(NumaArena, AnAutoArenaTakesTheNumaPathExactlyWhenLibnumaLoadedAndAvailable)
 {
     const bool expected{numa_path_expected()};
-    ArenaAllocator arena{kBlockBytes};
+    ArenaAllocator arena{kNumaBlockBytes};
     EXPECT_EQ(arena.numa_policy().kind,
               expected ? ArenaNumaPolicy::Kind::Auto : ArenaNumaPolicy::Kind::Disabled)
         << describe(numa::process_library());
     EXPECT_EQ(arena.numa_block_count(), expected ? 1U : 0U) << describe(numa::process_library());
 
-    auto* grown{static_cast<std::byte*>(arena.allocate(2 * kBlockBytes))};
+    auto* grown{static_cast<std::byte*>(arena.allocate(kNumaBlockBytes + 1))};
     ASSERT_NE(grown, nullptr);
-    std::memset(grown, 0x5A, 2 * kBlockBytes);
-    EXPECT_EQ(grown[2 * kBlockBytes - 1], std::byte{0x5A});
+    std::memset(grown, 0x5A, kNumaBlockBytes + 1);
+    EXPECT_EQ(grown[kNumaBlockBytes], std::byte{0x5A});
     EXPECT_EQ(arena.block_count(), 2U);
     EXPECT_EQ(arena.numa_block_count(), expected ? 2U : 0U) << describe(numa::process_library());
     EXPECT_EQ(insight::tokenization::arena_numa_supported(), expected);
 }
 
+TEST(NumaArena, ABlockBelowTheMeasuredThresholdTakesThePortablePath)
+{
+    ArenaAllocator arena{kNumaBlockBytes - 1};
+    static_cast<void>(arena.allocate(kBlockBytes));
+    EXPECT_EQ(arena.numa_block_count(), 0U) << describe(numa::process_library());
+    EXPECT_EQ(numa::allocate_block(numa::process_library(), arena.numa_policy(),
+                                   kNumaBlockBytes - 1, ArenaAllocator::kDefaultBlockAlignment),
+              nullptr);
+}
+
 TEST(NumaArena, AFixedArenaOnNodeZeroTakesTheNumaPathExactlyWhenLibnumaLoadedAndAvailable)
 {
     const bool expected{numa_path_expected()};
-    ArenaAllocator arena{kBlockBytes,
+    ArenaAllocator arena{kNumaBlockBytes,
                          ArenaNumaPolicy{.kind = ArenaNumaPolicy::Kind::Fixed, .node = 0}};
     EXPECT_EQ(arena.numa_policy().kind,
               expected ? ArenaNumaPolicy::Kind::Fixed : ArenaNumaPolicy::Kind::Disabled)
@@ -172,8 +183,8 @@ TEST(NumaArena, AFixedArenaOnNodeZeroTakesTheNumaPathExactlyWhenLibnumaLoadedAnd
 
 TEST(NumaArena, ADisabledArenaNeverTakesTheNumaPath)
 {
-    ArenaAllocator arena{kBlockBytes, ArenaNumaPolicy{.kind = ArenaNumaPolicy::Kind::Disabled}};
-    static_cast<void>(arena.allocate(2 * kBlockBytes));
+    ArenaAllocator arena{kNumaBlockBytes, ArenaNumaPolicy{.kind = ArenaNumaPolicy::Kind::Disabled}};
+    static_cast<void>(arena.allocate(kNumaBlockBytes + 1));
     EXPECT_EQ(arena.numa_policy().kind, ArenaNumaPolicy::Kind::Disabled);
     EXPECT_EQ(arena.block_count(), 2U);
     EXPECT_EQ(arena.numa_block_count(), 0U);
@@ -181,7 +192,7 @@ TEST(NumaArena, ADisabledArenaNeverTakesTheNumaPath)
 
 TEST(NumaArena, AMovedFromArenaHoldsTheResolvedDisabledPolicy)
 {
-    ArenaAllocator source{kBlockBytes};
+    ArenaAllocator source{kNumaBlockBytes};
     ArenaAllocator target{std::move(source)};
     // note: reading the moved-from arena's policy IS the property under test.
     // NOLINTNEXTLINE(bugprone-use-after-move,clang-analyzer-cplusplus.Move)

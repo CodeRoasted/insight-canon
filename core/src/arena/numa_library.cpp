@@ -158,7 +158,8 @@ std::byte* allocate_block(const Library& library, const ArenaNumaPolicy& resolve
                           std::size_t bytes, std::size_t alignment) noexcept
 {
     static constexpr std::size_t kPageAlignment{4096};
-    if (!resolved.active() || !library.usable() || alignment > kPageAlignment)
+    if (!resolved.active() || !library.usable() || alignment > kPageAlignment ||
+        bytes < kMinimumBlockBytes)
         return nullptr;
     void* block{resolved.kind == ArenaNumaPolicy::Kind::Auto
                     ? library.allocate_local(bytes)

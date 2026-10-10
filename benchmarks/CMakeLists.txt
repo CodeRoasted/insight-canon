@@ -49,6 +49,7 @@ find_package(benchmark REQUIRED CONFIG)
 
 add_executable(insight_canon_bench
     ${CMAKE_CURRENT_SOURCE_DIR}/src/bench_main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/bench_arena.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/bench_tokenization.cpp)
 target_link_libraries(insight_canon_bench PRIVATE
     insight::canon insight::semantic_github insight::semantic_gitlab insight::semantic_jenkins

@@ -43,6 +43,11 @@ struct Library
     }
 };
 
+// invariant: a smaller block takes the portable path, which reuses memory libnuma must map anew.
+// note: gcc-16 bench_arena, one node: 24 MiB lifecycle 53x slower via libnuma, 32 MiB at parity.
+// refs: DN-142.D16
+inline constexpr std::size_t kMinimumBlockBytes{std::size_t{32} * 1024 * 1024};
+
 // post: the outcome's name, as the loader's debug line and a test's failure message print it.
 [[nodiscard]] std::string_view outcome_name(LoadOutcome outcome) noexcept;
 
@@ -65,8 +70,8 @@ struct Library
 // sanitizer build never takes the NUMA path.
 [[nodiscard]] ArenaNumaPolicy resolve(ArenaNumaPolicy requested, const Library& library) noexcept;
 
-// post: a block from libnuma for an active `resolved` policy (`numa_alloc_local` for `Auto`,
-// `numa_alloc_onnode` for `Fixed`), or nullptr, in which case the caller takes the portable path.
+// post: a block from libnuma for an active `resolved` policy and `bytes >= kMinimumBlockBytes`
+// (`numa_alloc_local` for `Auto`, `numa_alloc_onnode` for `Fixed`), or nullptr: the portable path.
 // pre: `resolved` is `resolve`'s answer for this same `library`.
 [[nodiscard]] std::byte* allocate_block(const Library& library, const ArenaNumaPolicy& resolved,
                                         std::size_t bytes, std::size_t alignment) noexcept;
