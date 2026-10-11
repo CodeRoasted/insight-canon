@@ -398,7 +398,11 @@ if(INSIGHT_CANON_BUILD_TESTS)
         # The suite list here is checked against `scripts/run_corpus_gates.sh`'s registry by that
         # script's `--census` arm, so the two cannot drift apart silently.
         set(CORPUS_SUITES "TransportPeelEquivalenceGate.*:BracketPeelEquivalenceGate.*:LogHubProjectionPinGate.*:ApacheTwoTwoProjectionPinGate.*:HealthAppRoutingPinGate.*")
-        gtest_discover_tests(insight_canon_tests TEST_FILTER "-${CORPUS_SUITES}")
+        # The golden regenerator is a hand-run tool, not a test (DN-142.D23 (4)): its exact name
+        # leaves the default population, so no run reports it `disabled`. Never a DISABLED_* glob,
+        # which would hide the next disabled test too. It stays in the binary for kRegenCommand.
+        set(NOT_A_TEST "MaskRuleGolden.DISABLED_RegenerateGolden")
+        gtest_discover_tests(insight_canon_tests TEST_FILTER "-${CORPUS_SUITES}:${NOT_A_TEST}")
         gtest_discover_tests(insight_canon_tests TEST_FILTER "${CORPUS_SUITES}"
                              PROPERTIES LABELS corpus)
         # libnuma is loaded, never linked (DN-142.D16): the test executable carries canon's whole
