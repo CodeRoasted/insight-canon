@@ -62,7 +62,7 @@ class InsightCanonBenchConan(ConanFile):
         cmake.configure()
         cmake.build()
         # Every first-party create calls the helper (DN-142.D5 (1)): it registers no test, so the
-        # helper runs none, and it records the tree's linked targets the step-0 census compares.
+        # helper runs none, and a test added later runs in this create from its first commit.
         runpy.run_path(self.conf.get("user.malf:recipe_tests"))["run_tests"](self)
 
     def package(self):
