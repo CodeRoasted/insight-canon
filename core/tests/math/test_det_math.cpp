@@ -133,7 +133,7 @@ TEST(DetMath, ReducerOrderIndependenceIsExact)
     FixedReducer reverse;
     for (auto it = std::rbegin(counts); it != std::rend(counts); ++it)
         reverse.add_fixed(static_cast<i128>(u128{*it}) * i128{l2n - det_log2_fixed(*it)});
-    EXPECT_EQ(forward.raw(), reverse.raw());
+    EXPECT_EQ(static_cast<u128>(forward.raw()), static_cast<u128>(reverse.raw()));
     EXPECT_DOUBLE_EQ(forward.normalized_bits(total), reverse.normalized_bits(total));
 }
 
