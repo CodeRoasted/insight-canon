@@ -8,9 +8,14 @@
 // invariant: that counter is legitimate in a test binary and NEVER in the shipped library.
 // invariant: determinism — byte-only, with no RNG, clock or float.
 // refs: LSRC-28
+#include <array>
+#include <bit>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <limits>
+#include <memory>
 #include <new>
 
 #include <gtest/gtest.h>
@@ -85,6 +90,23 @@ struct AllocGuard
     }
 };
 
+// invariant: an over-aligned block is carved from ONE malloc, the malloc's pointer kept in the
+// word before it: MSVC has no std::aligned_alloc, and a replaced operator new cannot call one.
+// post: at least `bytes` bytes aligned to `alignment` (a power of two), or nullptr.
+[[nodiscard]] void* over_aligned_allocation(std::size_t bytes, std::size_t alignment) noexcept
+{
+    if (bytes > std::numeric_limits<std::size_t>::max() - alignment - sizeof(void*))
+        return nullptr;
+    void* const origin{std::malloc(bytes + alignment + sizeof(void*))};
+    if (origin == nullptr)
+        return nullptr;
+    void* cursor{static_cast<std::byte*>(origin) + sizeof(void*)};
+    std::size_t space{bytes + alignment};
+    void* const aligned{std::align(alignment, bytes, cursor, space)};
+    std::memcpy(static_cast<std::byte*>(aligned) - sizeof(void*), &origin, sizeof(void*));
+    return aligned;
+}
+
 // post: at least `size` bytes aligned to `alignment`, or nullptr; a live guard counts it.
 // invariant: every allocating form below passes through here, so no form escapes the counter.
 [[nodiscard]] void* counted_allocation(std::size_t size, std::size_t alignment) noexcept
@@ -94,10 +116,20 @@ struct AllocGuard
     const std::size_t bytes{size != 0 ? size : 1};
     if (alignment <= alignof(std::max_align_t))
         return std::malloc(bytes);
-    if (bytes > std::numeric_limits<std::size_t>::max() - alignment)
-        return nullptr;
-    const std::size_t rounded{(bytes + alignment - 1) / alignment * alignment};
-    return std::aligned_alloc(alignment, rounded);
+    return over_aligned_allocation(bytes, alignment);
+}
+
+// pre: `block` came from counted_allocation at this `alignment`, or is nullptr.
+void aligned_release(void* block, std::align_val_t alignment) noexcept
+{
+    if (block == nullptr || static_cast<std::size_t>(alignment) <= alignof(std::max_align_t))
+    {
+        std::free(block);
+        return;
+    }
+    void* origin{nullptr};
+    std::memcpy(&origin, static_cast<std::byte*>(block) - sizeof(void*), sizeof(void*));
+    std::free(origin);
 }
 
 [[nodiscard]] void* throwing_allocation(std::size_t size, std::size_t alignment)
@@ -165,29 +197,29 @@ void operator delete[](void* block, const std::nothrow_t&) noexcept
 {
     std::free(block);
 }
-void operator delete(void* block, std::align_val_t) noexcept
+void operator delete(void* block, std::align_val_t alignment) noexcept
 {
-    std::free(block);
+    aligned_release(block, alignment);
 }
-void operator delete[](void* block, std::align_val_t) noexcept
+void operator delete[](void* block, std::align_val_t alignment) noexcept
 {
-    std::free(block);
+    aligned_release(block, alignment);
 }
-void operator delete(void* block, std::size_t, std::align_val_t) noexcept
+void operator delete(void* block, std::size_t, std::align_val_t alignment) noexcept
 {
-    std::free(block);
+    aligned_release(block, alignment);
 }
-void operator delete[](void* block, std::size_t, std::align_val_t) noexcept
+void operator delete[](void* block, std::size_t, std::align_val_t alignment) noexcept
 {
-    std::free(block);
+    aligned_release(block, alignment);
 }
-void operator delete(void* block, std::align_val_t, const std::nothrow_t&) noexcept
+void operator delete(void* block, std::align_val_t alignment, const std::nothrow_t&) noexcept
 {
-    std::free(block);
+    aligned_release(block, alignment);
 }
-void operator delete[](void* block, std::align_val_t, const std::nothrow_t&) noexcept
+void operator delete[](void* block, std::align_val_t alignment, const std::nothrow_t&) noexcept
 {
-    std::free(block);
+    aligned_release(block, alignment);
 }
 
 // invariant: the synthetic vocabulary is deliberately NOT any real ecosystem's tokens, so a failure
@@ -505,6 +537,37 @@ TEST(SemanticWalkers, LevelLiftUnclaimedLineIsUnknown)
             << "no declared row claims \"" << line << "\" — expected Unknown, got "
             << insight::to_string(got);
     }
+}
+
+namespace
+{
+constexpr std::size_t kOverAlignment{64};
+static_assert(kOverAlignment > alignof(std::max_align_t));
+
+struct alignas(kOverAlignment) OverAligned
+{
+    std::array<std::byte, kOverAlignment> payload{};
+};
+} // namespace
+
+// invariant: the counter's over-aligned form hands back an aligned block, counted once, and its
+// aligned delete frees the malloc the block was carved from (a wrong pointer is an ASan red).
+// assert: the block ESCAPES into a static, because an allocation nothing observes may be elided.
+TEST(SemanticWalkers, OverAlignedAllocationIsAlignedCountedAndReleased)
+{
+    static std::unique_ptr<OverAligned> escaped;
+    std::size_t observed{0};
+    std::uintptr_t address{0};
+    {
+        const AllocGuard guard;
+        escaped = std::make_unique<OverAligned>();
+        address = std::bit_cast<std::uintptr_t>(escaped.get());
+        observed = guard.count();
+    }
+    escaped.reset();
+    EXPECT_EQ(address % kOverAlignment, 0U)
+        << "address " << address << " is not aligned to " << kOverAlignment;
+    EXPECT_EQ(observed, 1U) << "allocations counted: " << observed << ", expected exactly 1";
 }
 
 // invariant: the recognizer probe path performs ZERO heap allocations — it is a pure byte scan.
