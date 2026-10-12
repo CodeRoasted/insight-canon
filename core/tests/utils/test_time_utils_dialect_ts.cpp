@@ -26,7 +26,8 @@ namespace
 {
     using namespace std::chrono;
     const sys_days civil_day{std::chrono::year{year_value} / month_value / day_value};
-    return (civil_day + hours{hour_value} + minutes{minute_value} + seconds{second_value})
+    return (sys_seconds{civil_day} + hours{hour_value} + minutes{minute_value} +
+            seconds{second_value})
         .time_since_epoch()
         .count();
 }
