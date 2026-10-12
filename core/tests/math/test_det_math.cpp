@@ -104,7 +104,8 @@ TEST(DetMath, ReducerUniformDistributionEntropyIsExact)
     for (int i = 0; i < 4; ++i)
     {
         constexpr std::uint64_t count{25};
-        reducer.add_fixed(static_cast<__int128>(count) * (log2_total - det_log2_fixed(count)));
+        reducer.add_fixed(static_cast<i128>(u128{count}) *
+                          i128{log2_total - det_log2_fixed(count)});
     }
     EXPECT_DOUBLE_EQ(reducer.normalized_bits(total), 2.0);
 }
@@ -113,8 +114,8 @@ TEST(DetMath, ReducerConstantDistributionEntropyIsZero)
 {
     FixedReducer reducer;
     constexpr std::int64_t total{100};
-    reducer.add_fixed(static_cast<__int128>(100) *
-                      (det_log2_fixed(static_cast<std::uint64_t>(total)) - det_log2_fixed(100)));
+    reducer.add_fixed(
+        i128{100} * i128{det_log2_fixed(static_cast<std::uint64_t>(total)) - det_log2_fixed(100)});
     EXPECT_DOUBLE_EQ(reducer.normalized_bits(total), 0.0);
 }
 
@@ -128,10 +129,10 @@ TEST(DetMath, ReducerOrderIndependenceIsExact)
     const std::int64_t l2n{det_log2_fixed(static_cast<std::uint64_t>(total))};
     FixedReducer forward;
     for (std::uint64_t c : counts)
-        forward.add_fixed(static_cast<__int128>(c) * (l2n - det_log2_fixed(c)));
+        forward.add_fixed(static_cast<i128>(u128{c}) * i128{l2n - det_log2_fixed(c)});
     FixedReducer reverse;
     for (auto it = std::rbegin(counts); it != std::rend(counts); ++it)
-        reverse.add_fixed(static_cast<__int128>(*it) * (l2n - det_log2_fixed(*it)));
+        reverse.add_fixed(static_cast<i128>(u128{*it}) * i128{l2n - det_log2_fixed(*it)});
     EXPECT_EQ(forward.raw(), reverse.raw());
     EXPECT_DOUBLE_EQ(forward.normalized_bits(total), reverse.normalized_bits(total));
 }
@@ -139,10 +140,10 @@ TEST(DetMath, ReducerOrderIndependenceIsExact)
 // invariant: the rounding division rounds half AWAY from zero, symmetrically on both signs.
 TEST(DetMath, RoundDivRoundsHalfAwayDeterministically)
 {
-    EXPECT_EQ(round_div(static_cast<__int128>(10), 4), 3);
-    EXPECT_EQ(round_div(static_cast<__int128>(9), 4), 2);
-    EXPECT_EQ(round_div(static_cast<__int128>(-10), 4), -3);
-    EXPECT_EQ(round_div(static_cast<__int128>(0), 7), 0);
+    EXPECT_EQ(round_div(i128{10}, 4), 3);
+    EXPECT_EQ(round_div(i128{9}, 4), 2);
+    EXPECT_EQ(round_div(i128{-10}, 4), -3);
+    EXPECT_EQ(round_div(i128{0}, 7), 0);
 }
 
 TEST(DetMath, FixedToDoubleIsExactForPowerOfTwoScale)
