@@ -26,6 +26,16 @@ name: Determinism Golden Proof
 #
 # Runs on every PR to main (full matrix — determinism is caught in the PR, per Founder direction) and
 # as the Release gate (workflow_call) + weekly drift catch + manual dispatch.
+#
+# THE PRE-TAG READING IS DISPATCHED BY STEP 0 ITSELF (the Founder, 2026-10-13, the N360 plan's
+# ruling R-12 (a)): `pharos build` dispatches this workflow at `main` after its A1 stage recorded the
+# commits, with `record-run` (its own run) and `record-commits` (`<repo>=<40-hex>` words), waits for
+# it, and ingests the agreed digest only when the run's title is exactly the one those inputs render
+# and its commit is the one A1 recorded. Canon reads no sibling, so the commits only bind its own.
+
+run-name: >-
+  ${{ inputs.record-run && format('Determinism Golden Proof — step 0 run {0} — {1}', inputs.record-run, inputs.record-commits)
+  || 'Determinism Golden Proof' }}
 
 permissions:
   contents: read
@@ -34,6 +44,21 @@ permissions:
 on:
   workflow_call:
   workflow_dispatch:
+    inputs:
+      record-run:
+        description: >-
+          THE PRE-TAG READING: the pharos-build run id of this cut's step 0 in CodeRoasted/coderoast,
+          which dispatches this run itself; the run's title names it for `pharos cut`.
+        type: string
+        default: ''
+        required: false
+      record-commits:
+        description: >-
+          The commits step 0 recorded, as `<repository>=<40-hex>` words; this run refuses unless
+          the one named for insight-canon is the commit it runs at.
+        type: string
+        default: ''
+        required: false
   pull_request:
     branches: [main]
   schedule:
@@ -41,10 +66,13 @@ on:
 
 jobs:
   proof:
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-golden-proof.yml@49af9b28fd94fe3209c8d38eff81e7df60216824
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-golden-proof.yml@9f5d575f2b5f1acceb1b1d1198a100b31de71c95
     with:
       linux-proof: scripts/det_public_proof.sh
       msvc-proof: scripts/det_msvc_proof.ps1
+      record-run: ${{ inputs.record-run }}
+      record-commits: ${{ inputs.record-commits }}
+      record-self: insight-canon
 
   compare:
     # A failed or skipped leg never SKIPS the verdict (ROADMAP N370): the compare runs on every
@@ -52,6 +80,6 @@ jobs:
     # green run of this workflow whose compare job is absent or not green.
     needs: [proof]
     if: ${{ !cancelled() }}
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-golden-compare.yml@49af9b28fd94fe3209c8d38eff81e7df60216824
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-golden-compare.yml@9f5d575f2b5f1acceb1b1d1198a100b31de71c95
     with:
       min-legs: '5'
