@@ -294,7 +294,7 @@ declarations; it is a release-cut surface and is deliberately not re-rendered th
 
 ## `-16` — the Log4j locator: a pid-less prefix is not OpenStack, and a stamp's fraction is read whole
 
-This generation is owed by the Founder's ruling of 2026-09-26 (`LEXICON.md` § *Rulings closed*):
+This generation is owed by the Founder's ruling of 2026-09-26 (`RULINGS.md`, `RUL-8`):
 the token moves at most once per cut, and only if canon's serialized output changed for some input
 since the previous release tag — decided by bytes, never by intent. `-15` SHIPPED in `v1.10.4`
 (canon `dfbeddd`), and a generation is open only while no release tag carries it, so the two
@@ -427,7 +427,7 @@ their bytes declare, for example `[mpm_event:notice]` gives Info and `mpm_event`
 `AH00558` lines stay RawText. On LogHub's 2.2 `Apache_2k.log` (the Zenodo 8196385 re-cut, 2 000
 lines, sha256 `22c51ca1…`) the projection digest is `9dad52ad…` before and after the change.
 
-**It rides `-17`** under the Founder's ruling of 2026-09-26 (`LEXICON.md` § *Rulings closed*):
+**It rides `-17`** under the Founder's ruling of 2026-09-26 (`RULINGS.md`, `RUL-8`):
 one move per cut, and `-17` is this cut's.
 
 ### Rider — the sanitizer process tag
