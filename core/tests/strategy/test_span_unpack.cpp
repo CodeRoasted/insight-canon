@@ -363,7 +363,7 @@ TEST(SpanUnpack, DocumentPathAndFlatPathAgreeOnLinkedSpanIds)
         << ". The document path is LOSSY w.r.t. links[] — every Span Link in an export is "
            "destroyed "
            "before the flat-span parser sees it, which deletes the cross-trace Régime-B edge the "
-           "OTEL subject exists for (ADR-29.D8, ADR-29.D1/D2)";
+           "OTEL subject exists for (ADR-29.D8, ADR-29.D1, ADR-29.D2)";
 
     for (std::size_t index{0}; index < via_flat->linked_span_ids.size(); ++index)
         EXPECT_EQ(via_document->linked_span_ids[index], via_flat->linked_span_ids[index])
