@@ -1,4 +1,4 @@
-// refs: DN-89.D40, ADR-17.D1
+// refs: ADR-20.D32, ADR-17.D1
 // invariant: the GitHub dialect declares `Post job cleanup.` and `Cleaning up orphan processes` as
 // rows that CLOSE a job's declared steps, in both channels and only under its own dialect.
 // invariant: only `recognize_closer` returns a closing row.
@@ -47,7 +47,7 @@ constexpr std::string_view kOrphans{"Cleaning up orphan processes"};
 
 } // namespace
 
-// refs: DN-89.D40
+// refs: ADR-20.D32
 // invariant: both runner lines close the job's steps in the real channel and in our ablation alike,
 // and neither other walker reads them.
 TEST(GithubEpilogueCloser, BothRunnerTeardownLinesCloseInBothChannels)
@@ -70,7 +70,7 @@ TEST(GithubEpilogueCloser, BothRunnerTeardownLinesCloseInBothChannels)
     }
 }
 
-// refs: DN-89.D40
+// refs: ADR-20.D32
 // invariant: no naming or opening row of the dialect closes anything.
 TEST(GithubEpilogueCloser, NoOtherMarkerRowCloses)
 {
@@ -84,7 +84,7 @@ TEST(GithubEpilogueCloser, NoOtherMarkerRowCloses)
             << "\"" << line << "\" was read as a closing row";
 }
 
-// refs: DN-89.D40, ADR-22.D6
+// refs: ADR-20.D32, ADR-22.D6
 // invariant: the closing rows are gated to this dialect and anchored at the line start, so an
 // undeclared stream and a user step echoing the runner's text mid-line close nothing.
 TEST(GithubEpilogueCloser, TheClosersFireOnlyAtTheLineStartOfADeclaredStream)

@@ -57,7 +57,7 @@ classify(NormalizedContent content, const insight::semantic::ComposedSemantics& 
 // opening row matches.
 // invariant: an opening row carries no identity: the unit it opens is named by the naming row
 // of its kind that follows, and whether it takes effect is the segmenting caller's to decide.
-// refs: DN-89.D33
+// refs: ADR-17.D6
 [[nodiscard]] IntentMarkerKind
 recognize_opener(NormalizedContent content,
                  const insight::semantic::ComposedSemantics& composed) noexcept;
@@ -66,7 +66,7 @@ recognize_opener(NormalizedContent content,
 // enters the job's epilogue.
 // invariant: a closing row carries no identity and is of kind Step; what it does to the open
 // unit is the segmenting caller's to apply.
-// refs: DN-89.D40
+// refs: ADR-20.D32
 [[nodiscard]] bool recognize_closer(NormalizedContent content,
                                     const insight::semantic::ComposedSemantics& composed) noexcept;
 

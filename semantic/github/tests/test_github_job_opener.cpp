@@ -1,4 +1,4 @@
-// refs: DN-89.D33, ADR-17.D1
+// refs: ADR-17.D6, ADR-17.D1
 // invariant: the GitHub dialect declares `Current runner version: ` as a row that OPENS a job,
 // in both channels and only under its own dialect, and only `recognize_opener` returns it.
 // invariant: `recognize` never sees the opener, so no caller that asks it for a marker (the
@@ -50,7 +50,7 @@ constexpr std::string_view kNaming{"Complete job name: publish"};
 
 } // namespace
 
-// refs: DN-89.D33
+// refs: ADR-17.D6
 // invariant: the runner's first line opens a job in the real channel and in our ablation alike, and
 // `recognize` reads it as no marker.
 TEST(GithubJobOpener, TheRunnerVersionLineOpensAJobInBothChannels)
@@ -68,7 +68,7 @@ TEST(GithubJobOpener, TheRunnerVersionLineOpensAJobInBothChannels)
     }
 }
 
-// refs: DN-89.D33
+// refs: ADR-17.D6
 // invariant: the naming row is unchanged: it names the job with its payload, and opens nothing.
 TEST(GithubJobOpener, TheJobNameLineStillNamesTheJob)
 {
@@ -86,7 +86,7 @@ TEST(GithubJobOpener, TheJobNameLineStillNamesTheJob)
     }
 }
 
-// refs: DN-89.D33, ADR-22.D6
+// refs: ADR-17.D6, ADR-22.D6
 // invariant: the opener is gated to this dialect and anchored at the line start, so an undeclared
 // stream and a line quoting it mid-sentence open nothing.
 TEST(GithubJobOpener, TheOpenerFiresOnlyAtTheLineStartOfADeclaredStream)

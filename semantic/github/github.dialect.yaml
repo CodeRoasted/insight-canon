@@ -215,7 +215,7 @@ dialect:
           - "Another opener, a step marker, a declared error line or the end of input first leaves"
           - "the job it opened UNNAMED: `<unnamed-job>`, origin Opened, holding its lines, so a job"
           - "that dies before it is named is its own unit and never the previous job's lines"
-          - "(DN-89.D43, DN-89.D47)."
+          - "(ADR-17.D6)."
           - ""
           - "Measured on 4 000 run-grain annotated logs: of 15 766 such lines, 15 765 are a job"
           - "segment's first line and 15 209 are followed by a job name with no other marker"

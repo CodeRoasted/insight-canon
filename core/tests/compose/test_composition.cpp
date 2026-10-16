@@ -517,7 +517,7 @@ TEST(CompositionDeathTest, ADigitEndingMarkerFailsClosedAtRuntime)
     EXPECT_DEATH((void)compose(kDigitEndingSet), R"(declared value "ticket")");
 }
 
-// refs: DN-89.D43, DN-89.D33, DN-89.D47
+// refs: ADR-17.D6
 // invariant: an opening row exists on kind Job and on kind Step, so the unnamed unit an opener
 // leaves has one sentinel per kind to name it.
 // invariant: composition refuses one on any other kind, or one carrying identity, naming the row.
@@ -586,7 +586,7 @@ TEST(CompositionDeathTest, AStepOpeningRowCarryingIdentityFailsClosedAtRuntime)
         << "an opening row names nothing, so one with a payload extractor must be refused";
 }
 
-// refs: DN-89.D40
+// refs: ADR-20.D32
 // invariant: a row that CLOSES a job's steps enters the job's epilogue, a step-level unit, so
 // composition admits it on kind Step and refuses it on any other kind, naming the row.
 namespace

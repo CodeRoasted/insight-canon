@@ -58,7 +58,7 @@ constexpr std::array kProbes{
 
 } // namespace
 
-// refs: ADR-18.D1, DN-89.D40
+// refs: ADR-18.D1, ADR-20.D32
 // invariant: every Step row that NAMES its unit declares the introducer `@` on a one-token
 // payload; the Job rows and the Step rows that close a job's steps declare no version coordinate.
 TEST(GithubVersionCoordinate, BothStepRowsDeclareItAndTheJobRowDeclaresNone)

@@ -175,7 +175,7 @@ namespace
     // post: what the row's own walker recognizes on the content: `recognize` for a naming row;
     // `recognize_opener`'s kind for an opening row, and kind Step on a `recognize_closer` match.
     // invariant: an opening or closing row's result has an empty name, as it carries no identity.
-    // refs: DN-89.D33, DN-89.D40
+    // refs: ADR-17.D6, ADR-20.D32
     [[nodiscard]] insight::tokenization::IntentMarker
     recognize_as(const IntentMarkerRow& row, insight::tokenization::NormalizedContent content,
                  const ComposedSemantics& view) noexcept

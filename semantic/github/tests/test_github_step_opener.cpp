@@ -1,4 +1,4 @@
-// refs: DN-89.D47, ADR-17.D1, ADR-22.D6
+// refs: ADR-17.D6, ADR-17.D1, ADR-22.D6
 // invariant: the GitHub dialect declares `Prepare all required actions` as a row that OPENS a step,
 // in the annotated channel only and only under its own dialect.
 // invariant: only `recognize_opener` returns it.
@@ -52,7 +52,7 @@ constexpr std::string_view kOpener{"Prepare all required actions"};
 
 } // namespace
 
-// refs: DN-89.D47
+// refs: ADR-17.D6
 // invariant: the runner's preparation line opens a step on the annotated channel, and `recognize`
 // and `recognize_closer` read it as no marker.
 TEST(GithubStepOpener, ThePreparationLineOpensAStepOnTheAnnotatedChannel)
@@ -67,7 +67,7 @@ TEST(GithubStepOpener, ThePreparationLineOpensAStepOnTheAnnotatedChannel)
     EXPECT_FALSE(recognize_closer(norm_probe(kOpener), view)) << "the opener was read as a closer";
 }
 
-// refs: DN-89.D47, ADR-22.D6
+// refs: ADR-17.D6, ADR-22.D6
 // invariant: the gate is load-bearing: on the stripped channel the same line opens nothing.
 TEST(GithubStepOpener, ThePreparationLineOpensNothingOnTheStrippedChannel)
 {
@@ -78,7 +78,7 @@ TEST(GithubStepOpener, ThePreparationLineOpensNothingOnTheStrippedChannel)
         << "the opener fired on the stripped channel: " << show(opened);
 }
 
-// refs: DN-89.D47, ADR-22.D6
+// refs: ADR-17.D6, ADR-22.D6
 // invariant: the opener is gated to this dialect and anchored at the line start, so an undeclared
 // stream and a line quoting it mid-sentence open nothing.
 TEST(GithubStepOpener, TheOpenerFiresOnlyAtTheLineStartOfADeclaredStream)

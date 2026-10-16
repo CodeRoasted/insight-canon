@@ -319,7 +319,7 @@ namespace tokenization
     // pre: `composed` is a view already resolved for the stream; no dialect gate is tested here.
     // post: the longest opening row's kind; an opening row has no extractor, so its prefix alone
     // decides the match.
-    // refs: DN-89.D33
+    // refs: ADR-17.D6
     IntentMarkerKind recognize_opener(NormalizedContent content,
                                       const insight::semantic::ComposedSemantics& composed) noexcept
     {
@@ -334,7 +334,7 @@ namespace tokenization
 
     // pre: `composed` is a view already resolved for the stream; no dialect gate is tested here.
     // post: a closing row has no extractor, so its prefix alone decides the match.
-    // refs: DN-89.D40
+    // refs: ADR-20.D32
     bool recognize_closer(NormalizedContent content,
                           const insight::semantic::ComposedSemantics& composed) noexcept
     {

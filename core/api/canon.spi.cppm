@@ -540,18 +540,18 @@ struct VersionCoordinate
 
 // invariant: what a marker row does to a unit of its kind, a CLOSED set whose algorithm lives in
 // core; a new role is a grammar-version bump, part of the identity.
-// refs: DN-89.D33, DN-89.D40
+// refs: ADR-17.D6, ADR-20.D32
 enum class MarkerRole : std::uint8_t
 {
     // invariant: the row opens a unit and names it with its payload, at its own line.
     Names = 0,
     // invariant: the row opens a job at its own line and carries no identity; a naming row of
     // its kind before any other marker row names it, and a job no row names stays unnamed.
-    // refs: DN-89.D33, DN-89.D43
+    // refs: ADR-17.D6
     Opens,
     // invariant: the row ends its job's declared steps: its line enters the job's epilogue, a
     // step-level unit the segmenter supplies, and it carries no identity; legal on kind Step only.
-    // refs: DN-89.D40
+    // refs: ADR-20.D32
     Closes,
 };
 
@@ -592,7 +592,7 @@ struct IntentMarkerRow
     // exclusion — and its child_order is inert; composition refuses any other such row.
     // invariant: `recognize` returns Names rows only; `recognize_opener` returns only Opens rows
     // and `recognize_closer` only Closes rows.
-    // refs: DN-89.D33, DN-89.D40
+    // refs: ADR-17.D6, ADR-20.D32
     MarkerRole role{MarkerRole::Names};
 };
 
@@ -601,7 +601,7 @@ struct IntentMarkerRow
 // invariant: an Opens row is of kind Job or Step, so the unnamed unit an opener leaves has one
 // sentinel per kind to name it.
 // invariant: a Closes row is of kind Step, so the epilogue it enters is a step of its job.
-// refs: DN-89.D33, DN-89.D40, DN-89.D43, DN-89.D47
+// refs: ADR-17.D6, ADR-20.D32
 [[nodiscard]] constexpr bool unit_role_row_admitted(const IntentMarkerRow& row) noexcept
 {
     const bool no_identity{row.extract == PayloadExtract::None && row.version.introducer.empty() &&
@@ -646,7 +646,7 @@ struct IntentEmitRow
     std::string_view channel_gate{kAnyChannel};
     // invariant: the reader row's role, so a writer selecting a unit's banner selects its
     // naming row and never a row that only opens or closes one.
-    // refs: DN-89.D33, DN-89.D40
+    // refs: ADR-17.D6, ADR-20.D32
     MarkerRole role{MarkerRole::Names};
 };
 
