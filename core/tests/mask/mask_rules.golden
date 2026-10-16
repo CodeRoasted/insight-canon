@@ -95,7 +95,7 @@ literal_keep | libcc1plugin.so.0 | loading libcc1plugin.so.0 now | loading libcc
 # diagnostic_composite — the general per-segment rule that subsumed source-location.
 diagnostic_composite | tokenizer.cpp:4500:30: | error at tokenizer.cpp:4500:30: bad token | error at tokenizer.cpp:<*>:<*>: bad token
 diagnostic_composite | [6226:0609/094020.430910:ERROR:dbus/bus.cc:408] | [6226:0609/094020.430910:ERROR:dbus/bus.cc:408] Failed to connect | [<*>:<*>/<*>:ERROR:dbus/bus.cc:<*>] Failed to connect
-# DN-136.D4: a root reached behind a declared lead, or through `\` separators, masks the one component under it
+# ADR-16.D2: a root reached behind a declared lead, or through `\` separators, masks the one component under it
 # inside a location, and the file-and-line tail survives.
 diagnostic_composite | (/tmp/run-a1/x.ts:12:5) | at (/tmp/run-a1/x.ts:12:5) here | at (/tmp/<*>/x.ts:<*>:<*>) here
 diagnostic_composite | (C:\\Users\\u\\AppData\\Local\\Temp\\run-a1\\x.ts:12:5) | at (C:\\Users\\u\\AppData\\Local\\Temp\\run-a1\\x.ts:12:5) here | at (C:\\Users\\u\\AppData\\Local\\Temp\\<*>\\x.ts:<*>:<*>) here
@@ -110,14 +110,14 @@ ephemeral_root | /nix/store/abc123def456-glibc/lib/libc.so | mapping /nix/store/
 ephemeral_root | /private/var/folders/8j/a1/T/x | dir /private/var/folders/8j/a1/T/x ready | dir /private/var/folders/<*> ready
 ephemeral_root | /private/tmp/run-a1/x | dir /private/tmp/run-a1/x ready | dir /private/tmp/<*> ready
 ephemeral_root | C:\Users\u\AppData\Local\Temp\run-a1\x.ts | open C:\Users\u\AppData\Local\Temp\run-a1\x.ts ok | open C:\Users\u\AppData\Local\Temp\<*> ok
-# DN-136.D4: a path starts at byte 0 or right after a declared LEAD — a run of wrapper openers, an optional
+# ADR-16.D2: a path starts at byte 0 or right after a declared LEAD — a run of wrapper openers, an optional
 # `<key>=`, an optional `file://` — so a TokenStart root is the path's first component behind it, and `\`
 # separates components for the root predicate. A lead moves WHERE a root may sit, never what it matches.
 ephemeral_root | file:///tmp/run-a1/x.ts | loading file:///tmp/run-a1/x.ts now | loading file:///tmp/<*> now
 ephemeral_root | "/tmp/run-a1/s.json", | wrote "/tmp/run-a1/s.json", done | wrote "/tmp/<*> done
 ephemeral_root | TMPDIR=/tmp/run-a1 | export TMPDIR=/tmp/run-a1 now | export TMPDIR=/tmp/<*> now
 ephemeral_root | file:///C:/Users/u/AppData/Local/Temp/run-a1/x.ts | loading file:///C:/Users/u/AppData/Local/Temp/run-a1/x.ts now | loading file:///C:/Users/u/AppData/Local/Temp/<*> now
-# DN-136.D4's boundary: a root that is not the path's first component, a lead outside the grammar (a `:` label,
+# ADR-16.D2's boundary: a root that is not the path's first component, a lead outside the grammar (a `:` label,
 # an escaped quote, a file URL with an authority), the runner's own temp folder, a bare root and a near-miss name.
 literal_keep | /home/u/proj/tmp/x | copied /home/u/proj/tmp/x ok | copied /home/u/proj/tmp/x ok
 literal_keep | build/tmp/x | copied build/tmp/x ok | copied build/tmp/x ok
@@ -140,7 +140,7 @@ bracket_index | [gw0] | [gw0] PASSED test_alpha | [gw<*>] PASSED test_alpha
 
 # hash_counter — keep the counter marker, mask the number.
 hash_counter | #26 | step #26 done | step #<*> done
-# DN-136.D1: the counter reads through a COMPLETE wrapper shell (§3.2 of masking.md), as rule 5 reads a number:
+# ADR-16.D5: the counter reads through a COMPLETE wrapper shell (§3.2 of masking.md), as rule 5 reads a number:
 # the shell, the closer and the trailing bytes are kept, only the digits mask, and no param is pushed.
 hash_counter | (#9767): | INFO (#9767): watcher | INFO (#<*>): watcher
 hash_counter | [#42] | queued [#42] job | queued [#<*>] job
@@ -148,7 +148,7 @@ hash_counter | "#7", | tag "#7", ok | tag "#<*>", ok
 hash_counter | (#9767) | merged (#9767) today | merged (#<*>) today
 hash_counter | #9767): | INFO #9767): watcher | INFO #<*>): watcher
 bracket_index | [42] | queued [42] job | queued [<*>] job
-# DN-136.D1's boundary: a letter after the run, an incomplete shell, a byte before the opener, an empty core.
+# ADR-16.D5's boundary: a letter after the run, an incomplete shell, a byte before the opener, an empty core.
 literal_keep | (#42a) | merged (#42a) today | merged (#42a) today
 literal_keep | (#42 | merged (#42 today | merged (#42 today
 literal_keep | fix(#123): | fix(#123): bump parser | fix(#123): bump parser

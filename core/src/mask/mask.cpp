@@ -176,14 +176,14 @@ namespace
     inline constexpr std::array<std::string_view, 2> kRootNixStore{
         {std::string_view{"nix"}, std::string_view{"store"}}};
     // note: the macOS real paths of `/var/folders` and `/tmp`.
-    // refs: DN-136.D4
+    // refs: ADR-16.D2
     inline constexpr std::array<std::string_view, 3> kRootPrivateVarFolders{
         {std::string_view{"private"}, std::string_view{"var"}, std::string_view{"folders"}}};
     inline constexpr std::array<std::string_view, 2> kRootPrivateTmp{
         {std::string_view{"private"}, std::string_view{"tmp"}}};
     // invariant: the run names the Windows per-user temp folder and nothing else; the drive and
     // user components before it vary by machine.
-    // refs: DN-136.D4
+    // refs: ADR-16.D2
     inline constexpr std::array<std::string_view, 3> kRootWindowsUserTemp{
         {std::string_view{"AppData"}, std::string_view{"Local"}, std::string_view{"Temp"}}};
 
@@ -214,7 +214,7 @@ namespace
                                       { return root.segments.size() <= kMaxRootSegments; }),
                   "a declared ephemeral root is longer than the matcher's look-back window");
 
-    // refs: DN-136.D4, ADR-16.D2
+    // refs: ADR-16.D2
     // post: true for a byte that separates path components for the root predicate - a run of `\`
     // is one separator, as JSON escaping doubles it.
     [[nodiscard]] constexpr bool is_root_separator(char chr) noexcept
@@ -244,7 +244,7 @@ namespace
     // note: a file URL with an empty authority, whose path is the absolute path after it.
     inline constexpr std::string_view kFileUrlScheme{"file://"};
 
-    // refs: DN-136.D4, F-SRC-insight-canon:canon.detail.scan.cppm:kWrapperPairs
+    // refs: ADR-16.D2, F-SRC-insight-canon:canon.detail.scan.cppm:kWrapperPairs
     // post: the offset of the PATH's first component - past the separator that opens the path at
     // byte 0 or right after a declared lead - or npos when the token opens no path there.
     // invariant: the lead grammar is closed - wrapper openers, then optionally `<key>=` and more
@@ -309,7 +309,7 @@ namespace
                 continue;
             // assert: consecutive AND separator-joined - every separator from the root's FIRST
             // component onward must be a path separator, so a colon coincidence never matches.
-            // refs: ADR-16.D2, DN-136.D4
+            // refs: ADR-16.D2
             for (std::size_t idx{first}; idx < window.size(); ++idx)
                 if (!is_root_separator(window[idx].sep_before))
                 {
@@ -393,7 +393,7 @@ namespace
                     --trail;
                 return std::pair{lead, trail};
             }};
-        // refs: DN-136.D4
+        // refs: ADR-16.D2
         // post: appends a letter-led segment holding `\`, masking only a component directly under
         // a root its `\`-separated components reach; with no such root the bytes are unchanged.
         const auto append_backslash_segment{
@@ -507,7 +507,7 @@ namespace
 
     // post: where the token's first declared root ends - the offset just past its last component -
     // and that root's scope, else nullopt.
-    // refs: F-SRC-insight-canon:mask.cpp:root_scope_ending_at, DN-136.D4
+    // refs: F-SRC-insight-canon:mask.cpp:root_scope_ending_at, ADR-16.D2
     [[nodiscard]] inline std::optional<RootHit> first_root(std::string_view tok)
     {
         std::array<PathComponent, kMaxRootSegments> window{};
@@ -546,7 +546,7 @@ namespace
     // invariant: segment-anchored rather than prefix-matched, which is what lets a mid-path
     // floating root match; it is not a general absolute-path masker.
     // post: the instance keeps the separator before it verbatim, a `/` or a run of `\`.
-    // refs: F-SRC-insight-canon:mask.cpp:root_scope_ending_at, DN-136.D4
+    // refs: F-SRC-insight-canon:mask.cpp:root_scope_ending_at, ADR-16.D2
     [[nodiscard]] inline bool normalize_ephemeral_root(std::string_view tok, std::string& out)
     {
         const std::optional<RootHit> hit{first_root(tok)};
@@ -713,7 +713,7 @@ namespace
         return cursor;
     }
 
-    // refs: DN-136.D1, F-SRC-insight-canon:canon.api.cppm:complete_shell_core
+    // refs: ADR-16.D5, F-SRC-insight-canon:canon.api.cppm:complete_shell_core
     // post: keeps the counter marker and masks the index, bare or inside a complete wrapper shell
     // whose core is a bare counter - the shell, its closer and the trailing bytes stay verbatim.
     // invariant: the shelled acceptance set is the set the bare counter masks, so it merges

@@ -1113,7 +1113,7 @@ TEST(StatelessTemplate, ANumberInACompleteWrapperShellMasksAsItWouldBare)
                 }
             }
     // invariant: the false High pair DN-134.D1 measured — two runs' stamps in brackets were two
-    // templates and read as a new error pattern; the shelled counter masks too (DN-136.D1).
+    // templates and read as a new error pattern; the shelled counter masks too (ADR-16.D5).
     EXPECT_EQ(masked("[05:28:20.280] ERROR (#1537)", arena), "<*> ERROR (#<*>)");
     EXPECT_EQ(masked("[03:03:56.484] ERROR (#2210)", arena), "<*> ERROR (#<*>)");
     EXPECT_EQ(masked("finished in (1.7s)", arena), masked("finished in (11.2s)", arena));

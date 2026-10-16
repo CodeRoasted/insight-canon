@@ -617,7 +617,7 @@ each to the predicted list.
 
 **It rides `-17`.**
 
-### Rider — the hash counter reads a complete wrapper shell (DN-136.D1)
+### Rider — the hash counter reads a complete wrapper shell (ADR-16.D5)
 
 **What changed.** A hash counter inside a complete wrapper shell — a catalog opener at byte 0, a core the bare counter
 claims (`#`, a digit run, then no letter or digit) holding neither byte of that pair, the opener's own closer and at
@@ -638,7 +638,7 @@ params byte-identical on every event. Distinct templates holding such a token on
 
 **It rides `-17`.**
 
-### Rider — a path starts after a declared lead, `\` separates path components, and three roots join the catalog (DN-136.D4)
+### Rider — a path starts after a declared lead, `\` separates path components, and three roots join the catalog (ADR-16.D2)
 
 **What changed.** A `TokenStart` root now sits at the PATH's first component, and the path starts at byte 0 or right
 after a declared lead (a run of wrapper openers, an optional `<key>=`, an optional `file://`), so `file:///tmp/<run>`,
@@ -650,7 +650,7 @@ only, and inside a segment only the component directly under a matched root mask
 **Which serialized fields move.** `template_str` and `template_id` of a line holding such a path. `params` move on
 none.
 
-**Witness inputs.** `core/tests/mask/mask_rules.golden` pins the eight forms of `DN-136.D4`, a `/private/tmp` row and
+**Witness inputs.** `core/tests/mask/mask_rules.golden` pins the eight forms of `ADR-16.D2`, a `/private/tmp` row and
 the eight literal boundaries (`/home/u/proj/tmp/x`, `build/tmp/x`, `user@host:/tmp/x`, `\"/tmp/x`, the runner's
 `_temp`, `(/tmp)`, `file://host/tmp/x`, `AppData\Local\Templates`). Measured as above, against the build with the
 rider before it: 360 747 events move, every moved token is the rule's normal form of its base token and every token

@@ -47,7 +47,7 @@
 #   wrapper shell takes rule 5's disposition, so `(1)`, `[2.1]`, `"5.15.0-164-generic",`,
 #   `(2.35-0ubuntu3.8)` mask whole as their bare forms already did) moved all 26; a1e07d2
 #   (DN-134.D2, rule K: a number behind `;` masks per segment) also moved
-#   builds_apache_org/job_Brooklyn_job_brooklyn_dist_job_PR_145__56.log; f86abdb (DN-136.D4: a
+#   builds_apache_org/job_Brooklyn_job_brooklyn_dist_job_PR_145__56.log; f86abdb (ADR-16.D2: a
 #   path after a declared `"` lead masks under its ephemeral root) also moved
 #   debbie_postgis_net/job_PostGIS_multipipeline_extra_job_check_functions_ownership_on_upgrade_5165__2.log.
 #   No other commit moved a byte. Every moved line read against the three rules' masking.md
