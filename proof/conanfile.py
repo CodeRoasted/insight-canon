@@ -8,7 +8,7 @@ required_conan_version = ">=2.28"
 
 class InsightCanonProofConan(ConanFile):
     name = "insight_canon_proof"
-    version = "1.10.7"
+    version = "1.10.8"
     package_type = "application"
     license = "Apache-2.0"
     url = "https://github.com/CodeRoasted/insight-canon"
@@ -48,12 +48,12 @@ class InsightCanonProofConan(ConanFile):
         self.folders.source = "proof"
 
     def requirements(self):
-        self.requires("insight_canon/1.10.7")
-        self.requires("insight_semantic_github/1.10.7")
-        self.requires("insight_semantic_gitlab/1.10.7")
-        self.requires("insight_semantic_jenkins/1.10.7")
-        self.requires("insight_semantic_package_managers/1.10.7")
-        self.requires("insight_semantic_test_frameworks/1.10.7")
+        self.requires("insight_canon/1.10.8")
+        self.requires("insight_semantic_github/1.10.8")
+        self.requires("insight_semantic_gitlab/1.10.8")
+        self.requires("insight_semantic_jenkins/1.10.8")
+        self.requires("insight_semantic_package_managers/1.10.8")
+        self.requires("insight_semantic_test_frameworks/1.10.8")
         # `--digest` hashes each member column with canon's own SHA-256; canon links it PRIVATE.
         self.requires("picosha2/1.0.0")
 
