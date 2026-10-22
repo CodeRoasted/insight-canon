@@ -111,3 +111,9 @@ ingest:
     object: determinism-golden.txt
     commits: [insight-canon, metalog-spec]
     published: {assets: [{name: canon.det_proof.txt}]}
+
+# ── The jobs this repository's release.yaml runs beyond `attest` and `publish` (ROADMAP N394) ──────
+# pin_coherence INV-22's shape clause derives the release from this file: a job a tag runs that is
+# not declared here, or a declaration the release no longer carries, reds at its commit.
+release_jobs:
+  disclosure-set: "the exact-set disclosure gate's subject is the ref set the published tag joins, which does not exist when step 0 runs (OPS-7.O9)"

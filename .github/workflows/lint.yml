@@ -5,6 +5,9 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-lint.yml@b3b2dbb46b62e7df5b479d3fb66392b570a987df
