@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   lint:
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-lint.yml@8368339886f18faaf2e1afa2a5f9bbbdbd60f487
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-lint.yml@cd05d48f4107d4b0e286e4c5de183e83c8b9d7da
     permissions:
       contents: read
       actions: read   # malf's conan cache restore reads this job's runner group (actions-cache-allowed.sh)
@@ -30,7 +30,7 @@ jobs:
   sp1-semantic-unawareness:
     permissions:
       contents: read
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-script-gate.yml@8368339886f18faaf2e1afa2a5f9bbbdbd60f487
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-script-gate.yml@cd05d48f4107d4b0e286e4c5de183e83c8b9d7da
     with:
       gates: |
         bash scripts/sp1_semantic_unawareness_lint.sh
@@ -46,7 +46,7 @@ jobs:
   disclosure-set:
     permissions:
       contents: read
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-script-gate.yml@8368339886f18faaf2e1afa2a5f9bbbdbd60f487
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-script-gate.yml@cd05d48f4107d4b0e286e4c5de183e83c8b9d7da
     with:
       gates: bash scripts/disclosure_set_lint.sh
       full-history: true
