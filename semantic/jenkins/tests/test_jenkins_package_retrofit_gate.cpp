@@ -63,6 +63,7 @@ namespace
 
 // note: a `const char*`, not a string_view: it is handed to getenv, which needs the terminator
 constexpr const char* kCorpusVar{"CORPUS_JENKINS_MARKERS_DIR"};
+constexpr const char* kDataVar{"CORPUS_JENKINS_MARKERS_DATA_DIR"};
 constexpr std::string_view kTraceSidecar{"RETRO-v2.trace-sidecar.tsv"};
 // invariant: the frozen column order for a POSITIONAL reader — a drifted header is a red rather
 // than a guess.
@@ -72,7 +73,7 @@ constexpr std::string_view kTraceHeader{
     "\tconsole_finished\tstamp_class"};
 constexpr std::string_view kWfapiStages{"RETRO-v2.wfapi-stages.tsv"};
 constexpr std::string_view kConsoleStages{"RETRO-v2.console-stages.tsv"};
-constexpr std::string_view kBytesRoot{"data/v2"};
+constexpr std::string_view kBytesRoot{"v2"};
 
 constexpr std::size_t kMaxReportedRows{10};
 
@@ -457,7 +458,7 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
         if (raw == nullptr || *raw == '\0')
             FAIL() << kCorpusVar
                    << " unset — the private Jenkins marker corpus is not present. Point "
-                      "it at the tree holding the RETRO-v2.*.tsv projections and data/v2/ "
+                      "it at the tree holding the RETRO-v2.*.tsv projections "
                       "(i.e. .../coderoast-corpora/jenkins_corpora/marker_corpus).";
         root_ = std::filesystem::path{raw};
         ASSERT_TRUE(std::filesystem::is_regular_file(root_ / kTraceSidecar))
@@ -468,9 +469,17 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
             << kCorpusVar << ": missing " << kWfapiStages;
         ASSERT_TRUE(std::filesystem::is_regular_file(root_ / kConsoleStages))
             << kCorpusVar << ": missing " << kConsoleStages;
-        ASSERT_TRUE(std::filesystem::is_directory(root_ / kBytesRoot))
-            << kCorpusVar << ": no " << kBytesRoot << "/ under it — the corpus bytes ride the "
-            << "data/ symlink on the desk box and must be mounted.";
+        const char* const data{std::getenv(kDataVar)};
+        if (data == nullptr || *data == '\0')
+            FAIL()
+                << kDataVar
+                << " unset — the private Jenkins marker corpus bytes are not present. Point it at "
+                   "the bytes root holding "
+                << kBytesRoot << "/ (the runner's corpora-data/jenkins/marker).";
+        data_root_ = std::filesystem::path{data};
+        ASSERT_TRUE(std::filesystem::is_directory(data_root_ / kBytesRoot))
+            << kDataVar << " is set to '" << data << "' but there is no " << kBytesRoot
+            << "/ under it — the corpus bytes are materialized out-of-tree and must be mounted.";
     }
 
     [[nodiscard]] static const CorpusScore& score()
@@ -635,7 +644,7 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
             // assert: bytes are verified against the ATTESTED digest and size, never assumed —
             // wrong bytes under a right count is the fabricated-pass shape.
             bool read_ok{true};
-            const std::string bytes{read_file(root_ / kBytesRoot / row.path, read_ok)};
+            const std::string bytes{read_file(data_root_ / kBytesRoot / row.path, read_ok)};
             if (!read_ok)
             {
                 corpus.integrity_errors.push_back("trace '" + row.path +
@@ -773,9 +782,11 @@ class JenkinsRecognizerRetrofitGate : public ::testing::Test
     }
 
     static std::filesystem::path root_;
+    static std::filesystem::path data_root_;
 };
 
 std::filesystem::path JenkinsRecognizerRetrofitGate::root_{};
+std::filesystem::path JenkinsRecognizerRetrofitGate::data_root_{};
 
 // invariant: the shared diagnostic block is printed on ANY failure — every number with its
 // denominator, and the trace named.

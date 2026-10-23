@@ -44,9 +44,10 @@ namespace
 // canon-recognition file carries canon's five columns only, every one of them read here.
 // note: a `const char*`, not a string_view: it is handed to getenv, which needs the terminator
 constexpr const char* kCorpusVar{"CORPUS_GITLAB_MARKERS_DIR"};
+constexpr const char* kDataVar{"CORPUS_GITLAB_MARKERS_DATA_DIR"};
 constexpr std::string_view kSidecarFile{"PROBE-v1.trace-sidecar.tsv"};
 constexpr std::string_view kOracleFile{"PROBE-v1.canon-recognition.tsv"};
-constexpr std::string_view kBytesRoot{"data/v1"};
+constexpr std::string_view kBytesRoot{"v1"};
 
 // invariant: the identifiers name the BANNER axis and the strings are the sidecar's own, verbatim
 // from the frozen classifier through the generator.
@@ -391,8 +392,8 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
             FAIL() << kCorpusVar
                    << " unset — the private GitLab marker corpus is not present. Point it "
                       "at the tree holding "
-                   << kSidecarFile << ", " << kOracleFile
-                   << " and data/v1/ (i.e. .../coderoast-corpora/gitlab_corpora/marker_corpus).";
+                   << kSidecarFile << " and " << kOracleFile
+                   << " (i.e. .../coderoast-corpora/gitlab_corpora/marker_corpus).";
 
         root_ = std::filesystem::path{raw};
         // invariant: set-but-broken is a WIRING failure, not an absent corpus: the operator
@@ -404,8 +405,16 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
         ASSERT_TRUE(std::filesystem::is_regular_file(root_ / kOracleFile))
             << kCorpusVar << " is set to '" << raw << "' but there is no " << kOracleFile
             << " under it.";
-        ASSERT_TRUE(std::filesystem::is_directory(root_ / kBytesRoot))
-            << kCorpusVar << " is set to '" << raw << "' but there is no " << kBytesRoot
+        const char* const data{std::getenv(kDataVar)};
+        if (data == nullptr || *data == '\0')
+            FAIL()
+                << kDataVar
+                << " unset — the private GitLab marker corpus bytes are not present. Point it at "
+                   "the bytes root holding "
+                << kBytesRoot << "/ (the runner's corpora-data/gitlab/marker_corpus).";
+        data_root_ = std::filesystem::path{data};
+        ASSERT_TRUE(std::filesystem::is_directory(data_root_ / kBytesRoot))
+            << kDataVar << " is set to '" << data << "' but there is no " << kBytesRoot
             << "/ under it — the trace bytes are materialized out-of-tree and must be mounted.";
     }
 
@@ -564,7 +573,7 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
             // assert: the bytes are VERIFIED, sha256 and size, against the sidecar's attestation: a
             // right count over wrong bytes is the fabricated-pass shape counts cannot see.
             bool read_ok{true};
-            const std::string bytes{read_file(root_ / kBytesRoot / row.path, read_ok)};
+            const std::string bytes{read_file(data_root_ / kBytesRoot / row.path, read_ok)};
             if (!read_ok)
             {
                 corpus.integrity_errors.push_back("trace '" + row.path +
@@ -724,9 +733,11 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
     }
 
     static std::filesystem::path root_;
+    static std::filesystem::path data_root_;
 };
 
 std::filesystem::path GitLabPackageCorpusProofGate::root_{};
+std::filesystem::path GitLabPackageCorpusProofGate::data_root_{};
 
 // invariant: this block prints on ANY failure so a red is diagnosable without re-running under a
 // debugger — actual-vs-expected, with the trace named.

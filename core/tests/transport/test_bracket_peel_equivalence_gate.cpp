@@ -34,8 +34,9 @@ namespace
 {
 
 constexpr const char* kCorpusVar{"CORPUS_JENKINS_MARKERS_DIR"};
+constexpr const char* kDataVar{"CORPUS_JENKINS_MARKERS_DATA_DIR"};
 constexpr std::string_view kTraceSidecar{"RETRO-v2.trace-sidecar.tsv"};
-constexpr std::string_view kBytesRoot{"data/v2"};
+constexpr std::string_view kBytesRoot{"v2"};
 constexpr std::string_view kBracketRow{"bracket-rfc3339-line-prefix"};
 constexpr std::size_t kMaxReportedLines{10};
 
@@ -232,13 +233,20 @@ class BracketPeelEquivalenceGate : public ::testing::Test
         ASSERT_TRUE(std::filesystem::is_regular_file(root_ / kTraceSidecar))
             << kCorpusVar << " is set but " << kTraceSidecar
             << " is missing under it — a wiring error, not an absent corpus.";
-        ASSERT_TRUE(std::filesystem::is_directory(root_ / kBytesRoot))
-            << kCorpusVar << ": no " << kBytesRoot << "/ under it.";
+        const char* const data{std::getenv(kDataVar)};
+        if (data == nullptr || *data == '\0')
+            FAIL() << kDataVar
+                   << " unset — the private Jenkins marker corpus bytes are not present.";
+        data_root_ = std::filesystem::path{data};
+        ASSERT_TRUE(std::filesystem::is_directory(data_root_ / kBytesRoot))
+            << kDataVar << ": no " << kBytesRoot << "/ under it.";
     }
 
     static std::filesystem::path root_;
+    static std::filesystem::path data_root_;
 };
 std::filesystem::path BracketPeelEquivalenceGate::root_{};
+std::filesystem::path BracketPeelEquivalenceGate::data_root_{};
 
 TEST_F(BracketPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheFrozenStrategyStrip)
 {
@@ -315,7 +323,7 @@ TEST_F(BracketPeelEquivalenceGate, DeclaredPeelIsByteIdenticalToTheFrozenStrateg
     for (const WholeStreamTrace& trace : traces)
     {
         read_ok = true;
-        const std::string bytes{read_file(root_ / kBytesRoot / trace.path)};
+        const std::string bytes{read_file(data_root_ / kBytesRoot / trace.path)};
         ASSERT_TRUE(read_ok) << trace.path;
         // invariant: bytes are verified against the attestation, never assumed.
         ASSERT_EQ(bytes.size(), trace.size) << trace.path << ": size drifted from the attestation";
