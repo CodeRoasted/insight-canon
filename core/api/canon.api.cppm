@@ -982,7 +982,7 @@ struct CanonicalEvent
     // invariant: a declared time outranks a transport observation stamp and a parsed one does not,
     // which is the difference the pipeline needs.
     // invariant: written ONLY in make_event beside the timestamp, off one field carrying both, so
-    // the pair cannot be split on the way here; consumed in memory and never serialized.
+    // the pair cannot be split on the way here; projected as the `declared_timestamp` output cell.
     // invariant: NOT derivable from trace.is_span and it must never be re-derived that way — an
     // OTLP LOG record carries a declared time with is_span false and often no trace at all.
     // refs: ADR-29.D5

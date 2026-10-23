@@ -378,7 +378,8 @@ namespace detail
     }
 
     // pre: `token` is a sub-view of `line` - the occurrence, matched by pointer identity.
-    // post: true iff `token`'s immediately preceding token is a digit-leading numeric.
+    // post: true iff `token`'s preceding token is a bare integer whose own predecessor is not
+    // digit-leading.
     // refs: ADR-20.D5
     [[nodiscard]] bool is_count_register(std::string_view line, std::string_view token) noexcept
     {

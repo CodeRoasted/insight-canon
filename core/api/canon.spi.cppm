@@ -200,8 +200,7 @@ class IFormatStrategy
     // invariant: non-zero only if parse() is structurally committed to succeeding on that line.
     // invariant: prefix-shaped confidence is admissible only where the format's grammar is FULLY
     // DETERMINED by that prefix.
-    // invariant: bounded by the line's HEADER and never by the line — this runs on every line of
-    // every stream.
+    // note: runs on every line of every stream, so its cost is paid on the detection hot path.
     // refs: ADR-16.D10
     [[nodiscard]] virtual double confidence(std::string_view line) const noexcept = 0;
 };

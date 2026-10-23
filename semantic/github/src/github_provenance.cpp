@@ -56,8 +56,8 @@ namespace
 // refs: ADR-20.D5, BIB:determinism_model
 // pre: `line` carries its ANSI intact and its declared transport already peeled — the SGR wrapper
 // is the only signal and stage 1 would destroy it.
-// post: true iff the whole visible content is ONE command-echo SGR span — open (`36;1`/`1;36`), a
-// content run, a reset (`0`/empty/`39`) — with no visible byte outside it.
+// post: true iff the line OPENS with a command-echo SGR (`36;1`/`1;36`), then an ESC-free run, a
+// reset (`0`/empty/`39`) and only whitespace, CR or LF; leading bytes or a trailing escape: false.
 bool is_echoed_source(std::string_view line) noexcept
 {
     std::size_t pos{0};

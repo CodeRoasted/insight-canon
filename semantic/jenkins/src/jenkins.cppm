@@ -12,8 +12,8 @@
 // assert: the peel is certified equal to the deleted strategy's strip by the bracket
 // peel-equivalence gate over the 12 whole-stream traces.
 // refs: F-SRC-insight-canon:test_bracket_peel_equivalence_gate.cpp
-// assert: on the 82 bare traces the equivalence is certified for the 75 rows still carrying the
-// pre-cut emission; the other 7 were re-emitted 2026-08-26 and carry NO before/after null.
+// assert: on the bare traces the equivalence is certified only for the rows still carrying the
+// pre-cut emission; BARE-v2.baseline.tsv's header counts the re-emitted rows, which carry none.
 // refs: F-SRC-insight-canon:test_jenkins_bare_null_gate.cpp
 module;
 
@@ -76,8 +76,8 @@ inline constexpr std::array<IntentMarkerRow, 2> kMarkers{{
 // refs: STU-8, BIB:intent_library
 // invariant: one emit row per recognition row, paired by prefix, kind and dialect gate — the
 // WRITER dual of the reader above.
-// post: `PayloadThenClosingParen` is the exact inverse of the reader's `RemainderToClosingParen`,
-// so rendering a stage payload reproduces `[Pipeline] { (<name>)`.
+// post: for a non-empty payload, `PayloadThenClosingParen` is the exact inverse of the reader's
+// `RemainderToClosingParen`; an empty one renders `[Pipeline] { ()`, which the reader declines.
 // invariant: the STEP emit needs no dual for the exclusion set: the writer only ever emits a real
 // step verb, never a structural token, so the round trip closes on every declared row.
 inline constexpr std::array<IntentEmitRow, 2> kEmitMarkers{{
