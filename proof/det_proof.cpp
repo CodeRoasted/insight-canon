@@ -32,14 +32,15 @@ namespace
 {
 // invariant: this decimal text is part of the canonical digest, so it goes through the portable
 // 128-bit shim and is byte-identical on every compiler.
-std::string i128_to_dec(insight::det::i128 value)
+constexpr std::string i128_to_dec(insight::det::i128 value)
 {
     using insight::det::i128;
     using insight::det::u128;
     const bool negative{!(value >= i128{0})};
-    // assert: u128 is what REPRESENTS the most-negative value's magnitude; i128 cannot, and its own
-    // operator set carries no remainder.
-    const u128 magnitude{static_cast<u128>(negative ? -value : value)};
+    // assert: the magnitude is negated in u128, where wrap is defined: negating the most-negative
+    // i128 overflows, and i128's own operator set carries no remainder.
+    const u128 bits{static_cast<u128>(value)};
+    const u128 magnitude{negative ? u128{0} - bits : bits};
     std::string out;
     u128 rest{magnitude};
     while (rest != u128{0})
@@ -55,6 +56,13 @@ std::string i128_to_dec(insight::det::i128 value)
     std::ranges::reverse(out);
     return out;
 }
+
+// assert: constant evaluation refuses undefined behaviour, so the most-negative value -- whose
+// signed negation overflows -- is proven here on every compiler, native and portable alike.
+static_assert(i128_to_dec(static_cast<insight::det::i128>(insight::det::u128{1} << 127U)) ==
+              "-170141183460469231731687303715884105728");
+static_assert(i128_to_dec(insight::det::i128{-1}) == "-1");
+static_assert(i128_to_dec(insight::det::i128{0}) == "0");
 
 std::string basename_of(const std::string& path)
 {
