@@ -257,7 +257,12 @@ TEST(ArenaAllocator_Reset, ReusesGrownBlocks)
     EXPECT_EQ(arena.used(), 0u);
     EXPECT_EQ(arena.capacity(), grown_capacity);
     EXPECT_EQ(arena.block_count(), grown_blocks);
-    EXPECT_NO_THROW(static_cast<void>(arena.allocate(128, 1)));
+
+    static_cast<void>(arena.allocate(128, 1));
+    EXPECT_EQ(arena.block_count(), grown_blocks)
+        << "post-reset overflow appended a block instead of reusing the grown one";
+    EXPECT_EQ(arena.capacity(), grown_capacity)
+        << "post-reset overflow grew capacity instead of reusing the grown block";
 }
 
 TEST(ArenaAllocator_Reset, CanAllocateFullCapacityAfterReset)
