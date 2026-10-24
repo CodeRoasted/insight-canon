@@ -48,7 +48,7 @@ TEST(TemplateIdInvariants, RenderShapeIsHColonThirtyTwoHex)
     }
 }
 
-TEST(TemplateIdInvariants, ContentDeterministic)
+TEST(TemplateIdInvariants, ContentInProcessStable)
 {
     for (const auto& sample : kSamples)
         EXPECT_EQ(template_id_of(sample), template_id_of(sample));

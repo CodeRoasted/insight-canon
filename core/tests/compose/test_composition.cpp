@@ -374,7 +374,7 @@ TEST(Composition, DegenerateCoreOnlyRuns)
         << "a JSON line must still tokenize under a zero-package composition";
 }
 
-TEST(Composition, SemanticIdentityIsReproducibleOrderIndependentAndContentSensitive)
+TEST(Composition, SemanticIdentityIsInProcessStableOrderIndependentAndContentSensitive)
 {
     // invariant: REPRODUCIBILITY — the same package set yields the same identity.
     const std::array oneA{kPkgA};
