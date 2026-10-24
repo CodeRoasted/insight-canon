@@ -956,6 +956,34 @@ TEST_F(JsonStrategyTest, TopLevelArrayReturnsError)
     EXPECT_FALSE(result.has_value());
 }
 
+// note: each line passes simdjson's structural index, fails its member walk, and is a corpus shape.
+TEST_F(JsonStrategyTest, AMalformedBraceLineIsKeptAsARolelessRecordAndNeverRefused)
+{
+    constexpr std::array<std::string_view, 5> kMalformedShapes{{
+        R"({'name': 'alpha', 'count': 2})",
+        R"(    { name: 'alpha', count: 2 })",
+        R"({ items: ["alpha"], count: 2 })",
+        R"({ def result = build(job, 'alpha') })",
+        R"({placeholder_name})",
+    }};
+    for (const std::string_view line : kMalformedShapes)
+    {
+        const auto result{strategy.parse(line, arena)};
+        ASSERT_TRUE(result.has_value())
+            << "line [" << line << "] refused, reason: " << result.error()
+            << " — expected a role-less record carrying the whole line";
+        const ParsedLine& parsed{result.value()};
+        EXPECT_EQ(parsed.content, line)
+            << "line [" << line << "] content [" << parsed.content << "] — expected the whole line";
+        EXPECT_EQ(parsed.level, LogLevel::Unknown) << "line [" << line << "]";
+        EXPECT_TRUE(parsed.component.empty())
+            << "line [" << line << "] component [" << parsed.component << "]";
+        EXPECT_FALSE(parsed.timestamp.has_stamp()) << "line [" << line << "]";
+        EXPECT_FALSE(parsed.trace.present) << "line [" << line << "]";
+        arena.reset();
+    }
+}
+
 TEST_F(CLFStrategyTest, NonStandardVerbPatchConfidence)
 {
     constexpr std::string_view line{

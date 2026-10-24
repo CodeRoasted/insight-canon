@@ -760,12 +760,15 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     JsonRecordSink sink;
     walk_json_object(root, sink);
     const bool recognized_message{sink.apply(parsed_line, line, arena)};
-    if (bool rewound{}; root.reset().get(rewound) != simdjson::SUCCESS)
-    {
-        INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=JSON root reset failed");
-        return std::unexpected(std::string("JsonStrategy: the object could not be re-read for "
-                                           "its OTEL members"));
-    }
+
+    // invariant: the reset fails only on bytes the structural index passed and no member grammar
+    // reads (`{'k': 1}`, `{k: 1}`, `{name}`): no OTEL record, kept from the members walked so far.
+    // invariant: a refusal here would drop the line, which a reading gap never earns.
+    bool rewound{};
+    const bool readable_again{root.reset().get(rewound) == simdjson::SUCCESS};
+    if (!readable_again)
+        INSIGHT_LOG_TRACE(logging::strategy_logger(),
+                          "strategy=JSON malformed member past the structural index");
 
     // invariant: the severity number becomes the level band and the trace keys become consumed
     // structural metadata; the trace keys are top-level, so they are never tokenized.
@@ -773,7 +776,7 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     // rule.
     // refs: ADR-29, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext
     // refs: F-SRC-insight-canon:canon.api.cppm:kOtelFieldCatalog
-    const bool is_otel{extract_otel_fields(root, parsed_line)};
+    const bool is_otel{readable_again && extract_otel_fields(root, parsed_line)};
 
     if (is_otel)
     {
