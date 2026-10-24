@@ -142,11 +142,12 @@ TEST(DiagnosticsQuoteNoInput, RolelessJsonWarningQuotesNoKey)
     const AttachedCapture capture{insight::logging::strategy_logger()};
     std::expected<CanonicalEvent, std::string> event{std::unexpected{std::string{"never run"}}};
     {
-        std::jthread probe{[&event]
-                           {
-                               Door door;
-                               event = door.tokenizer.process_line(kJsonProbe);
-                           }};
+        const insight::test_support::TestThread probe{
+            [&event]
+            {
+                Door door;
+                event = door.tokenizer.process_line(kJsonProbe);
+            }};
     }
     ASSERT_TRUE(event.has_value()) << "the probe yields no event: " << event.error();
     ASSERT_EQ(event->format, insight::LogFormat::JSON)

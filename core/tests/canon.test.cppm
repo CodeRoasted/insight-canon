@@ -34,4 +34,35 @@ export namespace insight::test_support
 {
     return insight::semantic::compose({});
 }
+
+// note: clang-21.1.8 drops libc++'s jthread lock lambda below gtest (llvm-project#172241).
+// post: one jthread runs the task; join() and the destructor (after request_stop) wait for it.
+class TestThread
+{
+  public:
+    explicit TestThread(std::function<void()> task);
+    TestThread(const TestThread&) = delete;
+    TestThread& operator=(const TestThread&) = delete;
+    TestThread(TestThread&& other) noexcept;
+    TestThread& operator=(TestThread&& other) noexcept;
+    ~TestThread();
+
+    void join();
+
+  private:
+    std::jthread thread_;
+};
+
+TestThread::TestThread(std::function<void()> task) : thread_{std::move(task)} {}
+
+TestThread::TestThread(TestThread&& other) noexcept = default;
+
+TestThread& TestThread::operator=(TestThread&& other) noexcept = default;
+
+TestThread::~TestThread() = default;
+
+void TestThread::join()
+{
+    thread_.join();
+}
 } // namespace insight::test_support
