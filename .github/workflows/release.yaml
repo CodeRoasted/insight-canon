@@ -36,7 +36,7 @@ jobs:
   # `runs-on`). `BUILD_RECORD_READ_TOKEN` is a fine-grained PAT whose only grant is
   # `Actions: Read-only` on CodeRoasted/coderoast.
   attest:
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-attest.yml@073206b62b27a628409b1909d036d23fdc5d0870
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-attest.yml@e46f0fc92d127ebdf517fe09f4da118551f8834e
     secrets:
       BUILD_RECORD_READ_TOKEN: ${{ secrets.BUILD_RECORD_READ_TOKEN }}
 
@@ -50,13 +50,13 @@ jobs:
     needs: attest
     permissions:
       contents: read
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-script-gate.yml@073206b62b27a628409b1909d036d23fdc5d0870
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-script-gate.yml@e46f0fc92d127ebdf517fe09f4da118551f8834e
     with:
       gates: bash scripts/disclosure_set_lint.sh
       full-history: true
 
   publish:
     needs: [attest, disclosure-set]
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-publish.yml@073206b62b27a628409b1909d036d23fdc5d0870
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-publish.yml@e46f0fc92d127ebdf517fe09f4da118551f8834e
     with:
       record-sha256: ${{ needs.attest.outputs.record-sha256 }}
