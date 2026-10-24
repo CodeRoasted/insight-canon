@@ -173,7 +173,7 @@ namespace
 }
 } // namespace
 
-TEST(NgramIdInvariants, Deterministic)
+TEST(NgramIdInvariants, InProcessStable)
 {
     const auto sequence{seq({"GET <*> -> <*>", "user <*> logged in", "charge order total"})};
     EXPECT_EQ(ngram_id_of(sequence), ngram_id_of(sequence));
