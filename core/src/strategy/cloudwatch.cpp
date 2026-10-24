@@ -9,7 +9,8 @@ import insight.canon.api;
 import insight.canon.detail.scan;
 
 // post: an AWS CloudWatch JSON log event — a millisecond epoch, a message and a log group.
-// invariant: the hot path uses simdjson on-demand through the shared scratch helpers.
+// invariant: an escape-free flat line takes the byte reader and any other the simdjson on-demand
+// walk, both through the shared scratch helpers and into one assignment rule.
 // invariant: detection is gated by an O(1) substring check, so the parse is invoked at most once
 // per line.
 // invariant: the log macros and the simdjson entities stay TEXTUAL in the global module fragment
@@ -21,66 +22,95 @@ namespace insight::tokenization
 namespace
 {
 
-    // invariant: the fast reader's assignment: a string member, its key resolved by the compound
-    // shape, fills the first still-empty role whose name list holds that key, in document order.
-    // invariant: a numeric `timestamp` or `ts` member is a millisecond epoch.
-    // invariant: the simdjson reader below reads only the strategy's declared keys, so a line whose
-    // roles sit under the wider names reads differently on the two paths.
-    struct CloudWatchFastSink
+    // invariant: THE ONE ASSIGNMENT RULE of a CloudWatch line, fed by the byte reader and the
+    // simdjson reader alike, so an unrelated member's bytes never move a role.
+    // invariant: only the strategy's declared top-level keys are read — `timestamp`, `level`,
+    // `logGroup`, `logStream`, `message` — and no compound spelling or descended member is.
+    // invariant: a role takes the FIRST member of its key and kind in document order — a number
+    // for `timestamp`, a string otherwise — and an empty string is a value.
+    // invariant: the component is `logGroup` when one was read, else `logStream`, whatever order.
+    // invariant: a `timestamp` is a millisecond count only when its whole token is an int64
+    // integer, so a fraction, an exponent or a literal past int64 leaves the time absent.
+    class CloudWatchRecordSink
     {
-        std::string_view timestamp_str;
-        std::int64_t timestamp_ms{0};
-        std::string_view level_str;
-        std::string_view component_str;
-        std::string_view message_str;
-
-        [[nodiscard]] bool member(std::string_view raw_key, JsonScalar scalar) noexcept
+      public:
+        [[nodiscard]] bool member(std::string_view key, JsonScalar scalar) noexcept
         {
-            if (scalar.kind == JsonScalarKind::String)
-                assign_string(compound_key_name(raw_key), scalar.text);
-            else if (scalar.kind == JsonScalarKind::Number)
-                assign_number(raw_key, scalar.text);
+            if (scalar.kind == JsonScalarKind::Number)
+            {
+                if (key == "timestamp" && !timestamp_seen_)
+                {
+                    timestamp_seen_ = true;
+                    timestamp_ms_ = parse_millis(scalar.text);
+                }
+            }
+            else if (scalar.kind == JsonScalarKind::String)
+            {
+                if (key == "level")
+                    take_first(level_, scalar.text);
+                else if (key == "logGroup")
+                    take_first(log_group_, scalar.text);
+                else if (key == "logStream")
+                    take_first(log_stream_, scalar.text);
+                else if (key == "message")
+                    take_first(message_, scalar.text);
+            }
             return true;
         }
 
         void descended_member(std::string_view /*key*/, JsonScalar /*scalar*/) noexcept {}
 
-        [[nodiscard]] bool has_timestamp() const noexcept
+        // post: the chosen roles written to `parsed`, the content being the `message` member or
+        // else the whole line.
+        // invariant: every value is parsed or arena-stored here, so the views it holds may dangle
+        // once this returns.
+        void apply(ParsedLine& parsed, std::string_view line, ArenaAllocator& arena) const
         {
-            return !timestamp_str.empty() || timestamp_ms != 0;
+            static constexpr std::int64_t kMillisecondsPerSecond{1000};
+            parsed.raw_line = line;
+            if (timestamp_ms_.has_value())
+            {
+                // invariant: the producer's exact millisecond count is divided to whole seconds
+                // toward zero, its remainder dropped: this strategy's event time has second grain.
+                // invariant: a second outside Timestamp's range leaves the time absent.
+                // refs: DN-17.D44, DN-43.D21
+                parsed.timestamp = EventTime::parsed(
+                    utils::epoch_seconds_to_timestamp(*timestamp_ms_ / kMillisecondsPerSecond));
+            }
+            if (level_.has_value())
+                parsed.level = EventLevel::declared(utils::parse_log_level(*level_));
+            if (const auto& component{log_group_.has_value() ? log_group_ : log_stream_})
+                parsed.component = arena.store_string(*component);
+            parsed.content = arena.store_string(message_.value_or(line));
         }
 
-        void assign_string(std::string_view key, std::string_view value) noexcept
+      private:
+        static void take_first(std::optional<std::string_view>& role,
+                               std::string_view value) noexcept
         {
-            if (!has_timestamp() && (key == "ts" || key == "timestamp" || key == "@timestamp" ||
-                                     key == "time" || key == "datetime"))
-                timestamp_str = value;
-            else if (level_str.empty() && (key == "level" || key == "severity" ||
-                                           key == "loglevel" || key == "log_level"))
-                level_str = value;
-            else if (component_str.empty() &&
-                     (key == "component" || key == "source" || key == "logger" ||
-                      key == "service" || key == "module" || key == "logGroup" ||
-                      key == "logStream"))
-                component_str = value;
-            else if (message_str.empty() && (key == "message" || key == "msg" || key == "log" ||
-                                             key == "text" || key == "body"))
-                message_str = value;
+            if (!role.has_value())
+                role = value;
         }
 
-        // invariant: the integer prefix of the literal is read and a literal past int64 leaves the
-        // field unset, so the time is absent rather than wrapped.
-        void assign_number(std::string_view key, std::string_view text) noexcept
+        [[nodiscard]] static std::optional<std::int64_t>
+        parse_millis(std::string_view text) noexcept
         {
-            if (has_timestamp() || (key != "timestamp" && key != "ts"))
-                return;
             std::int64_t millis{0};
-            if (std::from_chars(text.data(), text.data() + text.size(), millis).ec != std::errc{})
-                return;
-            timestamp_ms = millis;
+            const char* const end{text.data() + text.size()};
+            const auto [stop, error]{std::from_chars(text.data(), end, millis)};
+            if (error != std::errc{} || stop != end)
+                return std::nullopt;
+            return millis;
         }
+
+        bool timestamp_seen_{false};
+        std::optional<std::int64_t> timestamp_ms_;
+        std::optional<std::string_view> level_;
+        std::optional<std::string_view> log_group_;
+        std::optional<std::string_view> log_stream_;
+        std::optional<std::string_view> message_;
     };
-    static_assert(JsonMemberSink<CloudWatchFastSink>);
+    static_assert(JsonMemberSink<CloudWatchRecordSink>);
 
     // post: true iff the line carries one of the production-shape markers; a substring scan, which
     // is cheaper than parsing for the detection step.
@@ -95,13 +125,6 @@ namespace
 std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_view line,
                                                                  ArenaAllocator& arena) const
 {
-    static constexpr std::int64_t kMillisecondsPerSecond{1000};
-    static constexpr std::array<std::string_view, 1> kTimestampKeys{"timestamp"};
-    static constexpr std::array<std::string_view, 1> kLevelKeys{"level"};
-    static constexpr std::array<std::string_view, 1> kComponentLogGroup{"logGroup"};
-    static constexpr std::array<std::string_view, 1> kComponentLogStream{"logStream"};
-    static constexpr std::array<std::string_view, 1> kMessageKeys{"message"};
-
     // invariant: the cheap substring gate is what avoids a full simdjson parse on generic JSON.
     if (!has_cloudwatch_indicators(line))
     {
@@ -110,38 +133,18 @@ std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_vie
             std::string("CloudWatchStrategy: no CloudWatch indicator keys found"));
     }
 
+    // invariant: the byte reader bypasses simdjson for escape-free flat objects and falls back on
+    // any anomaly — nested structures, escape sequences or malformed JSON.
+    // invariant: both readers feed the one sink, so the reader decides only how bytes are read.
+    if (CloudWatchRecordSink fast; scan_flat_json(line, fast))
     {
-        // invariant: the fast path bypasses simdjson for escape-free objects and falls back on any
-        // anomaly — nested structures, escape sequences or malformed JSON.
-        if (CloudWatchFastSink fast; scan_flat_json(line, fast))
-        {
-            ParsedLine parsed;
-            parsed.raw_line = line;
-            if (fast.timestamp_ms != 0)
-            {
-                // invariant: the producer's exact millisecond count is divided to whole seconds
-                // toward zero, its remainder dropped: this path's event time has second grain.
-                // invariant: a second outside Timestamp's range leaves the time absent.
-                // refs: DN-17.D44, DN-43.D21
-                parsed.timestamp = EventTime::parsed(
-                    utils::epoch_seconds_to_timestamp(fast.timestamp_ms / kMillisecondsPerSecond));
-            }
-            else if (!fast.timestamp_str.empty())
-            {
-                parsed.timestamp = EventTime::parsed(utils::parse_iso8601(fast.timestamp_str));
-            }
-            if (!fast.level_str.empty())
-                parsed.level = EventLevel::declared(utils::parse_log_level(fast.level_str));
-            if (!fast.component_str.empty())
-                parsed.component = arena.store_string(fast.component_str);
-            parsed.content = fast.message_str.empty() ? arena.store_string(line)
-                                                      : arena.store_string(fast.message_str);
-            INSIGHT_LOG_DEBUG(
-                logging::strategy_logger(),
-                "strategy=CloudWatch fast_path component={} level={} has_timestamp={}",
-                parsed.component, to_string(parsed.level.value()), parsed.timestamp.has_value());
-            return std::expected<ParsedLine, std::string>{parsed};
-        }
+        ParsedLine parsed;
+        fast.apply(parsed, line, arena);
+        INSIGHT_LOG_DEBUG(logging::strategy_logger(),
+                          "strategy=CloudWatch fast_path component={} level={} has_timestamp={}",
+                          parsed.component, to_string(parsed.level.value()),
+                          parsed.timestamp.has_value());
+        return std::expected<ParsedLine, std::string>{parsed};
     }
 
     auto& scratch{json_scratch()};
@@ -162,40 +165,10 @@ std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_vie
         return std::unexpected(std::string("CloudWatchStrategy: not an object"));
     }
 
+    CloudWatchRecordSink sink;
+    walk_json_object(root, sink);
     ParsedLine parsed;
-    parsed.raw_line = line;
-
-    std::int64_t millis{};
-    if (try_get_int64(root, kTimestampKeys, millis))
-    {
-        // invariant: the producer's exact millisecond count is divided to whole seconds
-        // toward zero, its remainder dropped: this path's event time has second grain.
-        // invariant: a second outside Timestamp's range leaves the time absent.
-        // refs: DN-17.D44, DN-43.D21
-        parsed.timestamp =
-            EventTime::parsed(utils::epoch_seconds_to_timestamp(millis / kMillisecondsPerSecond));
-    }
-
-    std::string_view scratch_view;
-
-    if (try_get_string(root, kLevelKeys, scratch_view))
-        parsed.level = EventLevel::declared(utils::parse_log_level(scratch_view));
-
-    if (try_get_string(root, kComponentLogGroup, scratch_view) ||
-        try_get_string(root, kComponentLogStream, scratch_view))
-        parsed.component = arena.store_string(scratch_view);
-
-    if (try_get_string(root, kMessageKeys, scratch_view))
-    {
-        parsed.content = arena.store_string(scratch_view);
-    }
-    else
-    {
-        // invariant: the fallback arena-stores the ORIGINAL line, which avoids the heap allocation
-        // a re-serialisation would force.
-        parsed.content = arena.store_string(line);
-    }
-
+    sink.apply(parsed, line, arena);
     INSIGHT_LOG_DEBUG(logging::strategy_logger(),
                       "strategy=CloudWatch parsed component={} level={} has_timestamp={}",
                       parsed.component, to_string(parsed.level.value()),

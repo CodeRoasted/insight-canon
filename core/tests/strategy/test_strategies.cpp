@@ -2267,8 +2267,8 @@ TEST_F(CloudWatchStrategyTest, AMillisecondCountPastTimestampsRangeIsAbsentOnBot
     }
 }
 
-// invariant: a literal past int64 is refused by the fast path's reader instead of wrapping in its
-// digit loop; the simdjson path's get_int64 already refuses it.
+// invariant: a literal past int64 is refused by the one integer read both readers feed, instead of
+// wrapping.
 TEST_F(CloudWatchStrategyTest, ALiteralPastInt64CarriesNoTime)
 {
     for (const bool escaped : {false, true})

@@ -690,11 +690,12 @@ is byte-identical.
 **It rides `-17`.**
 
 
-## `-18` — one JSON record reads one way on both readers, and an ISO 8601 zone is read whole or refused
+## `-18` — one JSON or CloudWatch record reads one way on both readers, and an ISO 8601 zone is read whole or refused
 
 `-17` SHIPPED in `v1.10.6` and `v1.10.7` carried it unchanged, so an output change after that tag
 rides a new value, and this is the one step this cut takes. Two fixes ride it together, as the
-Founder ruled on 2026-10-23.
+Founder ruled on 2026-10-23, and a third, the CloudWatch readers' alignment, as he ruled on
+2026-10-24.
 
 **What changed — the JSON readers.** `JsonStrategy` reads an escape-free flat object with a byte
 reader and anything else with simdjson, and the two assigned a record's roles by different rules,
@@ -740,8 +741,18 @@ does not admit; it did not move.
 line's member set reaches one of the six rules above. For a line whose time `parse_iso8601`
 reads, the JSON and key-value readers among them: `timestamp_ns`, where the zone is hour-only or
 malformed. A reader that first checks the stamp against `rfc3339_datetime_length` never hands it
-such a zone, so its output did not move. The CloudWatch
-strategy's own assignment did not move.
+such a zone, so its output did not move. For a CloudWatch line on the byte reader: `component`,
+`level`, `timestamp_ns`, `declared_timestamp`, `declared_level`, `template_str`, `template_id` and
+`params`, each only where the line reaches the CloudWatch rule below.
+
+**What changed — the CloudWatch readers.** `CloudWatchStrategy` has the same two readers, and its
+byte reader borrowed the JSON vocabulary while the simdjson reader read only the strategy's
+declared keys. Both now report every member to one rule that reads only `timestamp` (a number
+whose whole token is an int64 integer, a millisecond count), `level`, `logGroup` then `logStream`,
+and `message`, the first member of a key in document order, an empty string being a value. The
+simdjson reader's output is unchanged on every witness below; what moved is the byte reader,
+plus one simdjson-reader corner: a key spelled with an escape (`"mess\u0061ge"`) is now read under
+its unescaped name, as the JSON reader reads it.
 
 **Witness inputs.** `core/tests/identity/projection.golden`, regenerated across this bump, holds
 each witness's whole projection on both sides; 16 of its 150 rows moved and the other 134,
@@ -762,9 +773,19 @@ tokenizer with no semantic package:
   severity and trace context;
 * `{"ts":"2026-03-23T12:00:00+05",…}` — `12:00:00Z`, now `07:00:00Z`; `-05` — now `17:00:00Z`;
 * `+05:3`, `+0X:00`, `+053` and `+053012` — a time read under a shorter or no zone, now absent.
+* CloudWatch, `{"logGroup":"g","msg":"a"}` — template `a`, now the whole line;
+  `{"logGroup":"g","severity":"error","message":"m"}` — level Error, now Unknown;
+  `{"service":"svc","logGroup":"g","message":"m"}` — component `svc`, now `g`;
+  `{"logStream":"s","logGroup":"g","message":"m"}` — component `s`, now `g`;
+  `{"timestamp":"2026-03-23T08:30:00Z",…}`, a numeric `ts` or a string `time` — a time, now
+  absent; `{"logGroup":"g","log.message":"x","message":"m"}` — template `x`, now `m`;
+  `"message":""` — the whole line, now empty; `"logGroup":""` beside a `logStream` — the stream,
+  now empty; `"timestamp":0` — absent, now the epoch; `1700000000000.5` and `1.7e12` — a time read
+  from the integer prefix, now absent.
 
-`core/tests/strategy/test_json_path_agreement.cpp` pins the reader agreement fixture by fixture
-and through the template id; `core/tests/utils/test_time_utils.cpp` pins the zone grammar.
+`core/tests/strategy/test_json_path_agreement.cpp` and
+`core/tests/strategy/test_cloudwatch_path_agreement.cpp` pin the reader agreement fixture by
+fixture and through the template id; `core/tests/utils/test_time_utils.cpp` pins the zone grammar.
 
 **Why one step.** A consumer crossing the next cut pays exactly one comparability event. The
 re-base cost is this string in `core/tests/mask/mask_rules.golden`, in

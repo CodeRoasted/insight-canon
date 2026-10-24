@@ -82,7 +82,7 @@ fall through to the level-inference path in [classification.md](classification.m
 | **AndroidLogcat** | `MM-DD HH:MM:SS.mmm` (yearless, see below) | priority letter → level | tag | — | Zero-copy fast scan. |
 | **WindowsCBS** | `YYYY-MM-DD HH:MM:SS` | explicit level word; `Verbose`, the lowest word of the Windows level family, reads Trace in this seat only | component | — | Windows Component-Based Servicing. `Verbose` is mapped inside this strategy and never added to the shared level lexicon, whose free-text walk would otherwise stop on a line opening with "verbose" before its failure cues. |
 | **SystemdJournal** | `__REALTIME_TIMESTAMP` (µs, to whole seconds); absent unless the whole field is decimal digits, or past 2262-04-11T23:47:16Z | `PRIORITY` | `_COMM` | — | journal export (JSON-shaped). |
-| **CloudWatch** | millis field (to whole seconds); absent outside 1677-09-21T00:12:44Z to 2262-04-11T23:47:16Z or past int64 | (JSON path) | (JSON path) | — | AWS CloudWatch JSON. |
+| **CloudWatch** | `timestamp`, an integer millisecond count (to whole seconds); absent when not a whole int64 integer, or outside 1677-09-21T00:12:44Z to 2262-04-11T23:47:16Z | `level` | `logGroup`, else `logStream` | — | AWS CloudWatch JSON; content is `message`, else the whole line. Only these declared top-level keys are read, by the byte reader and the simdjson reader alike: no wider vocabulary, no compound spelling, the first member of a key in document order. |
 | **HealthApp** | `YYYYMMDD-HH:MM:SS:mmm` | — | pipe-delimited field | — | |
 | **HPC** | decimal epoch seconds, absent past 2262-04-11T23:47:16Z | — | space-delimited field | — | |
 | **Proxifier** | `[MM.DD HH:MM:SS]` (yearless, see below) | — | process name | — | No level column → `Unknown`. |
