@@ -109,6 +109,44 @@ SyntheticCorpus make_nested_json_corpus(std::size_t n_lines, std::uint32_t seed)
     return corpus;
 }
 
+// post: escape-free flat JSON records, the shape canon's byte reader takes.
+SyntheticCorpus make_flat_json_corpus(std::size_t n_lines, std::uint32_t seed)
+{
+    static constexpr const char* kMessages[] = {
+        "connection reset by peer while reading upstream response",
+        "retry budget exhausted for shard primary; falling back",
+        "schema validation failed: expected integer, saw string",
+        "lease renewal deadline exceeded, releasing write lock",
+    };
+    constexpr std::size_t kMessageCount{sizeof(kMessages) / sizeof(kMessages[0])};
+
+    std::mt19937 rng{seed};
+    std::uniform_int_distribution<std::size_t> msg_dist{0, kMessageCount - 1};
+    std::uniform_int_distribution<std::uint32_t> val_dist{0, 999'999};
+
+    SyntheticCorpus corpus;
+    corpus.lines.reserve(n_lines);
+    for (std::size_t i{0}; i < n_lines; ++i)
+    {
+        std::string line;
+        line.reserve(256);
+        line += R"({"ts":"2026-01-15T10:22:)";
+        line += std::to_string((i % 60) / 10);
+        line += std::to_string((i % 60) % 10);
+        line += R"(Z","level":"warn","component":"orders-api","message":")";
+        line += kMessages[msg_dist(rng)];
+        line += R"(","request_id":")";
+        line += std::to_string(val_dist(rng));
+        line += R"(","attempt":)";
+        line += std::to_string(val_dist(rng) % 5);
+        line += R"(,"latency_ms":)";
+        line += std::to_string(val_dist(rng) % 4000);
+        line += "}";
+        corpus.lines.push_back(std::move(line));
+    }
+    return corpus;
+}
+
 void run_throughput(benchmark::State& state, const insight::semantic::ComposedSemantics& composed)
 {
     const auto n_templates{static_cast<std::size_t>(state.range(0))};
@@ -172,13 +210,11 @@ void BM_TokenizationThroughputDegenerate(benchmark::State& state)
     run_throughput(state, composed);
 }
 
-// refs: ADR-29.D7
-void BM_TokenizationThroughputNestedJson(benchmark::State& state)
+// post: the composed tokenizer's throughput over one JSON corpus.
+void run_json_throughput(benchmark::State& state, const SyntheticCorpus& corpus,
+                         std::size_t lines_per_iter)
 {
     const insight::semantic::ComposedSemantics& composed{composed_vocabulary()};
-
-    constexpr std::size_t kLinesPerIter{1'000};
-    const auto corpus{make_nested_json_corpus(kLinesPerIter, 42)};
 
     tok::ArenaAllocator arena{1U << 22U};
     tok::Tokenizer tokenizer{arena, tok::MaskConfig{}, composed, tok::StreamContext{}};
@@ -196,17 +232,31 @@ void BM_TokenizationThroughputNestedJson(benchmark::State& state)
         state.ResumeTiming();
     }
 
-    state.SetItemsProcessed(static_cast<std::int64_t>(state.iterations() * kLinesPerIter));
+    state.SetItemsProcessed(static_cast<std::int64_t>(state.iterations() * lines_per_iter));
     // invariant: the NAME carries the unit the counter actually computes — the rate form yields
     // lines per second and kInvert yields SECONDS per line, which the SI renderer then prefixes.
     // note: it was named ns_per_line and published seconds under it, off by 10^9, through v1.10.3.
     state.counters["s_per_line"] = benchmark::Counter(
-        static_cast<double>(kLinesPerIter),
+        static_cast<double>(lines_per_iter),
         benchmark::Counter::kIsIterationInvariantRate | benchmark::Counter::kInvert);
+}
+
+// refs: ADR-29.D7
+void BM_TokenizationThroughputNestedJson(benchmark::State& state)
+{
+    constexpr std::size_t kLinesPerIter{1'000};
+    run_json_throughput(state, make_nested_json_corpus(kLinesPerIter, 42), kLinesPerIter);
+}
+
+void BM_TokenizationThroughputFlatJson(benchmark::State& state)
+{
+    constexpr std::size_t kLinesPerIter{1'000};
+    run_json_throughput(state, make_flat_json_corpus(kLinesPerIter, 42), kLinesPerIter);
 }
 
 BENCHMARK(BM_TokenizationThroughput)->Arg(4)->Arg(8)->Unit(benchmark::kMicrosecond);
 BENCHMARK(BM_TokenizationThroughputDegenerate)->Arg(4)->Arg(8)->Unit(benchmark::kMicrosecond);
 BENCHMARK(BM_TokenizationThroughputNestedJson)->Unit(benchmark::kMicrosecond);
+BENCHMARK(BM_TokenizationThroughputFlatJson)->Unit(benchmark::kMicrosecond);
 
 } // namespace

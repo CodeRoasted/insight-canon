@@ -689,6 +689,89 @@ is byte-identical.
 
 **It rides `-17`.**
 
+
+## `-18` — one JSON record reads one way on both readers, and an ISO 8601 zone is read whole or refused
+
+`-17` SHIPPED in `v1.10.6` and `v1.10.7` carried it unchanged, so an output change after that tag
+rides a new value, and this is the one step this cut takes. Two fixes ride it together, as the
+Founder ruled on 2026-10-23.
+
+**What changed — the JSON readers.** `JsonStrategy` reads an escape-free flat object with a byte
+reader and anything else with simdjson, and the two assigned a record's roles by different rules,
+so one record shape gave two template ids when an unrelated member carried a backslash (a stack
+trace with `\n`). Both readers now report every member, in document order, to one assignment
+rule:
+
+* **a role takes the string member of lowest rank**: an exact top-level name before any compound
+  spelling (a dotted key's resolved name, or a one-level descended member's bare name), then the
+  name's position in the role's vocabulary, then document order. The byte reader used to keep the
+  first matching key in document order and let a dotted key compete with an exact one, so
+  `{"msg":"a","message":"b"}` read `a` there and `b` on simdjson; it now reads `b` on both;
+* **the vocabulary is the JSON strategy's own**: `logGroup` and `logStream`, which the byte reader
+  borrowed from the CloudWatch strategy it shares the scanner with, are no JSON component names;
+* **a numeric member offers no role**: a numeric `ts` used to occupy the time on the byte reader,
+  never be read, and block a later string `time`;
+* **an ordinal is the first numeric member of its exact catalog name**, read past the byte
+  reader's former eight-member cap, and the observations are emitted in catalog order rather than
+  in member order;
+* **a record with no role is marked** (`no_role_witness_key`) on the byte reader too;
+* **a line carrying an OTEL member** (`timeUnixNano`, `startTimeUnixNano` or a key of the OTEL
+  field catalog) is declined by the byte reader, so a flat OTEL log record or span reads its
+  declared time, severity and trace context however its bytes are escaped.
+
+The simdjson reader's output is unchanged on every witness below; what moved is the byte reader,
+plus two simdjson-reader corners the one rule settles: a compound spelling now also competes on an
+OTEL record, and a chosen time that does not parse leaves the time absent rather than falling to a
+compound spelling.
+
+**What changed — the ISO 8601 zone.** `parse_iso8601` read a zone only when five bytes followed
+the designator, so an hour-only zone (`+05`) was dropped and the instant read as UTC, and it read a
+malformed zone as a shorter one (`+05:3` as `+05:00`, `+0X:00` as `+00:00`, `+053012` as
+`+05:30`). A signed offset is now `+hh`, `+hhmm` or `+hh:mm` (or `-`): an hour-only zone is
+applied, and a truncated minute, a non-digit, a three- or five-digit run or a lone sign is
+refused as a VALUE: the time is absent, the line is emitted with its other roles, as the
+29-February ruling refuses an impossible date. `rfc3339_datetime_length`, the transport and
+masking grammar, already refused all of these and still refuses an hour-only zone, which RFC 3339
+does not admit; it did not move.
+
+**Which serialized fields move.** For a JSON line on the byte reader: `component`, `level`,
+`template_str` and `template_id` (through the content), `params`, `timestamp_ns`, `ordinals`,
+`declared_timestamp`, `declared_level`, `trace` and `no_role_witness_key`, each only where the
+line's member set reaches one of the six rules above. For a line whose time `parse_iso8601`
+reads, the JSON and key-value readers among them: `timestamp_ns`, where the zone is hour-only or
+malformed. A reader that first checks the stamp against `rfc3339_datetime_length` never hands it
+such a zone, so its output did not move. The CloudWatch
+strategy's own assignment did not move.
+
+**Witness inputs.** `core/tests/identity/projection.golden`, regenerated across this bump, holds
+each witness's whole projection on both sides; 16 of its 150 rows moved and the other 134,
+including every row of the 8 proof-corpus files, are byte-identical. Through the composed
+tokenizer with no semantic package:
+
+* `{"msg":"a","message":"b"}` — at `-17`: template `a`; now: template `b`;
+* `{"severity":"warn","level":"error","message":"m"}` — level Warn, now Error;
+* `{"source":"s","component":"c","message":"m"}` — component `s`, now `c`;
+* `{"ts":1700000000,"time":"2026-03-23T08:30:00Z","message":"m"}` — no time, now
+  `2026-03-23T08:30:00Z`;
+* `{"log.level":"warn","level":"error","message":"m"}` — level Warn, now Error;
+* `{"message":"m","duration_ms":12,"latency_ms":3}` — ordinals in member order, now
+  `latency_ms` then `duration_ms`;
+* nine numeric members with `duration_ms` ninth — no ordinal, now `duration_ms`;
+* `{"foo":"bar"}` — no marker, now marked `foo`;
+* a flat OTEL log record and a flat span — read as a plain record, now with their declared time,
+  severity and trace context;
+* `{"ts":"2026-03-23T12:00:00+05",…}` — `12:00:00Z`, now `07:00:00Z`; `-05` — now `17:00:00Z`;
+* `+05:3`, `+0X:00`, `+053` and `+053012` — a time read under a shorter or no zone, now absent.
+
+`core/tests/strategy/test_json_path_agreement.cpp` pins the reader agreement fixture by fixture
+and through the template id; `core/tests/utils/test_time_utils.cpp` pins the zone grammar.
+
+**Why one step.** A consumer crossing the next cut pays exactly one comparability event. The
+re-base cost is this string in `core/tests/mask/mask_rules.golden`, in
+`core/tests/identity/projection.golden`, in `insight-metalog`'s three committed vector files and in
+`insight-eidos`'s Sift report-order golden and run-outcome gate; the hub's published determinism
+golden is re-rendered at the cut.
+
 ---
 
 *See also: [masking.md](masking.md) (what the current generation's rules actually are) ·

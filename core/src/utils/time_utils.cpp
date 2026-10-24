@@ -178,6 +178,43 @@ namespace
         return (sign == '+') ? -offset : offset;
     }
 
+    // post: the UTC correction in seconds of the ISO 8601 zone at `pos`: 0 when no signed offset
+    // starts there, nullopt when one is malformed or out of range.
+    // invariant: a signed offset is `+hh`, `+hhmm` or `+hh:mm` (or `-`); a truncated minute, a
+    // non-digit or a digit right after it is malformed, refused as a VALUE and never as the line.
+    std::optional<std::int64_t> zone_correction(std::string_view text, std::size_t pos) noexcept
+    {
+        if (pos >= text.size() || (text[pos] != '+' && text[pos] != '-'))
+            return std::int64_t{0};
+        const auto is_digit_at{
+            [text](std::size_t offset) noexcept
+            { return offset < text.size() && text[offset] >= '0' && text[offset] <= '9'; }};
+        const auto two_digits_at{
+            [text](std::size_t offset, int& out) noexcept
+            { return offset + 2 <= text.size() && parse2d(text.data() + offset, out); }};
+        int hour{0};
+        int minute{0};
+        std::size_t cursor{pos + 1};
+        if (!two_digits_at(cursor, hour))
+            return std::nullopt;
+        cursor += 2;
+        if (cursor < text.size() && text[cursor] == ':')
+        {
+            if (!two_digits_at(cursor + 1, minute))
+                return std::nullopt;
+            cursor += 3;
+        }
+        else if (is_digit_at(cursor))
+        {
+            if (!two_digits_at(cursor, minute))
+                return std::nullopt;
+            cursor += 2;
+        }
+        if (is_digit_at(cursor))
+            return std::nullopt;
+        return utc_correction(text[pos], hour, minute);
+    }
+
     constexpr std::array<std::string_view, 12> kMonthNames{
         "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
@@ -309,31 +346,10 @@ std::optional<Timestamp> parse_iso8601(std::string_view timestamp_str) noexcept
             ++pos;
         }
     }
-    if (pos < timestamp_str.size())
-    {
-        const char timezone_designator{timestamp_str[pos]};
-        if (timezone_designator == '+' || timezone_designator == '-')
-        {
-            if (pos + 5 <= timestamp_str.size())
-            {
-                int timezone_hour{0};
-                int timezone_minute{0};
-                static_cast<void>(parse2d(timestamp_str.data() + pos + 1, timezone_hour));
-                const std::size_t minute_offset{(timestamp_str[pos + 3] == ':') ? pos + 4
-                                                                                : pos + 3};
-                if (minute_offset + 2 <= timestamp_str.size())
-                {
-                    static_cast<void>(
-                        parse2d(timestamp_str.data() + minute_offset, timezone_minute));
-                }
-                const auto correction{
-                    utc_correction(timezone_designator, timezone_hour, timezone_minute)};
-                if (!correction.has_value())
-                    return std::nullopt;
-                parsed_time += *correction;
-            }
-        }
-    }
+    const auto correction{zone_correction(timestamp_str, pos)};
+    if (!correction.has_value())
+        return std::nullopt;
+    parsed_time += *correction;
 
     return std::chrono::system_clock::from_time_t(parsed_time);
 }

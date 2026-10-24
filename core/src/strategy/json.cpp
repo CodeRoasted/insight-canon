@@ -58,133 +58,55 @@ namespace
     // refs: F-SRC-insight-canon:simdjson_scratch.hpp:compound_key_name, ADR-17.D1, ADR-17.D12
     enum class JsonRole : std::uint8_t
     {
-        None,
         Timestamp,
         Level,
         Component,
-        Message
+        Message,
+    };
+    constexpr std::size_t kJsonRoleCount{4};
+
+    // invariant: a name's role and its position in that role's vocabulary, the position being the
+    // name's precedence within the role.
+    struct JsonRoleName
+    {
+        JsonRole role;
+        std::uint8_t position;
     };
 
-    [[nodiscard]] constexpr bool name_in(std::string_view name,
-                                         std::span<const std::string_view> vocabulary) noexcept
+    // post: the position of `name` in `vocabulary`, or nullopt.
+    [[nodiscard]] constexpr std::optional<std::uint8_t>
+    position_in(std::string_view name, std::span<const std::string_view> vocabulary) noexcept
     {
-        return std::ranges::contains(vocabulary, name);
+        const auto found{std::ranges::find(vocabulary, name)};
+        if (found == vocabulary.end())
+            return std::nullopt;
+        return static_cast<std::uint8_t>(std::distance(vocabulary.begin(), found));
     }
 
-    // post: the role a BARE name carries, or None; the order matches the parse's own precedence.
-    [[nodiscard]] constexpr JsonRole role_of(std::string_view name) noexcept
+    // post: the role a BARE name carries and its precedence within that role, or nullopt.
+    [[nodiscard]] constexpr std::optional<JsonRoleName> role_of(std::string_view name) noexcept
     {
-        if (name_in(name, kTimestampKeys))
-            return JsonRole::Timestamp;
-        if (name_in(name, kLevelKeys))
-            return JsonRole::Level;
-        if (name_in(name, kComponentKeys))
-            return JsonRole::Component;
-        if (name_in(name, kMessageKeys))
-            return JsonRole::Message;
-        return JsonRole::None;
+        if (const auto position{position_in(name, kTimestampKeys)})
+            return JsonRoleName{.role = JsonRole::Timestamp, .position = *position};
+        if (const auto position{position_in(name, kLevelKeys)})
+            return JsonRoleName{.role = JsonRole::Level, .position = *position};
+        if (const auto position{position_in(name, kComponentKeys)})
+            return JsonRoleName{.role = JsonRole::Component, .position = *position};
+        if (const auto position{position_in(name, kMessageKeys)})
+            return JsonRoleName{.role = JsonRole::Message, .position = *position};
+        return std::nullopt;
     }
 
-    // post: fills ONE role from a compound key's resolved name, and ONLY if that role is still
-    // MISSING.
-    // invariant: the exact-name pass always wins, which is the property that keeps an
-    // already-readable line byte-identical — a compound key can ADD a role, never move one.
-    // invariant: the single-dot resolution is defined in the shared scratch header and NOT here,
-    // because the fast scanner classifies keys too and parse RETURNS EARLY on a hit.
-    // invariant: so the rule must be the same object at both sites, or a flat namespaced line
-    // silently keeps the old behaviour.
-    void fill_missing_role(JsonRole role, std::string_view value, ParsedLine& parsed_line,
-                           ArenaAllocator& arena, bool& recognized_message)
-    {
-        switch (role)
-        {
-        case JsonRole::Timestamp:
-            if (!parsed_line.timestamp.has_stamp())
-            {
-                parsed_line.timestamp = EventTime::parsed(utils::parse_iso8601(value));
-                if (!parsed_line.timestamp)
-                    parsed_line.timestamp = EventTime::yearless(utils::parse_bsd_syslog_ts(value));
-            }
-            break;
-        case JsonRole::Level:
-            if (parsed_line.level == LogLevel::Unknown)
-                parsed_line.level = EventLevel::declared(utils::parse_log_level(value));
-            break;
-        case JsonRole::Component:
-            if (parsed_line.component.empty())
-                parsed_line.component = arena.store_string(value);
-            break;
-        case JsonRole::Message:
-            if (!recognized_message)
-            {
-                parsed_line.content = arena.store_string(value);
-                recognized_message = true;
-            }
-            break;
-        case JsonRole::None:
-            break;
-        }
-    }
-
-    // post: each string value of the descended object whose BARE name carries a role fills that
-    // role if it is still missing; the descent goes no deeper.
-    // invariant: bare name only — a dotted key inside the descent would be a SECOND level of
-    // compounding and is deliberately not read.
-    void route_descended_object(simdjson::ondemand::object& child, ParsedLine& parsed_line,
-                                ArenaAllocator& arena, bool& recognized_message)
-    {
-        for (auto sub : child)
-        {
-            std::string_view sub_key;
-            if (sub.unescaped_key().get(sub_key) != simdjson::SUCCESS)
-                continue;
-            if (const JsonRole role{role_of(sub_key)}; role != JsonRole::None)
-            {
-                std::string_view sub_value;
-                if (sub.value().get_string().get(sub_value) == simdjson::SUCCESS)
-                    fill_missing_role(role, sub_value, parsed_line, arena, recognized_message);
-            }
-        }
-    }
-
-    // invariant: ONE forward walk over the root object — each string value is offered under its
-    // single-dot resolved name, each object value is descended EXACTLY ONCE.
-    // invariant: no key NAME is consulted to decide whether to descend; the VALUE's type decides,
-    // which is what makes this a grammar rather than a list.
-    // invariant: it SUBSUMES the hard-coded single-vendor descent it replaces, so this is a name
-    // REMOVED from core rather than added.
-    // refs: F-SRC-insight-canon:simdjson_scratch.hpp:compound_key_name
-    void route_compound_keys(simdjson::ondemand::object& root, ParsedLine& parsed_line,
-                             ArenaAllocator& arena, bool& recognized_message)
-    {
-        for (auto field : root)
-        {
-            std::string_view key;
-            if (field.unescaped_key().get(key) != simdjson::SUCCESS)
-                continue;
-            auto value{field.value()};
-            simdjson::ondemand::json_type type{};
-            if (value.type().get(type) != simdjson::SUCCESS)
-                continue;
-
-            if (type == simdjson::ondemand::json_type::object)
-            {
-                simdjson::ondemand::object child;
-                if (value.get_object().get(child) == simdjson::SUCCESS)
-                    route_descended_object(child, parsed_line, arena, recognized_message);
-                continue;
-            }
-
-            if (type != simdjson::ondemand::json_type::string)
-                continue;
-            if (const JsonRole role{role_of(compound_key_name(key))}; role != JsonRole::None)
-            {
-                std::string_view text;
-                if (value.get_string().get(text) == simdjson::SUCCESS)
-                    fill_missing_role(role, text, parsed_line, arena, recognized_message);
-            }
-        }
-    }
+    // invariant: a member's rank is its TIER, then its name's position in the role's vocabulary.
+    // invariant: an exact top-level name outranks every compound spelling, so a compound key can
+    // ADD a role and never move one.
+    // invariant: the compound tier holds a dotted top-level key's resolved name and a descended
+    // member's bare name alike, so the two wire spellings of one document rank the same.
+    constexpr std::uint8_t kExactTier{0};
+    constexpr std::uint8_t kCompoundTier{1};
+    constexpr std::uint8_t kTierStride{8};
+    static_assert(std::max({kTimestampKeys.size(), kLevelKeys.size(), kComponentKeys.size(),
+                            kMessageKeys.size()}) <= kTierStride);
 
     // post: true iff the record is OTEL, which the caller uses to route the message to the nested
     // OTLP body.
@@ -562,150 +484,123 @@ namespace
         return std::span<const OrdinalObservation>{dst, observations.size()};
     }
 
-    // post: the scanner's numeric candidates matched against the declared catalog, each hit a
-    // consumed ordinal observation.
-    // invariant: the decimal TEXT becomes the int64 — there is no float-to-int anywhere on this
-    // path.
-    // refs: F-SRC-insight-canon:canon.api.cppm:parse_decimal_scaled
-    [[nodiscard]] std::span<const OrdinalObservation>
-    extract_ordinals_fast(const FastJsonResult& fast, ArenaAllocator& arena)
+    // post: true iff the member is one the OTEL readers own: a log record's event time, a span's
+    // start time, or a key of the OTEL field catalog.
+    // invariant: the fast reader declines a line carrying one, so the OTEL readers, which only the
+    // simdjson reader runs, see every line they could claim.
+    // refs: ADR-29.D5, F-SRC-insight-canon:canon.api.cppm:kOtelFieldCatalog
+    [[nodiscard]] constexpr bool is_otel_member(std::string_view key) noexcept
     {
-        if (fast.numeric_field_count == 0)
-            return {};
-        std::array<OrdinalObservation, kFastJsonMaxNumericFields> matched{};
-        std::size_t matched_count{0};
-        for (std::size_t k{0}; k < fast.numeric_field_count; ++k)
-        {
-            const FastJsonNumericField& candidate{fast.numeric_fields[k]};
-            const OrdinalFieldDescriptor* const descriptor{match_ordinal_field(candidate.key)};
-            if (descriptor == nullptr)
-                continue;
-            const std::optional<std::int64_t> value{
-                parse_decimal_scaled(candidate.text, descriptor->scale_to_canonical)};
-            if (value)
-                matched[matched_count++] = OrdinalObservation{.field_name = descriptor->key,
-                                                              .schedule = descriptor->schedule,
-                                                              .value = *value};
-        }
-        return store_ordinals(std::span<const OrdinalObservation>{matched.data(), matched_count},
-                              arena);
+        return key == "timeUnixNano" || key == "startTimeUnixNano" ||
+               std::ranges::any_of(kOtelFieldCatalog, [key](const OtelFieldDescriptor& descriptor)
+                                   { return descriptor.key == key; });
     }
 
-    // post: the same field-route on the slow path, one lookup per declared key.
-    // pre: this MUST run before the OTLP body descent below, which spends the on-demand cursor.
-    // invariant: the value's raw decimal TOKEN becomes the int64, never a double read — that is
-    // the determinism pin.
-    // refs: F-SRC-insight-canon:canon.api.cppm:parse_decimal_scaled
-    [[nodiscard]] std::span<const OrdinalObservation>
-    extract_ordinals_slow(simdjson::ondemand::object& root, ArenaAllocator& arena)
+    // invariant: THE ONE ASSIGNMENT RULE of a JSON record's roles and ordinals, fed by the byte
+    // reader and the simdjson reader alike, so an unrelated member's bytes never move a role.
+    // invariant: a role takes the string member of lowest rank, the first in document order on a
+    // tie; a non-string member offers no role, and an unparseable chosen value leaves it absent.
+    // invariant: an ordinal is the first numeric member of its exact catalog name, and the
+    // observations are emitted in catalog order.
+    // refs: ADR-17.D12, F-SRC-insight-canon:canon.api.cppm:OrdinalObservation
+    class JsonRecordSink
     {
-        std::array<OrdinalObservation, kOrdinalFieldCatalog.size()> matched{};
-        std::size_t matched_count{0};
-        for (const auto& descriptor : kOrdinalFieldCatalog)
+      public:
+        [[nodiscard]] bool member(std::string_view key, JsonScalar scalar) noexcept
         {
-            simdjson::ondemand::value field;
-            if (root.find_field_unordered(descriptor.key).get(field) != simdjson::SUCCESS)
-                continue;
-            const std::optional<std::int64_t> value{
-                parse_decimal_scaled(field.raw_json_token(), descriptor.scale_to_canonical)};
-            if (value)
+            if (is_otel_member(key))
+                return false;
+            if (scalar.kind == JsonScalarKind::Number)
+                capture_ordinal(key, scalar.text);
+            else if (scalar.kind == JsonScalarKind::String)
+            {
+                const std::string_view name{compound_key_name(key)};
+                offer(name, name.size() == key.size() ? kExactTier : kCompoundTier, scalar.text);
+            }
+            return true;
+        }
+
+        void descended_member(std::string_view key, JsonScalar scalar) noexcept
+        {
+            if (scalar.kind == JsonScalarKind::String)
+                offer(key, kCompoundTier, scalar.text);
+        }
+
+        // post: the chosen roles and the captured ordinals written to `parsed_line`, the content
+        // being the chosen message or else the whole line; true iff a message was chosen.
+        // invariant: every value is parsed or arena-stored here, so the views it holds may dangle
+        // once this returns.
+        [[nodiscard]] bool apply(ParsedLine& parsed_line, std::string_view line,
+                                 ArenaAllocator& arena) const
+        {
+            if (const JsonRoleChoice& stamp{choice(JsonRole::Timestamp)}; stamp.chosen())
+            {
+                parsed_line.timestamp = EventTime::parsed(utils::parse_iso8601(stamp.value));
+                if (!parsed_line.timestamp)
+                    parsed_line.timestamp =
+                        EventTime::yearless(utils::parse_bsd_syslog_ts(stamp.value));
+            }
+            if (const JsonRoleChoice& level{choice(JsonRole::Level)}; level.chosen())
+                parsed_line.level = EventLevel::declared(utils::parse_log_level(level.value));
+            if (const JsonRoleChoice& component{choice(JsonRole::Component)}; component.chosen())
+                parsed_line.component = arena.store_string(component.value);
+            const JsonRoleChoice& message{choice(JsonRole::Message)};
+            parsed_line.content = arena.store_string(message.chosen() ? message.value : line);
+            if (ordinal_count_ == 0)
+                return message.chosen();
+
+            std::array<OrdinalObservation, kOrdinalFieldCatalog.size()> matched{};
+            std::size_t matched_count{0};
+            for (std::size_t index{0}; index < kOrdinalFieldCatalog.size(); ++index)
+            {
+                const std::optional<std::int64_t>& value{ordinal_values_[index]};
+                if (!value.has_value())
+                    continue;
+                const OrdinalFieldDescriptor& descriptor{kOrdinalFieldCatalog[index]};
                 matched[matched_count++] = OrdinalObservation{
                     .field_name = descriptor.key, .schedule = descriptor.schedule, .value = *value};
-        }
-        return store_ordinals(std::span<const OrdinalObservation>{matched.data(), matched_count},
-                              arena);
-    }
-
-    // post: nullopt when the byte scan cannot complete — an escape, nesting or malformed input
-    // — so the caller falls back to full simdjson.
-    // invariant: split out of parse to keep that function within its complexity budget.
-    [[nodiscard]] std::optional<ParsedLine> try_fast_parse(std::string_view line,
-                                                           ArenaAllocator& arena)
-    {
-        const FastJsonResult fast{try_fast_json(line)};
-        if (!fast.has_result)
-            return std::nullopt;
-        ParsedLine parsed_line;
-        parsed_line.raw_line = line;
-        if (!fast.timestamp_str.empty())
-        {
-            parsed_line.timestamp = EventTime::parsed(utils::parse_iso8601(fast.timestamp_str));
-            if (!parsed_line.timestamp)
-                parsed_line.timestamp =
-                    EventTime::yearless(utils::parse_bsd_syslog_ts(fast.timestamp_str));
-        }
-        if (!fast.level_str.empty())
-            parsed_line.level = EventLevel::declared(utils::parse_log_level(fast.level_str));
-        if (!fast.component_str.empty())
-            parsed_line.component = arena.store_string(fast.component_str);
-        parsed_line.content = fast.message_str.empty() ? arena.store_string(line)
-                                                       : arena.store_string(fast.message_str);
-        parsed_line.ordinals = extract_ordinals_fast(fast, arena);
-        INSIGHT_LOG_DEBUG(logging::strategy_logger(),
-                          "strategy=JSON fast_path component={} level={} has_timestamp={}",
-                          parsed_line.component, to_string(parsed_line.level.value()),
-                          parsed_line.timestamp.has_value());
-        return parsed_line;
-    }
-
-    // post: the timestamp, level and component a record carries under their exact canon names;
-    // a role whose name is absent is left as it was.
-    void read_named_roles(simdjson::ondemand::object& root, ParsedLine& parsed_line,
-                          ArenaAllocator& arena)
-    {
-        std::string_view scratch_view;
-        if (try_get_string(root, kTimestampKeys, scratch_view))
-        {
-            parsed_line.timestamp = EventTime::parsed(utils::parse_iso8601(scratch_view));
-            if (!parsed_line.timestamp)
-                parsed_line.timestamp =
-                    EventTime::yearless(utils::parse_bsd_syslog_ts(scratch_view));
-        }
-        if (try_get_string(root, kLevelKeys, scratch_view))
-            parsed_line.level = EventLevel::declared(utils::parse_log_level(scratch_view));
-        if (try_get_string(root, kComponentKeys, scratch_view))
-            parsed_line.component = arena.store_string(scratch_view);
-    }
-
-    // post: the content of a record that is not OTEL: the message role when one is named, else the
-    // whole line; true iff the message role was recognized, by name or by the compound walk.
-    bool read_record_content(simdjson::ondemand::object& root, std::string_view line,
-                             simdjson::padded_string_view padded, ParsedLine& parsed_line,
-                             ArenaAllocator& arena)
-    {
-        std::string_view scratch_view;
-        bool recognized_message{false};
-        if (try_get_string(root, kMessageKeys, scratch_view))
-        {
-            parsed_line.content = arena.store_string(scratch_view);
-            recognized_message = true;
-        }
-        else
-        {
-            parsed_line.content = arena.store_string(line);
+            }
+            parsed_line.ordinals = store_ordinals(
+                std::span<const OrdinalObservation>{matched.data(), matched_count}, arena);
+            return message.chosen();
         }
 
-        // invariant: this pass runs ONLY when a role is still missing after the exact-name lookups,
-        // so an already-readable line never reaches it.
-        // invariant: that is what makes it additive — it closes a blindness, it does not
-        // re-decide anything.
-        // invariant: the predecessor descended into ONE literally-named object, which read one
-        // producer's namespacing convention by enumeration; the shape does it by structure.
-        // invariant: net effect on core's vocabulary is one name REMOVED and none added.
-        // invariant: a fresh cursor is required and is not free, and it is paid ONLY on a line
-        // still missing a role — never on a canon-named line.
-        // refs: F-SRC-insight-canon:simdjson_scratch.hpp:compound_key_name
-        if (parsed_line.component.empty() || parsed_line.level == LogLevel::Unknown ||
-            !parsed_line.timestamp.has_stamp() || !recognized_message)
+      private:
+        [[nodiscard]] const JsonRoleChoice& choice(JsonRole role) const noexcept
         {
-            simdjson::ondemand::document compound_doc;
-            simdjson::ondemand::object compound_root;
-            if (json_scratch().parser.iterate(padded).get(compound_doc) == simdjson::SUCCESS &&
-                compound_doc.get_object().get(compound_root) == simdjson::SUCCESS)
-                route_compound_keys(compound_root, parsed_line, arena, recognized_message);
+            return choices_[static_cast<std::size_t>(role)];
         }
-        return recognized_message;
-    }
+
+        void offer(std::string_view name, std::uint8_t tier, std::string_view value) noexcept
+        {
+            if (const auto role_name{role_of(name)})
+                choices_[static_cast<std::size_t>(role_name->role)].offer(
+                    static_cast<std::uint8_t>((tier * kTierStride) + role_name->position), value);
+        }
+
+        // invariant: the decimal TEXT becomes the int64 — there is no float-to-int anywhere on
+        // this path.
+        // refs: F-SRC-insight-canon:canon.api.cppm:parse_decimal_scaled
+        void capture_ordinal(std::string_view key, std::string_view text) noexcept
+        {
+            const OrdinalFieldDescriptor* const descriptor{match_ordinal_field(key)};
+            if (descriptor == nullptr)
+                return;
+            const auto index{static_cast<std::size_t>(descriptor - kOrdinalFieldCatalog.data())};
+            if (ordinal_seen_[index])
+                return;
+            ordinal_seen_[index] = true;
+            ordinal_values_[index] = parse_decimal_scaled(text, descriptor->scale_to_canonical);
+            if (ordinal_values_[index].has_value())
+                ++ordinal_count_;
+        }
+
+        std::array<JsonRoleChoice, kJsonRoleCount> choices_{};
+        std::array<bool, kOrdinalFieldCatalog.size()> ordinal_seen_{};
+        std::array<std::optional<std::int64_t>, kOrdinalFieldCatalog.size()> ordinal_values_{};
+        std::size_t ordinal_count_{0};
+    };
+    static_assert(JsonMemberSink<JsonRecordSink>);
 
     // post: the record carries its first top-level key as the no-role witness, and the console is
     // told, rate-limited per thread.
@@ -736,6 +631,37 @@ namespace
                              top_level_key_count_for_diagnosis(line), roleless_count);
     }
 
+    // post: the record is marked when it is not OTEL and yielded no role: no stamp, no level, no
+    // component and no message.
+    // invariant: the predicate is ALREADY COMPUTED — all four role probes have run, so this costs
+    // one integer test: no needle, no window constant, no second pass.
+    // refs: ADR-29.D7
+    void mark_if_roleless(ParsedLine& parsed_line, std::string_view line, bool recognized_message)
+    {
+        if (!parsed_line.timestamp.has_stamp() && parsed_line.level == LogLevel::Unknown &&
+            parsed_line.component.empty() && !recognized_message)
+            mark_roleless_record(parsed_line, line);
+    }
+
+    // post: nullopt when the byte reader cannot complete — an escape, nesting, malformed input or
+    // an OTEL member — so the caller falls back to full simdjson.
+    // invariant: split out of parse to keep that function within its complexity budget.
+    [[nodiscard]] std::optional<ParsedLine> try_fast_parse(std::string_view line,
+                                                           ArenaAllocator& arena)
+    {
+        JsonRecordSink sink;
+        if (!scan_flat_json(line, sink))
+            return std::nullopt;
+        ParsedLine parsed_line;
+        parsed_line.raw_line = line;
+        mark_if_roleless(parsed_line, line, sink.apply(parsed_line, line, arena));
+        INSIGHT_LOG_DEBUG(logging::strategy_logger(),
+                          "strategy=JSON fast_path component={} level={} has_timestamp={}",
+                          parsed_line.component, to_string(parsed_line.level.value()),
+                          parsed_line.timestamp.has_value());
+        return parsed_line;
+    }
+
 } // namespace
 
 // invariant: the strategy entry — a fast-path byte scan, then a guarded simdjson slow path
@@ -745,11 +671,6 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
 {
     if (line.empty())
         return std::unexpected(std::string("JsonStrategy: empty line"));
-
-    // invariant: for escape-free JSON objects the fast path bypasses simdjson entirely with a
-    // single-pass byte scan and no heap allocation, falling back on any anomaly.
-    if (std::optional<ParsedLine> fast_parsed{try_fast_parse(line, arena)})
-        return std::expected<ParsedLine, std::string>{*std::move(fast_parsed)};
 
     // invariant: an OTLP export DOCUMENT is REFUSED here, and the refusal is the feature.
     // invariant: without it the document falls through to the generic log-record route and yields
@@ -768,6 +689,13 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
             std::string("JsonStrategy: OTLP resourceSpans export DOCUMENT on the record-oriented "
                         "entry — document mode is acquisition-tier; this wire carries one flat "
                         "span per record (ADR-29.D7)"));
+
+    // invariant: for escape-free JSON objects the fast path bypasses simdjson entirely with a
+    // single-pass byte scan and no heap allocation, falling back on any anomaly.
+    // invariant: it runs AFTER the document refusal, which reads the first key only, so a refused
+    // document is refused whatever bytes it carries.
+    if (std::optional<ParsedLine> fast_parsed{try_fast_parse(line, arena)})
+        return std::expected<ParsedLine, std::string>{*std::move(fast_parsed)};
 
     auto& scratch{json_scratch()};
     const auto padded{load_padded(scratch, line)};
@@ -827,12 +755,17 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
         }
     }
 
-    // invariant: the fourth role probe's own result — the other three are readable off the parsed
-    // line, but content is set on BOTH branches.
-    // invariant: a recognized message and the raw-line fallback are indistinguishable afterwards,
-    // and treating the fallback as a role would silence the marker on its own input.
-    bool recognized_message{false};
-    read_named_roles(root, parsed_line, arena);
+    // invariant: the roles and ordinals come from the one sink the fast path feeds, so the two
+    // paths assign one record identically; the walk is the root's first read.
+    JsonRecordSink sink;
+    walk_json_object(root, sink);
+    const bool recognized_message{sink.apply(parsed_line, line, arena)};
+    if (bool rewound{}; root.reset().get(rewound) != simdjson::SUCCESS)
+    {
+        INSIGHT_LOG_TRACE(logging::strategy_logger(), "strategy=JSON root reset failed");
+        return std::unexpected(std::string("JsonStrategy: the object could not be re-read for "
+                                           "its OTEL members"));
+    }
 
     // invariant: the severity number becomes the level band and the trace keys become consumed
     // structural metadata; the trace keys are top-level, so they are never tokenized.
@@ -841,11 +774,6 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
     // refs: ADR-29, F-SRC-insight-canon:canon.api.cppm:OtelTraceContext
     // refs: F-SRC-insight-canon:canon.api.cppm:kOtelFieldCatalog
     const bool is_otel{extract_otel_fields(root, parsed_line)};
-
-    // pre: the ordinal route MUST precede the body descent below, which spends the on-demand
-    // cursor.
-    // refs: F-SRC-insight-canon:canon.api.cppm:OrdinalObservation
-    parsed_line.ordinals = extract_ordinals_slow(root, arena);
 
     if (is_otel)
     {
@@ -860,34 +788,15 @@ std::expected<ParsedLine, std::string> JsonStrategy::parse(std::string_view line
             parsed_line.content = arena.store_string(line);
     }
     else
-        recognized_message = read_record_content(root, line, padded, parsed_line, arena);
-
-    // invariant: the independent backstop against a SILENT wrong answer — the hard refusal above
-    // can only refuse what it RECOGNISES, via a dated premise about the top-level key.
-    // invariant: nothing in this repo can re-derive that premise, so the refusal alone would leave
-    // a schema change reading as a clean parse.
-    // invariant: this layer cannot be defeated by the same change, because it knows nothing about
-    // the schema at all.
-    // invariant: the predicate is ALREADY COMPUTED — all four role probes have run, so this costs
-    // one integer test: no needle, no window constant, no second pass.
-    // invariant: naming the keys DOES cost a re-walk, and it is paid only on the diagnostic path,
-    // once we already know the line was not understood.
-    // invariant: what it guarantees EXACTLY is that the record path never SILENTLY emits an event
-    // for input it understood nothing of.
-    // invariant: it does NOT promise to recognise a non-canonical export; it promises not to be
-    // silent about one, and that holds for shapes that do not exist yet.
-    // invariant: a MARKER, not a refusal — a role-less object may be an application record whose
-    // vocabulary we do not read yet, and refusing it would convert a reading gap into data loss.
-    // invariant: the DISCHARGE is the assignment below, never the log line: a warning desilences
-    // the console while a caller would still receive an indistinguishable value.
-    // invariant: it is asserted on the marker and never through the log line, which the rate limit
-    // samples per thread.
-    // refs: ADR-29.D7, ADR-17.D12
-    // refs: MEM:synthetic-gate-vacuity-vs-judgment
-    if (!is_otel && !parsed_line.timestamp.has_stamp() && parsed_line.level == LogLevel::Unknown &&
-        parsed_line.component.empty() && !recognized_message)
     {
-        mark_roleless_record(parsed_line, line);
+        // invariant: the independent backstop against a SILENT wrong answer — the hard refusal
+        // above can only refuse what it RECOGNISES, via a dated premise about the top-level key.
+        // invariant: this layer cannot be defeated by the same change, because it knows nothing
+        // about the schema at all.
+        // invariant: a MARKER, not a refusal — a role-less object may be an application record
+        // whose vocabulary we do not read yet, and refusing it would turn a gap into data loss.
+        // refs: ADR-29.D7, ADR-17.D12, MEM:synthetic-gate-vacuity-vs-judgment
+        mark_if_roleless(parsed_line, line, recognized_message);
     }
 
     INSIGHT_LOG_TRACE(logging::strategy_logger(),

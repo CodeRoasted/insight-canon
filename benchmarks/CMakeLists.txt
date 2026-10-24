@@ -3,9 +3,10 @@
 #
 #  Consumes canon + the FIVE semantic packages as EXTERNAL module libraries (the det_proof /
 #  test_package consumption shape — not a module-member rebuild), so the measured object is the
-#  shipped library build. Three arms in one binary: BM_TokenizationThroughput composes the real
+#  shipped library build. Four arms in one binary: BM_TokenizationThroughput composes the real
 #  vocabulary set; the Degenerate arm composes {}; the NestedJson arm runs the real set over a
-#  nested-JSON corpus. The first two arms' delta on a non-dialect corpus is what measures LSRC-28
+#  nested-JSON corpus (canon's simdjson reader) and the FlatJson arm over escape-free flat JSON
+#  (its byte reader). The first two arms' delta on a non-dialect corpus is what measures LSRC-28
 #  — see canon.compose.cppm for the contract.
 ###########################################################
 cmake_minimum_required(VERSION 3.28)

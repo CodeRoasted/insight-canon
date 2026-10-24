@@ -1,0 +1,380 @@
+# insight-canon — the projection golden (the 2026-10-23 determinism audit, guard G6)
+#
+# canon's whole output for a named line population, read through the composed tokenizer with
+# no semantic package: one `> input` line, then one `=` line holding the template id and every
+# `render_projection` member, tab-separated, or `<no event>`. Each `== stream:` section runs
+# through one fresh tokenizer in file order. An input escapes `\\`, tab, LF and CR as `\\`,
+# `\t`, `\n` and `\r`.
+#
+# Every line is SYNTHETIC or first-party (the proof corpus is this repository's own).
+#
+# TO CHANGE A VALUE: you cannot, without first bumping `kCanonicalizationVersion` in
+# `core/api/canon.api.cppm`; the regenerator refuses otherwise. See the test file's header.
+#
+canonicalization_version = stateless-masks-18
+
+== stream: proof/corpus/ci_build.log
+> Build started for commit a1b2c3d on branch main
+=h:5215c85369ac0f84571878a8b38ca504	0		0	Unknown	0	RawText			Build started for commit a1b2c3d on branch main	0	None	0,0,0,0,0,0	0	0	0	
+> Restoring dependencies from cache
+=h:fb12d4df8515af6195a428f060157619	1		0	Unknown	0	RawText			Restoring dependencies from cache	0	None	0,0,0,0,0,0	0	0	0	
+> Compiling module auth
+=h:06fe41380ed2377179650eb4edff1f31	2		0	Unknown	0	RawText			Compiling module auth	0	None	0,0,0,0,0,0	0	0	0	
+> Compiling module billing
+=h:e9c2b7ca78da9cb14552cfe94bad2048	3		0	Unknown	0	RawText			Compiling module billing	0	None	0,0,0,0,0,0	0	0	0	
+> Compiling module gateway
+=h:381221d17794b5d87915cfe94ecd07d2	4		0	Unknown	0	RawText			Compiling module gateway	0	None	0,0,0,0,0,0	0	0	0	
+> warning: unused variable 'retry_count' in billing/charge.cpp
+=h:64c1dc8551409c00daeca46b787f750f	5		0	Warn	0	RawText			warning: unused variable 'retry_count' in billing/charge.cpp	0	None	0,0,0,0,0,0	0	0	0	
+> Compiling module storage
+=h:39812d39458e1d82752c60400628f94b	6		0	Unknown	0	RawText			Compiling module storage	0	None	0,0,0,0,0,0	0	0	0	
+> Linking target service
+=h:36ee183db01875c89d6f52963a4ae252	7		0	Unknown	0	RawText			Linking target service	0	None	0,0,0,0,0,0	0	0	0	
+> Running unit suite
+=h:29ca341e92dc7426f9b201e9681e602f	8		0	Unknown	0	RawText			Running unit suite	0	None	0,0,0,0,0,0	0	0	0	
+> test auth.login passed
+=h:6ce65857038958306dc821a9094340ac	9		0	Unknown	0	RawText			test auth.login passed	0	None	0,0,0,0,0,0	0	0	0	
+> test auth.logout passed
+=h:5f519f1327f7a4bf322ae714d6ee6342	10		0	Unknown	0	RawText			test auth.logout passed	0	None	0,0,0,0,0,0	0	0	0	
+> test billing.charge passed
+=h:162551ad4c62026b5fc535c886228418	11		0	Unknown	0	RawText			test billing.charge passed	0	None	0,0,0,0,0,0	0	0	0	
+> error: test gateway.route failed: connection refused
+=h:8227b755f162a3421131d18265b6cf1a	12		0	Error	0	RawText			error: test gateway.route failed: connection refused	0	None	0,0,0,0,0,0	0	0	0	
+> Build failed with 1 error
+=h:1030d4c9f85777d7e7136aee633ed1e1	13		0	Error	0	RawText			Build failed with <*> error	1|1	None	0,0,0,0,0,0	0	0	0	
+
+== stream: proof/corpus/github_actions.log
+> 2026-01-15T10:00:00.1234567Z ##[group]Run build and test
+=h:81d1e12f5cb5feff0ff11456fd310ca5	0	1768471200000000000	0	Unknown	0	Rfc3339Text			<*> ##[group]Run build and test	1|2026-01-15T10:00:00.1234567Z	None	0,0,0,0,0,0	0	0	0	
+> 2026-01-15T10:00:01.2345678Z Restoring dependencies from cache
+=h:eeec2b34666106f696770c34c52d2a5a	1	1768471201000000000	0	Unknown	0	Rfc3339Text			<*> Restoring dependencies from cache	1|2026-01-15T10:00:01.2345678Z	None	0,0,0,0,0,0	0	0	0	
+> 2026-01-15T10:00:02.3456789Z Compiling module auth
+=h:ca7ada030c698f7444beea6709897c0f	2	1768471202000000000	0	Unknown	0	Rfc3339Text			<*> Compiling module auth	1|2026-01-15T10:00:02.3456789Z	None	0,0,0,0,0,0	0	0	0	
+> 2026-01-15T10:00:03.4567890Z Compiling module billing
+=h:d4635de6853fca36218cbc745a326c84	3	1768471203000000000	0	Unknown	0	Rfc3339Text			<*> Compiling module billing	1|2026-01-15T10:00:03.4567890Z	None	0,0,0,0,0,0	0	0	0	
+> 2026-01-15T10:00:04.5678901Z ##[warning]deprecated API used in billing/charge.cpp
+=h:47e480794c8acfeff6cf7bd816f1a20a	4	1768471204000000000	0	Warn	0	Rfc3339Text			<*> ##[warning]deprecated API used in billing/charge.cpp	1|2026-01-15T10:00:04.5678901Z	None	0,0,0,0,0,0	0	0	0	
+> 2026-01-15T10:00:05.6789012Z Linking target service
+=h:a5478f847bed98cadb7918bacf0f099e	5	1768471205000000000	0	Unknown	0	Rfc3339Text			<*> Linking target service	1|2026-01-15T10:00:05.6789012Z	None	0,0,0,0,0,0	0	0	0	
+> 2026-01-15T10:00:06.7890123Z ##[endgroup]
+=h:7b7554aaa00241b63d5388597a9c7bd4	6	1768471206000000000	0	Unknown	0	Rfc3339Text			<*> ##[endgroup]	1|2026-01-15T10:00:06.7890123Z	None	0,0,0,0,0,0	0	0	0	
+> 2026-01-15T10:00:07.8901234Z ##[group]Run unit suite
+=h:864c5cfb7bd7b9750c1a72e7912260ff	7	1768471207000000000	0	Unknown	0	Rfc3339Text			<*> ##[group]Run unit suite	1|2026-01-15T10:00:07.8901234Z	None	0,0,0,0,0,0	0	0	0	
+> 2026-01-15T10:00:08.9012345Z test auth.login passed
+=h:83ea59541b603968e1389897a734a464	8	1768471208000000000	0	Unknown	0	Rfc3339Text			<*> test auth.login passed	1|2026-01-15T10:00:08.9012345Z	None	0,0,0,0,0,0	0	0	0	
+> 2026-01-15T10:00:09.0123456Z test billing.charge passed
+=h:896299c82690c67f49399f2d2dd7916f	9	1768471209000000000	0	Unknown	0	Rfc3339Text			<*> test billing.charge passed	1|2026-01-15T10:00:09.0123456Z	None	0,0,0,0,0,0	0	0	0	
+> 2026-01-15T10:00:10.1234567Z ##[error]test gateway.route failed: connection refused
+=h:01f3fe4f695639385eb4b92d49f416fd	10	1768471210000000000	0	Error	0	Rfc3339Text			<*> ##[error]test gateway.route failed: connection refused	1|2026-01-15T10:00:10.1234567Z	None	0,0,0,0,0,0	0	0	0	
+> 2026-01-15T10:00:11.2345678Z ##[error]Process completed with exit code 1
+=h:f861f283a3e370bf62e388b321369d44	11	1768471211000000000	0	Error	0	Rfc3339Text			<*> ##[error]Process completed with exit code 1	1|2026-01-15T10:00:11.2345678Z	None	0,0,0,0,0,0	0	0	0	
+
+== stream: proof/corpus/gitlab_ci.log
+> 2026-05-01T10:00:01.101000Z 00O Running with gitlab-runner 18.9.1 (a1b2c3d4)
+=h:cdff218abadb1e0cb9dec77e4c2d55f3	0	1777629601000000000	0	Unknown	0	Rfc3339Text			<*> <*> Running with gitlab-runner <*> (a1b2c3d4)	3|2026-05-01T10:00:01.101000Z|00O|18.9.1	None	0,0,0,0,0,0	0	0	0	
+> 2026-05-01T10:00:01.201000Z 00O+  on runner-alpha proof-shard
+=h:752ba9d305676470d2816c40cc1e7356	1	1777629601000000000	0	Unknown	0	Rfc3339Text			<*> <*> on runner-alpha proof-shard	2|2026-05-01T10:00:01.201000Z|00O+	None	0,0,0,0,0,0	0	0	0	
+> 2026-05-01T10:00:02.102000Z 00O section_start:1746093602:prepare_executor\r
+=h:b52a85c929f6f5a45325300575f7e34d	2	1777629602000000000	0	Unknown	0	Syslog	section_start		<*>	1|1746093602:prepare_executor	None	0,0,0,0,0,0	0	0	0	
+> 2026-05-01T10:00:02.302000Z 00O Preparing the docker executor
+=h:419cfede8a62a1c9d76ed6ce4162a6b0	3	1777629602000000000	0	Unknown	0	Rfc3339Text			<*> <*> Preparing the docker executor	2|2026-05-01T10:00:02.302000Z|00O	None	0,0,0,0,0,0	0	0	0	
+> 2026-05-01T10:00:03.103000Z 00O section_start:1746093603:get_sources\r
+=h:b52a85c929f6f5a45325300575f7e34d	4	1777629603000000000	0	Unknown	0	Syslog	section_start		<*>	1|1746093603:get_sources	None	0,0,0,0,0,0	0	0	0	
+> 2026-05-01T10:00:03.303000Z 00O Fetching changes with git depth set to 20
+=h:12bab3213452f2a8baa355ab8ffc84b3	5	1777629603000000000	0	Unknown	0	Rfc3339Text			<*> <*> Fetching changes with git depth set to <*>	3|2026-05-01T10:00:03.303000Z|00O|20	None	0,0,0,0,0,0	0	0	0	
+> 2026-05-01T10:00:04.104000Z 00O section_start:1746093604:step_script\r
+=h:b52a85c929f6f5a45325300575f7e34d	6	1777629604000000000	0	Unknown	0	Syslog	section_start		<*>	1|1746093604:step_script	None	0,0,0,0,0,0	0	0	0	
+> 2026-05-01T10:00:04.304000Z 00O $ cmake --build build --config Release -j 8
+=h:f7e503496b46cfc24b7b8753abbb6a83	7	1777629604000000000	0	Unknown	0	Rfc3339Text			<*> <*> $ cmake --build build --config Release -j <*>	3|2026-05-01T10:00:04.304000Z|00O|8	None	0,0,0,0,0,0	0	0	0	
+> 2026-05-01T10:00:05.105000Z 00O [ 45%] Building CXX object src/engine/core.cpp.o
+=h:84a02c9f17049b4840263df8a2e87c3e	8	1777629605000000000	0	Unknown	0	Rfc3339Text			<*> <*> [ <*> Building CXX object src/engine/core.cpp.o	3|2026-05-01T10:00:05.105000Z|00O|45%]	None	0,0,0,0,0,0	0	0	0	
+> 2026-05-01T10:00:06.106000Z 00O section_start:1746093606:log_disk_usage[collapsed=true]\rDisk usage detail
+=h:5c7af53a3ffa8f34117d6f9d9892d6a2	9	1777629606000000000	0	Unknown	0	Syslog	section_start		<*> usage detail	1|1746093606:log_disk_usage[collapsed=true]\rDisk	None	0,0,0,0,0,0	0	0	0	
+> 2026-05-01T10:00:06.306000Z 00E df: /proc/mounts: permission denied
+=h:3eeb1f126bc8ec7eb3c01fa09e33d007	10	1777629606000000000	0	Error	0	Syslog	df		/proc/mounts: permission denied	0	None	0,0,0,0,0,0	0	0	0	
+> 2026-05-01T10:00:07.107000Z 00O ++ echo -e '\\e[0Ksection_start:1746093607:phantom\\r\\e[0K'
+=h:6fc87d07166b8bdb730047929c7f6b45	11	1777629607000000000	0	Unknown	0	Rfc3339Text			<*> <*> ++ echo -e '\\e[0Ksection_start:<*>:phantom\\r\\e[0K'	2|2026-05-01T10:00:07.107000Z|00O	None	0,0,0,0,0,0	0	0	0	
+> 2026-05-01T10:00:08.108000Z 00O section_start:%s:duration_blind\r
+=h:da43d00fbc56d6842f32892702228dd1	12	1777629608000000000	0	Unknown	0	Syslog	section_start		%s:duration_blind	0	None	0,0,0,0,0,0	0	0	0	
+> 2026-05-01T10:00:09.109000Z 00O section_start:1746093609:after_script\r
+=h:b52a85c929f6f5a45325300575f7e34d	13	1777629609000000000	0	Unknown	0	Syslog	section_start		<*>	1|1746093609:after_script	None	0,0,0,0,0,0	0	0	0	
+> 2026-05-01T10:00:10.110000Z 00O Cleaning up project directory and file based variables
+=h:f050fec72001b8bfad98e4ee337e5f8a	14	1777629610000000000	0	Unknown	0	Rfc3339Text			<*> <*> Cleaning up project directory and file based variables	2|2026-05-01T10:00:10.110000Z|00O	None	0,0,0,0,0,0	0	0	0	
+> 2026-05-01T10:00:11.111000Z 00O ERROR: Job failed: exit code 1
+=h:9f4c1804fba69a3fab65f0470726653f	15	1777629611000000000	0	Error	0	Syslog	ERROR		Job failed: exit code 1	0	None	0,0,0,0,0,0	0	0	0	
+
+== stream: proof/corpus/jenkins_pipeline.log
+> Started by user CodeRoast CI
+=h:cec0973fc1522cae769336e1b5c95197	0		0	Unknown	0	RawText			Started by user CodeRoast CI	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:01.101Z] [Pipeline] Start of Pipeline
+=h:d561e9e2c251695309ced5754acd34bc	1		0	Unknown	0	RawText			[<*>] [Pipeline] Start of Pipeline	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:02.102Z] [Pipeline] node
+=h:07a1625fd7e3e0c65075883ecfe69825	2		0	Unknown	0	RawText			[<*>] [Pipeline] node	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:03.103Z] Running on linux-agent-07 in /home/jenkins/workspace/proof_pipeline_main
+=h:1d9f1e65c200f8c22c9e4bdb661e7781	3		0	Unknown	0	RawText			[<*>] Running on linux-agent-07 in /home/jenkins/workspace/proof_pipeline_main	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:04.104Z] [Pipeline] {
+=h:39a7496d965ddd74ec79344d57300b64	4		0	Unknown	0	RawText			[<*>] [Pipeline] {	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:05.105Z] [Pipeline] stage
+=h:2e6c13dae9f78e0c0006d834e196df4b	5		0	Unknown	0	RawText			[<*>] [Pipeline] stage	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:06.106Z] [Pipeline] { (Declarative: Checkout SCM)
+=h:ba772680da2d413907c1ad66dfefed82	6		0	Unknown	0	RawText			[<*>] [Pipeline] { (Declarative: Checkout SCM)	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:07.107Z] [Pipeline] checkout
+=h:dcc23d917c148e7e232e08306e675bd3	7		0	Unknown	0	RawText			[<*>] [Pipeline] checkout	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:08.108Z] Checking out Revision 4f2a9c1e (refs/remotes/origin/main)
+=h:c94867af755dd6093a98cf21380038e3	8		0	Unknown	0	RawText			[<*>] Checking out Revision <*> (refs/remotes/origin/main)	1|4f2a9c1e	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:09.109Z] [Pipeline] }
+=h:605eb28ea436063d981bd51e6ab37519	9		0	Unknown	0	RawText			[<*>] [Pipeline] }	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:10.110Z] [Pipeline] stage
+=h:2e6c13dae9f78e0c0006d834e196df4b	10		0	Unknown	0	RawText			[<*>] [Pipeline] stage	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:11.111Z] [Pipeline] { (Build)
+=h:762370456ed999e002677e6bce18f671	11		0	Unknown	0	RawText			[<*>] [Pipeline] { (Build)	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:12.112Z] [Pipeline] sh
+=h:202b690b1965ccf0c22ac08b8b638626	12		0	Unknown	0	RawText			[<*>] [Pipeline] sh	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:13.113Z] + cmake --build build --config Release -j 8
+=h:36ca81a3aa44ed29cbca9a5579cffb6d	13		0	Unknown	0	RawText			[<*>] + cmake --build build --config Release -j <*>	1|8	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:14.114Z] [ 45%] Building CXX object src/engine/core.cpp.o
+=h:e10cba6e5d2edbabbcd102e0e2a8a7fa	14		0	Unknown	0	RawText			[<*>] [ <*> Building CXX object src/engine/core.cpp.o	1|45%]	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:15.115Z] [100%] Built target proof_engine
+=h:99f52bccfaf22d9046d4279304b381b8	15		0	Unknown	0	RawText			[<*>] <*> Built target proof_engine	1|[100%]	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:16.116Z] [Pipeline] }
+=h:605eb28ea436063d981bd51e6ab37519	16		0	Unknown	0	RawText			[<*>] [Pipeline] }	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:17.117Z] [Pipeline] stage
+=h:2e6c13dae9f78e0c0006d834e196df4b	17		0	Unknown	0	RawText			[<*>] [Pipeline] stage	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:18.118Z] [Pipeline] { (Test)
+=h:2749a2320cc95e9371db35daba8c7596	18		0	Unknown	0	RawText			[<*>] [Pipeline] { (Test)	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:19.119Z] [Pipeline] sh
+=h:202b690b1965ccf0c22ac08b8b638626	19		0	Unknown	0	RawText			[<*>] [Pipeline] sh	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:20.120Z] + ctest --output-on-failure --timeout 300
+=h:ece4585e2af1d3c8925d2596d06e4c37	20		0	Unknown	0	RawText			[<*>] + ctest --output-on-failure --timeout <*>	1|300	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:21.121Z] Test project /home/jenkins/workspace/proof_pipeline_main/build
+=h:d422ae3da6d71f16a193e5b33ff37db3	21		0	Unknown	0	RawText			[<*>] Test project /home/jenkins/workspace/proof_pipeline_main/build	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:22.122Z] 41/42 Test #17: engine_replay_roundtrip .......... FAILED (2.31 sec)
+=h:411c510d0ed023f731fd906ffac03850	22		0	Error	0	RawText			[<*>] 41/<*> Test #<*>: engine_replay_roundtrip .......... FAILED (2.31 sec)	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:23.123Z] ERROR: expected 128 sealed windows, observed 127
+=h:299f34a87a3eaaf00c7ce76540f482d3	23		0	Error	0	RawText			[<*>] ERROR: expected <*> sealed windows, observed <*>	2|128|127	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:24.124Z] 98% tests passed, 1 tests failed out of 42
+=h:c00f435dab01c85c4bba47a4b4d2ef65	24		0	Error	0	RawText			[<*>] <*> tests passed, <*> tests failed out of <*>	3|98%|1|42	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:25.125Z] [Pipeline] junit
+=h:29f77563ebf5c8376ea8931ad6ccf77c	25		0	Unknown	0	RawText			[<*>] [Pipeline] junit	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:26.126Z] Recording test results
+=h:09b6623ba929bc10031c515df82ccd73	26		0	Unknown	0	RawText			[<*>] Recording test results	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:27.127Z] [Pipeline] }
+=h:605eb28ea436063d981bd51e6ab37519	27		0	Unknown	0	RawText			[<*>] [Pipeline] }	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:28.128Z] [Pipeline] stage
+=h:2e6c13dae9f78e0c0006d834e196df4b	28		0	Unknown	0	RawText			[<*>] [Pipeline] stage	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:29.129Z] [Pipeline] { (Package)
+=h:3be6167bfb47e8175c11970ea9b9fa5e	29		0	Unknown	0	RawText			[<*>] [Pipeline] { (Package)	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:30.130Z] [Pipeline] sh
+=h:202b690b1965ccf0c22ac08b8b638626	30		0	Unknown	0	RawText			[<*>] [Pipeline] sh	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:31.131Z] + tar czf proof-engine-1.4.2.tar.gz build/dist
+=h:c82ffe751d8267264ef921cdc0df0f0e	31		0	Unknown	0	RawText			[<*>] + tar czf proof-engine-1.4.2.tar.gz build/dist	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:32.132Z] [Pipeline] archiveArtifacts
+=h:602064d2eb959ac7aa82baf3a75438b8	32		0	Unknown	0	RawText			[<*>] [Pipeline] archiveArtifacts	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:33.133Z] Archiving artifacts
+=h:6fee7ffe56c2f98c75edf9cfa1a4f551	33		0	Unknown	0	RawText			[<*>] Archiving artifacts	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:34.134Z] [Pipeline] }
+=h:605eb28ea436063d981bd51e6ab37519	34		0	Unknown	0	RawText			[<*>] [Pipeline] }	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:35.135Z] [Pipeline] }
+=h:605eb28ea436063d981bd51e6ab37519	35		0	Unknown	0	RawText			[<*>] [Pipeline] }	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:36.136Z] [Pipeline] End of Pipeline
+=h:098534d52762297501fcb93979d40846	36		0	Unknown	0	RawText			[<*>] [Pipeline] End of Pipeline	0	None	0,0,0,0,0,0	0	0	0	
+> [2026-05-01T10:00:37.137Z] Finished: UNSTABLE
+=h:1f9ce351457145e870e0c7093e286d88	37		0	Unknown	0	RawText			[<*>] Finished: UNSTABLE	0	None	0,0,0,0,0,0	0	0	0	
+
+== stream: proof/corpus/json_ordinals.log
+> {"level":"info","msg":"db query completed via shard \\"primary\\"","latency_ms":6.5}
+=h:4bd58d36e444a00af0c3419b37c45e17	0		0	Info	1	JSON			db query completed via shard "primary"	0	None	0,0,0,0,0,0	1|latency_ms,dur-log2-ns-v1,6500000	0	0	
+> {"level":"info","msg":"db query completed via shard \\"primary\\"","latency_ms":11.5}
+=h:4bd58d36e444a00af0c3419b37c45e17	1		0	Info	1	JSON			db query completed via shard "primary"	0	None	0,0,0,0,0,0	1|latency_ms,dur-log2-ns-v1,11500000	0	0	
+> {"level":"info","msg":"db query completed via shard \\"primary\\"","latency_ms":12.5}
+=h:4bd58d36e444a00af0c3419b37c45e17	2		0	Info	1	JSON			db query completed via shard "primary"	0	None	0,0,0,0,0,0	1|latency_ms,dur-log2-ns-v1,12500000	0	0	
+> {"level":"info","msg":"db query completed via shard \\"primary\\"","latency_ms":13.75}
+=h:4bd58d36e444a00af0c3419b37c45e17	3		0	Info	1	JSON			db query completed via shard "primary"	0	None	0,0,0,0,0,0	1|latency_ms,dur-log2-ns-v1,13750000	0	0	
+> {"level":"info","msg":"db query completed via shard \\"primary\\"","latency_ms":14.0}
+=h:4bd58d36e444a00af0c3419b37c45e17	4		0	Info	1	JSON			db query completed via shard "primary"	0	None	0,0,0,0,0,0	1|latency_ms,dur-log2-ns-v1,14000000	0	0	
+> {"level":"info","msg":"db query completed via shard \\"primary\\"","latency_ms":25.5}
+=h:4bd58d36e444a00af0c3419b37c45e17	5		0	Info	1	JSON			db query completed via shard "primary"	0	None	0,0,0,0,0,0	1|latency_ms,dur-log2-ns-v1,25500000	0	0	
+> {"level":"info","msg":"db query completed via shard \\"primary\\"","latency_ms":512.0}
+=h:4bd58d36e444a00af0c3419b37c45e17	6		0	Info	1	JSON			db query completed via shard "primary"	0	None	0,0,0,0,0,0	1|latency_ms,dur-log2-ns-v1,512000000	0	0	
+> {"level":"info","msg":"db query completed via shard \\"primary\\"","latency_ms":800.0}
+=h:4bd58d36e444a00af0c3419b37c45e17	7		0	Info	1	JSON			db query completed via shard "primary"	0	None	0,0,0,0,0,0	1|latency_ms,dur-log2-ns-v1,800000000	0	0	
+> {"level":"info","msg":"db query completed via shard \\"primary\\"","latency_ms":850.5}
+=h:4bd58d36e444a00af0c3419b37c45e17	8		0	Info	1	JSON			db query completed via shard "primary"	0	None	0,0,0,0,0,0	1|latency_ms,dur-log2-ns-v1,850500000	0	0	
+> {"level":"info","msg":"db query completed via shard \\"primary\\"","latency_ms":900.25}
+=h:4bd58d36e444a00af0c3419b37c45e17	9		0	Info	1	JSON			db query completed via shard "primary"	0	None	0,0,0,0,0,0	1|latency_ms,dur-log2-ns-v1,900250000	0	0	
+> {"level":"info","msg":"db query completed via shard \\"primary\\"","latency_ms":1024.5}
+=h:4bd58d36e444a00af0c3419b37c45e17	10		0	Info	1	JSON			db query completed via shard "primary"	0	None	0,0,0,0,0,0	1|latency_ms,dur-log2-ns-v1,1024500000	0	0	
+> {"level":"info","msg":"db query completed via shard \\"primary\\"","latency_ms":2048.0}
+=h:4bd58d36e444a00af0c3419b37c45e17	11		0	Info	1	JSON			db query completed via shard "primary"	0	None	0,0,0,0,0,0	1|latency_ms,dur-log2-ns-v1,2048000000	0	0	
+
+== stream: proof/corpus/masking_v4.log
+> [6226:0609/094020.430910:ERROR:dbus/bus.cc:408] Failed to connect to the bus
+=h:5ac439235f013e0e028a3037530aa956	0		0	Error	0	RawText			[<*>:<*>/<*>:ERROR:dbus/bus.cc:<*>] Failed to connect to the bus	0	None	0,0,0,0,0,0	0	0	0	
+> [6225:0528/144005.901629:ERROR:dbus/bus.cc:511] Failed to connect to the bus
+=h:5ac439235f013e0e028a3037530aa956	1		0	Error	0	RawText			[<*>:<*>/<*>:ERROR:dbus/bus.cc:<*>] Failed to connect to the bus	0	None	0,0,0,0,0,0	0	0	0	
+> [7001:1231/235959.000001:ERROR:dbus/bus.cc:77] Failed to connect to the bus
+=h:5ac439235f013e0e028a3037530aa956	2		0	Error	0	RawText			[<*>:<*>/<*>:ERROR:dbus/bus.cc:<*>] Failed to connect to the bus	0	None	0,0,0,0,0,0	0	0	0	
+> {"level":"error","msg":"db query completed via shard \\"primary\\"","fields":{"component":"query-engine"}}
+=h:4bd58d36e444a00af0c3419b37c45e17	3		0	Error	1	JSON	query-engine		db query completed via shard "primary"	0	None	0,0,0,0,0,0	0	0	0	
+> {"level":"warn","msg":"cache evicted entry \\"hot-key\\"","fields":{"component":"cache-tier"}}
+=h:d5c72d621d6989e6fd4c5f4be0aafa88	4		0	Warn	1	JSON	cache-tier		cache evicted entry "hot-key"	0	None	0,0,0,0,0,0	0	0	0	
+> order completed total=$199
+=h:97f12906ae9696bff45bef89bc08ad8d	5		0	Unknown	0	RawText			order completed total=$<*>	0	None	0,0,0,0,0,0	0	0	0	
+> order completed total=$4999
+=h:97f12906ae9696bff45bef89bc08ad8d	6		0	Unknown	0	RawText			order completed total=$<*>	0	None	0,0,0,0,0,0	0	0	0	
+> order completed total=$42
+=h:97f12906ae9696bff45bef89bc08ad8d	7		0	Unknown	0	RawText			order completed total=$<*>	0	None	0,0,0,0,0,0	0	0	0	
+> order completed total=$1000000
+=h:97f12906ae9696bff45bef89bc08ad8d	8		0	Unknown	0	RawText			order completed total=$<*>	0	None	0,0,0,0,0,0	0	0	0	
+> /home/runner/.conan2/p/b/insig247e3d1dffc33/p/include/insight/span_unpack.cpp:72:5: warning: unused variable
+=h:75932a2eda8d1bc444f74bb87207a2da	9		0	Warn	0	RawText			/home/runner/.conan2/p/b/<*>/p/include/insight/span_unpack.cpp:<*>:<*>: warning: unused variable	0	None	0,0,0,0,0,0	0	0	0	
+> /home/runner/.conan2/p/b/insigea56199c0f87b/p/include/insight/span_unpack.cpp:72:5: warning: unused variable
+=h:75932a2eda8d1bc444f74bb87207a2da	10		0	Warn	0	RawText			/home/runner/.conan2/p/b/<*>/p/include/insight/span_unpack.cpp:<*>:<*>: warning: unused variable	0	None	0,0,0,0,0,0	0	0	0	
+> /tmp/build-abc123/src/foo.cpp:42:5: error: expected ';' before token
+=h:54a7765eea584ca5ed52228dc8f87c3f	11		0	Error	0	RawText			/tmp/<*>/src/foo.cpp:<*>:<*>: error: expected ';' before token	0	None	0,0,0,0,0,0	0	0	0	
+> /tmp/pw-electron-userdata-Kw9v4a
+=h:d3fad88889e1f02fc4163db268a0933f	12		0	Unknown	0	RawText			/tmp/<*>	0	None	0,0,0,0,0,0	0	0	0	
+> /nix/store/abc123def456ghi789jkl012mno345pq-source/bin/tool started ok
+=h:eadeb8b4e487b90a1ac9da94dc5c4841	13		0	Unknown	0	RawText			/nix/store/<*>/bin/tool started ok	0	None	0,0,0,0,0,0	0	0	0	
+
+== stream: proof/corpus/otlp_nanos.log
+> {"timeUnixNano":"1700000000123456789","severityNumber":9,"severityText":"INFO","body":{"stringValue":"cache warmed in 12 ms"},"attributes":[{"key":"service.name","value":{"stringValue":"checkout"}}]}
+=h:788e91de28a6360d97b6b82959dd4229	0	1700000000123456789	1	Info	1	JSON			cache warmed in <*> ms	1|12	None	0,0,0,0,0,0	0	0	0	
+> {"timeUnixNano":"1700000000123456001","severityNumber":13,"severityText":"WARN","body":{"stringValue":"retrying upstream call attempt 2"}}
+=h:579ca073b4aa11b43d6f563c0afd4bbb	1	1700000000123456001	1	Warn	1	JSON			retrying upstream call attempt <*>	1|2	None	0,0,0,0,0,0	0	0	0	
+> {"timeUnixNano":"1700000000999999999","severityNumber":17,"severityText":"ERROR","body":{"stringValue":"connection pool exhausted"}}
+=h:835f8e3300ba685cf86ff4511ba0aa34	2	1700000000999999999	1	Error	1	JSON			connection pool exhausted	0	None	0,0,0,0,0,0	0	0	0	
+
+== stream: proof/corpus/syslog.log
+> Jan 15 10:00:00 web01 nginx[2451]: GET /api/users 200
+=h:c94a498d164adc75f4bab76cac954ed0	0		0	Unknown	0	Syslog	nginx		GET /api/users <*>	1|200	None	0,0,0,0,0,0	0	0	0	
+> Jan 15 10:00:01 web01 nginx[2451]: GET /api/orders 200
+=h:aa2f6f612d83ec7f66f589b1050c92c8	1		0	Unknown	0	Syslog	nginx		GET /api/orders <*>	1|200	None	0,0,0,0,0,0	0	0	0	
+> Jan 15 10:00:02 web01 app[1893]: cache warmed in 12ms
+=h:bb5f626b165d925f0d465a28af8159aa	2		0	Unknown	0	Syslog	app		cache warmed in <*>	1|12ms	None	0,0,0,0,0,0	0	0	0	
+> Jan 15 10:00:03 web01 app[1893]: request completed in 8ms
+=h:a5c70a9d6e5caad04cbcba97b5d6dd3c	3		0	Unknown	0	Syslog	app		request completed in <*>	1|8ms	None	0,0,0,0,0,0	0	0	0	
+> Jan 15 10:00:04 web01 nginx[2451]: GET /api/users 500
+=h:c94a498d164adc75f4bab76cac954ed0	4		0	Unknown	0	Syslog	nginx		GET /api/users <*>	1|500	None	0,0,0,0,0,0	0	0	0	
+> Jan 15 10:00:05 web01 app[1893]: upstream timeout on shard 3
+=h:bebb17b362f54e9ead0f9e6932ab06c3	5		0	Unknown	0	Syslog	app		upstream timeout on shard <*>	1|3	None	0,0,0,0,0,0	0	0	0	
+> Jan 15 10:00:06 web01 app[1893]: request failed after 30000ms
+=h:67cd7aef73134123c6e6578f3160d623	6		0	Error	0	Syslog	app		request failed after <*>	1|30000ms	None	0,0,0,0,0,0	0	0	0	
+> Jan 15 10:00:07 web01 kernel: Out of memory: Killed process 1893 (app)
+=h:6f11bc802664ec16c41c248476d65b2d	7		0	Unknown	0	Syslog	kernel		Out of memory: Killed process <*> (app)	1|1893	None	0,0,0,0,0,0	0	0	0	
+
+== stream: json reader agreement 01, byte reader
+> {"msg":"a","message":"b"}
+=h:3e23e8160039594a33894f6564e1b134	0		0	Unknown	0	JSON			b	0	None	0,0,0,0,0,0	0	0	0	
+
+== stream: json reader agreement 01, simdjson reader
+> {"msg":"a","message":"b","zz":"a\\\\b"}
+=h:3e23e8160039594a33894f6564e1b134	0		0	Unknown	0	JSON			b	0	None	0,0,0,0,0,0	0	0	0	
+
+== stream: json reader agreement 02, byte reader
+> {"severity":"warn","level":"error","message":"m"}
+=h:62c66a7a5dd70c3146618063c344e531	0		0	Error	1	JSON			m	0	None	0,0,0,0,0,0	0	0	0	
+
+== stream: json reader agreement 02, simdjson reader
+> {"severity":"warn","level":"error","message":"m","zz":"a\\\\b"}
+=h:62c66a7a5dd70c3146618063c344e531	0		0	Error	1	JSON			m	0	None	0,0,0,0,0,0	0	0	0	
+
+== stream: json reader agreement 03, byte reader
+> {"source":"s","component":"c","message":"m"}
+=h:62c66a7a5dd70c3146618063c344e531	0		0	Unknown	0	JSON	c		m	0	None	0,0,0,0,0,0	0	0	0	
+
+== stream: json reader agreement 03, simdjson reader
+> {"source":"s","component":"c","message":"m","zz":"a\\\\b"}
+=h:62c66a7a5dd70c3146618063c344e531	0		0	Unknown	0	JSON	c		m	0	None	0,0,0,0,0,0	0	0	0	
+
+== stream: json reader agreement 04, byte reader
+> {"logGroup":"g","message":"m"}
+=h:62c66a7a5dd70c3146618063c344e531	0		0	Unknown	0	CloudWatch	g		m	0	None	0,0,0,0,0,0	0	0	0	
+
+== stream: json reader agreement 04, simdjson reader
+> {"logGroup":"g","message":"m","zz":"a\\\\b"}
+=h:62c66a7a5dd70c3146618063c344e531	0		0	Unknown	0	CloudWatch	g		m	0	None	0,0,0,0,0,0	0	0	0	
+
+== stream: json reader agreement 05, byte reader
+> {"ts":1700000000,"time":"2026-03-23T08:30:00Z","message":"m"}
+=h:62c66a7a5dd70c3146618063c344e531	0	1774254600000000000	0	Unknown	0	JSON			m	0	None	0,0,0,0,0,0	0	0	0	
+
+== stream: json reader agreement 05, simdjson reader
+> {"ts":1700000000,"time":"2026-03-23T08:30:00Z","message":"m","zz":"a\\\\b"}
+=h:62c66a7a5dd70c3146618063c344e531	0	1774254600000000000	0	Unknown	0	JSON			m	0	None	0,0,0,0,0,0	0	0	0	
+
+== stream: json reader agreement 06, byte reader
+> {"log.level":"warn","level":"error","message":"m"}
+=h:62c66a7a5dd70c3146618063c344e531	0		0	Error	1	JSON			m	0	None	0,0,0,0,0,0	0	0	0	
+
+== stream: json reader agreement 06, simdjson reader
+> {"log.level":"warn","level":"error","message":"m","zz":"a\\\\b"}
+=h:62c66a7a5dd70c3146618063c344e531	0		0	Error	1	JSON			m	0	None	0,0,0,0,0,0	0	0	0	
+
+== stream: json reader agreement 07, byte reader
+> {"msg":"a","msg":"b"}
+=h:ca978112ca1bbdcafac231b39a23dc4d	0		0	Unknown	0	JSON			a	0	None	0,0,0,0,0,0	0	0	0	
+
+== stream: json reader agreement 07, simdjson reader
+> {"msg":"a","msg":"b","zz":"a\\\\b"}
+=h:ca978112ca1bbdcafac231b39a23dc4d	0		0	Unknown	0	JSON			a	0	None	0,0,0,0,0,0	0	0	0	
+
+== stream: json reader agreement 08, byte reader
+> {"message":"m","duration_ms":12,"latency_ms":3}
+=h:62c66a7a5dd70c3146618063c344e531	0		0	Unknown	0	JSON			m	0	None	0,0,0,0,0,0	2|latency_ms,dur-log2-ns-v1,3000000|duration_ms,dur-log2-ns-v1,12000000	0	0	
+
+== stream: json reader agreement 08, simdjson reader
+> {"message":"m","duration_ms":12,"latency_ms":3,"zz":"a\\\\b"}
+=h:62c66a7a5dd70c3146618063c344e531	0		0	Unknown	0	JSON			m	0	None	0,0,0,0,0,0	2|latency_ms,dur-log2-ns-v1,3000000|duration_ms,dur-log2-ns-v1,12000000	0	0	
+
+== stream: json reader agreement 09, byte reader
+> {"a1":1,"a2":2,"a3":3,"a4":4,"a5":5,"a6":6,"a7":7,"a8":8,"duration_ms":5,"message":"m"}
+=h:62c66a7a5dd70c3146618063c344e531	0		0	Unknown	0	JSON			m	0	None	0,0,0,0,0,0	1|duration_ms,dur-log2-ns-v1,5000000	0	0	
+
+== stream: json reader agreement 09, simdjson reader
+> {"a1":1,"a2":2,"a3":3,"a4":4,"a5":5,"a6":6,"a7":7,"a8":8,"duration_ms":5,"message":"m","zz":"a\\\\b"}
+=h:62c66a7a5dd70c3146618063c344e531	0		0	Unknown	0	JSON			m	0	None	0,0,0,0,0,0	1|duration_ms,dur-log2-ns-v1,5000000	0	0	
+
+== stream: json reader agreement 10, byte reader
+> {"foo":"bar"}
+=h:7a38bf81f383f69433ad6e900d35b3e2	0		0	Unknown	0	JSON			{"foo":"bar"}	0	None	0,0,0,0,0,0	0	0	0	foo
+
+== stream: json reader agreement 10, simdjson reader
+> {"foo":"bar","zz":"a\\\\b"}
+=h:d170ffbff055448ee77714afb6da99bb	0		0	Unknown	0	JSON			{"foo":"bar","zz":"a\\\\b"}	0	None	0,0,0,0,0,0	0	0	0	foo
+
+== stream: json reader agreement 11, byte reader
+> {"timeUnixNano":"1700000000000000000","severityNumber":17,"traceId":"0102030405060708090a0b0c0d0e0f10","body":"m"}
+=h:5c12dc35258f0649d12841c4b1aa3d6d	0	1700000000000000000	1	Error	1	JSON			{"body":"m","severityNumber":<*>":"<*>":"<*>"}	0	None	1,0,0,5387714096504370514,0,0	0	0	0	
+
+== stream: json reader agreement 11, simdjson reader
+> {"timeUnixNano":"1700000000000000000","severityNumber":17,"traceId":"0102030405060708090a0b0c0d0e0f10","body":"m","zz":"a\\\\b"}
+=h:a1c950118f5410cc9c61ade4f189f259	0	1700000000000000000	1	Error	1	JSON			{"body":"m","severityNumber":<*>":"<*>":"<*>":"a\\\\b"}	0	None	1,0,0,5387714096504370514,0,0	0	0	0	
+
+== stream: json reader agreement 12, byte reader
+> {"startTimeUnixNano":"1700000000000000000","endTimeUnixNano":"1700000000500000000","name":"op","traceId":"0102030405060708090a0b0c0d0e0f10","spanId":"0102030405060708"}
+=h:037aeaeaf4bbf26ddabe7256a8294dc5	0	1700000000000000000	1	Info	1	JSON			op	0	None	1,0,1,5387714096504370514,16998240409812713853,0	1|span_duration_ns,dur-log2-ns-v1,500000000	0	0	
+
+== stream: json reader agreement 12, simdjson reader
+> {"startTimeUnixNano":"1700000000000000000","endTimeUnixNano":"1700000000500000000","name":"op","traceId":"0102030405060708090a0b0c0d0e0f10","spanId":"0102030405060708","zz":"a\\\\b"}
+=h:037aeaeaf4bbf26ddabe7256a8294dc5	0	1700000000000000000	1	Info	1	JSON			op	0	None	1,0,1,5387714096504370514,16998240409812713853,0	1|span_duration_ns,dur-log2-ns-v1,500000000	0	0	
+
+== stream: iso 8601 zones
+> {"ts":"2026-03-23T12:00:00+05","level":"error","message":"zone +05"}
+=h:5916eb3ca6092e3dff8a341d78bc0a26	0	1774249200000000000	0	Error	1	JSON			zone <*>	1|+05	None	0,0,0,0,0,0	0	0	0	
+> {"ts":"2026-03-23T12:00:00-05","level":"error","message":"zone -05"}
+=h:5916eb3ca6092e3dff8a341d78bc0a26	1	1774285200000000000	0	Error	1	JSON			zone <*>	1|-05	None	0,0,0,0,0,0	0	0	0	
+> {"ts":"2026-03-23T12:00:00+05:30","level":"error","message":"zone +05:30"}
+=h:5916eb3ca6092e3dff8a341d78bc0a26	2	1774247400000000000	0	Error	1	JSON			zone <*>	1|+05:30	None	0,0,0,0,0,0	0	0	0	
+> {"ts":"2026-03-23T12:00:00+0530","level":"error","message":"zone +0530"}
+=h:5916eb3ca6092e3dff8a341d78bc0a26	3	1774247400000000000	0	Error	1	JSON			zone <*>	1|+0530	None	0,0,0,0,0,0	0	0	0	
+> {"ts":"2026-03-23T12:00:00Z","level":"error","message":"zone Z"}
+=h:bb33af55b6433845bf97f1e011217428	4	1774267200000000000	0	Error	1	JSON			zone Z	0	None	0,0,0,0,0,0	0	0	0	
+> {"ts":"2026-03-23T12:00:00+05:3","level":"error","message":"zone +05:3"}
+=h:5916eb3ca6092e3dff8a341d78bc0a26	5		0	Error	1	JSON			zone <*>	1|+05:3	None	0,0,0,0,0,0	0	0	0	
+> {"ts":"2026-03-23T12:00:00+0X:00","level":"error","message":"zone +0X:00"}
+=h:5916eb3ca6092e3dff8a341d78bc0a26	6		0	Error	1	JSON			zone <*>	1|+0X:00	None	0,0,0,0,0,0	0	0	0	
+> {"ts":"2026-03-23T12:00:00+053","level":"error","message":"zone +053"}
+=h:5916eb3ca6092e3dff8a341d78bc0a26	7		0	Error	1	JSON			zone <*>	1|+053	None	0,0,0,0,0,0	0	0	0	
+> {"ts":"2026-03-23T12:00:00+053012","level":"error","message":"zone +053012"}
+=h:5916eb3ca6092e3dff8a341d78bc0a26	8		0	Error	1	JSON			zone <*>	1|+053012	None	0,0,0,0,0,0	0	0	0	

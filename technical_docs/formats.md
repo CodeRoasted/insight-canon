@@ -68,7 +68,7 @@ fall through to the level-inference path in [classification.md](classification.m
 
 | Strategy (`LogFormat`) | Timestamp | `level` source | `component` source | `host` | Notes |
 |---|---|---|---|---|---|
-| **JSON** | `kTimestampKeys` | `kLevelKeys` (or OTEL `severityNumber`, which **overrides**) | `kComponentKeys` | — | OTEL- and ordinal-aware (§4). Fast path for escape-free input, simdjson slow path otherwise. |
+| **JSON** | `kTimestampKeys` | `kLevelKeys` (or OTEL `severityNumber`, which **overrides**) | `kComponentKeys` | — | OTEL- and ordinal-aware (§4). A byte reader for escape-free flat input, simdjson otherwise, both feeding one assignment rule: a role takes the string member of lowest rank — an exact top-level name before a compound spelling, then the name's position in its vocabulary, then document order; a numeric member offers no role; a line carrying an OTEL member is always read by simdjson. |
 | **KeyValue** | per-key `timestamp` value | per-key `level` value | first matched key value | — | `key=value` / logfmt. |
 | **Syslog** | BSD (yearless, see below) or RFC3339 prefix | inferred from the message body | daemon/tag (`tag[pid]:`) | — | Two prefix shapes. Claims a line only on the full syslog HEADER (`TIMESTAMP HOST TAG:`), never on the timestamp alone; the tag search is bounded to ONE token. |
 | **RFC5424** | RFC3339 | PRI value → level | APP-NAME | HOSTNAME | Structured syslog. |
@@ -148,7 +148,8 @@ carried as `OrdinalObservation { field_name, schedule, value }`:
 - **Size** fields (`response_bytes`, `request_bytes`, `size_bytes`, `payload_bytes`) → canonical **bytes**.
 
 Parsing is **decimal-text → int64** scaled by a power of ten (exact fixed-point, **no float**); negative /
-overflow / exponent → omitted. Ordinals are **consumed by metalog** (distribution-drift binning) and are
+overflow / exponent → omitted. An ordinal is the first numeric member of its key, and the observations are
+emitted in catalog order, never in member order. Ordinals are **consumed by metalog** (distribution-drift binning) and are
 **never tokenized into the template** — so a varying latency value never fragments template identity.
 
 ---

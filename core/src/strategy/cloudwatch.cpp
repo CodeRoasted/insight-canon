@@ -21,6 +21,67 @@ namespace insight::tokenization
 namespace
 {
 
+    // invariant: the fast reader's assignment: a string member, its key resolved by the compound
+    // shape, fills the first still-empty role whose name list holds that key, in document order.
+    // invariant: a numeric `timestamp` or `ts` member is a millisecond epoch.
+    // invariant: the simdjson reader below reads only the strategy's declared keys, so a line whose
+    // roles sit under the wider names reads differently on the two paths.
+    struct CloudWatchFastSink
+    {
+        std::string_view timestamp_str;
+        std::int64_t timestamp_ms{0};
+        std::string_view level_str;
+        std::string_view component_str;
+        std::string_view message_str;
+
+        [[nodiscard]] bool member(std::string_view raw_key, JsonScalar scalar) noexcept
+        {
+            if (scalar.kind == JsonScalarKind::String)
+                assign_string(compound_key_name(raw_key), scalar.text);
+            else if (scalar.kind == JsonScalarKind::Number)
+                assign_number(raw_key, scalar.text);
+            return true;
+        }
+
+        void descended_member(std::string_view /*key*/, JsonScalar /*scalar*/) noexcept {}
+
+        [[nodiscard]] bool has_timestamp() const noexcept
+        {
+            return !timestamp_str.empty() || timestamp_ms != 0;
+        }
+
+        void assign_string(std::string_view key, std::string_view value) noexcept
+        {
+            if (!has_timestamp() && (key == "ts" || key == "timestamp" || key == "@timestamp" ||
+                                     key == "time" || key == "datetime"))
+                timestamp_str = value;
+            else if (level_str.empty() && (key == "level" || key == "severity" ||
+                                           key == "loglevel" || key == "log_level"))
+                level_str = value;
+            else if (component_str.empty() &&
+                     (key == "component" || key == "source" || key == "logger" ||
+                      key == "service" || key == "module" || key == "logGroup" ||
+                      key == "logStream"))
+                component_str = value;
+            else if (message_str.empty() && (key == "message" || key == "msg" || key == "log" ||
+                                             key == "text" || key == "body"))
+                message_str = value;
+        }
+
+        // invariant: the integer prefix of the literal is read and a literal past int64 leaves the
+        // field unset, so the time is absent rather than wrapped.
+        void assign_number(std::string_view key, std::string_view text) noexcept
+        {
+            if (has_timestamp() || (key != "timestamp" && key != "ts"))
+                return;
+            std::int64_t millis{0};
+            if (std::from_chars(text.data(), text.data() + text.size(), millis).ec != std::errc{})
+                return;
+            timestamp_ms = millis;
+        }
+    };
+    static_assert(JsonMemberSink<CloudWatchFastSink>);
+
     // post: true iff the line carries one of the production-shape markers; a substring scan, which
     // is cheaper than parsing for the detection step.
     bool has_cloudwatch_indicators(std::string_view line) noexcept
@@ -52,8 +113,7 @@ std::expected<ParsedLine, std::string> CloudWatchStrategy::parse(std::string_vie
     {
         // invariant: the fast path bypasses simdjson for escape-free objects and falls back on any
         // anomaly — nested structures, escape sequences or malformed JSON.
-        const auto fast{try_fast_json(line)};
-        if (fast.has_result)
+        if (CloudWatchFastSink fast; scan_flat_json(line, fast))
         {
             ParsedLine parsed;
             parsed.raw_line = line;

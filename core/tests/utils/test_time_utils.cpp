@@ -145,6 +145,42 @@ TEST(ParseISO8601, ZoneOffsetOutOfRangeIsRefused)
             << real << " is a real instant and was refused";
 }
 
+// invariant: an hour-only zone offset is APPLIED: 12:00 at +05 is 07:00 UTC, and 12:00 at -05 is
+// 17:00 UTC, with or without a fraction before it.
+TEST(ParseISO8601, AnHourOnlyZoneIsApplied)
+{
+    for (const auto& [zoned, utc] :
+         {std::pair{"2026-03-23T12:00:00+05", "2026-03-23T07:00:00Z"},
+          std::pair{"2026-03-23T12:00:00-05", "2026-03-23T17:00:00Z"},
+          std::pair{"2026-03-23T12:00:00.250+05", "2026-03-23T07:00:00Z"},
+          std::pair{"2026-03-23 12:00:00+05 trailing", "2026-03-23T07:00:00Z"}})
+    {
+        const auto parsed{parse_iso8601(zoned)};
+        const auto expected{parse_iso8601(utc)};
+        ASSERT_TRUE(parsed.has_value()) << zoned << " is a real instant and was refused";
+        ASSERT_TRUE(expected.has_value()) << utc;
+        EXPECT_EQ(to_tt(*parsed), to_tt(*expected))
+            << zoned << "\n  actual epoch second  : " << to_tt(*parsed)
+            << "\n  expected epoch second: " << to_tt(*expected) << " (" << utc << ")";
+    }
+}
+
+// invariant: a malformed zone offset is REFUSED as an absence, never read as a shorter zone or as
+// no zone at all: a truncated minute, a non-digit, a three- or five-digit run, a lone sign.
+TEST(ParseISO8601, AMalformedZoneIsRefused)
+{
+    for (const char* malformed :
+         {"2026-03-23T12:00:00+05:3", "2026-03-23T12:00:00+0X:00", "2026-03-23T12:00:00+05:x0",
+          "2026-03-23T12:00:00+053", "2026-03-23T12:00:00+05:", "2026-03-23T12:00:00+053012",
+          "2026-03-23T12:00:00+5", "2026-03-23T12:00:00-", "2026-03-23T12:00:00+05:300"})
+    {
+        const auto parsed{parse_iso8601(malformed)};
+        EXPECT_FALSE(parsed.has_value())
+            << malformed << " carries a malformed zone, yet it parsed to epoch second "
+            << to_tt(*parsed);
+    }
+}
+
 TEST(ParseISO8601, CompactTimezoneWithoutColon)
 {
     // invariant: a zone offset written without its colon must parse IDENTICALLY to the colon form.

@@ -34,7 +34,7 @@ using EventID = uint64_t;
 // refs: ADR-2.D5, ADR-2.D9, F-SRC-insight-canon:canon.api.cppm:TemplateId
 // refs: F-SRC-insight-canon:mask.cpp:normalize_marker_number
 // note: the generation ledger is technical_docs/canonicalization_generations.md.
-inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-17"};
+inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-18"};
 
 // invariant: the first 16 bytes of SHA-256 over the masked template_str, carried as a fixed-size
 // POD; the 34-byte "h:"+hex string materialises only at the serialize seam.
@@ -1519,8 +1519,9 @@ struct YearlessStamp
     [[nodiscard]] bool operator==(const YearlessStamp&) const = default;
 };
 
-// post: an ISO 8601 or RFC 3339 UTC timestamp — with or without a fraction, with a numeric zone,
-// or space-separated.
+// post: an ISO 8601 or RFC 3339 timestamp as UTC — with or without a fraction, space-separated or
+// not, its signed zone `+hh`, `+hhmm` or `+hh:mm` applied.
+// post: nullopt on a malformed zone — a truncated minute, a non-digit, a digit right after it.
 // invariant: a fraction after the seconds is skipped, never read: the instant has second grain.
 [[nodiscard]] std::optional<Timestamp> parse_iso8601(std::string_view timestamp_str) noexcept;
 

@@ -6,10 +6,11 @@
 #pragma once
 
 #include <array>
-#include <charconv>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <simdjson.h>
 #include <span>
 #include <string_view>
@@ -169,7 +170,32 @@ inline void read_raw_json_or_keep(simdjson::simdjson_result<simdjson::ondemand::
     return field.get_object().get(out) == simdjson::SUCCESS;
 }
 
-// invariant: the fast path avoids simdjson entirely for escape-free JSON objects — a single byte
+// invariant: the two readers of one JSON object report every top-level member to ONE sink, so
+// what a member means is decided once and the reader only decides how the bytes are read.
+enum class JsonScalarKind : std::uint8_t
+{
+    String,
+    Number,
+    Literal
+};
+
+// invariant: a String's text is its unescaped value, a Number's its token without whitespace, and
+// a Literal's `true`, `false` or `null`.
+struct JsonScalar
+{
+    JsonScalarKind kind{JsonScalarKind::Literal};
+    std::string_view text;
+};
+
+// invariant: a sink reads top-level scalar members in document order and a single descent's scalar
+// members under their own bare names; a false return from `member` declines the fast reader.
+template <class Sink>
+concept JsonMemberSink = requires(Sink& sink, std::string_view key, JsonScalar scalar) {
+    { sink.member(key, scalar) } -> std::same_as<bool>;
+    { sink.descended_member(key, scalar) } -> std::same_as<void>;
+};
+
+// invariant: the fast reader avoids simdjson entirely for escape-free JSON objects — a single byte
 // pass over ASCII string values, measured at about three times the on-demand speed.
 // invariant: it bails on any backslash in any value, on nested objects or arrays, and on malformed
 // input, and the caller MUST fall back to simdjson when it does.
@@ -199,34 +225,6 @@ inline void read_raw_json_or_keep(simdjson::simdjson_result<simdjson::ondemand::
     return false;
 }
 
-// invariant: the catalog match and the decimal-to-int64 parse happen in the strategy's module
-// purview, because this global-module header cannot see the ordinal catalog.
-// invariant: so the scanner only records CANDIDATES.
-struct FastJsonNumericField
-{
-    std::string_view key;
-    std::string_view text;
-};
-
-// invariant: log JSON carries a handful of numeric fields, so beyond this cap extras are ignored
-// — a recognized ordinal past the cap is missed, which is accepted for the declared seed set.
-// invariant: the slow path has no cap.
-inline constexpr std::size_t kFastJsonMaxNumericFields{8};
-
-struct FastJsonResult
-{
-    std::string_view timestamp_str;
-    std::int64_t timestamp_ms{0};
-    std::string_view level_str;
-    std::string_view component_str;
-    std::string_view message_str;
-    // invariant: the numeric candidates seen in the scan, matched against the declared catalog by
-    // the caller; the count never exceeds the cap.
-    std::array<FastJsonNumericField, kFastJsonMaxNumericFields> numeric_fields{};
-    std::size_t numeric_field_count{0};
-    bool has_result{false};
-};
-
 // post: the position advanced past any JSON whitespace.
 inline void skip_json_ws(std::string_view line, std::size_t& pos) noexcept
 {
@@ -237,16 +235,11 @@ inline void skip_json_ws(std::string_view line, std::size_t& pos) noexcept
 
 // post: a compound key resolved to its LAST SEGMENT; a key with no dot is returned unchanged, so
 // this is the IDENTITY on every ordinary key and needs no caller branch.
-// invariant: it lives in this header so the TWO key-matching sites share ONE definition — the
-// escape-free fast scanner and the simdjson slow path both classify keys.
-// invariant: the strategy RETURNS EARLY on a fast-path hit, so a rule applied only on the slow path
-// is invisible to every flat line — exactly the shape a namespaced producer emits.
-// invariant: the rule would therefore have been dead on its main population; defining it once here
-// is what stops the two paths disagreeing about what a key means.
 // invariant: THE BOUND IS ONE DOT, shared with the nested shape's one descent — a two-dot key
 // resolves to NOTHING and is claimed by no role.
 // invariant: taking the last segment at any depth would make the dotted spelling resolve while the
 // equivalent nested spelling refused it — one logical document read two ways.
+// refs: ADR-17.D12
 [[nodiscard]] constexpr std::string_view compound_key_name(std::string_view key) noexcept
 {
     const std::size_t dot{key.find('.')};
@@ -259,49 +252,11 @@ inline void skip_json_ws(std::string_view line, std::size_t& pos) noexcept
     return tail;
 }
 
-inline void assign_string_field(FastJsonResult& result, std::string_view raw_key,
-                                std::string_view value) noexcept
-{
-    // invariant: the compound SHAPE is applied BEFORE any name comparison — no vendor field name
-    // is added to the comparisons below, only the key handed to them is resolved first.
-    // refs: F-SRC-insight-canon:simdjson_scratch.hpp:compound_key_name
-    const std::string_view key{compound_key_name(raw_key)};
-    const bool no_ts = result.timestamp_str.empty() && result.timestamp_ms == 0;
-    if (no_ts && (key == "ts" || key == "timestamp" || key == "@timestamp" || key == "time" ||
-                  key == "datetime"))
-        result.timestamp_str = value;
-    else if (result.level_str.empty() &&
-             (key == "level" || key == "severity" || key == "loglevel" || key == "log_level"))
-        result.level_str = value;
-    else if (result.component_str.empty() &&
-             (key == "component" || key == "source" || key == "logger" || key == "service" ||
-              key == "module" || key == "logGroup" || key == "logStream"))
-        result.component_str = value;
-    else if (result.message_str.empty() &&
-             (key == "message" || key == "msg" || key == "log" || key == "text" || key == "body"))
-        result.message_str = value;
-}
-
-// post: an integer millisecond timestamp parsed from a numeric literal, when the key is a timestamp
-// key.
-inline void parse_number_ts(FastJsonResult& result, std::string_view key,
-                            std::string_view num) noexcept
-{
-    const bool no_ts = result.timestamp_str.empty() && result.timestamp_ms == 0;
-    if (!no_ts || (key != "timestamp" && key != "ts"))
-        return;
-    std::int64_t millis{0};
-    // invariant: the integer prefix of the literal is read and a literal past int64 leaves the
-    // field unset, so the time is absent rather than wrapped.
-    if (std::from_chars(num.data(), num.data() + num.size(), millis).ec != std::errc{})
-        return;
-    result.timestamp_ms = millis;
-}
-
-// post: one JSON value consumed at the position, dispatched by type; false when the caller should
-// abort on nesting, arrays or malformed input.
-[[nodiscard]] inline bool consume_json_value(std::string_view line, std::size_t& pos,
-                                             std::string_view key, FastJsonResult& result) noexcept
+// post: one JSON value consumed at the position and reported to the sink; false when the caller
+// should abort on nesting, arrays, malformed input or the sink's decline.
+template <JsonMemberSink Sink>
+[[nodiscard]] bool consume_json_value(std::string_view line, std::size_t& pos, std::string_view key,
+                                      Sink& sink) noexcept
 {
     const char vch{line[pos]};
     if (vch == '"')
@@ -309,39 +264,34 @@ inline void parse_number_ts(FastJsonResult& result, std::string_view key,
         std::string_view value;
         if (!extract_json_str(line, pos, value))
             return false;
-        assign_string_field(result, key, value);
+        return sink.member(key, JsonScalar{.kind = JsonScalarKind::String, .text = value});
     }
-    else if ((vch >= '0' && vch <= '9') || vch == '-')
+    if ((vch >= '0' && vch <= '9') || vch == '-')
     {
         const std::size_t num_start{pos};
         while (pos < line.size() &&
                ((line[pos] >= '0' && line[pos] <= '9') || line[pos] == '-' || line[pos] == '+' ||
                 line[pos] == '.' || line[pos] == 'e' || line[pos] == 'E'))
             ++pos;
-        const std::string_view num_text{line.data() + num_start, pos - num_start};
-        parse_number_ts(result, key, num_text);
-        // invariant: a numeric value is recorded as an ordinal CANDIDATE, matched against the
-        // declared catalog by the caller.
-        if (result.numeric_field_count < kFastJsonMaxNumericFields)
-            result.numeric_fields[result.numeric_field_count++] =
-                FastJsonNumericField{.key = key, .text = num_text};
+        return sink.member(key, JsonScalar{.kind = JsonScalarKind::Number,
+                                           .text = line.substr(num_start, pos - num_start)});
     }
-    else if (vch == 't' || vch == 'f' || vch == 'n')
+    if (vch == 't' || vch == 'f' || vch == 'n')
     {
+        const std::size_t literal_start{pos};
         while (pos < line.size() && line[pos] >= 'a' && line[pos] <= 'z')
             ++pos;
+        return sink.member(key,
+                           JsonScalar{.kind = JsonScalarKind::Literal,
+                                      .text = line.substr(literal_start, pos - literal_start)});
     }
-    else
-    {
-        return false;
-    }
-    return true;
+    return false;
 }
 
 // pre: the position must point at the opening quote of the key.
 // post: one key-value pair consumed; false when parsing should abort.
-[[nodiscard]] inline bool process_json_kv(std::string_view line, std::size_t& pos,
-                                          FastJsonResult& result) noexcept
+template <JsonMemberSink Sink>
+[[nodiscard]] bool process_json_kv(std::string_view line, std::size_t& pos, Sink& sink) noexcept
 {
     if (line[pos] != '"')
         return false;
@@ -357,43 +307,145 @@ inline void parse_number_ts(FastJsonResult& result, std::string_view key,
         ++pos;
     if (pos >= line.size())
         return false;
-    return consume_json_value(line, pos, key, result);
+    return consume_json_value(line, pos, key, sink);
 }
 
-// post: the recognized timestamp, level, component and message fields of a JSON log object, with
-// unknown fields silently skipped.
-// invariant: linear in line length with no heap allocation; the recognized field set is the union
-// of what the JSON and CloudWatch strategies read.
-[[nodiscard]] inline FastJsonResult try_fast_json(std::string_view line) noexcept
+// post: true iff the line is one flat JSON object whose every member reached the sink and the
+// sink declined none; false means the caller reads the line through simdjson instead.
+// invariant: linear in line length with no heap allocation.
+template <JsonMemberSink Sink>
+[[nodiscard]] bool scan_flat_json(std::string_view line, Sink& sink) noexcept
 {
-    FastJsonResult result;
     std::size_t pos{0};
-
     while (pos < line.size() && (line[pos] == ' ' || line[pos] == '\t'))
         ++pos;
     if (pos >= line.size() || line[pos] != '{')
-        return result;
+        return false;
     ++pos;
 
     for (;;)
     {
         skip_json_ws(line, pos);
         if (pos >= line.size())
-            return result;
+            return false;
         const char cur_ch{line[pos]};
         if (cur_ch == '}')
-        {
-            result.has_result = true;
-            return result;
-        }
+            return true;
         if (cur_ch == ',')
         {
             ++pos;
             continue;
         }
-        if (!process_json_kv(line, pos, result))
-            return result;
+        if (!process_json_kv(line, pos, sink))
+            return false;
     }
 }
+
+// post: a scalar value's raw token without the whitespace simdjson's raw token carries after it.
+[[nodiscard]] inline std::string_view json_token_of(simdjson::ondemand::value& value) noexcept
+{
+    std::string_view token{value.raw_json_token()};
+    while (!token.empty() && (token.back() == ' ' || token.back() == '\t' || token.back() == '\r' ||
+                              token.back() == '\n'))
+        token.remove_suffix(1);
+    return token;
+}
+
+// post: the scalar a simdjson value holds, or nullopt for an object, an array or an unreadable
+// value.
+[[nodiscard]] inline std::optional<JsonScalar>
+read_json_scalar(simdjson::ondemand::value& value, simdjson::ondemand::json_type type) noexcept
+{
+    switch (type)
+    {
+    case simdjson::ondemand::json_type::string:
+    {
+        std::string_view text;
+        if (value.get_string().get(text) != simdjson::SUCCESS)
+            return std::nullopt;
+        return JsonScalar{.kind = JsonScalarKind::String, .text = text};
+    }
+    case simdjson::ondemand::json_type::number:
+        return JsonScalar{.kind = JsonScalarKind::Number, .text = json_token_of(value)};
+    case simdjson::ondemand::json_type::boolean:
+    case simdjson::ondemand::json_type::null:
+        return JsonScalar{.kind = JsonScalarKind::Literal, .text = json_token_of(value)};
+    default:
+        return std::nullopt;
+    }
+}
+
+// post: every scalar member of `child` reported to the sink as a descended member; deeper levels
+// are not read.
+template <JsonMemberSink Sink>
+void walk_descended_object(simdjson::ondemand::object& child, Sink& sink) noexcept
+{
+    for (auto sub : child)
+    {
+        std::string_view sub_key;
+        if (sub.unescaped_key().get(sub_key) != simdjson::SUCCESS)
+            continue;
+        simdjson::ondemand::value sub_value;
+        simdjson::ondemand::json_type sub_type{};
+        if (sub.value().get(sub_value) != simdjson::SUCCESS ||
+            sub_value.type().get(sub_type) != simdjson::SUCCESS)
+            continue;
+        if (const auto scalar{read_json_scalar(sub_value, sub_type)})
+            sink.descended_member(sub_key, *scalar);
+    }
+}
+
+// post: every scalar member of `root` reported to the sink in document order, and every scalar
+// member of an object member reported once as a descended member.
+// invariant: the sink's decline is the fast reader's signal only, so this reader ignores it.
+// pre: `root` is unread; the walk leaves its cursor at the end, and a caller reading it again
+// resets it first.
+template <JsonMemberSink Sink>
+void walk_json_object(simdjson::ondemand::object& root, Sink& sink) noexcept
+{
+    for (auto field : root)
+    {
+        std::string_view key;
+        if (field.unescaped_key().get(key) != simdjson::SUCCESS)
+            continue;
+        simdjson::ondemand::value value;
+        simdjson::ondemand::json_type type{};
+        if (field.value().get(value) != simdjson::SUCCESS ||
+            value.type().get(type) != simdjson::SUCCESS)
+            continue;
+        if (type == simdjson::ondemand::json_type::object)
+        {
+            if (simdjson::ondemand::object child;
+                value.get_object().get(child) == simdjson::SUCCESS)
+                walk_descended_object(child, sink);
+            continue;
+        }
+        if (const auto scalar{read_json_scalar(value, type)})
+            static_cast<void>(sink.member(key, *scalar));
+    }
+}
+
+// invariant: one role's choice among the members offering it: the LOWEST rank wins and an equal
+// rank keeps the first offer, so the choice is a function of the member set and its order only.
+struct JsonRoleChoice
+{
+    static constexpr std::uint8_t kNoRank{0xFF};
+    std::string_view value;
+    std::uint8_t rank{kNoRank};
+
+    void offer(std::uint8_t candidate_rank, std::string_view candidate) noexcept
+    {
+        if (candidate_rank < rank)
+        {
+            rank = candidate_rank;
+            value = candidate;
+        }
+    }
+
+    [[nodiscard]] bool chosen() const noexcept
+    {
+        return rank != kNoRank;
+    }
+};
 
 } // namespace insight::tokenization

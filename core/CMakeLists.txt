@@ -361,6 +361,10 @@ if(INSIGHT_CANON_BUILD_TESTS)
         # makes the gate independent of the working directory ctest happens to launch it from.
         target_compile_definitions(insight_canon_tests PRIVATE
             INSIGHT_CANON_MASK_GOLDEN_PATH="${CMAKE_CURRENT_SOURCE_DIR}/tests/mask/mask_rules.golden")
+        # The projection golden (the 2026-10-23 determinism audit's G6) is read from the source
+        # tree for the same reason: its regeneration action writes back through this path.
+        target_compile_definitions(insight_canon_tests PRIVATE
+            INSIGHT_CANON_PROJECTION_GOLDEN_PATH="${CMAKE_CURRENT_SOURCE_DIR}/tests/identity/projection.golden")
         # The package's source root, for the tests that read a committed capture or the package's
         # own source text. Never __FILE__: inside `conan create` malf's path map makes a
         # translation unit's own name an identifier, not a path (DN-142.D13 (3)).
@@ -398,10 +402,10 @@ if(INSIGHT_CANON_BUILD_TESTS)
         # The suite list here is checked against `scripts/run_corpus_gates.sh`'s registry by that
         # script's `--census` arm, so the two cannot drift apart silently.
         set(CORPUS_SUITES "TransportPeelEquivalenceGate.*:BracketPeelEquivalenceGate.*:LogHubProjectionPinGate.*:ApacheTwoTwoProjectionPinGate.*:HealthAppRoutingPinGate.*")
-        # The golden regenerator is a hand-run tool, not a test (DN-142.D23 (4)): its exact name
-        # leaves the default population, so no run reports it `disabled`. Never a DISABLED_* glob,
-        # which would hide the next disabled test too. It stays in the binary for kRegenCommand.
-        set(NOT_A_TEST "MaskRuleGolden.DISABLED_RegenerateGolden")
+        # The golden regenerators are hand-run tools, not tests (DN-142.D23 (4)): their exact names
+        # leave the default population, so no run reports them `disabled`. Never a DISABLED_* glob,
+        # which would hide the next disabled test too. They stay in the binary for kRegenCommand.
+        set(NOT_A_TEST "MaskRuleGolden.DISABLED_RegenerateGolden:ProjectionGolden.DISABLED_RegenerateGolden")
         gtest_discover_tests(insight_canon_tests TEST_FILTER "-${CORPUS_SUITES}:${NOT_A_TEST}")
         gtest_discover_tests(insight_canon_tests TEST_FILTER "${CORPUS_SUITES}"
                              PROPERTIES LABELS corpus)
