@@ -19,6 +19,8 @@
 // call-once flag, the initialised atomic, and the memo of already-reported names.
 // invariant: each of the three is answered at the entity that answers it, below.
 // refs: ADR-5.D1
+#include <utils/log_macros.hpp>
+
 #include <gtest/gtest.h>
 #include <spdlog/common.h>
 #include <spdlog/details/log_msg.h>
@@ -26,7 +28,6 @@
 #include <spdlog/logger.h>
 #include <spdlog/sinks/base_sink.h>
 #include <spdlog/spdlog.h>
-#include <utils/log_macros.hpp>
 
 import insight.canon.test;
 

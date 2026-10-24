@@ -5,6 +5,11 @@
 // refs: ADR-3.D4
 #pragma once
 
+// note: only spdlog/common.h defines SPDLOG_LEVEL_TRACE; a -D SPDLOG_ACTIVE_LEVEL never does.
+#ifdef SPDLOG_LEVEL_TRACE
+#error "utils/log_macros.hpp must precede every spdlog header, or debug builds lose TRACE/DEBUG"
+#endif
+
 // note: canon sets its level as a PRIVATE -D; a public one collides with a consumer's own.
 #ifndef SPDLOG_ACTIVE_LEVEL
 #ifdef NDEBUG
