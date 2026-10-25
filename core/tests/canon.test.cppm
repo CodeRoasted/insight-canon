@@ -43,8 +43,8 @@ class TestThread
     explicit TestThread(std::function<void()> task);
     TestThread(const TestThread&) = delete;
     TestThread& operator=(const TestThread&) = delete;
-    TestThread(TestThread&& other) noexcept;
-    TestThread& operator=(TestThread&& other) noexcept;
+    TestThread(TestThread&&) = delete;
+    TestThread& operator=(TestThread&&) = delete;
     ~TestThread();
 
     void join();
@@ -55,11 +55,15 @@ class TestThread
 
 TestThread::TestThread(std::function<void()> task) : thread_{std::move(task)} {}
 
-TestThread::TestThread(TestThread&& other) noexcept = default;
-
-TestThread& TestThread::operator=(TestThread&& other) noexcept = default;
-
-TestThread::~TestThread() = default;
+// note: hand-written, never `= default`: MSVC re-emits a defaulted one in each importer (LNK2005).
+TestThread::~TestThread()
+{
+    if (thread_.joinable())
+    {
+        thread_.request_stop();
+        thread_.join();
+    }
+}
 
 void TestThread::join()
 {
