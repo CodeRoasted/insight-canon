@@ -9,7 +9,7 @@ required_conan_version = ">=2.28"
 
 class InsightCanonBenchConan(ConanFile):
     name = "insight_canon_bench"
-    version = "1.10.8"
+    version = "1.10.9"
     package_type = "application"
     license = "Apache-2.0"
     url = "https://github.com/CodeRoasted/insight-canon"
@@ -42,12 +42,12 @@ class InsightCanonBenchConan(ConanFile):
         self.cpp.build.builddirs = [build_dir]
 
     def requirements(self):
-        self.requires("insight_canon/1.10.8")
-        self.requires("insight_semantic_github/1.10.8")
-        self.requires("insight_semantic_gitlab/1.10.8")
-        self.requires("insight_semantic_jenkins/1.10.8")
-        self.requires("insight_semantic_package_managers/1.10.8")
-        self.requires("insight_semantic_test_frameworks/1.10.8")
+        self.requires("insight_canon/1.10.9")
+        self.requires("insight_semantic_github/1.10.9")
+        self.requires("insight_semantic_gitlab/1.10.9")
+        self.requires("insight_semantic_jenkins/1.10.9")
+        self.requires("insight_semantic_package_managers/1.10.9")
+        self.requires("insight_semantic_test_frameworks/1.10.9")
         self.requires("benchmark/1.9.5")
 
     def generate(self):
