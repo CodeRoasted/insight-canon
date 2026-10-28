@@ -43,6 +43,11 @@ permissions:
 
 on:
   workflow_call:
+    inputs:
+      canon-ref:
+        description: 'The commit the legs build: the candidate passes its own (github.sha), so the proof judges the candidate, never whatever main is by then.'
+        type: string
+        required: true
   workflow_dispatch:
     inputs:
       record-run:
@@ -59,8 +64,6 @@ on:
         type: string
         default: ''
         required: false
-  pull_request:
-    branches: [main]
   schedule:
     - cron: '0 6 * * 1'   # Mondays 06:00 UTC — drift catch
 
@@ -73,6 +76,7 @@ jobs:
       record-run: ${{ inputs.record-run }}
       record-commits: ${{ inputs.record-commits }}
       record-self: insight-canon
+      canon-ref: ${{ inputs.canon-ref }}
 
   compare:
     # A failed or skipped leg never SKIPS the verdict (ROADMAP N370): the compare runs on every
