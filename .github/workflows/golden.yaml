@@ -66,7 +66,7 @@ on:
 
 jobs:
   proof:
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-golden-proof.yml@1633bacf710f2f6913f845a9dc2f7070e6b7d676
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-golden-proof.yml@3409812bc455209ecef668f76c44b132b496e509
     with:
       linux-proof: scripts/det_public_proof.sh
       msvc-proof: scripts/det_msvc_proof.ps1
@@ -80,6 +80,6 @@ jobs:
     # green run of this workflow whose compare job is absent or not green.
     needs: [proof]
     if: ${{ !cancelled() }}
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-golden-compare.yml@1633bacf710f2f6913f845a9dc2f7070e6b7d676
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-golden-compare.yml@3409812bc455209ecef668f76c44b132b496e509
     with:
       min-legs: '5'
