@@ -1,22 +1,20 @@
-name: Lint
+name: Preflight
+
+# The cheap checks of this repository, nothing built: actionlint, C++23 module conformance, clang-format
+# conformance and the dead-symbol-in-comment gate (malf-toolchain's coderoast-preflight.yml, every leg
+# armed), and canon's own gate scripts below. Dispatched alone, or called by CI. PUBLIC repository: every
+# job runs on GitHub-hosted machines.
 
 on:
   workflow_dispatch:
-  pull_request:
-    branches: [ main ]
+  workflow_call:
 
 permissions:
   contents: read
 
 jobs:
-  lint:
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-lint.yml@b54dd5053a3d5be5d7c498a0dc5962798b88196a
-    permissions:
-      contents: read
-      actions: read   # malf's conan cache restore reads this job's runner group (actions-cache-allowed.sh)
-    # PUBLIC repo: no runs-on passthrough — a self-hosted runner reachable from a fork PR is an RCE.
-    # No `with:` at all: every gate in the reusable workflow defaults TRUE, so a caller that says
-    # nothing is fully gated, and a hole would have to be a written line here.
+  preflight:
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-preflight.yml@b54dd5053a3d5be5d7c498a0dc5962798b88196a
 
   # canon's own gate scripts, through malf-toolchain's script-gate job (ROADMAP N357). PUBLIC repo: no
   # runs-on passthrough — the reusable workflow's hosted default.
@@ -25,7 +23,7 @@ jobs:
   # deny-list is canon-specific, so the script stays here). ADR-29.D5 / ADR-20.D19: on both
   # provenance pairs the seam keeps the plain datum + a separate bool, so each pairing is held by ONE
   # write site; a second write site fails on the commit that adds it. Every gate runs and each red is
-  # named. Gates PRs directly, and every cut through step 0's B4, which runs this file's jobs before
+  # named. Runs in every CI and every cut through step 0's B4, which runs this file's jobs before
   # any tag (ADR-2.D3).
   sp1-semantic-unawareness:
     permissions:
@@ -41,7 +39,7 @@ jobs:
   # disclosure bar is "signed record in-tree + exact-set gate in CI on every publication run". This is
   # the gate half, at two coordinates running one script: release.yaml runs it on every publication
   # run (its subject is the ref set, the tag being published included, so ADR-2.D3 keeps it there),
-  # and this job gives pull requests and step 0's B4 the early signal. Exact-set, both directions;
+  # and this job gives CI and step 0's B4 the early signal. Exact-set, both directions;
   # the script selftests its red arms on every run, and fails closed on a partial fetch.
   disclosure-set:
     permissions:

@@ -1,54 +1,52 @@
 name: CI
 
+# This repository's CI: the preflight (cheap checks) and the build (malf-toolchain's coderoast-build.yml:
+# the clang-21 dev build of canon core, the five semantic packages and the bench harness, with every test; test on clang, ship gcc). With
+# postflight, clang-tidy runs over that same build in the build job, because only that job holds it. The
+# two jobs do not wait for each other, so a red preflight never hides the build's or the lint's verdict.
+# PUBLIC repository: every job runs on GitHub-hosted machines.
+
 on:
   workflow_dispatch:
-  pull_request:
-    branches: [ main ]
+    inputs:
+      postflight:
+        description: 'Run clang-tidy over the dev build (the postflight), in the build job.'
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      postflight:
+        description: 'Run clang-tidy over the dev build (the postflight), in the build job.'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
+  actions: read   # malf's conan cache restore reads this job's runner group (actions-cache-allowed.sh)
 
 jobs:
-  ci:
+  preflight:
+    uses: ./.github/workflows/preflight.yml
+
+  build:
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-build.yml@b54dd5053a3d5be5d7c498a0dc5962798b88196a
+    with:
+      postflight: ${{ inputs.postflight }}
+
+  # Sift, integrated the way any user integrates it (the Founder, 2026-10-27): the published Action
+  # from the marketplace, in a job of its own that diffs the build job's log (`target-job`) against
+  # the last green run of this workflow. Advisory: `fail-on` stays `none`, and `always()` diffs a red
+  # build too, which is when the diff matters.
+  sift:
+    needs: build
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
-      actions: read
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-ci.yml@b54dd5053a3d5be5d7c498a0dc5962798b88196a
-    with:
-      # canon is a tower root (no first-party deps to vendor). Post-ADR-17 it is a MULTI-package
-      # repo: the core under core/ (the logcraft/server layout — the repo root is the shelf), the five
-      # semantic vocabulary packages under semantic/ (github, gitlab, jenkins, package_managers, test_frameworks), and the composed
-      # bench harness under benchmarks/. Dependency-ordered — each row's `create` publishes into the local
-      # cache so the next row's `conan install` resolves it; the semantic packages `require insight_canon`
-      # and the bench requires ALL FIVE, so the order below is load-bearing (a missing semantic row =
-      # the bench falls through to remotes and the release build reds — keep this list 1:1 with
-      # packages.yml). test+create both default true; kept explicit so the ordering intent is legible.
-      # Building the packages here is what exercises the deepened cross-package C++-module closure
-      # (ADR-17.D8) on every PR, not just at the tag.
-      modules: |
-        core true true
-        semantic/github true true
-        semantic/gitlab true true
-        semantic/jenkins true true
-        semantic/package_managers true true
-        semantic/test_frameworks true true
-        benchmarks true true
-      # PUBLIC repo: sift-mode: public renders the Sift comment fork-safe (read-only token; a fork PR
-      # can build here but post nothing) — the sift-post job below posts it.
-      sift-mode: public
-    secrets: inherit
-
-  # Post the comment the `ci` build rendered to the sift-comment artifact. Separate job so `ci` (which
-  # runs PR code) stays read-only; only THIS job holds pull-requests: write, and it runs no PR code —
-  # it just posts the pre-rendered artifact of this same run. Same-repo PRs only: a fork PR's
-  # pull_request run is read-only, so posting is capped anyway (external forks get no comment).
-  sift-post:
-    needs: ci
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork != true }}
-    permissions:
-      pull-requests: write
-      actions: read
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-sift-post.yml@b54dd5053a3d5be5d7c498a0dc5962798b88196a
-    with:
-      run-id: ${{ github.run_id }}
-    secrets: inherit
+      actions: read   # the build job's log and the baseline artifact
+    steps:
+      - name: Sift — the build log against the last green run
+        uses: CodeRoasted/sift-action@02066069ff16d9b8ce2487b19a3686a3acdf24d7 # v2.0.0
+        with:
+          target-job: build
