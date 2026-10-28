@@ -13,7 +13,7 @@ permissions: {}
 
 jobs:
   probe:
-    uses: CodeRoasted/malf-toolchain/.github/workflows/store-access-probe.yml@b54dd5053a3d5be5d7c498a0dc5962798b88196a
+    uses: CodeRoasted/malf-toolchain/.github/workflows/store-access-probe.yml@76162212dd3984673d1af23a41c19d9c020eb723
     permissions:
       packages: write   # the write attempt must hold the scope, so its refusal is the package's grant
     with:
