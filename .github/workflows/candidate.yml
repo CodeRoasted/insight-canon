@@ -41,6 +41,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      packages: read
 
   # The determinism golden (the Founder, 2026-10-28): its five legs build THIS commit and the compare
   # asserts their digests byte-identical; the store job waits on it, so a candidate index exists only for
