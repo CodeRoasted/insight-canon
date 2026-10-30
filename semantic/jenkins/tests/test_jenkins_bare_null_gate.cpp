@@ -56,6 +56,7 @@ using insight::tokenization::Tokenizer;
 
 constexpr const char* kCorpusVar{"CORPUS_JENKINS_MARKERS_DIR"};
 constexpr const char* kDataVar{"CORPUS_JENKINS_MARKERS_DATA_DIR"};
+constexpr const char* kTestsDirVar{"INSIGHT_SEMANTIC_JENKINS_TESTS_DIR"};
 constexpr std::string_view kTraceSidecar{"RETRO-v2.trace-sidecar.tsv"};
 constexpr std::string_view kBytesRoot{"v2"};
 constexpr std::string_view kOracleFile{"BARE-v2.baseline.tsv"};
@@ -331,10 +332,15 @@ TEST_F(JenkinsBareNullGate, TheBareSurfaceIsByteIdenticalToTheCommittedBaseline)
                              return std::move(buffer).str();
                          }};
 
-    // invariant: the committed baseline is found in the exported tests/ directory the build
-    // names, so the gate needs no second environment variable.
+    // invariant: the baseline is read from the tests/ directory INSIGHT_SEMANTIC_JENKINS_TESTS_DIR
+    // names in the environment when set non-empty, else from the one the build names.
+    // note: the cut runs this binary restored from the store, where the build's path is gone.
+    const char* const tests_dir_override{std::getenv(kTestsDirVar)};
     const std::filesystem::path oracle_path{
-        std::filesystem::path{INSIGHT_SEMANTIC_JENKINS_TESTS_DIR} / kOracleFile};
+        std::filesystem::path{tests_dir_override != nullptr && *tests_dir_override != '\0'
+                                  ? tests_dir_override
+                                  : INSIGHT_SEMANTIC_JENKINS_TESTS_DIR} /
+        kOracleFile};
     const std::string oracle_text{read_file(oracle_path)};
     // invariant: `.string()` is load-bearing: libstdc++ spells the path stream operator through a
     // header template this TU never sees, so streaming the string sidesteps the module/header seam.

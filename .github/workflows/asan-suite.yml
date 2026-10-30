@@ -1,0 +1,27 @@
+name: Canon Core ASan Suite
+
+# canon core's own suite under ASan/UBSan, a job of this repository's candidate (DN-142.D33, the sanitizer gates
+# move into the candidates): `malf test core --asan` in the build environment, red on an exit other than 0 and on
+# zero tests counted from ctest's summary. Until 2026-10-30 the superproject's cut ran it; no other leg runs canon
+# core's suite under a sanitizer, and the release legs build without one.
+#
+# THE GATE IS malf-toolchain's `coderoast-sanitizer.yml`. Its verdict document is uploaded as
+# `canon-core-asan-verdict`, which packages.yml's `candidate_verdicts:` row names and the candidate's store job
+# ingests; that job waits on this one, so a red suite leaves the candidate without an index. PUBLIC: hosted runners,
+# no secret.
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  actions: read
+  packages: read
+
+jobs:
+  suite:
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-sanitizer.yml@cd9c2a0b980e656d297e528f0c0e6142dbcc0fcc
+    with:
+      gate: asan-suite
+      package: core
+      artifact: canon-core-asan-verdict

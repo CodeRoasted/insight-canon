@@ -33,6 +33,9 @@ if(DEFINED BUILD_TESTING AND NOT BUILD_TESTING)
     set(INSIGHT_SEMANTIC_JENKINS_TEST_DEFAULT OFF)
 endif()
 option(INSIGHT_SEMANTIC_JENKINS_BUILD_TESTS "Build unit tests" ${INSIGHT_SEMANTIC_JENKINS_TEST_DEFAULT})
+# invariant: OFF keeps the test executable and registers none of its tests: the corpus cut tool
+# builds this target from this file and must not judge this package's suites a second time.
+option(INSIGHT_SEMANTIC_JENKINS_REGISTER_TESTS "Register the built test executable's tests with ctest" ON)
 
 # Cross-package dep: guarded so an umbrella build's single resolution stays authoritative.
 if(NOT TARGET insight::canon)
@@ -134,8 +137,10 @@ if(INSIGHT_SEMANTIC_JENKINS_BUILD_TESTS)
         # The suite list here is checked against `scripts/run_corpus_gates.sh`'s registry by that
         # script's `--census` arm, so the two cannot drift apart silently.
         set(CORPUS_SUITES "JenkinsPayloadStampMeasurement.*:JenkinsRecognizerRetrofitGate.*:JenkinsBareNullGate.*")
-        gtest_discover_tests(insight_semantic_jenkins_tests TEST_FILTER "-${CORPUS_SUITES}")
-        gtest_discover_tests(insight_semantic_jenkins_tests TEST_FILTER "${CORPUS_SUITES}"
-                             PROPERTIES LABELS corpus)
+        if(INSIGHT_SEMANTIC_JENKINS_REGISTER_TESTS)
+            gtest_discover_tests(insight_semantic_jenkins_tests TEST_FILTER "-${CORPUS_SUITES}")
+            gtest_discover_tests(insight_semantic_jenkins_tests TEST_FILTER "${CORPUS_SUITES}"
+                                 PROPERTIES LABELS corpus)
+        endif()
     endif()
 endif()

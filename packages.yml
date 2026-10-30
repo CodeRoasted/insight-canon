@@ -81,6 +81,26 @@ packages:
     # clang verdict, and never releases it; the cut restores det_proof by key and runs it on the release seat.
     cut_tool:
       why: "the cut's canon-generation job renders canon's projection over the private corpora with this det_proof, and canon-showcase-gate.yml renders the public samples with it"
+  # The corpus cut tool (DN-142.D33): the three test executables holding canon's corpus gates, built from the
+  # targets core/ and semantic/{jenkins,gitlab} define (their test switches forced on, their tests registered
+  # by their own packages only) and installed alone. canon is compiled in its tree, so it requires no
+  # first-party package; its export is shaped as the repository, as proof/'s is.
+  insight_canon_corpus:
+    path: corpus
+    version: 1.10.9
+    source_public: true
+    release: false
+    depends: []
+    # DN-142.D22: every executable this package stores, classed `published` (it ships) or
+    # `run-from-cache` (a later step runs it from the cache, so it keeps its runpath).
+    executables:
+      bin/insight_canon_tests: run-from-cache
+      bin/insight_semantic_jenkins_tests: run-from-cache
+      bin/insight_semantic_gitlab_tests: run-from-cache
+    # DN-142.D33: a CUT TOOL. The candidate stores its ship form beside what ships, bound to its clang verdict,
+    # and never releases it; the cut restores the three executables by key and runs them on the release seat.
+    cut_tool:
+      why: "the cut's corpus-gates job runs canon's corpus suites (core, jenkins, gitlab) over the private corpora with these stored test executables, never a binary the release seat compiles"
 
 # ── The build system's INVENTORY (ADR-3.D9) ─────────────────────────────────────────────────────
 # Projects that declare their own `project()` and belong to NO conan package. They are NOT
@@ -116,6 +136,12 @@ ingest:
     commits: [insight-canon, metalog-spec]
     published: {assets: [{name: canon.det_proof.txt}]}
 
+# DN-142.D33 (the sanitizer gates): the verdicts this repository's candidate judges in a job of its own run and its
+# store job ingests as `<repository>/ingest.<workflow stem>` records, never published and never dispatched by step 0
+# (malf artefact_store.py CANDIDATE_VERDICTS). The member is the gate's verdict document, refused unless it passed.
+candidate_verdicts:
+  asan-suite.yml: {artifact: canon-core-asan-verdict, object: asan-suite.verdict.json}
+
 # ── The jobs this repository's release.yaml runs beyond `attest` and `publish` (ROADMAP N394) ──────
 # pin_coherence INV-22's shape clause derives the release from this file: a job a tag runs that is
 # not declared here, or a declaration the release no longer carries, reds at its commit.
@@ -141,4 +167,5 @@ determinism:
     - semantic/test_frameworks/src
     - proof
   out_of_scope:
+    insight_canon_corpus: "the corpus cut tool (release: false) adds no translation unit of its own: it builds the test executables of core and the jenkins and gitlab dialects, whose library sources the roots above judge, and its stored binaries are gates the cut runs, reaching no consumer of deterministic output"
     insight_canon_bench: "the composed perf harness (release: false, built and run by malf bench) MEASURES the core and ships no content: a benchmark that may not read a clock cannot time anything, and a draw it makes reaches no consumer of deterministic output"

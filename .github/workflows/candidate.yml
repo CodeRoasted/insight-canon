@@ -3,7 +3,8 @@ name: Candidate
 # This repository's candidate (DN-142.D31, the Founder's per-repository CI): whether its own store
 # already holds this commit's candidate (`present`, the no-op: nothing else starts), else its CI with
 # the postflight (`ci`: preflight, the clang dev leg in the image, clang-tidy over it), the determinism
-# golden at this commit (`golden`: five legs, one compare), and then the store
+# golden at this commit (`golden`: five legs, one compare), canon core's suite under ASan/UBSan (`asan-suite`),
+# and then the store
 # job (`store`: the gcc ship form of every released package, bound to the clang verdicts by equal
 # inputs, pushed to ghcr.io/<owner>/store-insight-canon and attested, the index last). PUBLIC
 # repository: every job runs on GitHub-hosted machines, and every identity is derived from the run, so
@@ -56,8 +57,19 @@ jobs:
       contents: read
       actions: read
 
+  # canon core's suite under ASan/UBSan (DN-142.D33, the sanitizer gates): its verdict is ingested by the store job,
+  # which waits on it, so a candidate index exists only for a commit whose suite held under the sanitizers.
+  asan-suite:
+    needs: present
+    if: ${{ needs.present.outputs.present != 'true' }}
+    uses: ./.github/workflows/asan-suite.yml
+    permissions:
+      contents: read
+      actions: read
+      packages: read
+
   store:
-    needs: [present, ci, golden]
+    needs: [present, ci, golden, asan-suite]
     if: ${{ needs.present.outputs.present != 'true' }}
     uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-candidate.yml@cd9c2a0b980e656d297e528f0c0e6142dbcc0fcc
     permissions:

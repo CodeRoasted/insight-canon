@@ -29,6 +29,9 @@ if(DEFINED BUILD_TESTING AND NOT BUILD_TESTING)
     set(INSIGHT_CANON_TEST_DEFAULT OFF)
 endif()
 option(INSIGHT_CANON_BUILD_TESTS  "Build unit and regression tests" ${INSIGHT_CANON_TEST_DEFAULT})
+# invariant: OFF keeps the test executable and registers none of its tests: the corpus cut tool
+# builds this target from this file and must not judge this package's suites a second time.
+option(INSIGHT_CANON_REGISTER_TESTS "Register the built test executable's tests with ctest" ON)
 
 # Arena reset poison — a DEBUG-BUILD INSTRUMENT (arena_allocator.cpp explains what and why).
 # Default ON for Debug, which is also what the ASan/MSan profiles set (malf/profiles/*-asan,
@@ -406,13 +409,15 @@ if(INSIGHT_CANON_BUILD_TESTS)
         # leave the default population, so no run reports them `disabled`. Never a DISABLED_* glob,
         # which would hide the next disabled test too. They stay in the binary for kRegenCommand.
         set(NOT_A_TEST "MaskRuleGolden.DISABLED_RegenerateGolden:ProjectionGolden.DISABLED_RegenerateGolden")
-        gtest_discover_tests(insight_canon_tests TEST_FILTER "-${CORPUS_SUITES}:${NOT_A_TEST}")
-        gtest_discover_tests(insight_canon_tests TEST_FILTER "${CORPUS_SUITES}"
-                             PROPERTIES LABELS corpus)
+        if(INSIGHT_CANON_REGISTER_TESTS)
+            gtest_discover_tests(insight_canon_tests TEST_FILTER "-${CORPUS_SUITES}:${NOT_A_TEST}")
+            gtest_discover_tests(insight_canon_tests TEST_FILTER "${CORPUS_SUITES}"
+                                 PROPERTIES LABELS corpus)
+        endif()
         # libnuma is loaded, never linked (DN-142.D16): the test executable carries canon's whole
         # arena, so it is the subject — no `libnuma` NEEDED entry and no `numa_` symbol, defined or
         # undefined. ELF only; a missing readelf or nm fails the test rather than passing it.
-        if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        if(INSIGHT_CANON_REGISTER_TESTS AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
             add_test(NAME canon_never_links_libnuma
                 COMMAND ${CMAKE_COMMAND} -DSUBJECT=$<TARGET_FILE:insight_canon_tests>
                         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/arena/never_links_libnuma.cmake)
