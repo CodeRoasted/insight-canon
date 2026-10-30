@@ -1,16 +1,15 @@
 name: Release
 
-# On a vX.Y.Z tag (or a manual re-run): attest -> the disclosure set -> publish. A RELEASE IS A
-# PUBLICATION (DN-142.D9, ROADMAP N360): insight_canon and the five insight_semantic_* packages were
-# built, tested and judged once, at step 0, and stored by the writer; the composed benchmark ran
-# inside insight_canon_bench's create as a verdict of its own (DN-142.D25 (5), call D), and the
-# determinism golden is the agreed digest of the five legs step 0 ingested from this repository's
-# `golden.yaml` (DN-142.D25 (3)). `publish` (malf's coderoast-publish.yml) attaches this
-# repository's writer-signed slice of the attested step-0 record — the six package transports, the
-# benchmark JSON, `canon.det_proof.txt` and the slice — and reads the Release back equal to it, both
-# ways. Nothing here builds, tests, measures or packs. This repository is PUBLIC, so every job runs
-# on a GitHub-hosted machine, and `publish` reads the private `store-insight-canon` package through
-# this repository's Read grant on it.
+# On a vX.Y.Z tag (or a manual re-run): attest -> the disclosure set -> publish. A RELEASE PUBLISHES FROM
+# ITS CANDIDATE (DN-142.D33 (3), DN-142.D9): the cut dispatched this repository's candidate, which tested
+# its sources, held its determinism golden and stored the ship form of insight_canon and the five
+# insight_semantic_* packages in this repository's own store; `publish` (malf's coderoast-publish.yml)
+# reads that candidate at the key `attest` hands on, through its attestations (this repository is
+# PUBLIC, and so is its store), and attaches every row packages.yml declares — the six package
+# transports, the benchmark JSON and `canon.det_proof.txt` — with the Release's publication document,
+# refusing unless every row resolves in the candidate, then reads the Release back equal to the staged
+# files, both ways. Nothing here builds, tests, measures or packs; every job runs on a GitHub-hosted
+# machine.
 
 on:
   push:
@@ -24,17 +23,18 @@ on:
 permissions:
   contents: write   # create the Release at the existing tag and upload its assets
   packages: read    # `publish` reads this repository's own store package
-  actions: read     # `attest` reads the superproject's step-0 runs (malf coderoast-attest.yml asks it)
+  actions: read        # `attest` reads the superproject's cut runs; `publish` reads its own run's referenced workflows
+  attestations: read   # `publish` trusts a public store's candidate through its attestations
 
 jobs:
-  # ── The tag's ONE gate: the tagged tree is the tree step 0 judged ─────────────────────────────
+  # ── The tag's ONE gate: the tagged tree is the tree the cut judged ────────────────────────────
   # malf-toolchain's `coderoast-attest.yml` proves that the commit this tag points at is the commit
-  # step 0's build record (`pharos-build.yml` in the private superproject) verified for this
-  # repository, and that a store writer sealed that record, and refuses the tag otherwise
-  # (DN-108.D7). Every other job in this file `needs: attest`, so a refusal lands before anything
-  # publishes; `pin_coherence` INV-22 holds that shape in every releasing repository. Hosted (no
-  # `runs-on`). `BUILD_RECORD_READ_TOKEN` is a fine-grained PAT whose only grant is
-  # `Actions: Read-only` on CodeRoasted/coderoast.
+  # the cut's record (`cut.yml` in the private superproject) names for this repository, and the
+  # commit its candidate was built at, and refuses the tag otherwise (DN-108.D7, DN-142.D33); it hands
+  # on that candidate's `key`. Every other job in this file `needs: attest`, so a refusal lands before
+  # anything publishes; `pin_coherence` INV-22 holds that shape in every releasing repository. Hosted
+  # (no `runs-on`). `BUILD_RECORD_READ_TOKEN` is a fine-grained PAT whose repository access is
+  # CodeRoasted/coderoast alone, `Actions: Read-only` and `Contents: Read-only`.
   attest:
     uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-attest.yml@6c75df26d4b660fc5d1ba98d962d724d74e8936e
     secrets:
@@ -42,10 +42,10 @@ jobs:
 
   # OPS-7.O9's PUBLICATION-RUN SEAT. The disclosure bar is "signed record in-tree + exact-set gate in CI
   # on every publication run", and the gate's subject is the REF SET — which refs carry the LogHub
-  # slice, the tag being published included, which does not exist when step 0 runs. So it is the
+  # slice, the tag being published included, which does not exist when the cut runs. So it is the
   # one gate this tag still runs (ADR-2.D3: a gate whose subject is the published ref stays on the
   # publication run), as a job of its own `publish` needs. The same script is also a job of
-  # lint.yml, where step 0's B4 and a pull request read it early: one script, two coordinates.
+  # preflight.yml, where the candidate and a pull request read it early: one script, two coordinates.
   disclosure-set:
     needs: attest
     permissions:
@@ -59,4 +59,8 @@ jobs:
     needs: [attest, disclosure-set]
     uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-publish.yml@6c75df26d4b660fc5d1ba98d962d724d74e8936e
     with:
+      candidate-key: ${{ needs.attest.outputs.key }}
+      cut-run: ${{ needs.attest.outputs.run }}
       record-sha256: ${{ needs.attest.outputs.record-sha256 }}
+    secrets:
+      BUILD_RECORD_READ_TOKEN: ${{ secrets.BUILD_RECORD_READ_TOKEN }}
