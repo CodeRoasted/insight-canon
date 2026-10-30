@@ -59,8 +59,9 @@ packages:
     # DN-142.D22: every executable this package stores, classed `published` (it ships) or
     # `run-from-cache` (a later step runs it from the cache, so it keeps its runpath).
     executables: {bin/insight_canon_bench: run-from-cache}
-    # DN-142.D25 (5) call D: the verdict `insight_canon_bench/bench`, run inside this package's create under step 0's
-    # `user.malf:bench`; each JSON is published under the name the hub collects.
+    # DN-142.D25 (5) call D: the verdict `insight_canon_bench/bench`, measured by the cut's bench job on the release seat
+    # (`pharos candidates bench`, DN-142.D33 slice (a)) under `user.malf:bench`; each JSON is published under
+    # the name the hub collects.
     objects:
       bench/insight_canon_bench.json: {published: {assets: [{name: insight-canon-benchmark.json}]}}
   # The determinism proof's ship-leg STEP (DN-142.D5 (4)): det_proof linked against the stored canon
@@ -126,9 +127,10 @@ inventory:
     defines:
       CANON_ROOT: ${repo}
 
-# DN-142.D25 (3): the hosted output step 0 dispatches and ingests (its stage B5): the determinism
-# golden, whose arm64 and MSVC legs run on hosted runners. The run title is the workflow's `name:`.
-# Its reading is a verdict B5 owes, published under the name the hub collects.
+# DN-142.D25 (3), DN-142.D33: the hosted output this repository's candidate produces in a job of its own run —
+# the determinism golden, whose arm64 and MSVC legs run on hosted runners — and its store job ingests from that
+# run as the record `<repository>/ingest.<workflow stem>` (malf artefact_store.py `candidate-ingest`). The
+# Release publishes it from the candidate, under the name the hub collects.
 ingest:
   golden.yaml:
     artifact: determinism-golden
@@ -137,7 +139,7 @@ ingest:
     published: {assets: [{name: canon.det_proof.txt}]}
 
 # DN-142.D33 (the sanitizer gates): the verdicts this repository's candidate judges in a job of its own run and its
-# store job ingests as `<repository>/ingest.<workflow stem>` records, never published and never dispatched by step 0
+# store job ingests as `<repository>/ingest.<workflow stem>` records, never published
 # (malf artefact_store.py CANDIDATE_VERDICTS). The member is the gate's verdict document, refused unless it passed.
 candidate_verdicts:
   asan-suite.yml: {artifact: canon-core-asan-verdict, object: asan-suite.verdict.json}
@@ -146,7 +148,7 @@ candidate_verdicts:
 # pin_coherence INV-22's shape clause derives the release from this file: a job a tag runs that is
 # not declared here, or a declaration the release no longer carries, reds at its commit.
 release_jobs:
-  disclosure-set: "the exact-set disclosure gate's subject is the ref set the published tag joins, which does not exist when step 0 runs (OPS-7.O9)"
+  disclosure-set: "the exact-set disclosure gate's subject is the ref set the published tag joins, which does not exist when the candidate runs (OPS-7.O9)"
 
 # ── The deterministic-content core the determinism gates judge (malf determinism_lint.py) ────────
 # Both gates — the clock (the determinism bible §7) and std <random> (§5 M7/M9) — judge every C/C++

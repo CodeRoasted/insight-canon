@@ -24,8 +24,7 @@ jobs:
   # deny-list is canon-specific, so the script stays here). ADR-29.D5 / ADR-20.D19: on both
   # provenance pairs the seam keeps the plain datum + a separate bool, so each pairing is held by ONE
   # write site; a second write site fails on the commit that adds it. Every gate runs and each red is
-  # named. Runs in every CI and every cut through step 0's B4, which runs this file's jobs before
-  # any tag (ADR-2.D3).
+  # named. Runs in every CI and in every candidate, whose preflight is this file (DN-142.D33).
   sp1-semantic-unawareness:
     permissions:
       contents: read
@@ -40,7 +39,7 @@ jobs:
   # disclosure bar is "signed record in-tree + exact-set gate in CI on every publication run". This is
   # the gate half, at two coordinates running one script: release.yaml runs it on every publication
   # run (its subject is the ref set, the tag being published included, so ADR-2.D3 keeps it there),
-  # and this job gives CI and step 0's B4 the early signal. Exact-set, both directions;
+  # and this job gives CI and the candidate the early signal. Exact-set, both directions;
   # the script selftests its red arms on every run, and fails closed on a partial fetch.
   disclosure-set:
     permissions:
