@@ -58,7 +58,7 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 # workspace map in CLAUDE.md, where every repo including malf is a sibling. There is no second
 # candidate and there never may be: a two-candidate `if(EXISTS a) else(b)` probe SUCCEEDS in
 # both environments while being right in only one, and nothing downstream can tell which it
-# picked. In CI the variable is exported (`conan_module.sh`, `setup-build-env`, and each raw
+# picked. In CI the variable is exported (`setup-build-env`, and each raw
 # golden leg), so the two never compete; under `conan create` no relative path can reach the
 # toolchain at all, because the build runs from sources exported into the conan cache.
 if(NOT DEFINED MALF_TOOLCHAIN_DIR OR MALF_TOOLCHAIN_DIR STREQUAL "")
