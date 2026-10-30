@@ -77,6 +77,10 @@ packages:
     # DN-142.D22: every executable this package stores, classed `published` (it ships) or
     # `run-from-cache` (a later step runs it from the cache, so it keeps its runpath).
     executables: {bin/det_proof: run-from-cache}
+    # DN-142.D33 (option (i)): a CUT TOOL. The candidate stores its ship form beside what ships, bound to its
+    # clang verdict, and never releases it; the cut restores det_proof by key and runs it on the release seat.
+    cut_tool:
+      why: "the cut's canon-generation job renders canon's projection over the private corpora with this det_proof, and canon-showcase-gate.yml renders the public samples with it"
 
 # ── The build system's INVENTORY (ADR-3.D9) ─────────────────────────────────────────────────────
 # Projects that declare their own `project()` and belong to NO conan package. They are NOT
@@ -117,3 +121,24 @@ ingest:
 # not declared here, or a declaration the release no longer carries, reds at its commit.
 release_jobs:
   disclosure-set: "the exact-set disclosure gate's subject is the ref set the published tag joins, which does not exist when step 0 runs (OPS-7.O9)"
+
+# ── The deterministic-content core the determinism gates judge (malf determinism_lint.py) ────────
+# Both gates — the clock (the determinism bible §7) and std <random> (§5 M7/M9) — judge every C/C++
+# unit under `roots:`, one subject and one root list; every build target above that no root reaches
+# is named under `out_of_scope:` with its reason. malf's coderoast-preflight.yml runs them over this
+# repository; the superproject sums the `opt_outs:` budgets across repositories (DN-142.D33).
+determinism:
+  # core/ whole, every shipped semantic dialect (a dialect that lands unlisted is the drift that missed
+  # jenkins at 1.7.7, and the coverage comparison now refuses it), and proof/: a determinism-PROOF
+  # harness is COVERED, never excluded — a clock read or a stateful std engine inside it is the defect.
+  roots:
+    - core/src
+    - core/api
+    - semantic/github/src
+    - semantic/gitlab/src
+    - semantic/jenkins/src
+    - semantic/package_managers/src
+    - semantic/test_frameworks/src
+    - proof
+  out_of_scope:
+    insight_canon_bench: "the composed perf harness (release: false, built and run by malf bench) MEASURES the core and ships no content: a benchmark that may not read a clock cannot time anything, and a draw it makes reaches no consumer of deterministic output"

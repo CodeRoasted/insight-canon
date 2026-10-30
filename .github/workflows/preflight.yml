@@ -1,8 +1,9 @@
 name: Preflight
 
 # The cheap checks of this repository, nothing built: actionlint, C++23 module conformance, clang-format
-# conformance and the dead-symbol-in-comment gate (malf-toolchain's coderoast-preflight.yml, every leg
-# armed), and canon's own gate scripts below. Dispatched alone, or called by CI. PUBLIC repository: every
+# conformance, the two determinism gates over the core packages.yml declares, and the dead-symbol-in-
+# comment gate (malf-toolchain's coderoast-preflight.yml, every leg armed), and canon's own gate
+# scripts below. Dispatched alone, or called by CI. PUBLIC repository: every
 # job runs on GitHub-hosted machines.
 
 on:
