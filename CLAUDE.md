@@ -37,3 +37,7 @@ design — this repo is the verifiable half of the determinism claim.
   vectorizable scans (whitespace splitting, digit/hex classification, prefix
   checks) and implement the SIMD/branchless version in the same change,
   measured, with determinism intact.
+
+## The C++ doctrine
+
+@../malf/doctrine.md
