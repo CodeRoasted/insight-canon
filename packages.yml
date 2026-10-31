@@ -135,7 +135,6 @@ ingest:
   golden.yaml:
     artifact: determinism-golden
     object: determinism-golden.txt
-    commits: [insight-canon, metalog-spec]
     published: {assets: [{name: canon.det_proof.txt}]}
 
 # DN-142.D33 (the sanitizer gates): the verdicts this repository's candidate judges in a job of its own run and its
