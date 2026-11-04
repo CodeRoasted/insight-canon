@@ -8,6 +8,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <string_view>
 
@@ -117,6 +118,36 @@ namespace detail
 
 } // namespace detail
 
+// post: the length of the longest well-formed prefix of `text`, so `text` is well-formed exactly
+// when the result is `text.size()`; it reads and allocates nothing else.
+// refs: DN-43.D20, DN-148.D5
+// invariant: an ASCII run is skipped eight bytes at a time, a byte below 0x80 being a whole
+// character in every row of Table 3-7.
+[[nodiscard]] inline std::size_t well_formed_prefix(std::string_view text) noexcept
+{
+    constexpr std::size_t kWordBytes{sizeof(std::uint64_t)};
+    constexpr std::uint64_t kHighBits{0x8080808080808080ULL};
+    std::size_t at{0};
+    while (at < text.size())
+    {
+        while (at + kWordBytes <= text.size())
+        {
+            std::uint64_t word{0};
+            std::memcpy(&word, text.data() + at, kWordBytes);
+            if ((word & kHighBits) != 0U)
+                break;
+            at += kWordBytes;
+        }
+        if (at == text.size())
+            break;
+        const detail::Step step{detail::step_at(text, at)};
+        if (!step.well_formed)
+            break;
+        at += step.length;
+    }
+    return at;
+}
+
 // refs: DN-43.D20
 // post: `text` with each maximal subpart of an ill-formed UTF-8 subsequence replaced by one U+FFFD,
 // the Unicode Standard's recommended practice, which the WHATWG decoder implements too.
@@ -126,14 +157,7 @@ namespace detail
 // invariant: idempotent — the output is well-formed, and the only bytes it adds are U+FFFD's.
 [[nodiscard]] inline std::string replace_ill_formed(std::string text)
 {
-    std::size_t at{0};
-    while (at < text.size())
-    {
-        const detail::Step step{detail::step_at(text, at)};
-        if (!step.well_formed)
-            break;
-        at += step.length;
-    }
+    std::size_t at{well_formed_prefix(text)};
     if (at == text.size())
         return text;
 

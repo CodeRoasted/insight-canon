@@ -12,6 +12,7 @@ using insight::ngram_id_of;
 using insight::NgramId;
 using insight::parse_template_id;
 using insight::render;
+using insight::sha256_of;
 using insight::template_id_of;
 using insight::template_id_of_label;
 using insight::TemplateId;
@@ -172,6 +173,38 @@ namespace
     return out;
 }
 } // namespace
+
+// invariant: sha256_of is FIPS 180-4's SHA-256, checked against the standard's own vectors (the
+// oracle is the published digest, not this code), and template_id_of is its first 16 bytes.
+// refs: DN-148.D5
+TEST(Sha256Invariants, MatchesThePublishedVectorsAndPrefixesTheTemplateId)
+{
+    const auto hex{[](const std::array<std::uint8_t, 32>& digest)
+                   {
+                       constexpr std::string_view kDigits{"0123456789abcdef"};
+                       std::string out;
+                       for (const std::uint8_t byte : digest)
+                       {
+                           out.push_back(kDigits[byte >> 4U]);
+                           out.push_back(kDigits[byte & 0xFU]);
+                       }
+                       return out;
+                   }};
+    EXPECT_EQ(hex(sha256_of("abc")),
+              "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+        << "sha256_of(\"abc\") is not FIPS 180-4's example B.1 digest";
+    EXPECT_EQ(hex(sha256_of("")),
+              "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+        << "sha256_of of the empty input is not the published empty-message digest";
+    for (const auto& sample : kSamples)
+    {
+        const auto digest{sha256_of(sample)};
+        const TemplateId id{template_id_of(sample)};
+        EXPECT_TRUE(std::equal(id.bytes.begin(), id.bytes.end(), digest.begin()))
+            << "template_id_of(\"" << sample << "\") is not the first 16 bytes of its SHA-256 "
+            << hex(digest) << "; rendered id " << render(id);
+    }
+}
 
 TEST(NgramIdInvariants, InProcessStable)
 {

@@ -34,14 +34,22 @@ namespace
     }
 } // namespace
 
-TemplateId template_id_of(std::string_view canonical_template) noexcept
+std::array<std::uint8_t, kSha256Bytes> sha256_of(std::string_view bytes) noexcept
 {
     std::array<unsigned char, kSha256Bytes> digest{};
-    picosha2::hash256(canonical_template.begin(), canonical_template.end(), digest.begin(),
-                      digest.end());
+    picosha2::hash256(bytes.begin(), bytes.end(), digest.begin(), digest.end());
+    std::array<std::uint8_t, kSha256Bytes> out{};
+    for (std::size_t i{0}; i < kSha256Bytes; ++i)
+        out[i] = static_cast<std::uint8_t>(digest[i]);
+    return out;
+}
+
+TemplateId template_id_of(std::string_view canonical_template) noexcept
+{
+    const std::array<std::uint8_t, kSha256Bytes> digest{sha256_of(canonical_template)};
     TemplateId out;
     for (std::size_t i{0}; i < kTemplateIdBytes; ++i)
-        out.bytes[i] = static_cast<std::uint8_t>(digest[i]);
+        out.bytes[i] = digest[i];
     return out;
 }
 

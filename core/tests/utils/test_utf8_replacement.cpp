@@ -165,3 +165,26 @@ TEST(Utf8Replacement, EveryShortInputComesOutWellFormedWithItsAsciiBytesInPlace)
 }
 
 } // namespace
+
+// invariant: the word-at-a-time ASCII skip agrees with simdjson's validator, and stops on the
+// exact byte, wherever a non-ASCII or ill-formed byte falls relative to an eight-byte boundary.
+// refs: DN-148.D5
+TEST(Utf8Replacement, TheWellFormedPrefixStopsOnTheFirstIllFormedByteAtEveryOffset)
+{
+    using insight::utf8::well_formed_prefix;
+    constexpr std::array<std::string_view, 4> kInserts{"FF", "C3", "C3A9", "F09D849E"};
+    for (const std::string_view insert_hex : kInserts)
+        for (std::size_t offset{0}; offset <= 40; ++offset)
+            for (std::size_t tail{0}; tail <= 17; tail += 17)
+            {
+                const std::string insert{bytes_of(insert_hex)};
+                const std::string input{std::string(offset, 'a') + insert + std::string(tail, 'b')};
+                const std::size_t prefix{well_formed_prefix(input)};
+                const std::size_t expected{well_formed(insert) ? input.size() : offset};
+                EXPECT_EQ(prefix, expected)
+                    << "insert " << insert_hex << " at offset " << offset << " with a " << tail
+                    << "-byte ASCII tail: input " << hex_of(input);
+                EXPECT_EQ(prefix == input.size(), well_formed(input))
+                    << "well_formed_prefix and simdjson disagree on " << hex_of(input);
+            }
+}

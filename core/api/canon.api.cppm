@@ -73,6 +73,11 @@ struct NgramId
 // post: render(template_id_of(s)) is byte-identical to the former string id for every s.
 // refs: F-SRC-insight-canon:canon.api.cppm:TemplateId
 [[nodiscard]] TemplateId template_id_of(std::string_view canonical_template) noexcept;
+// post: the whole SHA-256 (FIPS 180-4) of `bytes`; template_id_of is its first 16 bytes.
+// invariant: the one SHA-256 implementation the reference links, so a digest taken downstream is
+// the primitive the MetaLog wire already requires and no consumer brings a second one.
+// refs: DN-148.D5
+[[nodiscard]] std::array<std::uint8_t, 32> sha256_of(std::string_view bytes) noexcept;
 // post: "h:" + 32 lowercase hex — the ONLY place the id string materialises.
 [[nodiscard]] std::string render(TemplateId template_id);
 // refs: ADR-16.D3
