@@ -60,7 +60,7 @@ packages:
     # `run-from-cache` (a later step runs it from the cache, so it keeps its runpath).
     executables: {bin/insight_canon_bench: run-from-cache}
     # DN-142.D25 (5) call D: the verdict `insight_canon_bench/bench`, measured by the cut's bench job on the release seat
-    # (`pharos candidates bench`, DN-142.D33 slice (a)) under `user.malf:bench`; each JSON is published under
+    # (`pharos candidates bench`, DN-142.D33) under `user.malf:bench`; each JSON is published under
     # the name the hub collects.
     objects:
       bench/insight_canon_bench.json: {published: {assets: [{name: insight-canon-benchmark.json}]}}
@@ -78,7 +78,7 @@ packages:
     # DN-142.D22: every executable this package stores, classed `published` (it ships) or
     # `run-from-cache` (a later step runs it from the cache, so it keeps its runpath).
     executables: {bin/det_proof: run-from-cache}
-    # DN-142.D33 (option (i)): a CUT TOOL. The candidate stores its ship form beside what ships, bound to its
+    # DN-142.D33: a CUT TOOL. The candidate stores its ship form beside what ships, bound to its
     # clang verdict, and never releases it; the cut restores det_proof by key and runs it on the release seat.
     cut_tool:
       why: "the cut's canon-generation job renders canon's projection over the private corpora with this det_proof, and canon-showcase-gate.yml renders the public samples with it"
