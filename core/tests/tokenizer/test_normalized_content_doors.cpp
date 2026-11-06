@@ -130,14 +130,15 @@ TEST(NormalizedContentDoors, DeclaredPeelYieldsTypedContentAndObservationTime)
     return found;
 }
 
-// invariant: the census is anchored to the SOURCE TREE through the build's source-root definition,
-// so it runs on the desk and inside `conan create`, whose export carries api/ and src/.
-const std::filesystem::path kCoreRoot{INSIGHT_CANON_CORE_SOURCE_ROOT};
-
+// invariant: the census is anchored to the SOURCE TREE through the core source root the
+// environment names (canon.test.cppm), so it runs on the desk and inside `conan create`.
+// note: `conan create`'s export carries api/ and src/.
 TEST(NormalizedContentDoors, NormalizedContentHasExactlyTheTwoAuditedFriends)
 {
-    const std::string api{read_source(kCoreRoot / "api" / "canon.api.cppm")};
-    ASSERT_FALSE(api.empty()) << "could not read canon.api.cppm from " << kCoreRoot;
+    const std::filesystem::path core_root{insight::test_support::core_source_root()};
+    ASSERT_FALSE(core_root.empty()) << insight::test_support::core_source_root_unset();
+    const std::string api{read_source(core_root / "api" / "canon.api.cppm")};
+    ASSERT_FALSE(api.empty()) << "could not read canon.api.cppm from " << core_root.string();
     const std::vector<std::string> found{friends_of(api, "NormalizedContent")};
     // invariant: the passkey friend is QUALIFIED in source, and a qualified friend is a pure
     // reference to the exported global-module forward declaration.
@@ -157,8 +158,11 @@ TEST(NormalizedContentDoors, NormalizedContentHasExactlyTheTwoAuditedFriends)
 
 TEST(NormalizedContentDoors, TheMintKeyHasExactlyOneFriendAndItIsTheParser)
 {
-    const std::string parse{read_source(kCoreRoot / "src" / "parse" / "canon.detail.parse.cppm")};
-    ASSERT_FALSE(parse.empty()) << "could not read canon.detail.parse.cppm from " << kCoreRoot;
+    const std::filesystem::path core_root{insight::test_support::core_source_root()};
+    ASSERT_FALSE(core_root.empty()) << insight::test_support::core_source_root_unset();
+    const std::string parse{read_source(core_root / "src" / "parse" / "canon.detail.parse.cppm")};
+    ASSERT_FALSE(parse.empty()) << "could not read canon.detail.parse.cppm from "
+                                << core_root.string();
     const std::vector<std::string> found{friends_of(parse, "LogParserPasskey")};
     const std::vector<std::string> expected{"friend class LogParser"};
     EXPECT_EQ(found, expected)

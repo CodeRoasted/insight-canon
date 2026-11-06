@@ -116,11 +116,14 @@ if(INSIGHT_SEMANTIC_JENKINS_BUILD_TESTS)
         target_compile_options(insight_semantic_jenkins_tests PRIVATE
             $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-ffp-contract=off>)
         # The committed baselines the gates read sit in tests/, which the recipe exports. A test
-        # locates them through this definition, never through __FILE__: inside `conan create`
-        # malf's path map makes a translation unit's own name an identifier, not a path
-        # (DN-142.D13 (3)).
-        target_compile_definitions(insight_semantic_jenkins_tests PRIVATE
-            INSIGHT_SEMANTIC_JENKINS_TESTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests")
+        # locates them through INSIGHT_SEMANTIC_JENKINS_TESTS_DIR in its environment, which the
+        # registration below sets. Never a compile definition: insight_canon_corpus stores this
+        # target, and a path compiled in makes its bytes depend on the home the create ran in
+        # (DN-142.D33); the cut names its clone's directory (scripts/pharos/candidates.py
+        # TOOL_INPUT_ROOTS). Never __FILE__: inside `conan create` malf's path map makes a
+        # translation unit's own name an identifier, not a path (DN-142.D13 (3)).
+        set(INSIGHT_SEMANTIC_JENKINS_TEST_ENVIRONMENT
+            "INSIGHT_SEMANTIC_JENKINS_TESTS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/tests")
         include(GoogleTest)
         # THE CORPUS POPULATION IS SPLIT OUT BY LABEL, NEVER MIXED INTO THE DEFAULT RUN
         # (Founder, 2026-09-04: "I also dont want to mix up big corpus tests/gates with regular
@@ -138,9 +141,11 @@ if(INSIGHT_SEMANTIC_JENKINS_BUILD_TESTS)
         # script's `--census` arm, so the two cannot drift apart silently.
         set(CORPUS_SUITES "JenkinsPayloadStampMeasurement.*:JenkinsRecognizerRetrofitGate.*:JenkinsBareNullGate.*")
         if(INSIGHT_SEMANTIC_JENKINS_REGISTER_TESTS)
-            gtest_discover_tests(insight_semantic_jenkins_tests TEST_FILTER "-${CORPUS_SUITES}")
+            gtest_discover_tests(insight_semantic_jenkins_tests TEST_FILTER "-${CORPUS_SUITES}"
+                                 PROPERTIES ENVIRONMENT "${INSIGHT_SEMANTIC_JENKINS_TEST_ENVIRONMENT}")
             gtest_discover_tests(insight_semantic_jenkins_tests TEST_FILTER "${CORPUS_SUITES}"
-                                 PROPERTIES LABELS corpus)
+                                 PROPERTIES LABELS corpus
+                                            ENVIRONMENT "${INSIGHT_SEMANTIC_JENKINS_TEST_ENVIRONMENT}")
         endif()
     endif()
 endif()

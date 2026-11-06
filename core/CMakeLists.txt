@@ -358,21 +358,16 @@ if(INSIGHT_CANON_BUILD_TESTS)
         set_target_properties(insight_canon_tests PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
         target_compile_definitions(insight_canon_tests PRIVATE
             $<IF:$<CONFIG:Debug>,SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE,SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO>)
-        # The masking-rule golden (ROADMAP N74) is read from the SOURCE tree, not a copy in the
-        # build tree: the regeneration action writes back through this same path, so a copy would
-        # regenerate an artifact git never sees. An absolute path baked at configure time is what
-        # makes the gate independent of the working directory ctest happens to launch it from.
-        target_compile_definitions(insight_canon_tests PRIVATE
-            INSIGHT_CANON_MASK_GOLDEN_PATH="${CMAKE_CURRENT_SOURCE_DIR}/tests/mask/mask_rules.golden")
-        # The projection golden (the 2026-10-23 determinism audit's G6) is read from the source
-        # tree for the same reason: its regeneration action writes back through this path.
-        target_compile_definitions(insight_canon_tests PRIVATE
-            INSIGHT_CANON_PROJECTION_GOLDEN_PATH="${CMAKE_CURRENT_SOURCE_DIR}/tests/identity/projection.golden")
-        # The package's source root, for the tests that read a committed capture or the package's
-        # own source text. Never __FILE__: inside `conan create` malf's path map makes a
+        # The tests that read this package's SOURCE tree — the masking golden (ROADMAP N74) and
+        # the projection golden (the 2026-10-23 determinism audit's G6), whose regeneration
+        # actions write back through the path they read, a committed capture, the package's own
+        # source text — find it through INSIGHT_CANON_CORE_SOURCE_ROOT in their environment, which
+        # the registration below sets as an absolute path, so a gate does not depend on the
+        # working directory ctest launches it from. Never a compile definition: insight_canon_corpus
+        # stores this target, and a path compiled in makes its bytes depend on the home the create
+        # ran in (DN-142.D33). Never __FILE__: inside `conan create` malf's path map makes a
         # translation unit's own name an identifier, not a path (DN-142.D13 (3)).
-        target_compile_definitions(insight_canon_tests PRIVATE
-            INSIGHT_CANON_CORE_SOURCE_ROOT="${CMAKE_CURRENT_SOURCE_DIR}")
+        set(INSIGHT_CANON_TEST_ENVIRONMENT "INSIGHT_CANON_CORE_SOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}")
         # The test target RECOMPILES arena_allocator.cpp (white-box, above), so it needs the switch
         # in its own right — inheriting the library's PRIVATE define is not a thing. Without this
         # the arena's own instrument test would read `arena_poisons_on_reset() == false` inside a
@@ -410,9 +405,11 @@ if(INSIGHT_CANON_BUILD_TESTS)
         # which would hide the next disabled test too. They stay in the binary for kRegenCommand.
         set(NOT_A_TEST "MaskRuleGolden.DISABLED_RegenerateGolden:ProjectionGolden.DISABLED_RegenerateGolden")
         if(INSIGHT_CANON_REGISTER_TESTS)
-            gtest_discover_tests(insight_canon_tests TEST_FILTER "-${CORPUS_SUITES}:${NOT_A_TEST}")
+            gtest_discover_tests(insight_canon_tests TEST_FILTER "-${CORPUS_SUITES}:${NOT_A_TEST}"
+                                 PROPERTIES ENVIRONMENT "${INSIGHT_CANON_TEST_ENVIRONMENT}")
             gtest_discover_tests(insight_canon_tests TEST_FILTER "${CORPUS_SUITES}"
-                                 PROPERTIES LABELS corpus)
+                                 PROPERTIES LABELS corpus
+                                            ENVIRONMENT "${INSIGHT_CANON_TEST_ENVIRONMENT}")
         endif()
         # libnuma is loaded, never linked (DN-142.D16): the test executable carries canon's whole
         # arena, so it is the subject — no `libnuma` NEEDED entry and no `numa_` symbol, defined or

@@ -27,8 +27,8 @@ constexpr char kExpectedMark{'='};
 constexpr std::string_view kNoEvent{"<no event>"};
 
 constexpr std::string_view kRegenCommand{
-    "<build dir>/core/insight_canon_tests --gtest_also_run_disabled_tests "
-    "--gtest_filter='ProjectionGolden.DISABLED_RegenerateGolden'"};
+    "INSIGHT_CANON_CORE_SOURCE_ROOT=<checkout>/core <build dir>/core/insight_canon_tests "
+    "--gtest_also_run_disabled_tests --gtest_filter='ProjectionGolden.DISABLED_RegenerateGolden'"};
 
 struct Row
 {
@@ -78,13 +78,27 @@ struct Golden
     return out;
 }
 
+// post: the projection golden in the SOURCE tree, never a build-tree copy: the regeneration
+// action writes back through this same path. Empty when the core source root is unset.
+[[nodiscard]] std::filesystem::path golden_path()
+{
+    const std::filesystem::path root{insight::test_support::core_source_root()};
+    return root.empty() ? root : root / "tests" / "identity" / "projection.golden";
+}
+
 [[nodiscard]] Golden load_golden(std::string& why)
 {
     Golden golden;
-    std::ifstream file{INSIGHT_CANON_PROJECTION_GOLDEN_PATH, std::ios::binary};
+    const std::filesystem::path path{golden_path()};
+    if (path.empty())
+    {
+        why = insight::test_support::core_source_root_unset();
+        return golden;
+    }
+    std::ifstream file{path, std::ios::binary};
     if (!file)
     {
-        why = std::string{"cannot open the golden at "} + INSIGHT_CANON_PROJECTION_GOLDEN_PATH;
+        why = "cannot open the golden at " + path.string();
         return golden;
     }
     std::string text;
@@ -303,8 +317,9 @@ TEST(ProjectionGolden, DISABLED_RegenerateGolden)
     for (std::string& line : lines)
         if (line.starts_with(kVersionKey))
             line = std::string{kVersionKey} + std::string{insight::kCanonicalizationVersion};
-    std::ofstream out{INSIGHT_CANON_PROJECTION_GOLDEN_PATH, std::ios::binary | std::ios::trunc};
-    ASSERT_TRUE(out.is_open()) << "cannot write " << INSIGHT_CANON_PROJECTION_GOLDEN_PATH;
+    const std::filesystem::path path{golden_path()};
+    std::ofstream out{path, std::ios::binary | std::ios::trunc};
+    ASSERT_TRUE(out.is_open()) << "cannot write " << path.string();
     for (const std::string& line : lines)
         out << line << '\n';
 }

@@ -162,13 +162,29 @@ constexpr std::string_view kFieldSep{" | "};
     return true;
 }
 
+// post: the masking golden in the SOURCE tree, never a build-tree copy; empty when the core
+// source root is unset.
+// invariant: the regeneration action writes back through this same path, so a copy would
+// regenerate an artifact git never sees.
+[[nodiscard]] std::filesystem::path golden_path()
+{
+    const std::filesystem::path root{insight::test_support::core_source_root()};
+    return root.empty() ? root : root / "tests" / "mask" / "mask_rules.golden";
+}
+
 [[nodiscard]] Golden load_golden(std::string& why)
 {
     Golden golden;
-    std::ifstream file{INSIGHT_CANON_MASK_GOLDEN_PATH};
+    const std::filesystem::path path{golden_path()};
+    if (path.empty())
+    {
+        why = insight::test_support::core_source_root_unset();
+        return golden;
+    }
+    std::ifstream file{path};
     if (!file)
     {
-        why = std::string{"cannot open the golden at "} + INSIGHT_CANON_MASK_GOLDEN_PATH;
+        why = "cannot open the golden at " + path.string();
         return golden;
     }
     std::string text;
@@ -409,8 +425,8 @@ const Loaded& loaded()
 }
 
 constexpr std::string_view kRegenCommand{
-    "<build dir>/core/insight_canon_tests --gtest_also_run_disabled_tests "
-    "--gtest_filter='MaskRuleGolden.DISABLED_RegenerateGolden'"};
+    "INSIGHT_CANON_CORE_SOURCE_ROOT=<checkout>/core <build dir>/core/insight_canon_tests "
+    "--gtest_also_run_disabled_tests --gtest_filter='MaskRuleGolden.DISABLED_RegenerateGolden'"};
 
 } // namespace
 
@@ -1029,8 +1045,9 @@ TEST(MaskRuleGolden, DISABLED_RegenerateGolden)
                   "      prints the first differing TOKEN for each.";
     }
 
-    std::ofstream out{INSIGHT_CANON_MASK_GOLDEN_PATH, std::ios::binary | std::ios::trunc};
-    ASSERT_TRUE(out.is_open()) << "cannot write " << INSIGHT_CANON_MASK_GOLDEN_PATH;
+    const std::filesystem::path path{golden_path()};
+    std::ofstream out{path, std::ios::binary | std::ios::trunc};
+    ASSERT_TRUE(out.is_open()) << "cannot write " << path.string();
     for (std::size_t pos{0}; pos < golden.lines.size(); ++pos)
     {
         if (golden.row_at[pos] != std::string::npos)
@@ -1041,13 +1058,12 @@ TEST(MaskRuleGolden, DISABLED_RegenerateGolden)
             out << golden.lines[pos] << "\n";
     }
     out.flush();
-    ASSERT_TRUE(out.good()) << "write to " << INSIGHT_CANON_MASK_GOLDEN_PATH << " failed";
+    ASSERT_TRUE(out.good()) << "write to " << path.string() << " failed";
 
     std::printf("regenerated %s\n  version : %s\n  rows    : %zu\n  filled  : %zu\n  rewritten: "
                 "%zu\n",
-                INSIGHT_CANON_MASK_GOLDEN_PATH,
-                std::string{insight::kCanonicalizationVersion}.c_str(), rebuilt_rows.size(),
-                filled.size(), rewritten.size());
+                path.string().c_str(), std::string{insight::kCanonicalizationVersion}.c_str(),
+                rebuilt_rows.size(), filled.size(), rewritten.size());
     for (const std::string& item : filled)
         std::printf("  filled    %s\n", item.c_str());
     for (const std::string& item : rewritten)

@@ -35,6 +35,30 @@ export namespace insight::test_support
     return insight::semantic::compose({});
 }
 
+// invariant: the core package's source root reaches a test through the environment only, never a
+// compile definition (DN-142.D33).
+// invariant: insight_canon_corpus stores this test binary, and a build path compiled into it makes
+// the stored bytes depend on the home the create ran in.
+// note: core/CMakeLists.txt's test registration sets it; a direct run sets it to core/.
+inline constexpr const char* kCoreSourceRootVar{"INSIGHT_CANON_CORE_SOURCE_ROOT"};
+
+// post: the directory kCoreSourceRootVar names in the environment; an empty path when the variable
+// is unset or empty, which a caller reports as a failure (core_source_root_unset()), never a skip.
+[[nodiscard]] inline std::filesystem::path core_source_root()
+{
+    const char* const raw{std::getenv(kCoreSourceRootVar)};
+    return raw == nullptr ? std::filesystem::path{} : std::filesystem::path{raw};
+}
+
+// post: the failure text for an unset core source root, naming the variable and who sets it.
+[[nodiscard]] inline std::string core_source_root_unset()
+{
+    return std::string{kCoreSourceRootVar} +
+           " is unset or empty, so the package's source tree cannot be located: ctest's "
+           "registration sets it, and a direct run of the binary sets it to the checkout's core/ "
+           "directory.";
+}
+
 // note: clang-21.1.8 drops libc++'s jthread lock lambda below gtest (llvm-project#172241).
 // post: one jthread runs the task; join() and the destructor (after request_stop) wait for it.
 class TestThread

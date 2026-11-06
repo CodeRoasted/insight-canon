@@ -168,8 +168,9 @@ constexpr std::array<CaptureRow, 21> kCaptureTable{{
 // headerless line re-runs it -- the order the shipping ingest reads them in.
 TEST(ApacheErrorTwoFourCapture, EveryLineReadsAsTheTableWrittenFromItsBytes)
 {
-    const std::filesystem::path file{std::filesystem::path{INSIGHT_CANON_CORE_SOURCE_ROOT} /
-                                     "tests" / "strategy" / kCapture.relative_path};
+    const std::filesystem::path root{insight::test_support::core_source_root()};
+    ASSERT_FALSE(root.empty()) << insight::test_support::core_source_root_unset();
+    const std::filesystem::path file{root / "tests" / "strategy" / kCapture.relative_path};
     ASSERT_TRUE(std::filesystem::is_regular_file(file)) << file.string() << " is missing.";
     const std::string bytes{read_bytes(file)};
     ASSERT_EQ(bytes.size(), kCapture.bytes) << file.string() << " is not the pinned capture.";

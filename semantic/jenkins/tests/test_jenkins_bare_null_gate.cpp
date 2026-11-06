@@ -333,14 +333,16 @@ TEST_F(JenkinsBareNullGate, TheBareSurfaceIsByteIdenticalToTheCommittedBaseline)
                          }};
 
     // invariant: the baseline is read from the tests/ directory INSIGHT_SEMANTIC_JENKINS_TESTS_DIR
-    // names in the environment when set non-empty, else from the one the build names.
-    // note: the cut runs this binary restored from the store, where the build's path is gone.
-    const char* const tests_dir_override{std::getenv(kTestsDirVar)};
-    const std::filesystem::path oracle_path{
-        std::filesystem::path{tests_dir_override != nullptr && *tests_dir_override != '\0'
-                                  ? tests_dir_override
-                                  : INSIGHT_SEMANTIC_JENKINS_TESTS_DIR} /
-        kOracleFile};
+    // names in the environment, and only there.
+    // invariant: insight_canon_corpus stores this binary, so it compiles in no build path
+    // (DN-142.D33).
+    // note: the package's test registration sets it; the cut names its clone's directory.
+    const char* const tests_dir{std::getenv(kTestsDirVar)};
+    ASSERT_TRUE(tests_dir != nullptr && *tests_dir != '\0')
+        << kTestsDirVar << " unset or empty — the committed baselines cannot be located: ctest's "
+        << "registration sets it, and a direct run sets it to the checkout's "
+           "semantic/jenkins/tests.";
+    const std::filesystem::path oracle_path{std::filesystem::path{tests_dir} / kOracleFile};
     const std::string oracle_text{read_file(oracle_path)};
     // invariant: `.string()` is load-bearing: libstdc++ spells the path stream operator through a
     // header template this TU never sees, so streaming the string sidesteps the module/header seam.
