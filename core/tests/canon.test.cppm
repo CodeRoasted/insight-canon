@@ -36,7 +36,7 @@ export namespace insight::test_support
 }
 
 // invariant: the core package's source root reaches a test through the environment only, never a
-// compile definition (DN-142.D33).
+// compile definition (ADR-2.D14).
 // invariant: insight_canon_corpus stores this test binary, and a build path compiled into it makes
 // the stored bytes depend on the home the create ran in.
 // note: core/CMakeLists.txt's test registration sets it; a direct run sets it to core/.

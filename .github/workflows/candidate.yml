@@ -58,7 +58,7 @@ jobs:
       contents: read
       actions: read
 
-  # canon core's suite under ASan/UBSan (DN-142.D33, the sanitizer gates): its verdict is ingested by the store job,
+  # canon core's suite under ASan/UBSan (ADR-2.D14, the sanitizer gates): its verdict is ingested by the store job,
   # which waits on it, so a candidate index exists only for a commit whose suite held under the sanitizers.
   asan-suite:
     needs: present

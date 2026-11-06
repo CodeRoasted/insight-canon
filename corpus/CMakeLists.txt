@@ -1,4 +1,4 @@
-# invariant: insight_canon_corpus, a CUT TOOL (DN-142.D33): it builds the three test executables
+# invariant: insight_canon_corpus, a CUT TOOL (ADR-2.D14): it builds the three test executables
 # that hold canon's corpus gates and installs them, and only them, for the cut to restore and run.
 # invariant: each executable is the target its own package's CMakeLists defines, configured here
 # with its test switch forced ON, so the ship form builds it too; there is no second definition.

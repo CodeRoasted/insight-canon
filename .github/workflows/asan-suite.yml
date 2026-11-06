@@ -1,6 +1,6 @@
 name: Canon Core ASan Suite
 
-# canon core's own suite under ASan/UBSan, a job of this repository's candidate (DN-142.D33, the sanitizer gates
+# canon core's own suite under ASan/UBSan, a job of this repository's candidate (ADR-2.D14, the sanitizer gates
 # move into the candidates): `malf test core --asan` in the build environment, red on an exit other than 0 and on
 # zero tests counted from ctest's summary. Until 2026-10-30 the superproject's cut ran it; no other leg runs canon
 # core's suite under a sanitizer, and the release legs build without one.

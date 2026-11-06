@@ -365,7 +365,7 @@ if(INSIGHT_CANON_BUILD_TESTS)
         # the registration below sets as an absolute path, so a gate does not depend on the
         # working directory ctest launches it from. Never a compile definition: insight_canon_corpus
         # stores this target, and a path compiled in makes its bytes depend on the home the create
-        # ran in (DN-142.D33). Never __FILE__: inside `conan create` malf's path map makes a
+        # ran in (ADR-2.D14). Never __FILE__: inside `conan create` malf's path map makes a
         # translation unit's own name an identifier, not a path (DN-142.D13 (3)).
         set(INSIGHT_CANON_TEST_ENVIRONMENT "INSIGHT_CANON_CORE_SOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}")
         # The test target RECOMPILES arena_allocator.cpp (white-box, above), so it needs the switch

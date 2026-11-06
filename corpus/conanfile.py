@@ -13,7 +13,7 @@ class InsightCanonCorpusConan(ConanFile):
     license = "Apache-2.0"
     url = "https://github.com/CodeRoasted/insight-canon"
     description = (
-        "InSight Canon corpus cut tool (DN-142.D33): the three test executables that hold canon's "
+        "InSight Canon corpus cut tool (ADR-2.D14): the three test executables that hold canon's "
         "corpus gates, insight_canon_tests, insight_semantic_jenkins_tests and "
         "insight_semantic_gitlab_tests, built from the targets core/ and semantic/{jenkins,gitlab} "
         "define. A candidate stores the ship form; the cut restores them by key and runs their "

@@ -335,7 +335,7 @@ TEST_F(JenkinsBareNullGate, TheBareSurfaceIsByteIdenticalToTheCommittedBaseline)
     // invariant: the baseline is read from the tests/ directory INSIGHT_SEMANTIC_JENKINS_TESTS_DIR
     // names in the environment, and only there.
     // invariant: insight_canon_corpus stores this binary, so it compiles in no build path
-    // (DN-142.D33).
+    // (ADR-2.D14).
     // note: the package's test registration sets it; the cut names its clone's directory.
     const char* const tests_dir{std::getenv(kTestsDirVar)};
     ASSERT_TRUE(tests_dir != nullptr && *tests_dir != '\0')

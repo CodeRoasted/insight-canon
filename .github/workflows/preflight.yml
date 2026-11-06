@@ -24,7 +24,7 @@ jobs:
   # deny-list is canon-specific, so the script stays here). ADR-29.D5 / ADR-20.D19: on both
   # provenance pairs the seam keeps the plain datum + a separate bool, so each pairing is held by ONE
   # write site; a second write site fails on the commit that adds it. Every gate runs and each red is
-  # named. Runs in every CI and in every candidate, whose preflight is this file (DN-142.D33).
+  # named. Runs in every CI and in every candidate, whose preflight is this file (ADR-2.D14).
   sp1-semantic-unawareness:
     permissions:
       contents: read

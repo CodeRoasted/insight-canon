@@ -119,7 +119,7 @@ if(INSIGHT_SEMANTIC_JENKINS_BUILD_TESTS)
         # locates them through INSIGHT_SEMANTIC_JENKINS_TESTS_DIR in its environment, which the
         # registration below sets. Never a compile definition: insight_canon_corpus stores this
         # target, and a path compiled in makes its bytes depend on the home the create ran in
-        # (DN-142.D33); the cut names its clone's directory (scripts/pharos/candidates.py
+        # (ADR-2.D14); the cut names its clone's directory (scripts/pharos/candidates.py
         # TOOL_INPUT_ROOTS). Never __FILE__: inside `conan create` malf's path map makes a
         # translation unit's own name an identifier, not a path (DN-142.D13 (3)).
         set(INSIGHT_SEMANTIC_JENKINS_TEST_ENVIRONMENT
