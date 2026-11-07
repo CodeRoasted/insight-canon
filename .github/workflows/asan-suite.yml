@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   suite:
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-sanitizer.yml@d61ec48d9a3bd22510d950f86ec23b1e0431cdc0
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-sanitizer.yml@de1c4b8855bac46434fabc97ae0a4ef49ca5dca2
     with:
       gate: asan-suite
       package: core
