@@ -35,12 +35,15 @@ namespace
 }
 } // namespace
 
-TEST(GitLabOutcome, TheApiStatusVocabularyMapsToTheFourClassModel)
+TEST(GitLabOutcome, TheApiStatusVocabularyMapsToTheCoreClasses)
 {
     const ComposedSemantics composed{gitlab_only()};
     EXPECT_EQ(map_outcome_token("success", composed), RunOutcome::Success);
     EXPECT_EQ(map_outcome_token("failed", composed), RunOutcome::Failure);
-    EXPECT_EQ(map_outcome_token("canceled", composed), RunOutcome::Aborted);
+    // invariant: GitLab reports a timeout as `failed`, so its `canceled` is a stop declared from
+    // outside the job: Cancelled, spelled by the class and not by the declarer.
+    // refs: DN-146.D7
+    EXPECT_EQ(map_outcome_token("canceled", composed), RunOutcome::Cancelled);
     // invariant: a row mapping TO Unknown still MAPS — engaged optional, value Unknown; an ABSENT
     // row instead produces a fail-closed note about a token this dialect does define.
     const auto skipped{map_outcome_token("skipped", composed)};
@@ -88,7 +91,7 @@ TEST(GitLabOutcome, TheFailureTailHasAFreeFormRemainderAndStillResolves)
     }
 }
 
-TEST(GitLabOutcome, ACancellationAnnouncedWithTheFailurePrefixResolvesToAborted)
+TEST(GitLabOutcome, ACancellationAnnouncedWithTheFailurePrefixResolvesToCancelled)
 {
     const ComposedSemantics composed{gitlab_only()};
     // assert: longest-VALID-prefix-wins is what makes this work, and it must not depend on where
@@ -96,7 +99,7 @@ TEST(GitLabOutcome, ACancellationAnnouncedWithTheFailurePrefixResolvesToAborted)
     const std::vector<std::string> lines{"building", "ERROR: Job failed: canceled"};
     const RunOutcomeScan scan{scan_run_outcome(lines, composed)};
     ASSERT_TRUE(scan.marker_present);
-    EXPECT_EQ(resolve_run_outcome({}, scan, composed, composed).outcome, RunOutcome::Aborted)
+    EXPECT_EQ(resolve_run_outcome({}, scan, composed, composed).outcome, RunOutcome::Cancelled)
         << "GitLab announces a CANCELLATION with the FAILURE prefix — reading it as Failure is a "
            "wrong verdict, not a missing one (17 of 25 cancelled jobs in marker_corpus_v1)";
 }
@@ -111,7 +114,7 @@ TEST(GitLabOutcome, TheApiResultOutranksADivergentConsoleTail)
     const auto resolution{resolve_run_outcome(
         {.token = "canceled", .vocabulary = insight::semantic::gitlab::kManifest.name}, scan,
         composed, gitlab_vocabularies())};
-    EXPECT_EQ(resolution.outcome, RunOutcome::Aborted);
+    EXPECT_EQ(resolution.outcome, RunOutcome::Cancelled);
     EXPECT_TRUE(resolution.authoritative);
     EXPECT_TRUE(resolution.divergent);
     EXPECT_EQ(resolution.console, RunOutcome::Success);

@@ -95,7 +95,7 @@ TEST(JenkinsOutcome, ConsoleTailRecoveredFromADeclaredWholeStreamConsole)
 
     const auto res{resolve_run_outcome({.token = ""}, scan, composed, composed)};
     EXPECT_EQ(res.outcome, RunOutcome::Unstable)
-        << "the degenerate only-a-console-log path preserves the four-class verdict";
+        << "the degenerate only-a-console-log path preserves the verdict class";
 
     const RunOutcomeScan raw_scan{scan_run_outcome(raw_lines, composed)};
     EXPECT_FALSE(raw_scan.marker_present)

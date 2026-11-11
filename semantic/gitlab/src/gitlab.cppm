@@ -68,20 +68,23 @@ static_assert(
 // invariant: `skipped` and `manual` map to Unknown as EXPLICIT rows — a known token carrying no
 // verdict, where an ABSENT row would raise a fail-closed note about a token this dialect defines.
 // note: the five tokens are success, failed, canceled, skipped, manual — `cancelled` has no row.
+// invariant: `canceled` is Cancelled: GitLab reports a timeout as `failed`, so its cancellation is
+// a stop declared from outside the job.
+// refs: DN-146.D7
 inline constexpr std::array<OutcomeTokenRow, 5> kOutcomeTokens{{
     {.token = "success", .outcome = insight::RunOutcome::Success, .dialect_gate = kDialect},
     {.token = "failed", .outcome = insight::RunOutcome::Failure, .dialect_gate = kDialect},
-    {.token = "canceled", .outcome = insight::RunOutcome::Aborted, .dialect_gate = kDialect},
+    {.token = "canceled", .outcome = insight::RunOutcome::Cancelled, .dialect_gate = kDialect},
     {.token = "skipped", .outcome = insight::RunOutcome::Unknown, .dialect_gate = kDialect},
     {.token = "manual", .outcome = insight::RunOutcome::Unknown, .dialect_gate = kDialect},
 }};
 
-// refs: ADR-17, ADR-17.D5
+// refs: ADR-17, ADR-17.D5, DN-146.D7
 // assert: all three rows resolve by LONGEST PREFIX, never by array order: the cancel row is a
 // strict extension of the failure row, and it matches on 17 of the 25 cancelled jobs.
 // invariant: the console tail is the DEGENERATE fallback and the API result is authoritative; the
 // divergence it exists for is measured — 2 of the 25 cancelled jobs end on `Job succeeded`.
-// invariant: `ERROR: Job failed: canceled` resolves to Aborted and `ERROR: Job failed` to Failure.
+// invariant: `ERROR: Job failed: canceled` resolves to Cancelled, `ERROR: Job failed` to Failure.
 // note: the third row is MEASURED, not symmetry: GitLab announces a cancel with the failure prefix
 inline constexpr std::array<OutcomeMarkerRow, 3> kOutcomeMarkers{{
     {.prefix = "Job succeeded",
@@ -95,7 +98,7 @@ inline constexpr std::array<OutcomeMarkerRow, 3> kOutcomeMarkers{{
     {.prefix = "ERROR: Job failed: canceled",
      .dialect_gate = kDialect,
      .shape = OutcomeMarkerShape::PrefixIsVerdict,
-     .outcome = insight::RunOutcome::Aborted},
+     .outcome = insight::RunOutcome::Cancelled},
 }};
 
 // refs: ADR-17.D9, ADR-22.D8
@@ -109,7 +112,7 @@ export inline constexpr std::array<std::string_view, 1> kDialectRevisions{{"v1"}
 // note: no `echoed_source` hook is needed: GitLab's marker phantom dies to anchoring alone
 export inline constexpr SemanticPackageManifest kManifest{
     .name = "gitlab",
-    .version = "1.0.0",
+    .version = "1.1.0",
     .roles = {},
     .markers = kMarkers,
     .emits = kEmitMarkers,

@@ -224,7 +224,7 @@ export namespace insight::semantic
 // invariant: distinct from the MASKING token kCanonicalizationVersion, whose value canon.api.cppm
 // owns; this one names the GRAMMAR's shape.
 // refs: ADR-2.D5, ADR-17.D4, ADR-22.D8
-inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-7"};
+inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-8"};
 
 // invariant: a DIALECT is a VOCABULARY over a HOST FORMAT — the format owns the layout rule, the
 // dialect owns the names inside a layout another layer already delimited.

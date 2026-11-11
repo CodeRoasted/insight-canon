@@ -312,12 +312,14 @@ struct TraceEngineResult
         return "Failure";
     case RunOutcome::Aborted:
         return "Aborted";
+    case RunOutcome::Cancelled:
+        return "Cancelled";
     case RunOutcome::Unstable:
         return "Unstable";
     case RunOutcome::Unknown:
         return "Unknown";
     }
-    return "?";
+    std::unreachable();
 }
 
 [[nodiscard]] ComposedSemantics jenkins_only()
@@ -1029,7 +1031,7 @@ TEST_F(JenkinsRecognizerRetrofitGate, LOTheRunOutcomeRecoversThePlatformVerdict)
     // invariant: Unstable is FIRST-CLASS and pinned BY NAME — it is neither Success nor Failure
     // and must never collapse into either.
     EXPECT_EQ(corpus.unstable_recovered, kAgreeUnstable)
-        << "an UNSTABLE run did not recover as RunOutcome::Unstable — the four-class run-grain "
+        << "an UNSTABLE run did not recover as RunOutcome::Unstable — the run-grain "
            "vocabulary folded: Unstable is neither Success nor Failure and must never collapse "
            "into either."
         << report(corpus);

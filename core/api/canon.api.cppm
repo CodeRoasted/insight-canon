@@ -560,11 +560,18 @@ static_assert(std::is_trivially_copyable_v<EventLevel>,
 
 // invariant: a RUN-level verdict — never a field on CanonicalEvent, and never a cube dimension:
 // outcome is the run LABEL, not an axis.
-// invariant: the five categories are UNIVERSAL; the per-dialect strings that name them are
+// invariant: the six categories are UNIVERSAL; the per-dialect strings that name them are
 // semantic-package data.
-// invariant: Unstable is neither Success nor Failure and is NEVER folded into either; Aborted means
-// the log is INCOMPLETE and is never read as pass or fail.
-// refs: ADR-17
+// invariant: Unstable is neither Success nor Failure and is NEVER folded into either; Aborted and
+// Cancelled mean the log is INCOMPLETE and are never read as pass or fail.
+// invariant: Cancelled is a unit stopped before its own verdict by a declarer OUTSIDE it: a person,
+// a fail-fast policy, a concurrency group.
+// invariant: Aborted is a unit stopped before its own verdict whose platform does not say who
+// stopped it: a timeout, or a token that does not say.
+// invariant: Cancelled is appended after Aborted, so no existing integer moves.
+// invariant: no switch over RunOutcome carries a `default:` label: each names every enumerator and
+// ends in `std::unreachable()`, so the compiler enumerates the class a new member must reach.
+// refs: ADR-17, DN-146.D7, DN-146.D8
 enum class RunOutcome : std::uint8_t
 {
     Unknown = 0,
@@ -572,6 +579,7 @@ enum class RunOutcome : std::uint8_t
     Failure,
     Unstable,
     Aborted,
+    Cancelled,
 };
 
 [[nodiscard]] constexpr std::string_view to_string(RunOutcome outcome) noexcept
@@ -580,6 +588,8 @@ enum class RunOutcome : std::uint8_t
 
     switch (outcome)
     {
+    case RunOutcome::Unknown:
+        return "UNKNOWN"sv;
     case RunOutcome::Success:
         return "SUCCESS"sv;
     case RunOutcome::Failure:
@@ -588,18 +598,44 @@ enum class RunOutcome : std::uint8_t
         return "UNSTABLE"sv;
     case RunOutcome::Aborted:
         return "ABORTED"sv;
-    default:
-        return "UNKNOWN"sv;
+    case RunOutcome::Cancelled:
+        return "CANCELLED"sv;
     }
+    std::unreachable();
+}
+
+// post: true iff the run stopped before it reached its own verdict, so its log is INCOMPLETE:
+// Aborted or Cancelled.
+// invariant: the ONE reading of incompleteness — every reader that branches on a truncated log
+// reads this predicate, never a class by name.
+// invariant: so a cancelled run behaves at RUN grain exactly as an aborted one does.
+// refs: DN-146.D7
+[[nodiscard]] constexpr bool outcome_incomplete(RunOutcome outcome) noexcept
+{
+    switch (outcome)
+    {
+    case RunOutcome::Aborted:
+    case RunOutcome::Cancelled:
+        return true;
+    case RunOutcome::Unknown:
+    case RunOutcome::Success:
+    case RunOutcome::Failure:
+    case RunOutcome::Unstable:
+        return false;
+    }
+    std::unreachable();
 }
 
 // post: true iff the verdict got strictly worse on the pass-fail axis Success < Unstable < Failure.
-// invariant: Aborted and Unknown are EXCLUDED because they are not points on that axis, so no
-// transition touching them is ever an outcome regression.
+// invariant: an incomplete verdict and Unknown are EXCLUDED because they are not points on that
+// axis, so no transition touching them is ever an outcome regression.
 // invariant: deterministic integer compare, and the single-source predicate the CLI gate, the check
 // and the comment verdict all read.
 [[nodiscard]] constexpr bool outcome_regressed(RunOutcome baseline, RunOutcome changed) noexcept
 {
+    if (outcome_incomplete(baseline) || outcome_incomplete(changed))
+        return false;
+    constexpr int kOffTheAxis{-1};
     constexpr auto axis_rank{[](RunOutcome outcome) noexcept -> int
                              {
                                  switch (outcome)
@@ -610,9 +646,12 @@ enum class RunOutcome : std::uint8_t
                                      return 1;
                                  case RunOutcome::Failure:
                                      return 2;
-                                 default:
-                                     return -1;
+                                 case RunOutcome::Unknown:
+                                 case RunOutcome::Aborted:
+                                 case RunOutcome::Cancelled:
+                                     return kOffTheAxis;
                                  }
+                                 std::unreachable();
                              }};
     const int baseline_rank{axis_rank(baseline)};
     const int changed_rank{axis_rank(changed)};

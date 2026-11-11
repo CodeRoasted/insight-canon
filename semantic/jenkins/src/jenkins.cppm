@@ -103,7 +103,7 @@ static_assert(
     "jenkins: a recognition marker has no paired generation row (reader without a writer)");
 
 // refs: ADR-17, STU-6, ADR-17.D5
-// invariant: the five native `result` strings map into the core four-class vocabulary, and
+// invariant: the five native `result` strings map into four of the core verdict classes, and
 // NOT_BUILT maps to Unknown because the run never produced a verdict — honest, not a guess.
 // invariant: the console-tail `Finished: <RESULT>` epilogue is the DEGENERATE fallback source only:
 // it is truncation-fragile and can be present-but-divergent from the API result.
@@ -135,7 +135,7 @@ export inline constexpr std::array<std::string_view, 1> kDialectRevisions{{"v1"}
 // and step recall on that carrier; scripted and matrix-pipe corroborate, never widen it.
 // invariant: freestyle and classic MatrixProject emit no `[Pipeline]` skeleton at all, so they are
 // the degenerate-closure floor for STRUCTURE.
-// assert: they still get a correct four-class VERDICT, because the `result` is always present and
+// assert: they still get a correct VERDICT class, because the `result` is always present and
 // `Finished:` is emitted on every Jenkins job type.
 // refs: LSRC-27, BIB:intent_identity
 export inline constexpr SemanticPackageManifest kManifest{

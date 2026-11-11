@@ -86,13 +86,14 @@ struct OutcomeLegPins
 {
     std::size_t success;
     std::size_t failure;
-    std::size_t aborted;
+    std::size_t cancelled;
     std::size_t none;
 };
 constexpr OutcomeLegPins kOutcomeBannerModern{
-    .success = 329, .failure = 93, .aborted = 11, .none = 12};
-constexpr OutcomeLegPins kOutcomeBannerOld{.success = 111, .failure = 52, .aborted = 6, .none = 5};
-constexpr std::size_t kAbortedConsoleCeiling{17};
+    .success = 329, .failure = 93, .cancelled = 11, .none = 12};
+constexpr OutcomeLegPins kOutcomeBannerOld{
+    .success = 111, .failure = 52, .cancelled = 6, .none = 5};
+constexpr std::size_t kCancelledConsoleCeiling{17};
 constexpr std::size_t kRecoveredTraces{602};
 constexpr std::size_t kAgreements{599};
 constexpr std::size_t kDisagreements{3};
@@ -260,19 +261,21 @@ struct TraceResult
         return "Failure";
     case RunOutcome::Aborted:
         return "Aborted";
+    case RunOutcome::Cancelled:
+        return "Cancelled";
     case RunOutcome::Unstable:
         return "Unstable";
     case RunOutcome::Unknown:
         return "Unknown";
     }
-    return "?";
+    std::unreachable();
 }
 
 struct OutcomeLegCells
 {
     std::size_t success{0};
     std::size_t failure{0};
-    std::size_t aborted{0};
+    std::size_t cancelled{0};
     std::size_t none{0};
 };
 
@@ -690,10 +693,12 @@ class GitLabPackageCorpusProofGate : public ::testing::Test
                 case RunOutcome::Failure:
                     ++cells.failure;
                     break;
-                case RunOutcome::Aborted:
-                    ++cells.aborted;
+                case RunOutcome::Cancelled:
+                    ++cells.cancelled;
                     break;
-                default:
+                case RunOutcome::Unknown:
+                case RunOutcome::Unstable:
+                case RunOutcome::Aborted:
                     corpus.vocabulary_errors.push_back(
                         "trace '" + row.path + "': the console scan resolved to " +
                         outcome_name(result.outcome) +
@@ -768,15 +773,15 @@ std::filesystem::path GitLabPackageCorpusProofGate::data_root_{};
         << "\n  per-trace marker mismatches: " << corpus.per_trace_marker_mismatches
         << " (pinned 0)   <<< THE TRANSCRIPTION CLAIM"
         << "\n  outcome banner-modern      : " << corpus.outcome_banner_modern.success << " S / "
-        << corpus.outcome_banner_modern.failure << " F / " << corpus.outcome_banner_modern.aborted
-        << " A / " << corpus.outcome_banner_modern.none << " none (pinned "
+        << corpus.outcome_banner_modern.failure << " F / " << corpus.outcome_banner_modern.cancelled
+        << " C / " << corpus.outcome_banner_modern.none << " none (pinned "
         << kOutcomeBannerModern.success << "/" << kOutcomeBannerModern.failure << "/"
-        << kOutcomeBannerModern.aborted << "/" << kOutcomeBannerModern.none << ")"
+        << kOutcomeBannerModern.cancelled << "/" << kOutcomeBannerModern.none << ")"
         << "\n  outcome banner-old         : " << corpus.outcome_banner_old.success << " S / "
-        << corpus.outcome_banner_old.failure << " F / " << corpus.outcome_banner_old.aborted
-        << " A / " << corpus.outcome_banner_old.none << " none (pinned "
+        << corpus.outcome_banner_old.failure << " F / " << corpus.outcome_banner_old.cancelled
+        << " C / " << corpus.outcome_banner_old.none << " none (pinned "
         << kOutcomeBannerOld.success << "/" << kOutcomeBannerOld.failure << "/"
-        << kOutcomeBannerOld.aborted << "/" << kOutcomeBannerOld.none << ")"
+        << kOutcomeBannerOld.cancelled << "/" << kOutcomeBannerOld.none << ")"
         << "\n  recovered / agree / diverge: " << corpus.recovered << " / " << corpus.agreements
         << " / " << corpus.disagreements << " (pinned " << kRecoveredTraces << " / " << kAgreements
         << " / " << kDisagreements << ")";
@@ -898,28 +903,29 @@ TEST_F(GitLabPackageCorpusProofGate, TheOutcomeLegRecoversThePlatformVerdictFrom
 
     EXPECT_EQ(corpus.outcome_banner_modern.success, kOutcomeBannerModern.success) << report(corpus);
     EXPECT_EQ(corpus.outcome_banner_modern.failure, kOutcomeBannerModern.failure) << report(corpus);
-    EXPECT_EQ(corpus.outcome_banner_modern.aborted, kOutcomeBannerModern.aborted) << report(corpus);
+    EXPECT_EQ(corpus.outcome_banner_modern.cancelled, kOutcomeBannerModern.cancelled)
+        << report(corpus);
     EXPECT_EQ(corpus.outcome_banner_modern.none, kOutcomeBannerModern.none)
         << "banner-modern `none` is 12 traces with NO terminal outcome line anywhere in the "
            "console — the engine is CORRECT to report none; there is no evidence to recover."
         << report(corpus);
     EXPECT_EQ(corpus.outcome_banner_old.success, kOutcomeBannerOld.success) << report(corpus);
     EXPECT_EQ(corpus.outcome_banner_old.failure, kOutcomeBannerOld.failure) << report(corpus);
-    EXPECT_EQ(corpus.outcome_banner_old.aborted, kOutcomeBannerOld.aborted) << report(corpus);
+    EXPECT_EQ(corpus.outcome_banner_old.cancelled, kOutcomeBannerOld.cancelled) << report(corpus);
     EXPECT_EQ(corpus.outcome_banner_old.none, kOutcomeBannerOld.none) << report(corpus);
 
     EXPECT_EQ(corpus.outcome_banner_modern.success + corpus.outcome_banner_modern.failure +
-                  corpus.outcome_banner_modern.aborted + corpus.outcome_banner_modern.none,
+                  corpus.outcome_banner_modern.cancelled + corpus.outcome_banner_modern.none,
               kBannerModernTraces)
         << "the banner-modern outcome partition does not close." << report(corpus);
     EXPECT_EQ(corpus.outcome_banner_old.success + corpus.outcome_banner_old.failure +
-                  corpus.outcome_banner_old.aborted + corpus.outcome_banner_old.none,
+                  corpus.outcome_banner_old.cancelled + corpus.outcome_banner_old.none,
               kBannerOldTraces)
         << "the banner-old outcome partition does not close." << report(corpus);
 
-    EXPECT_EQ(corpus.outcome_banner_modern.aborted + corpus.outcome_banner_old.aborted,
-              kAbortedConsoleCeiling)
-        << "Aborted must equal the console CEILING: GitLab put `ERROR: Job failed: canceled` on "
+    EXPECT_EQ(corpus.outcome_banner_modern.cancelled + corpus.outcome_banner_old.cancelled,
+              kCancelledConsoleCeiling)
+        << "Cancelled must equal the console CEILING: GitLab put `ERROR: Job failed: canceled` on "
            "17 of the 25 cancelled jobs, and the `\\r`-aware anchor (insight-canon c6a1e84) is "
            "what makes all 17 reachable (11 banner-modern `\\n`-delimited + 6 banner-old "
            "`\\r`-delimited). 25 is NOT a recall target — the other 8 carry no cancel line at "

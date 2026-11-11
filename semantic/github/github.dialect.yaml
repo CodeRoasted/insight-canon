@@ -17,7 +17,7 @@
 
 dialect:
   name: github
-  version: "1.10.0"
+  version: "1.11.0"
   why:
     - "ADR-17.D3 keys identity on CONTENT, not on spelling: `version:` moves when what this package"
     - "RECOGNIZES or EMITS moves — its rows, their gates, or its code tier — and never for a"
@@ -434,9 +434,14 @@ dialect:
   outcome_tokens:
     why:
       - "The GHA native job/run conclusion strings — `needs.<job>.result` and the API `conclusion`"
-      - "— mapped into the core four-class vocabulary. This retires the render-side binary"
-      - "pass/fail derivation at its ROOT: the verdict now enters the engine four-class-aware,"
+      - "— mapped into the core verdict vocabulary. This retires the render-side binary"
+      - "pass/fail derivation at its ROOT: the verdict now enters the engine class-aware,"
       - "through the same channel as Jenkins."
+      - ""
+      - "`cancelled` is Cancelled and `timed_out` is Aborted (DN-146.D7): GitHub declares a"
+      - "cancellation only when a declarer OUTSIDE the job stopped it (a person, fail-fast, a"
+      - "concurrency group), and a timeout names no such declarer. Both logs are incomplete; only"
+      - "a job declared cancelled withdraws its units' FAILING claim."
       - ""
       - "GHA has no native UNSTABLE string today. The category stays core; this dialect simply"
       - "ships no row for it."
@@ -451,7 +456,7 @@ dialect:
         outcome: Failure
         dialect_gate: self
       - token: cancelled
-        outcome: Aborted
+        outcome: Cancelled
         dialect_gate: self
       - token: timed_out
         outcome: Aborted

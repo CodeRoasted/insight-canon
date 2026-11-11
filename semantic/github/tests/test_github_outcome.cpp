@@ -61,10 +61,16 @@ TEST(GithubOutcome, TheSevenNativeConclusionStringsMap)
     const ComposedSemantics composed{github_only()};
     EXPECT_EQ(map_outcome_token("success", composed), RunOutcome::Success);
     EXPECT_EQ(map_outcome_token("failure", composed), RunOutcome::Failure);
-    // invariant: both non-completion conclusions are ONE class — an incomplete run whose log
-    // stops early — so either one SUPPRESSES vanished-quantum alarms rather than raising them.
-    EXPECT_EQ(map_outcome_token("cancelled", composed), RunOutcome::Aborted);
+    // invariant: the two non-completion conclusions are TWO classes: `cancelled` names a stop
+    // declared from outside the job, `timed_out` does not, so only the first is Cancelled.
+    // invariant: both are INCOMPLETE — a log that stops early — so either one SUPPRESSES
+    // vanished-quantum alarms rather than raising them.
+    // refs: DN-146.D7
+    EXPECT_EQ(map_outcome_token("cancelled", composed), RunOutcome::Cancelled);
     EXPECT_EQ(map_outcome_token("timed_out", composed), RunOutcome::Aborted);
+    for (const std::string_view token : {"cancelled", "timed_out"})
+        EXPECT_TRUE(insight::outcome_incomplete(map_outcome_token(token, composed).value()))
+            << "`" << token << "` must read incomplete";
     // assert: a no-verdict conclusion MAPS to Unknown rather than missing, so rung 1 resolves and a
     // stale console tail is never consulted.
     for (const std::string_view token : {"skipped", "neutral", "action_required"})
@@ -113,7 +119,7 @@ TEST(GithubOutcome, AuthoritativeSideInputCarriesTheGhaVerdict)
     const auto res{resolve_run_outcome(
         {.token = "cancelled", .vocabulary = insight::semantic::github::kManifest.name}, scan,
         composed, github_vocabularies())};
-    EXPECT_EQ(res.outcome, RunOutcome::Aborted);
+    EXPECT_EQ(res.outcome, RunOutcome::Cancelled);
     EXPECT_TRUE(res.authoritative);
     EXPECT_FALSE(res.divergent) << "no console verdict exists — nothing to diverge from";
     EXPECT_TRUE(res.note.empty()) << res.note;

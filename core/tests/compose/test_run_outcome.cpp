@@ -700,4 +700,28 @@ TEST(OutcomeRegressed, StrictlyWorseOnTheAxisOnly)
     EXPECT_FALSE(outcome_regressed(RunOutcome::Aborted, RunOutcome::Failure));
     EXPECT_FALSE(outcome_regressed(RunOutcome::Success, RunOutcome::Unknown));
     EXPECT_FALSE(outcome_regressed(RunOutcome::Unknown, RunOutcome::Failure));
+    // invariant: Cancelled is incomplete as Aborted is, so it is off the axis in both directions.
+    // refs: DN-146.D7
+    EXPECT_FALSE(outcome_regressed(RunOutcome::Success, RunOutcome::Cancelled));
+    EXPECT_FALSE(outcome_regressed(RunOutcome::Cancelled, RunOutcome::Failure));
+}
+
+// assert: the incomplete predicate reads exactly the two classes whose log stopped early, and the
+// spelling of every class is its own: Cancelled prints CANCELLED, never UNKNOWN.
+// invariant: RED before DN-146.D8 removed `to_string`'s `default:` label, which printed UNKNOWN
+// for any class the switch did not name.
+// refs: DN-146.D7, DN-146.D8
+TEST(OutcomeIncomplete, AbortedAndCancelledAreIncompleteAndEveryClassSpellsItself)
+{
+    using Spelled = std::pair<RunOutcome, std::string_view>;
+    for (const auto& [outcome, spelling] :
+         {Spelled{RunOutcome::Unknown, "UNKNOWN"}, Spelled{RunOutcome::Success, "SUCCESS"},
+          Spelled{RunOutcome::Failure, "FAILURE"}, Spelled{RunOutcome::Unstable, "UNSTABLE"},
+          Spelled{RunOutcome::Aborted, "ABORTED"}, Spelled{RunOutcome::Cancelled, "CANCELLED"}})
+    {
+        EXPECT_EQ(insight::to_string(outcome), spelling);
+        const bool incomplete{outcome == RunOutcome::Aborted || outcome == RunOutcome::Cancelled};
+        EXPECT_EQ(insight::outcome_incomplete(outcome), incomplete)
+            << spelling << ": only a log that stopped early reads incomplete";
+    }
 }
