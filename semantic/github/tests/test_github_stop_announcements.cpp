@@ -1,11 +1,11 @@
-// assert: DN-146.D10 — the github package declares the whole lines its runner writes into a step it
+// assert: ADR-17.D15 — the github package declares the whole lines its runner writes into a step it
 // assert: stops, each matched exactly as peeled, its trailing whitespace trimmed, and any appended
 // assert: byte matching no row.
 // assert: a stop announcement is a second declaration about the line: each matched line still
 // assert: classifies Terminator and its declared level is still Error.
 // assert: the rows enter semantic_identity: declaring them moves the github identity.
 // invariant: determinism — literal lines, no clock, no RNG.
-// refs: DN-146.D10, ADR-17.D4, ADR-22.D6
+// refs: ADR-17.D15, ADR-17.D4, ADR-22.D6
 #include <gtest/gtest.h>
 
 import std;
@@ -47,7 +47,7 @@ constexpr std::array<std::string_view, 3> kStopLines{
     "##[error]Step canceled by GitHub (see: "
     "https://depot.dev/docs/github-actions/troubleshooting#error-step-canceled-by-github)"};
 
-// invariant: the stop-like wordings DN-146.D10 read and left out.
+// invariant: the stop-like wordings ADR-17.D15 read and left out.
 constexpr std::array<std::string_view, 3> kUndeclaredStopLike{
     "##[error]A task was canceled.",
     "##[error][OSDC] Step cancelled by GitHub Actions (received SIGINT).",

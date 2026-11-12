@@ -176,7 +176,7 @@ namespace
         // invariant: a zero-length string opens the section, and no package name is empty
         // (`all_packages_named`), so the next package's name can never read as it.
         // invariant: the preimage therefore stays a prefix-free encoding of the manifest list.
-        // refs: DN-146.D10, ADR-2.D5
+        // refs: ADR-17.D15, ADR-2.D5
         if (!pkg.stop_announcements.empty())
         {
             append_str(out, {});
@@ -591,7 +591,7 @@ ComposedSemantics ComposedSemantics::for_stream(std::string_view declared_dialec
     std::ranges::copy_if(all_declared_values_, std::back_inserter(out.declared_values_),
                          [&admits](const DeclaredValueRow& row)
                          { return admits(row.dialect_gate); });
-    // refs: DN-146.D10
+    // refs: ADR-17.D15
     out.stop_announcements_.reserve(all_stop_announcements_.size());
     std::ranges::copy_if(all_stop_announcements_, std::back_inserter(out.stop_announcements_),
                          [&admits](const StopAnnouncementRow& row)

@@ -152,7 +152,7 @@ export inline constexpr SemanticPackageManifest kManifest{
     .dialect_revisions = kDialectRevisions,
     // invariant: EMPTY by declaration: the stop announcement orders a unit's errors against a job
     // the platform declares cancelled, and no Jenkins job graph reaches a reader of it.
-    // refs: DN-146.D10
+    // refs: ADR-17.D15
     .stop_announcements = {},
     .echoed_source = nullptr,
 };

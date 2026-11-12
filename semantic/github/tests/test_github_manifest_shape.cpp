@@ -40,7 +40,7 @@ TEST(GithubManifestShape, ShipsTheDeclaredRulesetShapeAndNothingElse)
         << "declared vendor-revision vocabulary — cardinality one until GitHub ships a second "
            "workflow-command syntax generation; actual: "
         << dialect_revisions.size();
-    // refs: DN-146.D10
+    // refs: ADR-17.D15
     EXPECT_EQ(stop_announcements.size(), 3U)
         << "stop-announcement rows — the runner's cancellation and shutdown lines and depot's; "
            "actual: "

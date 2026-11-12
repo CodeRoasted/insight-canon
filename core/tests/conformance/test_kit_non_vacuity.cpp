@@ -209,7 +209,7 @@ TEST(ConformanceKitNonVacuity, TheOutcomeRoundTripNamesAPassThatMeasuredNothing)
 // assert: the kit reaches the stop-announcement section: the dialect-gate leg measures both rows of
 // assert: the control and passes, and the ASCII leg refuses a non-ASCII shape by the section's name
 // assert: while it passes the control.
-// refs: DN-146.D10
+// refs: ADR-17.D15
 TEST(ConformanceKitNonVacuity, TheKitMeasuresTheStopAnnouncementSection)
 {
     const Report control{run(kStopping)};

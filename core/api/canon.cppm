@@ -45,7 +45,7 @@ classify(NormalizedContent content, const insight::semantic::ComposedSemantics& 
 // whitespace trimmed: the line is one a runner writes into a step it stops.
 // invariant: a SECOND declaration about the line and never a role: `classify` reads the same line
 // unchanged, and its declared level is untouched.
-// refs: DN-146.D10
+// refs: ADR-17.D15
 [[nodiscard]] bool announces_stop(NormalizedContent content,
                                   const insight::semantic::ComposedSemantics& composed) noexcept;
 

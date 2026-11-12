@@ -171,7 +171,7 @@ class ComposedSemantics
     {
         return declared_values_;
     }
-    // refs: DN-146.D10
+    // refs: ADR-17.D15
     // invariant: THE VIEW of the stop announcements, filtered by the declared dialect: a stream
     // that declares no dialect owning one reads no line as a stop.
     [[nodiscard]] std::span<const StopAnnouncementRow> stop_announcements() const noexcept

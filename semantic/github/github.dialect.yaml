@@ -511,7 +511,7 @@ dialect:
       - "as a whole line. A row only lets a reader ORDER a unit's own errors against the stop, in"
       - "line order inside the job's own span: the line keeps its role (Terminator) and its"
       - "level (Error), because a line holds one role and every reader of the terminator would"
-      - "otherwise need a second spelling of it. The rule and its census are DN-146.D10's."
+      - "otherwise need a second spelling of it. The rule and its census are ADR-17.D15's."
       - ""
       - "Read and left out: `##[error]A task was canceled.`, which the runner writes while it"
       - "downloads actions, and whose meaning (a job cancelled during setup, or a download that"

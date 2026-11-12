@@ -195,7 +195,7 @@ namespace tokenization
     }
 
     // pre: `composed` is a view already resolved for the stream; no dialect gate is tested here.
-    // refs: DN-146.D10
+    // refs: ADR-17.D15
     bool announces_stop(NormalizedContent content,
                         const insight::semantic::ComposedSemantics& composed) noexcept
     {

@@ -2,7 +2,7 @@
 // invariant: its matcher, its gate, its fence and its place in the identity are proven here.
 // invariant: the declared GitHub wordings are proven in the github suite.
 // invariant: determinism — literal rows and lines, no clock, no RNG.
-// refs: DN-146.D10, ADR-17.D4, ADR-22.D6
+// refs: ADR-17.D15, ADR-17.D4, ADR-22.D6
 #include <gtest/gtest.h>
 
 import insight.canon.test;

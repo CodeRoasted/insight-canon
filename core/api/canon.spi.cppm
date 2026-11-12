@@ -467,7 +467,7 @@ namespace detail
 // post: it is non-empty, with no other brace, no trailing whitespace, and no hole against a
 // digit, a hole or a decimal point leading into either.
 // invariant: malf's dialect codegen refusals, held here for a package the generator never sees.
-// refs: ADR-17.D14, DN-146.D10
+// refs: ADR-17.D14, ADR-17.D15
 [[nodiscard]] constexpr bool shape_well_formed(std::string_view shape) noexcept
 {
     if (shape.empty() || detail::shape_trailing_space(shape.back()))
@@ -522,7 +522,7 @@ namespace detail
 // invariant: a line holds one role, so a stop role would give every terminator reader a second
 // spelling to learn.
 // invariant: it only lets a reader ORDER a unit's own errors against the stop, in line order.
-// refs: DN-146.D10, ADR-17.D4
+// refs: ADR-17.D15, ADR-17.D4
 struct StopAnnouncementRow
 {
     std::string_view shape;
@@ -532,7 +532,7 @@ struct StopAnnouncementRow
 };
 
 // post: whether the row can be composed: its shape is well formed.
-// refs: DN-146.D10
+// refs: ADR-17.D15
 [[nodiscard]] constexpr bool
 stop_announcement_row_well_formed(const StopAnnouncementRow& row) noexcept
 {
@@ -870,7 +870,7 @@ struct SemanticPackageManifest
     // invariant: the whole lines this platform's runner writes into a step it stops; empty for a
     // package whose platform reaches no reader of them.
     // invariant: serialized into semantic_identity only when declared, so none keeps the identity.
-    // refs: DN-146.D10
+    // refs: ADR-17.D15
     std::span<const StopAnnouncementRow> stop_announcements;
     // invariant: both code-tier hooks are nullable; a data-only package leaves each null.
     StrategyFactory strategy{nullptr};
