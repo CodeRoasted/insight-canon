@@ -185,7 +185,7 @@ line prints and matching never backtracks.
 event its own content lines carry (`Cache restored from key`, pnpm's `, done` summary). It is declared by an exact
 shape only — never a prefix, because its samples share their opening bytes with lines that are content — in the
 package that owns the producer, and only on measured evidence. Canon emits the line and its template unchanged and
-only names the role; a consumer comparing content (Sift) leaves the line out, and the MetaLog carries it with its
+only names the role; a consumer comparing content (Tamys) leaves the line out, and the MetaLog carries it with its
 count. Work-paced progress (git, docker, pip, curl, apt) is not `Progress`: its count is work done, not time.
 
 The role registry is a declared seed catalog; it grows only when a scenario or a measured census surfaces a line

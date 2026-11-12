@@ -38,7 +38,7 @@ dialect:
     - ""
     - "THE SUPERSEDED CLAIM, recorded so it is not re-derived: shipping BOTH Step prefixes UNGATED"
     - "was believed to make the step name materialization-INVARIANT and to dissolve the"
-    - "which-form-was-Sift-fed hazard. It does the opposite. The PAYLOAD does read back the same"
+    - "which-form-was-Tamys-fed hazard. It does the opposite. The PAYLOAD does read back the same"
     - "from both (both yield `yarn lint`), but ungated recognition of the BARE prefix in the"
     - "annotated channel is exactly the defect. The two gated rows preserve that same-payload"
     - "property under their own channels — but note what that is and is not: it is canon reading"
@@ -105,7 +105,7 @@ dialect:
           - "  it is unsound in the DANGEROUS direction — it re-arms the bare `Run ` row against"
           - "  annotated prose and reinstates the phantom Step the marker gates below exist to"
           - "  kill. The deduction that gets this right, and its fail-closed branch, belong to"
-          - "  sift's channel probe; canon never infers."
+          - "  tamys's channel probe; canon never infers."
 
   # ── the code tier: REFERENCED by name, never generated ──
   code_tier:
@@ -484,7 +484,7 @@ dialect:
   declared_values:
     why:
       - "A run's own pull-request number is glued into words (`/stirling/V2-PR-6656/...`), so"
-      - "every pull request mints a new template and Sift reads a line appeared and a line"
+      - "every pull request mints a new template and Tamys reads a line appeared and a line"
       - "vanished on a pair that changed nothing. No per-line rule can mask it: the line alone"
       - "cannot say whether `PR-6656` is this run's request or another one a ref listing names."
       - "So the acquirer, who knows the run, declares the number, and canon masks that number and"
@@ -499,5 +499,5 @@ dialect:
           - "`PR#` and `pulls/` (DN-133.D7): GitHub's own vocabulary, each collapsing ranked rows"
           - "with 0 coincidences read. The set is closed, and it is extended only on measured"
           - "evidence: a marker nobody measured is a coincidence nobody read. `pull/`, `issues/`"
-          - "and `prN` were measured and stay out. Sift masks its job and step instance key behind"
+          - "and `prN` were measured and stay out. Tamys masks its job and step instance key behind"
           - "these same markers."

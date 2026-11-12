@@ -83,7 +83,7 @@ TEST(YearlessStream, TheChainCrossesNewYearWithNoNewAnchor)
     EXPECT_EQ(later, std::optional<Timestamp>{utc(2026, 1, 1, 0, 5, 0)}) << "got " << render(later);
 }
 
-// invariant: Sift declares a context before each side it reads, so the baseline's last instant
+// invariant: Tamys declares a context before each side it reads, so the baseline's last instant
 // must never resolve a line of the changed log.
 TEST(YearlessStream, DeclaringAContextResetsTheChain)
 {

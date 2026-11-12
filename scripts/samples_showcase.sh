@@ -3,7 +3,7 @@
 # samples_showcase — run canon's PUBLIC det_proof over our PUBLIC sample logs and
 # render a human-legible "what Canon does over our samples" showcase.
 #
-# CLIENT-FACING TRANSPARENCY, NOT A COVERAGE GATE. Eidos + Sift own the end-to-end;
+# CLIENT-FACING TRANSPARENCY, NOT A COVERAGE GATE. Eidos + Tamys own the end-to-end;
 # this exists so an external reader can SEE, over the exact sample logs we publish,
 # what the open (Apache-2.0) canon core extracts: the templates it collapses lines
 # into, each event's columns under the published VIEW, and the deterministic
@@ -322,7 +322,7 @@ echo "attribution: $attributed licensed corpus/corpora declared → $OUT/ATTRIBU
   echo
   echo "It is a **transparency showcase, not a test result**: nothing here passes or fails."
   echo "It lets you read, line by line, what Canon does to a log before any of our proprietary"
-  echo "analysis runs. The end-to-end detection is exercised elsewhere (Eidos + Sift)."
+  echo "analysis runs. The end-to-end detection is exercised elsewhere (Eidos + Tamys)."
   echo
   [ -n "$identity" ] && echo "- \`$identity\`"
   [ -n "$packages" ] && echo "- \`$packages\`"

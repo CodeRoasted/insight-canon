@@ -151,7 +151,7 @@ namespace
                      "VERIFIES, it does not infer. An unknown transform is a MISTAKE and fails "
                      "closed here; an ABSENT stack is a CHOICE and peels nothing. Declare one of "
                      "the names above, or declare no stack at all.\n"
-                     "(A driver may accept its own spelling for the empty stack — `sift` takes "
+                     "(A driver may accept its own spelling for the empty stack — `tamys` takes "
                      "`--transport none` — but no such token reaches this catalogue.)\n";
         std::terminate();
     }

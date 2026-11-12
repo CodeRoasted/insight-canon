@@ -50,7 +50,7 @@ SCAN_ROOTS=(core/src core/api)
 # LogFormat enum names (GitHubActions/…) — those are the closed identifier registry §1.3 keeps core.
 #   - GHA workflow-command markers (`##[error]`, `::group::`, `::set-output`, …)
 #   - GHA intent-marker prefixes (`"Complete job name: "`, the exact `"Run "` step-marker literal)
-#   - the GHA discriminant source (`Requested labels`) + capture-section marker (`SIFT_CAPTURE`)
+#   - the GHA discriminant source (`Requested labels`) + capture-section marker (`TAMYS_CAPTURE`)
 #   - the echoed-source SGR params (`36;1`/`1;36`) — the GHA runner's command-echo styling
 #   - test-framework file-naming vocabulary (jest/vitest/playwright `.test.`/`.spec.`; the exact
 #     pytest `"test_"` prefix literal; go/ruby `_test.go`/`_spec.rb`; cypress `.cy.`)
@@ -64,7 +64,7 @@ DENY=(
   'Complete job name'                                 # GHA Job intent marker
   '"Run "'                                            # GHA Step intent marker (exact code literal)
   'Requested labels'                                  # GHA declared runs-on discriminant source
-  'SIFT_CAPTURE'                                      # sift-action capture-section marker
+  'TAMYS_CAPTURE'                                      # sift-action capture-section marker
   '36;1|1;36'                                         # GHA echoed-source SGR params
   '_test\.(go|py|rb)'                                 # go/pytest/ruby suffix set
   '_spec\.rb'                                         # ruby spec suffix

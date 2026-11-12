@@ -472,7 +472,7 @@ release window still open.
 **Which serialized fields move.** `template_str` and `template_id` of a line holding such a token, on a stream
 that declares a value under a key its dialect declares, and nothing else: the run is a normalization inside a
 token, so `params` does not gain it, as a composite rule's normalization does not. A stream that declares no
-value — every MetaLog producer, the server, the hosted door, and Sift without its context flags — is
+value — every MetaLog producer, the server, the hosted door, and Tamys without its context flags — is
 byte-identical to the generation before this rider. The GitHub package's composed identity moves, because its
 manifest carries the new row.
 
@@ -492,7 +492,7 @@ pair record's pull-request number (coderoast-corpora `9830858` registered before
 changed-files action names the run's own request `PR#<n>`) and `pulls/` (GitHub's REST path for a pull request).
 The mechanism is unchanged; the predicate that claims a run is now one exported function,
 `claim_declared_runs`, which the masker's normal-form pass calls and which also keys a unit's instance
-(`declared_discriminant_of`, read by Sift's segmentation), so the two never disagree about a marker. The ruleset
+(`declared_discriminant_of`, read by Tamys's segmentation), so the two never disagree about a marker. The ruleset
 version stays `1.7.0` and the grammar stays `semantic-grammar-7`: both are the values of the release window
 still open, which already carries the rider above.
 
@@ -669,7 +669,7 @@ token-final carriage-return clause (`ADR-16.D15`) became unreachable and is dele
 intent trim set, since no name ends in a line ending any more.
 
 **Which serialized fields move.** None for a consumer that already framed a line without one final carriage return,
-as Sift's splitter did. For a consumer that frames on LF alone, a CRLF line now reads as its LF twin, so every
+as Tamys's splitter did. For a consumer that frames on LF alone, a CRLF line now reads as its LF twin, so every
 projected member can move: `template_str` and `template_id` (a literal last token loses its carriage return; a mask
 the carriage return blocked now fires — a complete wrapper shell, the long hash, the address and the hash counter;
 the status KEEP holds again for `exit 1` + CR, which rule 5 masked, so `exit 0` and `exit 1` no longer share a
@@ -684,7 +684,7 @@ over every LF-framed line of the three private CI-log views and the Jenkins mark
 `b3d6343` registered before the build): 249 290, 242 616, 3 483 005 and 0 lines move, every one ending in a carriage
 return; distinct templates 254 756 → 201 302, 221 075 → 169 662, 2 797 262 → 2 620 167 and 116 235 unchanged;
 9 373, 9 287, 191 382 and 0 lines stop being events; 3, 3, 1 and 0 base templates split, each an exit code; every
-merge is a carriage-return line into its LF twin. Under Sift's framing 0 lines move, and the 21 596-pair Sift replay
+merge is a carriage-return line into its LF twin. Under Tamys's framing 0 lines move, and the 21 596-pair Tamys replay
 is byte-identical.
 
 **It rides `-17`.**
@@ -790,7 +790,7 @@ fixture and through the template id; `core/tests/utils/test_time_utils.cpp` pins
 **Why one step.** A consumer crossing the next cut pays exactly one comparability event. The
 re-base cost is this string in `core/tests/mask/mask_rules.golden`, in
 `core/tests/identity/projection.golden`, in `insight-metalog`'s three committed vector files and in
-`insight-eidos`'s Sift report-order golden and run-outcome gate; the hub's published determinism
+`insight-eidos`'s Tamys report-order golden and run-outcome gate; the hub's published determinism
 golden is re-rendered at the cut.
 
 ## `-19` — a failure word qualified by a bracketed diagnostic code reads as its colon form, and a leading fail glyph reads Error
@@ -846,7 +846,7 @@ their generation line: no witness row there holds a coded head.
 
 **Why one step.** The re-base cost is this string in `core/tests/mask/mask_rules.golden`, in
 `core/tests/identity/projection.golden`, in `insight-metalog`'s three committed vector files and in
-`insight-eidos`'s Sift report-order golden and run-outcome gate; the hub's published determinism
+`insight-eidos`'s Tamys report-order golden and run-outcome gate; the hub's published determinism
 golden is re-rendered at the cut.
 
 ---

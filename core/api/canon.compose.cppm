@@ -341,7 +341,7 @@ check_stream_context(const insight::tokenization::StreamContext& context,
 // post: one declared run per row of the composition's declared-value VIEW whose key the context
 // declares, in row order; a key the view does not hold applies nothing.
 // invariant: the ONE resolution of a context against a composition — the tokenizer's template and
-// Sift's instance key read the same runs, so neither can mask behind a marker the other does not.
+// Tamys's instance key read the same runs, so neither can mask behind a marker the other does not.
 // pre: `context` passes `check_stream_context` against `composed`; one that does not terminates,
 // naming the refusal, since no log byte can produce it.
 // pre: `context` and `composed` outlive the returned runs, which view both.

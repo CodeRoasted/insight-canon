@@ -359,7 +359,7 @@ TEST(FailureLexicon, CompilerNoteDiagnosticCarriesNoFailureVerdict)
 {
     EXPECT_FALSE(contains_failure_cue("/opt/gcc-15.3/include/c++/15.3.0/bits/random.tcc:910:5: "
                                       "note: template argument deduction/substitution failed:"))
-        << "the note's own 'failed' must not confer a verdict — this is the line Sift blamed";
+        << "the note's own 'failed' must not confer a verdict — this is the line Tamys blamed";
     EXPECT_FALSE(contains_failure_cue(
         "/opt/gcc-15.3/include/c++/15.3.0/bits/fs_path.h:542:14: note: there are 102 candidates"))
         << "a note carrying no failure word stays silent (the trivial control)";
