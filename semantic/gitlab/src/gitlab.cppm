@@ -70,7 +70,7 @@ static_assert(
 // note: the five tokens are success, failed, canceled, skipped, manual — `cancelled` has no row.
 // invariant: `canceled` is Cancelled: GitLab reports a timeout as `failed`, so its cancellation is
 // a stop declared from outside the job.
-// refs: DN-146.D7
+// refs: ADR-17.D5
 inline constexpr std::array<OutcomeTokenRow, 5> kOutcomeTokens{{
     {.token = "success", .outcome = insight::RunOutcome::Success, .dialect_gate = kDialect},
     {.token = "failed", .outcome = insight::RunOutcome::Failure, .dialect_gate = kDialect},
@@ -79,7 +79,7 @@ inline constexpr std::array<OutcomeTokenRow, 5> kOutcomeTokens{{
     {.token = "manual", .outcome = insight::RunOutcome::Unknown, .dialect_gate = kDialect},
 }};
 
-// refs: ADR-17, ADR-17.D5, DN-146.D7
+// refs: ADR-17, ADR-17.D5
 // assert: all three rows resolve by LONGEST PREFIX, never by array order: the cancel row is a
 // strict extension of the failure row, and it matches on 17 of the 25 cancelled jobs.
 // invariant: the console tail is the DEGENERATE fallback and the API result is authoritative; the

@@ -701,16 +701,16 @@ TEST(OutcomeRegressed, StrictlyWorseOnTheAxisOnly)
     EXPECT_FALSE(outcome_regressed(RunOutcome::Success, RunOutcome::Unknown));
     EXPECT_FALSE(outcome_regressed(RunOutcome::Unknown, RunOutcome::Failure));
     // invariant: Cancelled is incomplete as Aborted is, so it is off the axis in both directions.
-    // refs: DN-146.D7
+    // refs: ADR-17.D5
     EXPECT_FALSE(outcome_regressed(RunOutcome::Success, RunOutcome::Cancelled));
     EXPECT_FALSE(outcome_regressed(RunOutcome::Cancelled, RunOutcome::Failure));
 }
 
 // assert: the incomplete predicate reads exactly the two classes whose log stopped early, and the
 // spelling of every class is its own: Cancelled prints CANCELLED, never UNKNOWN.
-// invariant: RED before DN-146.D8 removed `to_string`'s `default:` label, which printed UNKNOWN
+// invariant: RED before ADR-17.D5 removed `to_string`'s `default:` label, which printed UNKNOWN
 // for any class the switch did not name.
-// refs: DN-146.D7, DN-146.D8
+// refs: ADR-17.D5
 TEST(OutcomeIncomplete, AbortedAndCancelledAreIncompleteAndEveryClassSpellsItself)
 {
     using Spelled = std::pair<RunOutcome, std::string_view>;

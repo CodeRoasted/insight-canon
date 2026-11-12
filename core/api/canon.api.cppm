@@ -571,7 +571,7 @@ static_assert(std::is_trivially_copyable_v<EventLevel>,
 // invariant: Cancelled is appended after Aborted, so no existing integer moves.
 // invariant: no switch over RunOutcome carries a `default:` label: each names every enumerator and
 // ends in `std::unreachable()`, so the compiler enumerates the class a new member must reach.
-// refs: ADR-17, DN-146.D7, DN-146.D8
+// refs: ADR-17, ADR-17.D5
 enum class RunOutcome : std::uint8_t
 {
     Unknown = 0,
@@ -609,7 +609,7 @@ enum class RunOutcome : std::uint8_t
 // invariant: the ONE reading of incompleteness — every reader that branches on a truncated log
 // reads this predicate, never a class by name.
 // invariant: so a cancelled run behaves at RUN grain exactly as an aborted one does.
-// refs: DN-146.D7
+// refs: ADR-17.D5
 [[nodiscard]] constexpr bool outcome_incomplete(RunOutcome outcome) noexcept
 {
     switch (outcome)

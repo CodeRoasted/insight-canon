@@ -42,7 +42,7 @@ TEST(GitLabOutcome, TheApiStatusVocabularyMapsToTheCoreClasses)
     EXPECT_EQ(map_outcome_token("failed", composed), RunOutcome::Failure);
     // invariant: GitLab reports a timeout as `failed`, so its `canceled` is a stop declared from
     // outside the job: Cancelled, spelled by the class and not by the declarer.
-    // refs: DN-146.D7
+    // refs: ADR-17.D5
     EXPECT_EQ(map_outcome_token("canceled", composed), RunOutcome::Cancelled);
     // invariant: a row mapping TO Unknown still MAPS — engaged optional, value Unknown; an ABSENT
     // row instead produces a fail-closed note about a token this dialect does define.

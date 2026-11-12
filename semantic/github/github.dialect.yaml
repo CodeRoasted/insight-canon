@@ -438,7 +438,7 @@ dialect:
       - "pass/fail derivation at its ROOT: the verdict now enters the engine class-aware,"
       - "through the same channel as Jenkins."
       - ""
-      - "`cancelled` is Cancelled and `timed_out` is Aborted (DN-146.D7): GitHub declares a"
+      - "`cancelled` is Cancelled and `timed_out` is Aborted (ADR-17.D5): GitHub declares a"
       - "cancellation only when a declarer OUTSIDE the job stopped it (a person, fail-fast, a"
       - "concurrency group), and a timeout names no such declarer. Both logs are incomplete; only"
       - "a job declared cancelled withdraws its units' FAILING claim."

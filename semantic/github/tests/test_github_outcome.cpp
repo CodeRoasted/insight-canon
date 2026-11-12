@@ -65,7 +65,7 @@ TEST(GithubOutcome, TheSevenNativeConclusionStringsMap)
     // declared from outside the job, `timed_out` does not, so only the first is Cancelled.
     // invariant: both are INCOMPLETE — a log that stops early — so either one SUPPRESSES
     // vanished-quantum alarms rather than raising them.
-    // refs: DN-146.D7
+    // refs: ADR-17.D5
     EXPECT_EQ(map_outcome_token("cancelled", composed), RunOutcome::Cancelled);
     EXPECT_EQ(map_outcome_token("timed_out", composed), RunOutcome::Aborted);
     for (const std::string_view token : {"cancelled", "timed_out"})
