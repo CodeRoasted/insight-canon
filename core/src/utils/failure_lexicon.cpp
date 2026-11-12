@@ -323,7 +323,7 @@ namespace detail
     // post: true iff the first outcome-bearing token in the head is a fail glyph.
     // invariant: two readers, two roles: as anchor #3 it only CONFIRMS a matched failure word; the
     // level inference reads it alone as a verdict, after both failure-cue stages.
-    // refs: DN-154.D3, F-SRC-insight-canon:time_utils.cpp:infer_leading_log_level
+    // refs: ADR-20.D5, F-SRC-insight-canon:time_utils.cpp:infer_leading_log_level
     [[nodiscard]] bool leading_outcome_is_fail(std::string_view line) noexcept
     {
         // invariant: equal to leading_outcome_is_pass's kOutcomeHead - the two heads must agree.

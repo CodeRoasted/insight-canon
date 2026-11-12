@@ -11,7 +11,7 @@
 // invariant: word, so a line without one read Unknown; every guard reads the same before and after.
 // invariant: the lines are synthetic, written in the producers' public shapes (a test runner's
 // invariant: list reporter, on Linux and on Windows); no corpus byte is in this file.
-// refs: DN-154.D3, DN-154.D4, F-SRC-insight-canon:failure_lexicon.cpp:leading_outcome_is_fail
+// refs: ADR-20.D5, DN-154.D4, F-SRC-insight-canon:failure_lexicon.cpp:leading_outcome_is_fail
 #include <gtest/gtest.h>
 
 import insight.canon.test;

@@ -1482,7 +1482,7 @@ namespace detail
     // invariant: promoted out of the lexicon's anonymous namespace so the level inference in a
     // SEPARATE translation unit consults the same predicate.
     // note: internal detail; the public API stays the two cue predicates.
-    // refs: DN-154.D3, F-SRC-insight-canon:time_utils.cpp:infer_leading_log_level
+    // refs: ADR-20.D5, F-SRC-insight-canon:time_utils.cpp:infer_leading_log_level
     [[nodiscard]] bool leading_outcome_is_fail(std::string_view line) noexcept;
 
     // post: MEMBERSHIP in the failure lexicon, never firing — case-insensitive, whole-token and
@@ -1758,7 +1758,7 @@ parse_log4j_timestamp(std::string_view timestamp_str) noexcept;
 // re-derive the distinction by re-reading the words.
 // invariant: a line no failure cue fires on, led by a fail glyph, reads Error - a test runner's
 // result line carries its verdict in the glyph alone; a counted summary keeps its Warn cap.
-// refs: ADR-22.D3, ADR-20.D19, DN-154.D3
+// refs: ADR-22.D3, ADR-20.D19, ADR-20.D5
 [[nodiscard]] EventLevel infer_leading_log_level(std::string_view line) noexcept;
 
 // post: an Nginx error-log timestamp — a slash-separated date and clock, 19 characters.

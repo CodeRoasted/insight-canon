@@ -808,7 +808,7 @@ not the count register, not the fail-glyph rule.
 
 **The second change on this step.** `infer_leading_log_level` reads a line Error when no failure cue
 fired on it and its first outcome-bearing token in the 128-byte head is a fail glyph (U+2715 to
-U+2718, U+274C) (`DN-154.D3`, `F-SRC-insight-canon:failure_lexicon.cpp:leading_outcome_is_fail`). The
+U+2718, U+274C) (`ADR-20.D5`, `F-SRC-insight-canon:failure_lexicon.cpp:leading_outcome_is_fail`). The
 glyph used to anchor a failure word only, so a test runner's result line, which carries its verdict in
 the glyph and holds no failure word, read Unknown. The cue predicates do not move: a glyph still never
 creates a cue there, so the MetaLog severity signal is unchanged. It shares `-19` because `-19` is

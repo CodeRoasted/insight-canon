@@ -140,7 +140,7 @@ Two small predicates encode the verdict polarity, both walking the head left-to-
   word first → false (a failure leads).
 - `leading_outcome_is_fail` — first outcome token is a ballot-X fail glyph (`✕`/`✖`/`✗`/`✘`/`❌`) → true. It
   has two readers. As anchor #3 above it only confirms an existing failure word, so `contains_failure_cue`
-  never fires on a glyph alone. `infer_leading_log_level` reads it alone as `Error` (`DN-154.D3`), after both
+  never fires on a glyph alone. `infer_leading_log_level` reads it alone as `Error` (`ADR-20.D5`), after both
   failure-cue stages: a test runner's result line, `✘  3 [chromium] › login.spec.ts:4:4 › signs in (18.5s)`,
   carries its verdict in the glyph and holds no failure word. A token that bears no outcome (a stamp, an
   indent, a counter) does not displace the glyph; a pass glyph or a failure word met first, or a glyph whose
