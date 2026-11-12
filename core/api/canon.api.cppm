@@ -1470,6 +1470,21 @@ namespace detail
     // refs: ADR-20.D5
     [[nodiscard]] bool leading_outcome_is_pass(std::string_view line) noexcept;
 
+    // post: true iff the FIRST outcome-bearing token in the 128-byte head is a fail glyph.
+    // invariant: the glyphs are U+2715 to U+2718 and U+274C; U+00D7 and an ASCII x are not.
+    // invariant: a pass glyph or a failure-lexicon word met first yields false.
+    // invariant: a token that bears no outcome (a stamp, an indent, a counter) does not
+    // displace the glyph, so it still leads behind one.
+    // invariant: as is_verdict_anchored's anchor it only CONFIRMS a matched failure word, so
+    // the cue predicates never fire on a glyph alone.
+    // invariant: infer_leading_log_level reads it ALONE as an Error verdict, after both of its
+    // failure-cue stages.
+    // invariant: promoted out of the lexicon's anonymous namespace so the level inference in a
+    // SEPARATE translation unit consults the same predicate.
+    // note: internal detail; the public API stays the two cue predicates.
+    // refs: DN-154.D3, F-SRC-insight-canon:time_utils.cpp:infer_leading_log_level
+    [[nodiscard]] bool leading_outcome_is_fail(std::string_view line) noexcept;
+
     // post: MEMBERSHIP in the failure lexicon, never firing — case-insensitive, whole-token and
     // role-blind, so a self-anchoring word and a register-anchored one are both members.
     // invariant: the two questions differ by ORDER: the firing path consults the register only
@@ -1488,7 +1503,7 @@ namespace detail
     // invariant: the anchors are the CAPS register, a kind-slot colon or a bracket pair, a LEADING
     // fail glyph, a CamelCase error type, and the adjacent-pair phrase.
     // invariant: a leading fail glyph CONFIRMS a token and never CREATES a cue, so a glyph-only
-    // line has no failure word and stays silent.
+    // line has no failure word and the cue stays silent; its level is leading_outcome_is_fail's.
     // invariant: the multiplication sign is excluded on purpose — it doubles as a dimension
     // separator, which is the precision risk that deferred an earlier rule.
     // invariant: a trailing colon anchors a token only when every token preceding it is itself
@@ -1741,7 +1756,9 @@ parse_log4j_timestamp(std::string_view timestamp_str) noexcept;
 // guessing the word IS the line's level, not a producer declaring one.
 // invariant: so a caller cannot mistake the guess for a declaration and no consumer has to
 // re-derive the distinction by re-reading the words.
-// refs: ADR-22.D3, ADR-20.D19
+// invariant: a line no failure cue fires on, led by a fail glyph, reads Error - a test runner's
+// result line carries its verdict in the glyph alone; a counted summary keeps its Warn cap.
+// refs: ADR-22.D3, ADR-20.D19, DN-154.D3
 [[nodiscard]] EventLevel infer_leading_log_level(std::string_view line) noexcept;
 
 // post: an Nginx error-log timestamp — a slash-separated date and clock, 19 characters.

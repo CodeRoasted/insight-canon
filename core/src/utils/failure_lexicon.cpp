@@ -280,29 +280,6 @@ namespace
         }
     }
 
-    // post: true iff the first outcome-bearing token in the head is a fail glyph.
-    // invariant: it only ANCHORS an already-matched failure word and never creates a cue, so a
-    // glyph-only line stays silent.
-    [[nodiscard]] bool leading_outcome_is_fail(std::string_view line) noexcept
-    {
-        // invariant: equal to leading_outcome_is_pass's kOutcomeHead - the two heads must agree.
-        static constexpr std::size_t kOutcomeHead{128U};
-        const std::size_t limit{line.size() < kOutcomeHead ? line.size() : kOutcomeHead};
-        std::size_t pos{0};
-        while ((pos = skip_to_token_start(line, pos)) < limit)
-        {
-            if (starts_with_fail_glyph(line, pos))
-                return true;
-            if (starts_with_pass_glyph(line, pos))
-                return false;
-            const std::string_view token{take_trimmed_token(line, pos)};
-            for (const FailureWord& entry : kFailureLexicon)
-                if (iequals(token, entry.word))
-                    return false;
-        }
-        return false;
-    }
-
     // pre: `end` is the index one past a token's last byte in `line`.
     // post: true iff `line` continues at `end` with at most one space, a bracketed diagnostic code
     // (one or more letters, digits, `_` or `-` between `[` and `]`), then at once a colon.
@@ -341,6 +318,30 @@ namespace detail
     {
         return std::ranges::any_of(kFailureLexicon, [token](const FailureWord& entry)
                                    { return iequals(token, entry.word); });
+    }
+
+    // post: true iff the first outcome-bearing token in the head is a fail glyph.
+    // invariant: two readers, two roles: as anchor #3 it only CONFIRMS a matched failure word; the
+    // level inference reads it alone as a verdict, after both failure-cue stages.
+    // refs: DN-154.D3, F-SRC-insight-canon:time_utils.cpp:infer_leading_log_level
+    [[nodiscard]] bool leading_outcome_is_fail(std::string_view line) noexcept
+    {
+        // invariant: equal to leading_outcome_is_pass's kOutcomeHead - the two heads must agree.
+        static constexpr std::size_t kOutcomeHead{128U};
+        const std::size_t limit{line.size() < kOutcomeHead ? line.size() : kOutcomeHead};
+        std::size_t pos{0};
+        while ((pos = skip_to_token_start(line, pos)) < limit)
+        {
+            if (starts_with_fail_glyph(line, pos))
+                return true;
+            if (starts_with_pass_glyph(line, pos))
+                return false;
+            const std::string_view token{take_trimmed_token(line, pos)};
+            for (const FailureWord& entry : kFailureLexicon)
+                if (iequals(token, entry.word))
+                    return false;
+        }
+        return false;
     }
 
     // post: true iff a pass glyph leads the head, or a pass word is its first significant token.

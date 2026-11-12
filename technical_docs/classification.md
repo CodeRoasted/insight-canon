@@ -60,7 +60,8 @@ cue path (`kKeywordHead`) — in two stages:
   level.
 
 - **Stage 2 — failure / warning cue.** If no authoritative explicit level, the failure lexicon (§2) decides:
-  a failure cue → `Error`; a warning cue → `Warn`; otherwise `Unknown`.
+  a failure cue → `Error`; a counted failure summary → `Warn`; then a line whose first outcome-bearing token
+  is a fail glyph (§2.3) → `Error`; then a warning cue → `Warn`; otherwise `Unknown`.
 
 ### 1.2 The outcome guard (passing tests are not failures)
 
@@ -117,8 +118,9 @@ tooling uses to mark an outcome:
    once, so `error[E0425]:` and `Error [ERR_X]:` anchor as `error:` does, with the same kind-slot
    precondition; an empty or free-text bracket, a second space or a byte between `]` and the colon does not.
 3. **Leading fail glyph** — the line is led by a ballot-X glyph (`✗`/`✕`/`✖`/`✘`), which *confirms* an
-   already-matched failure word on that line. (It only confirms an existing word; a glyph-only line with no
-   failure word stays silent. `×` U+00D7 is excluded — it doubles as a dimension separator, `1920×1080`.)
+   already-matched failure word on that line. (As an anchor it only confirms an existing word, so the cue
+   predicates stay silent on a glyph-only line; the level inference reads that line on its own, §2.3. `×`
+   U+00D7 is excluded — it doubles as a dimension separator, `1920×1080`.)
 
 Two more structural cues complete the picture:
 
@@ -136,8 +138,14 @@ Two small predicates encode the verdict polarity, both walking the head left-to-
 
 - `leading_outcome_is_pass` — first outcome token is a pass glyph → true (drives the §1.2 demotion). A failure
   word first → false (a failure leads).
-- `leading_outcome_is_fail` — first outcome token is a ballot-X fail glyph → true (drives anchor #3 above). Used
-  only to confirm an existing failure word, never to invent one.
+- `leading_outcome_is_fail` — first outcome token is a ballot-X fail glyph (`✕`/`✖`/`✗`/`✘`/`❌`) → true. It
+  has two readers. As anchor #3 above it only confirms an existing failure word, so `contains_failure_cue`
+  never fires on a glyph alone. `infer_leading_log_level` reads it alone as `Error` (`DN-154.D3`), after both
+  failure-cue stages: a test runner's result line, `✘  3 [chromium] › login.spec.ts:4:4 › signs in (18.5s)`,
+  carries its verdict in the glyph and holds no failure word. A token that bears no outcome (a stamp, an
+  indent, a counter) does not displace the glyph; a pass glyph or a failure word met first, or a glyph whose
+  token starts past the 128-byte head, does. A counted summary led by a glyph (`✘ 3 failed`) keeps its `Warn`
+  cap, and a leading ASCII `x` (a Windows reporter's fail mark) is not a glyph and stays unread.
 
 `contains_failure_cue` / `contains_warning_cue` are the public entry points; they apply the lexicon, the
 anchors, the phrase, the type-name rule, and the pass-glyph demotion in one head-bounded pass. They run pure

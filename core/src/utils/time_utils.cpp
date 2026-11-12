@@ -992,6 +992,11 @@ EventLevel infer_leading_log_level(std::string_view line) noexcept
     if (detail::contains_failure_summary_cue(line, kKeywordHead))
         return EventLevel::inferred(detail::leading_outcome_is_pass(line) ? LogLevel::Unknown
                                                                           : LogLevel::Warn);
+    // assert: a leading fail glyph is a verdict on its own, read only once no failure cue fired,
+    // so a counted summary keeps its cap and a glyph-led failure word keeps its own level.
+    // refs: DN-154.D3, F-SRC-insight-canon:failure_lexicon.cpp:leading_outcome_is_fail
+    if (detail::leading_outcome_is_fail(line))
+        return EventLevel::inferred(LogLevel::Error);
     // assert: contains_warning_cue has no outcome guard, so the caller applies it here.
     // refs: F-SRC-insight-canon:canon.api.cppm:leading_outcome_is_pass
     if (contains_warning_cue(line, kKeywordHead))

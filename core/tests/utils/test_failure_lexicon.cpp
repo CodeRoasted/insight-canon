@@ -234,7 +234,7 @@ TEST(FailureLexicon, RegisterAnchoredNounDemotesInProseFiresAnchored)
     EXPECT_TRUE(contains_failure_cue("panic: runtime stack overflow")) << "'panic:' colon fires";
 }
 // invariant: a leading FAIL glyph ANCHORS a collision-prone word but never CREATES a cue, so a
-// glyph-only line with no failure word stays silent.
+// glyph-only line's cue stays silent; its level is the level inference's own glyph stage.
 // invariant: the multiplication sign is excluded from the glyph set on purpose — it doubles as a
 // dimension separator, which is the precision risk that deferred an earlier rule.
 // refs: F-SRC-insight-canon:failure_lexicon.cpp:leading_outcome_is_fail

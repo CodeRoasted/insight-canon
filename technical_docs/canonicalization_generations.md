@@ -793,7 +793,7 @@ re-base cost is this string in `core/tests/mask/mask_rules.golden`, in
 `insight-eidos`'s Sift report-order golden and run-outcome gate; the hub's published determinism
 golden is re-rendered at the cut.
 
-## `-19` — a failure word qualified by a bracketed diagnostic code reads as its colon form
+## `-19` — a failure word qualified by a bracketed diagnostic code reads as its colon form, and a leading fail glyph reads Error
 
 `-18` SHIPPED in `v1.10.8` and `v1.10.9` to `v1.10.11` carried it unchanged, so an output change
 after that tag rides a new value, and this is the one step this cut takes (`RUL-8`).
@@ -806,9 +806,20 @@ used to split the word from its colon, so a compiler's coded diagnostic (`error[
 runtime's coded error (`Error [ERR_X]:`) matched no anchor. Nothing else moved: not the lexicon,
 not the count register, not the fail-glyph rule.
 
+**The second change on this step.** `infer_leading_log_level` reads a line Error when no failure cue
+fired on it and its first outcome-bearing token in the 128-byte head is a fail glyph (U+2715 to
+U+2718, U+274C) (`DN-154.D3`, `F-SRC-insight-canon:failure_lexicon.cpp:leading_outcome_is_fail`). The
+glyph used to anchor a failure word only, so a test runner's result line, which carries its verdict in
+the glyph and holds no failure word, read Unknown. The cue predicates do not move: a glyph still never
+creates a cue there, so the MetaLog severity signal is unchanged. It shares `-19` because `-19` is
+unshipped: `v1.10.11`, the last tag, carries `-18`, and no tag or candidate holds `-19`, so a
+consumer crossing the next cut still pays exactly one comparability event (`RUL-8` gives a new value
+per shipped output, not per change).
+
 **Which serialized fields move.** The level of a line whose leading level word, or whose
-register-anchored failure word, carries such a code in the kind slot, and every field a consumer
-derives from it (`dominant_level`, the cube's `level` axis). The masker is untouched:
+register-anchored failure word, carries such a code in the kind slot; the level of a line led by a
+fail glyph on which no failure cue fires; and every field a consumer derives from either
+(`dominant_level`, the cube's `level` axis). The masker is untouched:
 `template_str` and `template_id` do not move, the `-7`/`-9` class.
 
 **Witness inputs.** Through `infer_leading_log_level`, as
@@ -820,6 +831,15 @@ derives from it (`dominant_level`, the cube's `level` axis). The masker is untou
 * `` warning[W0001]: unused variable `total` `` — Warn, unchanged; `see error[E0001]: …`,
   `error [some text]: …`, `error[]: …`, `error  [E0425]: …` and `error[E0425] : …` — Unknown,
   unchanged.
+
+and as `core/tests/utils/test_leading_fail_glyph.cpp` pins them:
+
+* `✘  3 [chromium] › tests/login.spec.ts:4:4 › signs the user in (18.5s)` — at `-19` before this
+  change: Unknown; now: Error; the same with `✕`, `✖`, `✗` or `❌` leading, behind a stamp, or in
+  colour;
+* `✓  1 [chromium] › …` and `✔ renders the ✘ icon …` — Unknown, unchanged; `error handling ✘ …` —
+  Unknown, unchanged; a glyph whose token starts at byte 128 — Unknown, unchanged; `x  3 [chromium] › …`
+  and `× 3 [chromium] › …` — Unknown, unchanged; `✘ 3 failed, 12 passed` — Warn, unchanged.
 
 `core/tests/identity/projection.golden` and `core/tests/mask/mask_rules.golden` moved only on
 their generation line: no witness row there holds a coded head.
