@@ -1,7 +1,7 @@
 // refs: ADR-17.D3, DN-17.D22
 // invariant: canon's kit asks only whether the rows a package ships are WELL-FORMED and
 // deliberately admits an EMPTY package, so nothing in canon says THIS one ships any row.
-// assert: all fifteen manifest members are bound, so a SIXTEENTH is a compile error here.
+// assert: all sixteen manifest members are bound, so a SEVENTEENTH is a compile error here.
 // note: the generator-equivalence oracle must be proven LIVE elsewhere or its green is vacuous
 #include <gtest/gtest.h>
 
@@ -12,7 +12,7 @@ TEST(GithubManifestShape, ShipsTheDeclaredRulesetShapeAndNothingElse)
 {
     const auto& [name, version, roles, markers, emits, level_lifts, locations, value_classes,
                  outcome_tokens, outcome_markers, channels, dialect_revisions, declared_values,
-                 strategy, echoed_source]{insight::semantic::github::kManifest};
+                 stop_announcements, strategy, echoed_source]{insight::semantic::github::kManifest};
 
     EXPECT_EQ(name, "github") << "the declared package name is the dialect coordinate every gated "
                                  "row carries and what a caller declares; actual: "
@@ -40,6 +40,11 @@ TEST(GithubManifestShape, ShipsTheDeclaredRulesetShapeAndNothingElse)
         << "declared vendor-revision vocabulary — cardinality one until GitHub ships a second "
            "workflow-command syntax generation; actual: "
         << dialect_revisions.size();
+    // refs: DN-146.D10
+    EXPECT_EQ(stop_announcements.size(), 3U)
+        << "stop-announcement rows — the runner's cancellation and shutdown lines and depot's; "
+           "actual: "
+        << stop_announcements.size();
     // refs: DN-133.D1
     ASSERT_EQ(declared_values.size(), 1U)
         << "declared-value rows — one key, the run's own pull-request number; actual: "

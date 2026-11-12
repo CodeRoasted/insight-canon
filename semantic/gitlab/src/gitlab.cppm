@@ -123,6 +123,10 @@ export inline constexpr SemanticPackageManifest kManifest{
     .outcome_markers = kOutcomeMarkers,
     .channels = {},
     .dialect_revisions = kDialectRevisions,
+    // invariant: EMPTY by declaration: the stop announcement orders a unit's errors against a job
+    // the platform declares cancelled, and no GitLab job graph reaches a reader of it.
+    // refs: DN-146.D10
+    .stop_announcements = {},
     .strategy = &make_strategy,
     .echoed_source = nullptr,
 };

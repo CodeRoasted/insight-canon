@@ -194,6 +194,18 @@ namespace tokenization
         return best;
     }
 
+    // pre: `composed` is a view already resolved for the stream; no dialect gate is tested here.
+    // refs: DN-146.D10
+    bool announces_stop(NormalizedContent content,
+                        const insight::semantic::ComposedSemantics& composed) noexcept
+    {
+        const std::string_view bytes{content.bytes()};
+        return std::ranges::any_of(
+            composed.stop_announcements(),
+            [bytes](const insight::semantic::StopAnnouncementRow& row) noexcept
+            { return insight::semantic::shape_matches(row.shape, bytes); });
+    }
+
     namespace
     {
         // post: a digit run, one ':', then the payload — which ENDS at the first CR and drops a

@@ -171,6 +171,13 @@ class ComposedSemantics
     {
         return declared_values_;
     }
+    // refs: DN-146.D10
+    // invariant: THE VIEW of the stop announcements, filtered by the declared dialect: a stream
+    // that declares no dialect owning one reads no line as a stop.
+    [[nodiscard]] std::span<const StopAnnouncementRow> stop_announcements() const noexcept
+    {
+        return stop_announcements_;
+    }
     // refs: DN-133.D2
     // invariant: every key any composed package declares, unfiltered and in composition order:
     // the closed set a caller's context is validated against, and the list a refusal names.
@@ -252,7 +259,7 @@ class ComposedSemantics
     friend ComposedSemantics compose(std::span<const SemanticPackageManifest> packages);
 
     // refs: ADR-22
-    // invariant: THE VIEW — what this stream's walkers see. Each of these six is already
+    // invariant: THE VIEW — what this stream's walkers see. Each of these seven is already
     // filtered by the declared dialect and channel.
     // invariant: a freshly composed vocabulary is the UNSPECIFIED view on BOTH axes, so only
     // any-dialect, any-channel rows fire until a caller declares.
@@ -265,6 +272,7 @@ class ComposedSemantics
     std::vector<OutcomeTokenRow> outcome_tokens_;
     std::vector<OutcomeMarkerRow> outcome_markers_;
     std::vector<DeclaredValueRow> declared_values_;
+    std::vector<StopAnnouncementRow> stop_announcements_;
 
     // invariant: THE UNFILTERED TABLES — every row the packages declared, gated or not. They are
     // the SOURCE `for_stream` re-derives each view from, and recognition never walks them.
@@ -276,6 +284,7 @@ class ComposedSemantics
     std::vector<OutcomeTokenRow> all_outcome_tokens_;
     std::vector<OutcomeMarkerRow> all_outcome_markers_;
     std::vector<DeclaredValueRow> all_declared_values_;
+    std::vector<StopAnnouncementRow> all_stop_announcements_;
 
     // refs: ADR-22
     // invariant: the dialect this view was resolved for; empty means Unspecified.

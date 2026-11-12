@@ -501,3 +501,39 @@ dialect:
           - "evidence: a marker nobody measured is a coincidence nobody read. `pull/`, `issues/`"
           - "and `prN` were measured and stay out. Tamys masks its job and step instance key behind"
           - "these same markers."
+
+  # ── the whole lines the runner writes into a step it STOPS ──
+  stop_announcements:
+    why:
+      - "A job the platform declares cancelled withdraws its units' FAILING claim, unless the"
+      - "unit failed before the stop (RUL-283, RUL-286). Reading \"before\" needs the stop line"
+      - "itself, so each wording the runner writes into a step it stops is declared here, matched"
+      - "as a whole line. A row only lets a reader ORDER a unit's own errors against the stop, in"
+      - "line order inside the job's own span: the line keeps its role (Terminator) and its"
+      - "level (Error), because a line holds one role and every reader of the terminator would"
+      - "otherwise need a second spelling of it. The rule and its census are DN-146.D10's."
+      - ""
+      - "Read and left out: `##[error]A task was canceled.`, which the runner writes while it"
+      - "downloads actions, and whose meaning (a job cancelled during setup, or a download that"
+      - "timed out) the bytes do not settle; one organization's own runner hook, which no dialect"
+      - "package can declare; and an aggregator job's report that other jobs failed or were"
+      - "cancelled, which stops nothing. A wording missing here leaves the withdrawal standing:"
+      - "it costs recall, never precision."
+    rows:
+      - shape: "##[error]The operation was canceled."
+        dialect_gate: self
+        why:
+          - "The GitHub runner's cancellation line. Measured in gr-v3 (14 lines in 5 logs, every"
+          - "one in a job segment every banked graph entry declares cancelled) and in the store"
+          - "(1 948 lines in 703 logs)."
+      - shape: "##[error]The runner has received a shutdown signal. This can happen when the runner service is stopped, or a manually started runner is canceled."
+        dialect_gate: self
+        why:
+          - "The same runner's shutdown line, its stop vocabulary. Absent from both views and"
+          - "measured in the store (76 lines in 69 logs)."
+      - shape: "##[error]Step canceled by GitHub (see: https://depot.dev/docs/github-actions/troubleshooting#error-step-canceled-by-github)"
+        dialect_gate: self
+        why:
+          - "depot's runner, which runs GitHub's jobs and writes its own line into the step GitHub"
+          - "cancelled. Measured in gr-v3 (1 line, run 33441602938) and in the store (17 lines in"
+          - "8 logs)."

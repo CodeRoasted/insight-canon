@@ -433,7 +433,7 @@ namespace detail
     }
 } // namespace detail
 
-// pre: `shape` is well-formed (`role_row_well_formed`), so a hole never borders a digit, another
+// pre: `shape` is well-formed (`shape_well_formed`), so a hole never borders a digit, another
 // hole or a decimal point leading into a digit, and a greedy hole is therefore exact.
 // post: whether `content`, its trailing whitespace trimmed, is `shape` with every hole replaced by
 // a decimal number; a scan without backtracking, linear in the content.
@@ -463,21 +463,14 @@ namespace detail
     return content.empty();
 }
 
-// post: whether the row can be composed: a non-empty prefix, and a Progress role on a shape row
-// only, its samples sharing their prefix with lines that are content.
-// post: a shape has a hole, no other brace, no trailing whitespace, and no hole against a digit,
-// a hole or a decimal point leading into either.
+// post: whether `shape` is a whole-line shape a greedy hole matches exactly; it may hold no hole.
+// post: it is non-empty, with no other brace, no trailing whitespace, and no hole against a
+// digit, a hole or a decimal point leading into either.
 // invariant: malf's dialect codegen refusals, held here for a package the generator never sees.
-// refs: ADR-17.D14, ADR-17.D4
-[[nodiscard]] constexpr bool role_row_well_formed(const StructuralRoleRow& row) noexcept
+// refs: ADR-17.D14, DN-146.D10
+[[nodiscard]] constexpr bool shape_well_formed(std::string_view shape) noexcept
 {
-    if (row.prefix.empty())
-        return false;
-    if (row.match == RoleMatchKind::Prefix)
-        return row.role != insight::StructuralRole::Progress;
-    const std::string_view shape{row.prefix};
-    if (shape.find(kShapeHole) == std::string_view::npos ||
-        detail::shape_trailing_space(shape.back()))
+    if (shape.empty() || detail::shape_trailing_space(shape.back()))
         return false;
     std::size_t cursor{0};
     bool after_hole{false};
@@ -506,6 +499,44 @@ namespace detail
         ++cursor;
     }
     return true;
+}
+
+// post: whether the row can be composed: a non-empty prefix, and a Progress role on a shape row
+// only, its samples sharing their prefix with lines that are content.
+// post: a shape is well formed and holds at least one hole, the quantity it samples.
+// invariant: malf's dialect codegen refusals, held here for a package the generator never sees.
+// refs: ADR-17.D14, ADR-17.D4
+[[nodiscard]] constexpr bool role_row_well_formed(const StructuralRoleRow& row) noexcept
+{
+    if (row.prefix.empty())
+        return false;
+    if (row.match == RoleMatchKind::Prefix)
+        return row.role != insight::StructuralRole::Progress;
+    return row.prefix.find(kShapeHole) != std::string_view::npos && shape_well_formed(row.prefix);
+}
+
+// invariant: a whole line a platform's runner writes into a step it STOPS, matched as a role
+// row's shape is, `{n}` holes admitted and not required.
+// invariant: the match reads the whole content after the transport peel and a whitespace trim.
+// invariant: a SECOND declaration about the line, never a role: it keeps its role and its level.
+// invariant: a line holds one role, so a stop role would give every terminator reader a second
+// spelling to learn.
+// invariant: it only lets a reader ORDER a unit's own errors against the stop, in line order.
+// refs: DN-146.D10, ADR-17.D4
+struct StopAnnouncementRow
+{
+    std::string_view shape;
+    // invariant: filtered into the stream view once, at resolution, and never consulted per line.
+    // refs: ADR-22.D6
+    std::string_view dialect_gate{kAnyDialect};
+};
+
+// post: whether the row can be composed: its shape is well formed.
+// refs: DN-146.D10
+[[nodiscard]] constexpr bool
+stop_announcement_row_well_formed(const StopAnnouncementRow& row) noexcept
+{
+    return shape_well_formed(row.shape);
 }
 
 // invariant: a CLOSED set of payload shapes a version coordinate applies to — the algorithm
@@ -836,6 +867,11 @@ struct SemanticPackageManifest
     // package that declares none, and serialized into semantic_identity after the revisions.
     // refs: DN-133.D2
     std::span<const DeclaredValueRow> declared_values;
+    // invariant: the whole lines this platform's runner writes into a step it stops; empty for a
+    // package whose platform reaches no reader of them.
+    // invariant: serialized into semantic_identity only when declared, so none keeps the identity.
+    // refs: DN-146.D10
+    std::span<const StopAnnouncementRow> stop_announcements;
     // invariant: both code-tier hooks are nullable; a data-only package leaves each null.
     StrategyFactory strategy{nullptr};
     ProvenanceHook echoed_source{nullptr};
@@ -1011,6 +1047,9 @@ all_dialect_gates_owned(const SemanticPackageManifest& manifest) noexcept
                                { return owned(row.dialect_gate); }) &&
            std::ranges::all_of(manifest.declared_values,
                                [&owned](const DeclaredValueRow& row) noexcept
+                               { return owned(row.dialect_gate); }) &&
+           std::ranges::all_of(manifest.stop_announcements,
+                               [&owned](const StopAnnouncementRow& row) noexcept
                                { return owned(row.dialect_gate); });
 }
 

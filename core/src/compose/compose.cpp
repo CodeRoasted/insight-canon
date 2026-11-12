@@ -170,6 +170,23 @@ namespace
             append_str_span(out, row.markers);
             append_str(out, row.dialect_gate);
         }
+        // note: a stop announcement orders a unit's errors against the stop, so it is identity.
+        // invariant: written only by a package that declares one, so a package declaring none
+        // keeps the preimage it had before the section existed.
+        // invariant: a zero-length string opens the section, and no package name is empty
+        // (`all_packages_named`), so the next package's name can never read as it.
+        // invariant: the preimage therefore stays a prefix-free encoding of the manifest list.
+        // refs: DN-146.D10, ADR-2.D5
+        if (!pkg.stop_announcements.empty())
+        {
+            append_str(out, {});
+            append_u32_le(out, static_cast<std::uint32_t>(pkg.stop_announcements.size()));
+            for (const StopAnnouncementRow& row : pkg.stop_announcements)
+            {
+                append_str(out, row.shape);
+                append_str(out, row.dialect_gate);
+            }
+        }
     }
 
     // post: one shadow note per pair whose shorter prefix properly prefixes the longer and whose
@@ -261,6 +278,19 @@ namespace
     }
 
     // note: the message states the rule and the remedy and names no record: canon ships public.
+    [[noreturn]] void fail_stop_announcement(const SemanticPackageManifest& pkg,
+                                             const StopAnnouncementRow& row)
+    {
+        std::cerr << "FATAL: insight::semantic::compose — package \"" << pkg.name
+                  << "\", stop announcement \"" << row.shape
+                  << "\": a stop announcement is a whole-line shape of literal bytes, with {n} "
+                     "holes admitted and none required, no other brace, no trailing whitespace, "
+                     "and no hole against a digit, another hole or a decimal point leading into "
+                     "either. Fix the row.\n";
+        std::terminate();
+    }
+
+    // note: the message states the rule and the remedy and names no record: canon ships public.
     [[noreturn]] void fail_role_row(const SemanticPackageManifest& pkg,
                                     const StructuralRoleRow& row)
     {
@@ -325,8 +355,53 @@ namespace
         std::terminate();
     }
 
+    // post: returns only when every intent marker row carries a whole version coordinate and an
+    // admitted unit role; otherwise fails closed naming the row.
+    void fence_marker_rows(std::span<const SemanticPackageManifest> packages)
+    {
+        for (const SemanticPackageManifest& pkg : packages)
+            for (const IntentMarkerRow& row : pkg.markers)
+            {
+                if (!version_coordinate_whole(row.version))
+                    fail_version_coordinate(pkg, row);
+                if (!unit_role_row_admitted(row))
+                    fail_unit_role_row(pkg, row);
+            }
+    }
+
+    // post: returns only when every declared-value row is well formed; otherwise fails closed
+    // naming the row.
+    void fence_declared_value_rows(std::span<const SemanticPackageManifest> packages)
+    {
+        for (const SemanticPackageManifest& pkg : packages)
+            for (const DeclaredValueRow& row : pkg.declared_values)
+                if (!declared_value_row_well_formed(row))
+                    fail_declared_value(pkg, row);
+    }
+
+    // post: returns only when every structural role row is well formed; otherwise fails closed
+    // naming the row.
+    void fence_role_rows(std::span<const SemanticPackageManifest> packages)
+    {
+        for (const SemanticPackageManifest& pkg : packages)
+            for (const StructuralRoleRow& row : pkg.roles)
+                if (!role_row_well_formed(row))
+                    fail_role_row(pkg, row);
+    }
+
+    // post: returns only when every stop-announcement row is well formed; otherwise fails closed
+    // naming the row.
+    void fence_stop_announcement_rows(std::span<const SemanticPackageManifest> packages)
+    {
+        for (const SemanticPackageManifest& pkg : packages)
+            for (const StopAnnouncementRow& row : pkg.stop_announcements)
+                if (!stop_announcement_row_well_formed(row))
+                    fail_stop_announcement(pkg, row);
+    }
+
     // post: returns only when every package is named, the set holds no conflict, and every
-    // marker, declared-value and role row is well formed; otherwise fails closed naming the row.
+    // marker, declared-value, role and stop-announcement row is well formed.
+    // post: otherwise it fails closed, naming the package and the row.
     // note: the unnamed-package fence answers first: every other diagnostic names the package.
     void fence_manifests(std::span<const SemanticPackageManifest> packages)
     {
@@ -336,22 +411,10 @@ namespace
 
         if (const ConflictInfo conflict{find_conflict(packages)}; conflict.has_conflict)
             fail_closed(conflict);
-        for (const SemanticPackageManifest& pkg : packages)
-            for (const IntentMarkerRow& row : pkg.markers)
-            {
-                if (!version_coordinate_whole(row.version))
-                    fail_version_coordinate(pkg, row);
-                if (!unit_role_row_admitted(row))
-                    fail_unit_role_row(pkg, row);
-            }
-        for (const SemanticPackageManifest& pkg : packages)
-            for (const DeclaredValueRow& row : pkg.declared_values)
-                if (!declared_value_row_well_formed(row))
-                    fail_declared_value(pkg, row);
-        for (const SemanticPackageManifest& pkg : packages)
-            for (const StructuralRoleRow& row : pkg.roles)
-                if (!role_row_well_formed(row))
-                    fail_role_row(pkg, row);
+        fence_marker_rows(packages);
+        fence_declared_value_rows(packages);
+        fence_role_rows(packages);
+        fence_stop_announcement_rows(packages);
     }
 
     // post: appends the transport catalog's row count, then each row's name, kind, extract,
@@ -502,6 +565,7 @@ ComposedSemantics ComposedSemantics::for_stream(std::string_view declared_dialec
     out.all_outcome_tokens_ = all_outcome_tokens_;
     out.all_outcome_markers_ = all_outcome_markers_;
     out.all_declared_values_ = all_declared_values_;
+    out.all_stop_announcements_ = all_stop_announcements_;
     out.declared_dialect_ = resolved_dialect;
 
     const auto admits{[resolved_dialect](std::string_view dialect_gate) noexcept
@@ -526,6 +590,11 @@ ComposedSemantics ComposedSemantics::for_stream(std::string_view declared_dialec
     out.declared_values_.reserve(all_declared_values_.size());
     std::ranges::copy_if(all_declared_values_, std::back_inserter(out.declared_values_),
                          [&admits](const DeclaredValueRow& row)
+                         { return admits(row.dialect_gate); });
+    // refs: DN-146.D10
+    out.stop_announcements_.reserve(all_stop_announcements_.size());
+    std::ranges::copy_if(all_stop_announcements_, std::back_inserter(out.stop_announcements_),
+                         [&admits](const StopAnnouncementRow& row)
                          { return admits(row.dialect_gate); });
     // refs: ADR-22.D4
     out.markers_.reserve(all_markers_.size());
@@ -584,6 +653,9 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
         composed.all_declared_values_.insert(composed.all_declared_values_.end(),
                                              pkg.declared_values.begin(),
                                              pkg.declared_values.end());
+        composed.all_stop_announcements_.insert(composed.all_stop_announcements_.end(),
+                                                pkg.stop_announcements.begin(),
+                                                pkg.stop_announcements.end());
         for (const DeclaredValueRow& row : pkg.declared_values)
             if (std::ranges::find(composed.declared_value_keys_, row.key) ==
                 composed.declared_value_keys_.end())

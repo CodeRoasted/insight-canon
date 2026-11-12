@@ -49,6 +49,7 @@ using insight::semantic::OutcomeTokenRow;
 using insight::semantic::PayloadEmit;
 using insight::semantic::PayloadExtract;
 using insight::semantic::SemanticPackageManifest;
+using insight::semantic::StopAnnouncementRow;
 using insight::semantic::StructuralRoleRow;
 using insight::semantic::ValueClass;
 using insight::semantic::ValueClassRow;
@@ -143,6 +144,8 @@ constexpr std::array<std::string_view, 1> kRevisionsA{{"v1"}};
 constexpr std::array<std::string_view, 2> kValueMarkersA{{"TK-", "tk-"}};
 constexpr std::array<DeclaredValueRow, 1> kDeclaredValuesA{
     {{.key = "ticket", .markers = kValueMarkersA, .dialect_gate = "alpha"}}};
+constexpr std::array<StopAnnouncementRow, 1> kStopsA{
+    {{.shape = "<AAA-stopped after {n}s>", .dialect_gate = "alpha"}}};
 
 constexpr SemanticPackageManifest kAlpha{.name = "alpha",
                                          .version = "1.0.0",
@@ -157,6 +160,7 @@ constexpr SemanticPackageManifest kAlpha{.name = "alpha",
                                          .channels = kChannelsA,
                                          .dialect_revisions = kRevisionsA,
                                          .declared_values = kDeclaredValuesA,
+                                         .stop_announcements = kStopsA,
                                          .strategy = nullptr,
                                          .echoed_source = nullptr};
 
@@ -230,6 +234,8 @@ constexpr std::array<std::string_view, 1> kRevisionsTwin{{"v1"}};
 constexpr std::array<std::string_view, 2> kValueMarkersTwin{{"TK-", "tk-"}};
 constexpr std::array<DeclaredValueRow, 1> kDeclaredValuesTwin{
     {{.key = "ticket", .markers = kValueMarkersTwin, .dialect_gate = "alpha"}}};
+constexpr std::array<StopAnnouncementRow, 1> kStopsTwin{
+    {{.shape = "<AAA-stopped after {n}s>", .dialect_gate = "alpha"}}};
 
 constexpr SemanticPackageManifest kAlphaTwin{.name = "alpha",
                                              .version = "1.0.0",
@@ -244,6 +250,7 @@ constexpr SemanticPackageManifest kAlphaTwin{.name = "alpha",
                                              .channels = kChannelsTwin,
                                              .dialect_revisions = kRevisionsTwin,
                                              .declared_values = kDeclaredValuesTwin,
+                                             .stop_announcements = kStopsTwin,
                                              .strategy = nullptr,
                                              .echoed_source = nullptr};
 
@@ -351,6 +358,8 @@ constexpr std::array<std::string_view, 1> kRevisionsMut{{"v2"}};
 constexpr std::array<std::string_view, 2> kValueMarkersMut{{"TK-", "Tk-"}};
 constexpr std::array<DeclaredValueRow, 1> kDeclaredValuesMut{
     {{.key = "ticket", .markers = kValueMarkersMut, .dialect_gate = "alpha"}}};
+constexpr std::array<StopAnnouncementRow, 1> kStopsMut{
+    {{.shape = "<AAA-stopped at {n}s>", .dialect_gate = "alpha"}}};
 
 // invariant: each mutant is the subject with exactly ONE member re-pointed, built in the test body
 // from the arrays above.
@@ -399,12 +408,13 @@ struct MutationArm
 // invariant: the members NAMED BY HAND — the ORACLE for one check per manifest member.
 // invariant: written here and NOT derived from the report, so a comparator that dropped a member
 // cannot also drop the expectation.
-constexpr std::array<std::string_view, 15> kExpectedCheckNames{
+constexpr std::array<std::string_view, 16> kExpectedCheckNames{
     {"equivalence.name", "equivalence.version", "equivalence.roles", "equivalence.markers",
      "equivalence.emits", "equivalence.level_lifts", "equivalence.locations",
      "equivalence.value_classes", "equivalence.outcome_tokens", "equivalence.outcome_markers",
      "equivalence.channels", "equivalence.dialect_revisions", "equivalence.declared_values",
-     "equivalence.strategy_presence_only", "equivalence.echoed_source_presence_only"}};
+     "equivalence.stop_announcements", "equivalence.strategy_presence_only",
+     "equivalence.echoed_source_presence_only"}};
 
 } // namespace
 
@@ -461,12 +471,14 @@ TEST(ManifestEquivalence, EveryManifestMemberDiscriminates)
     mut_revisions.dialect_revisions = kRevisionsMut;
     SemanticPackageManifest mut_declared_values{kAlpha};
     mut_declared_values.declared_values = kDeclaredValuesMut;
+    SemanticPackageManifest mut_stops{kAlpha};
+    mut_stops.stop_announcements = kStopsMut;
     SemanticPackageManifest mut_strategy{kAlpha};
     mut_strategy.strategy = &make_probe_strategy;
     SemanticPackageManifest mut_hook{kAlpha};
     mut_hook.echoed_source = &probe_echoed_source;
 
-    const std::array<MutationArm, 15> arms{
+    const std::array<MutationArm, 16> arms{
         {{"name: \"alpha\" -> \"alpha-renamed\"", "equivalence.name", "alpha-renamed", mut_name},
          {"version: \"1.0.0\" -> \"1.0.1\"", "equivalence.version", "1.0.1", mut_version},
          {"roles[0].role: GroupBegin -> GroupEnd", "equivalence.roles", "roles[0]", mut_roles},
@@ -489,6 +501,8 @@ TEST(ManifestEquivalence, EveryManifestMemberDiscriminates)
           mut_revisions},
          {"declared_values[0].markers: \"tk-\" -> \"Tk-\"", "equivalence.declared_values",
           "declared_values[0]", mut_declared_values},
+         {"stop_announcements[0].shape: \"after {n}s\" -> \"at {n}s\"",
+          "equivalence.stop_announcements", "stop_announcements[0]", mut_stops},
          {"strategy: absent -> present", "equivalence.strategy_presence_only", "PRESENCE",
           mut_strategy},
          {"echoed_source: absent -> present", "equivalence.echoed_source_presence_only", "PRESENCE",
@@ -592,5 +606,5 @@ TEST(ManifestEquivalence, EmptyManifestsAreEquivalentAndStillDiscriminate)
         << "an empty manifest and a populated one compared EQUAL — the comparator is inert";
     // invariant: every POPULATED member must be reported, and the two code-tier members are absent
     // on BOTH sides so they legitimately stay green.
-    EXPECT_EQ(failing_names(split_report).size(), 13U) << failures_of(split_report);
+    EXPECT_EQ(failing_names(split_report).size(), 14U) << failures_of(split_report);
 }

@@ -18,6 +18,7 @@ using insight::semantic::OutcomeTokenRow;
 using insight::semantic::PayloadEmit;
 using insight::semantic::PayloadExtract;
 using insight::semantic::SemanticPackageManifest;
+using insight::semantic::StopAnnouncementRow;
 using insight::semantic::conformance::CheckResult;
 using insight::semantic::conformance::marker_probe_for;
 using insight::semantic::conformance::Report;
@@ -80,6 +81,21 @@ constexpr SemanticPackageManifest kTokensNoMarker{
 // round trips, reached through the other loop.
 constexpr SemanticPackageManifest kMarkerNoTokens{
     .name = kKitDialect, .version = "1.0.0", .outcome_markers = kOutcomeMarkers};
+
+// invariant: one stop announcement gated to the package and one to any dialect, both ASCII: the
+// CONTROL the dialect-gate and ASCII legs measure and pass.
+constexpr std::array<StopAnnouncementRow, 2> kStops{
+    {{.shape = "KIT step stopped after {n} s", .dialect_gate = kKitDialect},
+     {.shape = "KIT runner stopped.", .dialect_gate = insight::semantic::kAnyDialect}}};
+constexpr SemanticPackageManifest kStopping{
+    .name = kKitDialect, .version = "1.0.0", .stop_announcements = kStops};
+
+// invariant: the same section with one non-ASCII byte in a shape, which composition admits and
+// the ASCII leg must refuse by the row's own name.
+constexpr std::array<StopAnnouncementRow, 1> kNonAsciiStop{
+    {{.shape = "KIT step stopp\u00e9.", .dialect_gate = kKitDialect}}};
+constexpr SemanticPackageManifest kNonAsciiStopping{
+    .name = kKitDialect, .version = "1.0.0", .stop_announcements = kNonAsciiStop};
 
 // post: the report's first check whose name opens with `leg`, else nullptr.
 // note: a prefix and not a name, because a leg's passing and failing names differ in spelling.
@@ -188,4 +204,27 @@ TEST(ConformanceKitNonVacuity, TheOutcomeRoundTripNamesAPassThatMeasuredNothing)
                "so a caller holding only the report cannot tell the two apart:\n"
             << every_check(subject);
     }
+}
+
+// assert: the kit reaches the stop-announcement section: the dialect-gate leg measures both rows of
+// assert: the control and passes, and the ASCII leg refuses a non-ASCII shape by the section's name
+// assert: while it passes the control.
+// refs: DN-146.D10
+TEST(ConformanceKitNonVacuity, TheKitMeasuresTheStopAnnouncementSection)
+{
+    const Report control{run(kStopping)};
+    const CheckResult* const gate{check_of(control, "dialect_gate")};
+    ASSERT_NE(gate, nullptr) << "run() pushed no dialect-gate check:\n" << every_check(control);
+    EXPECT_TRUE(gate->passed) << every_check(control);
+    const CheckResult* const ascii_control{check_of(control, "ascii")};
+    ASSERT_NE(ascii_control, nullptr) << every_check(control);
+    EXPECT_TRUE(ascii_control->passed) << every_check(control);
+
+    const Report subject{run(kNonAsciiStopping)};
+    const CheckResult* const ascii{check_of(subject, "ascii")};
+    ASSERT_NE(ascii, nullptr) << "run() pushed no ASCII check:\n" << every_check(subject);
+    EXPECT_FALSE(ascii->passed)
+        << "a non-ASCII stop shape passed the ASCII leg, so the leg never read the section:\n"
+        << every_check(subject);
+    EXPECT_EQ(ascii->name, "ascii.stop_announcement") << every_check(subject);
 }

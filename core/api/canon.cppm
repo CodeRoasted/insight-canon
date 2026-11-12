@@ -41,6 +41,14 @@ export namespace insight::tokenization
 [[nodiscard]] StructuralRole
 classify(NormalizedContent content, const insight::semantic::ComposedSemantics& composed) noexcept;
 
+// post: whether a stop-announcement row of the view matches the whole content, its trailing
+// whitespace trimmed: the line is one a runner writes into a step it stops.
+// invariant: a SECOND declaration about the line and never a role: `classify` reads the same line
+// unchanged, and its declared level is untouched.
+// refs: DN-146.D10
+[[nodiscard]] bool announces_stop(NormalizedContent content,
+                                  const insight::semantic::ComposedSemantics& composed) noexcept;
+
 // refs: ADR-18
 // post: `recognize` returns the longest-matching marker row's `IntentMarker`, whose payload is the
 // content after the matched prefix, and None when no row of the view matches.
