@@ -34,7 +34,7 @@ using EventID = uint64_t;
 // refs: ADR-2.D5, ADR-2.D9, F-SRC-insight-canon:canon.api.cppm:TemplateId
 // refs: F-SRC-insight-canon:mask.cpp:normalize_marker_number
 // note: the generation ledger is technical_docs/canonicalization_generations.md.
-inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-18"};
+inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-19"};
 
 // invariant: the first 16 bytes of SHA-256 over the masked template_str, carried as a fixed-size
 // POD; the 34-byte "h:"+hex string materialises only at the serialize seam.
@@ -1493,6 +1493,8 @@ namespace detail
     // separator, which is the precision risk that deferred an earlier rule.
     // invariant: a trailing colon anchors a token only when every token preceding it is itself
     // colon-terminated or bracket-enclosed — the KIND SLOT.
+    // invariant: a bracketed diagnostic code between the token and its colon, after at most one
+    // space and with the colon at once after `]`, is read through — `error[E0425]:` is `error:`.
     // invariant: a bare adjacency cannot separate a log prefix from an object key, a named
     // parameter or a quoted source string: the discriminating information is POSITIONAL.
     // invariant: the kind-slot rule is monotone-DEMOTING — it only ever removes an anchor —
@@ -1506,6 +1508,7 @@ namespace detail
     // refs: F-SRC-insight-canon:failure_lexicon.cpp:leading_outcome_is_fail
     // refs: F-SRC-insight-canon:failure_lexicon.cpp:error_type_anchors
     // refs: F-SRC-insight-canon:failure_lexicon.cpp:token_in_kind_slot
+    // refs: DN-154.D2, F-SRC-insight-canon:failure_lexicon.cpp:code_then_colon_at
     [[nodiscard]] bool is_verdict_anchored(std::string_view line, std::string_view token) noexcept;
 
     // pre: token MUST be a sub-view of line.

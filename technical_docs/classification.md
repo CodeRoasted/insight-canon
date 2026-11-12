@@ -112,7 +112,10 @@ tooling uses to mark an outcome:
 
 1. **Caps register** — the raw token is ALL-UPPERCASE, ≥ 2 letters (`ERROR`, `FAILED`, `FATAL`, `PANIC`).
 2. **Delimiter-bound** — immediately followed by `:` (`error:`, `fatal:`), or enclosed `[…]` / `(…)`
-   (`[error]`, `(FAILED)`, `##[error]`).
+   (`[error]`, `(FAILED)`, `##[error]`). A bracketed diagnostic code between the word and its colon is read
+   through (`DN-154.D2`): after at most one space, one `[…]` of letters, digits, `_` or `-`, then the colon at
+   once, so `error[E0425]:` and `Error [ERR_X]:` anchor as `error:` does, with the same kind-slot
+   precondition; an empty or free-text bracket, a second space or a byte between `]` and the colon does not.
 3. **Leading fail glyph** — the line is led by a ballot-X glyph (`✗`/`✕`/`✖`/`✘`), which *confirms* an
    already-matched failure word on that line. (It only confirms an existing word; a glyph-only line with no
    failure word stays silent. `×` U+00D7 is excluded — it doubles as a dimension separator, `1920×1080`.)

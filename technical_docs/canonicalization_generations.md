@@ -28,7 +28,7 @@ Two recurring classes are named rather than re-argued at each entry:
 * **The identity class** (`-4`, `-8`, `-11`, `-12`, `-13`, rider 2 of `-15`, and `-16`) — the masker
   itself moved, so `template_str` and `template_id` move.
 * **The classification class** (`-7`, `-9`, `-14`'s level half, `-15`'s rider 1, `-16`'s level
-  half) — the masker is
+  half, and `-19`) — the masker is
   untouched and identity does not move, but a **serialized** field does (`dominant_level` gates
   NewErrorPattern and diff polarity; `component` is the cube's WHERE axis). That is still
   output-affecting, and it is the state a reader most easily mistakes for *nothing moved*.
@@ -789,6 +789,42 @@ fixture and through the template id; `core/tests/utils/test_time_utils.cpp` pins
 
 **Why one step.** A consumer crossing the next cut pays exactly one comparability event. The
 re-base cost is this string in `core/tests/mask/mask_rules.golden`, in
+`core/tests/identity/projection.golden`, in `insight-metalog`'s three committed vector files and in
+`insight-eidos`'s Sift report-order golden and run-outcome gate; the hub's published determinism
+golden is re-rendered at the cut.
+
+## `-19` — a failure word qualified by a bracketed diagnostic code reads as its colon form
+
+`-18` SHIPPED in `v1.10.8` and `v1.10.9` to `v1.10.11` carried it unchanged, so an output change
+after that tag rides a new value, and this is the one step this cut takes (`RUL-8`).
+
+**What changed.** `is_verdict_anchored`'s colon anchor reads a bracketed diagnostic code through
+(`DN-154.D2`): a token followed, after at most one space, by one `[`…`]` of letters, digits, `_`
+or `-`, and then at once by `:`, is anchored as if the colon followed the token, under the same
+kind-slot precondition (`F-SRC-insight-canon:failure_lexicon.cpp:code_then_colon_at`). The bracket
+used to split the word from its colon, so a compiler's coded diagnostic (`error[E0425]:`) and a
+runtime's coded error (`Error [ERR_X]:`) matched no anchor. Nothing else moved: not the lexicon,
+not the count register, not the fail-glyph rule.
+
+**Which serialized fields move.** The level of a line whose leading level word, or whose
+register-anchored failure word, carries such a code in the kind slot, and every field a consumer
+derives from it (`dominant_level`, the cube's `level` axis). The masker is untouched:
+`template_str` and `template_id` do not move, the `-7`/`-9` class.
+
+**Witness inputs.** Through `infer_leading_log_level`, as
+`core/tests/utils/test_verdict_register_coded_head.cpp` pins them:
+
+* `` error[E0425]: cannot find value `total` in this scope `` — at `-18`: Unknown; now: Error;
+* `Error [ERR_INVALID_STATE]: the stream was already closed` — Unknown, now Error;
+* `` [build] error[E0599]: no method named `size` found for struct `Grid` `` — Unknown, now Error;
+* `` warning[W0001]: unused variable `total` `` — Warn, unchanged; `see error[E0001]: …`,
+  `error [some text]: …`, `error[]: …`, `error  [E0425]: …` and `error[E0425] : …` — Unknown,
+  unchanged.
+
+`core/tests/identity/projection.golden` and `core/tests/mask/mask_rules.golden` moved only on
+their generation line: no witness row there holds a coded head.
+
+**Why one step.** The re-base cost is this string in `core/tests/mask/mask_rules.golden`, in
 `core/tests/identity/projection.golden`, in `insight-metalog`'s three committed vector files and in
 `insight-eidos`'s Sift report-order golden and run-outcome gate; the hub's published determinism
 golden is re-rendered at the cut.

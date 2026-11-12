@@ -303,6 +303,27 @@ namespace
         return false;
     }
 
+    // pre: `end` is the index one past a token's last byte in `line`.
+    // post: true iff `line` continues at `end` with at most one space, a bracketed diagnostic code
+    // (one or more letters, digits, `_` or `-` between `[` and `]`), then at once a colon.
+    // invariant: the code is read through as one unit and nothing else is: a second space, an empty
+    // or free-text bracket, or a byte between `]` and the colon refuses.
+    // refs: DN-154.D2, F-SRC-insight-canon:canon.api.cppm:is_verdict_anchored
+    [[nodiscard]] bool code_then_colon_at(std::string_view line, std::size_t end) noexcept
+    {
+        std::size_t pos{end};
+        if (pos < line.size() && line[pos] == ' ')
+            ++pos;
+        if (pos >= line.size() || line[pos] != '[')
+            return false;
+        const std::size_t code_begin{++pos};
+        while (pos < line.size() &&
+               (detail::is_token_alnum(line[pos]) || line[pos] == '_' || line[pos] == '-'))
+            ++pos;
+        return pos > code_begin && pos + 1U < line.size() && line[pos] == ']' &&
+               line[pos + 1U] == ':';
+    }
+
     // pre: the caller reached this only on a line carrying no failure-lexicon word at all.
     [[nodiscard]] bool error_type_anchors(std::string_view line, std::string_view token) noexcept
     {
@@ -367,8 +388,11 @@ namespace detail
         const char after{end < line.size() ? line[end] : '\0'};
         // assert: only the colon anchor carries the kind-slot precondition, and that asymmetry is
         // the design - a bracket pair is already two-sided, a trailing colon is not.
+        // assert: a bracketed code between the word and its colon is the same anchor with the code
+        // read through, so it carries the same kind-slot precondition.
         // refs: F-SRC-insight-canon:failure_lexicon.cpp:token_in_kind_slot
-        if (after == ':' && token_in_kind_slot(line, token))
+        // refs: F-SRC-insight-canon:failure_lexicon.cpp:code_then_colon_at
+        if ((after == ':' || code_then_colon_at(line, end)) && token_in_kind_slot(line, token))
             return true;
         if ((before == '[' && after == ']') || (before == '(' && after == ')'))
             return true;
