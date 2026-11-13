@@ -64,7 +64,7 @@ DENY=(
   'Complete job name'                                 # GHA Job intent marker
   '"Run "'                                            # GHA Step intent marker (exact code literal)
   'Requested labels'                                  # GHA declared runs-on discriminant source
-  'TAMYS_CAPTURE'                                      # sift-action capture-section marker
+  'TAMYS_CAPTURE'                                      # tamys-action capture-section marker
   '36;1|1;36'                                         # GHA echoed-source SGR params
   '_test\.(go|py|rb)'                                 # go/pytest/ruby suffix set
   '_spec\.rb'                                         # ruby spec suffix
