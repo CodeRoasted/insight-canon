@@ -322,6 +322,14 @@ target_link_libraries(leading_level_token_index_measure PRIVATE insight::canon)
 target_compile_features(leading_level_token_index_measure PRIVATE cxx_std_23)
 set_target_properties(leading_level_token_index_measure PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
 
+# The template stream (ADR-2.D9, DN-40.O2): one template_str per input line, in input order, through
+# the FLAW-13 tool's tokenizer configuration. A generation's precedence and blast-radius gates read
+# two builds' streams of one population side by side, so it prints rather than asserts.
+add_executable(template_stream_measure tools/template_stream_measure.cpp)
+target_link_libraries(template_stream_measure PRIVATE insight::canon)
+target_compile_features(template_stream_measure PRIVATE cxx_std_23)
+set_target_properties(template_stream_measure PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
+
 ###########################################################
 #  Tests (unit + regression)
 ###########################################################

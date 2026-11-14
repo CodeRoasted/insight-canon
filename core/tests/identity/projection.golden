@@ -11,7 +11,7 @@
 # TO CHANGE A VALUE: you cannot, without first bumping `kCanonicalizationVersion` in
 # `core/api/canon.api.cppm`; the regenerator refuses otherwise. See the test file's header.
 #
-canonicalization_version = stateless-masks-19
+canonicalization_version = stateless-masks-20
 
 == stream: proof/corpus/ci_build.log
 > Build started for commit a1b2c3d on branch main

@@ -121,7 +121,7 @@ struct Tokenizer::Impl
             }
         }
 
-        const StatelessTemplate match{stateless_template(parsed_line.content, arena, config, runs)};
+        const StatelessTemplate match{stateless_template(parsed_line.content, arena, runs)};
 
         CanonicalEvent event;
         event.id = next_id++;

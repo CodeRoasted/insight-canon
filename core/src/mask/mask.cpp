@@ -32,6 +32,16 @@ namespace
                 kHexLetterCount);
     }
 
+    // pre: `pos` is at most `text.size()`, as every caller's index is.
+    // post: the bytes of `text` from `pos`, at most `len` of them - substr without the throw, so
+    // the noexcept scanners below carry no exception path.
+    [[nodiscard]] constexpr std::string_view
+    slice(std::string_view text, std::size_t pos, std::size_t len = std::string_view::npos) noexcept
+    {
+        const std::size_t from{std::min(pos, text.size())};
+        return {text.data() + from, std::min(len, text.size() - from)};
+    }
+
     // post: consumes one to three decimal digits at `pos`; false when no digit is there.
     [[nodiscard]] constexpr bool consume_ipv4_octet(std::string_view str, std::size_t& pos) noexcept
     {
@@ -79,6 +89,502 @@ namespace
         return pos == str.size();
     }
 
+    // invariant: the address family's earned grammar, transcribed from the census that earned it,
+    // byte-only and pure - no inet_pton, no locale - so the class is identical on every platform.
+    // refs: DN-40.D10, DN-40.D6
+    constexpr std::size_t kMaxHextetDigits{4};
+    constexpr std::size_t kIpv6Units{8};
+    constexpr std::size_t kMinCompressedUnits{2};
+    constexpr std::size_t kIpv4TailUnits{2};
+    constexpr std::size_t kIpv4Octets{4};
+    constexpr std::size_t kMaxOctetDigits{3};
+    constexpr unsigned kMaxOctetValue{255U};
+    constexpr std::size_t kHardwareGroupDigits{2};
+    constexpr std::size_t kMaxPortDigits{5};
+    constexpr std::array<std::size_t, 3> kHardwareGroupCounts{6, 8, 12};
+    // invariant: the hyphen-joined and dotted hardware forms are not earned, yet a token of either
+    // shape ends the shell walk, as it ended the census's.
+    constexpr std::size_t kMinDashHardwareGroups{3};
+    constexpr std::size_t kMinColonHardwareGroups{4};
+    constexpr std::size_t kCiscoGroups{3};
+    constexpr std::size_t kCiscoGroupDigits{4};
+
+    [[nodiscard]] constexpr bool is_alnum(char chr) noexcept
+    {
+        return is_digit(chr) || is_alpha(chr);
+    }
+
+    // post: true for one to four hex digits and nothing else.
+    [[nodiscard]] constexpr bool is_hextet(std::string_view group) noexcept
+    {
+        return !group.empty() && group.size() <= kMaxHextetDigits &&
+               std::ranges::all_of(group, [](char chr) { return is_hex_char(chr); });
+    }
+
+    // post: true for a strict dotted quad: four groups of one to three digits, each at most 255.
+    [[nodiscard]] constexpr bool is_dotted_quad(std::string_view text) noexcept
+    {
+        std::size_t octets{0};
+        std::size_t start{0};
+        while (true)
+        {
+            const std::size_t dot{text.find('.', start)};
+            const std::string_view octet{slice(
+                text, start, dot == std::string_view::npos ? std::string_view::npos : dot - start)};
+            if (octet.empty() || octet.size() > kMaxOctetDigits)
+                return false;
+            unsigned value{0};
+            for (const char chr : octet)
+            {
+                if (!is_digit(chr))
+                    return false;
+                value = (value * kDecimalBase) + static_cast<unsigned>(chr - '0');
+            }
+            if (value > kMaxOctetValue)
+                return false;
+            ++octets;
+            if (dot == std::string_view::npos)
+                return octets == kIpv4Octets;
+            start = dot + 1;
+        }
+    }
+
+    // post: true for a byte an RFC 4007 zone id may hold.
+    [[nodiscard]] constexpr bool is_zone_byte(char chr) noexcept
+    {
+        return is_alnum(chr) || chr == '.' || chr == '_' || chr == '~' || chr == '-';
+    }
+
+    struct Ipv6Text
+    {
+        bool compressed{false};
+        bool ipv4_tail{false};
+        // invariant: a hextet written with more than one digit and a leading 0.
+        bool leading_zero{false};
+        std::size_t units{0};
+    };
+
+    // post: false when `part` holds a group that is neither a hextet nor, last overall, a dotted
+    // quad; `text` counts every group read.
+    [[nodiscard]] constexpr bool read_ipv6_groups(Ipv6Text& text, std::string_view part,
+                                                  bool holds_last) noexcept
+    {
+        std::size_t start{0};
+        while (true)
+        {
+            const std::size_t colon{part.find(':', start)};
+            const bool last{colon == std::string_view::npos};
+            const std::string_view group{
+                slice(part, start, last ? std::string_view::npos : colon - start)};
+            if (holds_last && last && group.contains('.'))
+            {
+                if (!is_dotted_quad(group))
+                    return false;
+                text.units += kIpv4TailUnits;
+                text.ipv4_tail = true;
+            }
+            else if (is_hextet(group))
+            {
+                ++text.units;
+                text.leading_zero = text.leading_zero || (group.size() > 1 && group[0] == '0');
+            }
+            else
+                return false;
+            if (last)
+                return true;
+            start = colon + 1;
+        }
+    }
+
+    // post: false when `core` ends in a `%` zone that is empty or holds a byte no RFC 4007 zone id
+    // may; else `core` is cut before the zone, if it had one.
+    [[nodiscard]] constexpr bool strip_zone(std::string_view& core) noexcept
+    {
+        const std::size_t zone_at{core.find('%')};
+        if (zone_at == std::string_view::npos)
+            return true;
+        const std::string_view zone{slice(core, zone_at + 1)};
+        if (zone.empty() || !std::ranges::all_of(zone, is_zone_byte))
+            return false;
+        core = slice(core, 0, zone_at);
+        return true;
+    }
+
+    // post: the RFC 4291 section 2.2 text form `core` writes, an RFC 4007 zone admitted; nullopt
+    // when it writes none.
+    // invariant: a dotted IPv4 tail counts two units, and only the last group may be one.
+    [[nodiscard]] constexpr std::optional<Ipv6Text> ipv6_text(std::string_view core) noexcept
+    {
+        if (!strip_zone(core))
+            return std::nullopt;
+        Ipv6Text text;
+        const std::size_t gap{core.find("::")};
+        text.compressed = gap != std::string_view::npos;
+        if (text.compressed && core.find("::", gap + 1) != std::string_view::npos)
+            return std::nullopt;
+        if (!text.compressed)
+        {
+            if (!read_ipv6_groups(text, core, true) || text.units != kIpv6Units)
+                return std::nullopt;
+            return text;
+        }
+        const std::string_view left{slice(core, 0, gap)};
+        const std::string_view right{slice(core, gap + 2)};
+        if (!left.empty() && !read_ipv6_groups(text, left, right.empty()))
+            return std::nullopt;
+        if (!right.empty() && !read_ipv6_groups(text, right, true))
+            return std::nullopt;
+        if (text.units >= kIpv6Units)
+            return std::nullopt;
+        return text;
+    }
+
+    // post: the number of `sep`-joined groups of exactly two hex digits `core` is, else 0.
+    [[nodiscard]] constexpr std::size_t two_hex_groups(std::string_view core, char sep) noexcept
+    {
+        std::size_t groups{0};
+        std::size_t start{0};
+        while (true)
+        {
+            const std::size_t sep_at{core.find(sep, start)};
+            const std::string_view group{
+                slice(core, start,
+                      sep_at == std::string_view::npos ? std::string_view::npos : sep_at - start)};
+            if (group.size() != kHardwareGroupDigits || !is_hex_char(group[0]) ||
+                !is_hex_char(group[1]))
+                return 0;
+            ++groups;
+            if (sep_at == std::string_view::npos)
+                return groups < 2 ? 0 : groups;
+            start = sep_at + 1;
+        }
+    }
+
+    // post: true for three dot-joined groups of four hex digits.
+    [[nodiscard]] constexpr bool is_cisco_dotted(std::string_view core) noexcept
+    {
+        return core.size() == (kCiscoGroups * kCiscoGroupDigits) + kCiscoGroups - 1 &&
+               core[kCiscoGroupDigits] == '.' && core[(2 * kCiscoGroupDigits) + 1] == '.' &&
+               std::ranges::count_if(core, [](char chr) { return is_hex_char(chr); }) ==
+                   static_cast<std::ptrdiff_t>(kCiscoGroups * kCiscoGroupDigits);
+    }
+
+    [[nodiscard]] constexpr bool is_hardware_group_count(std::size_t groups) noexcept
+    {
+        return std::ranges::contains(kHardwareGroupCounts, groups);
+    }
+
+    // post: the address inside a bracketed `[v6]:port` token - one to five port digits, then at
+    // most two closers or `,;:.` - else nullopt.
+    [[nodiscard]] constexpr std::optional<std::string_view>
+    bracketed_with_port(std::string_view tok) noexcept
+    {
+        if (!tok.starts_with('['))
+            return std::nullopt;
+        const std::size_t close{tok.find("]:")};
+        if (close == std::string_view::npos)
+            return std::nullopt;
+        std::size_t pos{close + 2};
+        const std::size_t port_start{pos};
+        while (pos < tok.size() && is_digit(tok[pos]))
+            ++pos;
+        if (pos == port_start || pos - port_start > kMaxPortDigits ||
+            tok.size() - pos > kMaxShellTrailBytes)
+            return std::nullopt;
+        for (; pos < tok.size(); ++pos)
+            if (!is_wrapper_close(tok[pos]) && !is_shell_trailing_punct(tok[pos]))
+                return std::nullopt;
+        return slice(tok, 1, close - 1);
+    }
+
+    // post: true when one shell-stripped `core` writes an address the grammar claims, false when it
+    // writes one it does not claim or an unearned hardware form.
+    // post: nullopt when it writes none, so the next trail is read.
+    // invariant: a `:` stripped after a hextet is the address's own separator and no shell byte;
+    // after a dotted IPv4 tail it is one.
+    [[nodiscard]] constexpr std::optional<bool> core_verdict(std::string_view core,
+                                                             bool colon_stripped) noexcept
+    {
+        if (const std::optional<Ipv6Text> text{ipv6_text(core)}; text.has_value())
+        {
+            if (text->ipv4_tail)
+                return true;
+            if (colon_stripped)
+                return false;
+            return !text->compressed || (text->units >= kMinCompressedUnits && !text->leading_zero);
+        }
+        if (const std::size_t groups{two_hex_groups(core, ':')}; groups >= kMinColonHardwareGroups)
+            return is_hardware_group_count(groups);
+        if (two_hex_groups(core, '-') >= kMinDashHardwareGroups || is_cisco_dotted(core))
+            return false;
+        return std::nullopt;
+    }
+
+    // post: true when the whole token is an IPv6 or colon-joined hardware address the earned
+    // grammar admits: bare, bracketed with a port, or inside the IPv4 address's wrapper shell.
+    // invariant: the shell's trailing bytes are read shortest first, and the first core that
+    // writes address or hardware text decides the token, as the census that earned it did.
+    // refs: DN-40.D10, DN-40.D5, F-SRC-insight-canon:canon.detail.scan.cppm:kWrapperPairs
+    [[nodiscard]] constexpr bool is_ipv6_or_hardware_token(std::string_view tok) noexcept
+    {
+        if (!tok.contains(':'))
+            return false;
+        if (const auto inside{bracketed_with_port(tok)};
+            inside.has_value() && ipv6_text(*inside).has_value())
+            return true;
+        const std::size_t start{is_wrapper_open(tok[0]) ? std::size_t{1} : 0};
+        bool colon_stripped{false};
+        for (std::size_t trail{0}; trail <= kMaxShellTrailBytes; ++trail)
+        {
+            if (tok.size() <= start + trail)
+                return false;
+            if (trail != 0)
+            {
+                const char stripped{tok[tok.size() - trail]};
+                if (!is_wrapper_close(stripped) && !is_shell_trailing_punct(stripped))
+                    return false;
+                colon_stripped = colon_stripped || stripped == ':';
+            }
+            if (const std::optional<bool> verdict{
+                    core_verdict(slice(tok, start, tok.size() - trail - start), colon_stripped)};
+                verdict.has_value())
+                return *verdict;
+        }
+        return false;
+    }
+
+    // post: true when rule 2, the address rule, claims the whole token: IPv4, IPv6 or a
+    // colon-joined hardware address, bare or in its shell.
+    // pre: `has_separator` is the token's TokenShape fact, which every IPv6 and hardware form sets.
+    // invariant: ONE predicate, read by the dispatcher and by the rule catalog.
+    // refs: DN-40.D11, ADR-16.D5
+    [[nodiscard]] constexpr bool is_address_token(std::string_view tok, bool has_separator) noexcept
+    {
+        return is_ipv4_token(tok) || (has_separator && is_ipv6_or_hardware_token(tok));
+    }
+
+    struct AddressRun
+    {
+        std::size_t start;
+        std::size_t end;
+    };
+
+    // post: the end of the `:`-segment of `tok` that starts at `from`.
+    [[nodiscard]] constexpr std::size_t segment_end(std::string_view tok, std::size_t from) noexcept
+    {
+        const std::size_t colon{tok.find(':', from)};
+        return colon == std::string_view::npos ? tok.size() : colon;
+    }
+
+    // post: the start of the segment after the one ending at `seg_end`, the token's end when none.
+    [[nodiscard]] constexpr std::size_t after_segment(std::string_view tok,
+                                                      std::size_t seg_end) noexcept
+    {
+        return seg_end < tok.size() ? seg_end + 1 : tok.size();
+    }
+
+    // post: the length of the hex prefix of `segment` a run's last group may take, 0 when the
+    // segment cannot extend a run; a whole hextet segment is taken whole.
+    [[nodiscard]] constexpr std::size_t run_group_digits(std::string_view segment) noexcept
+    {
+        if (is_hextet(segment))
+            return segment.size();
+        std::size_t taken{0};
+        while (taken < segment.size() && is_hex_char(segment[taken]))
+            ++taken;
+        if (taken > kMaxHextetDigits || taken == segment.size() ||
+            (taken != 0 && is_alnum(segment[taken])))
+            return 0;
+        return taken;
+    }
+
+    // invariant: what the walk along one candidate run learned.
+    struct RunScan
+    {
+        std::size_t groups;
+        bool all_two_digit;
+        std::size_t last_start;
+        std::size_t run_end;
+        std::size_t eighth_end;
+    };
+
+    // post: the groups after the first one, which spans `first` to `seg_end`; `cursor` is left
+    // after the last whole segment the run took, or at the segment its last group is a prefix of.
+    [[nodiscard]] constexpr RunScan extend_run(std::string_view tok, std::size_t first,
+                                               std::size_t seg_end, std::size_t& cursor) noexcept
+    {
+        RunScan scan{.groups = 1,
+                     .all_two_digit = seg_end - first == kHardwareGroupDigits,
+                     .last_start = first,
+                     .run_end = seg_end,
+                     .eighth_end = seg_end};
+        std::size_t next{seg_end + 1};
+        while (true)
+        {
+            const std::size_t group_end{segment_end(tok, next)};
+            const std::string_view segment{slice(tok, next, group_end - next)};
+            const std::size_t taken{run_group_digits(segment)};
+            if (taken == 0)
+                return scan;
+            ++scan.groups;
+            scan.all_two_digit = scan.all_two_digit && taken == kHardwareGroupDigits;
+            scan.last_start = next;
+            scan.run_end = next + taken;
+            if (scan.groups == kIpv6Units)
+                scan.eighth_end = scan.run_end;
+            // assert: a last group that is a hex prefix leaves the rest of its segment unread, so
+            // the scan resumes in that segment, where its hex suffix may open the next run.
+            // refs: DN-40.D14
+            if (taken != segment.size())
+            {
+                cursor = next;
+                return scan;
+            }
+            cursor = after_segment(tok, group_end);
+            if (group_end == tok.size())
+                return scan;
+            next = group_end + 1;
+        }
+    }
+
+    // post: the run `scan` found from `first`, when the grammar claims it, else nullopt.
+    [[nodiscard]] constexpr std::optional<AddressRun>
+    claimed_run(std::string_view tok, std::size_t first, const RunScan& scan) noexcept
+    {
+        constexpr std::size_t kPortedGroups{kIpv6Units + 1};
+        constexpr std::size_t kMinRunGroups{3};
+        if (scan.groups < kMinRunGroups || (first == 0 && scan.run_end == tok.size()))
+            return std::nullopt;
+        if (scan.all_two_digit)
+        {
+            if (is_hardware_group_count(scan.groups))
+                return AddressRun{.start = first, .end = scan.run_end};
+            return std::nullopt;
+        }
+        if (scan.groups == kIpv6Units)
+            return AddressRun{.start = first, .end = scan.run_end};
+        if (scan.groups == kPortedGroups &&
+            std::ranges::all_of(slice(tok, scan.last_start, scan.run_end - scan.last_start),
+                                [](char chr) { return is_digit(chr); }))
+            return AddressRun{.start = first, .end = scan.eighth_end};
+        return std::nullopt;
+    }
+
+    // post: the next address run inside `tok` from the `:`-segment starting at `cursor`, the
+    // cursor advanced past it; nullopt, the cursor at the token's end, when none remains.
+    // invariant: a run's first group is its segment's whole hex suffix of one to four digits,
+    // behind a byte that is no letter or digit or at the segment's start.
+    // invariant: its inner groups are whole hextet segments, and its last one is a hextet segment
+    // or a hex prefix of one to four digits followed by a byte that is no letter or digit.
+    // invariant: a run claims when it is not the whole token and is 6, 8 or 12 two-digit groups,
+    // or 8 groups, or 8 groups and a decimal port, of which only the 8 are claimed.
+    // invariant: the scan resumes after the run's segments, claimed or not, or in the segment its
+    // last group is a hex prefix of, as the census re-run for DN-40.D14 measured.
+    // refs: DN-40.D10, DN-40.D3, DN-40.D11, DN-40.D14
+    [[nodiscard]] constexpr std::optional<AddressRun> address_run_at(std::string_view tok,
+                                                                     std::size_t& cursor) noexcept
+    {
+        while (cursor < tok.size())
+        {
+            const std::size_t seg_start{cursor};
+            const std::size_t seg_end{segment_end(tok, seg_start)};
+            cursor = after_segment(tok, seg_end);
+            std::size_t first{seg_end};
+            while (first > seg_start && is_hex_char(tok[first - 1]))
+                --first;
+            if (first == seg_end || seg_end - first > kMaxHextetDigits || seg_end == tok.size() ||
+                (first != seg_start && is_alnum(tok[first - 1])))
+                continue;
+            if (const auto run{claimed_run(tok, first, extend_run(tok, first, seg_end, cursor))};
+                run.has_value())
+                return run;
+        }
+        return std::nullopt;
+    }
+
+    // post: the bounds `[lead, trail)` of the alphanumeric core of `part`, empty when it has none.
+    [[nodiscard]] constexpr std::pair<std::size_t, std::size_t>
+    alnum_core(std::string_view part) noexcept
+    {
+        std::size_t lead{0};
+        while (lead < part.size() && !is_alnum(part[lead]))
+            ++lead;
+        std::size_t trail{part.size()};
+        while (trail > lead && !is_alnum(part[trail - 1]))
+            --trail;
+        return {lead, trail};
+    }
+
+    [[nodiscard]] constexpr bool is_walk_separator(char chr) noexcept
+    {
+        return chr == ':' || chr == '/';
+    }
+
+    // invariant: an address run as the diagnostic walk writes it: one wildcard over `[start, end)`.
+    struct WalkRun
+    {
+        std::size_t start;
+        std::size_t end;
+        // invariant: true when a walk segment the run covers is letter-led, as the walk read it
+        // before the run arm existed.
+        bool anchors;
+    };
+
+    // post: `run` widened to the whole core of the walk segment it opens or closes in when that
+    // core is digit-led, so no byte of a segment the walk masks is left beside the wildcard.
+    // post: `anchors` is read on the token's own segments: the segment the run opens in by its
+    // core, every later group by its first byte.
+    // refs: DN-40.D14
+    [[nodiscard]] constexpr WalkRun widen_for_walk(std::string_view tok, AddressRun run) noexcept
+    {
+        std::size_t open_start{run.start};
+        while (open_start > 0 && !is_walk_separator(tok[open_start - 1]))
+            --open_start;
+        const std::size_t first_end{tok.find(':', run.start)};
+        const std::size_t open_lead{
+            open_start + alnum_core(slice(tok, open_start, first_end - open_start)).first};
+        WalkRun walk{.start = is_digit(tok[open_lead]) ? open_lead : run.start,
+                     .end = run.end,
+                     .anchors = is_alpha(tok[open_lead])};
+        std::size_t last_start{run.start};
+        for (std::size_t pos{first_end}; pos < run.end; pos = tok.find(':', pos + 1))
+        {
+            last_start = pos + 1;
+            walk.anchors = walk.anchors || is_alpha(tok[last_start]);
+        }
+        std::size_t close_end{run.end};
+        while (close_end < tok.size() && !is_walk_separator(tok[close_end]))
+            ++close_end;
+        const std::size_t close_trail{
+            last_start + alnum_core(slice(tok, last_start, close_end - last_start)).second};
+        if (is_digit(tok[last_start]) && close_trail > run.end)
+            walk.end = close_trail;
+        return walk;
+    }
+
+    // post: the next run the walk writes from `cursor`, merged with every later run its widening
+    // reaches; nullopt when none remains.
+    // refs: DN-40.D14, F-SRC-insight-canon:mask.cpp:address_run_at
+    [[nodiscard]] constexpr std::optional<WalkRun> next_walk_run(std::string_view tok,
+                                                                 std::size_t& cursor) noexcept
+    {
+        const std::optional<AddressRun> run{address_run_at(tok, cursor)};
+        if (!run.has_value())
+            return std::nullopt;
+        WalkRun walk{widen_for_walk(tok, *run)};
+        while (true)
+        {
+            std::size_t peek{cursor};
+            const std::optional<AddressRun> next{address_run_at(tok, peek)};
+            if (!next.has_value() || next->start >= walk.end)
+                return walk;
+            const WalkRun merged{widen_for_walk(tok, *next)};
+            walk.end = std::max(walk.end, merged.end);
+            walk.anchors = walk.anchors || merged.anchors;
+            cursor = peek;
+        }
+    }
+
     [[nodiscard]] inline bool is_all_digits(std::string_view str) noexcept
     {
         if (str.empty())
@@ -123,9 +629,9 @@ namespace
     // refs: DN-134.D1, ADR-16.D5, F-SRC-insight-canon:canon.api.cppm:complete_shell_core
     // post: true for a complete shell whose core is digit-led, false for a short status value
     // behind a status keyword, as rule 1 keeps the bare form.
-    // invariant: rule 5 read through the shell, as rule 4 reads an address - its acceptance set is
+    // invariant: rule 5 read through the shell, as rule 2 reads an address - its acceptance set is
     // the set rule 5 masks bare, so it merges nothing canon does not merge without the shell.
-    // pre: reached only for a token no composite claimed and rules 3-5 did not mask.
+    // pre: reached only for a token no address, composite, hash or digit-leading rule claimed.
     [[nodiscard]] inline bool is_shelled_numeric(std::string_view tok,
                                                  std::string_view prev) noexcept
     {
@@ -488,13 +994,36 @@ namespace
                 push_component(seg, sep_before, at_token_start);
                 mask_next = root_ends_here();
             }};
+        // assert: an address run is one masked component: the walk writes one wildcard for the
+        // whole run and resumes after it, so its groups are never classified one by one.
+        // assert: the run keeps the walk's claim: a letter-led segment inside it still anchors.
+        // refs: DN-40.D11, DN-40.D14, F-SRC-insight-canon:mask.cpp:next_walk_run
+        std::size_t run_cursor{0};
+        std::optional<WalkRun> run{next_walk_run(tok, run_cursor)};
         for (std::size_t pos{0}; pos < tok.size(); ++pos)
+        {
+            if (run.has_value() && pos == run->start)
+            {
+                flush_segment(pos);
+                out.append(kWildcard);
+                masked = true;
+                has_letter_anchor = has_letter_anchor || run->anchors;
+                prev_core = {};
+                push_component(tok.substr(run->start, run->end - run->start),
+                               pos == 0 ? '\0' : tok[pos - 1U], pos == first_comp);
+                mask_next = root_ends_here();
+                seg_start = run->end;
+                pos = run->end - 1U;
+                run = next_walk_run(tok, run_cursor);
+                continue;
+            }
             if (tok[pos] == ':' || tok[pos] == '/')
             {
                 flush_segment(pos);
                 out.push_back(tok[pos]);
                 seg_start = pos + 1;
             }
+        }
         flush_segment(tok.size());
         return masked && has_letter_anchor;
     }
@@ -844,9 +1373,23 @@ namespace
         return true;
     }
 
-    // post: masks a UUID, a long hex run or a compact UTC instant EMBEDDED in a larger token,
-    // keeping the surrounding structure.
-    // invariant: a CLOSED grammar pinned by literal bytes at fixed offsets, every member of whose
+    // post: true when rule 4 or rule 5 masks `tok` whole; false when it reaches rule 6.
+    // pre: read by the dispatcher on a token no status KEEP, address or composite rule claimed, and
+    // by the address arm, on a token holding a run, where the status carve-out cannot fire.
+    // invariant: rules 4 and 5 are one decision: both MASK, and neither outranks the other.
+    // refs: ADR-16.D5, DN-134.D1, DN-40.D11, DN-40.D14
+    [[nodiscard]] inline bool is_masked_value(std::string_view tok, const TokenShape& shape,
+                                              std::string_view prev) noexcept
+    {
+        // assert: a hexadecimal-prefixed token needs no arm: it starts with a digit, so the
+        // digit-leading test carries it.
+        return shape.empty || is_uuid_or_long_hash(tok) || shape.digit_leading ||
+               is_shelled_numeric(tok, prev);
+    }
+
+    // post: masks a UUID, a long hex run, a compact UTC instant or an address run EMBEDDED in a
+    // larger token, keeping the surrounding structure.
+    // invariant: a CLOSED grammar pinned by literal bytes and group counts, every member of whose
     // acceptance set is an instance value by the encoding's own semantics.
     // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate, ADR-16.D5
     // invariant: the reasoning does not extend to an embedded long-DIGIT-run arm - a stable name
@@ -856,11 +1399,23 @@ namespace
         out.clear();
         bool masked{false};
         std::size_t pos{0};
-        // assert: the three arms are DISJOINT BY CONSTRUCTION and their order is a COST choice,
+        std::size_t run_cursor{0};
+        std::optional<AddressRun> run{address_run_at(tok, run_cursor)};
+        // assert: the four arms are DISJOINT BY CONSTRUCTION and their order is a COST choice,
         // never a precedence claim - the fixed-length probes run first because they are cheaper.
         // refs: F-SRC-insight-canon:test_stateless_template.cpp:EmbeddedIdentityArmsAreDisjoint
+        // refs: DN-40.D11, F-SRC-insight-canon:mask.cpp:address_run_at
+        bool masked_run{false};
         while (pos < tok.size())
         {
+            if (run.has_value() && pos == run->start)
+            {
+                out.append(kWildcard);
+                pos = run->end;
+                masked_run = true;
+                run = address_run_at(tok, run_cursor);
+                continue;
+            }
             if (uuid_at(tok, pos))
             {
                 out.append(kWildcard);
@@ -891,7 +1446,10 @@ namespace
             out.push_back(tok[pos]);
             ++pos;
         }
-        return masked;
+        // assert: the address arm alone never claims a token rule 4 or rule 5 masks whole: that
+        // mask hides every byte, so any normalization of the token would unmask some.
+        // refs: DN-40.D14
+        return masked || (masked_run && !is_masked_value(tok, TokenShape{tok}, std::string_view{}));
     }
 
     // invariant: the sanitizer-family process tag - AddressSanitizer, libFuzzer and valgrind open a
@@ -1063,7 +1621,7 @@ namespace
     // refs: DN-134.D2
     // post: true with `out` holding `form` whose `;`-segments each passed append_segment; false
     // when no segment moved, `out` then unspecified.
-    // invariant: NOT a claiming rule - it reads a token's normal form after rules 2 and 6, before
+    // invariant: NOT a claiming rule - it reads a token's normal form after rules 3 and 6, before
     // the declared-run step, and contributes no param.
     [[nodiscard]] bool mask_segment_values(std::string_view form, std::string& out)
     {
@@ -1548,36 +2106,6 @@ namespace
         return out != content;
     }
 
-    // invariant: rules 3 to 5 as one decision on a token the status KEEP and the composites left.
-    enum class ValueDisposition : std::uint8_t
-    {
-        Mask,
-        KeepLiteral,
-        NotAValue
-    };
-
-    // pre: no status KEEP and no composite rule claimed `tok`.
-    // post: rule 3's, rule 4's or rule 5's disposition of `tok`; NotAValue when none reaches it.
-    // invariant: rule 4 decides its whole acceptance set, bare or shelled - MASK with the switch
-    // on, KEEP literal with it off - so neither rule 5 nor the shelled reader reaches an address.
-    // refs: ADR-16.D5, DN-134.D1, DN-134.D8
-    [[nodiscard]] inline ValueDisposition value_disposition(std::string_view tok,
-                                                            const TokenShape& shape,
-                                                            std::string_view prev,
-                                                            const MaskConfig& config) noexcept
-    {
-        if (shape.empty || is_uuid_or_long_hash(tok))
-            return ValueDisposition::Mask;
-        if (is_ipv4_token(tok))
-            return config.mask_ip_addresses ? ValueDisposition::Mask
-                                            : ValueDisposition::KeepLiteral;
-        // assert: a hexadecimal-prefixed token needs no arm: it starts with a digit, so the
-        // digit-leading test carries it.
-        if (shape.digit_leading || is_shelled_numeric(tok, prev))
-            return ValueDisposition::Mask;
-        return ValueDisposition::NotAValue;
-    }
-
 } // namespace
 
 // post: the joined per-token canonical forms; a masked position contributes a param, a kept or
@@ -1589,7 +2117,6 @@ namespace
 // refs: ADR-16.D5, DN-128.D6, F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
 // refs: F-SRC-insight-canon:canon.api.cppm:TemplateId
 StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& out_arena,
-                                     const MaskConfig& config,
                                      std::span<const DeclaredRun> declared_runs)
 {
     // assert: the JSON member-order normal form runs before tokenization; a rewritten line is
@@ -1657,6 +2184,15 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                            prev = tok;
                            return;
                        }
+                       // assert: rule 2, the address rule, claims an address whole before any
+                       // composite reads it, so no normalizer shreds one along its own separators.
+                       // refs: DN-40.D11
+                       if (is_address_token(tok, shape.has_separator))
+                       {
+                           mask();
+                           prev = tok;
+                           return;
+                       }
                        // assert: the declared rule set AND its precedence are the catalog, tried in
                        // array order with the first claim winning.
                        if (try_composite(tok, shape, composite, nullptr))
@@ -1668,20 +2204,12 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                            prev = tok;
                            return;
                        }
-                       switch (value_disposition(tok, shape, prev, config))
-                       {
-                       case ValueDisposition::Mask:
+                       // assert: a token no rule claimed is its own normal form.
+                       // refs: DN-133.D1
+                       if (is_masked_value(tok, shape, prev))
                            mask();
-                           break;
-                       case ValueDisposition::KeepLiteral:
-                           tmpl.append(tok);
-                           break;
-                       case ValueDisposition::NotAValue:
-                           // assert: a token no rule claimed is its own normal form.
-                           // refs: DN-133.D1
+                       else
                            append_normal_form(normal_form_steps(tok));
-                           break;
-                       }
                        prev = tok;
                    });
 
@@ -1755,6 +2283,11 @@ namespace rule_catalog
                 return segs;
             }()};
         return kSegments;
+    }
+
+    bool address_rule_claims(std::string_view token) noexcept
+    {
+        return is_address_token(token, TokenShape{token}.has_separator);
     }
 
     std::size_t min_hash_length() noexcept

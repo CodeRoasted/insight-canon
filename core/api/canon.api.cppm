@@ -34,7 +34,7 @@ using EventID = uint64_t;
 // refs: ADR-2.D5, ADR-2.D9, F-SRC-insight-canon:canon.api.cppm:TemplateId
 // refs: F-SRC-insight-canon:mask.cpp:normalize_marker_number
 // note: the generation ledger is technical_docs/canonicalization_generations.md.
-inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-19"};
+inline constexpr std::string_view kCanonicalizationVersion{"stateless-masks-20"};
 
 // invariant: the first 16 bytes of SHA-256 over the masked template_str, carried as a fixed-size
 // POD; the 34-byte "h:"+hex string materialises only at the serialize seam.
@@ -1149,16 +1149,11 @@ export namespace insight::tokenization
 // invariant: the Drain clustering knobs are gone with the clustering — a stateless masker has no
 // tree, no similarity match and no cluster cap to bound.
 // refs: ADR-16.D5, F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate, ADR-17
+// invariant: no knob gates a mask rule: masking relocates a value into params and never deletes
+// it, so a switch keeping a value in the template could only mint a template per value.
+// refs: ADR-16.O3, DN-40.D12
 struct MaskConfig
 {
-    // invariant: structurally variable tokens are replaced before the masked template is formed, so
-    // they never fossilise into the template identity.
-    // invariant: there is deliberately NO hex knob — its acceptor required a leading 0, so every
-    // token it accepted was already digit-leading and the knob was inert over ALL inputs.
-    // invariant: the IP knob decides rule 4's whole acceptance set - an IPv4 token bare or shelled
-    // masks when it is on and stays literal when it is off, before any numeric rule reads it.
-    // refs: ADR-16.D5, DN-134.D8
-    bool mask_ip_addresses{true};
     // invariant: when set, a line whose NATIVE component is empty takes its recognized test-file as
     // component — populating the cube WHERE axis above the empty native tier, never faking it.
     // invariant: OFF by default so every existing path is byte-identical; the gated block moves no

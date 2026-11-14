@@ -96,7 +96,6 @@ struct StatelessTemplate
 // pushed, so a template token that is exactly the wildcard is a param and every param is one.
 [[nodiscard]] StatelessTemplate stateless_template(std::string_view content,
                                                    ArenaAllocator& out_arena,
-                                                   const MaskConfig& config,
                                                    std::span<const DeclaredRun> declared_runs);
 
 // invariant: every accessor returns a view DERIVED from the table the masker itself reads, never a
@@ -132,6 +131,11 @@ namespace rule_catalog
     // never a string containing a separator.
     [[nodiscard]] std::span<const std::span<const std::string_view>>
     ephemeral_root_segments() noexcept;
+
+    // post: true when the address rule claims `token` whole, by the predicate the dispatcher
+    // reads.
+    // refs: DN-40.D11
+    [[nodiscard]] bool address_rule_claims(std::string_view token) noexcept;
 
     // post: the hex-run length at or above which a run is an instance hash rather than a word.
     // note: exposed so a witness asserts a run sits below the floor instead of restating it.

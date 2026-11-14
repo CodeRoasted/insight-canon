@@ -51,9 +51,9 @@ Each whitespace token is classified by the **first** matching rule:
 | # | Rule | Disposition |
 |---|---|---|
 | 1 | **Status-value KEEP** — an all-digit token, ≤ 3 digits, immediately after a **status keyword** | KEEP literal |
-| 2 | **Composite** — the token carries a structural delimiter; one of the normalizers (§4) matches. The hash counter reads its token through a **complete** wrapper shell (§3.2), and the ephemeral-root reader finds a path behind a declared **lead** (§3.1) | KEEP normalized (embeds `<*>`, no param) |
-| 3 | **UUID / long hash** | MASK `<*>` |
-| 4 | **IPv4**, bare or inside a declared **wrapper shell** (§3.2), with at most two trailing closers or `,;:.` | MASK `<*>` when `mask_ip_addresses` is on; KEEP literal when it is off — rule 4 decides every token it accepts, so no later rule reaches one |
+| 2 | **Address** — an **IPv4**, **IPv6** or `:`-joined **hardware** address, whole: bare or inside a declared **wrapper shell** (§3.2), with at most two trailing closers or `,;:.` (§3.3 states the grammar) | MASK `<*>` — the address is claimed before any composite reads the token, so no normalizer shreds it along its own separators |
+| 3 | **Composite** — the token carries a structural delimiter; one of the normalizers (§4) matches. The hash counter reads its token through a **complete** wrapper shell (§3.2), the ephemeral-root reader finds a path behind a declared **lead** (§3.1), and an **address run** inside the token is one masked component (§3.3) | KEEP normalized (embeds `<*>`, no param) |
+| 4 | **UUID / long hash** | MASK `<*>` |
 | 5 | **Digit-leading numeric**, or a digit-leading core inside a **complete** wrapper shell (§3.2) | MASK `<*>` — this also carries `0x`-hex: a `0x…` token starts with a digit. The shelled form masks whole and its raw token is the param; a short status value behind a status keyword stays literal through the shell, as rule 1 keeps it bare |
 | 6 | **Literal** — none of the above | KEEP literal |
 
@@ -61,8 +61,8 @@ Before the first token is read, a `content` that is, whole, one JSON object or a
 normal form**: the members of every object are permuted into name order, every other byte staying where it was
 ([formats.md](formats.md) § 5). Every other `content` is tokenized as it is.
 
-After rules 2 and 6 — on the token's **normal form**, the literal token or the form a composite gave it, and
-never on a token rules 3–5 masked whole — two further steps run, in this order, and neither claims the token or
+After rules 3 and 6 — on the token's **normal form**, the literal token or the form a composite gave it, and
+never on a token rules 2, 4 and 5 masked whole — two further steps run, in this order, and neither claims the token or
 contributes a param (§4, the last two rows):
 
 - the **`;`-segment** step: the form is cut at `;`, and each `<key>=<digit-leading value>` segment has its value
@@ -73,7 +73,7 @@ contributes a param (§4, the last two rows):
 
 Rule 1 wins first on purpose: it protects the **green→red distinction** that downstream diffing depends on —
 `exit code 0` and `exit code 1` must stay *different* templates, so a short status value after a status keyword
-is never masked (see §3). The composite layer (rule 2) is gated by a cheap pre-check: a token is only tried
+is never masked (see §3). The composite layer (rule 3) is gated by a cheap pre-check: a token is only tried
 against the normalizers if it contains one of `: / # - =`, a **wrapper byte** (§3.2), or a declared marker
 prefix; everything else skips straight to the fixed masks.
 
@@ -90,18 +90,14 @@ data-learned. This is what keeps masking decidable and deterministic.
 | **Max status digits** | `3` | Rule 1 — a status value masks if longer (it's an id, not a code). |
 | **Currency markers** | `$` (ASCII; structured to add `€`/`£`/`¥` as declared byte sequences if a corpus shows them) | §4 marker-number — a leading currency symbol glued to a number. |
 | **Ephemeral roots** | `/tmp`, `/var/tmp`, `/var/folders`, `/private/var/folders`, `/private/tmp`, `.conan2/p/b`, `/nix/store`, `AppData/Local/Temp` — each carrying a declared **anchor** + **scope** (§3.1) | §4 ephemeral-root — a path segment directly under a per-run build/temp root is an instance and masks; the root is kept. |
-| **Min hash length** | `16` | Rule 3 / §4 embedded-identity — a hex-only run this long is an instance hash, not a word. |
-| **Wrapper pairs** | `[]` `()` `{}` `<>` `""` `''` | §3.2 — the punctuation shell a producer wraps a whole token in. Read by rule 4's grammar, by rule 5's shelled form, by the hash counter's shelled form, by the ephemeral-root lead (§3.1) and by the rule-2 pre-gate. |
+| **Min hash length** | `16` | Rule 4 / §4 embedded-identity — a hex-only run this long is an instance hash, not a word. |
+| **Wrapper pairs** | `[]` `()` `{}` `<>` `""` `''` | §3.2 — the punctuation shell a producer wraps a whole token in. Read by the address rule's grammar (§3.3), by rule 5's shelled form, by the hash counter's shelled form, by the ephemeral-root lead (§3.1) and by the rule-3 pre-gate. |
 | **Wildcard** | `<*>` | The mask placeholder. |
 | **Declared-value markers** | none in core: each key and its markers are a dialect's data (`DeclaredValueRow`); the GitHub dialect declares `pull_request` behind `PR-`, `pr-`, `Pr-`, `pull-`, `PULL-`, `Pull-`, `PR#`, `pulls/` | §4 declared-run — the markers a run's own declared value is masked behind. Core holds the mechanism and no marker. |
 
-`mask_ip_addresses` is the one `MaskConfig` knob (default **on**) gating a rule — rule 4 — and it decides
-rule 4's **whole** acceptance set: `10.20.30.40`, `(10.20.30.40)` and `[10.20.30.40],` mask with the knob on
-and all stay **literal** with it off. Rule 4 runs before rule 5, so neither the digit-leading rule (which would
-mask the bare form) nor rule 5's shelled form (which would mask the complete shell) can reach an address the
-switch keeps: a switch named for IP addresses that left some masked would break its own name. An address a
-composite claims first (`10.0.0.1:8080` as a location, a URL, `ip=10.0.0.1`) is rule 2's, outside the knob's
-domain, and is unchanged by it.
+No `MaskConfig` knob gates a mask rule. Masking relocates a value into `params` and never deletes it, so a
+switch that kept an address in the template could buy only a template per host — the identity defect the
+address rule exists to remove.
 
 ### 3.1 The ephemeral-root catalog — the root is the decidable thing
 
@@ -163,10 +159,10 @@ generation ledger ([canonicalization_generations.md](canonicalization_generation
 
 A producer wraps a whole token in punctuation and means nothing by it: `(10.100.0.250)`, `[10.20.30.40]`
 and `"10.0.0.1"` are one address in three dresses. The six pairs are the declared, frozen set, read from
-**one table** (`kWrapperPairs`) by every surface that needs them — rule 4's grammar, rule 2's pre-gate, the
+**one table** (`kWrapperPairs`) by every surface that needs them — the address rule's grammar, rule 3's pre-gate, the
 complete-shell reader and the ephemeral-root lead (§3.1) — because a second copy is how two maskers diverge.
 
-**This catalog exists because its absence shipped.** Rule 4 had *already* decided a shell does not defeat
+**This catalog exists because its absence shipped.** The IPv4 rule had *already* decided a shell does not defeat
 the class — it spelled `\[?…\]?` — and then implemented that decision over the single pair the first corpus
 happened to show. Nothing chose `[` over `(`. So a parenthesised address failed at byte 0, was not
 digit-leading, carried no byte in the pre-gate's separator set, and fell to rule 6 literal KEEP — and six
@@ -176,10 +172,10 @@ where a reader has been told the addresses are gone.
 Two facts about its shape, both measured rather than assumed:
 
 - **Only the OPENING byte was ever the defect.** A trailing closer leaves byte 0 a digit, so `10.0.0.1)`
-  was always masked by the digit-leading rule. An opener destroys digit-leading and left rule 4 the only
+  was always masked by the digit-leading rule. An opener destroys digit-leading and left the IPv4 rule the only
   rule that could see the token. The closers matter as the shell's trailing half, never as an entry point.
 - **The hash class needed the *pre-gate*, not a second shell.** A hex run ≥ 16 inside `[…]` already
-  normalized to `[<*>]` — not because rule 3 tolerates a shell (it requires the whole token) but because
+  normalized to `[<*>]` — not because rule 4 tolerates a shell (it requires the whole token) but because
   `[` sat in the pre-gate's separator set, so `embedded-identity` got a look. `(` did not, so the same hash
   in parentheses was kept whole. A wrapped *UUID* escaped only by accident (a UUID carries `-`, which was
   in the set), and that accident is what hid the hex case. Widening the pre-gate reproduces the normal form
@@ -209,6 +205,45 @@ of a complete shell or nothing. Rule 5 and the hash counter call it, and a consu
 by its syntax (Tamys's value-slot gates) calls the same function, so the shell is read one way on both sides of the
 package boundary and the catalog is never copied out of canon.
 
+### 3.3 The address grammar — earned by a census, not asserted
+
+The address rule (rule 2) reads one byte-only grammar, with no `inet_pton` and no locale, so the class is the
+same on every platform. Its outer bound was measured before it was written: every registered corpus, 39 341 483
+lines, each candidate arm's claims read for anything that is not an address, and only arms that claimed none
+ship (`DN-40.D10`). The values below are documentation addresses (RFC 5737, RFC 3849, RFC 7042).
+
+- **IPv4**: four dot-joined runs of one to three digits, an optional `:` port.
+- **IPv6, whole token**: the RFC 4291 text forms — the fully expanded 8-hextet form, a hextet padded or not
+  (`2001:DB8:0:0:0:0:0:1`); the `::` form with **at least two explicit hextets, none written with a leading
+  zero** (`2001:db8::1`, `fe80::200:5eff:fe00:5301`), the shape an `inet_ntop` prints; a dotted IPv4 tail in
+  both RFC 4291 forms (`::ffff:192.0.2.1`, `0:0:0:0:0:ffff:192.0.2.1`), so a dual-stack peer and its IPv4 twin
+  are one template; an RFC 4007 zone (`%` and `[A-Za-z0-9._~-]+`); and the bracketed form with its port, any
+  address inside the brackets (`[2001:db8::1]:8080`, `[::1]:51780`).
+- **Hardware, whole token**: `:`-joined runs of exactly **6, 8 or 12** two-hex-digit groups, any case
+  (`00:00:5e:00:53:01`). The declared count set is what keeps a certificate fingerprint (20 to 32 groups)
+  literal.
+- **The shell** is the IPv4 rule's: one catalog opener at byte 0 (§3.2), then at most two trailing closers or
+  `,;:.`, read shortest first; the first core that writes address or hardware text decides the token. A `:`
+  shed after a hextet is the address's own separator, so it is no shell byte there (`2001:db8::1:` is not an
+  address whole); after a dotted IPv4 tail it is (`::ffff:192.0.2.1:` masks).
+- **An address run inside a larger token** — a fully expanded 8-group IPv6 run, or a 6-, 8- or 12-group
+  hardware run, each bounded on both sides by a byte that is no letter or digit, or by the token's edge — is
+  one masked component of the composite that reaches it: `v6(en0:2001:db8:0:0:0:0:0:1)` → `v6(en0:<*>)`,
+  `hwaddr=00:00:5e:00:53:01,` → `hwaddr=<*>,`. A decimal group after an 8-group run is a port and is not
+  claimed: the walk masks it as its own segment (`[Peer[id=1]/0:0:0:0:0:0:0:0:2181:Manager@1]` →
+  `[Peer[id=1]/<*>:<*>:Manager@1]`). One predicate is read at two seats (§4): the source-location walk, which
+  writes one `<*>` for the whole run and resumes after it, and embedded-identity, for a token no earlier
+  composite claims. After a run whose last group is a hex prefix of its `:`-segment, the scan resumes in that
+  segment, so a second address glued behind the first opens at its own first group.
+- **A run never unmasks a byte** (`DN-40.D14`): every byte masked without the run arms is masked with them. The
+  walk's letter anchor is read on the token's own segments, a letter-led group inside a run included, so a run
+  changes what the walk writes and never whether it claims; a run that opens or closes in a walk segment whose
+  core is digit-led takes that core whole (`x/7,00:00:5e:00:53:01` → `x/<*>`); and embedded-identity's address
+  arm never claims a token rule 4 or rule 5 masks whole (`7/00:00:5e:00:53:01` stays `<*>`, its param the
+  token).
+
+What the grammar leaves out, and why, is declared by name in §6 (b).
+
 ---
 
 ## 4. The composite normalizers (keep-class, mask-instance)
@@ -218,13 +253,13 @@ instance. Tried in order; first match wins.
 
 | Normalizer | Matches | Keeps / masks | Example |
 |---|---|---|---|
-| **source-location** | `<path-like>:<digits>[:<digits>]` (prefix contains `.` or `/`) | keep the file/path, mask each `:<digit-run>` | `tokenizer.cpp:4500:30:` → `tokenizer.cpp:<*>:<*>:` |
+| **source-location** | `<path-like>:<digits>[:<digits>]` (prefix contains `.` or `/`) | keep the file/path, mask each `:<digit-run>`; an address run inside the token (§3.3) is one masked component, the walk resuming after it | `tokenizer.cpp:4500:30:` → `tokenizer.cpp:<*>:<*>:` · `LPF/eth0/00:00:5e:00:53:01/net` → `LPF/eth0/<*>/net` |
 | **ephemeral-root** | a path (components separated by `/` or a run of `\`) whose components match a declared ephemeral root (§3.1), a `TokenStart` root sitting at the path's start behind an optional declared lead; reached only when no earlier rule claimed the token | keep the root and the separator after it, mask the instance component; **Subtree** collapses the whole remainder, **Instance** keeps the tail | `/tmp/pw-electron-userdata-Kw9v4a` → `/tmp/<*>` (Subtree) · `~/.conan2/p/b/insig247…/lib/x.so` → `~/.conan2/p/b/<*>/lib/x.so` (Instance) · `file:///tmp/run-a1/x.ts` → `file:///tmp/<*>` · `TMPDIR=/tmp/run-a1` → `TMPDIR=/tmp/<*>` · `C:\Users\u\AppData\Local\Temp\run-a1\x.ts` → `C:\Users\u\AppData\Local\Temp\<*>` |
 | **versioned-ref** | `<name>/<numeric-version>` (digit after the last `/`, only punctuation may trail) | keep the name, mask the version | `zlib/1.3` → `zlib/<*>` |
 | **bracket-index** | `<word>[<short-alpha?><digits>]` | keep the word + class marker, mask the index | `make[2]:` → `make[<*>]:` · `[gw0]` → `[gw<*>]` |
 | **hash-counter** | `#<digits>` (no alnum may trail), bare or inside a complete wrapper shell (§3.2) | keep `#` and the shell, mask the index; no param | `step #26` → `step #<*>` · `INFO (#9767): watcher` → `INFO (#<*>): watcher` · `[#42]` → `[#<*>]` |
 | **marker-number** | `<currency-marker><digit-core>[.<digits>]` | keep the marker, mask the number | `$463.50` → `$<*>` |
-| **embedded-identity** | a UUID (`8-4-4-4-12`), a hex run ≥ 16, or a **compact UTC instant** (`YYYY-MM-DDTHHMMSSZ` — exactly 18 bytes, colon-free time, mandatory `Z`, non-alphanumeric on both sides), *inside* a larger token not under a declared ephemeral root — including one whose only structure is a wrapper shell (§3.2) | mask the id in place, keep surrounding structure | `~/.cache/gradle/f7f6…2680/lib.jar` → `~/.cache/gradle/<*>/lib.jar` · `(d41d…427e)` → `(<*>)` · `/home/runner/work/_temp/2026-06-09T185733Z.json` → `/home/runner/work/_temp/<*>.json` |
+| **embedded-identity** | a UUID (`8-4-4-4-12`), a hex run ≥ 16, an **address run** (§3.3), or a **compact UTC instant** (`YYYY-MM-DDTHHMMSSZ` — exactly 18 bytes, colon-free time, mandatory `Z`, non-alphanumeric on both sides), *inside* a larger token not under a declared ephemeral root — including one whose only structure is a wrapper shell (§3.2) | mask the id in place, keep surrounding structure | `~/.cache/gradle/f7f6…2680/lib.jar` → `~/.cache/gradle/<*>/lib.jar` · `(d41d…427e)` → `(<*>)` · `/home/runner/work/_temp/2026-06-09T185733Z.json` → `/home/runner/work/_temp/<*>.json` · `addr=2001:db8:abc:def:cafe:beef:face:fade` → `addr=<*>` |
 | **sanitizer-pid** | `==<digits>==` opening the token, followed by nothing or by a letter (the process tag AddressSanitizer, libFuzzer and valgrind print) | keep both fences and a glued letter-leading tail, mask the pid; a digit after the closing fence, or any byte before the opening one, declines | `==4242==` → `==<*>==` · `==77==ABORTING` → `==<*>==ABORTING` |
 | **kv-value** | `<key>=<value>`, the key every byte before the token's first `=`, the value digit-leading after an optional currency marker and an optional sign | keep the key (+ marker); mask the value over its number's **extent** (the `;`-segment row's, read by the same disposition): a remainder of only wrapper closers and `,;:.` is swallowed, any other remainder is kept byte for byte behind `<*>`. A short status value behind a status key declines, read on the extent; no param | `order=100000` → `order=<*>` · `total=$18` → `total=$<*>` · `off=-5` → `off=<*>` · `[pid=2152]` → `[pid=<*>` · `n=8,11,14` → `n=<*>` · `size=10.5MB` → `size=<*>` · `[pid=2152][err]` → `[pid=<*>][err]` · `?a=1&b=2` → `?a=<*>&b=2` · `pkg>=1.2->dep==3.4)` → `pkg>=<*>>dep==3.4)` · `a=1;b=x2` → `a=<*>;b=x2` · `exit=1]` and `status=200)` stay literal |
 | **`;`-segment** | not a claiming rule: applied to the token's normal form after every rule above and before declared-run, when the form holds `;` and `=`. Each `;`-segment `<key>=<value>` whose key is a letter- or `_`-led run of `[A-Za-z0-9_.-]` opening the segment (the first segment may open with wrapper openers) and whose value is digit-leading after an optional currency marker and an optional sign | keep every key, every `;` and a word value; mask a digit-leading value over its **extent**: from its first byte (a sign or a digit) over `[A-Za-z0-9._+%-]` and any `<*>` an earlier rule wrote, across one `,` `:` or `/` directly followed by a digit or `<*>`. The **remainder** after the extent is decided whole: swallowed when it is empty or only wrapper closers and `,;:.`, else kept byte for byte behind `<*>`; a carriage return is content (§1). A short status value behind a status key stays literal per segment, read on the extent; no param. `,` is not a delimiter | `##[end-action id=build;outcome=success;duration_ms=12]` → `##[end-action id=build;outcome=success;duration_ms=<*>` · `item=book;total=$18` → `item=book;total=$<*>` · `Import-Package=okio;version=1.15,javax.annotation;version=1.3,*` → `Import-Package=okio;version=<*>,javax.annotation;version=<*>,*` · `id=a;n=5&amp;m=6` → `id=a;n=<*>&amp;m=<*>` · `FREQ=WEEKLY;BYHOUR=8,11,14;BYMINUTE=0` → `FREQ=WEEKLY;BYHOUR=<*>;BYMINUTE=<*>` · `id=a;t=12:30:01` (normal form `id=a;t=12:<*>:<*>`) → `id=a;t=<*>` · `id=a;n=5]`+CR keeps `]`+CR and `id=a;n=5]`+CR+`,` keeps `]`+CR+`,` · `id=build;status=200`, `id=a;status=200]` and `id=build,duration_ms=12` stay literal |
@@ -277,8 +312,12 @@ contract: masking decides identity, identity decides "same kind of line," and ev
 ## 6. The boundary — what canon deliberately does NOT mask
 
 Masking is **syntactic and decidable by construction**. It masks classes it can recognize from a single line's
-bytes; it stops where recognition would require cross-line knowledge. This boundary is a design guarantee, not
-a gap to be closed with more rules:
+bytes; it stops where recognition would require cross-line knowledge. **Silence is not a boundary:** a class
+that is decidable and unmasked is named in (b), or it is a defect.
+
+### 6 (a) Undecidable per line, by construction
+
+This boundary is a design guarantee, not a gap to be closed with more rules:
 
 - **Arbitrary varying words.** `User alice` / `User bob` — letter-leading, not a number/hash. canon keeps
   them. Knowing `alice` and `bob` are "the same field varying" needs cardinality across lines.
@@ -305,6 +344,23 @@ a future data-informed, cardinality-aware, **frozen** classifier (the deferred `
 more syntactic rules. A standing cardinality monitor watches for any format where over-splitting erodes
 compression past the healthy band — that signals masking is too weak *for that format*, surfaced as a measured
 warning rather than guessed at.
+
+
+### 6 (b) Decidable, and declared outside the current generation
+
+Each member is named with the reason it stays out, measured over the census that earned the address grammar
+(§3.3, `DN-40.D10`). A member joins at its first measured witness, through its own gate and a new generation.
+
+- **A `::` form with at most one explicit hextet** (`::`, `::1`, `::0`, `abc::`): 36 098 claims over the corpora,
+  constants that do not vary and C++ scope resolution (`std::vector`). Inside brackets with a port, the
+  brackets end the ambiguity, so `[::1]:51780` masks.
+- **A `::` form with a hextet written with a leading zero** (`2001:0db8::1`): legal RFC 4291 text that no corpus
+  witnessed as an address, while the zero-padded `::` forms it did witness were progress-meter debris.
+- **An embedded `::` form** (`answer=2001:db8::1` keeps its address, `answer=2001:db8::<*>`): 52 of the 139
+  embedded `::` claims were C++ scope, a package channel, a location or debris. This is a measured miss: 70 DNS
+  answer values in one CI producer and one macOS line are addresses the rule does not mask.
+- **The `-`-joined and dotted hardware forms** (`00-00-5E-00-53-01`, `0000.5e00.5301`): zero claims in
+  39 341 483 lines, so an arm for them would pass vacuously, and a vacuous pass is not a measurement.
 
 ---
 

@@ -3,7 +3,7 @@
 # One row per WITNESS:   rule_id | subject_token | input_line | expected_template [| declared]
 #
 # `expected_template` is the exact `StatelessTemplate::template_str` that
-# `stateless_template(input_line, arena, MaskConfig{}, runs)` must return, where `runs` is the
+# `stateless_template(input_line, arena, runs)` must return, where `runs` is the
 # row's optional fifth field, one declared value spelled `<marker>=<value>` (DN-133.D1), and
 # empty when the row has no fifth field. A masking rule that changes
 # what a line canonicalises to moves one of these rows, and the gate reds WITHOUT waiting for
@@ -23,7 +23,7 @@
 # TO CHANGE A VALUE: you cannot, without first bumping `kCanonicalizationVersion` in
 # `core/api/canon.api.cppm`. The regenerator refuses otherwise. See the test file's header.
 #
-canonicalization_version = stateless-masks-19
+canonicalization_version = stateless-masks-20
 
 # ── rule 1 — status-value KEEP. The green->red split, the one collapse masking may never make.
 # One witness per declared status keyword; each is non-vacuous (remove the keyword, the value masks).
@@ -35,22 +35,54 @@ status_keep | 2 | worker returned exit 2 | worker returned exit 2
 status_keep | (1) | process exited with exit code (1) | process exited with exit code (1)
 status_keep | (200), | request finished status (200), retrying | request finished status (200), retrying
 
-# ── rule 3 — UUID / long hash. Letter-leading on purpose: a digit-leading hash would be masked by
+# ── rule 2 — the address rule (DN-40.D11): IPv4, IPv6 and colon-joined hardware addresses, claimed whole
+# before any composite reads the token, so no normalizer shreds an address along its own separators.
+# IPv4: a bare address, one per declared wrapper pair (the shell whose absence once leaked a real
+# address into a published render) and a closer-only form.
+address | 10.0.0.1 | client 10.0.0.1 connected | client <*> connected
+address | 10.0.0.1), | client 10.0.0.1), connected | client <*> connected
+address | (10.0.0.1) | client (10.0.0.1) connected | client <*> connected
+address | [10.0.0.1] | client [10.0.0.1] connected | client <*> connected
+address | {10.0.0.1} | client {10.0.0.1} connected | client <*> connected
+address | <10.0.0.1> | client <10.0.0.1> connected | client <*> connected
+address | "10.0.0.1" | client "10.0.0.1" connected | client <*> connected
+address | '10.0.0.1' | client '10.0.0.1' connected | client <*> connected
+# IPv6 (DN-40.D10, documentation addresses, RFC 3849): the `::` form with two or more explicit
+# hextets, the fully expanded form padded and in a shell, a zone, a dotted IPv4 tail whose trailing
+# `:` is shell punctuation, and the bracketed form with its port, `::1` included there.
+address | 2001:db8::1 | client 2001:db8::1 connected | client <*> connected
+address | (2001:DB8:0:0:0:0:0:1) | client (2001:DB8:0:0:0:0:0:1) connected | client <*> connected
+address | fe80::200:5eff:fe00:5301%en0 | neighbor fe80::200:5eff:fe00:5301%en0 reachable | neighbor <*> reachable
+address | ::ffff:192.0.2.1: | accepted ::ffff:192.0.2.1: peer | accepted <*> peer
+address | [2001:db8::1]:8080 | listening on [2001:db8::1]:8080 now | listening on <*> now
+address | [::1]:51780 | accepted [::1]:51780 client | accepted <*> client
+# Hardware (DN-40.D5, documentation addresses, RFC 7042): `:`-joined runs of exactly 6, 8 or 12
+# two-hex groups, bare and behind an opener.
+address | 00:00:5e:00:53:01 | dhcp discover from 00:00:5e:00:53:01 via eth0 | dhcp discover from <*> via eth0
+address | 00:00:5E:00:53:01:00:02 | machine id 00:00:5E:00:53:01:00:02 set | machine id <*> set
+address | 00:00:5E:00:53:01:00:00:5E:00:53:02 | chip 00:00:5E:00:53:01:00:00:5E:00:53:02 inserted | chip <*> inserted
+address | (00:00:5e:00:53:01 | arp (00:00:5e:00:53:01 resolved | arp <*> resolved
+
+# ── the address rule's boundary (DN-40.D10): forms its earned grammar does NOT claim, each keeping the
+# form the rule that claimed it before still gives it. The `::` forms with at most one explicit hextet
+# are constants and C++ scope; a hextet written with a leading zero is progress-meter debris; a `:`
+# shed after a hextet is the address's own separator; an embedded `::` form is a declared miss; a
+# two-hex run outside the 6/8/12 group counts is a fingerprint; a time is four decimal groups; the
+# `-`-joined and dotted hardware forms have no measured witness.
+literal_keep | :: | separator :: here | separator :: here
+literal_keep | ::1 | bound to ::1 only | bound to ::1 only
+digit_leading | 000::0002 | rate 000::0002 shown | rate <*> shown
+literal_keep | ::8827:38:: | included from ::8827:38:: here | included from ::8827:38:: here
+literal_keep | std::vector | using std::vector here | using std::vector here
+literal_keep | ns::ABC::abc1() | call ns::ABC::abc1() now | call ns::ABC::abc1() now
+digit_leading | 23:59:59:999 | tick 23:59:59:999 done | tick <*> done
+diagnostic_composite | ab:cd:ef:01:23:45:67:89:ab:cd:ef:01:23:45:67:89:ab:cd:ef:02 | fingerprint ab:cd:ef:01:23:45:67:89:ab:cd:ef:01:23:45:67:89:ab:cd:ef:02 ok | fingerprint ab:cd:ef:<*>:<*>:<*>:<*>:<*>:ab:cd:ef:<*>:<*>:<*>:<*>:<*>:ab:cd:ef:<*> ok
+diagnostic_composite | answer=2001:db8::1 | dns answer=2001:db8::1 ok | dns answer=2001:db8::<*> ok
+digit_leading | 0000.5e00.5301 | station 0000.5e00.5301 seen | station <*> seen
+
+# ── rule 4 — UUID / long hash. Letter-leading on purpose: a digit-leading hash would be masked by
 # rule 5 anyway, and the row would name the wrong rule.
 uuid_or_hash | deadbeefcafe0badf00d5678 | commit deadbeefcafe0badf00d5678 landed | commit <*> landed
-
-# ── rule 4 — IPv4, the only knob-gated rule. It decides its WHOLE acceptance set (DN-134.D8): a bare
-# address, one per declared wrapper pair (the shell whose absence once leaked a real address into a
-# published render) and a closer-only form all mask with the knob ON and stay literal with it OFF,
-# because rule 4 runs before rule 5 and the shelled-numeric reader and keeps what the switch keeps.
-ipv4 | 10.0.0.1 | client 10.0.0.1 connected | client <*> connected
-ipv4 | 10.0.0.1), | client 10.0.0.1), connected | client <*> connected
-ipv4 | (10.0.0.1) | client (10.0.0.1) connected | client <*> connected
-ipv4 | [10.0.0.1] | client [10.0.0.1] connected | client <*> connected
-ipv4 | {10.0.0.1} | client {10.0.0.1} connected | client <*> connected
-ipv4 | <10.0.0.1> | client <10.0.0.1> connected | client <*> connected
-ipv4 | "10.0.0.1" | client "10.0.0.1" connected | client <*> connected
-ipv4 | '10.0.0.1' | client '10.0.0.1' connected | client <*> connected
 
 # ── rule 5 — digit-leading. One rule subsumes number+unit, percent, grouped, hex-with-0x, and the
 # status-digit ceiling (a 4-digit value after a status keyword is an id, not a code).
@@ -61,7 +93,7 @@ digit_leading | 0xdeadbeef | fault at 0xdeadbeef now | fault at <*> now
 digit_leading | 1234 | worker exit code 1234 | worker exit code <*>
 digit_leading | 8080 | listening on port 8080 | listening on port <*>
 # DN-134.D1: rule 5 reads a digit-leading core through a COMPLETE declared wrapper shell (opener at
-# byte 0, the opener's own closer, at most two trailing bytes from `,;:.`), as rule 4 reads an
+# byte 0, the opener's own closer, at most two trailing bytes from `,;:.`), as the address rule reads an
 # address. The status KEEP reads through it: see the status_keep rows below.
 digit_leading | (1.7s) | step finished in (1.7s) | step finished in <*>
 digit_leading | (96.4%), | coverage (96.4%), above floor | coverage <*> above floor
@@ -89,7 +121,7 @@ literal_keep | VK_KHR_maintenance7 | enabling VK_KHR_maintenance7 now | enabling
 literal_keep | -DQT_QUICKCONTROLS2_LIB | compile -DQT_QUICKCONTROLS2_LIB flag | compile -DQT_QUICKCONTROLS2_LIB flag
 literal_keep | libcc1plugin.so.0 | loading libcc1plugin.so.0 now | loading libcc1plugin.so.0 now
 
-# ── rule 2, the composite layer — one section per declared rule of kCompositeRules, in its
+# ── rule 3, the composite layer — one section per declared rule of kCompositeRules, in its
 # precedence order.
 
 # diagnostic_composite — the general per-segment rule that subsumed source-location.
@@ -99,6 +131,22 @@ diagnostic_composite | [6226:0609/094020.430910:ERROR:dbus/bus.cc:408] | [6226:0
 # inside a location, and the file-and-line tail survives.
 diagnostic_composite | (/tmp/run-a1/x.ts:12:5) | at (/tmp/run-a1/x.ts:12:5) here | at (/tmp/<*>/x.ts:<*>:<*>) here
 diagnostic_composite | (C:\\Users\\u\\AppData\\Local\\Temp\\run-a1\\x.ts:12:5) | at (C:\\Users\\u\\AppData\\Local\\Temp\\run-a1\\x.ts:12:5) here | at (C:\\Users\\u\\AppData\\Local\\Temp\\<*>\\x.ts:<*>:<*>) here
+# DN-40.D11: an address run inside the token is one masked component of the walk - one wildcard for the
+# whole run, the walk resuming after it - so a port after an 8-group run masks as its own segment.
+diagnostic_composite | v6(en0:2001:db8:0:0:0:0:0:1) | iface v6(en0:2001:db8:0:0:0:0:0:1) up | iface v6(en0:<*>) up
+diagnostic_composite | hwaddr=00:00:5e:00:53:01, | lease hwaddr=00:00:5e:00:53:01, bound | lease hwaddr=<*>, bound
+diagnostic_composite | LPF/eth0/00:00:5e:00:53:01/net | Listening on LPF/eth0/00:00:5e:00:53:01/net now | Listening on LPF/eth0/<*>/net now
+diagnostic_composite | [Peer[id=1]/0:0:0:0:0:0:0:0:2181:Manager@1] | [Peer[id=1]/0:0:0:0:0:0:0:0:2181:Manager@1] - connection broken | [Peer[id=1]/<*>:<*>:Manager@1] - connection broken
+# DN-40.D14: a run arm is monotone - every byte masked without it stays masked with it. The walk's
+# letter anchor reads the token's own segments (a letter-led group inside a run still anchors), a run
+# never cuts a walk segment with a digit-led core, and after a run that ends on a hex prefix the scan
+# resumes in that segment.
+diagnostic_composite | ab:00:5e:00:53:01:02:00:5e:00:53:01@/192.0.2.1:8080 | chip ab:00:5e:00:53:01:02:00:5e:00:53:01@/192.0.2.1:8080 up | chip <*>@/<*>:<*> up
+diagnostic_composite | 192.0.2.1/2001:db8:0:0:0:0:0:2 | route 192.0.2.1/2001:db8:0:0:0:0:0:2 set | route <*>/<*> set
+diagnostic_composite | x/00:00:5e:00:53:01@99:1 | probe x/00:00:5e:00:53:01@99:1 sent | probe x/<*>:<*> sent
+diagnostic_composite | x/7,00:00:5e:00:53:01 | probe x/7,00:00:5e:00:53:01 sent | probe x/<*> sent
+diagnostic_composite | 2001:db8:0:0:0:0:0:1/2001:db8:0:0:0:0:0:2:8080] | pair 2001:db8:0:0:0:0:0:1/2001:db8:0:0:0:0:0:2:8080] open | pair <*>/<*>:<*>] open
+diagnostic_composite | x/00:00:5e:00:53:01/00:00:5e:00:53:02 | bridge x/00:00:5e:00:53:01/00:00:5e:00:53:02 up | bridge x/<*>/<*> up
 
 # ephemeral_root — one witness per DECLARED root, with its declared anchor and scope visible in the
 # expected value (Subtree collapses the remainder; Instance keeps the tail).
@@ -163,6 +211,8 @@ embedded_identity | f7f63412-b7a7-468d-bd31-1a6ae1ca2680 | session f7f63412-b7a7
 embedded_identity | ~/.cache/gradle/f7f63412b7a7468dbd311a6ae1ca2680/lib.jar | reading ~/.cache/gradle/f7f63412b7a7468dbd311a6ae1ca2680/lib.jar ok | reading ~/.cache/gradle/<*>/lib.jar ok
 embedded_identity | (d41d8cd98f00b204e9800998ecf8427e) | digest (d41d8cd98f00b204e9800998ecf8427e) ok | digest (<*>) ok
 embedded_identity | /home/runner/work/_temp/2026-06-09T185733Z.json | wrote /home/runner/work/_temp/2026-06-09T185733Z.json ok | wrote /home/runner/work/_temp/<*>.json ok
+# DN-40.D11: the address run's second seat, for a token no earlier composite claims (no `:` before a digit).
+embedded_identity | addr=2001:db8:abc:def:cafe:beef:face:fade | peer addr=2001:db8:abc:def:cafe:beef:face:fade up | peer addr=<*> up
 
 # sanitizer_pid — the sanitizer-family process tag: keep both fences, mask the pid. A
 # letter-leading tail glued to the closing fence is kept verbatim; a digit after it, or any byte

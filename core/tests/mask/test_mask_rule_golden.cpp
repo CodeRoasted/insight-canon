@@ -37,7 +37,7 @@
 // — detection picking another strategy, a different content slice, a semantic row change.
 // invariant: none of those is a masking-rule change, and each has its own home, including the
 // committed wire vectors downstream that DO re-derive through the full shipped tokenizer.
-// invariant: the only config knob covered is the IP one, because it is the only knob gating a rule.
+// invariant: no config knob is covered, because no knob gates a mask rule (DN-40.D12).
 // invariant: a rule class whose witness is absent is made VISIBLE by limb 2 for the declared
 // catalogs, but it cannot see a class that no catalog declares.
 // invariant: REGENERATION IS AN ACTION, NOT A PROPERTY, which is why it is a disabled test — the
@@ -56,7 +56,6 @@ import insight.canon.test;
 
 using insight::tokenization::ArenaAllocator;
 using insight::tokenization::DeclaredRun;
-using insight::tokenization::MaskConfig;
 using insight::tokenization::stateless_template;
 namespace catalog = insight::tokenization::rule_catalog;
 
@@ -72,7 +71,7 @@ namespace
 // a table, and a sibling arm is what keeps a typo here from silently minting another id.
 // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate, DN-134.D2, DN-134.D3
 constexpr std::array<std::string_view, 8> kTopLevelRuleIds{
-    {std::string_view{"status_keep"}, std::string_view{"uuid_or_hash"}, std::string_view{"ipv4"},
+    {std::string_view{"status_keep"}, std::string_view{"uuid_or_hash"}, std::string_view{"address"},
      std::string_view{"digit_leading"}, std::string_view{"literal_keep"},
      std::string_view{"declared_run"}, std::string_view{"segment_kv"},
      std::string_view{"json_member_order"}}};
@@ -216,34 +215,34 @@ constexpr std::string_view kFieldSep{" | "};
     return golden;
 }
 
-[[nodiscard]] std::string mask_line(std::string_view content, const MaskConfig& config,
+[[nodiscard]] std::string mask_line(std::string_view content,
                                     std::span<const DeclaredRun> declared_runs)
 {
     ArenaAllocator arena{256U * 1024U};
-    return std::string{stateless_template(content, arena, config, declared_runs).template_str};
+    return std::string{stateless_template(content, arena, declared_runs).template_str};
 }
 
 [[nodiscard]] std::string mask_line(std::string_view content)
 {
-    return mask_line(content, {}, {});
+    return mask_line(content, {});
 }
 
 // post: `content` masked under one declared value, `marker` then `value`; an empty value declares
 // none.
-[[nodiscard]] std::string mask_line_declared(std::string_view content, const MaskConfig& config,
-                                             std::string_view marker, std::string_view value)
+[[nodiscard]] std::string mask_line_declared(std::string_view content, std::string_view marker,
+                                             std::string_view value)
 {
     if (value.empty())
-        return mask_line(content, config, {});
+        return mask_line(content, {});
     const std::array<std::string_view, 1> markers{marker};
     const std::array<DeclaredRun, 1> runs{DeclaredRun{.markers = markers, .value = value}};
-    return mask_line(content, config, runs);
+    return mask_line(content, runs);
 }
 
 // post: the row's input masked under the row's own declared value, or none.
-[[nodiscard]] std::string mask_row(const Row& row, const MaskConfig& config)
+[[nodiscard]] std::string mask_row(const Row& row)
 {
-    return mask_line_declared(row.input, config, row.declared_marker, row.declared_value);
+    return mask_line_declared(row.input, row.declared_marker, row.declared_value);
 }
 
 // post: the row's declared value as the file spells it, empty when it declares none.
@@ -285,7 +284,7 @@ constexpr std::string_view kFieldSep{" | "};
     const std::span<const DeclaredRun> declared{row.declared_value.empty()
                                                     ? std::span<const DeclaredRun>{}
                                                     : std::span<const DeclaredRun>{runs}};
-    const auto masked{stateless_template(row.input, arena, MaskConfig{}, declared)};
+    const auto masked{stateless_template(row.input, arena, declared)};
     const std::vector<std::string> source{tokens_of(row.input)};
     const std::vector<std::string> output{tokens_of(masked.template_str)};
     std::vector<std::size_t> whole;
@@ -325,14 +324,14 @@ constexpr std::string_view kFieldSep{" | "};
 // actually about.
 // invariant: reading the whole template instead would fold every other token's behaviour into the
 // discriminator.
-[[nodiscard]] std::string masked_subject(const Row& row, const MaskConfig& config, bool& okay)
+[[nodiscard]] std::string masked_subject(const Row& row, bool& okay)
 {
     std::size_t occurrences{0};
     const std::size_t index{subject_index(row, occurrences)};
     okay = index != std::string::npos && occurrences == 1;
     if (!okay)
         return {};
-    const std::vector<std::string> masked{tokens_of(mask_row(row, config))};
+    const std::vector<std::string> masked{tokens_of(mask_row(row))};
     // invariant: the masker emits exactly one output token per input token, joining on a single
     // space and never gaining one, so the indices correspond.
     if (index >= masked.size())
@@ -341,13 +340,6 @@ constexpr std::string_view kFieldSep{" | "};
         return {};
     }
     return masked[index];
-}
-
-[[nodiscard]] MaskConfig without_ip_masking()
-{
-    MaskConfig cfg;
-    cfg.mask_ip_addresses = false;
-    return cfg;
 }
 
 [[nodiscard]] bool is_top_level_id(std::string_view rule_id)
@@ -446,7 +438,7 @@ TEST(MaskRuleGolden, EveryWholeTokenWildcardIsBoundToItsParamOnEveryWitness)
         ++broken;
         ADD_FAILURE() << "golden line " << row.line_no << " (" << row.rule_id
                       << ") breaks the binding: " << why << "\n  input    : " << row.input
-                      << "\n  template : " << mask_row(row, MaskConfig{});
+                      << "\n  template : " << mask_row(row);
     }
     EXPECT_EQ(broken, 0U) << broken << " of " << loaded().golden.rows.size()
                           << " witness rows break the binding";
@@ -471,7 +463,7 @@ TEST(MaskRuleGolden, GoldenTemplatesAreByteIdentical)
                           << kRegenCommand;
             continue;
         }
-        const std::string actual{mask_row(row, MaskConfig{})};
+        const std::string actual{mask_row(row)};
         if (actual == row.expected)
             continue;
         ++moved;
@@ -613,7 +605,7 @@ TEST(MaskRuleGolden, StatusKeepRowsAreKeptBecauseOfTheKeywordBeforeThem)
         if (row.rule_id != "status_keep")
             continue;
         bool okay{false};
-        const std::string kept{masked_subject(row, MaskConfig{}, okay)};
+        const std::string kept{masked_subject(row, okay)};
         if (!okay)
             continue;
         EXPECT_EQ(kept, row.subject)
@@ -659,34 +651,29 @@ TEST(MaskRuleGolden, StatusKeepRowsAreKeptBecauseOfTheKeywordBeforeThem)
     }
 }
 
-TEST(MaskRuleGolden, Ipv4RowsMaskOnlyBecauseOfTheKnobbedRule)
+// refs: DN-40.D11
+// invariant: rule 2 runs before every composite, so an address witness is discriminated by the
+// predicate the dispatcher reads, and its normal form must be the bare wildcard.
+TEST(MaskRuleGolden, AddressRowsMaskBecauseTheAddressRuleClaimsThem)
 {
     if (!golden_is_readable())
         return;
     for (const Row& row : loaded().golden.rows)
     {
-        if (row.rule_id != "ipv4")
+        if (row.rule_id != "address")
             continue;
-        bool knob_on_okay{false};
-        bool knob_off_okay{false};
-        const std::string with_knob{masked_subject(row, MaskConfig{}, knob_on_okay)};
-        const std::string without_knob{masked_subject(row, without_ip_masking(), knob_off_okay)};
-        if (!knob_on_okay || !knob_off_okay)
+        bool okay{false};
+        const std::string got{masked_subject(row, okay)};
+        if (!okay)
             continue;
-        EXPECT_EQ(with_knob, "<*>")
+        EXPECT_EQ(got, "<*>") << "golden line " << row.line_no
+                              << ": an address witness must mask whole.\n"
+                              << "  subject: " << row.subject << "\n  masked to: " << got;
+        EXPECT_TRUE(catalog::address_rule_claims(row.subject))
             << "golden line " << row.line_no
-            << ": an ipv4 witness must mask with mask_ip_addresses ON.\n"
-            << "  subject: " << row.subject << "\n  masked to: " << with_knob;
-        // invariant: the IP knob gates its rule and nothing else.
-        // invariant: a subject that still masks with the knob OFF is being claimed by some OTHER
-        // rule and this rule is unwitnessed by that row.
-        // invariant: rule 4 decides its whole acceptance set before rule 5 reads a token, so a
-        // bare or closer-only address witnesses it as an opener-led one does (DN-134.D8).
-        EXPECT_EQ(without_knob, row.subject)
-            << "golden line " << row.line_no
-            << ": with mask_ip_addresses OFF an ipv4 witness must stay LITERAL — otherwise "
-               "something upstream of rule 4 claims it and this row names the wrong rule.\n"
-            << "  subject: " << row.subject << "\n  masked to: " << without_knob;
+            << ": the address rule does not claim this witness, so whatever masks it is another "
+               "rule and the row names the wrong one.\n  subject: "
+            << row.subject;
     }
 }
 
@@ -698,24 +685,22 @@ TEST(MaskRuleGolden, DigitLeadingRowsMaskWithoutAnyOtherRuleReachingThem)
     {
         if (row.rule_id != "digit_leading")
             continue;
-        bool knob_on_okay{false};
-        bool knob_off_okay{false};
-        const std::string with_knob{masked_subject(row, MaskConfig{}, knob_on_okay)};
-        const std::string without_knob{masked_subject(row, without_ip_masking(), knob_off_okay)};
-        if (!knob_on_okay || !knob_off_okay)
+        bool okay{false};
+        const std::string got{masked_subject(row, okay)};
+        if (!okay)
             continue;
-        EXPECT_EQ(with_knob, "<*>")
-            << "golden line " << row.line_no << ": a digit_leading witness must mask.\n"
-            << "  subject: " << row.subject << "\n  masked to: " << with_knob;
-        EXPECT_EQ(without_knob, "<*>")
+        EXPECT_EQ(got, "<*>") << "golden line " << row.line_no
+                              << ": a digit_leading witness must mask.\n"
+                              << "  subject: " << row.subject << "\n  masked to: " << got;
+        EXPECT_FALSE(catalog::address_rule_claims(row.subject))
             << "golden line " << row.line_no
-            << ": it must mask with the IPv4 knob OFF too — otherwise rule 4, not rule 5, is what "
-               "masks it.\n  subject: "
+            << ": the address rule claims a digit_leading witness — rule 2 runs before rule 5, so "
+               "the row witnesses the address rule.\n  subject: "
             << row.subject;
         EXPECT_EQ(catalog::composite_rule_claiming(row.subject), std::string_view{})
             << "golden line " << row.line_no
-            << ": no composite rule may claim a digit_leading witness — rule 2 runs first, so a "
-               "claimed token witnesses rule 2.\n  subject: "
+            << ": no composite rule may claim a digit_leading witness — rule 3 runs first, so a "
+               "claimed token witnesses rule 3.\n  subject: "
             << row.subject;
         // invariant: the hash rule also masks to a wildcard, so the row must be out of its reach to
         // name the digit-leading rule honestly.
@@ -723,7 +708,7 @@ TEST(MaskRuleGolden, DigitLeadingRowsMaskWithoutAnyOtherRuleReachingThem)
         // here.
         EXPECT_LT(row.subject.size(), catalog::min_hash_length())
             << "golden line " << row.line_no
-            << ": a digit_leading witness at or above the hash floor could be claimed by rule 3 "
+            << ": a digit_leading witness at or above the hash floor could be claimed by rule 4 "
                "instead.\n  subject: "
             << row.subject << " (" << row.subject.size() << " bytes, floor "
             << catalog::min_hash_length() << ")";
@@ -739,7 +724,7 @@ TEST(MaskRuleGolden, UuidOrHashRowsAreOutOfEveryOtherRulesReach)
         if (row.rule_id != "uuid_or_hash")
             continue;
         bool okay{false};
-        const std::string got{masked_subject(row, MaskConfig{}, okay)};
+        const std::string got{masked_subject(row, okay)};
         if (!okay)
             continue;
         EXPECT_EQ(got, "<*>") << "golden line " << row.line_no
@@ -747,7 +732,7 @@ TEST(MaskRuleGolden, UuidOrHashRowsAreOutOfEveryOtherRulesReach)
                               << "  subject: " << row.subject << "\n  masked to: " << got;
         EXPECT_EQ(catalog::composite_rule_claiming(row.subject), std::string_view{})
             << "golden line " << row.line_no
-            << ": no composite rule may claim it — rule 2 runs before rule 3.\n  subject: "
+            << ": no composite rule may claim it — rule 3 runs before rule 4.\n  subject: "
             << row.subject;
         // invariant: the digit-leading rule also masks to a wildcard, so a LETTER-leading subject
         // is out of its reach and the disposition can only have come from the hash rule.
@@ -768,7 +753,7 @@ TEST(MaskRuleGolden, LiteralKeepRowsSurviveEveryRule)
         if (row.rule_id != "literal_keep")
             continue;
         bool okay{false};
-        const std::string got{masked_subject(row, MaskConfig{}, okay)};
+        const std::string got{masked_subject(row, okay)};
         if (!okay)
             continue;
         EXPECT_EQ(got, row.subject)
@@ -779,7 +764,7 @@ TEST(MaskRuleGolden, LiteralKeepRowsSurviveEveryRule)
         EXPECT_EQ(catalog::composite_rule_claiming(row.subject), std::string_view{})
             << "golden line " << row.line_no
             << ": a composite rule claims a literal_keep witness. Even if it normalizes to the "
-               "same bytes today, the row is witnessing rule 2, not rule 6.\n  subject: "
+               "same bytes today, the row is witnessing rule 3, not rule 6.\n  subject: "
             << row.subject;
     }
 }
@@ -805,10 +790,10 @@ TEST(MaskRuleGolden, DeclaredRunRowsMoveOnlyUnderTheirOwnDeclaredValue)
                           << row.input;
             continue;
         }
-        const std::string declared{mask_row(row, MaskConfig{})};
+        const std::string declared{mask_row(row)};
         const std::string undeclared{mask_line(row.input)};
-        const std::string other_value{mask_line_declared(
-            row.input, MaskConfig{}, row.declared_marker, row.declared_value + "1")};
+        const std::string other_value{
+            mask_line_declared(row.input, row.declared_marker, row.declared_value + "1")};
         EXPECT_NE(declared, undeclared)
             << "golden line " << row.line_no
             << ": under its declared value the line must mask differently from undeclared.\n"
@@ -842,7 +827,7 @@ TEST(MaskRuleGolden, SegmentKvRowsMoveByTheNonClaimingStep)
             continue;
         ++witnesses;
         bool okay{false};
-        const std::string got{masked_subject(row, MaskConfig{}, okay)};
+        const std::string got{masked_subject(row, okay)};
         if (!okay)
             continue;
         EXPECT_NE(got, row.subject)
@@ -877,7 +862,7 @@ TEST(MaskRuleGolden, JsonMemberOrderRowsArePermutationsOfTheirInput)
         if (row.rule_id != "json_member_order")
             continue;
         ++witnesses;
-        const std::string got{mask_row(row, MaskConfig{})};
+        const std::string got{mask_row(row)};
         std::string got_bytes{got};
         std::string input_bytes{row.input};
         std::ranges::sort(got_bytes);
@@ -911,7 +896,7 @@ TEST(MaskRuleGolden, EveryDeclaredWrapperPairHasAWitness)
         EXPECT_TRUE(covered) << "declared wrapper pair `" << pair.open << pair.close
                              << "` has no witness whose subject is led by its OPENING byte.\n"
                                 "  The opener is the byte that destroys digit-leading and leaves "
-                                "rule 4 the only rule that can see the token,\n"
+                                "the address rule the only rule that can see the token,\n"
                                 "  which is why a shell that shipped without one leaked a real "
                                 "address into a published render.";
     }
@@ -990,7 +975,7 @@ TEST(MaskRuleGolden, DISABLED_RegenerateGolden)
 
     for (const Row& row : golden.rows)
     {
-        const std::string actual{mask_row(row, MaskConfig{})};
+        const std::string actual{mask_row(row)};
         if (row.expected.empty())
             filled.push_back(row.rule_id + " -> " + actual);
         else if (row.expected != actual)

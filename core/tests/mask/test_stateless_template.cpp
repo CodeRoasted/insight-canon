@@ -13,17 +13,12 @@ using namespace insight::tokenization;
 
 namespace
 {
-MaskConfig cfg()
-{
-    return MaskConfig{};
-}
-
 // invariant: the masked template is copied out IMMEDIATELY, because the arena is reused across
 // calls.
 std::string masked(std::string_view content, ArenaAllocator& arena)
 {
     arena.reset();
-    return std::string{stateless_template(content, arena, cfg(), {}).template_str};
+    return std::string{stateless_template(content, arena, {}).template_str};
 }
 } // namespace
 
@@ -578,97 +573,30 @@ TEST(EphemeralRootMask, G7_NoCatalogedRootNoOverFire)
               "/home/user/project/src/main.cpp:<*>:<*>");
 }
 
-// invariant: WHICH OF THE TWO CONFIG KNOBS ACTUALLY GATES, AND ON WHICH TOKEN SHAPE.
-// invariant: the two rules sit in ONE disjunction with digit-leading as a later disjunct, so a rule
-// whose whole domain is digit-leading can never change an outcome.
-// invariant: its knob is then inert and the predicate is dead at the output level, which is
-// MEASURED true of the hex rule, whose domain is a STRICT SUBSET of digit-leading.
-// invariant: IT IS NOT TRUE OF THE IP RULE, AND THE DIFFERENCE IS ONE CHARACTER — that grammar
-// admits an optional leading bracket, and a token starting with one is NOT digit-leading.
-// invariant: so the BRACKETED form reaches the IP rule and nothing else catches it, which makes its
-// knob a live gate on exactly that shape.
-// invariant: AND THAT DISTINCTION WAS MISSED BY A 14-TOKEN PROBE THAT CARRIED NO BRACKET — the
-// sample said both knobs were inert and the population disagreed.
-// invariant: recorded here rather than in a report, because the next person to shrink this test
-// will be tempted by the same sample.
-// invariant: the bracket is not one more case, it is the ONLY case that separates the two knobs.
-// invariant: the bracketed address is NOT synthetic — it is an attested line, a catalogued row in
-// the format docs, and the literal already ships inside a sibling gate.
-// invariant: with the knob off it falls to literal KEEP, putting a raw client address into the
-// template, the fingerprint and any rendered evidence.
-// invariant: on a product whose claim is about what leaves the machine, that is a PRIVACY surface
-// and not a config nicety.
-// invariant: FALSIFIABILITY WAS OBSERVED, THEN REVERTED — disabling the IP rule wholesale was
-// RED, and the whole-suite run says this arm is the SOLE guard, 1 failure out of 601.
-// invariant: before this arm, deleting that rule outright moved no test in the repository.
-// invariant: note WHICH leg caught it — the knob-ON leg; the knob-OFF leg stayed green,
-// correctly, since staying literal is what a dead rule also produces.
-// invariant: the two legs are not redundant, they fail in OPPOSITE directions, and only holding
-// both distinguishes a gating knob from nothing masking this at all.
-// invariant: disabling the hex rule wholesale left the entire suite GREEN at 596 of 596, which is
-// the measurement the rip rests on.
-// invariant: it is recorded here because after the rip there is no predicate left to mutate.
-// refs: ADR-16.D5
-namespace
-{
-// invariant: the masker under a CALLER-CHOSEN config, which is exactly why no committed test using
-// the default helper could ever have observed a knob.
-[[nodiscard]] std::string masked_with(std::string_view content, ArenaAllocator& arena,
-                                      const MaskConfig& conf)
-{
-    arena.reset();
-    return std::string{stateless_template(content, arena, conf, {}).template_str};
-}
-
-[[nodiscard]] MaskConfig cfg_without_ip_masking()
-{
-    MaskConfig conf{};
-    conf.mask_ip_addresses = false;
-    return conf;
-}
-} // namespace
-
-// invariant: rule 4 decides its whole acceptance set before rule 5 and the shelled-numeric reader
-// read a token, so the knob governs the bare address, the complete shell and the opener-only form.
-// refs: DN-134.D8
-TEST(StatelessTemplate, Ipv4KnobGatesTheBracketedFormThatDigitLeadingCannotReach)
+// invariant: THE ADDRESS RULE OWNS EVERY IPv4 SHAPE IT ACCEPTS, AND RUNS BEFORE THE COMPOSITES.
+// invariant: the bracketed form is the shape digit-leading cannot reach - a leading bracket is not
+// a digit - so only the address rule masks it, and an attested line carries it.
+// invariant: unmasked, it puts a raw client address into the template, the fingerprint and any
+// rendered evidence - a PRIVACY surface on a product whose claim is what leaves the machine.
+// invariant: disabling the IP rule wholesale was RED here and nowhere else, 1 failure of 601.
+// invariant: the non-vacuity leg reads the predicate the dispatcher reads: a token the address
+// rule does not claim is masked by some other rule, and this test would name the wrong one.
+// refs: ADR-16.D5, DN-40.D11, DN-40.D12
+TEST(StatelessTemplate, TheAddressRuleMasksTheBracketedFormThatDigitLeadingCannotReach)
 {
     ArenaAllocator arena{256U * 1024U};
-    constexpr std::string_view kBracketed{"[10.20.30.40]"};
-    constexpr std::string_view kBare{"10.20.30.40"};
-    constexpr std::string_view kOpenerOnly{"[10.20.30.40"};
-
-    // invariant: THE DECISIVE LEG — the knob ON must mask and the knob OFF must KEEP.
-    const std::string on{masked_with(kBracketed, arena, MaskConfig{})};
-    EXPECT_EQ(on, "<*>") << "the bracketed IPv4 must mask with mask_ip_addresses ON — this is rule "
-                            "4's disposition.\n  token: "
-                         << kBracketed << "\n  actual: " << on;
-
-    const std::string off{masked_with(kBracketed, arena, cfg_without_ip_masking())};
-    EXPECT_EQ(off, kBracketed)
-        << "the bracketed IPv4 must stay LITERAL with mask_ip_addresses OFF. If this masked "
-           "anyway, something upstream (a composite rule reached through the `maybe_composite` "
-           "pre-gate, which runs BEFORE rule 4) is claiming the token first, or rule 4 stopped "
-           "deciding a complete shell and the shelled-numeric reader reached it.\n  token: "
-        << kBracketed << "\n  expected: " << kBracketed << " (kept)\n  actual: " << off;
-
-    // invariant: THE CONTRAST that names the knob's whole domain — the BARE form is digit-leading,
-    // and rule 4 still decides it before rule 5 can.
-    for (const std::string_view tok : {kBare, kOpenerOnly})
+    for (const std::string_view tok : {"[10.20.30.40]", "10.20.30.40", "[10.20.30.40"})
     {
-        EXPECT_EQ(masked_with(tok, arena, MaskConfig{}), "<*>") << "token: " << tok;
-        EXPECT_EQ(masked_with(tok, arena, cfg_without_ip_masking()), tok)
-            << "with the knob OFF rule 4 keeps every address it accepts, the digit-leading bare "
-               "form included: a switch named for IP addresses that leaves one masked breaks its "
-               "own contract (DN-134.D8).\n  token: "
-            << tok;
+        const std::string got{masked(tok, arena)};
+        EXPECT_EQ(got, "<*>") << "the address rule masks every IPv4 shape it accepts.\n  token:  "
+                              << tok << "\n  actual: " << got;
+        EXPECT_TRUE(rule_catalog::address_rule_claims(tok))
+            << "the address rule must be what claims it.\n  token: " << tok;
     }
 }
 
 // invariant: THE WRAPPER SHELL — the IP grammar admitted ONE delimiter pair out of six, and the
 // omission published a real third-party address.
-// invariant: the test directly above pins the bracketed form and calls it the only case that
-// separates the two knobs, which is true of the KNOB and was read as true of the GRAMMAR.
 // invariant: the grammar admitted a leading square bracket and nothing else.
 // invariant: a parenthesised address failed at byte 0, was not digit-leading, and carried no byte
 // in the composite pre-gate's separator set.
@@ -683,10 +611,8 @@ TEST(StatelessTemplate, Ipv4KnobGatesTheBracketedFormThatDigitLeadingCannotReach
 // the next delimiter is not a second incident.
 // invariant: every leg below was OBSERVED RED on the pre-fix grammar, which is what makes this a
 // regression guard and not a restatement of current behaviour.
-// invariant: the knob-OFF leg is the NON-VACUITY arm — it proves the IP rule is what masks the
-// wrapped form.
-// invariant: if a composite rule ever claims these tokens first, that leg goes green-blind and this
-// whole block stops testing the IP rule, which is exactly the trap the block above names.
+// invariant: the NON-VACUITY arm reads the address rule's own predicate, so it proves the IP rule
+// is what masks the wrapped form and not a neighbour that masks it anyway.
 TEST(StatelessTemplate, Ipv4MasksInsideEveryDeclaredWrapperPair)
 {
     ArenaAllocator arena{256U * 1024U};
@@ -703,7 +629,7 @@ TEST(StatelessTemplate, Ipv4MasksInsideEveryDeclaredWrapperPair)
         shells.push_back(std::string{pair.open} + "10.20.30.40" + std::string{pair.close});
     for (const std::string& tok : shells)
     {
-        const std::string got{masked_with(tok, arena, MaskConfig{})};
+        const std::string got{masked(tok, arena)};
         EXPECT_EQ(got, "<*>")
             << "a wrapped IPv4 must MASK for EVERY declared wrapper pair — this row was built "
                "from kWrapperPairs, so it covers the pair that exists rather than the pair "
@@ -732,28 +658,21 @@ TEST(StatelessTemplate, Ipv4MasksInsideEveryDeclaredWrapperPair)
              "\"10.20.30.40\".",
          })
     {
-        const std::string got{masked_with(tok, arena, MaskConfig{})};
+        const std::string got{masked(tok, arena)};
         EXPECT_EQ(got, "<*>")
             << "a wrapped IPv4 must MASK — the shell is punctuation, not part of the address, and "
                "the whole product claim about a `templates` section rests on this.\n  token:    "
             << tok << "\n  expected: <*>\n  actual:   " << got;
     }
 
-    // invariant: NON-VACUITY — with the knob OFF every one of these must come back LITERAL.
-    // invariant: if any masks anyway, something upstream of rule 4 claimed the token and the table
-    // above is no longer testing the IP grammar at all.
-    // invariant: rule 4 decides before rule 5 and the shelled-numeric reader (DN-134.D8), so a
-    // complete shell, an opener-only form and a closer-only form all belong in this leg.
+    // invariant: NON-VACUITY — the address rule, by the predicate the dispatcher reads, claims
+    // every one of these, so the table above tests the IP grammar and not a neighbour.
     for (const std::string_view tok :
          {"(10.20.30.40)", "\"10.20.30.40\"", "{10.20.30.40", "[10.20.30.40)", "10.20.30.40)"})
-    {
-        const std::string off{masked_with(tok, arena, cfg_without_ip_masking())};
-        EXPECT_EQ(off, tok)
-            << "with mask_ip_addresses OFF the wrapped IPv4 must stay literal — this leg is what "
-               "proves rule 4 (and not a composite rule reached through the maybe_composite "
-               "pre-gate) is what masks it.\n  token:    "
-            << tok << "\n  expected: " << tok << " (kept)\n  actual:   " << off;
-    }
+        EXPECT_TRUE(rule_catalog::address_rule_claims(tok))
+            << "the wrapped IPv4 must be the address rule's, or something else masks it and this "
+               "table is no longer testing the IP grammar.\n  token: "
+            << tok;
 }
 
 // invariant: the six rows that ACTUALLY SHIPPED, verbatim from the published showcase artifact.
@@ -806,21 +725,22 @@ TEST(StatelessTemplate, TheWrapperShellDoesNotReachBeyondTheAddressClass)
              "(v1.2.3.4)",
          })
     {
-        const std::string got{masked_with(tok, arena, MaskConfig{})};
+        const std::string got{masked(tok, arena)};
         EXPECT_EQ(got, tok) << "this token is not an address and must survive verbatim — the shell "
-                               "widens WHICH punctuation rule 4 tolerates, never WHAT it "
+                               "widens WHICH punctuation the address rule tolerates, never WHAT it "
                                "matches.\n  token:    "
                             << tok << "\n  expected: " << tok << " (kept)\n  actual:   " << got;
     }
     for (const std::string_view tok : {"(1.2.3)", "(1.2.3.4.5)", "(1.2.3.4x)"})
-        for (const MaskConfig& conf : {MaskConfig{}, cfg_without_ip_masking()})
-        {
-            const std::string got{masked_with(tok, arena, conf)};
-            EXPECT_EQ(got, "<*>")
-                << "not an address, but a digit-led core in a complete shell: rule 5 masks it as "
-                   "it masks the bare form, whatever the IP knob says (DN-134.D1).\n  token:  "
-                << tok << "\n  actual: " << got;
-        }
+    {
+        const std::string got{masked(tok, arena)};
+        EXPECT_EQ(got, "<*>")
+            << "not an address, but a digit-led core in a complete shell: rule 5 masks it as it "
+               "masks the bare form (DN-134.D1).\n  token:  "
+            << tok << "\n  actual: " << got;
+        EXPECT_FALSE(rule_catalog::address_rule_claims(tok))
+            << "not an address, so not the address rule's.\n  token: " << tok;
+    }
 }
 
 // invariant: the sibling with the same shape takes a DIFFERENT repair.
@@ -852,7 +772,7 @@ TEST(StatelessTemplate, AWrappedHashNormalizesLikeTheBracketedFormItAlreadyMatch
     {
         const std::string_view tok{row.token};
         const std::string_view want{row.want};
-        const std::string got{masked_with(tok, arena, MaskConfig{})};
+        const std::string got{masked(tok, arena)};
         EXPECT_EQ(got, want)
             << "a wrapped high-cardinality identity must normalize to the SAME shape in every "
                "shell — two normal forms for one class means two templates for one logical "
@@ -862,7 +782,7 @@ TEST(StatelessTemplate, AWrappedHashNormalizesLikeTheBracketedFormItAlreadyMatch
 
     // invariant: the floor holds — a short hex-looking word is still a word, shell or no shell.
     for (const std::string_view tok : {"(deadbeef)", "(cafe)"})
-        EXPECT_EQ(masked_with(tok, arena, MaskConfig{}), tok)
+        EXPECT_EQ(masked(tok, arena), tok)
             << "the >=16 hash floor must not move — a wrapped short hex word is still content.";
 }
 
@@ -881,14 +801,14 @@ TEST(StatelessTemplate, HexTokensStillMaskViaDigitLeadingAfterTheRuleFiveRip)
 
     for (const std::string_view tok : {"0xDEADBEEF", "0x1f,", "0xdeadbeef"})
     {
-        const std::string masked{masked_with(tok, arena, MaskConfig{})};
-        EXPECT_EQ(masked, "<*>")
+        const std::string got{masked(tok, arena)};
+        EXPECT_EQ(got, "<*>")
             << "token '" << tok
             << "' must mask via digit-leading (it starts with '0'). With rule 5 gone this is "
                "the "
                "ONLY thing that can catch it. If this KEEPS, the rip was not behaviour-preserving "
                "and digit-leading is not the cover it was measured to be.\n  actual: "
-            << masked;
+            << got;
     }
 }
 
@@ -1035,6 +955,12 @@ TEST(StatelessTemplate, EmbeddedIdentityArmsAreDisjoint)
                  .want = "/var/cache/<*>/x",
                  .why = "a >=16 hex run is still the hex arm's; the instant grammar must not "
                         "see it"},
+             // refs: DN-40.D11
+             Row{.token = "/var/cache/f7f63412-b7a7-468d-bd31-1a6ae1ca2680/deadbeefcafe0badf00d/"
+                          "2026-06-09T185733Z/a=fe80:db8:abc:def:cafe:beef:face:fade/x",
+                 .want = "/var/cache/<*>/<*>/<*>/a=<*>/x",
+                 .why = "the address-run arm sits beside the three others, each claiming its own "
+                        "shape whole"},
          })
     {
         const std::string one{masked(row.token, arena)};
@@ -1062,7 +988,7 @@ TEST(StatelessTemplate, MaskingRelocatesTheValueIntoParamsRatherThanDeletingIt)
                            " after 3 retries"};
 
     arena.reset();
-    const StatelessTemplate result{stateless_template(line, arena, cfg(), {})};
+    const StatelessTemplate result{stateless_template(line, arena, {})};
 
     // invariant: HALF 1 — the identity no longer carries the instance.
     EXPECT_EQ(result.template_str, "connection refused from <*> after <*> retries")
@@ -1081,7 +1007,7 @@ TEST(StatelessTemplate, MaskingRelocatesTheValueIntoParamsRatherThanDeletingIt)
 // refs: DN-134.D1
 // invariant: rule 5 reads a digit-leading core through a COMPLETE declared wrapper shell, so a
 // number a producer wraps in punctuation masks exactly as it masks bare.
-// invariant: the raw token becomes the param, as rule 4 does for a shelled address.
+// invariant: the raw token becomes the param, as the address rule does for a shelled address.
 // invariant: the shells are DERIVED from the catalog, so a pair added to it arrives witnessed.
 TEST(StatelessTemplate, ANumberInACompleteWrapperShellMasksAsItWouldBare)
 {
@@ -1095,22 +1021,17 @@ TEST(StatelessTemplate, ANumberInACompleteWrapperShellMasksAsItWouldBare)
                     continue;
                 const std::string tok{std::string{pair.open} + std::string{core} +
                                       std::string{pair.close} + std::string{trail}};
-                for (const MaskConfig& conf : {MaskConfig{}, cfg_without_ip_masking()})
-                {
-                    arena.reset();
-                    const StatelessTemplate got{stateless_template(tok, arena, conf, {})};
-                    EXPECT_EQ(got.template_str, "<*>")
-                        << "a digit-leading core inside a COMPLETE shell must mask as its bare "
-                           "form "
-                           "does, whatever the IP knob says (DN-134.D1).\n  token:    "
-                        << tok << "\n  knob:     " << conf.mask_ip_addresses
-                        << "\n  expected: <*>\n  actual:   " << got.template_str;
-                    ASSERT_EQ(got.params.size(), 1U)
-                        << "the shelled number must push exactly one param.\n  token: " << tok;
-                    EXPECT_EQ(got.params[0], tok)
-                        << "the param is the RAW token, shell included.\n  token: " << tok
-                        << "\n  param: " << got.params[0];
-                }
+                arena.reset();
+                const StatelessTemplate got{stateless_template(tok, arena, {})};
+                EXPECT_EQ(got.template_str, "<*>")
+                    << "a digit-leading core inside a COMPLETE shell must mask as its bare form "
+                       "does (DN-134.D1).\n  token:    "
+                    << tok << "\n  expected: <*>\n  actual:   " << got.template_str;
+                ASSERT_EQ(got.params.size(), 1U)
+                    << "the shelled number must push exactly one param.\n  token: " << tok;
+                EXPECT_EQ(got.params[0], tok)
+                    << "the param is the RAW token, shell included.\n  token: " << tok
+                    << "\n  param: " << got.params[0];
             }
     // invariant: the false High pair DN-134.D1 measured — two runs' stamps in brackets were two
     // templates and read as a new error pattern; the shelled counter masks too (ADR-16.D5).
@@ -1186,23 +1107,178 @@ TEST(StatelessTemplate, TheShellNumberRuleKeepsTheStatusValueAndAnIncompleteShel
         << "embedded_identity still claims it first";
 }
 
-// refs: DN-134.D8
-// invariant: rule 4 decides its WHOLE acceptance set - an IPv4 address bare, in a complete shell,
-// or with declared trailing bytes masks with the switch on and stays literal with it off.
-// invariant: neither rule 5 nor the shelled-numeric reader reaches an address the switch keeps.
-TEST(StatelessTemplate, TheIpSwitchDecidesEveryAddressRuleFourAccepts)
+// refs: DN-40.D10, DN-40.D11
+// invariant: the address family whole - IPv4, IPv6, colon-joined hardware - masks to the bare
+// wildcard, the raw token its param, so a dual-stack peer and its IPv4 twin are one template.
+// invariant: every value is a documentation address: RFC 5737, RFC 3849, RFC 7042.
+TEST(StatelessTemplate, TheAddressRuleMasksTheWholeFamilyAndKeepsTheValueAsItsParam)
 {
     ArenaAllocator arena{256U * 1024U};
-    for (const std::string_view tok : {"10.20.30.40", "(10.20.30.40)", "[10.20.30.40],"})
+    for (const std::string_view tok :
+         {"192.0.2.1", "[192.0.2.1],", "2001:db8::1", "(2001:DB8:0:0:0:0:0:1)",
+          "fe80::200:5eff:fe00:5301%en0", "::ffff:192.0.2.1",
+          "::ffff:192.0.2.1:", "0:0:0:0:0:ffff:192.0.2.1", "[2001:db8::1]:8080", "[::1]:51780",
+          "[2001:db8::1]", "00:00:5e:00:53:01", "00:00:5E:00:53:01,", "00:00:5E:00:53:01:00:02",
+          "00:00:5E:00:53:01:00:00:5E:00:53:02", "(00:00:5e:00:53:01"})
     {
-        const std::string on{masked_with(tok, arena, MaskConfig{})};
-        EXPECT_EQ(on, "<*>") << "with mask_ip_addresses ON rule 4 masks the address.\n  token:  "
-                             << tok << "\n  actual: " << on;
-        const std::string off{masked_with(tok, arena, cfg_without_ip_masking())};
-        EXPECT_EQ(off, tok) << "with mask_ip_addresses OFF the address must stay LITERAL: a switch "
-                               "named for IP addresses that leaves one masked breaks its own "
-                               "contract (DN-134.D8).\n  token:    "
-                            << tok << "\n  expected: " << tok << " (kept)\n  actual:   " << off;
+        arena.reset();
+        const StatelessTemplate got{stateless_template(tok, arena, {})};
+        EXPECT_EQ(got.template_str, "<*>")
+            << "an address the earned grammar admits masks whole.\n  token:  " << tok
+            << "\n  actual: " << got.template_str;
+        ASSERT_EQ(got.params.size(), 1U) << "one masked token, one param.\n  token: " << tok;
+        EXPECT_EQ(got.params[0], tok) << "the param is the RAW token.\n  token: " << tok;
+        EXPECT_TRUE(rule_catalog::address_rule_claims(tok))
+            << "the address rule must be what claims it.\n  token: " << tok;
+    }
+    EXPECT_EQ(masked("accepted ::ffff:192.0.2.7 peer", arena),
+              masked("accepted 192.0.2.7 peer", arena))
+        << "a dual-stack socket's line and its IPv4 twin are one template";
+}
+
+// refs: DN-40.D10, DN-40.D4, DN-40.D5
+// invariant: the grammar's boundary, asserted as hard as its reach: each is a form the census
+// read as debris, scope resolution or a time, or a form with no witness, and none is claimed.
+// invariant: a `:` shed after a hextet is the address's own separator, so no such form is an
+// address whole; after a dotted IPv4 tail it is a shell byte.
+TEST(StatelessTemplate, TheAddressRuleClaimsNothingOutsideItsEarnedGrammar)
+{
+    for (const std::string_view tok :
+         {"::",
+          "::1",
+          "::0",
+          "(::1)",
+          "000::0002",
+          "2001:0db8::1",
+          "::8827:38::",
+          "std::vector",
+          "abc::",
+          "23:59:59:999",
+          "12:30:01",
+          "2001:db8::1:",
+          "2001:db8::1):",
+          "2001:db8:0:0:0:0:0:1:",
+          "00:00:5e:00:53",
+          "00:00:5e:00:53:01:02",
+          "00-00-5E-00-53-01",
+          "0000.5e00.5301",
+          "ab:cd:ef:01:23:45:67:89:ab:cd:ef:01:23:45:67:89:ab:cd:ef:02",
+          "1:2:3:4:5:6:7:8:9",
+          "[2001:db8::1]:123456",
+          "fe80::1%",
+          "2001:db8::1::2",
+          "2001:db8:::1"})
+        EXPECT_FALSE(rule_catalog::address_rule_claims(tok))
+            << "outside the earned grammar, so not the address rule's.\n  token: " << tok;
+}
+
+// refs: DN-40.D11, DN-40.D3
+// invariant: an address run inside a larger token collapses to ONE wildcard at either seat - the
+// diagnostic walk and embedded_identity - keeping the class around it, with no param pushed.
+// invariant: a run bounded by a letter or digit, a run of a count outside the grammar and an
+// embedded `::` form are not claimed, and the walk keeps classifying them segment by segment.
+TEST(StatelessTemplate, AnEmbeddedAddressRunIsOneWildcardAtBothSeats)
+{
+    ArenaAllocator arena{256U * 1024U};
+    struct Row
+    {
+        std::string_view token;
+        std::string_view want;
+        std::string_view seat;
+    };
+    for (const Row& row : {
+             Row{.token = "v6(en0:2001:db8:0:0:0:0:0:1)",
+                 .want = "v6(en0:<*>)",
+                 .seat = "diagnostic_composite"},
+             Row{.token = "hwaddr=00:00:5e:00:53:01,",
+                 .want = "hwaddr=<*>,",
+                 .seat = "diagnostic_composite"},
+             Row{.token = "LPF/eth0/00:00:5e:00:53:01/net",
+                 .want = "LPF/eth0/<*>/net",
+                 .seat = "diagnostic_composite"},
+             Row{.token = "[Peer[id=1]/0:0:0:0:0:0:0:0:2181:Manager@1]",
+                 .want = "[Peer[id=1]/<*>:<*>:Manager@1]",
+                 .seat = "diagnostic_composite"},
+             Row{.token = "chip=00:00:5E:00:53:01:00:00:5E:00:53:02:slot7",
+                 .want = "chip=<*>:slot7",
+                 .seat = "diagnostic_composite"},
+             Row{.token = "addr=2001:db8:abc:def:cafe:beef:face:fade",
+                 .want = "addr=<*>",
+                 .seat = "embedded_identity"},
+             Row{.token = "fp=ab:cd:ef:01:23:45:67:89:ab:cd:ef:01:23:45:67:89:ab:cd:ef:02",
+                 .want =
+                     "fp=ab:cd:ef:<*>:<*>:<*>:<*>:<*>:ab:cd:ef:<*>:<*>:<*>:<*>:<*>:ab:cd:ef:<*>",
+                 .seat = "diagnostic_composite"},
+             Row{.token = "answer=2001:db8::1",
+                 .want = "answer=2001:db8::<*>",
+                 .seat = "diagnostic_composite"},
+             Row{.token = "x00:00:5e:00:53:01y:1",
+                 .want = "x00:<*>:<*>:<*>:<*>:<*>:<*>",
+                 .seat = "diagnostic_composite"},
+         })
+    {
+        arena.reset();
+        const StatelessTemplate got{stateless_template(row.token, arena, {})};
+        EXPECT_EQ(got.template_str, row.want)
+            << "an embedded run is one wildcard, and nothing else moves.\n  token:    " << row.token
+            << "\n  expected: " << row.want << "\n  actual:   " << got.template_str;
+        EXPECT_TRUE(got.params.empty())
+            << "a normalization pushes no param.\n  token: " << row.token;
+        EXPECT_EQ(rule_catalog::composite_rule_claiming(row.token), row.seat)
+            << "the seat that claims it.\n  token: " << row.token;
+    }
+}
+
+// refs: DN-40.D14
+// invariant: the run arms are monotone: every byte the masker masks without them, it masks with
+// them, so a run changes what a seat writes and never which rule claims the token.
+// invariant: rule 5's whole mask outranks any normalization, so the address arm declines a token
+// rule 4 or rule 5 masks whole and the token keeps its param.
+TEST(StatelessTemplate, TheRunArmsNeverUnmaskAByte)
+{
+    ArenaAllocator arena{256U * 1024U};
+    for (const std::string_view tok :
+         {"7/00:00:5e:00:53:01", "0:0:0:0:0:0:0:0/0:0:0:0:0:0:0:0:50000]"})
+    {
+        arena.reset();
+        const StatelessTemplate got{stateless_template(tok, arena, {})};
+        EXPECT_EQ(got.template_str, "<*>")
+            << "rule 5 masks this token whole, so no run arm may claim it.\n  token:  " << tok
+            << "\n  actual: " << got.template_str;
+        ASSERT_EQ(got.params.size(), 1U) << "the whole mask keeps its param.\n  token: " << tok;
+        EXPECT_EQ(got.params[0], tok) << "the param is the RAW token.\n  token: " << tok;
+    }
+    struct Row
+    {
+        std::string_view token;
+        std::string_view want;
+        std::string_view why;
+    };
+    for (const Row& row : {
+             Row{.token = "ab:00:5e:00:53:01:02:00:5e:00:53:01@/192.0.2.1:8080",
+                 .want = "<*>@/<*>:<*>",
+                 .why = "a letter-led group inside the run still anchors the walk"},
+             Row{.token = "192.0.2.1/2001:db8:0:0:0:0:0:2",
+                 .want = "<*>/<*>",
+                 .why = "the walk keeps its claim, so the IPv4 segment stays masked"},
+             Row{.token = "x/00:00:5e:00:53:01@99:1",
+                 .want = "x/<*>:<*>",
+                 .why = "the run takes the digit-led core it closes in whole"},
+             Row{.token = "x/7,00:00:5e:00:53:01",
+                 .want = "x/<*>",
+                 .why = "the run takes the digit-led core it opens in whole"},
+             Row{.token = "2001:db8:0:0:0:0:0:1/2001:db8:0:0:0:0:0:2:8080]",
+                 .want = "<*>/<*>:<*>]",
+                 .why = "the walk masks the first hextet left between the two runs"},
+             Row{.token = "x/00:00:5e:00:53:01/00:00:5e:00:53:02",
+                 .want = "x/<*>/<*>",
+                 .why = "the scan resumes in the segment a run ends in, so the second address "
+                        "opens at its own first group"},
+         })
+    {
+        const std::string got{masked(row.token, arena)};
+        EXPECT_EQ(got, row.want) << row.why << "\n  token:    " << row.token
+                                 << "\n  expected: " << row.want << "\n  actual:   " << got;
     }
 }
 
@@ -1243,7 +1319,7 @@ TEST(StatelessTemplate, AWholeTokenWildcardIsAParamAndEveryParamIsOne)
     for (const Case& each : cases)
     {
         arena.reset();
-        const StatelessTemplate result{stateless_template(each.line, arena, cfg(), {})};
+        const StatelessTemplate result{stateless_template(each.line, arena, {})};
         const std::vector<std::string_view> params{result.params.begin(), result.params.end()};
         std::string seen;
         for (const std::string_view param : params)
@@ -1266,7 +1342,7 @@ TEST(StatelessTemplate, TheSegmentStepMasksEachKeyValueSegmentOfANormalForm)
     const auto expect{[&](std::string_view line, std::string_view want)
                       {
                           arena.reset();
-                          const StatelessTemplate got{stateless_template(line, arena, cfg(), {})};
+                          const StatelessTemplate got{stateless_template(line, arena, {})};
                           EXPECT_EQ(got.template_str, want)
                               << "the `;`-segment key-value step (DN-134.D2).\n  line:     " << line
                               << "\n  expected: " << want << "\n  actual:   " << got.template_str;
@@ -1354,7 +1430,7 @@ TEST(StatelessTemplate, KvValueMasksOverItsNumbersExtentThroughTheOneDisposition
         [&](std::string_view line, std::string_view want)
         {
             arena.reset();
-            const StatelessTemplate got{stateless_template(line, arena, cfg(), {})};
+            const StatelessTemplate got{stateless_template(line, arena, {})};
             EXPECT_EQ(got.template_str, want)
                 << "kv_value over its number's extent (ADR-16.D15).\n  line:     " << line
                 << "\n  expected: " << want << "\n  actual:   " << got.template_str;
@@ -1451,7 +1527,7 @@ TEST(StatelessTemplate, AWholeLineJsonValueHasItsMembersInNameOrder)
         expect(keep, keep);
     // invariant: the masked values follow the permuted text, and the params are its tokens.
     arena.reset();
-    const StatelessTemplate got{stateless_template(R"({"b": 7, "a": 9})", arena, cfg(), {})};
+    const StatelessTemplate got{stateless_template(R"({"b": 7, "a": 9})", arena, {})};
     EXPECT_EQ(got.template_str, R"({"a": <*> "b": <*>)");
     ASSERT_EQ(got.params.size(), 2U) << "template: " << got.template_str;
     EXPECT_EQ(got.params[0], "9,");
