@@ -43,21 +43,30 @@ Every classification and masking rule in this library obeys the same constraints
 
 ## 3. The `canonicalization_version` gate
 
-`canonicalization_version` (owned by `kCanonicalizationVersion` in `core/api/canon.api.cppm` — the
-current value and the generation ledger live there, never mirrored here) is the contract that makes templates
-**comparable across runs**. It identifies the exact set of masking/identity rules that produced a template.
+A MetaLog document's `canonicalization_version` (the specification's §2.4 token) is the contract that
+makes templates **comparable across runs**. It is built in one place,
+`ComposedSemantics::canonicalization_version()` in `core/api/canon.compose.cppm`, as
+`<masking generation>:<composed identity>`:
 
-- **When it bumps:** any change to the **masking** rules or template identity — a new mask class, a changed
-  marker catalog, a different normalizer — bumps the version. A consumer compares only documents sharing a
-  version; mismatched versions are **re-derived, never migrated** (a template under old rules is not the same
-  identity as under new rules).
-- **When it does *not* bump:** changes to **classification** (level / failure-cue / structural role) do **not**
-  bump it — they do not change template identity. They may still move the determinism goldens (a line's level
-  flips), which is verified by re-deriving the affected golden, but they are a different change class from a
-  masking bump.
-- **The discipline:** a masking change that bumps the version cascades the full golden diagonal (re-derive +
-  re-prove cross-toolchain). The version string is the single source of truth for "are these two templates
-  even talking about the same rule set?"
+- the **masking generation** is `kCanonicalizationVersion` in `core/api/canon.api.cppm` (the current value
+  lives there; every value it has held, and why, is in
+  [canonicalization_generations.md](canonicalization_generations.md)). It is also hashed into the composed
+  identity;
+- the **composed identity** (`semantic_identity`, rendered by `identity_hex()`) is a content hash over the
+  rows the composed vocabulary packages and canon's transport catalogue ship, so a package change moves
+  it without a hand-bumped label.
+
+The token is opaque: a consumer compares only documents carrying an equal token, and never parses it. A
+producer that injects no composition (the metalog library's default) carries the bare masking generation.
+
+- **When the masking generation bumps:** on a change to what canon serializes in a field a consumer must
+  handle — the masking rules and template identity, and every classification rule whose output is
+  serialized. The ledger names each bump's class and its witness.
+- **When only the composed identity moves:** a vocabulary package's rows change. The token still moves, so
+  documents from the two compositions are incomparable, while the masking generation stays.
+- **The discipline:** mismatched tokens are **re-derived, never migrated** (a template under old rules is not
+  the same identity as under new rules). A masking change cascades the full golden diagonal (re-derive +
+  re-prove cross-toolchain).
 
 ---
 

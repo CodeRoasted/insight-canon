@@ -7,6 +7,10 @@ defaults to it, so a rules change is one edit at that declaration and impossible
 and old/new metalogs become incomparable at the specification's §2.4 gate — re-derive, never
 migrate (`F-SRC-insight-canon:canon.api.cppm:TemplateId`).
 
+The token a shipped MetaLog document carries is `<this generation>:<composed identity>`, built by
+`ComposedSemantics::canonicalization_version()` (`core/api/canon.compose.cppm`): a bump here moves it,
+and so does a change to a composed vocabulary package's rows, which leaves this generation alone.
+
 It names the **rules generation, not the package version**. The two are decoupled: a patch release
 that does not touch the rules must not change it, and a rules change inside an unreleased window
 does not wait for a release to take it.
