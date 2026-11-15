@@ -245,6 +245,12 @@ class ComposedSemantics
     }
     // invariant: the identity rendered as hex, produced only at seams.
     [[nodiscard]] std::string identity_hex() const;
+    // post: the SPEC 2.4 token of a document tokenized under this composition, built here and
+    // nowhere else: kCanonicalizationVersion, a colon, then identity_hex().
+    // note: the prefix is redundant on purpose -- an operator reads which generation moved.
+    // invariant: opaque to every consumer; the identity already covers the masking constant.
+    // refs: DN-42.D20
+    [[nodiscard]] std::string canonicalization_version() const;
     [[nodiscard]] std::span<const ComposedPackage> packages() const noexcept
     {
         return packages_;

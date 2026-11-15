@@ -404,6 +404,24 @@ TEST(Composition, SemanticIdentityIsInProcessStableOrderIndependentAndContentSen
         << "core-only and core+alpha must not collide";
 }
 
+// invariant: the SPEC 2.4 token is the masking generation joined to the composed identity, so two
+// compositions under one masking generation publish two tokens, each naming both.
+// refs: DN-42.D20
+TEST(Composition, TheCanonicalizationTokenJoinsTheMaskingGenerationToTheComposedIdentity)
+{
+    const std::string generation{insight::kCanonicalizationVersion};
+    for (const auto& composed : {compose(std::array{kPkgA}), compose(std::array{kPkgA, kPkgB})})
+    {
+        const std::string token{composed.canonicalization_version()};
+        EXPECT_EQ(token, generation + ":" + composed.identity_hex())
+            << "the token must be the masking generation, a colon, then the 32-hex identity";
+        EXPECT_EQ(composed.identity_hex().size(), 32U) << composed.identity_hex();
+    }
+    EXPECT_NE(compose(std::array{kPkgA}).canonicalization_version(),
+              compose(std::array{kPkgA, kPkgB}).canonicalization_version())
+        << "two compositions under one masking generation must publish two tokens";
+}
+
 // invariant: a stream view OWNS its resolved dialect coordinate — the caller's dialect string may
 // be rewritten or destroyed the moment `for_stream` returns, and the view's question stays right.
 // invariant: the rewrite leg is the sanitizer-free witness: the caller's buffer is still alive,

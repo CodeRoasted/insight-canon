@@ -514,6 +514,11 @@ std::string ComposedSemantics::identity_hex() const
     return out;
 }
 
+std::string ComposedSemantics::canonicalization_version() const
+{
+    return std::string{insight::kCanonicalizationVersion} + ":" + identity_hex();
+}
+
 // post: true when a marker of THIS view's dialect is withheld by the channel gate alone.
 bool ComposedSemantics::withholds_markers_for(std::string_view declared_channel) const noexcept
 {
