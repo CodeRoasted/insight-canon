@@ -249,7 +249,7 @@ class ComposedSemantics
     // nowhere else: kCanonicalizationVersion, a colon, then identity_hex().
     // note: the prefix is redundant on purpose -- an operator reads which generation moved.
     // invariant: opaque to every consumer; the identity already covers the masking constant.
-    // refs: DN-42.D20
+    // refs: ADR-17.D3
     [[nodiscard]] std::string canonicalization_version() const;
     [[nodiscard]] std::span<const ComposedPackage> packages() const noexcept
     {

@@ -406,7 +406,7 @@ TEST(Composition, SemanticIdentityIsInProcessStableOrderIndependentAndContentSen
 
 // invariant: the SPEC 2.4 token is the masking generation joined to the composed identity, so two
 // compositions under one masking generation publish two tokens, each naming both.
-// refs: DN-42.D20
+// refs: ADR-17.D3
 TEST(Composition, TheCanonicalizationTokenJoinsTheMaskingGenerationToTheComposedIdentity)
 {
     const std::string generation{insight::kCanonicalizationVersion};
