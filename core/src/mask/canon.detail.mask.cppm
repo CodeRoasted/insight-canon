@@ -134,7 +134,7 @@ namespace rule_catalog
 
     // post: true when the address rule claims `token` whole, by the predicate the dispatcher
     // reads.
-    // refs: DN-40.D11
+    // refs: ADR-16.D17
     [[nodiscard]] bool address_rule_claims(std::string_view token) noexcept;
 
     // post: the hex-run length at or above which a run is an instance hash rather than a word.

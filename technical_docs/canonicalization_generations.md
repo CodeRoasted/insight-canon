@@ -854,17 +854,17 @@ golden is re-rendered at the cut.
 `-19` SHIPPED in `v1.10.12`, so an output change after that tag takes a new value, and this is the first one
 (`ADR-2.D9`).
 
-**What changed.** The address rule (`DN-40.D10`, `DN-40.D11`, `masking.md` §3.3) claims IPv6 and `:`-joined
+**What changed.** The address rule (`ADR-16.D17`, `masking.md` §3.3) claims IPv6 and `:`-joined
 hardware addresses beside IPv4, whole, and it moves to rule 2 — above the composite layer — so no composite
 shreds an address along its own separators (the precedence is now 1 status KEEP, 2 address, 3 composite,
 4 UUID/long hash, 5 digit-leading, 6 literal). IPv4 moves with it and its resolution does not: no composite
 claims a token `is_ipv4_token` accepts. One predicate, `address_run_at`, finds an address run inside a larger
 token, and it is read at two seats: the source-location walk writes one `<*>` for the run and resumes after it,
-and `embedded_identity` masks it for a token no earlier composite claims. The run arms are monotone (`DN-40.D14`): every
+and `embedded_identity` masks it for a token no earlier composite claims. The run arms are monotone (`ADR-16.D17`): every
 byte masked without them is masked with them — the walk's letter anchor is read on the token's own segments,
 a run takes a digit-led walk core it opens or closes in whole, `embedded_identity`'s address arm never claims
 a token rule 4 or rule 5 masks whole, and after a run that ends on a hex prefix the scan resumes in that
-segment. `MaskConfig::mask_ip_addresses` is removed with its OFF path (`DN-40.D12`): the default
+segment. `MaskConfig::mask_ip_addresses` is removed with its OFF path (`ADR-16.D5`): the default
 configuration's bytes do not move for it.
 
 **Which serialized fields move.** The identity class: `template_str` and `template_id` of every line holding a
@@ -888,7 +888,7 @@ seats claim, each at `-19` → now:
   `LPF/eth0/00:00:5e:00:53:01/net` — `LPF/eth0/<*>:<*>:<*>:<*>:<*>:<*>/net`, now `LPF/eth0/<*>/net`;
   `[Peer[id=1]/0:0:0:0:0:0:0:0:2181:Manager@1]` — nine `<*>` groups, now `[Peer[id=1]/<*>:<*>:Manager@1]`;
   `addr=2001:db8:abc:def:cafe:beef:face:fade` — `addr=<*>:db8:abc:def:cafe:beef:face:fade`, now `addr=<*>`;
-* `DN-40.D14`'s monotone rows: `ab:00:5e:00:53:01:02:00:5e:00:53:01@/192.0.2.1:8080` → `<*>@/<*>:<*>`,
+* `ADR-16.D17`'s monotone rows: `ab:00:5e:00:53:01:02:00:5e:00:53:01@/192.0.2.1:8080` → `<*>@/<*>:<*>`,
   `192.0.2.1/2001:db8:0:0:0:0:0:2` → `<*>/<*>`, `x/00:00:5e:00:53:01@99:1` → `x/<*>:<*>`,
   `x/7,00:00:5e:00:53:01` → `x/<*>`, `2001:db8:0:0:0:0:0:1/2001:db8:0:0:0:0:0:2:8080]` → `<*>/<*>:<*>]`,
   `x/00:00:5e:00:53:01/00:00:5e:00:53:02` → `x/<*>/<*>`; and `7/00:00:5e:00:53:01` stays rule 5's `<*>`;

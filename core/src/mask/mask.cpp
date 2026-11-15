@@ -91,7 +91,7 @@ namespace
 
     // invariant: the address family's earned grammar, transcribed from the census that earned it,
     // byte-only and pure - no inet_pton, no locale - so the class is identical on every platform.
-    // refs: DN-40.D10, DN-40.D6
+    // refs: ADR-16.D17, DN-40.D6
     constexpr std::size_t kMaxHextetDigits{4};
     constexpr std::size_t kIpv6Units{8};
     constexpr std::size_t kMinCompressedUnits{2};
@@ -324,7 +324,7 @@ namespace
     // grammar admits: bare, bracketed with a port, or inside the IPv4 address's wrapper shell.
     // invariant: the shell's trailing bytes are read shortest first, and the first core that
     // writes address or hardware text decides the token, as the census that earned it did.
-    // refs: DN-40.D10, DN-40.D5, F-SRC-insight-canon:canon.detail.scan.cppm:kWrapperPairs
+    // refs: ADR-16.D17, F-SRC-insight-canon:canon.detail.scan.cppm:kWrapperPairs
     [[nodiscard]] constexpr bool is_ipv6_or_hardware_token(std::string_view tok) noexcept
     {
         if (!tok.contains(':'))
@@ -357,7 +357,7 @@ namespace
     // colon-joined hardware address, bare or in its shell.
     // pre: `has_separator` is the token's TokenShape fact, which every IPv6 and hardware form sets.
     // invariant: ONE predicate, read by the dispatcher and by the rule catalog.
-    // refs: DN-40.D11, ADR-16.D5
+    // refs: ADR-16.D17, ADR-16.D5
     [[nodiscard]] constexpr bool is_address_token(std::string_view tok, bool has_separator) noexcept
     {
         return is_ipv4_token(tok) || (has_separator && is_ipv6_or_hardware_token(tok));
@@ -434,7 +434,7 @@ namespace
                 scan.eighth_end = scan.run_end;
             // assert: a last group that is a hex prefix leaves the rest of its segment unread, so
             // the scan resumes in that segment, where its hex suffix may open the next run.
-            // refs: DN-40.D14
+            // refs: ADR-16.D17
             if (taken != segment.size())
             {
                 cursor = next;
@@ -479,8 +479,8 @@ namespace
     // invariant: a run claims when it is not the whole token and is 6, 8 or 12 two-digit groups,
     // or 8 groups, or 8 groups and a decimal port, of which only the 8 are claimed.
     // invariant: the scan resumes after the run's segments, claimed or not, or in the segment its
-    // last group is a hex prefix of, as the census re-run for DN-40.D14 measured.
-    // refs: DN-40.D10, DN-40.D3, DN-40.D11, DN-40.D14
+    // last group is a hex prefix of, as the census re-run for ADR-16.D17 measured.
+    // refs: ADR-16.D17
     [[nodiscard]] constexpr std::optional<AddressRun> address_run_at(std::string_view tok,
                                                                      std::size_t& cursor) noexcept
     {
@@ -534,7 +534,7 @@ namespace
     // core is digit-led, so no byte of a segment the walk masks is left beside the wildcard.
     // post: `anchors` is read on the token's own segments: the segment the run opens in by its
     // core, every later group by its first byte.
-    // refs: DN-40.D14
+    // refs: ADR-16.D17
     [[nodiscard]] constexpr WalkRun widen_for_walk(std::string_view tok, AddressRun run) noexcept
     {
         std::size_t open_start{run.start};
@@ -564,7 +564,7 @@ namespace
 
     // post: the next run the walk writes from `cursor`, merged with every later run its widening
     // reaches; nullopt when none remains.
-    // refs: DN-40.D14, F-SRC-insight-canon:mask.cpp:address_run_at
+    // refs: ADR-16.D17, F-SRC-insight-canon:mask.cpp:address_run_at
     [[nodiscard]] constexpr std::optional<WalkRun> next_walk_run(std::string_view tok,
                                                                  std::size_t& cursor) noexcept
     {
@@ -997,7 +997,7 @@ namespace
         // assert: an address run is one masked component: the walk writes one wildcard for the
         // whole run and resumes after it, so its groups are never classified one by one.
         // assert: the run keeps the walk's claim: a letter-led segment inside it still anchors.
-        // refs: DN-40.D11, DN-40.D14, F-SRC-insight-canon:mask.cpp:next_walk_run
+        // refs: ADR-16.D17, F-SRC-insight-canon:mask.cpp:next_walk_run
         std::size_t run_cursor{0};
         std::optional<WalkRun> run{next_walk_run(tok, run_cursor)};
         for (std::size_t pos{0}; pos < tok.size(); ++pos)
@@ -1377,7 +1377,7 @@ namespace
     // pre: read by the dispatcher on a token no status KEEP, address or composite rule claimed, and
     // by the address arm, on a token holding a run, where the status carve-out cannot fire.
     // invariant: rules 4 and 5 are one decision: both MASK, and neither outranks the other.
-    // refs: ADR-16.D5, DN-134.D1, DN-40.D11, DN-40.D14
+    // refs: ADR-16.D5, DN-134.D1, ADR-16.D17
     [[nodiscard]] inline bool is_masked_value(std::string_view tok, const TokenShape& shape,
                                               std::string_view prev) noexcept
     {
@@ -1404,7 +1404,7 @@ namespace
         // assert: the four arms are DISJOINT BY CONSTRUCTION and their order is a COST choice,
         // never a precedence claim - the fixed-length probes run first because they are cheaper.
         // refs: F-SRC-insight-canon:test_stateless_template.cpp:EmbeddedIdentityArmsAreDisjoint
-        // refs: DN-40.D11, F-SRC-insight-canon:mask.cpp:address_run_at
+        // refs: ADR-16.D17, F-SRC-insight-canon:mask.cpp:address_run_at
         bool masked_run{false};
         while (pos < tok.size())
         {
@@ -1448,7 +1448,7 @@ namespace
         }
         // assert: the address arm alone never claims a token rule 4 or rule 5 masks whole: that
         // mask hides every byte, so any normalization of the token would unmask some.
-        // refs: DN-40.D14
+        // refs: ADR-16.D17
         return masked || (masked_run && !is_masked_value(tok, TokenShape{tok}, std::string_view{}));
     }
 
@@ -2186,7 +2186,7 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
                        }
                        // assert: rule 2, the address rule, claims an address whole before any
                        // composite reads it, so no normalizer shreds one along its own separators.
-                       // refs: DN-40.D11
+                       // refs: ADR-16.D17
                        if (is_address_token(tok, shape.has_separator))
                        {
                            mask();

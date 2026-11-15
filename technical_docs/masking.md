@@ -210,7 +210,7 @@ package boundary and the catalog is never copied out of canon.
 The address rule (rule 2) reads one byte-only grammar, with no `inet_pton` and no locale, so the class is the
 same on every platform. Its outer bound was measured before it was written: every registered corpus, 39 341 483
 lines, each candidate arm's claims read for anything that is not an address, and only arms that claimed none
-ship (`DN-40.D10`). The values below are documentation addresses (RFC 5737, RFC 3849, RFC 7042).
+ship (`ADR-16.D17`). The values below are documentation addresses (RFC 5737, RFC 3849, RFC 7042).
 
 - **IPv4**: four dot-joined runs of one to three digits, an optional `:` port.
 - **IPv6, whole token**: the RFC 4291 text forms — the fully expanded 8-hextet form, a hextet padded or not
@@ -235,7 +235,7 @@ ship (`DN-40.D10`). The values below are documentation addresses (RFC 5737, RFC 
   writes one `<*>` for the whole run and resumes after it, and embedded-identity, for a token no earlier
   composite claims. After a run whose last group is a hex prefix of its `:`-segment, the scan resumes in that
   segment, so a second address glued behind the first opens at its own first group.
-- **A run never unmasks a byte** (`DN-40.D14`): every byte masked without the run arms is masked with them. The
+- **A run never unmasks a byte** (`ADR-16.D17`): every byte masked without the run arms is masked with them. The
   walk's letter anchor is read on the token's own segments, a letter-led group inside a run included, so a run
   changes what the walk writes and never whether it claims; a run that opens or closes in a walk segment whose
   core is digit-led takes that core whole (`x/7,00:00:5e:00:53:01` → `x/<*>`); and embedded-identity's address
@@ -349,7 +349,7 @@ warning rather than guessed at.
 ### 6 (b) Decidable, and declared outside the current generation
 
 Each member is named with the reason it stays out, measured over the census that earned the address grammar
-(§3.3, `DN-40.D10`). A member joins at its first measured witness, through its own gate and a new generation.
+(§3.3, `ADR-16.D17`). A member joins at its first measured witness, through its own gate and a new generation.
 
 - **A `::` form with at most one explicit hextet** (`::`, `::1`, `::0`, `abc::`): 36 098 claims over the corpora,
   constants that do not vary and C++ scope resolution (`std::vector`). Inside brackets with a port, the

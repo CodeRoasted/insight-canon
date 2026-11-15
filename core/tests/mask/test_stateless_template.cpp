@@ -581,7 +581,7 @@ TEST(EphemeralRootMask, G7_NoCatalogedRootNoOverFire)
 // invariant: disabling the IP rule wholesale was RED here and nowhere else, 1 failure of 601.
 // invariant: the non-vacuity leg reads the predicate the dispatcher reads: a token the address
 // rule does not claim is masked by some other rule, and this test would name the wrong one.
-// refs: ADR-16.D5, DN-40.D11, DN-40.D12
+// refs: ADR-16.D5, ADR-16.D17
 TEST(StatelessTemplate, TheAddressRuleMasksTheBracketedFormThatDigitLeadingCannotReach)
 {
     ArenaAllocator arena{256U * 1024U};
@@ -955,7 +955,7 @@ TEST(StatelessTemplate, EmbeddedIdentityArmsAreDisjoint)
                  .want = "/var/cache/<*>/x",
                  .why = "a >=16 hex run is still the hex arm's; the instant grammar must not "
                         "see it"},
-             // refs: DN-40.D11
+             // refs: ADR-16.D17
              Row{.token = "/var/cache/f7f63412-b7a7-468d-bd31-1a6ae1ca2680/deadbeefcafe0badf00d/"
                           "2026-06-09T185733Z/a=fe80:db8:abc:def:cafe:beef:face:fade/x",
                  .want = "/var/cache/<*>/<*>/<*>/a=<*>/x",
@@ -1107,7 +1107,7 @@ TEST(StatelessTemplate, TheShellNumberRuleKeepsTheStatusValueAndAnIncompleteShel
         << "embedded_identity still claims it first";
 }
 
-// refs: DN-40.D10, DN-40.D11
+// refs: ADR-16.D17
 // invariant: the address family whole - IPv4, IPv6, colon-joined hardware - masks to the bare
 // wildcard, the raw token its param, so a dual-stack peer and its IPv4 twin are one template.
 // invariant: every value is a documentation address: RFC 5737, RFC 3849, RFC 7042.
@@ -1136,7 +1136,7 @@ TEST(StatelessTemplate, TheAddressRuleMasksTheWholeFamilyAndKeepsTheValueAsItsPa
         << "a dual-stack socket's line and its IPv4 twin are one template";
 }
 
-// refs: DN-40.D10, DN-40.D4, DN-40.D5
+// refs: ADR-16.D17
 // invariant: the grammar's boundary, asserted as hard as its reach: each is a form the census
 // read as debris, scope resolution or a time, or a form with no witness, and none is claimed.
 // invariant: a `:` shed after a hextet is the address's own separator, so no such form is an
@@ -1172,7 +1172,7 @@ TEST(StatelessTemplate, TheAddressRuleClaimsNothingOutsideItsEarnedGrammar)
             << "outside the earned grammar, so not the address rule's.\n  token: " << tok;
 }
 
-// refs: DN-40.D11, DN-40.D3
+// refs: ADR-16.D17
 // invariant: an address run inside a larger token collapses to ONE wildcard at either seat - the
 // diagnostic walk and embedded_identity - keeping the class around it, with no param pushed.
 // invariant: a run bounded by a letter or digit, a run of a count outside the grammar and an
@@ -1229,7 +1229,7 @@ TEST(StatelessTemplate, AnEmbeddedAddressRunIsOneWildcardAtBothSeats)
     }
 }
 
-// refs: DN-40.D14
+// refs: ADR-16.D17
 // invariant: the run arms are monotone: every byte the masker masks without them, it masks with
 // them, so a run changes what a seat writes and never which rule claims the token.
 // invariant: rule 5's whole mask outranks any normalization, so the address arm declines a token

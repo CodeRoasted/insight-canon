@@ -1151,7 +1151,7 @@ export namespace insight::tokenization
 // refs: ADR-16.D5, F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate, ADR-17
 // invariant: no knob gates a mask rule: masking relocates a value into params and never deletes
 // it, so a switch keeping a value in the template could only mint a template per value.
-// refs: ADR-16.O3, DN-40.D12
+// refs: ADR-16.O3, ADR-16.D5
 struct MaskConfig
 {
     // invariant: when set, a line whose NATIVE component is empty takes its recognized test-file as

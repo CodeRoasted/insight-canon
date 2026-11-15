@@ -37,7 +37,7 @@
 // — detection picking another strategy, a different content slice, a semantic row change.
 // invariant: none of those is a masking-rule change, and each has its own home, including the
 // committed wire vectors downstream that DO re-derive through the full shipped tokenizer.
-// invariant: no config knob is covered, because no knob gates a mask rule (DN-40.D12).
+// invariant: no config knob is covered, because no knob gates a mask rule (ADR-16.D5).
 // invariant: a rule class whose witness is absent is made VISIBLE by limb 2 for the declared
 // catalogs, but it cannot see a class that no catalog declares.
 // invariant: REGENERATION IS AN ACTION, NOT A PROPERTY, which is why it is a disabled test — the
@@ -651,7 +651,7 @@ TEST(MaskRuleGolden, StatusKeepRowsAreKeptBecauseOfTheKeywordBeforeThem)
     }
 }
 
-// refs: DN-40.D11
+// refs: ADR-16.D17
 // invariant: rule 2 runs before every composite, so an address witness is discriminated by the
 // predicate the dispatcher reads, and its normal form must be the bare wildcard.
 TEST(MaskRuleGolden, AddressRowsMaskBecauseTheAddressRuleClaimsThem)
