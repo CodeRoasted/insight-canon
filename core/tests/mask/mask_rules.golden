@@ -213,6 +213,13 @@ embedded_identity | (d41d8cd98f00b204e9800998ecf8427e) | digest (d41d8cd98f00b20
 embedded_identity | /home/runner/work/_temp/2026-06-09T185733Z.json | wrote /home/runner/work/_temp/2026-06-09T185733Z.json ok | wrote /home/runner/work/_temp/<*>.json ok
 # ADR-16.D17: the address run's second seat, for a token no earlier composite claims (no `:` before a digit).
 embedded_identity | addr=2001:db8:abc:def:cafe:beef:face:fade | peer addr=2001:db8:abc:def:cafe:beef:face:fade up | peer addr=<*> up
+# DN-162.D13: `@` is a pre-gate trigger, so the instance after `<name>@` reaches this rule; every other
+# `@` token keeps what it read before: a version, a mail address, and a pin already reached through `/`.
+embedded_identity | ci@0123456789abcdef0123456789abcdef01234567 | SENTRY_RELEASE: ci@0123456789abcdef0123456789abcdef01234567 | SENTRY_RELEASE: ci@<*>
+literal_keep | pkg@1.2.3 | installing pkg@1.2.3 now | installing pkg@1.2.3 now
+literal_keep | node@20 | using node@20 here | using node@20 here
+literal_keep | user@example.com | mailing user@example.com today | mailing user@example.com today
+embedded_identity | owner/action@0123456789abcdef0123456789abcdef01234567 | uses owner/action@0123456789abcdef0123456789abcdef01234567 | uses owner/action@<*>
 
 # sanitizer_pid — the sanitizer-family process tag: keep both fences, mask the pid. A
 # letter-leading tail glued to the closing fence is kept verbatim; a digit after it, or any byte

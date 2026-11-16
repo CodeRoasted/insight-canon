@@ -51,6 +51,45 @@ namespace
             append_str(out, str);
     }
 
+    // invariant: the KeyedFields roles enter in member order, every one, an empty one included.
+    // refs: DN-162.D4
+    void append_field_roles(std::string& out, const KeyedFieldRoles& fields)
+    {
+        append_str(out, fields.name);
+        append_str(out, fields.display);
+        append_str(out, fields.segment);
+        append_str(out, fields.ordinal);
+        append_str(out, fields.anonymous);
+        append_str(out, fields.outcome);
+        append_str(out, fields.propagated_outcome);
+    }
+
+    // invariant: the row sections whose rows carry a revision_since, in the order the trailing
+    // ownership section writes them — the serialization order of their own sections.
+    // refs: DN-162.D1
+    constexpr std::uint32_t kOwnerBearingSections{7U};
+
+    template <typename Row> void append_row_owners(std::string& out, std::span<const Row> rows)
+    {
+        append_u32_le(out, static_cast<std::uint32_t>(rows.size()));
+        for (const Row& row : rows)
+            append_str(out, row.revision_since);
+    }
+
+    // post: the index of `since` in the package's ordered revision span; 0 for an empty one, the
+    // single-revision package's spelling of its one revision.
+    // pre: a non-empty `since` names a revision of the span, the fence every package asserts in
+    // its own translation unit (`all_row_revisions_declared`).
+    // refs: DN-162.D1
+    [[nodiscard]] std::uint32_t revision_rank_of(const SemanticPackageManifest& pkg,
+                                                 std::string_view since) noexcept
+    {
+        const auto found{std::ranges::find(pkg.dialect_revisions, since)};
+        if (found == pkg.dialect_revisions.end())
+            return 0U;
+        return static_cast<std::uint32_t>(found - pkg.dialect_revisions.begin());
+    }
+
     // post: a stable index permutation by package name, compared byte-wise and locale-independent.
     // invariant: a name tie is impossible; the version tiebreak keeps the sort total regardless.
     // refs: ADR-17.D3
@@ -104,6 +143,8 @@ namespace
             append_str(out, row.version.introducer);
             append_u8(out, static_cast<std::uint8_t>(row.version.shape));
             append_u8(out, static_cast<std::uint8_t>(row.role));
+            if (row.extract == PayloadExtract::KeyedFields)
+                append_field_roles(out, row.fields);
         }
         append_u32_le(out, static_cast<std::uint32_t>(pkg.level_lifts.size()));
         for (const LevelLiftRow& row : pkg.level_lifts)
@@ -157,17 +198,20 @@ namespace
             append_u8(out, static_cast<std::uint8_t>(row.emit));
             append_str(out, row.channel_gate);
             append_u8(out, static_cast<std::uint8_t>(row.role));
+            if (row.emit == PayloadEmit::KeyedFieldsThenClosingBracket)
+                append_field_roles(out, row.fields);
         }
         // note: byte-identical rows under different declared generations are different claims.
         // refs: ADR-17.D9
         append_str_span(out, pkg.dialect_revisions);
-        // note: a declared key and its markers are what canon masks behind, so they are identity.
-        // refs: DN-133.D2
+        // note: a declared key, its markers and its floor decide what canon masks: identity.
+        // refs: DN-133.D2, DN-162.D13
         append_u32_le(out, static_cast<std::uint32_t>(pkg.declared_values.size()));
         for (const DeclaredValueRow& row : pkg.declared_values)
         {
             append_str(out, row.key);
             append_str_span(out, row.markers);
+            append_u32_le(out, row.min_digits);
             append_str(out, row.dialect_gate);
         }
         // note: a stop announcement orders a unit's errors against the stop, so it is identity.
@@ -186,6 +230,23 @@ namespace
                 append_str(out, row.shape);
                 append_str(out, row.dialect_gate);
             }
+        }
+        // note: which revision introduced each row is identity: it is what a generation owns.
+        // invariant: written only by a package declaring several revisions, so every
+        // single-revision package keeps the preimage it had before the section existed.
+        // invariant: a decoder knows it is present from the revisions already serialized, and it
+        // opens with a non-zero count, so it never reads as the stop section's empty opener.
+        // refs: DN-162.D1, ADR-17.D9
+        if (pkg.dialect_revisions.size() > 1U)
+        {
+            append_u32_le(out, kOwnerBearingSections);
+            append_row_owners(out, pkg.roles);
+            append_row_owners(out, pkg.markers);
+            append_row_owners(out, pkg.level_lifts);
+            append_row_owners(out, pkg.outcome_tokens);
+            append_row_owners(out, pkg.emits);
+            append_row_owners(out, pkg.declared_values);
+            append_row_owners(out, pkg.stop_announcements);
         }
     }
 
@@ -249,7 +310,16 @@ namespace
     {
         std::cerr << "FATAL: insight::semantic::compose — package \"" << pkg.name
                   << "\", marker row \"" << row.prefix << "\": ";
-        if (row.role == MarkerRole::Closes)
+        if (row.kind == insight::tokenization::IntentMarkerKind::InnerStep ||
+            row.extract == PayloadExtract::KeyedFields || row.role == MarkerRole::Ends)
+            std::cerr << "an inner step is read by the KeyedFields extractor alone, and a "
+                         "KeyedFields row is an inner step's. Its naming row declares exactly the "
+                         "field roles name, display, segment, ordinal and anonymous; its ending "
+                         "row (role Ends, legal on kind InnerStep only) declares exactly outcome "
+                         "and propagated_outcome, two distinct keys; neither declares a version "
+                         "coordinate or a payload exclusion, and no other row declares a field "
+                         "role. Fix the row's kind, extractor or field roles.\n";
+        else if (row.role == MarkerRole::Closes)
             std::cerr << "a row that CLOSES its job's steps carries no identity and is of the "
                          "step kind. It needs kind Step, and no payload extractor, version "
                          "coordinate or payload exclusion: the job's epilogue it enters is the "
@@ -270,10 +340,12 @@ namespace
     {
         std::cerr << "FATAL: insight::semantic::compose — package \"" << pkg.name
                   << "\", declared value \"" << row.key
-                  << "\": a declared value names a key and at least one marker, and every "
-                     "marker is non-empty and ends in a byte that is not a digit — a marker "
-                     "ending in a digit would make the digit run after it ambiguous. Fix the "
-                     "row.\n";
+                  << "\": a declared value names a key and exactly one way to find its value: "
+                     "markers, every one non-empty and ending in a byte that is not a digit (a "
+                     "marker ending in a digit would make the digit run after it ambiguous), or "
+                     "no marker and a digit floor of at least "
+                  << kMinDeclaredValueFloor
+                  << " (a shorter markerless value would meet ordinary words). Fix the row.\n";
         std::terminate();
     }
 
@@ -476,6 +548,14 @@ check_stream_context(const insight::tokenization::StreamContext& context,
             return std::unexpected("context value \"" + entry.value + "\" under key \"" +
                                    entry.key +
                                    "\" is not a run of decimal digits with no leading zero.");
+        // refs: DN-162.D13
+        if (const std::uint32_t floor{composed.declared_value_floor(entry.key)};
+            entry.value.size() < floor)
+            return std::unexpected("context value \"" + entry.value + "\" under key \"" +
+                                   entry.key + "\" has " + std::to_string(entry.value.size()) +
+                                   " digits; the key declares no marker, so its value must hold "
+                                   "at least " +
+                                   std::to_string(floor) + " digits.");
     }
     return {};
 }
@@ -497,7 +577,8 @@ declared_runs_of(const insight::tokenization::StreamContext& context,
         const auto entry{
             std::ranges::find(context.values, row.key, &insight::tokenization::ContextValue::key)};
         if (entry != context.values.end())
-            runs.push_back({.markers = row.markers, .value = entry->value});
+            runs.push_back(
+                {.markers = row.markers, .value = entry->value, .min_digits = row.min_digits});
     }
     return runs;
 }
@@ -566,6 +647,7 @@ ComposedSemantics ComposedSemantics::for_stream(std::string_view declared_dialec
 
     out.all_roles_ = all_roles_;
     out.all_markers_ = all_markers_;
+    out.all_marker_ranks_ = all_marker_ranks_;
     out.all_level_lifts_ = all_level_lifts_;
     out.all_outcome_tokens_ = all_outcome_tokens_;
     out.all_outcome_markers_ = all_outcome_markers_;
@@ -601,12 +683,18 @@ ComposedSemantics ComposedSemantics::for_stream(std::string_view declared_dialec
     std::ranges::copy_if(all_stop_announcements_, std::back_inserter(out.stop_announcements_),
                          [&admits](const StopAnnouncementRow& row)
                          { return admits(row.dialect_gate); });
-    // refs: ADR-22.D4
+    // note: the ranks are filtered in lockstep with their rows, so the two stay parallel.
+    // refs: ADR-22.D4, DN-162.D1
     out.markers_.reserve(all_markers_.size());
-    std::ranges::copy_if(
-        all_markers_, std::back_inserter(out.markers_),
-        [&admits, declared_channel](const IntentMarkerRow& row)
-        { return admits(row.dialect_gate) && channel_admits(row.channel_gate, declared_channel); });
+    out.marker_ranks_.reserve(all_markers_.size());
+    for (std::size_t index{0}; index < all_markers_.size(); ++index)
+    {
+        const IntentMarkerRow& row{all_markers_[index]};
+        if (!admits(row.dialect_gate) || !channel_admits(row.channel_gate, declared_channel))
+            continue;
+        out.markers_.push_back(row);
+        out.marker_ranks_.push_back(all_marker_ranks_[index]);
+    }
     return out;
 }
 
@@ -641,6 +729,8 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
         composed.all_roles_.insert(composed.all_roles_.end(), pkg.roles.begin(), pkg.roles.end());
         composed.all_markers_.insert(composed.all_markers_.end(), pkg.markers.begin(),
                                      pkg.markers.end());
+        for (const IntentMarkerRow& row : pkg.markers)
+            composed.all_marker_ranks_.push_back(revision_rank_of(pkg, row.revision_since));
         composed.all_level_lifts_.insert(composed.all_level_lifts_.end(), pkg.level_lifts.begin(),
                                          pkg.level_lifts.end());
         composed.locations_.insert(composed.locations_.end(), pkg.locations.begin(),

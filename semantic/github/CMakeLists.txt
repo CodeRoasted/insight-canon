@@ -133,6 +133,11 @@ if(NOT EXISTS "${GITHUB_DIALECT_DECLARATION}")
         "missing declaration must stop the build here instead of producing an empty package. "
         "Under `conan create` its presence is carried by `exports_sources` in conanfile.py.")
 endif()
+# The retained declarations the v2 compatibility claim is checked against (DN-162.D2): the tool
+# reads them, so an edit to one must re-run it. Globbed, unlike the live declaration: a revision
+# that names an oracle the glob missed is refused by the tool itself, naming the path.
+file(GLOB GITHUB_DIALECT_ORACLES CONFIGURE_DEPENDS
+     "${CMAKE_CURRENT_SOURCE_DIR}/revisions/*.dialect.yaml")
 set(GITHUB_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 set(GITHUB_GENERATED_INC "${GITHUB_GENERATED_DIR}/github.generated.inc")
 set(GITHUB_GENERATED_STAMP "${GITHUB_GENERATED_DIR}/github.dialect.stamp")
@@ -152,7 +157,7 @@ add_custom_command(
             --out "${GITHUB_GENERATED_INC}"
     COMMAND ${CMAKE_COMMAND} -E touch "${GITHUB_GENERATED_STAMP}"
     DEPENDS "${DIALECT_CODEGEN_TOOL}" "${DIALECT_CODEGEN_SHARED}"
-            "${GITHUB_DIALECT_DECLARATION}"
+            "${GITHUB_DIALECT_DECLARATION}" ${GITHUB_DIALECT_ORACLES}
     COMMENT "dialect_package_codegen: --selftest, then project github.dialect.yaml"
     VERBATIM)
 add_custom_target(insight_semantic_github_dialect_gen DEPENDS "${GITHUB_GENERATED_STAMP}")

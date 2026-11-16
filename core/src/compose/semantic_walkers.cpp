@@ -259,8 +259,54 @@ namespace tokenization
                 return remainder;
             case insight::semantic::PayloadExtract::NumericFieldThenRemainder:
                 return skip_numeric_field(remainder);
+            case insight::semantic::PayloadExtract::KeyedFields:
+                // note: a line-final ']' is REQUIRED and dropped; the pairs are read by key below.
+                // refs: DN-162.D4
+                if (remainder.empty() || remainder.back() != ']')
+                    return std::nullopt;
+                remainder.remove_suffix(1U);
+                return remainder;
             }
             return std::nullopt;
+        }
+
+        // post: the value of the FIRST `key=value` pair of `pairs` whose key is `key`, the pairs
+        // separated by ';' and a value running to the next ';'; nullopt when no pair names it.
+        // pre: `key` is non-empty and holds no '=' or ';' (the declaration tool's refusals).
+        // refs: DN-162.D4
+        [[nodiscard]] constexpr std::optional<std::string_view>
+        keyed_value(std::string_view pairs, std::string_view key) noexcept
+        {
+            while (true)
+            {
+                const std::size_t end{std::min(pairs.find(';'), pairs.size())};
+                const std::string_view pair{pairs.data(), end};
+                if (pair.size() > key.size() && pair.starts_with(key) && pair[key.size()] == '=')
+                    return pair.substr(key.size() + 1U);
+                if (end == pairs.size())
+                    return std::nullopt;
+                pairs.remove_prefix(end + 1U);
+            }
+        }
+
+        // post: an inner step's NAME: its id's last segment after the declared segment literal,
+        // a trailing declared ordinal (the literal, then one or more digits) removed.
+        // post: the display in its place when that segment is the declared anonymous literal.
+        // post: empty when the id or the name it yields is empty, so the row declines the line.
+        // refs: DN-162.D5
+        [[nodiscard]] constexpr std::string_view
+        inner_step_name(std::string_view step_id, std::string_view display,
+                        const insight::semantic::KeyedFieldRoles& fields) noexcept
+        {
+            if (const std::size_t cut{step_id.rfind(fields.segment)}; cut != std::string_view::npos)
+                step_id.remove_prefix(cut + fields.segment.size());
+            if (const std::size_t ordinal{step_id.rfind(fields.ordinal)};
+                ordinal != std::string_view::npos && ordinal > 0 &&
+                ordinal + fields.ordinal.size() < step_id.size() &&
+                std::ranges::all_of(step_id.substr(ordinal + fields.ordinal.size()),
+                                    [](char chr) noexcept { return chr >= '0' && chr <= '9'; }))
+                step_id = step_id.substr(0, ordinal);
+            return step_id == fields.anonymous ? display : step_id;
         }
 
         // post: the payload's version under the row's declared coordinate; empty when the row
@@ -297,35 +343,62 @@ namespace tokenization
     // pre: `composed` is a view already resolved for the stream; no dialect gate is tested here.
     // post: the longest VALID match wins — a row whose extractor fails or whose payload is
     // excluded falls through.
-    // refs: ADR-17.D1, ADR-17.D4, ADR-22.D6
+    // post: a KeyedFields row also falls through on a missing key or an empty name.
+    // post: a KeyedFields row's unit is named by `inner_step_name`, carries its display, and
+    // declares no discriminant: same-named siblings are true repeats, paired in order.
+    // refs: ADR-17.D1, ADR-17.D4, ADR-22.D6, DN-162.D4, DN-162.D5
     IntentMarker recognize(NormalizedContent content,
                            const insight::semantic::ComposedSemantics& composed) noexcept
     {
         const std::string_view bytes{content.bytes()};
-        const insight::semantic::IntentMarkerRow* best{nullptr};
-        std::string_view best_payload;
-        for (const insight::semantic::IntentMarkerRow& row : composed.markers())
+        const std::span<const insight::semantic::IntentMarkerRow> rows{composed.markers()};
+        std::size_t best{rows.size()};
+        std::string_view best_name;
+        std::string_view best_display;
+        for (std::size_t index{0}; index < rows.size(); ++index)
         {
+            const insight::semantic::IntentMarkerRow& row{rows[index]};
             if (row.role != insight::semantic::MarkerRole::Names ||
                 !bytes.starts_with(row.prefix) ||
-                (best != nullptr && row.prefix.size() <= best->prefix.size()))
+                (best != rows.size() && row.prefix.size() <= rows[best].prefix.size()))
                 continue;
             const std::optional<std::string_view> payload{extract_payload(bytes, row)};
             if (!payload || payload_excluded(*payload, row))
                 continue;
-            best = &row;
-            best_payload = *payload;
+            std::string_view name{*payload};
+            std::string_view display;
+            if (row.extract == insight::semantic::PayloadExtract::KeyedFields)
+            {
+                const std::optional<std::string_view> step_id{
+                    keyed_value(*payload, row.fields.name)};
+                const std::optional<std::string_view> shown{
+                    keyed_value(*payload, row.fields.display)};
+                if (!step_id || !shown)
+                    continue;
+                name = inner_step_name(*step_id, *shown, row.fields);
+                display = *shown;
+                if (name.empty())
+                    continue;
+            }
+            best = index;
+            best_name = name;
+            best_display = display;
         }
-        if (best == nullptr)
+        if (best == rows.size())
             return {};
+        const insight::semantic::IntentMarkerRow& row{rows[best]};
         // note: the payload is the extractor's capture verbatim; the class is derived downstream.
         // refs: ADR-18.D5
-        const std::string_view version{declared_version(best_payload, *best)};
-        return {.kind = best->kind,
-                .name = best_payload,
-                .discriminant = discriminant_of(best_payload, version),
-                .child_order = best->child_order,
-                .version = version};
+        const std::string_view version{declared_version(best_name, row)};
+        const bool keyed{row.extract == insight::semantic::PayloadExtract::KeyedFields};
+        return {.kind = row.kind,
+                .name = best_name,
+                .discriminant = keyed ? std::string_view{} : discriminant_of(best_name, version),
+                .child_order = row.child_order,
+                .version = version,
+                .display = best_display,
+                .revision_since = row.revision_since,
+                .revision_rank = composed.marker_revision_ranks()[best]};
     }
 
     // pre: `composed` is a view already resolved for the stream; no dialect gate is tested here.
@@ -342,6 +415,40 @@ namespace tokenization
                 (best == nullptr || row.prefix.size() > best->prefix.size()))
                 best = &row;
         return best == nullptr ? IntentMarkerKind::None : best->kind;
+    }
+
+    // pre: `composed` is a view already resolved for the stream; no dialect gate is tested here.
+    // post: the longest ending row whose extractor holds and whose line names both outcome keys.
+    // refs: DN-162.D4, DN-162.D8
+    UnitEnd recognize_end(NormalizedContent content,
+                          const insight::semantic::ComposedSemantics& composed) noexcept
+    {
+        const std::string_view bytes{content.bytes()};
+        const std::span<const insight::semantic::IntentMarkerRow> rows{composed.markers()};
+        UnitEnd best;
+        std::size_t best_len{0};
+        for (std::size_t index{0}; index < rows.size(); ++index)
+        {
+            const insight::semantic::IntentMarkerRow& row{rows[index]};
+            if (row.role != insight::semantic::MarkerRole::Ends || !bytes.starts_with(row.prefix) ||
+                (best.kind != IntentMarkerKind::None && row.prefix.size() <= best_len))
+                continue;
+            const std::optional<std::string_view> payload{extract_payload(bytes, row)};
+            if (!payload)
+                continue;
+            const std::optional<std::string_view> own{keyed_value(*payload, row.fields.outcome)};
+            const std::optional<std::string_view> counted{
+                keyed_value(*payload, row.fields.propagated_outcome)};
+            if (!own || !counted)
+                continue;
+            best = {.kind = row.kind,
+                    .outcome = *own,
+                    .propagated_outcome = *counted,
+                    .revision_since = row.revision_since,
+                    .revision_rank = composed.marker_revision_ranks()[index]};
+            best_len = row.prefix.size();
+        }
+        return best;
     }
 
     // pre: `composed` is a view already resolved for the stream; no dialect gate is tested here.

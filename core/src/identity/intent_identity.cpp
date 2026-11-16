@@ -300,6 +300,25 @@ namespace
         }
         return pos + 1;
     }
+
+    // post: `claims` gains every maximal digit run of `form` equal to `run`'s value, a digit on
+    // neither side, when the value is at least `run`'s floor long.
+    // pre: `run` declares no marker.
+    // refs: DN-162.D13
+    void claim_whole_runs(std::string_view form, const DeclaredRun& run,
+                          std::vector<ClaimedRun>& claims)
+    {
+        if (run.value.size() < run.min_digits)
+            return;
+        for (std::size_t first{form.find(run.value)}; first != std::string_view::npos;
+             first = form.find(run.value, first + 1))
+        {
+            const std::size_t last{first + run.value.size()};
+            if ((first == 0 || !is_digit(form[first - 1])) &&
+                (last == form.size() || !is_digit(form[last])))
+                claims.push_back({.first = first, .last = last});
+        }
+    }
 } // namespace
 
 void claim_declared_runs(std::string_view form, std::span<const DeclaredRun> runs,
@@ -311,6 +330,11 @@ void claim_declared_runs(std::string_view form, std::span<const DeclaredRun> run
         // note: the whole cost of a form naming no declared value is this one search per run.
         if (form.find(run.value) == std::string_view::npos)
             continue;
+        if (run.markers.empty())
+        {
+            claim_whole_runs(form, run, claims);
+            continue;
+        }
         std::size_t pos{0};
         while (pos < form.size())
             pos = pos == 0 || (!is_alpha(form[pos - 1]) && !is_digit(form[pos - 1]))

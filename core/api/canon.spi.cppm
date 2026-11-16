@@ -224,7 +224,7 @@ export namespace insight::semantic
 // invariant: distinct from the MASKING token kCanonicalizationVersion, whose value canon.api.cppm
 // owns; this one names the GRAMMAR's shape.
 // refs: ADR-2.D5, ADR-17.D4, ADR-22.D8
-inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-8"};
+inline constexpr std::string_view kSemanticGrammarVersion{"semantic-grammar-9"};
 
 // invariant: a DIALECT is a VOCABULARY over a HOST FORMAT — the format owns the layout rule, the
 // dialect owns the names inside a layout another layer already delimited.
@@ -279,6 +279,20 @@ inline constexpr std::string_view kAnyChannel{};
     return channel_gate == kAnyChannel || channel_gate == declared_channel;
 }
 
+// post: true when the row is owned by EVERY revision its package recognizes: its revision_since
+// is the ordered span's first, or empty in a single-revision package.
+// invariant: the WRITER's question beside channel_admits: a writer rendering only neutral rows
+// writes a log every generation of its dialect reads.
+// invariant: a row owned by the newest generation is NOT neutral: under the superset every row is.
+// refs: DN-162.D9, ADR-22.D8
+template <typename Row>
+[[nodiscard]] constexpr bool
+generation_neutral(const Row& row, std::span<const std::string_view> revisions) noexcept
+{
+    return row.revision_since.empty() ||
+           (!revisions.empty() && row.revision_since == revisions.front());
+}
+
 // invariant: a CLOSED extractor enum — the algorithm lives in core and a new extractor is a
 // grammar-version bump, part of the identity.
 // invariant: the alignment class and the discriminant are derived in core, by canonicalize_intent
@@ -306,6 +320,12 @@ enum class PayloadExtract : std::uint8_t
     // excludes the echoed phantoms.
     // refs: F-SRC-insight-canon:canon.api.cppm:normalize, STU-12, ADR-17
     NumericFieldThenRemainder,
+    // invariant: the content after the prefix is `key=value` pairs separated by ';' up to a
+    // REQUIRED line-final ']'; a line that does not end with ']' does not match the row at all.
+    // invariant: the row's `fields` say which key plays which part, as data, so core holds no
+    // platform's keys or literals; a key the row names and the line lacks declines the row.
+    // refs: DN-162.D4, DN-162.D5, ADR-18.D1
+    KeyedFields,
 };
 
 // invariant: the CLOSED dual of PayloadExtract — each emit value is the exact inverse of one
@@ -330,6 +350,10 @@ enum class PayloadEmit : std::uint8_t
     // invariant: the two reader-side suffix drops have no generation dual: the writer emits neither
     // a producer option group nor the CR terminator.
     PlaceholderNumericFieldThenPayload,
+    // invariant: dual of KeyedFields — the prefix, every key the row's fields name set to the
+    // payload in member order, ';'-separated, then the final ']'.
+    // refs: DN-162.D4
+    KeyedFieldsThenClosingBracket,
 };
 
 // post: the extractor-to-emitter map, TOTAL over the declared pairs, and the ONE site the pairing
@@ -351,6 +375,8 @@ enum class PayloadEmit : std::uint8_t
         return PayloadEmit::PayloadThenClosingParen;
     case PayloadExtract::NumericFieldThenRemainder:
         return PayloadEmit::PlaceholderNumericFieldThenPayload;
+    case PayloadExtract::KeyedFields:
+        return PayloadEmit::KeyedFieldsThenClosingBracket;
     }
     return PayloadEmit::None;
 }
@@ -396,6 +422,12 @@ struct StructuralRoleRow
     std::string_view dialect_gate{kAnyDialect};
     // refs: ADR-17.D14
     RoleMatchKind match{RoleMatchKind::Prefix};
+    // invariant: the dialect revision that INTRODUCED the row; empty in a single-revision package
+    // and a declared revision in every other (`all_row_revisions_declared`).
+    // invariant: the LAST member of every row struct that carries it, so a row that omits it
+    // compiles unchanged; it enters the identity in the manifest's trailing section, never here.
+    // refs: DN-162.D1
+    std::string_view revision_since;
 };
 
 // invariant: the one hole spelling a shape admits.
@@ -529,6 +561,8 @@ struct StopAnnouncementRow
     // invariant: filtered into the stream view once, at resolution, and never consulted per line.
     // refs: ADR-22.D6
     std::string_view dialect_gate{kAnyDialect};
+    // refs: DN-162.D1
+    std::string_view revision_since;
 };
 
 // post: whether the row can be composed: its shape is well formed.
@@ -583,6 +617,37 @@ enum class MarkerRole : std::uint8_t
     // step-level unit the segmenter supplies, and it carries no identity; legal on kind Step only.
     // refs: ADR-20.D32
     Closes,
+    // invariant: the row ends the innermost open unit of its kind, and the lines after it belong
+    // to the enclosing unit again; it names nothing and compares no id, as position governs.
+    // invariant: it carries the ended unit's own declared outcome token and the one its containing
+    // unit counted; legal on kind InnerStep only, with a KeyedFields extractor reading both.
+    // refs: DN-162.D4, DN-162.D8
+    Ends,
+};
+
+// invariant: which payload key of a KeyedFields row plays which part, and the literal bytes core
+// applies to the name's value; every member defaulted to the empty view.
+// invariant: an EXACT set per row shape, never a core with optional extras (see
+// `unit_role_row_admitted`).
+// invariant: a naming row declares `name`, `display`, `segment`, `ordinal` and `anonymous`, and
+// an Ends row `outcome` and `propagated_outcome`, the rest empty.
+// invariant: `name`, `display`, `outcome` and `propagated_outcome` name a payload KEY;
+// `segment`, `ordinal` and `anonymous` are literal bytes, so core holds no platform's literal.
+// invariant: serialized into semantic_identity on a KeyedFields row, in this member order.
+// refs: DN-162.D4, DN-162.D5, DN-162.O3, ADR-18.D1
+struct KeyedFieldRoles
+{
+    std::string_view name;
+    std::string_view display;
+    std::string_view segment;
+    std::string_view ordinal;
+    std::string_view anonymous;
+    // invariant: the ended unit's OWN declared outcome token.
+    std::string_view outcome;
+    // invariant: the ended unit's outcome as its CONTAINING unit counted it — a tolerance the
+    // containing unit declares, named for what it means and never for a platform's key.
+    // refs: DN-162.D8
+    std::string_view propagated_outcome;
 };
 
 // invariant: a prefix opens a behavioural quantum, carrying the dialect's kind and child_order —
@@ -624,28 +689,82 @@ struct IntentMarkerRow
     // and `recognize_closer` only Closes rows.
     // refs: ADR-17.D6, ADR-20.D32
     MarkerRole role{MarkerRole::Names};
+    // invariant: the KeyedFields roles, empty on a row with any other extractor.
+    // refs: DN-162.D4
+    KeyedFieldRoles fields{};
+    // refs: DN-162.D1
+    std::string_view revision_since;
 };
+
+// post: true when `fields` declares exactly the naming set — `name`, `display`, `segment`,
+// `ordinal` and `anonymous`, none empty — and no outcome role.
+// refs: DN-162.O3
+[[nodiscard]] constexpr bool naming_fields_exact(const KeyedFieldRoles& fields) noexcept
+{
+    return !fields.name.empty() && !fields.display.empty() && !fields.segment.empty() &&
+           !fields.ordinal.empty() && !fields.anonymous.empty() && fields.outcome.empty() &&
+           fields.propagated_outcome.empty();
+}
+
+// post: true when `fields` declares exactly the ending set — `outcome` and `propagated_outcome`,
+// two distinct keys — and no naming role.
+// refs: DN-162.O3
+[[nodiscard]] constexpr bool ending_fields_exact(const KeyedFieldRoles& fields) noexcept
+{
+    return fields.name.empty() && fields.display.empty() && fields.segment.empty() &&
+           fields.ordinal.empty() && fields.anonymous.empty() && !fields.outcome.empty() &&
+           !fields.propagated_outcome.empty() && fields.outcome != fields.propagated_outcome;
+}
 
 // post: true when the row names its unit, or opens a job or a step, or closes a job's steps, while
 // carrying no identity — no extractor, version coordinate or payload exclusion.
+// post: an inner step is read by KeyedFields alone, and a KeyedFields row is an inner step's.
+// post: its naming row declares the naming set and an Ends row the ending set, neither a version
+// coordinate nor an exclusion.
+// post: every other row declares no field role.
 // invariant: an Opens row is of kind Job or Step, so the unnamed unit an opener leaves has one
 // sentinel per kind to name it.
 // invariant: a Closes row is of kind Step, so the epilogue it enters is a step of its job.
-// refs: ADR-17.D6, ADR-20.D32
+// refs: ADR-17.D6, ADR-20.D32, DN-162.D4
 [[nodiscard]] constexpr bool unit_role_row_admitted(const IntentMarkerRow& row) noexcept
 {
-    const bool no_identity{row.extract == PayloadExtract::None && row.version.introducer.empty() &&
-                           row.version.shape == VersionPayloadShape::None &&
+    const bool no_version{row.version.introducer.empty() &&
+                          row.version.shape == VersionPayloadShape::None};
+    const bool no_identity{row.extract == PayloadExtract::None && no_version &&
                            row.payload_excludes.empty()};
+    const bool inner{row.kind == insight::tokenization::IntentMarkerKind::InnerStep};
+    const bool keyed{row.extract == PayloadExtract::KeyedFields};
+    if (inner != keyed)
+        return false;
+    if (!keyed && row.fields.name.empty() && row.fields.display.empty() &&
+        row.fields.segment.empty() && row.fields.ordinal.empty() && row.fields.anonymous.empty() &&
+        row.fields.outcome.empty() && row.fields.propagated_outcome.empty())
+    {
+        switch (row.role)
+        {
+        case MarkerRole::Names:
+            return true;
+        case MarkerRole::Opens:
+            return no_identity && (row.kind == insight::tokenization::IntentMarkerKind::Job ||
+                                   row.kind == insight::tokenization::IntentMarkerKind::Step);
+        case MarkerRole::Closes:
+            return no_identity && row.kind == insight::tokenization::IntentMarkerKind::Step;
+        case MarkerRole::Ends:
+            return false;
+        }
+        return false;
+    }
+    if (!keyed || !no_version || !row.payload_excludes.empty())
+        return false;
     switch (row.role)
     {
     case MarkerRole::Names:
-        return true;
+        return naming_fields_exact(row.fields);
+    case MarkerRole::Ends:
+        return ending_fields_exact(row.fields);
     case MarkerRole::Opens:
-        return no_identity && (row.kind == insight::tokenization::IntentMarkerKind::Job ||
-                               row.kind == insight::tokenization::IntentMarkerKind::Step);
     case MarkerRole::Closes:
-        return no_identity && row.kind == insight::tokenization::IntentMarkerKind::Step;
+        return false;
     }
     return false;
 }
@@ -678,6 +797,12 @@ struct IntentEmitRow
     // naming row and never a row that only opens or closes one.
     // refs: ADR-17.D6, ADR-20.D32
     MarkerRole role{MarkerRole::Names};
+    // invariant: the reader row's field roles: the dual renders the line its extractor reads back.
+    // refs: DN-162.D4
+    KeyedFieldRoles fields{};
+    // invariant: the reader row's own revision, copied and never declared (DN-17.D15).
+    // refs: DN-162.D1
+    std::string_view revision_since;
 };
 
 // invariant: a prefix lifts the line's LogLevel, inside parse() and before raw-text inference,
@@ -688,6 +813,8 @@ struct LevelLiftRow
     std::string_view prefix;
     insight::LogLevel level;
     std::string_view dialect_gate{kAnyDialect};
+    // refs: DN-162.D1
+    std::string_view revision_since;
 };
 
 // invariant: recognizes a test-file WHERE coordinate; kind selects the core matching algorithm and
@@ -718,6 +845,8 @@ struct OutcomeTokenRow
     std::string_view token;
     insight::RunOutcome outcome;
     std::string_view dialect_gate{kAnyDialect};
+    // refs: DN-162.D1
+    std::string_view revision_since;
 };
 
 // invariant: a CLOSED shape enum — how a matched OutcomeMarkerRow yields its verdict; two
@@ -770,26 +899,41 @@ struct ValueClassRow
     std::int64_t scale;
 };
 
-// refs: DN-133.D1, DN-133.D2
-// invariant: a VALUE a stream's acquirer may declare under `key`, and the markers behind which
-// core masks a digit run equal to it; the package declares the key and the markers, never a value.
-// invariant: core applies it as a mechanism and holds no marker: a marker is this row's data.
+// refs: DN-162.D13
+// invariant: the lowest digit floor a markerless declared value may take: with no marker, a
+// shorter value would meet ordinary words.
+inline constexpr std::uint32_t kMinDeclaredValueFloor{10};
+
+// refs: DN-133.D1, DN-133.D2, DN-162.D13
+// invariant: a VALUE a stream's acquirer may declare under `key`, and how core finds it: behind
+// one of `markers`, or, with no marker, as a whole digit run behind the floor `min_digits`.
+// invariant: the package declares the key and the match, never a value; core holds neither.
 // invariant: every marker is non-empty and ends in a byte that is not a digit, or the maximal
 // digit run after it would not be the run the marker introduces; composition refuses any other.
+// invariant: a row declares exactly one of markers and a floor, and a floor is at least
+// kMinDeclaredValueFloor; `min_digits` zero means the row declares none.
 // invariant: dialect-gated like every recognition row, so a key applies only on a stream that
 // declares the owning dialect.
 struct DeclaredValueRow
 {
     std::string_view key;
     std::span<const std::string_view> markers;
+    std::uint32_t min_digits{0};
     std::string_view dialect_gate{kAnyDialect};
+    // refs: DN-162.D1
+    std::string_view revision_since;
 };
 
-// post: true when the row names a key and every marker is non-empty and does not end in a digit.
-// refs: DN-133.D1
+// post: true when the row names a key and declares exactly one match: non-empty markers, none
+// empty nor ending in a digit, or no marker and a floor of at least kMinDeclaredValueFloor.
+// refs: DN-133.D1, DN-162.D13
 [[nodiscard]] constexpr bool declared_value_row_well_formed(const DeclaredValueRow& row) noexcept
 {
-    return !row.key.empty() && !row.markers.empty() &&
+    if (row.key.empty())
+        return false;
+    if (row.markers.empty())
+        return row.min_digits >= kMinDeclaredValueFloor;
+    return row.min_digits == 0 &&
            std::ranges::all_of(
                row.markers, [](std::string_view marker) noexcept
                { return !marker.empty() && (marker.back() < '0' || marker.back() > '9'); });
@@ -853,10 +997,11 @@ struct SemanticPackageManifest
     // ruleset identity and a reader must never substitute one for the other.
     // invariant: NON-EMPTY, with names unique and non-empty — a package that recognizes nothing
     // in particular is not a state the grammar admits.
-    // invariant: cardinality ONE is a SCHEMA bound enforced by the declaration tool, never here:
-    // core stays general so a later schema bump re-opens it without reshaping this member.
-    // invariant: NOT a gate — nothing filters on it and no row carries it; the identity serializer
-    // is its only RUNTIME reader, and the conformance kit's equivalence check compares it too.
+    // invariant: ORDERED oldest first: the order is what makes a row's revision_since a lower
+    // bound, and a row's revision RANK is its revision's index here.
+    // invariant: NOT a gate — nothing filters on it; the identity serializer, the conformance
+    // kit's equivalence check and composition's revision ranks are its runtime readers.
+    // refs: DN-162.D1
     // invariant: deliberately NOT propagated into ComposedPackage or the metalog RulesetIdentity
     // wire surface, which has a different owner and external implementers.
     // invariant: the span points at package-static constexpr storage and is serialized at the END
@@ -888,17 +1033,38 @@ struct SemanticPackageManifest
 // refs: STU-8, DN-17.D15
 inline constexpr std::string_view kPlaceholderNumericField{"0:"};
 
+// pre: on a KeyedFields row, `payload` holds no ';', no ']', no segment or anonymous literal of
+// the row and no trailing ordinal, so it is one unit's whole id.
 // post: PURE — a function of (row, payload) only: no RNG, no envelope, no engine state, no
 // wall-clock.
 // post: the exact inverse of the PayloadExtract algorithm — recognize(render_row(row, payload))
 // recovers the row's kind and child_order and the payload.
 // post: allocates the result string, caller-owned, and it is the only allocation.
-// refs: STU-8
+// refs: STU-8, DN-162.D4
 [[nodiscard]] inline std::string render_row(const IntentEmitRow& row, std::string_view payload)
 {
     std::string out;
     switch (row.emit)
     {
+    case PayloadEmit::KeyedFieldsThenClosingBracket:
+    {
+        out.append(row.prefix);
+        bool first{true};
+        for (const std::string_view key : {row.fields.name, row.fields.display, row.fields.outcome,
+                                           row.fields.propagated_outcome})
+        {
+            if (key.empty())
+                continue;
+            if (!first)
+                out.push_back(';');
+            first = false;
+            out.append(key);
+            out.push_back('=');
+            out.append(payload);
+        }
+        out.push_back(']');
+        break;
+    }
     case PayloadEmit::None:
         out.reserve(row.prefix.size());
         out.append(row.prefix);
@@ -950,7 +1116,7 @@ inline constexpr std::string_view kPlaceholderNumericField{"0:"};
 }
 
 // post: the generation row that materializes into a line THAT reader row recognizes — the same
-// prefix, kind, role and MEDIUM.
+// prefix, kind, role, field roles, revision and MEDIUM.
 // invariant: the Medium is dialect times IntentChannel, so the pairing matches on BOTH gates — a
 // reader row gated to one channel pairs only with a writer row gated to the same one.
 // post: nullptr when unpaired, and well-defined iff every reader row has exactly one paired writer
@@ -963,7 +1129,14 @@ paired_writer_row(const IntentMarkerRow& reader, std::span<const IntentEmitRow> 
     {
         if (emit.prefix == reader.prefix && emit.kind == reader.kind &&
             emit.dialect_gate == reader.dialect_gate && emit.channel_gate == reader.channel_gate &&
-            emit.role == reader.role)
+            emit.role == reader.role && emit.fields.name == reader.fields.name &&
+            emit.fields.display == reader.fields.display &&
+            emit.fields.segment == reader.fields.segment &&
+            emit.fields.ordinal == reader.fields.ordinal &&
+            emit.fields.anonymous == reader.fields.anonymous &&
+            emit.fields.outcome == reader.fields.outcome &&
+            emit.fields.propagated_outcome == reader.fields.propagated_outcome &&
+            emit.revision_since == reader.revision_since)
         {
             return &emit;
         }
@@ -1001,6 +1174,35 @@ all_revisions_named(std::span<const std::string_view> revisions) noexcept
                 return false;
     }
     return true;
+}
+
+// post: with ONE declared revision, every row's revision_since is empty.
+// post: with more, every row of every owner-bearing section names a revision of the span.
+// post: with more, the sections whose rows carry no owner — locations, value classes, outcome
+// markers — are empty.
+// invariant: takes the MANIFEST, as all_dialect_gates_owned does, so a row section added later
+// cannot be forgotten here.
+// refs: DN-162.D1, DN-162.O3
+[[nodiscard]] consteval bool
+all_row_revisions_declared(const SemanticPackageManifest& manifest) noexcept
+{
+    const bool singleton{manifest.dialect_revisions.size() == 1U};
+    const auto owned{[&manifest, singleton](std::string_view since) noexcept
+                     {
+                         return singleton
+                                    ? since.empty()
+                                    : std::ranges::contains(manifest.dialect_revisions, since);
+                     }};
+    const auto all_owned{[&owned](const auto& rows) noexcept
+                         {
+                             return std::ranges::all_of(rows, [&owned](const auto& row) noexcept
+                                                        { return owned(row.revision_since); });
+                         }};
+    return (singleton || (manifest.locations.empty() && manifest.value_classes.empty() &&
+                          manifest.outcome_markers.empty())) &&
+           all_owned(manifest.roles) && all_owned(manifest.markers) && all_owned(manifest.emits) &&
+           all_owned(manifest.level_lifts) && all_owned(manifest.outcome_tokens) &&
+           all_owned(manifest.declared_values) && all_owned(manifest.stop_announcements);
 }
 
 // invariant: every row's channel_gate is kAnyChannel or one of the package's DECLARED channels, so

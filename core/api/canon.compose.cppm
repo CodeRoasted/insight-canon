@@ -127,6 +127,15 @@ class ComposedSemantics
     {
         return markers_;
     }
+    // post: parallel to markers(): each row's revision RANK, its revision_since's index in its OWN
+    // package's ordered span, 0 for the first revision and for a single-revision package's rows.
+    // invariant: derived at composition, where a row's package is still known; the flattened
+    // table no longer says which package a row came from.
+    // refs: DN-162.D1, DN-162.D7
+    [[nodiscard]] std::span<const std::uint32_t> marker_revision_ranks() const noexcept
+    {
+        return marker_ranks_;
+    }
     [[nodiscard]] std::span<const LevelLiftRow> level_lifts() const noexcept
     {
         return level_lifts_;
@@ -184,6 +193,19 @@ class ComposedSemantics
     [[nodiscard]] std::span<const std::string_view> declared_value_keys() const noexcept
     {
         return declared_value_keys_;
+    }
+    // refs: DN-162.D13
+    // post: the highest digit floor any row under `key` declares, read unfiltered as the keys
+    // are; zero for a key only markers find or a key no package declares.
+    // invariant: the highest, because rows under one key in packages of disjoint dialects may
+    // differ, and a value refused by none of them is one no stream's row can refuse.
+    [[nodiscard]] std::uint32_t declared_value_floor(std::string_view key) const noexcept
+    {
+        std::uint32_t floor{0};
+        for (const DeclaredValueRow& row : all_declared_values_)
+            if (row.key == key)
+                floor = std::max(floor, row.min_digits);
+        return floor;
     }
 
     // refs: ADR-22, ADR-22.D4
@@ -274,6 +296,7 @@ class ComposedSemantics
     // note: that is why the accessors expose the VIEW and the unfiltered tables below are private
     std::vector<StructuralRoleRow> roles_;
     std::vector<IntentMarkerRow> markers_;
+    std::vector<std::uint32_t> marker_ranks_;
     std::vector<LevelLiftRow> level_lifts_;
     std::vector<OutcomeTokenRow> outcome_tokens_;
     std::vector<OutcomeMarkerRow> outcome_markers_;
@@ -286,6 +309,7 @@ class ComposedSemantics
     // view would be a shrinking chain, so a second declaration could only ever remove rows.
     std::vector<StructuralRoleRow> all_roles_;
     std::vector<IntentMarkerRow> all_markers_;
+    std::vector<std::uint32_t> all_marker_ranks_;
     std::vector<LevelLiftRow> all_level_lifts_;
     std::vector<OutcomeTokenRow> all_outcome_tokens_;
     std::vector<OutcomeMarkerRow> all_outcome_markers_;
@@ -345,7 +369,9 @@ resolve_stream(const ComposedSemantics& composed,
 
 // refs: DN-133.D2
 // post: the context checked against a composition — every key declared by some composed package,
-// no key declared twice, every value declarable; the refusal names the declared keys.
+// no key declared twice, every value declarable and at least its key's digit floor long.
+// post: a refusal names the declared keys, or the floor.
+// refs: DN-162.D13
 // invariant: an unknown key is a MISTAKE and is refused here; a known key whose dialect a stream
 // does not declare is legal and applies nothing on that stream, through the view.
 [[nodiscard]] std::expected<void, std::string>

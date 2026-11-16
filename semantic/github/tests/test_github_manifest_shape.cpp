@@ -17,7 +17,7 @@ TEST(GithubManifestShape, ShipsTheDeclaredRulesetShapeAndNothingElse)
     EXPECT_EQ(name, "github") << "the declared package name is the dialect coordinate every gated "
                                  "row carries and what a caller declares; actual: "
                               << name;
-    EXPECT_EQ(version, "1.11.0")
+    EXPECT_EQ(version, "1.12.0")
         << "ruleset version moved without this pin moving with it — if the "
            "rows below changed, both edits belong in one pass (ADR-17.D3); "
            "actual: "
@@ -26,8 +26,11 @@ TEST(GithubManifestShape, ShipsTheDeclaredRulesetShapeAndNothingElse)
     EXPECT_EQ(roles.size(), 8U) << "structural-role rows — six announced markers and two Progress "
                                    "shapes (ADR-17.D14), actual: "
                                 << roles.size();
-    EXPECT_EQ(markers.size(), 7U) << "intent-marker rows, actual: " << markers.size();
-    EXPECT_EQ(emits.size(), 7U)
+    EXPECT_EQ(markers.size(), 9U)
+        << "intent-marker rows — seven v1 rows and the v2 inner step's start and end "
+           "(DN-162.D4), actual: "
+        << markers.size();
+    EXPECT_EQ(emits.size(), 9U)
         << "generation-template rows — the writer dual, one per recognition row (ADR-18.D4), so "
            "this must equal markers.size() = "
         << markers.size() << "; actual: " << emits.size();
@@ -36,18 +39,21 @@ TEST(GithubManifestShape, ShipsTheDeclaredRulesetShapeAndNothingElse)
         << "run-outcome token rows, actual: " << outcome_tokens.size();
     EXPECT_EQ(channels.size(), 2U)
         << "declared intent-channel vocabulary (annotated + stripped), actual: " << channels.size();
-    EXPECT_EQ(dialect_revisions.size(), 1U)
-        << "declared vendor-revision vocabulary — cardinality one until GitHub ships a second "
-           "workflow-command syntax generation; actual: "
+    ASSERT_EQ(dialect_revisions.size(), 2U)
+        << "declared vendor-revision vocabulary — v1 and the runner of 2026-07-16 onward, oldest "
+           "first (DN-162.D1); actual: "
         << dialect_revisions.size();
+    EXPECT_EQ(dialect_revisions[0], "v1") << "the span is ordered oldest first (DN-162.D1)";
+    EXPECT_EQ(dialect_revisions[1], "v2") << "the span is ordered oldest first (DN-162.D1)";
     // refs: ADR-17.D15
     EXPECT_EQ(stop_announcements.size(), 3U)
         << "stop-announcement rows — the runner's cancellation and shutdown lines and depot's; "
            "actual: "
         << stop_announcements.size();
-    // refs: DN-133.D1
-    ASSERT_EQ(declared_values.size(), 1U)
-        << "declared-value rows — one key, the run's own pull-request number; actual: "
+    // refs: DN-133.D1, DN-162.D13
+    ASSERT_EQ(declared_values.size(), 2U)
+        << "declared-value rows — two keys, the run's own pull-request number and run id; "
+           "actual: "
         << declared_values.size();
     EXPECT_EQ(declared_values[0].key, "pull_request")
         << "the key a caller declares the value under; actual: " << declared_values[0].key;
@@ -59,6 +65,18 @@ TEST(GithubManifestShape, ShipsTheDeclaredRulesetShapeAndNothingElse)
     EXPECT_EQ(markers_declared, markers_measured)
         << "the eight spellings measured before their builds, byte-exact and in declared order; "
            "the set is extended only on measured evidence";
+    // refs: DN-162.D13
+    EXPECT_EQ(declared_values[1].key, "run_id")
+        << "the second key is the run's own id; actual: " << declared_values[1].key;
+    EXPECT_TRUE(declared_values[1].markers.empty())
+        << "a run id is matched as a whole digit run, behind no marker; actual markers: "
+        << declared_values[1].markers.size();
+    EXPECT_EQ(declared_values[1].min_digits, 10U)
+        << "the floor that keeps a markerless value off ordinary words; actual: "
+        << declared_values[1].min_digits;
+    EXPECT_EQ(declared_values[1].revision_since, "v2")
+        << "the revision this declaration adds the key in; actual: "
+        << declared_values[1].revision_since;
 
     // assert: each absence is argued in the declaration, and asserting it POSITIVELY is what
     // separates a measured exclusion from a row kind silently dropped.

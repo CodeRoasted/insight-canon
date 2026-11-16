@@ -1387,14 +1387,24 @@ namespace
                is_shelled_numeric(tok, prev);
     }
 
-    // post: masks a UUID, a long hex run, a compact UTC instant or an address run EMBEDDED in a
-    // larger token, keeping the surrounding structure.
+    // invariant: what one pass of the instance arms over a token masked: `masked` by the UUID,
+    // compact instant and hex-run arms, `masked_run` by the address-run arm.
+    struct InstanceScan
+    {
+        bool masked;
+        bool masked_run;
+    };
+
+    // post: `out` holds `tok` with every UUID, long hex run, compact UTC instant and address run
+    // in it replaced by the wildcard, the surrounding bytes kept.
     // invariant: a CLOSED grammar pinned by literal bytes and group counts, every member of whose
     // acceptance set is an instance value by the encoding's own semantics.
-    // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate, ADR-16.D5
     // invariant: the reasoning does not extend to an embedded long-DIGIT-run arm - a stable name
     // and an ephemeral id are the same shape there, and no parameter separates them.
-    [[nodiscard]] inline bool normalize_embedded_identity(std::string_view tok, std::string& out)
+    // invariant: ONE scan, read by the embedded-identity rule and by `mask_instance_values`, so
+    // the template and a definition comparison cannot disagree about an instance span.
+    // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate, ADR-16.D5, DN-162.D18
+    [[nodiscard]] inline InstanceScan scan_instance_spans(std::string_view tok, std::string& out)
     {
         out.clear();
         bool masked{false};
@@ -1446,10 +1456,20 @@ namespace
             out.push_back(tok[pos]);
             ++pos;
         }
+        return InstanceScan{.masked = masked, .masked_run = masked_run};
+    }
+
+    // post: masks a UUID, a long hex run, a compact UTC instant or an address run EMBEDDED in a
+    // larger token, keeping the surrounding structure.
+    // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate, ADR-16.D5
+    [[nodiscard]] inline bool normalize_embedded_identity(std::string_view tok, std::string& out)
+    {
+        const InstanceScan scan{scan_instance_spans(tok, out)};
         // assert: the address arm alone never claims a token rule 4 or rule 5 masks whole: that
         // mask hides every byte, so any normalization of the token would unmask some.
         // refs: ADR-16.D17
-        return masked || (masked_run && !is_masked_value(tok, TokenShape{tok}, std::string_view{}));
+        return scan.masked ||
+               (scan.masked_run && !is_masked_value(tok, TokenShape{tok}, std::string_view{}));
     }
 
     // invariant: the sanitizer-family process tag - AddressSanitizer, libFuzzer and valgrind open a
@@ -2224,6 +2244,33 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
         params_span = buf_span;
     }
     return {.template_str = tmpl_view, .params = params_span};
+}
+
+// refs: DN-162.D18
+std::string instance_masked_text(std::string_view text)
+{
+    std::string out;
+    out.reserve(text.size());
+    std::string form;
+    std::size_t cursor{0};
+    // assert: tokens are delimited exactly as `for_each_token` delimits them, by the space byte, so
+    // a span this masks is a span the template masks.
+    while (cursor < text.size())
+    {
+        if (text[cursor] == ' ')
+        {
+            out.push_back(' ');
+            ++cursor;
+            continue;
+        }
+        const std::size_t space{text.find(' ', cursor)};
+        const std::size_t end{space == std::string_view::npos ? text.size() : space};
+        const std::string_view tok{text.substr(cursor, end - cursor)};
+        const InstanceScan scan{scan_instance_spans(tok, form)};
+        out.append(scan.masked || scan.masked_run ? std::string_view{form} : tok);
+        cursor = end;
+    }
+    return out;
 }
 
 // invariant: every table here is DERIVED from the catalog the masker itself reads, never restated

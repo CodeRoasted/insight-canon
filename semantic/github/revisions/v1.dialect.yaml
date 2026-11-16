@@ -1,0 +1,539 @@
+# The GitHub Actions / Azure Pipelines dialect, declared as DATA.
+#
+# This file IS the package: `dialect_package_codegen.py` (malf-toolchain) projects it into the
+# complete C++ content of the semantic package — the manifest, every row kind, the channel and
+# revision vocabularies, the derived writer projection, the compile-time fences, and the code-tier
+# hook referenced by name. Nothing about the dialect is stated anywhere else.
+#
+# THE `why:` KEY IS NOT DOCUMENTATION. It is where this dialect's argument lives: the measurement
+# behind a gate, the alternative that was rejected, the warning a reader must not walk past, the
+# superseded claim recorded so nobody re-derives it. It is emitted verbatim as comment lines above
+# what it annotates, and it is EXCLUDED from the content hash — prose is not ruleset content, so
+# editing an argument must never move the identity of what this package recognizes.
+#
+# DECLARED ORDER IS CONTENT. Level-lift matching is first-match-in-declared-order and the identity
+# serializer walks every row span in declared order. Reordering a row changes both what this
+# dialect recognizes and the composed comparability hash. Nothing here is sorted, ever.
+
+dialect:
+  name: github
+  version: "1.11.0"
+  why:
+    - "ADR-17.D3 keys identity on CONTENT, not on spelling: `version:` moves when what this package"
+    - "RECOGNIZES or EMITS moves — its rows, their gates, or its code tier — and never for a"
+    - "grammar-shape change or a rename. The discipline and the alternative it rejects are"
+    - "ADR-17.D3's; DN-17.D22 is the slot that applied it to the grammar-6 widening and ruled that"
+    - "this `version:` does not bump."
+    - ""
+    - "Every gated row below names THIS package or fires on any dialect. That the row-level dialect"
+    - "gate is required, and why, is ADR-22.D6's."
+    - ""
+    - "The exported dialect-name constant, and the schema's `self` / `any` gate spelling that makes"
+    - "an illegal third gate value unrepresentable rather than merely asserted, are the generator's"
+    - "contract rather than this dialect's: DN-17.D13."
+    - ""
+    - "Self-containment — a semantic package imports only canon's public API and its provider"
+    - "contract, never a sealed detail shard — is ADR-17.D1's: core owns the language, packages own"
+    - "the vocabulary, and the vocabulary is DATA."
+    - ""
+    - "THE SUPERSEDED CLAIM, recorded so it is not re-derived: shipping BOTH Step prefixes UNGATED"
+    - "was believed to make the step name materialization-INVARIANT and to dissolve the"
+    - "which-form-was-Tamys-fed hazard. It does the opposite. The PAYLOAD does read back the same"
+    - "from both (both yield `yarn lint`), but ungated recognition of the BARE prefix in the"
+    - "annotated channel is exactly the defect. The two gated rows preserve that same-payload"
+    - "property under their own channels — but note what that is and is not: it is canon reading"
+    - "OUR ablation back to the same intent, NOT invariance across two real GHA materializations."
+
+  # ── the VENDOR generation these rows recognize ──
+  revisions:
+    why:
+      - "GitHub's workflow-command syntax v1 — the `::name key=value::payload` family and the"
+      - "`##[group]` / `##[endgroup]` pair. GitHub has deprecated `set-env` / `add-path` WITHIN v1"
+      - "and has shipped no v2 syntax, so this vocabulary is cardinality one and stays so until a"
+      - "second generation exists."
+      - ""
+      - "It is NOT `version:` above, and the two answer different questions for a reader of a"
+      - "MetaLog ruleset block: `version:` moves when WE edit the ruleset, this one moves when"
+      - "GITHUB ships a new syntax generation. A reader must never substitute one for the other."
+      - ""
+      - "The cardinality-one FENCE is the schema's, not this dialect's, and so is the fact that"
+      - "core carries a general span so the day a second generation lands is a data change rather"
+      - "than a redesign: ADR-17.D9."
+    names: [v1]
+
+  # ── the declared INTENT CHANNEL vocabulary ──
+  channels:
+    why:
+      - "GHA is ONE format that canon receives in TWO materializations — but they are NOT two"
+      - "channels GitHub serves, and describing them that way was an error that had to be"
+      - "corrected. A real channel and our own ablation of it are never two materializations the"
+      - "ecosystem serves; a claim tracks its GROUNDING. That argument lives in ADR-22.D7, and the"
+      - "rule that a caller declares what it ACQUIRED — canon never infers a channel — is"
+      - "ADR-22.D5."
+      - ""
+      - "The names stay `annotated` / `stripped` because they name what a user can verify by"
+      - "looking at their own file, which `api` / `download` would not."
+    names:
+      - name: annotated
+        why:
+          - "GHA's ONE REAL CHANNEL: the runner's raw job log — what the API serves, what"
+          - "downloadJobLogsForWorkflowRun fetches, and what the shipped Action feeds. Step banners"
+          - "are `##[group]Run <cmd>` and the workflow-command markers are present. A user's GHA"
+          - "log is annotated in every path we ship, so this is the writer's default medium."
+      - name: stripped
+        why:
+          - "OUR OWN LAB ABLATION, not a GitHub product. Produced by the corpus degrade transform,"
+          - "which strips the `##[…]` workflow commands to build the structure-poor arm of the"
+          - "template-lattice lift experiment. Step banners are the bare `Run <cmd>`. Canon must"
+          - "READ it — the lattice experiment is a real consumer — so it stays a declared channel."
+          - ""
+          - "Two things wear this one name, and conflating them is the trip sessions keep making,"
+          - "which is why it is stated HERE, at the definition, and not only in the design document"
+          - "that already declares it: a limitation that lives one repo away does not travel to the"
+          - "point of use."
+          - ""
+          - "  The BYTES are ours. Anything measured on a stripped corpus was measured against our"
+          - "  own degrade transform, so it evidences how canon reads OUR ablation — never how a"
+          - "  dialect behaves in the field. It may not stand as corpus evidence for a product"
+          - "  claim, and an A/B across the pair is not materialization invariance."
+          - ""
+          - "  The NAME is real, and it is a recognition state that ABSENCE CANNOT DECIDE. Markers"
+          - "  present positively proves the annotated channel — only that channel carries them —"
+          - "  but no observation proves this one: a log with no markers is equally consistent with"
+          - "  stripped and with annotated-that-happened-to-emit-none. So this name is never"
+          - "  inferred from absence; a caller with no evidence claims no channel at all. Guessing"
+          - "  it is unsound in the DANGEROUS direction — it re-arms the bare `Run ` row against"
+          - "  annotated prose and reinstates the phantom Step the marker gates below exist to"
+          - "  kill. The deduction that gets this right, and its fail-closed branch, belong to"
+          - "  tamys's channel probe; canon never infers."
+
+  # ── the code tier: REFERENCED by name, never generated ──
+  code_tier:
+    echoed_source:
+      symbol: is_echoed_source
+      unit: src/github_provenance.cpp
+      why:
+        - "The echoed-source raw-line provenance hook: a pure byte predicate over the RAW,"
+        - "ANSI-bearing line, consulted independently of the routed strategy."
+        - ""
+        - "There is NO format strategy any more, and that is the rejected alternative worth"
+        - "recording: the dialect strategy used to detect and peel GitHub's per-line delivery"
+        - "stamp, and that peel became DECLARED transport instead — ADR-23.D3. What is left of this"
+        - "package's code tier is one byte predicate — so the dialect is DATA: these rows plus"
+        - "canon's walkers ARE the GHA parser."
+
+  # ── structural-role rows ──
+  roles:
+    why:
+      - "The announced GitHub-Actions / Azure markers. These fire whatever the caller declared,"
+      - "reproducing the pre-split UNGATED structural-role classification EXACTLY: a `##[group]`"
+      - "on an undeclared CI line still classifies."
+      - ""
+      - "⚠ THE UNGATED READING IS DELIBERATE AND IS NOT AN OVERSIGHT. The dialect split changed the"
+      - "gate's TYPE, never a row's VALUE: these six were format-any and are now dialect-any, which"
+      - "is the same claim in the new vocabulary. Narrowing them to \"github\" would be a"
+      - "RECOGNITION change riding a type change — a different decision, with its own gate, and not"
+      - "that cut's."
+      - ""
+      - "The two Progress rows after them are a later and different claim, a toolkit's gauge"
+      - "matched by its whole shape, and they are gated to this package: each row says why."
+    rows:
+      - prefix: "##[group]"
+        role: GroupBegin
+        dialect_gate: any
+      - prefix: "::group::"
+        role: GroupBegin
+        dialect_gate: any
+      - prefix: "##[endgroup]"
+        role: GroupEnd
+        dialect_gate: any
+      - prefix: "::endgroup::"
+        role: GroupEnd
+        dialect_gate: any
+      - prefix: "##[error]"
+        role: Terminator
+        dialect_gate: any
+      - prefix: "::error::"
+        role: Terminator
+        dialect_gate: any
+      - shape: "Received {n} of {n} ({n}%), {n} MBs/sec"
+        role: Progress
+        dialect_gate: self
+        why:
+          - "The actions/cache toolkit's download gauge: printed once a second while a cache"
+          - "transfers, so its count is the transfer's duration and its values are instantaneous."
+          - "The event it samples is carried by content lines of its own (`Cache restored from"
+          - "key`, `Cache not found`), so leaving the samples out of a comparison drops no event."
+          - "The rule and the qualification test are ADR-17.D14's."
+          - ""
+          - "A SHAPE, never a prefix: `Received ` opens unrelated lines (`Received 200 OK`,"
+          - "`Received 3 of 5 files`). Measured on the three CI-log views (26 234 logs): 204 958"
+          - "lines of this shape and its upload twin, every one inside a `uses:` step or after"
+          - "`Post job cleanup.`, none in a `run:` step body, and no line carries `MBs/sec` outside"
+          - "the exact shape. Gated to this package because the toolkit runs under GitHub's runner."
+      - shape: "Sent {n} of {n} ({n}%), {n} MBs/sec"
+        role: Progress
+        dialect_gate: self
+        why:
+          - "The same toolkit's upload gauge, the download row's twin: one sample a second while"
+          - "a cache is saved, its event carried by the save's own content lines."
+
+  # ── intent-marker rows ──
+  markers:
+    why:
+      - "DIALECT-GATED to this package: `Run ` is GHA-runner-specific and would misfire elsewhere."
+      - "The payload is the content after the prefix, verbatim; core derives the alignment class"
+      - "and the instance discriminant from it."
+      - ""
+      - "CHANNEL-GATED per Step: the two Step prefixes are the same intent in two channels, so each"
+      - "gates to ITS channel. The per-row arguments below say why each one is what it is."
+      - ""
+      - "The generation-template rows the generator derives from these — one emit row per"
+      - "recognition row, `emit = dual(extract)` — carry three claims that have no authored row to"
+      - "sit on, and all three live in ADR-18.D4 (ONE declaration, TWO projections: the writer is"
+      - "the reader's dual, as data): that each projection names the same Medium as its dual, that"
+      - "bidirectionality is a compile-time obligation rather than a convention, and that the"
+      - "generation projection is identity-bearing — a generation-side change moves the"
+      - "comparability hash, so two writers can never claim one ruleset identity."
+    rows:
+      - prefix: "Current runner version: "
+        kind: Job
+        role: Opens
+        dialect_gate: self
+        channel_gate: any
+        why:
+          - "A job's log does not START at the line that names it. The runner writes this line"
+          - "first, then its own preamble: the runner name, the machine or image, the token"
+          - "permissions, the action downloads. Only then comes `Complete job name: `. With the"
+          - "naming row alone, those lines belonged to whatever unit came before, so on an input"
+          - "holding several jobs they were the previous job's lines, and reordering the jobs"
+          - "moved them."
+          - ""
+          - "So this row OPENS a job and names nothing; the naming row below names it. A naming"
+          - "row of its kind that follows with no other marker row and no declared error line"
+          - "between names the job from this line on, and its lines are the named job's setup."
+          - "Another opener, a step marker, a declared error line or the end of input first leaves"
+          - "the job it opened UNNAMED: `<unnamed-job>`, origin Opened, holding its lines, so a job"
+          - "that dies before it is named is its own unit and never the previous job's lines"
+          - "(ADR-17.D6)."
+          - ""
+          - "Measured on 4 000 run-grain annotated logs: of 15 766 such lines, 15 765 are a job"
+          - "segment's first line and 15 209 are followed by a job name with no other marker"
+          - "between; the 557 that are not sit in segments whose middle was elided. The line is"
+          - "the same in both channels, so it needs no channel gate."
+          - ""
+          - "⚠ A DECLARED LIMITATION: with runner debug logging on, three `##[debug]` lines come"
+          - "before this one, and `##[debug]Starting: ` cannot open a job because it also opens"
+          - "every step. Those three lines stay with the previous unit."
+      - prefix: "Complete job name: "
+        kind: Job
+        child_order: Unordered
+        dialect_gate: self
+        extract: RemainderAfterPrefix
+        channel_gate: any
+        why:
+          - "The job banner is identical in BOTH channels — the strip does not touch it — so it has"
+          - "no channel-dependent reading and needs no gate. A gate is required exactly when one"
+          - "channel's marker occurs as ordinary content in a sibling channel, which is why `Run `"
+          - "needs one and this does not: the requirement does not metastasize to every row."
+      - prefix: "Run "
+        kind: Step
+        child_order: Ordered
+        dialect_gate: self
+        extract: RemainderAfterPrefix
+        channel_gate: stripped
+        version_coordinate:
+          introducer: "@"
+          shape: OneToken
+          why:
+            - "A step whose banner is ONE token is a `uses:` step, and the runner prints its"
+            - "reference whole: `<owner>/<action>@<ref>`, or an image reference. The bytes after"
+            - "the LAST `@` are the version the workflow pinned: a tag, a branch or a commit."
+            - "Declared here so that canon masks it as a version and carries it as the step's"
+            - "instance: two pins of one action are then one unit at two versions, and a pin"
+            - "move is one replacement instead of a new step beside a disappeared one."
+            - ""
+            - "ONE TOKEN is the shape, and it is the guard: a `run:` banner is the command's"
+            - "first line, which holds spaces, so an `@` inside a shell command (an e-mail"
+            - "address, `docker pull image@digest`) is never read as a version."
+            - ""
+            - "The same declaration sits on the other channel's Step row: the two rows are one"
+            - "banner in two materializations, and they must give one identity."
+        why:
+          - "In the ANNOTATED channel a line starting with `Run ` is ordinary PROSE, so an ungated"
+          - "row mints a phantom Step quantum out of it. Measured on REAL annotated bytes: 9.05 %"
+          - "of 22 030 logs, 7 752 lines, 62 distinct payloads, EVERY ONE prose (`` `npm audit` for"
+          - "details. `` dominates). Confirmed end-to-end to fabricate a VanishedPhase."
+          - ""
+          - "REQUIRED, and the row cannot simply be deleted: our ablation arm genuinely uses the"
+          - "bare `Run ` as its banner, and that arm's control fence is what holds this row in"
+          - "place."
+      - prefix: "##[group]Run "
+        kind: Step
+        child_order: Ordered
+        dialect_gate: self
+        extract: RemainderAfterPrefix
+        channel_gate: annotated
+        version_coordinate:
+          introducer: "@"
+          shape: OneToken
+          why:
+            - "A step whose banner is ONE token is a `uses:` step, and the runner prints its"
+            - "reference whole: `<owner>/<action>@<ref>`, or an image reference. The bytes after"
+            - "the LAST `@` are the version the workflow pinned: a tag, a branch or a commit."
+            - "Declared here so that canon masks it as a version and carries it as the step's"
+            - "instance: two pins of one action are then one unit at two versions, and a pin"
+            - "move is one replacement instead of a new step beside a disappeared one."
+            - ""
+            - "ONE TOKEN is the shape, and it is the guard: a `run:` banner is the command's"
+            - "first line, which holds spaces, so an `@` inside a shell command (an e-mail"
+            - "address, `docker pull image@digest`) is never read as a version."
+            - ""
+            - "The same declaration sits on the other channel's Step row: the two rows are one"
+            - "banner in two materializations, and they must give one identity."
+        why:
+          - "The runner-wrapped materialization of the same step banner. Self-gating in principle —"
+          - "`##[` never occurs in a stripped log — but gated anyway, so the declared channel"
+          - "selects EXACTLY ONE Step row: a multi-channel tree becomes unrepresentable rather than"
+          - "merely unattested, fail-closed is symmetric across both forms, and the writer's medium"
+          - "selector has a gate to select ON. The selection-order hazard that makes the gate"
+          - "load-bearing rather than decorative is DN-17.D15's."
+          - ""
+          - "The two Step prefixes never shadow: neither is a proper prefix of the other, so the"
+          - "composed longest-match note stays empty."
+      - prefix: "Prepare all required actions"
+        kind: Step
+        role: Opens
+        dialect_gate: self
+        channel_gate: annotated
+        why:
+          - "A step's log does not always START at its banner. A step that uses an action the"
+          - "runner has not yet fetched (a local composite action, `uses: ./.github/actions/x`)"
+          - "first prints this line, then `Getting action download info` and `Download action"
+          - "repository …`, and only then its `##[group]Run ` banner. With no row here those lines"
+          - "were the PREVIOUS step's. When the download failed (HTTP 429 / 500 from codeload) the"
+          - "step printed its `##[error]` lines and NO banner, so its failure was reported under"
+          - "the step before it, which the platform lists as passed, or under the next banner,"
+          - "a later step that never ran it."
+          - ""
+          - "So this row OPENS a step and names nothing. Inside a named job, the next step banner,"
+          - "with no other marker row and no declared error line between, names the step from"
+          - "this line on. A declared error line, another marker row or the end of input first"
+          - "leaves it `<unnamed-step>`, origin Opened: a step whose preparation failed is its own"
+          - "unit. Before a job's naming row, or inside `<unnamed-job>`, the line is that job's"
+          - "setup content, as it always was: the runner prints it there for every job."
+          - ""
+          - "Gated to the ANNOTATED channel, and the gate is load-bearing: the stripped channel"
+          - "prints this line but not the `##[error]` marker that tells a failed preparation from a"
+          - "successful one, so an ungated opener would name a failed preparation for the next"
+          - "step there: the same wrong-name defect, one step later."
+          - ""
+          - "Measured on the three CI-log views (26 234 annotated logs and their stripped twins)"
+          - "and the 73 920 annotated logs of the bank: no line starts with this text without"
+          - "being exactly it once the line ending is removed; inside a named job its next marker"
+          - "row is a step banner or `Post job cleanup.`, at most 11 lines later, and the lines"
+          - "between are runner download lines, warnings, errors and the Node-runtime notice."
+          - ""
+          - "⚠ A DECLARED LIMITATION: two different failed preparations in one job pair in order,"
+          - "so the second reads as already failing."
+      - prefix: "Post job cleanup."
+        kind: Step
+        role: Closes
+        dialect_gate: self
+        channel_gate: any
+        why:
+          - "A job's log does not END with its last declared step. After it the runner runs each"
+          - "action's post step, which prints this line and names no step, and then its own"
+          - "\"Complete job\" step. With no row here, every line from the first post step to the"
+          - "job's end was the last declared step's: a post step's warning was reported under, and"
+          - "folded with, an unrelated step, and a failing last step listed teardown lines among"
+          - "its failure evidence."
+          - ""
+          - "So this row CLOSES the job's declared steps: its line enters the job's epilogue, a"
+          - "unit the segmenter supplies and names, and a later closing row extends it. A post"
+          - "step is NOT attributed to its action: which steps register a post action is the"
+          - "action's metadata, never printed in the run, so any mapping would be inference."
+          - "A job-completed hook stays its own step: its banner names it, and the next closing"
+          - "row opens a second epilogue in the same job."
+          - ""
+          - "Measured on the three CI-log views (26 234 annotated logs and their stripped"
+          - "twins): no line starts with this text without being exactly it, and no step other"
+          - "than a runner hook opens after it. The line is the same in both channels, so it"
+          - "needs no channel gate."
+      - prefix: "Cleaning up orphan processes"
+        kind: Step
+        role: Closes
+        dialect_gate: self
+        channel_gate: any
+        why:
+          - "The runner prints this line in its \"Complete job\" step, the job's last, after any"
+          - "post step and any job-completed hook. It enters the job's epilogue as the post-step"
+          - "line does, so a job with no post step still gets one, and the lines after a hook"
+          - "leave the hook's step. It is job-level content like post-step output, so it shares"
+          - "their unit rather than a second one split on a boundary no line names."
+          - ""
+          - "Measured on the same views: every line starting with this text is exactly it, and it"
+          - "is the same line in both channels."
+
+  # ── level-lift rows ──
+  level_lifts:
+    why:
+      - "The GHA workflow-command level lift, dialect-gated to this package. Pure DATA: the package"
+      - "declares the rows and canon walks them over the composed table, applied to every parsed"
+      - "line."
+      - ""
+      - "FIRST MATCH IN DECLARED ORDER WINS, so row order is CONTENT here — this is a property of"
+      - "the section, not of any one row, and no type can express it. These rows also feed"
+      - "`semantic_identity`, which the serializer walks in this same order."
+    rows:
+      - prefix: "##[error]"
+        level: Error
+        dialect_gate: self
+      - prefix: "::error::"
+        level: Error
+        dialect_gate: self
+      - prefix: "##[warning]"
+        level: Warn
+        dialect_gate: self
+      - prefix: "::warning::"
+        level: Warn
+        dialect_gate: self
+      - prefix: "##[debug]"
+        level: Debug
+        dialect_gate: self
+      - prefix: "::debug::"
+        level: Debug
+        dialect_gate: self
+      - prefix: "##[notice]"
+        level: Info
+        dialect_gate: self
+      - prefix: "::notice::"
+        level: Info
+        dialect_gate: self
+
+  # ── a DECLARED ABSENCE: the WHERE coordinate belongs to another package ──
+  locations:
+    why:
+      - "This dialect declares NO test-file location rows, and the absence is an ATTRIBUTION rather"
+      - "than a gap: a WHERE coordinate is a property of the TEST FRAMEWORK that named the file, not"
+      - "of the CI runner that printed the line, and the test_frameworks package is the one that"
+      - "owns that vocabulary. Empty on purpose and pointed somewhere, so a reader expecting a"
+      - "location row here is told where to look instead of meeting silence."
+    rows: []
+
+  # ── a DECLARED ABSENCE: no consumer exists, so no row is declared ──
+  value_classes:
+    why:
+      - "This dialect declares NO value classes, because not one of its candidates has a consumer"
+      - "yet. A class nothing reads can only rot, and declaring one to reserve the slot is exactly"
+      - "the dormant plumbing this project rips rather than extends. Empty by DECISION: it is"
+      - "revisited when a reader exists, and not before."
+    rows: []
+
+  # ── run-outcome token rows ──
+  outcome_tokens:
+    why:
+      - "The GHA native job/run conclusion strings — `needs.<job>.result` and the API `conclusion`"
+      - "— mapped into the core verdict vocabulary. This retires the render-side binary"
+      - "pass/fail derivation at its ROOT: the verdict now enters the engine class-aware,"
+      - "through the same channel as Jenkins."
+      - ""
+      - "`cancelled` is Cancelled and `timed_out` is Aborted (ADR-17.D5): GitHub declares a"
+      - "cancellation only when a declarer OUTSIDE the job stopped it (a person, fail-fast, a"
+      - "concurrency group), and a timeout names no such declarer. Both logs are incomplete; only"
+      - "a job declared cancelled withdraws its units' FAILING claim."
+      - ""
+      - "GHA has no native UNSTABLE string today. The category stays core; this dialect simply"
+      - "ships no row for it."
+      - ""
+      - "`skipped` / `neutral` / `action_required` carry no pass-versus-fail verdict, so they map to"
+      - "Unknown — honest, never a guess."
+    rows:
+      - token: success
+        outcome: Success
+        dialect_gate: self
+      - token: failure
+        outcome: Failure
+        dialect_gate: self
+      - token: cancelled
+        outcome: Cancelled
+        dialect_gate: self
+      - token: timed_out
+        outcome: Aborted
+        dialect_gate: self
+      - token: skipped
+        outcome: Unknown
+        dialect_gate: self
+      - token: neutral
+        outcome: Unknown
+        dialect_gate: self
+      - token: action_required
+        outcome: Unknown
+        dialect_gate: self
+
+  # ── a DECLARED ABSENCE: measured, argued, and empty on purpose ──
+  outcome_markers:
+    why:
+      - "GHA emits NO single run-verdict console line — `Process completed with exit code N` is"
+      - "per-STEP, not per-run — so there is no console tail to recognize and the degenerate"
+      - "console path is correctly Unknown. This section is empty by MEASUREMENT, not by omission:"
+      - "an exclusion and an omission must not look alike."
+    rows: []
+
+  # ── the VALUES a run's acquirer declares, and the markers canon masks them behind ──
+  declared_values:
+    why:
+      - "A run's own pull-request number is glued into words (`/stirling/V2-PR-6656/...`), so"
+      - "every pull request mints a new template and Tamys reads a line appeared and a line"
+      - "vanished on a pair that changed nothing. No per-line rule can mask it: the line alone"
+      - "cannot say whether `PR-6656` is this run's request or another one a ref listing names."
+      - "So the acquirer, who knows the run, declares the number, and canon masks that number and"
+      - "only that number, directly behind one of the markers below. A stream that declares no"
+      - "value is unchanged byte for byte. The rule and its refusals are DN-133.D1's."
+    rows:
+      - key: pull_request
+        markers: ["PR-", "pr-", "Pr-", "pull-", "PULL-", "Pull-", "PR#", "pulls/"]
+        dialect_gate: self
+        why:
+          - "The six spellings measured on the CI-log views before the build, byte-exact, then"
+          - "`PR#` and `pulls/` (DN-133.D7): GitHub's own vocabulary, each collapsing ranked rows"
+          - "with 0 coincidences read. The set is closed, and it is extended only on measured"
+          - "evidence: a marker nobody measured is a coincidence nobody read. `pull/`, `issues/`"
+          - "and `prN` were measured and stay out. Tamys masks its job and step instance key behind"
+          - "these same markers."
+
+  # ── the whole lines the runner writes into a step it STOPS ──
+  stop_announcements:
+    why:
+      - "A job the platform declares cancelled withdraws its units' FAILING claim, unless the"
+      - "unit failed before the stop (RUL-283, RUL-286). Reading \"before\" needs the stop line"
+      - "itself, so each wording the runner writes into a step it stops is declared here, matched"
+      - "as a whole line. A row only lets a reader ORDER a unit's own errors against the stop, in"
+      - "line order inside the job's own span: the line keeps its role (Terminator) and its"
+      - "level (Error), because a line holds one role and every reader of the terminator would"
+      - "otherwise need a second spelling of it. The rule and its census are ADR-17.D15's."
+      - ""
+      - "Read and left out: `##[error]A task was canceled.`, which the runner writes while it"
+      - "downloads actions, and whose meaning (a job cancelled during setup, or a download that"
+      - "timed out) the bytes do not settle; one organization's own runner hook, which no dialect"
+      - "package can declare; and an aggregator job's report that other jobs failed or were"
+      - "cancelled, which stops nothing. A wording missing here leaves the withdrawal standing:"
+      - "it costs recall, never precision."
+    rows:
+      - shape: "##[error]The operation was canceled."
+        dialect_gate: self
+        why:
+          - "The GitHub runner's cancellation line. Measured in gr-v3 (14 lines in 5 logs, every"
+          - "one in a job segment every banked graph entry declares cancelled) and in the store"
+          - "(1 948 lines in 703 logs)."
+      - shape: "##[error]The runner has received a shutdown signal. This can happen when the runner service is stopped, or a manually started runner is canceled."
+        dialect_gate: self
+        why:
+          - "The same runner's shutdown line, its stop vocabulary. Absent from both views and"
+          - "measured in the store (76 lines in 69 logs)."
+      - shape: "##[error]Step canceled by GitHub (see: https://depot.dev/docs/github-actions/troubleshooting#error-step-canceled-by-github)"
+        dialect_gate: self
+        why:
+          - "depot's runner, which runs GitHub's jobs and writes its own line into the step GitHub"
+          - "cancelled. Measured in gr-v3 (1 line, run 33441602938) and in the store (17 lines in"
+          - "8 logs)."

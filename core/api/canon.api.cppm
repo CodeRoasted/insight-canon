@@ -1208,13 +1208,15 @@ inline constexpr std::string_view kMaskWildcard{"<*>"};
 // shell call it, so the catalog is never copied outside canon.
 [[nodiscard]] std::optional<std::string_view> complete_shell_core(std::string_view token) noexcept;
 
-// refs: DN-133.D1
-// invariant: one declared value resolved against its row: the markers it is masked behind and the
-// value itself, both viewing storage that outlives every call reading them.
+// refs: DN-133.D1, DN-162.D13
+// invariant: one declared value resolved against its row: the markers it is masked behind, or
+// none and its row's digit floor, and the value itself.
+// invariant: every view here outlives every call reading it.
 struct DeclaredRun
 {
     std::span<const std::string_view> markers;
     std::string_view value;
+    std::uint32_t min_digits{0};
 };
 
 // invariant: the byte range [first, last) of one digit run a declared run claims in a form.
@@ -1226,12 +1228,13 @@ struct ClaimedRun
     [[nodiscard]] bool operator==(const ClaimedRun&) const = default;
 };
 
-// refs: DN-133.D1, DN-133.D7
+// refs: DN-133.D1, DN-133.D7, DN-162.D13
 // post: `claims` holds every digit run of `form` some declared run claims, ascending and disjoint.
-// invariant: a run is claimed when it is the maximal digit run behind a declared run's marker and
-// equals that run's value.
-// invariant: the marker opens the form or follows a byte that is neither a letter nor a digit.
-// invariant: the byte after a claimed run is not a letter.
+// invariant: a run with markers claims the maximal digit run behind one of them equal to its
+// value, the byte after it not a letter.
+// invariant: such a marker opens the form or follows a byte that is neither a letter nor a digit.
+// invariant: a run with no marker claims every maximal digit run equal to its value, a digit on
+// neither side, and only when its value is at least its floor long.
 // invariant: THE declared-run predicate — the masker's normal-form pass and an intent's instance
 // key both call it, so no second marker list and no copy of the rule exists anywhere.
 // invariant: a marker ends in a non-digit, so a claimed run's start is fixed by its marker and two
@@ -1266,11 +1269,15 @@ export namespace insight::tokenization
 // invariant: deterministic, ASCII-safe, no cross-line state.
 // refs: ADR-17.D1, BIB:intent_identity, STU-4
 // refs: F-SRC-insight-canon:github.dialect.yaml
+// invariant: an InnerStep is a unit inside a step that RECURSES: one named while one is open is
+// that unit's child, and an Ends row ends the innermost open one; depth is positional.
+// refs: DN-162.D4, DN-162.D6
 enum class IntentMarkerKind : std::uint8_t
 {
     None = 0,
     Job,
-    Step
+    Step,
+    InnerStep
 };
 
 // invariant: how a level's sibling nodes are matched across two runs — a DECLARED property of the
@@ -1300,8 +1307,37 @@ struct IntentMarker
     // version coordinate selects, kept verbatim.
     // invariant: empty when the row declares none or the payload is not the declared shape.
     std::string_view version;
+    // invariant: the unit's DISPLAY, apart from its name, raw as the line carries it: a
+    // KeyedFields row's display field, percent-encoded bytes kept, decoded at render only.
+    // invariant: empty for every row of another extractor.
+    // refs: DN-162.D4, DN-162.D5
+    std::string_view display;
+    // invariant: the fired row's revision_since: which vendor generation's row fired, observed
+    // per row as evidence and never a gate; empty in a single-revision package.
+    // refs: DN-162.D1, ADR-22.D8
+    std::string_view revision_since;
+    // invariant: that revision's index in its package's ordered span: 0 for the first revision
+    // and for every row of a single-revision package, so a rank above 0 OBSERVES a later one.
+    // refs: DN-162.D1, DN-162.D7
+    std::uint32_t revision_rank{0};
     auto operator<=>(const IntentMarker&) const = default;
     bool operator==(const IntentMarker&) const = default;
+};
+
+// invariant: what an ENDING row read off its line: the kind of unit it ends and the ended unit's
+// two declared outcome TOKENS, verbatim, mapped by the caller through the view's outcome tokens.
+// invariant: `outcome` is the unit's OWN declared outcome; `propagated_outcome` is that outcome
+// as its CONTAINING unit counted it, so the two differ only by a tolerance the parent declares.
+// invariant: kind None when no ending row matched; the views point into the handed content.
+// refs: DN-162.D4, DN-162.D8
+struct UnitEnd
+{
+    IntentMarkerKind kind{IntentMarkerKind::None};
+    std::string_view outcome;
+    std::string_view propagated_outcome;
+    std::string_view revision_since;
+    std::uint32_t revision_rank{0};
+    bool operator==(const UnitEnd&) const = default;
 };
 
 } // namespace insight::tokenization

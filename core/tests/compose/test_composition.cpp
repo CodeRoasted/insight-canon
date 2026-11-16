@@ -473,6 +473,15 @@ constexpr std::array<insight::semantic::DeclaredValueRow, 1> kTicketValueAgain{
     {{.key = "ticket", .markers = kOtherMarkers, .dialect_gate = kAnyDialect}}};
 constexpr std::array<insight::semantic::DeclaredValueRow, 1> kDigitEndingValue{
     {{.key = "ticket", .markers = kDigitEndingMarkers, .dialect_gate = "ticketing"}}};
+// refs: DN-162.D13
+constexpr std::array<insight::semantic::DeclaredValueRow, 1> kFloorValue{
+    {{.key = "ticket", .min_digits = 10, .dialect_gate = "ticketing"}}};
+constexpr std::array<insight::semantic::DeclaredValueRow, 1> kHigherFloorValue{
+    {{.key = "ticket", .min_digits = 11, .dialect_gate = "ticketing"}}};
+constexpr std::array<insight::semantic::DeclaredValueRow, 1> kLowFloorValue{
+    {{.key = "ticket", .min_digits = 9, .dialect_gate = "ticketing"}}};
+constexpr std::array<insight::semantic::DeclaredValueRow, 1> kMarkerAndFloorValue{
+    {{.key = "ticket", .markers = kTicketMarkers, .min_digits = 10, .dialect_gate = "ticketing"}}};
 constexpr std::array<std::string_view, 1> kTicketingRevisions{{"v1"}};
 constexpr SemanticPackageManifest kTicketing{.name = "ticketing",
                                              .version = "1.0.0",
@@ -501,6 +510,12 @@ static_assert(!insight::semantic::declared_value_row_well_formed(kDigitEndingVal
               "a marker ending in a digit makes the run after it ambiguous and must be refused");
 static_assert(insight::semantic::declared_value_row_well_formed(kTicketValue[0]),
               "a key with non-empty markers ending in a non-digit is well formed");
+static_assert(insight::semantic::declared_value_row_well_formed(kFloorValue[0]),
+              "a key with no marker and a digit floor of 10 is well formed");
+static_assert(!insight::semantic::declared_value_row_well_formed(kLowFloorValue[0]),
+              "a floor below 10 would let a markerless value meet ordinary words");
+static_assert(!insight::semantic::declared_value_row_well_formed(kMarkerAndFloorValue[0]),
+              "a row finds its value behind markers or by its length, never both");
 
 TEST(CompositionDeclaredValues, TheViewHoldsAKeyOnlyUnderItsOwnDialectAndTheKeysListAll)
 {
@@ -522,6 +537,26 @@ TEST(CompositionDeclaredValues, ADeclaredValueMovesTheIdentity)
     EXPECT_NE(compose(std::array{kTicketing}).identity_hex(),
               compose(std::array{kTicketingBare}).identity_hex())
         << "the key and its markers are what canon masks behind, so they are identity";
+}
+
+// refs: DN-162.D13
+TEST(CompositionDeclaredValues, ADeclaredFloorMovesTheIdentity)
+{
+    constexpr SemanticPackageManifest kFloor{.name = "ticketing",
+                                             .version = "1.0.0",
+                                             .dialect_revisions = kTicketingRevisions,
+                                             .declared_values = kFloorValue};
+    constexpr SemanticPackageManifest kHigherFloor{.name = "ticketing",
+                                                   .version = "1.0.0",
+                                                   .dialect_revisions = kTicketingRevisions,
+                                                   .declared_values = kHigherFloorValue};
+    EXPECT_NE(compose(std::array{kFloor}).identity_hex(),
+              compose(std::array{kHigherFloor}).identity_hex())
+        << "the floor decides which runs a value may claim, so it is identity";
+    EXPECT_EQ(compose(std::array{kFloor}).declared_value_floor("ticket"), 10U)
+        << "the floor is read from the composition, unfiltered, by the key it belongs to";
+    EXPECT_EQ(compose(std::array{kTicketing}).declared_value_floor("ticket"), 0U)
+        << "a key behind markers declares no floor";
 }
 
 TEST(CompositionDeathTest, ADuplicateDeclaredKeyFailsClosedAtRuntime)

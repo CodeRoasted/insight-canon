@@ -83,6 +83,14 @@ struct StatelessTemplate
     std::span<const std::string_view> params;
 };
 
+// post: `text` with each span the value masker's INSTANCE arms mask in a line's template replaced
+// by the wildcard: a hex run of 16 or more, a UUID, a compact UTC instant, an address run.
+// invariant: each space-delimited token is read as the template reads it; every other byte, the
+// spaces included, is kept.
+// invariant: the instance arms ONLY: no number, version, key-value or status rule runs here.
+// refs: DN-162.D18, ADR-16.D5, ADR-16.D17
+[[nodiscard]] std::string instance_masked_text(std::string_view text);
+
 // refs: DN-133.D1, DN-134.D2, DN-134.D3, DN-128.D6
 // post: a `content` that is, whole, one JSON object or array is first given its member-order
 // normal form; every other `content` is tokenized as it is.

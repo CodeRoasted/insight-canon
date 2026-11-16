@@ -181,6 +181,11 @@ struct Tokenizer::Impl
     }
 };
 
+std::string mask_instance_values(std::string_view text)
+{
+    return instance_masked_text(text);
+}
+
 Tokenizer::Tokenizer(ArenaAllocator& arena, MaskConfig mask_config,
                      const insight::semantic::ComposedSemantics& composed, StreamContext context)
     : impl_{std::make_unique<Impl>(arena, mask_config, composed, std::move(context))}

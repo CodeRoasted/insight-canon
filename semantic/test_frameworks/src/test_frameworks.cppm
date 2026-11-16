@@ -71,12 +71,17 @@ export inline constexpr SemanticPackageManifest kManifest{
 };
 
 // refs: ADR-17.D9
-// invariant: this package ships no dialect gates, so this is its only compile-time declaration
-// check.
+// invariant: this package ships no dialect gates, so its revision fences are its only
+// compile-time declaration checks.
 static_assert(
     insight::semantic::all_revisions_named(kDialectRevisions),
     "test_frameworks: the declared dialect-revision vocabulary must be non-empty, with unique, "
     "non-empty names (grammar-6 — the coordinate is what a reader compares generations "
     "on, so an unnamed or repeated one is not a declaration)");
+// refs: DN-162.D1
+static_assert(
+    insight::semantic::all_row_revisions_declared(kManifest),
+    "test_frameworks: a row names a revision_since -- a single-revision package's rows carry "
+    "none, since its one revision owns every row");
 
 } // namespace insight::semantic::test_frameworks

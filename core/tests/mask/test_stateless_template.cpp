@@ -1557,3 +1557,79 @@ TEST(StatelessTemplate, TheJsonMemberOrderFormIsBoundedInNestingDepth)
     const std::string deep{nested(kDeep, kUnordered)};
     EXPECT_EQ(masked(deep, arena), deep) << "past the declared depth the line is left as it is";
 }
+
+// refs: DN-162.D13
+// invariant: `@` is a composite pre-gate trigger, so the long hash after `<name>@` is the instance
+// embedded_identity already masks behind `/`; every other `@` token reads as it did before.
+TEST(StatelessTemplate, AnAtJoinsThePreGateAndReachesOnlyTheEmbeddedIdentity)
+{
+    ArenaAllocator arena{256U * 1024U};
+    constexpr std::string_view kSha{"0123456789abcdef0123456789abcdef01234567"};
+    const std::string release{"ci@" + std::string{kSha}};
+    EXPECT_EQ(masked("SENTRY_RELEASE: " + release, arena), "SENTRY_RELEASE: ci@<*>")
+        << "the commit after `ci@` is an instance, as it is after `ci/`";
+    EXPECT_EQ(rule_catalog::composite_rule_claiming(release), "embedded_identity")
+        << "the one rule `@` newly reaches is embedded_identity";
+    for (const std::string_view tok : {"pkg@1.2.3", "node@20", "user@example.com"})
+    {
+        EXPECT_EQ(rule_catalog::composite_rule_claiming(tok), std::string_view{})
+            << "no composite rule claims an `@` token that holds no instance value: " << tok;
+        EXPECT_EQ(masked("using " + std::string{tok} + " here", arena),
+                  "using " + std::string{tok} + " here")
+            << "an `@` token with no instance value stays literal: " << tok;
+    }
+    EXPECT_EQ(masked("uses owner/action@" + std::string{kSha}, arena), "uses owner/action@<*>")
+        << "a pin already reached through `/` is unchanged";
+}
+
+// invariant: the definition comparison's mask is the value masker's INSTANCE arms and nothing else:
+// each arm masks the span the template masks.
+// invariant: a number, a version and a key-value pair the template masks stay as written.
+// refs: DN-162.D18, F-SRC-insight-canon:canon.cppm:mask_instance_values
+TEST(MaskInstanceValues, MasksTheFourInstanceArmsAndKeepsEveryOtherByte)
+{
+    struct Row
+    {
+        std::string_view text;
+        std::string_view want;
+        std::string_view why;
+    };
+    for (const Row& row : {
+             Row{.text = "echo KEY=node-modules-"
+                         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                 .want = "echo KEY=node-modules-<*>",
+                 .why = "a 64-hex cache key behind a prefix is the hex-run arm's"},
+             Row{.text = "git checkout 3f786850e387550fdab836ed7e6dc881de23001b",
+                 .want = "git checkout <*>",
+                 .why = "a whole 40-hex token is rule 5's span, and the hex-run arm's"},
+             Row{.text = "cp /var/cache/f7f63412-b7a7-468d-bd31-1a6ae1ca2680/x .",
+                 .want = "cp /var/cache/<*>/x .",
+                 .why = "a UUID is the UUID arm's"},
+             Row{.text = "tar xf build-2026-06-09T185733Z.tar",
+                 .want = "tar xf build-<*>.tar",
+                 .why = "a compact UTC instant is the instant arm's"},
+             Row{.text = "ping host=fe80:db8:abc:def:cafe:beef:face:fade/x",
+                 .want = "ping host=<*>/x",
+                 .why = "an eight-group run inside a token is the address-run arm's"},
+             Row{.text = "pip install foo==1.2.3 --retries 3 count=42",
+                 .want = "pip install foo==1.2.3 --retries 3 count=42",
+                 .why = "a version, a bare number and a key-value number are not instance arms"},
+             Row{.text = "  a  b deadbeef ",
+                 .want = "  a  b deadbeef ",
+                 .why = "every space is kept, and an 8-hex word sits below the hex-run floor"},
+         })
+    {
+        const std::string got{mask_instance_values(row.text)};
+        EXPECT_EQ(got, row.want) << row.why << "\n  input    : [" << row.text << "]\n  expected : ["
+                                 << row.want << "]\n  actual   : [" << got << "]";
+    }
+
+    // invariant: the template masks the kept row's numbers, so the kept row is the instance arms'
+    // own boundary and not a token no rule reads.
+    ArenaAllocator arena{256U * 1024U};
+    const std::string templated{masked("pip install foo==1.2.3 --retries 3 count=42", arena)};
+    EXPECT_NE(templated, "pip install foo==1.2.3 --retries 3 count=42")
+        << "the value masker must mask something in the kept row, or the row proves nothing about "
+           "the instance arms' boundary\n  template : ["
+        << templated << "]";
+}

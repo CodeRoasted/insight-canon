@@ -910,6 +910,28 @@ templates 2 808 798 → 2 794 243 and singletons 1 667 517 → 1 658 077 summed 
 in `insight-metalog`'s three committed vector files and in `insight-eidos`'s Tamys report-order golden and
 run-outcome gate; the hub's published determinism golden is re-rendered at the cut.
 
+**Also in this window: `@` joins the composite pre-gate, and a declared value may be markerless
+(`DN-162.D13`).** `-20` is open (no tag carries it), so these ride it (`ADR-2.D9`).
+
+* *What changed.* `TokenShape::has_separator` counts `@`, so a token whose only separator is `@` reaches the
+  composite catalog. The only rule it newly reaches is `embedded_identity`; every other composite carries its
+  own trigger. A declared value's row may name no marker and a digit floor (`min_digits`, at least 10)
+  instead: the stream's value then masks wherever it is a maximal digit run, a digit on neither side, and a
+  context value shorter than its key's floor is refused. The GitHub package declares `run_id` so.
+* *Which serialized fields move.* The identity class: `template_str` and `template_id` of a line holding a
+  `<name>@<instance>` token no other separator reached (`ci@<40-hex>` gives `ci@<*>`), and, on a stream that
+  declares `run_id`, of a line holding the run's own id. `params` do not move: the claimed bytes become a
+  wildcard inside a token, which is a normalization, not a param. Nothing at the classification class. An
+  undeclared stream moves only by the `@` change.
+* *Registration, before the code.* On the 1 738 logs of the N294 bench's pinned manifest, every token holding
+  `@` (13 070 distinct, 213 203 occurrences) read before and after the one-byte change: 25 distinct tokens
+  (2 924 occurrences) change normal form, every one newly claimed by `embedded_identity`, every one
+  `ci@<40-hex>` to `ci@<*>`; the address rule's claim moves on none.
+* *Witness inputs.* `core/tests/mask/mask_rules.golden`: `ci@<40-hex>` gives `ci@<*>` (literal at `-19`);
+  `pkg@1.2.3`, `node@20` and `user@example.com` stay literal, and `owner/action@<40-hex>` still gives
+  `owner/action@<*>` through its `/`. The markerless value is witnessed beside the GitHub package's declared
+  pull-request arms, since only a composition holds a row.
+
 ---
 
 *See also: [masking.md](masking.md) (what the current generation's rules actually are) ·

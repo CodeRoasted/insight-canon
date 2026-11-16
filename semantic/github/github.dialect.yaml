@@ -17,7 +17,7 @@
 
 dialect:
   name: github
-  version: "1.11.0"
+  version: "1.12.0"
   why:
     - "ADR-17.D3 keys identity on CONTENT, not on spelling: `version:` moves when what this package"
     - "RECOGNIZES or EMITS moves — its rows, their gates, or its code tier — and never for a"
@@ -47,19 +47,33 @@ dialect:
   # ── the VENDOR generation these rows recognize ──
   revisions:
     why:
-      - "GitHub's workflow-command syntax v1 — the `::name key=value::payload` family and the"
-      - "`##[group]` / `##[endgroup]` pair. GitHub has deprecated `set-env` / `add-path` WITHIN v1"
-      - "and has shipped no v2 syntax, so this vocabulary is cardinality one and stays so until a"
-      - "second generation exists."
+      - "The generations of GitHub's runner log this package recognizes, oldest first. v1 is the"
+      - "workflow-command syntax — the `::name key=value::payload` family and the `##[group]` /"
+      - "`##[endgroup]` pair — that every row below declares `since: v1`. v2 is the runner of"
+      - "2026-07-16 onward, which brackets each inner step of a composite action with"
+      - "`##[start-action ` / `##[end-action ` and changes no line v1 printed: every v2 log is a v1"
+      - "log plus those lines, so one package recognizes both (ADR-22.D8 arm (b)) and every row"
+      - "names the revision that INTRODUCED it (DN-162.D1)."
       - ""
       - "It is NOT `version:` above, and the two answer different questions for a reader of a"
       - "MetaLog ruleset block: `version:` moves when WE edit the ruleset, this one moves when"
       - "GITHUB ships a new syntax generation. A reader must never substitute one for the other."
       - ""
-      - "The cardinality-one FENCE is the schema's, not this dialect's, and so is the fact that"
-      - "core carries a general span so the day a second generation lands is a data change rather"
-      - "than a redesign: ADR-17.D9."
-    names: [v1]
+      - "That v2 is a superset of v1 is not asserted here but CHECKED: v2's claim names v1's"
+      - "retained declaration, `revisions/v1.dialect.yaml`, a byte copy of this file as v1 shipped"
+      - "it, and the generator refuses any v1 row that changed, moved or is shadowed (DN-162.D2)."
+      - "The retained file is append-only and must equal what this file held when it was added;"
+      - "a Pharos check holds that, from git history (DN-162.D3)."
+    names:
+      - v1
+      - name: v2
+        backward_compatible_with: v1
+        oracle: revisions/v1.dialect.yaml
+        why:
+          - "The runner of 2026-07-16 onward. Measured on the bank (DN-162.O1): every start line is"
+          - "exactly `display=…;id=…` and every end line exactly"
+          - "`id=…;outcome=…;conclusion=…;duration_ms=…` in 186 986 of 186 986 spans; the pairs"
+          - "nest with 0 dangling and 0 out-of-order ends; the stripped channel carries none."
 
   # ── the declared INTENT CHANNEL vocabulary ──
   channels:
@@ -139,24 +153,31 @@ dialect:
       - "matched by its whole shape, and they are gated to this package: each row says why."
     rows:
       - prefix: "##[group]"
+        since: v1
         role: GroupBegin
         dialect_gate: any
       - prefix: "::group::"
+        since: v1
         role: GroupBegin
         dialect_gate: any
       - prefix: "##[endgroup]"
+        since: v1
         role: GroupEnd
         dialect_gate: any
       - prefix: "::endgroup::"
+        since: v1
         role: GroupEnd
         dialect_gate: any
       - prefix: "##[error]"
+        since: v1
         role: Terminator
         dialect_gate: any
       - prefix: "::error::"
+        since: v1
         role: Terminator
         dialect_gate: any
       - shape: "Received {n} of {n} ({n}%), {n} MBs/sec"
+        since: v1
         role: Progress
         dialect_gate: self
         why:
@@ -172,6 +193,7 @@ dialect:
           - "`Post job cleanup.`, none in a `run:` step body, and no line carries `MBs/sec` outside"
           - "the exact shape. Gated to this package because the toolkit runs under GitHub's runner."
       - shape: "Sent {n} of {n} ({n}%), {n} MBs/sec"
+        since: v1
         role: Progress
         dialect_gate: self
         why:
@@ -197,6 +219,7 @@ dialect:
       - "comparability hash, so two writers can never claim one ruleset identity."
     rows:
       - prefix: "Current runner version: "
+        since: v1
         kind: Job
         role: Opens
         dialect_gate: self
@@ -226,6 +249,7 @@ dialect:
           - "before this one, and `##[debug]Starting: ` cannot open a job because it also opens"
           - "every step. Those three lines stay with the previous unit."
       - prefix: "Complete job name: "
+        since: v1
         kind: Job
         child_order: Unordered
         dialect_gate: self
@@ -237,6 +261,7 @@ dialect:
           - "channel's marker occurs as ordinary content in a sibling channel, which is why `Run `"
           - "needs one and this does not: the requirement does not metastasize to every row."
       - prefix: "Run "
+        since: v1
         kind: Step
         child_order: Ordered
         dialect_gate: self
@@ -269,6 +294,7 @@ dialect:
           - "bare `Run ` as its banner, and that arm's control fence is what holds this row in"
           - "place."
       - prefix: "##[group]Run "
+        since: v1
         kind: Step
         child_order: Ordered
         dialect_gate: self
@@ -302,6 +328,7 @@ dialect:
           - "The two Step prefixes never shadow: neither is a proper prefix of the other, so the"
           - "composed longest-match note stays empty."
       - prefix: "Prepare all required actions"
+        since: v1
         kind: Step
         role: Opens
         dialect_gate: self
@@ -336,7 +363,55 @@ dialect:
           - ""
           - "⚠ A DECLARED LIMITATION: two different failed preparations in one job pair in order,"
           - "so the second reads as already failing."
+      - prefix: "##[start-action "
+        since: v2
+        kind: InnerStep
+        child_order: Ordered
+        dialect_gate: self
+        extract: KeyedFields
+        fields:
+          name: id
+          display: display
+          segment: "."
+          ordinal: "_"
+          anonymous: "__run"
+        channel_gate: annotated
+        why:
+          - "The v2 runner opens each inner step of a composite action with this line, its payload"
+          - "exactly `display=…;id=…]`. An inner step named while one is open is that unit's child:"
+          - "depth is positional, and the id's ancestry agreed with the open stack in 21 061 of"
+          - "21 061 nested spans (DN-162.D4)."
+          - ""
+          - "NAMED by the id's last `.` segment with a trailing `_<digits>` ordinal removed, because"
+          - "the path pairs half the inner steps positionally and the display embeds a uses-step's"
+          - "pinned version. Where the vendor synthesized the anonymous `__run` segment, the"
+          - "display names the unit instead (DN-162.D5's table: 154 189 distinct sibling keys of"
+          - "156 654). The display is `;`- and `]`-percent-encoded, decoded at render only."
+          - ""
+          - "Gated to the ANNOTATED channel: the stripped channel carries no marker (0 of 200"
+          - "sampled stripped twins of marked logs)."
+      - prefix: "##[end-action "
+        since: v2
+        kind: InnerStep
+        role: Ends
+        dialect_gate: self
+        extract: KeyedFields
+        fields:
+          outcome: outcome
+          propagated_outcome: conclusion
+        channel_gate: annotated
+        why:
+          - "The v2 runner ends the innermost open inner step with this line, its payload exactly"
+          - "`id=…;outcome=…;conclusion=…;duration_ms=…]`. Position governs, never the id: 0 ends"
+          - "on the bank close anything but the innermost open span (DN-162.D4)."
+          - ""
+          - "Two declarations at two grains (DN-162.D8, RUL-315): `outcome` is the inner step's OWN"
+          - "outcome, and `conclusion` is that outcome as its containing unit counted it, after"
+          - "a `continue-on-error` tolerance. Measured: `failure/success` 246 times, and never a"
+          - "`conclusion` failing where `outcome` succeeds. Both map through the outcome tokens"
+          - "below; every token measured is declared there."
       - prefix: "Post job cleanup."
+        since: v1
         kind: Step
         role: Closes
         dialect_gate: self
@@ -361,6 +436,7 @@ dialect:
           - "than a runner hook opens after it. The line is the same in both channels, so it"
           - "needs no channel gate."
       - prefix: "Cleaning up orphan processes"
+        since: v1
         kind: Step
         role: Closes
         dialect_gate: self
@@ -387,27 +463,35 @@ dialect:
       - "`semantic_identity`, which the serializer walks in this same order."
     rows:
       - prefix: "##[error]"
+        since: v1
         level: Error
         dialect_gate: self
       - prefix: "::error::"
+        since: v1
         level: Error
         dialect_gate: self
       - prefix: "##[warning]"
+        since: v1
         level: Warn
         dialect_gate: self
       - prefix: "::warning::"
+        since: v1
         level: Warn
         dialect_gate: self
       - prefix: "##[debug]"
+        since: v1
         level: Debug
         dialect_gate: self
       - prefix: "::debug::"
+        since: v1
         level: Debug
         dialect_gate: self
       - prefix: "##[notice]"
+        since: v1
         level: Info
         dialect_gate: self
       - prefix: "::notice::"
+        since: v1
         level: Info
         dialect_gate: self
 
@@ -450,24 +534,31 @@ dialect:
       - "Unknown — honest, never a guess."
     rows:
       - token: success
+        since: v1
         outcome: Success
         dialect_gate: self
       - token: failure
+        since: v1
         outcome: Failure
         dialect_gate: self
       - token: cancelled
+        since: v1
         outcome: Cancelled
         dialect_gate: self
       - token: timed_out
+        since: v1
         outcome: Aborted
         dialect_gate: self
       - token: skipped
+        since: v1
         outcome: Unknown
         dialect_gate: self
       - token: neutral
+        since: v1
         outcome: Unknown
         dialect_gate: self
       - token: action_required
+        since: v1
         outcome: Unknown
         dialect_gate: self
 
@@ -490,8 +581,11 @@ dialect:
       - "So the acquirer, who knows the run, declares the number, and canon masks that number and"
       - "only that number, directly behind one of the markers below. A stream that declares no"
       - "value is unchanged byte for byte. The rule and its refusals are DN-133.D1's."
+      - "A run's own run id is the second such value (DN-162.D13): only the acquirer knows it, and"
+      - "a stable digit-named path has its shape, so no per-line rule may mask it either."
     rows:
       - key: pull_request
+        since: v1
         markers: ["PR-", "pr-", "Pr-", "pull-", "PULL-", "Pull-", "PR#", "pulls/"]
         dialect_gate: self
         why:
@@ -501,6 +595,17 @@ dialect:
           - "evidence: a marker nobody measured is a coincidence nobody read. `pull/`, `issues/`"
           - "and `prN` were measured and stay out. Tamys masks its job and step instance key behind"
           - "these same markers."
+      - key: run_id
+        since: v2
+        min_digits: 10
+        dialect_gate: self
+        why:
+          - "A run's own id lands in paths no rule masks (`/home/runner/.codex/<id>.json`), and"
+          - "every run then reads a vanished and a new line. Its value is matched as a whole digit"
+          - "run, no digit on either side, with no marker: the references are too varied to list,"
+          - "and the floor keeps a declared value off ordinary words; every run id the measured"
+          - "bank holds has 11 digits (DN-162.D13). `since: v2` is bookkeeping: a declared"
+          - "value is never an observation, so it applies in the full and common readings alike."
 
   # ── the whole lines the runner writes into a step it STOPS ──
   stop_announcements:
@@ -521,17 +626,20 @@ dialect:
       - "it costs recall, never precision."
     rows:
       - shape: "##[error]The operation was canceled."
+        since: v1
         dialect_gate: self
         why:
           - "The GitHub runner's cancellation line. Measured in gr-v3 (14 lines in 5 logs, every"
           - "one in a job segment every banked graph entry declares cancelled) and in the store"
           - "(1 948 lines in 703 logs)."
       - shape: "##[error]The runner has received a shutdown signal. This can happen when the runner service is stopped, or a manually started runner is canceled."
+        since: v1
         dialect_gate: self
         why:
           - "The same runner's shutdown line, its stop vocabulary. Absent from both views and"
           - "measured in the store (76 lines in 69 logs)."
       - shape: "##[error]Step canceled by GitHub (see: https://depot.dev/docs/github-actions/troubleshooting#error-step-canceled-by-github)"
+        since: v1
         dialect_gate: self
         why:
           - "depot's runner, which runs GitHub's jobs and writes its own line into the step GitHub"

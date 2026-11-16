@@ -132,9 +132,10 @@ struct TokenShape
     bool empty{true};
     bool all_digits{false};
     bool digit_leading{false};
-    // invariant: embedded_identity is the ONLY rule the wrapper bytes newly reach — every other
-    // normalizer already carries its own trigger.
-    // note: the trigger set is `: / # - =` plus every kWrapperPairs byte.
+    // invariant: embedded_identity is the ONLY rule the wrapper bytes and `@` newly reach — every
+    // other normalizer already carries its own trigger; after `<name>@` it masks an instance.
+    // note: the trigger set is `: / # - = @` plus every kWrapperPairs byte.
+    // refs: DN-162.D13
     bool has_separator{false};
 
     explicit constexpr TokenShape(std::string_view tok) noexcept : empty(tok.empty())
@@ -150,7 +151,8 @@ struct TokenShape
         {
             all_digits = all_digits && is_digit(chr);
             has_separator = has_separator || chr == ':' || chr == '/' || chr == '#' || chr == '-' ||
-                            chr == '=' || is_wrapper_open(chr) || is_wrapper_close(chr);
+                            chr == '=' || chr == '@' || is_wrapper_open(chr) ||
+                            is_wrapper_close(chr);
         }
     }
 };

@@ -78,6 +78,23 @@ recognize_opener(NormalizedContent content,
 [[nodiscard]] bool recognize_closer(NormalizedContent content,
                                     const insight::semantic::ComposedSemantics& composed) noexcept;
 
+// post: the longest-matching ENDING row's `UnitEnd`: the kind it ends and the ended unit's two
+// declared outcome tokens; kind None when no ending row matches, its extractor included.
+// invariant: an ending row names nothing: which unit it ends is the innermost open one of its
+// kind, the segmenting caller's to apply; it compares no id.
+// invariant: the tokens VIEW the handed content's bytes, so the caller's storage must outlive them.
+// refs: DN-162.D4, DN-162.D8
+[[nodiscard]] UnitEnd recognize_end(NormalizedContent content,
+                                    const insight::semantic::ComposedSemantics& composed) noexcept;
+
+// post: `text` with the spans the value masker's INSTANCE arms mask in a line's template replaced
+// by the wildcard: a hex run of 16 or more, a UUID, a compact UTC instant, an address run.
+// invariant: the instance arms only: a number, a version or a key-value pair stays as written, so
+// a caller comparing two texts through it keeps every change but an instance value's.
+// invariant: homed in the facade because the arms live in the masker's detail shard.
+// refs: DN-162.D18, ADR-16.D5
+[[nodiscard]] std::string mask_instance_values(std::string_view text);
+
 // invariant: phase 1 of the pipeline: one raw log line in, one `CanonicalEvent` out.
 // invariant: NOT thread-safe — one instance per thread or per strand.
 class Tokenizer

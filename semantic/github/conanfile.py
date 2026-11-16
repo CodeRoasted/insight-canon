@@ -30,7 +30,8 @@ class InsightSemanticGithubConan(ConanFile):
     # spelled out rather than swept by a glob because zero rows is not a degenerate dialect,
     # it is a broken one — a row-less manifest still compiles, still composes and still
     # publishes a `semantic_identity`.
-    exports_sources = "CMakeLists.txt", "src/*", "github.dialect.yaml", "tests/*"
+    exports_sources = ("CMakeLists.txt", "src/*", "github.dialect.yaml", "revisions/*",
+                       "tests/*")
 
     def export_sources(self):
         # The export is the TRACKED files under exports_sources, never the disk's (DN-142.D4 (b)):

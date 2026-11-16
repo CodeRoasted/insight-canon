@@ -146,5 +146,9 @@ static_assert(insight::semantic::all_revisions_named(kDialectRevisions),
               "gitlab: the declared dialect-revision vocabulary must be non-empty, with unique, "
               "non-empty names (grammar-6 — the coordinate is what a reader compares generations "
               "on, so an unnamed or repeated one is not a declaration)");
+// refs: DN-162.D1
+static_assert(insight::semantic::all_row_revisions_declared(kManifest),
+              "gitlab: a row names a revision_since -- a single-revision package's rows carry "
+              "none, since its one revision owns every row");
 
 } // namespace insight::semantic::gitlab

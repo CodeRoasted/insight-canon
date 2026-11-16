@@ -15,7 +15,7 @@ masks, what it keeps, and which markers it knows** (the rules generation named b
   yields the same template in any run, any order, on any machine. (This is why identity is reproducible and why a
   "phantom pair" from learned wildcards cannot occur.) The declarations are fixed before the line is read: the
   composed dialect, the `MaskConfig`, and the stream's **declared context** — values the acquirer supplies about
-  the run, such as its own pull-request number (`StreamContext`). A declared value is a supplied
+  the run, such as its own pull-request number or run id (`StreamContext`). A declared value is a supplied
   fact, never learned state; a stream that declares none templates byte-identically to one that has no context
   at all.
 - **Keep-class / mask-instance.** The unifying idea behind every rule: keep the **stable class marker**, mask
@@ -69,12 +69,14 @@ contributes a param (§4, the last two rows):
   masked over its number's **extent** (§4) by the ONE value disposition the kv-value rule also reads: a remainder
   of closers and `,;:.` is swallowed, any other remainder stays literal behind `<*>`;
 - the **declared-run** step, only on a stream that declares a value under a key its dialect declares: each
-  maximal digit run equal to the declared value, directly behind a declared marker, becomes `<*>`.
+  maximal digit run equal to the declared value, directly behind a declared marker, becomes `<*>`; for a key
+  that declares no marker and a digit floor instead, each maximal digit run equal to the value, a digit on
+  neither side, becomes `<*>`, and a value shorter than the floor is refused before any line is read.
 
 Rule 1 wins first on purpose: it protects the **green→red distinction** that downstream diffing depends on —
 `exit code 0` and `exit code 1` must stay *different* templates, so a short status value after a status keyword
 is never masked (see §3). The composite layer (rule 3) is gated by a cheap pre-check: a token is only tried
-against the normalizers if it contains one of `: / # - =`, a **wrapper byte** (§3.2), or a declared marker
+against the normalizers if it contains one of `: / # - = @`, a **wrapper byte** (§3.2), or a declared marker
 prefix; everything else skips straight to the fixed masks.
 
 ---
@@ -93,7 +95,7 @@ data-learned. This is what keeps masking decidable and deterministic.
 | **Min hash length** | `16` | Rule 4 / §4 embedded-identity — a hex-only run this long is an instance hash, not a word. |
 | **Wrapper pairs** | `[]` `()` `{}` `<>` `""` `''` | §3.2 — the punctuation shell a producer wraps a whole token in. Read by the address rule's grammar (§3.3), by rule 5's shelled form, by the hash counter's shelled form, by the ephemeral-root lead (§3.1) and by the rule-3 pre-gate. |
 | **Wildcard** | `<*>` | The mask placeholder. |
-| **Declared-value markers** | none in core: each key and its markers are a dialect's data (`DeclaredValueRow`); the GitHub dialect declares `pull_request` behind `PR-`, `pr-`, `Pr-`, `pull-`, `PULL-`, `Pull-`, `PR#`, `pulls/` | §4 declared-run — the markers a run's own declared value is masked behind. Core holds the mechanism and no marker. |
+| **Declared-value markers** | none in core: each key and its markers or digit floor are a dialect's data (`DeclaredValueRow`); the GitHub dialect declares `pull_request` behind `PR-`, `pr-`, `Pr-`, `pull-`, `PULL-`, `Pull-`, `PR#`, `pulls/`, and `run_id` with no marker and a floor of 10 digits | §4 declared-run — the markers a run's own declared value is masked behind, or the floor a markerless value must reach. Core holds the mechanism, no marker and no floor; it refuses a floor below 10. |
 
 No `MaskConfig` knob gates a mask rule. Masking relocates a value into `params` and never deletes it, so a
 switch that kept an address in the template could buy only a template per host — the identity defect the
@@ -264,6 +266,13 @@ instance. Tried in order; first match wins.
 | **kv-value** | `<key>=<value>`, the key every byte before the token's first `=`, the value digit-leading after an optional currency marker and an optional sign | keep the key (+ marker); mask the value over its number's **extent** (the `;`-segment row's, read by the same disposition): a remainder of only wrapper closers and `,;:.` is swallowed, any other remainder is kept byte for byte behind `<*>`. A short status value behind a status key declines, read on the extent; no param | `order=100000` → `order=<*>` · `total=$18` → `total=$<*>` · `off=-5` → `off=<*>` · `[pid=2152]` → `[pid=<*>` · `n=8,11,14` → `n=<*>` · `size=10.5MB` → `size=<*>` · `[pid=2152][err]` → `[pid=<*>][err]` · `?a=1&b=2` → `?a=<*>&b=2` · `pkg>=1.2->dep==3.4)` → `pkg>=<*>>dep==3.4)` · `a=1;b=x2` → `a=<*>;b=x2` · `exit=1]` and `status=200)` stay literal |
 | **`;`-segment** | not a claiming rule: applied to the token's normal form after every rule above and before declared-run, when the form holds `;` and `=`. Each `;`-segment `<key>=<value>` whose key is a letter- or `_`-led run of `[A-Za-z0-9_.-]` opening the segment (the first segment may open with wrapper openers) and whose value is digit-leading after an optional currency marker and an optional sign | keep every key, every `;` and a word value; mask a digit-leading value over its **extent**: from its first byte (a sign or a digit) over `[A-Za-z0-9._+%-]` and any `<*>` an earlier rule wrote, across one `,` `:` or `/` directly followed by a digit or `<*>`. The **remainder** after the extent is decided whole: swallowed when it is empty or only wrapper closers and `,;:.`, else kept byte for byte behind `<*>`; a carriage return is content (§1). A short status value behind a status key stays literal per segment, read on the extent; no param. `,` is not a delimiter | `##[end-action id=build;outcome=success;duration_ms=12]` → `##[end-action id=build;outcome=success;duration_ms=<*>` · `item=book;total=$18` → `item=book;total=$<*>` · `Import-Package=okio;version=1.15,javax.annotation;version=1.3,*` → `Import-Package=okio;version=<*>,javax.annotation;version=<*>,*` · `id=a;n=5&amp;m=6` → `id=a;n=<*>&amp;m=<*>` · `FREQ=WEEKLY;BYHOUR=8,11,14;BYMINUTE=0` → `FREQ=WEEKLY;BYHOUR=<*>;BYMINUTE=<*>` · `id=a;t=12:30:01` (normal form `id=a;t=12:<*>:<*>`) → `id=a;t=<*>` · `id=a;n=5]`+CR keeps `]`+CR and `id=a;n=5]`+CR+`,` keeps `]`+CR+`,` · `id=build;status=200`, `id=a;status=200]` and `id=build,duration_ms=12` stay literal |
 | **declared-run** | not a claiming rule: applied once to the token's normal form after every rule above, on a stream that declares a value V under a key its dialect declares. A digit run masks when it is the maximal run directly behind a declared marker, the marker opens the form or follows a byte that is neither a letter nor a digit, the run equals V byte for byte, and the byte after it is the form's end or neither a letter nor a digit | keep everything else in the token, mask the run; no param | V = 6656: `/stirling/V2-PR-6656/docker-compose.yml` → `/stirling/V2-PR-<*>/docker-compose.yml` · `PR#6656` → `PR#<*>` · `PR-6657`, `XPR-6656`, `PR-66560` and `python3` (V = 3) stay literal. The predicate is one exported function (`claim_declared_runs`); Tamys's job and step instance key reads the same claims (`declared_discriminant_of`) |
+
+**The instance arms alone are one exported function.** `mask_instance_values` (facade `insight.canon`) runs only the
+embedded-identity scan, its four arms (a hex run ≥ 16, a UUID, a compact UTC instant, an address run), over each
+space-delimited token of a text (an address run is masked even in a token rule 4 would mask whole, since rule 4 is no
+instance arm), keeping every other byte, the spaces included: a number, a version, a key-value pair and a status stay
+as written. Tamys compares an inner step's definition through it (`DN-162.D18`): `KEY=node-modules-<64 hex>` →
+`KEY=node-modules-<*>`, `--retries 3` stays `--retries 3`.
 
 **The ephemeral-root catalog is also consulted from inside source-location.** A per-run instance directory in
 a compiler diagnostic masks even though it is letter-leading (it would otherwise be *kept* as a class anchor),

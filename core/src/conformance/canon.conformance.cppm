@@ -178,7 +178,8 @@ namespace
     }
 
     // post: what the row's own walker recognizes on the content: `recognize` for a naming row;
-    // `recognize_opener`'s kind for an opening row, and kind Step on a `recognize_closer` match.
+    // `recognize_opener`'s kind for an opening row, kind Step on a `recognize_closer` match.
+    // post: `recognize_end`'s kind for an ending row.
     // invariant: an opening or closing row's result has an empty name, as it carries no identity.
     // refs: ADR-17.D6, ADR-20.D32
     [[nodiscard]] insight::tokenization::IntentMarker
@@ -193,6 +194,8 @@ namespace
             return {.kind = insight::tokenization::recognize_closer(content, view)
                                 ? insight::tokenization::IntentMarkerKind::Step
                                 : insight::tokenization::IntentMarkerKind::None};
+        case MarkerRole::Ends:
+            return {.kind = insight::tokenization::recognize_end(content, view).kind};
         case MarkerRole::Names:
             break;
         }
@@ -785,6 +788,8 @@ namespace
             return "Job";
         case IntentMarkerKind::Step:
             return "Step";
+        case IntentMarkerKind::InnerStep:
+            return "InnerStep";
         }
         return "?";
     }
@@ -838,6 +843,32 @@ Report round_trip_report(const SemanticPackageManifest& manifest, const Composed
         const insight::tokenization::IntentMarker got{
             recognize_as(reader, normalized_probe(line, scratch), medium_view)};
 
+        // invariant: an ending row names nothing; its closure is its kind AND both outcome tokens,
+        // which its dual renders under the row's two keys.
+        // refs: DN-162.D4
+        if (reader.role == MarkerRole::Ends)
+        {
+            const insight::tokenization::UnitEnd ended{
+                insight::tokenization::recognize_end(normalized_probe(line, scratch), medium_view)};
+            const bool closed{ended.kind == reader.kind && ended.outcome == kProbePayload &&
+                              ended.propagated_outcome == kProbePayload};
+            report.checks.push_back(
+                {.name = closed ? "round_trip" : "round_trip.closure",
+                 .passed = closed,
+                 .detail = closed
+                               ? std::string{}
+                               : "recognize_end(render_row(\"" + std::string{reader.prefix} +
+                                     "\", \"" + std::string{kProbePayload} + "\")) over line \"" +
+                                     line + "\" did NOT recover the ending row. expected {kind=" +
+                                     std::string{kind_name(reader.kind)} + ", outcome=\"" +
+                                     std::string{kProbePayload} + "\", propagated_outcome=\"" +
+                                     std::string{kProbePayload} + "\"} got {kind=" +
+                                     std::string{kind_name(ended.kind)} + ", outcome=\"" +
+                                     std::string{ended.outcome} + "\", propagated_outcome=\"" +
+                                     std::string{ended.propagated_outcome} + "\"}."});
+            continue;
+        }
+
         // invariant: an opening or closing row renders its prefix alone and carries no payload,
         // so its closure is its kind; its child_order is inert.
         const bool unnamed{reader.role != MarkerRole::Names};
@@ -890,6 +921,8 @@ namespace
             return "RemainderToClosingParen";
         case PayloadExtract::NumericFieldThenRemainder:
             return "NumericFieldThenRemainder";
+        case PayloadExtract::KeyedFields:
+            return "KeyedFields";
         }
         return "?";
     }
@@ -906,6 +939,8 @@ namespace
             return "PayloadThenClosingParen";
         case PayloadEmit::PlaceholderNumericFieldThenPayload:
             return "PlaceholderNumericFieldThenPayload";
+        case PayloadEmit::KeyedFieldsThenClosingBracket:
+            return "KeyedFieldsThenClosingBracket";
         }
         return "?";
     }
@@ -1031,6 +1066,8 @@ namespace
             return "Opens";
         case MarkerRole::Closes:
             return "Closes";
+        case MarkerRole::Ends:
+            return "Ends";
         }
         return "unknown";
     }
@@ -1112,16 +1149,34 @@ namespace
     kind and it is the only thing standing between this comparator and the defect class it lives
     inside.
     ***********************************************************************************************/
+    // refs: DN-162.D4
+    void field_roles_differences(FieldDiff& diff, const KeyedFieldRoles& lhs,
+                                 const KeyedFieldRoles& rhs)
+    {
+        const auto& [lhs_name, lhs_display, lhs_segment, lhs_ordinal, lhs_anonymous, lhs_outcome,
+                     lhs_propagated] = lhs;
+        const auto& [rhs_name, rhs_display, rhs_segment, rhs_ordinal, rhs_anonymous, rhs_outcome,
+                     rhs_propagated] = rhs;
+        diff.field("fields.name", lhs_name, rhs_name);
+        diff.field("fields.display", lhs_display, rhs_display);
+        diff.field("fields.segment", lhs_segment, rhs_segment);
+        diff.field("fields.ordinal", lhs_ordinal, rhs_ordinal);
+        diff.field("fields.anonymous", lhs_anonymous, rhs_anonymous);
+        diff.field("fields.outcome", lhs_outcome, rhs_outcome);
+        diff.field("fields.propagated_outcome", lhs_propagated, rhs_propagated);
+    }
+
     [[nodiscard]] std::string row_differences(const StructuralRoleRow& lhs,
                                               const StructuralRoleRow& rhs)
     {
-        const auto& [lhs_prefix, lhs_role, lhs_dialect, lhs_match] = lhs;
-        const auto& [rhs_prefix, rhs_role, rhs_dialect, rhs_match] = rhs;
+        const auto& [lhs_prefix, lhs_role, lhs_dialect, lhs_match, lhs_since] = lhs;
+        const auto& [rhs_prefix, rhs_role, rhs_dialect, rhs_match, rhs_since] = rhs;
         FieldDiff diff;
         diff.field("prefix", lhs_prefix, rhs_prefix);
         diff.field("role", lhs_role, rhs_role);
         diff.field("dialect_gate", lhs_dialect, rhs_dialect);
         diff.field("match", lhs_match, rhs_match);
+        diff.field("revision_since", lhs_since, rhs_since);
         return diff.text();
     }
 
@@ -1129,9 +1184,9 @@ namespace
                                               const IntentMarkerRow& rhs)
     {
         const auto& [lhs_prefix, lhs_kind, lhs_order, lhs_dialect, lhs_extract, lhs_excludes,
-                     lhs_channel, lhs_version, lhs_role] = lhs;
+                     lhs_channel, lhs_version, lhs_role, lhs_fields, lhs_since] = lhs;
         const auto& [rhs_prefix, rhs_kind, rhs_order, rhs_dialect, rhs_extract, rhs_excludes,
-                     rhs_channel, rhs_version, rhs_role] = rhs;
+                     rhs_channel, rhs_version, rhs_role, rhs_fields, rhs_since] = rhs;
         const auto& [lhs_introducer, lhs_shape] = lhs_version;
         const auto& [rhs_introducer, rhs_shape] = rhs_version;
         FieldDiff diff;
@@ -1145,15 +1200,17 @@ namespace
         diff.field("version.introducer", lhs_introducer, rhs_introducer);
         diff.field("version.shape", lhs_shape, rhs_shape);
         diff.field("role", lhs_role, rhs_role);
+        field_roles_differences(diff, lhs_fields, rhs_fields);
+        diff.field("revision_since", lhs_since, rhs_since);
         return diff.text();
     }
 
     [[nodiscard]] std::string row_differences(const IntentEmitRow& lhs, const IntentEmitRow& rhs)
     {
-        const auto& [lhs_prefix, lhs_kind, lhs_order, lhs_dialect, lhs_emit, lhs_channel,
-                     lhs_role] = lhs;
-        const auto& [rhs_prefix, rhs_kind, rhs_order, rhs_dialect, rhs_emit, rhs_channel,
-                     rhs_role] = rhs;
+        const auto& [lhs_prefix, lhs_kind, lhs_order, lhs_dialect, lhs_emit, lhs_channel, lhs_role,
+                     lhs_fields, lhs_since] = lhs;
+        const auto& [rhs_prefix, rhs_kind, rhs_order, rhs_dialect, rhs_emit, rhs_channel, rhs_role,
+                     rhs_fields, rhs_since] = rhs;
         FieldDiff diff;
         diff.field("prefix", lhs_prefix, rhs_prefix);
         diff.field("kind", lhs_kind, rhs_kind);
@@ -1162,17 +1219,20 @@ namespace
         diff.field("emit", lhs_emit, rhs_emit);
         diff.field("channel_gate", lhs_channel, rhs_channel);
         diff.field("role", lhs_role, rhs_role);
+        field_roles_differences(diff, lhs_fields, rhs_fields);
+        diff.field("revision_since", lhs_since, rhs_since);
         return diff.text();
     }
 
     [[nodiscard]] std::string row_differences(const LevelLiftRow& lhs, const LevelLiftRow& rhs)
     {
-        const auto& [lhs_prefix, lhs_level, lhs_dialect] = lhs;
-        const auto& [rhs_prefix, rhs_level, rhs_dialect] = rhs;
+        const auto& [lhs_prefix, lhs_level, lhs_dialect, lhs_since] = lhs;
+        const auto& [rhs_prefix, rhs_level, rhs_dialect, rhs_since] = rhs;
         FieldDiff diff;
         diff.field("prefix", lhs_prefix, rhs_prefix);
         diff.field("level", lhs_level, rhs_level);
         diff.field("dialect_gate", lhs_dialect, rhs_dialect);
+        diff.field("revision_since", lhs_since, rhs_since);
         return diff.text();
     }
 
@@ -1204,12 +1264,13 @@ namespace
     [[nodiscard]] std::string row_differences(const OutcomeTokenRow& lhs,
                                               const OutcomeTokenRow& rhs)
     {
-        const auto& [lhs_token, lhs_outcome, lhs_dialect] = lhs;
-        const auto& [rhs_token, rhs_outcome, rhs_dialect] = rhs;
+        const auto& [lhs_token, lhs_outcome, lhs_dialect, lhs_since] = lhs;
+        const auto& [rhs_token, rhs_outcome, rhs_dialect, rhs_since] = rhs;
         FieldDiff diff;
         diff.field("token", lhs_token, rhs_token);
         diff.field("outcome", lhs_outcome, rhs_outcome);
         diff.field("dialect_gate", lhs_dialect, rhs_dialect);
+        diff.field("revision_since", lhs_since, rhs_since);
         return diff.text();
     }
 
@@ -1232,12 +1293,14 @@ namespace
     [[nodiscard]] std::string row_differences(const DeclaredValueRow& lhs,
                                               const DeclaredValueRow& rhs)
     {
-        const auto& [lhs_key, lhs_markers, lhs_dialect] = lhs;
-        const auto& [rhs_key, rhs_markers, rhs_dialect] = rhs;
+        const auto& [lhs_key, lhs_markers, lhs_floor, lhs_dialect, lhs_since] = lhs;
+        const auto& [rhs_key, rhs_markers, rhs_floor, rhs_dialect, rhs_since] = rhs;
         FieldDiff diff;
         diff.field("key", lhs_key, rhs_key);
         diff.field("markers", lhs_markers, rhs_markers);
+        diff.field("min_digits", lhs_floor, rhs_floor);
         diff.field("dialect_gate", lhs_dialect, rhs_dialect);
+        diff.field("revision_since", lhs_since, rhs_since);
         return diff.text();
     }
 
@@ -1245,11 +1308,12 @@ namespace
     [[nodiscard]] std::string row_differences(const StopAnnouncementRow& lhs,
                                               const StopAnnouncementRow& rhs)
     {
-        const auto& [lhs_shape, lhs_dialect] = lhs;
-        const auto& [rhs_shape, rhs_dialect] = rhs;
+        const auto& [lhs_shape, lhs_dialect, lhs_since] = lhs;
+        const auto& [rhs_shape, rhs_dialect, rhs_since] = rhs;
         FieldDiff diff;
         diff.field("shape", lhs_shape, rhs_shape);
         diff.field("dialect_gate", lhs_dialect, rhs_dialect);
+        diff.field("revision_since", lhs_since, rhs_since);
         return diff.text();
     }
 
