@@ -968,6 +968,26 @@ value.
   `core/tests/utils/test_zero_count_asserts_nothing.cpp`. The package rows are witnessed in the GitHub package's
   instance-value and declared pull-ref tests, since only a composition holds a row. `core/tests/identity/projection.golden`
   moves on one row, a test runner's `41/42 ... FAILED (2.31 sec)` line, whose counter and opened duration now mask.
+
+**Also in this window: the head branch reads as the masker's one shell grammar does, and an argument value masks where
+its line repeats it (`DN-163.D6` and `DN-163.D7`, their re-rulings of 2026-11-16).** `-20` is still open (no tag
+carries it), so this rides it (`ADR-2.D5`, `ADR-2.D9`), and the GitHub package's `version:` rides its open value.
+`kSemanticGrammarVersion` does not move: no row kind is added.
+
+* *What changed, the identity class.* A text value masks bare or behind a shell with at most two trailing `,;:.`,
+  which are kept, and an opener whose closer is not in the token is a kept shell (`(<v>,` gives `(<*>,`). A value an
+  argument row masks on a line also masks where that line repeats it as a token's bytes before its first `:`, and
+  that token masks whole. The GitHub argument row gains the flag `-t`.
+* *Which serialized fields move.* `template_str` and `template_id` of a line naming its declared head branch before
+  trailing punctuation or behind an unclosed opener (no param: a text value is a normalization), and of the runner's
+  `docker build -t` and `docker run` lines naming a container action's image, whose image token is now a whole-token
+  wildcard and so a param. On a composition holding the GitHub package, its composed identity moves (the argument
+  row's flags are serialized).
+* *Registration, before the code.* coderoast-corpora `sift_assessment/n462/item6/`: on the 1 738 GitHub logs, the port
+  at the base moves exactly 2 head-branch tokens bare before trailing punctuation and 14 behind an unclosed opener,
+  42 tokens after `-t` and 34 run-line image tokens; GitLab and Jenkins move none.
+* *Witness inputs.* The GitHub package's declared pull-ref and instance-value tests, since only a composition holds a
+  row. `core/tests/mask/mask_rules.golden` declares no text value and no instance row, so it does not move.
 ---
 
 *See also: [masking.md](masking.md) (what the current generation's rules actually are) ·

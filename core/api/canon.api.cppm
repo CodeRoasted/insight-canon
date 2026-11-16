@@ -1271,8 +1271,8 @@ struct ClaimedRun
 // invariant: such a marker opens the form or follows a byte that is neither a letter nor a digit.
 // invariant: a digit run with a floor claims every maximal digit run equal to its value, a digit
 // on neither side, and only when its value is at least its floor long, markers or none.
-// invariant: a text run claims its value when the form, read inside a complete wrapper shell or
-// bare, then after at most one of its prefixes, is exactly the value; the shell and prefix stay.
+// invariant: a text run claims its value when the form, in a complete shell, behind an opener whose
+// closer is not in it, or bare, then after one prefix, is the value and at most two `,;:.`.
 // invariant: a text value of letters only claims nothing, since a word coincides with words.
 // invariant: THE declared-run predicate — the masker's normal-form pass and an intent's instance
 // key both call it, so no second marker list and no copy of the rule exists anywhere.

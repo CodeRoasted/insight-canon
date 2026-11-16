@@ -140,6 +140,37 @@ TEST(GithubDeclaredPullRef, TheHeadBranchMasksAsAWholeTokenBehindAShellOrAPrefix
 }
 
 // refs: DN-163.D6
+// invariant: the arms of DN-163.D6's re-ruling of 2026-11-16: at most two trailing `,;:.` are read
+// with or without a shell, and an opener whose closer is outside the token is a shell; both kept.
+TEST(GithubDeclaredPullRef, TheHeadBranchReadsTrailingPunctuationBareAndAnOpenerAsAShell)
+{
+    const ComposedSemantics composed{github_composition()};
+    const ResolvedStream stream{github_stream(composed)};
+    ArenaAllocator arena{kArenaBytes};
+    Tokenizer tokenizer{arena, MaskConfig{}, stream.semantics,
+                        declared("head_ref", "fix/upload-asset")};
+    for (const Arm& arm : {Arm{"no such branch fix/upload-asset.", "no such branch <*>."},
+                           Arm{"merging fix/upload-asset, then main", "merging <*>, then main"},
+                           Arm{"branches (fix/upload-asset, main)", "branches (<*>, main)"},
+                           Arm{"tracking origin/fix/upload-asset.", "tracking origin/<*>."},
+                           Arm{"tracking origin/fix/upload-asset;:", "tracking origin/<*>;:"},
+                           Arm{"see [refs/heads/fix/upload-asset now", "see [refs/heads/<*> now"},
+                           Arm{"listed (fix/upload-asset), done", "listed (<*>), done"}})
+        EXPECT_EQ(template_of(tokenizer, arena, arm.line), arm.expected)
+            << "the head branch masks bare with at most two trailing `,;:.` and behind an "
+               "opener whose closer is in another token; the opener, the prefix and the "
+               "trailing bytes are kept.\n  line: "
+            << arm.line;
+    for (const std::string_view line :
+         {"branches master,fix/upload-asset here", "pushed fix/upload-asset... done",
+          "branches (fix/upload-asset)x here", "pushed fix/upload-asset-2. done"})
+        EXPECT_EQ(template_of(tokenizer, arena, line), line)
+            << "a value inside a larger token, three trailing bytes, a closer inside the token "
+               "with more after it, or another branch: literal.\n  line: "
+            << line;
+}
+
+// refs: DN-163.D6
 TEST(GithubDeclaredPullRef, ATextValueIsRefusedOnlyWhenEmpty)
 {
     const ComposedSemantics composed{github_composition()};

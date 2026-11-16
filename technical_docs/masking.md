@@ -78,13 +78,16 @@ contributes a param (§4, the last rows):
   that declares a digit floor, beside markers or instead of them, each maximal digit run equal to a value at
   least that long, a digit on neither side, becomes `<*>` (`DN-163.D5`), and for a key with no marker a value
   shorter than the floor is refused before any line is read. A **text** key (`DN-163.D6`) masks its value where
-  the whole normal form, read inside a complete wrapper shell or bare and then after at most one declared prefix,
-  is exactly the value; the shell and the prefix stay, and a value of letters only masks nothing;
+  the whole normal form, read inside a complete wrapper shell, behind a catalog opener whose closer is not in the
+  token (§3.2's one shell grammar, `DN-163.D3`), or bare, and then after at most one declared prefix, is exactly
+  the value followed by at most two `,;:.`; the shell, the prefix and those bytes stay (`(<v>,` reads `(<*>,`), a
+  value inside a larger token stays literal, and a value of letters only masks nothing;
 - the **instance values** a stream's dialect declares (`DN-163.D1`, `DN-163.D7`), after every other rule: a
   `line` row's whole-line prefix followed by one quoted value reads `<prefix>'<*>'` and pushes no param; an
   `argument` row's line prefix masks the token after each of its flags whole and, inside a token no rule masked
-  whole, the value after each of its keys; a `shape` row's literal bytes mask the digit run in their one `{n}`
-  hole, inside any token.
+  whole, the value after each of its keys; a value it masks there also masks where the same line repeats it as a
+  token's bytes before its first `:`, and that token masks whole (`<label>:<hash>` when the line's `--label` is
+  `<label>`); a `shape` row's literal bytes mask the digit run in their one `{n}` hole, inside any token.
 
 Rule 1 wins first on purpose: it protects the **green→red distinction** that downstream diffing depends on —
 `exit code 0` and `exit code 1` must stay *different* templates, so a short status value after a status keyword
@@ -109,7 +112,7 @@ data-learned. This is what keeps masking decidable and deterministic.
 | **Wrapper pairs** | `[]` `()` `{}` `<>` `""` `''` and the backtick paired with itself (`DN-163.D2`) | §3.2 — the punctuation shell a producer wraps a whole token in. Read by the address rule's grammar (§3.3), by rule 5's shelled form, by the hash counter's shelled form, by the ephemeral-root lead (§3.1) and by the rule-3 pre-gate. |
 | **Wildcard** | `<*>` | The mask placeholder. |
 | **Declared-value markers** | none in core: each key and its markers, digit floor or text prefixes are a dialect's data (`DeclaredValueRow`); the GitHub dialect declares `pull_request` behind `PR-`, `pr-`, `Pr-`, `pull-`, `PULL-`, `Pull-`, `PR#`, `pulls/`, extended at v2 by `pull/` and a floor of 5 digits, `run_id` with no marker and a floor of 10 digits, and `head_ref`, a text value behind `refs/heads/`, `refs/remotes/origin/` or `origin/` | §4 declared-run — the markers a run's own declared value is masked behind, the floor at which it masks with no marker, or the prefixes a text value stands behind. Core holds the mechanism, no marker, floor or prefix; it refuses a floor below 5 (`DN-163.D5`). |
-| **Instance values** | none in core: each `line`, `shape` or `argument` row is a dialect's data (`InstanceValueRow`), gated to its own package; the GitHub dialect declares `Runner name: ` and `Machine name: `, `productionresultssa{n}.blob.core.windows.net`, and `##[command]/usr/bin/docker ` with `--name`, `--label` and `label=` | §2 — where a runner prints its own instance, masked after every other rule (`DN-163.D1`, `DN-163.D7`). |
+| **Instance values** | none in core: each `line`, `shape` or `argument` row is a dialect's data (`InstanceValueRow`), gated to its own package; the GitHub dialect declares `Runner name: ` and `Machine name: `, `productionresultssa{n}.blob.core.windows.net`, and `##[command]/usr/bin/docker ` with `--name`, `--label`, `-t` and `label=` | §2 — where a runner prints its own instance, masked after every other rule (`DN-163.D1`, `DN-163.D7`). |
 
 No `MaskConfig` knob gates a mask rule. Masking relocates a value into `params` and never deletes it, so a
 switch that kept an address in the template could buy only a template per host — the identity defect the

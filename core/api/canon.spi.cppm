@@ -910,7 +910,7 @@ using DeclaredValueKind = insight::tokenization::DeclaredValueKind;
 // refs: DN-133.D1, DN-133.D2, DN-162.D13, DN-163.D4, DN-163.D5, DN-163.D6
 // invariant: a VALUE a stream's acquirer may declare under `key`, and how core finds it: a digit
 // value behind one of `markers`, or as a whole digit run from the floor `min_digits`, or both.
-// invariant: a text value is found as a whole token behind at most one of `prefixes`.
+// invariant: a text value is found as a whole token behind its shell and at most one of `prefixes`.
 // invariant: the package declares the key and the match, never a value; core holds neither.
 // invariant: every marker is non-empty and ends in a byte that is not a digit, or the maximal
 // digit run after it would not be the run the marker introduces; composition refuses any other.

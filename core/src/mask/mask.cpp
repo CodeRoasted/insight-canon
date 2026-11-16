@@ -2291,11 +2291,11 @@ namespace
     }
 
     // refs: DN-163.D7
-    // post: true with `out` holding `tok` with one of `row`'s keys' values masked: the key after
-    // the token's wrapper openers, then a non-empty value up to its trailing closers and `,;:.`.
-    // post: false when no key opens the token.
-    [[nodiscard]] bool mask_argument_key(std::string_view tok, const InstanceValue& row,
-                                         std::string& out)
+    // post: the value one of `row`'s keys opens in `tok`: the key after the token's wrapper
+    // openers, then a non-empty value up to its trailing closers and `,;:.`; empty when none.
+    // invariant: a view into `tok`, so its offset in `tok` places the value.
+    [[nodiscard]] std::string_view argument_key_value(std::string_view tok,
+                                                      const InstanceValue& row) noexcept
     {
         std::size_t lead{0};
         while (lead < tok.size() && is_wrapper_open(tok[lead]))
@@ -2305,15 +2305,25 @@ namespace
                (is_wrapper_close(tok[tail - 1]) || is_shell_trailing_punct(tok[tail - 1])))
             --tail;
         for (const std::string_view key : row.keys)
-        {
-            if (!tok.substr(lead).starts_with(key) || lead + key.size() >= tail)
-                continue;
-            out.assign(tok.substr(0, lead + key.size()));
-            out.append(kWildcard);
-            out.append(tok.substr(tail));
-            return true;
-        }
-        return false;
+            if (tok.substr(lead).starts_with(key) && lead + key.size() < tail)
+                return slice(tok, lead + key.size(), tail - lead - key.size());
+        return {};
+    }
+
+    // refs: DN-163.D7
+    // post: true with `out` holding `tok` with the value one of `row`'s keys opens masked.
+    // post: false when no key opens the token.
+    [[nodiscard]] bool mask_argument_key(std::string_view tok, const InstanceValue& row,
+                                         std::string& out)
+    {
+        const std::string_view value{argument_key_value(tok, row)};
+        if (value.empty())
+            return false;
+        const auto first{static_cast<std::size_t>(value.data() - tok.data())};
+        out.assign(tok.substr(0, first));
+        out.append(kWildcard);
+        out.append(tok.substr(first + value.size()));
+        return true;
     }
 
     // invariant: one line's masking state: the template and params being built, the scratch
@@ -2333,6 +2343,7 @@ namespace
             line_row_ = row;
             line_quote_ = quote;
             tmpl_.reserve(line.size() + kWildcard.size());
+            collect_argument_values();
         }
 
         // post: the bytes the tokens are read from: the line, or a line row's prefix alone.
@@ -2351,7 +2362,8 @@ namespace
             if (!first_)
                 tmpl_.push_back(' ');
             first_ = false;
-            if (argument_row_ != nullptr && std::ranges::contains(argument_row_->flags, prev_))
+            if (argument_row_ != nullptr &&
+                (std::ranges::contains(argument_row_->flags, prev_) || repeats_argument_value(tok)))
                 mask(tok);
             else if (const std::string_view form{disposition(tok)};
                      form != kWildcard && argument_row_ != nullptr &&
@@ -2387,6 +2399,38 @@ namespace
         }
 
       private:
+        // post: `argument_values_` holds every value the argument row masks on this line: each
+        // token after one of its flags, and each value one of its keys opens in a token.
+        // invariant: read before any token is emitted, so a recurrence masks wherever it stands.
+        // refs: DN-163.D7
+        void collect_argument_values()
+        {
+            if (argument_row_ == nullptr)
+                return;
+            std::string_view prev;
+            for_each_token(
+                tokenized(),
+                [this, &prev](std::string_view tok)
+                {
+                    if (std::ranges::contains(argument_row_->flags, prev))
+                        argument_values_.push_back(tok);
+                    if (const std::string_view value{argument_key_value(tok, *argument_row_)};
+                        !value.empty())
+                        argument_values_.push_back(value);
+                    prev = tok;
+                });
+        }
+
+        // post: true when `tok`'s bytes before its first `:` are a value the argument row masks
+        // on this line, so the token masks whole.
+        // refs: DN-163.D7
+        [[nodiscard]] bool repeats_argument_value(std::string_view tok) const noexcept
+        {
+            const std::size_t colon{tok.find(':')};
+            return colon != std::string_view::npos &&
+                   std::ranges::contains(argument_values_, tok.substr(0, colon));
+        }
+
         void mask(std::string_view tok)
         {
             tmpl_.append(kWildcard);
@@ -2462,6 +2506,7 @@ namespace
         std::string declared_;
         std::string shaped_;
         std::string argument_form_;
+        std::vector<std::string_view> argument_values_;
         std::vector<ClaimedRun> declared_claims_;
         std::string_view prev_;
         bool first_{true};
@@ -2480,7 +2525,7 @@ namespace
 // invariant: an instance value is applied after every other rule: a line row replaces its
 // quoted value whole, a shape row masks its hole in a token's final form.
 // invariant: an argument row masks the token after a flag whole, and a key's value inside a token
-// no rule masked whole.
+// no rule masked whole; a token repeating a value it masks before its first `:` masks whole.
 // refs: DN-163.D1, DN-163.D7
 StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& out_arena,
                                      std::span<const DeclaredRun> declared_runs,

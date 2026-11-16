@@ -1,5 +1,6 @@
 module insight.canon.api;
 import insight.canon.internal;
+import insight.canon.detail.scan;
 
 // refs: BIB:intent_identity, ADR-25.D6, ADR-17, ADR-18
 // invariant: geometry TREE, axis species POPULATION: matrix legs and shards are exchangeable
@@ -273,11 +274,6 @@ namespace insight::tokenization
 {
 namespace
 {
-    [[nodiscard]] constexpr bool is_alpha(char chr) noexcept
-    {
-        return (chr >= 'a' && chr <= 'z') || (chr >= 'A' && chr <= 'Z');
-    }
-
     // post: the position after the digit run a marker of `run` opens at `pos`, `claims` holding it
     // when it is the run's value; `pos + 1` when no marker opens a digit run there.
     // pre: `pos` is the form's start or follows a byte that is neither a letter nor a digit.
@@ -319,8 +315,31 @@ namespace
                 claims.push_back({.first = first, .last = last});
         }
     }
-    // post: `claims` gains the text value of `run` when `form`, read inside a complete wrapper
-    // shell or bare, then after at most one of `run`'s prefixes, is exactly the value.
+    // post: true when `rest` is at most kMaxShellTrailBytes bytes, each one of `,;:.`.
+    [[nodiscard]] constexpr bool is_value_trail(std::string_view rest) noexcept
+    {
+        return rest.size() <= kMaxShellTrailBytes &&
+               std::ranges::all_of(rest, is_shell_trailing_punct);
+    }
+
+    // post: a complete shell's core; else the bytes after a catalog opener whose closer is
+    // nowhere after it in the token; else `form` whole.
+    // invariant: the masker's one shell grammar: an opener whose closer sits in another token is
+    // a shell (DN-163.D3), and this reading keeps it.
+    // refs: DN-163.D3, DN-163.D6
+    [[nodiscard]] std::string_view text_value_region(std::string_view form)
+    {
+        if (const std::optional<std::string_view> core{complete_shell_core(form)})
+            return *core;
+        if (form.size() > 1 && is_wrapper_open(form[0]) &&
+            !form.substr(1).contains(wrapper_closer_of(form[0])))
+            return form.substr(1);
+        return form;
+    }
+
+    // post: `claims` gains the text value of `run` when the region of `form`, after at most one
+    // of `run`'s prefixes, is the value followed by at most two `,;:.`.
+    // invariant: the shell, the prefix and the trailing bytes are kept; only the value masks.
     // invariant: a value of letters only claims nothing: a word coincides with words.
     // refs: DN-163.D6
     void claim_text_value(std::string_view form, const DeclaredRun& run,
@@ -328,19 +347,23 @@ namespace
     {
         if (std::ranges::all_of(run.value, is_alpha))
             return;
-        const std::string_view region{complete_shell_core(form).value_or(form)};
+        const std::string_view region{text_value_region(form)};
         const auto offset{static_cast<std::size_t>(region.data() - form.data())};
-        if (region == run.value)
-        {
-            claims.push_back({.first = offset, .last = offset + region.size()});
-            return;
-        }
-        for (const std::string_view prefix : run.prefixes)
-            if (region.starts_with(prefix) && region.substr(prefix.size()) == run.value)
+        const auto claim_after{
+            [&](std::size_t lead)
             {
-                claims.push_back({.first = offset + prefix.size(), .last = offset + region.size()});
+                const std::string_view tail{region.substr(lead)};
+                if (!tail.starts_with(run.value) || !is_value_trail(tail.substr(run.value.size())))
+                    return false;
+                claims.push_back(
+                    {.first = offset + lead, .last = offset + lead + run.value.size()});
+                return true;
+            }};
+        if (claim_after(0))
+            return;
+        for (const std::string_view prefix : run.prefixes)
+            if (region.starts_with(prefix) && claim_after(prefix.size()))
                 return;
-            }
     }
 } // namespace
 

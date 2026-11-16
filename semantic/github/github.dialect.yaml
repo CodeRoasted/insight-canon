@@ -632,8 +632,9 @@ dialect:
         dialect_gate: self
         why:
           - "The run's head branch says what its pull-request number says: which request this run"
-          - "is. It masks where it stands as a whole token, inside a complete wrapper shell or"
-          - "bare, behind at most one of these ref prefixes, which stay (DN-163.D6). Read on 472"
+          - "is. It masks where it stands as a whole token, inside a wrapper shell or behind an"
+          - "opener whose closer is in another token, or bare, behind at most one of these ref"
+          - "prefixes and before at most two `,;:.`, which stay (DN-163.D6). Read on 472"
           - "runs: 460 whole-token occurrences in 116 logs. A value of letters only (`master`,"
           - "`dev`) masks nothing, since a word coincides with words; inside a larger token (a"
           - "refspec glued with `*`, 165 occurrences) it stays literal, a declared limit."
@@ -706,7 +707,7 @@ dialect:
           - "The results-storage account an artifact is served from: 1 152 tokens in GitHub logs,"
           - "428 of them in the artifact download's redirect line in 106 logs (DN-163.D7)."
       - argument: "##[command]/usr/bin/docker "
-        flags: ["--name", "--label"]
+        flags: ["--name", "--label", "-t"]
         keys: ["label="]
         since: v2
         dialect_gate: self
@@ -715,3 +716,7 @@ dialect:
           - "per run (110 lines in 66 logs, every value distinct), and its label is the runner's"
           - "instance coordinate (DN-163.D7). The runner prints `##[command]` for its own commands"
           - "only, so an action's exec and a script's own `docker run` stay literal."
+          - "It builds a container action's image as `<label>:<32 hex>` behind `-t` (42 lines) and"
+          - "runs it by that name, where core masks the label's recurrence (34 lines, the label"
+          - "equal to the line's `--label` in 34 of 34); the 42 lines of the image build's own"
+          - "output stay literal (DN-163.D7, 2026-11-16)."
