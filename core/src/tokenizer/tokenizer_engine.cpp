@@ -47,6 +47,10 @@ struct Tokenizer::Impl
     // whenever `context` is replaced, never left viewing a previous one.
     StreamContext context;
     std::vector<DeclaredRun> runs;
+    // refs: DN-163.D1, DN-163.D7
+    // invariant: views the composition's rows, which outlive the Tokenizer; the view's dialect
+    // gate is already applied, so a stream of another dialect resolves none.
+    std::vector<InstanceValue> instances;
     // refs: ADR-16.D16
     // invariant: the event time of the last line on this stream that had one — the year source of
     // a yearless stamp; reset with the declared context, so one stream never reads another's.
@@ -58,7 +62,7 @@ struct Tokenizer::Impl
     Impl(ArenaAllocator& arena_ref, MaskConfig mask_config,
          const insight::semantic::ComposedSemantics& composed_ref, StreamContext declared)
         : arena{arena_ref}, composed{composed_ref}, parser{arena_ref, composed_ref},
-          config{mask_config}
+          config{mask_config}, instances{insight::semantic::instance_values_of(composed_ref)}
     {
         declare(std::move(declared));
     }
@@ -121,7 +125,8 @@ struct Tokenizer::Impl
             }
         }
 
-        const StatelessTemplate match{stateless_template(parsed_line.content, arena, runs)};
+        const StatelessTemplate match{
+            stateless_template(parsed_line.content, arena, runs, instances)};
 
         CanonicalEvent event;
         event.id = next_id++;

@@ -59,5 +59,14 @@ target_link_libraries(insight_canon_bench PRIVATE
 target_compile_features(insight_canon_bench PRIVATE cxx_std_23)
 set_target_properties(insight_canon_bench PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
 
+# The composed template stream, a measurement tool (DN-163.O4 G5): template_stream_measure's stream
+# read through the five packages, a declared dialect and a declared stream context.
+add_executable(composed_stream_measure ${CMAKE_CURRENT_SOURCE_DIR}/tools/composed_stream_measure.cpp)
+target_link_libraries(composed_stream_measure PRIVATE
+    insight::canon insight::semantic_github insight::semantic_gitlab insight::semantic_jenkins
+    insight::semantic_package_managers insight::semantic_test_frameworks)
+target_compile_features(composed_stream_measure PRIVATE cxx_std_23)
+set_target_properties(composed_stream_measure PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
+
 include(GNUInstallDirs)
 install(TARGETS insight_canon_bench RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

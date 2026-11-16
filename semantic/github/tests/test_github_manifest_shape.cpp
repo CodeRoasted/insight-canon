@@ -1,7 +1,7 @@
 // refs: ADR-17.D3, DN-17.D22
 // invariant: canon's kit asks only whether the rows a package ships are WELL-FORMED and
 // deliberately admits an EMPTY package, so nothing in canon says THIS one ships any row.
-// assert: all sixteen manifest members are bound, so a SEVENTEENTH is a compile error here.
+// assert: all seventeen manifest members are bound, so an EIGHTEENTH is a compile error here.
 // note: the generator-equivalence oracle must be proven LIVE elsewhere or its green is vacuous
 #include <gtest/gtest.h>
 
@@ -12,7 +12,8 @@ TEST(GithubManifestShape, ShipsTheDeclaredRulesetShapeAndNothingElse)
 {
     const auto& [name, version, roles, markers, emits, level_lifts, locations, value_classes,
                  outcome_tokens, outcome_markers, channels, dialect_revisions, declared_values,
-                 stop_announcements, strategy, echoed_source]{insight::semantic::github::kManifest};
+                 stop_announcements, instance_values, strategy,
+                 echoed_source]{insight::semantic::github::kManifest};
 
     EXPECT_EQ(name, "github") << "the declared package name is the dialect coordinate every gated "
                                  "row carries and what a caller declares; actual: "
@@ -50,10 +51,22 @@ TEST(GithubManifestShape, ShipsTheDeclaredRulesetShapeAndNothingElse)
         << "stop-announcement rows — the runner's cancellation and shutdown lines and depot's; "
            "actual: "
         << stop_announcements.size();
-    // refs: DN-133.D1, DN-162.D13
-    ASSERT_EQ(declared_values.size(), 2U)
-        << "declared-value rows — two keys, the run's own pull-request number and run id; "
-           "actual: "
+    // refs: DN-163.D1, DN-163.D7
+    ASSERT_EQ(instance_values.size(), 4U)
+        << "instance-value rows — the runner name and machine name lines, the results-storage "
+           "shard shape, the runner's docker argument row; actual: "
+        << instance_values.size();
+    EXPECT_EQ(instance_values[0].form, insight::semantic::InstanceValueForm::Line);
+    EXPECT_EQ(instance_values[0].bytes, "Runner name: ");
+    EXPECT_EQ(instance_values[1].bytes, "Machine name: ");
+    EXPECT_EQ(instance_values[2].form, insight::semantic::InstanceValueForm::Shape);
+    EXPECT_EQ(instance_values[2].bytes, "productionresultssa{n}.blob.core.windows.net");
+    EXPECT_EQ(instance_values[3].form, insight::semantic::InstanceValueForm::Argument);
+    EXPECT_EQ(instance_values[3].bytes, "##[command]/usr/bin/docker ");
+    // refs: DN-133.D1, DN-162.D13, DN-163.D4, DN-163.D6
+    ASSERT_EQ(declared_values.size(), 4U)
+        << "declared-value rows — the pull-request base row, run id, the pull-request v2 "
+           "extension and the head branch; actual: "
         << declared_values.size();
     EXPECT_EQ(declared_values[0].key, "pull_request")
         << "the key a caller declares the value under; actual: " << declared_values[0].key;
@@ -77,6 +90,24 @@ TEST(GithubManifestShape, ShipsTheDeclaredRulesetShapeAndNothingElse)
     EXPECT_EQ(declared_values[1].revision_since, "v2")
         << "the revision this declaration adds the key in; actual: "
         << declared_values[1].revision_since;
+    // refs: DN-163.D4, DN-163.D5
+    EXPECT_EQ(declared_values[2].key, "pull_request")
+        << "the third row extends the pull-request key; actual: " << declared_values[2].key;
+    EXPECT_TRUE(declared_values[2].extends) << "it is an extension, so the base row stays v1's";
+    ASSERT_EQ(declared_values[2].markers.size(), 1U);
+    EXPECT_EQ(declared_values[2].markers[0], "pull/");
+    EXPECT_EQ(declared_values[2].min_digits, 5U)
+        << "the floor beside the markers; actual: " << declared_values[2].min_digits;
+    EXPECT_EQ(declared_values[2].revision_since, "v2");
+    // refs: DN-163.D6
+    EXPECT_EQ(declared_values[3].key, "head_ref");
+    EXPECT_EQ(declared_values[3].value, insight::semantic::DeclaredValueKind::Text);
+    const std::vector<std::string_view> prefixes{declared_values[3].prefixes.begin(),
+                                                 declared_values[3].prefixes.end()};
+    EXPECT_EQ(prefixes,
+              (std::vector<std::string_view>{"refs/heads/", "refs/remotes/origin/", "origin/"}))
+        << "the three ref prefixes, in declared order";
+    EXPECT_EQ(declared_values[3].revision_since, "v2");
 
     // assert: each absence is argued in the declaration, and asserting it POSITIVELY is what
     // separates a measured exclusion from a row kind silently dropped.

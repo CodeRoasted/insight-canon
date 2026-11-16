@@ -61,7 +61,11 @@ cue path (`kKeywordHead`) — in two stages:
 
 - **Stage 2 — failure / warning cue.** If no authoritative explicit level, the failure lexicon (§2) decides:
   a failure cue → `Error`; a counted failure summary → `Warn`; then a line whose first outcome-bearing token
-  is a fail glyph (§2.3) → `Error`; then a warning cue → `Warn`; otherwise `Unknown`.
+  is a fail glyph (§2.3) → `Error`; then a warning cue → `Warn`; otherwise `Unknown`. A failure word counted by
+  exactly `0` summarizes no failure, so it asserts nothing and the line goes on as if the word were absent:
+  `5 passed, 0 failed` and `0 fail` read `Unknown`, `0 passed, 5 failed` reads `Warn`, and `✗ 0 failed` reads
+  `Error` through the glyph (`DN-163.D11`). The level belongs to the line; a template's level is its
+  `dominant_level` over its lines.
 
 ### 1.2 The outcome guard (passing tests are not failures)
 

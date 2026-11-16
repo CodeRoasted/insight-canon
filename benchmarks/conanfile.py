@@ -25,7 +25,7 @@ class InsightCanonBenchConan(ConanFile):
     )
     settings = "os", "arch", "compiler", "build_type"
 
-    exports_sources = "CMakeLists.txt", "src/*"
+    exports_sources = "CMakeLists.txt", "src/*", "tools/*"
 
     def export_sources(self):
         # The export is the TRACKED files under exports_sources, never the disk's (DN-142.D4 (b)):

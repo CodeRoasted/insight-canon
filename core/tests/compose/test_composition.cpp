@@ -479,7 +479,7 @@ constexpr std::array<insight::semantic::DeclaredValueRow, 1> kFloorValue{
 constexpr std::array<insight::semantic::DeclaredValueRow, 1> kHigherFloorValue{
     {{.key = "ticket", .min_digits = 11, .dialect_gate = "ticketing"}}};
 constexpr std::array<insight::semantic::DeclaredValueRow, 1> kLowFloorValue{
-    {{.key = "ticket", .min_digits = 9, .dialect_gate = "ticketing"}}};
+    {{.key = "ticket", .min_digits = 4, .dialect_gate = "ticketing"}}};
 constexpr std::array<insight::semantic::DeclaredValueRow, 1> kMarkerAndFloorValue{
     {{.key = "ticket", .markers = kTicketMarkers, .min_digits = 10, .dialect_gate = "ticketing"}}};
 constexpr std::array<std::string_view, 1> kTicketingRevisions{{"v1"}};
@@ -512,10 +512,11 @@ static_assert(insight::semantic::declared_value_row_well_formed(kTicketValue[0])
               "a key with non-empty markers ending in a non-digit is well formed");
 static_assert(insight::semantic::declared_value_row_well_formed(kFloorValue[0]),
               "a key with no marker and a digit floor of 10 is well formed");
+// refs: DN-163.D5
 static_assert(!insight::semantic::declared_value_row_well_formed(kLowFloorValue[0]),
-              "a floor below 10 would let a markerless value meet ordinary words");
-static_assert(!insight::semantic::declared_value_row_well_formed(kMarkerAndFloorValue[0]),
-              "a row finds its value behind markers or by its length, never both");
+              "a floor below 5 would let a value meet ordinary numbers in a word");
+static_assert(insight::semantic::declared_value_row_well_formed(kMarkerAndFloorValue[0]),
+              "a digit key may declare markers and a floor beside them (DN-163.D5)");
 
 TEST(CompositionDeclaredValues, TheViewHoldsAKeyOnlyUnderItsOwnDialectAndTheKeysListAll)
 {
@@ -557,6 +558,144 @@ TEST(CompositionDeclaredValues, ADeclaredFloorMovesTheIdentity)
         << "the floor is read from the composition, unfiltered, by the key it belongs to";
     EXPECT_EQ(compose(std::array{kTicketing}).declared_value_floor("ticket"), 0U)
         << "a key behind markers declares no floor";
+}
+
+// refs: DN-163.D4, DN-163.D5, DN-163.D6
+namespace
+{
+constexpr std::array<std::string_view, 1> kExtensionMarkers{{"tk/"}};
+constexpr std::array<std::string_view, 2> kBranchPrefixes{{"refs/heads/", "origin/"}};
+constexpr std::array<std::string_view, 2> kTwoRevisions{{"v1", "v2"}};
+constexpr std::array<insight::semantic::DeclaredValueRow, 2> kExtendedValue{
+    {{.key = "ticket",
+      .markers = kTicketMarkers,
+      .dialect_gate = "ticketing",
+      .revision_since = "v1"},
+     {.key = "ticket",
+      .markers = kExtensionMarkers,
+      .min_digits = 5,
+      .dialect_gate = "ticketing",
+      .extends = true,
+      .revision_since = "v2"}}};
+constexpr std::array<insight::semantic::DeclaredValueRow, 1> kOrphanExtension{
+    {{.key = "ticket",
+      .markers = kExtensionMarkers,
+      .dialect_gate = "ticketing",
+      .extends = true,
+      .revision_since = "v2"}}};
+constexpr std::array<insight::semantic::DeclaredValueRow, 1> kBranchValue{
+    {{.key = "branch",
+      .value = insight::semantic::DeclaredValueKind::Text,
+      .prefixes = kBranchPrefixes,
+      .dialect_gate = "ticketing"}}};
+constexpr std::array<insight::semantic::DeclaredValueRow, 1> kTextWithMarkers{
+    {{.key = "branch",
+      .markers = kTicketMarkers,
+      .value = insight::semantic::DeclaredValueKind::Text,
+      .prefixes = kBranchPrefixes,
+      .dialect_gate = "ticketing"}}};
+constexpr SemanticPackageManifest kTicketingExtended{.name = "ticketing",
+                                                     .version = "1.0.0",
+                                                     .dialect_revisions = kTwoRevisions,
+                                                     .declared_values = kExtendedValue};
+constexpr SemanticPackageManifest kTicketingOrphan{.name = "ticketing",
+                                                   .version = "1.0.0",
+                                                   .dialect_revisions = kTwoRevisions,
+                                                   .declared_values = kOrphanExtension};
+constexpr SemanticPackageManifest kTicketingBranch{.name = "ticketing",
+                                                   .version = "1.0.0",
+                                                   .dialect_revisions = kTicketingRevisions,
+                                                   .declared_values = kBranchValue};
+} // namespace
+
+static_assert(insight::semantic::declared_value_row_well_formed(kExtendedValue[1]),
+              "an extension adding markers and a floor is well formed");
+static_assert(insight::semantic::declared_value_row_well_formed(kBranchValue[0]),
+              "a text key with prefixes is well formed");
+static_assert(!insight::semantic::declared_value_row_well_formed(kTextWithMarkers[0]),
+              "a text key declares no marker");
+static_assert(!find_conflict(std::array{kTicketingExtended}).has_conflict,
+              "an extension is its base's row, never a second base under the key");
+
+TEST(CompositionDeclaredValues, AnExtensionComposesWithItsBaseAndTheFloorStaysOffTheContext)
+{
+    const ComposedSemantics composed{compose(std::array{kTicketingExtended})};
+    const ComposedSemantics view{composed.for_stream("ticketing", {})};
+    ASSERT_EQ(view.declared_values().size(), 2U) << "the base row and its extension";
+    EXPECT_EQ(composed.declared_value_floor("ticket"), 0U)
+        << "a key some marker finds is found at any length, so the context bears no floor";
+    EXPECT_NE(composed.identity_hex(), compose(std::array{kTicketing}).identity_hex())
+        << "the extension is identity";
+    const insight::tokenization::StreamContext context{
+        .values = {{.key = "ticket", .value = "4242"}}};
+    const auto runs{insight::semantic::declared_runs_of(context, view)};
+    EXPECT_EQ(runs.size(), 2U) << "one run per row of the key";
+}
+
+TEST(CompositionDeclaredValues, ATextKeyTakesTextAndRefusesOnlyAnEmptyValue)
+{
+    const ComposedSemantics composed{compose(std::array{kTicketingBranch})};
+    EXPECT_EQ(composed.declared_value_kind("branch"), insight::semantic::DeclaredValueKind::Text);
+    EXPECT_TRUE(insight::semantic::check_stream_context(
+        insight::tokenization::StreamContext{.values = {{.key = "branch", .value = "fix/x-1"}}},
+        composed));
+    EXPECT_FALSE(insight::semantic::check_stream_context(
+        insight::tokenization::StreamContext{.values = {{.key = "branch", .value = ""}}},
+        composed));
+}
+
+TEST(CompositionDeathTest, AnExtensionWithNoBaseFailsClosedAtRuntime)
+{
+    EXPECT_DEATH((void)compose(std::array{kTicketingOrphan}), R"(declared value "ticket")");
+}
+
+// refs: DN-163.D1, DN-163.D7
+namespace
+{
+constexpr std::array<std::string_view, 1> kFlags{{"--name"}};
+constexpr std::array<std::string_view, 1> kKeys{{"label="}};
+constexpr std::array<insight::semantic::InstanceValueRow, 3> kInstanceRows{
+    {{.form = insight::semantic::InstanceValueForm::Line,
+      .bytes = "Host name: ",
+      .dialect_gate = "ticketing"},
+     {.form = insight::semantic::InstanceValueForm::Shape,
+      .bytes = "shard{n}.example",
+      .dialect_gate = "ticketing"},
+     {.form = insight::semantic::InstanceValueForm::Argument,
+      .bytes = "$ run ",
+      .flags = kFlags,
+      .keys = kKeys,
+      .dialect_gate = "ticketing"}}};
+constexpr SemanticPackageManifest kTicketingInstances{.name = "ticketing",
+                                                      .version = "1.0.0",
+                                                      .dialect_revisions = kTicketingRevisions,
+                                                      .instance_values = kInstanceRows};
+} // namespace
+
+static_assert(std::ranges::all_of(kInstanceRows, insight::semantic::instance_value_row_well_formed),
+              "a line prefix, a shape with one hole and an argument prefix with a flag are well "
+              "formed");
+static_assert(!insight::semantic::instance_value_row_well_formed(
+                  {.form = insight::semantic::InstanceValueForm::Shape, .bytes = "shard1{n}x"}),
+              "a hole against a digit is refused");
+static_assert(!insight::semantic::instance_value_row_well_formed(
+                  {.form = insight::semantic::InstanceValueForm::Argument, .bytes = "$ run "}),
+              "an argument row with no flag is refused");
+static_assert(!insight::semantic::instance_value_row_well_formed(
+                  {.form = insight::semantic::InstanceValueForm::Line, .bytes = "Host name:"}),
+              "a line prefix ends in a space");
+
+TEST(CompositionInstanceValues, TheViewHoldsARowOnlyUnderItsOwnDialectAndTheRowsAreIdentity)
+{
+    const ComposedSemantics composed{compose(std::array{kTicketingInstances})};
+    EXPECT_TRUE(composed.instance_values().empty())
+        << "a fresh composition is the Unspecified view: a dialect-gated row is absent";
+    const ComposedSemantics view{composed.for_stream("ticketing", {})};
+    EXPECT_EQ(view.instance_values().size(), 3U) << "declaring the owning dialect admits its rows";
+    EXPECT_EQ(insight::semantic::instance_values_of(view).size(), 3U)
+        << "one resolved instance value per row of the view";
+    EXPECT_NE(composed.identity_hex(), compose(std::array{kTicketingBare}).identity_hex())
+        << "an instance value decides what canon masks, so it is identity";
 }
 
 TEST(CompositionDeathTest, ADuplicateDeclaredKeyFailsClosedAtRuntime)

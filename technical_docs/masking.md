@@ -54,7 +54,7 @@ Each whitespace token is classified by the **first** matching rule:
 | 2 | **Address** — an **IPv4**, **IPv6** or `:`-joined **hardware** address, whole: bare or inside a declared **wrapper shell** (§3.2), with at most two trailing closers or `,;:.` (§3.3 states the grammar) | MASK `<*>` — the address is claimed before any composite reads the token, so no normalizer shreds it along its own separators |
 | 3 | **Composite** — the token carries a structural delimiter; one of the normalizers (§4) matches. The hash counter reads its token through a **complete** wrapper shell (§3.2), the ephemeral-root reader finds a path behind a declared **lead** (§3.1), and an **address run** inside the token is one masked component (§3.3) | KEEP normalized (embeds `<*>`, no param) |
 | 4 | **UUID / long hash** | MASK `<*>` |
-| 5 | **Digit-leading numeric**, or a digit-leading core inside a **complete** wrapper shell (§3.2) | MASK `<*>` — this also carries `0x`-hex: a `0x…` token starts with a digit. The shelled form masks whole and its raw token is the param; a short status value behind a status keyword stays literal through the shell, as rule 1 keeps it bare |
+| 5 | **Digit-leading numeric** — after an optional sign or tilde (`~775`, an approximation mark) — or a digit-leading core inside a **complete** wrapper shell, or behind an **opener** whose closer sits in a later token (§3.2) | MASK `<*>` — this also carries `0x`-hex: a `0x…` token starts with a digit. The shelled and opened forms mask whole and the raw token is the param; a short status value behind a status keyword stays literal through the shell and through the opener, as rule 1 keeps it bare |
 | 6 | **Literal** — none of the above | KEEP literal |
 
 Before the first token is read, a `content` that is, whole, one JSON object or array is given its **member-order
@@ -62,16 +62,29 @@ normal form**: the members of every object are permuted into name order, every o
 ([formats.md](formats.md) § 5). Every other `content` is tokenized as it is.
 
 After rules 3 and 6 — on the token's **normal form**, the literal token or the form a composite gave it, and
-never on a token rules 2, 4 and 5 masked whole — two further steps run, in this order, and neither claims the token or
-contributes a param (§4, the last two rows):
+never on a token rules 2, 4 and 5 masked whole — further steps run, in this order, and none claims the token or
+contributes a param (§4, the last rows):
 
+- the **instance arms** (`DN-163.D8`): the four arms embedded-identity reads — a hex run of 16 or more, a UUID, a
+  compact UTC instant, an address run — run once more over the normal form's literal bytes, never across a `<*>`
+  already written. A composite's claim, or no claim at all, never leaves an instance literal:
+  `http://localhost:<port>/api/<uuid>/x` gives `http://localhost:<*>/api/<*>/x`, and `net_<32 hex>` gives
+  `net_<*>` as `net-<32 hex>` always did. They only add masks;
 - the **`;`-segment** step: the form is cut at `;`, and each `<key>=<digit-leading value>` segment has its value
   masked over its number's **extent** (§4) by the ONE value disposition the kv-value rule also reads: a remainder
   of closers and `,;:.` is swallowed, any other remainder stays literal behind `<*>`;
 - the **declared-run** step, only on a stream that declares a value under a key its dialect declares: each
   maximal digit run equal to the declared value, directly behind a declared marker, becomes `<*>`; for a key
-  that declares no marker and a digit floor instead, each maximal digit run equal to the value, a digit on
-  neither side, becomes `<*>`, and a value shorter than the floor is refused before any line is read.
+  that declares a digit floor, beside markers or instead of them, each maximal digit run equal to a value at
+  least that long, a digit on neither side, becomes `<*>` (`DN-163.D5`), and for a key with no marker a value
+  shorter than the floor is refused before any line is read. A **text** key (`DN-163.D6`) masks its value where
+  the whole normal form, read inside a complete wrapper shell or bare and then after at most one declared prefix,
+  is exactly the value; the shell and the prefix stay, and a value of letters only masks nothing;
+- the **instance values** a stream's dialect declares (`DN-163.D1`, `DN-163.D7`), after every other rule: a
+  `line` row's whole-line prefix followed by one quoted value reads `<prefix>'<*>'` and pushes no param; an
+  `argument` row's line prefix masks the token after each of its flags whole and, inside a token no rule masked
+  whole, the value after each of its keys; a `shape` row's literal bytes mask the digit run in their one `{n}`
+  hole, inside any token.
 
 Rule 1 wins first on purpose: it protects the **green→red distinction** that downstream diffing depends on —
 `exit code 0` and `exit code 1` must stay *different* templates, so a short status value after a status keyword
@@ -91,11 +104,12 @@ data-learned. This is what keeps masking decidable and deterministic.
 | **Status keywords** | `code`, `status`, `exit`, `signal` (case-insensitive) | Rule 1 — the keyword before a short numeric value that must stay split (status codes, exit codes). |
 | **Max status digits** | `3` | Rule 1 — a status value masks if longer (it's an id, not a code). |
 | **Currency markers** | `$` (ASCII; structured to add `€`/`£`/`¥` as declared byte sequences if a corpus shows them) | §4 marker-number — a leading currency symbol glued to a number. |
-| **Ephemeral roots** | `/tmp`, `/var/tmp`, `/var/folders`, `/private/var/folders`, `/private/tmp`, `.conan2/p/b`, `/nix/store`, `AppData/Local/Temp` — each carrying a declared **anchor** + **scope** (§3.1) | §4 ephemeral-root — a path segment directly under a per-run build/temp root is an instance and masks; the root is kept. |
+| **Ephemeral roots** | `/tmp`, `/var/tmp`, `/var/folders`, `/private/var/folders`, `/private/tmp`, `.conan2/p/b`, `/nix/store`, `AppData/Local/Temp`, `global/v11` — each carrying a declared **anchor** + **scope** (§3.1) | §4 ephemeral-root — a path segment directly under a per-run build/temp root is an instance and masks; the root is kept. |
 | **Min hash length** | `16` | Rule 4 / §4 embedded-identity — a hex-only run this long is an instance hash, not a word. |
-| **Wrapper pairs** | `[]` `()` `{}` `<>` `""` `''` | §3.2 — the punctuation shell a producer wraps a whole token in. Read by the address rule's grammar (§3.3), by rule 5's shelled form, by the hash counter's shelled form, by the ephemeral-root lead (§3.1) and by the rule-3 pre-gate. |
+| **Wrapper pairs** | `[]` `()` `{}` `<>` `""` `''` and the backtick paired with itself (`DN-163.D2`) | §3.2 — the punctuation shell a producer wraps a whole token in. Read by the address rule's grammar (§3.3), by rule 5's shelled form, by the hash counter's shelled form, by the ephemeral-root lead (§3.1) and by the rule-3 pre-gate. |
 | **Wildcard** | `<*>` | The mask placeholder. |
-| **Declared-value markers** | none in core: each key and its markers or digit floor are a dialect's data (`DeclaredValueRow`); the GitHub dialect declares `pull_request` behind `PR-`, `pr-`, `Pr-`, `pull-`, `PULL-`, `Pull-`, `PR#`, `pulls/`, and `run_id` with no marker and a floor of 10 digits | §4 declared-run — the markers a run's own declared value is masked behind, or the floor a markerless value must reach. Core holds the mechanism, no marker and no floor; it refuses a floor below 10. |
+| **Declared-value markers** | none in core: each key and its markers, digit floor or text prefixes are a dialect's data (`DeclaredValueRow`); the GitHub dialect declares `pull_request` behind `PR-`, `pr-`, `Pr-`, `pull-`, `PULL-`, `Pull-`, `PR#`, `pulls/`, extended at v2 by `pull/` and a floor of 5 digits, `run_id` with no marker and a floor of 10 digits, and `head_ref`, a text value behind `refs/heads/`, `refs/remotes/origin/` or `origin/` | §4 declared-run — the markers a run's own declared value is masked behind, the floor at which it masks with no marker, or the prefixes a text value stands behind. Core holds the mechanism, no marker, floor or prefix; it refuses a floor below 5 (`DN-163.D5`). |
+| **Instance values** | none in core: each `line`, `shape` or `argument` row is a dialect's data (`InstanceValueRow`), gated to its own package; the GitHub dialect declares `Runner name: ` and `Machine name: `, `productionresultssa{n}.blob.core.windows.net`, and `##[command]/usr/bin/docker ` with `--name`, `--label` and `label=` | §2 — where a runner prints its own instance, masked after every other rule (`DN-163.D1`, `DN-163.D7`). |
 
 No `MaskConfig` knob gates a mask rule. Masking relocates a value into `params` and never deletes it, so a
 switch that kept an address in the template could buy only a template per host — the identity defect the
@@ -129,6 +143,7 @@ over-masking destroys signal irrecoverably, so the dangerous choices are named o
 | `.conan2/p/b` | `Floating` | `Instance` |
 | `/nix/store` | `TokenStart` | `Instance` |
 | `AppData/Local/Temp` (the Windows per-user temp folder; the drive and user before it vary by machine) | `Floating` | `Subtree` |
+| `global/v11` (pnpm's isolated global directory, its component `<pid>-<hex instant>`; `DN-163.D10`) | `Floating` | `Instance` |
 
 **Separators.** For the root, `/` and a run of `\` both separate path components (JSON escaping doubles the
 backslash, so `C:\\Users\\u\\AppData\\Local\\Temp\\run-a1` reads as one path), and every separator from the root's first
@@ -160,7 +175,7 @@ generation ledger ([canonicalization_generations.md](canonicalization_generation
 ### 3.2 The wrapper-shell catalog — a shell is punctuation, never part of the value
 
 A producer wraps a whole token in punctuation and means nothing by it: `(10.100.0.250)`, `[10.20.30.40]`
-and `"10.0.0.1"` are one address in three dresses. The six pairs are the declared, frozen set, read from
+and `"10.0.0.1"` are one address in three dresses. The seven pairs are the declared, frozen set, read from
 **one table** (`kWrapperPairs`) by every surface that needs them — the address rule's grammar, rule 3's pre-gate, the
 complete-shell reader and the ephemeral-root lead (§3.1) — because a second copy is how two maskers diverge.
 
@@ -188,10 +203,15 @@ The shell widens **which punctuation** a rule tolerates, never **what it matches
 opener at byte 0, a digit-leading core holding neither byte of that pair, the opener's own closer, and at most
 two trailing bytes from `,;:.` takes rule 5's disposition, so `(1.7s)`, `[02:16:00]`, `(96.4%),`, `"2220"` and
 `(1.2.3)` mask as their bare forms do. Its acceptance set is, by construction, the set rule 5 masks bare, so it
-merges nothing canon does not already merge when the value is printed without the punctuation. The shell must be
-complete: `(25 warnings)` splits into `(25` and `warnings)`, neither a shell, so that count stays literal; a core
-of at most 3 digits behind a status keyword stays literal (`exit code (1)`), and a composite rule still wins
-(`[42]` is the bracket index's `[<*>]`). Measured on 32 000 lines of real third-party
+merges nothing canon does not already merge when the value is printed without the punctuation. A core of at most
+3 digits behind a status keyword stays literal (`exit code (1)`), and a composite rule still wins (`[42]` is the
+bracket index's `[<*>]`). **An opener whose closer sits in a later token is a shell too** (`DN-163.D3`, lifting
+`DN-134.D1`'s incomplete-shell boundary): a catalog opener at byte 0, a digit after it and the opener's closer nowhere
+in the token mask the token whole, so `(25 warnings)` reads `<*> warnings)` and `(812406136 B)` reads `<*> B)`. A
+count is a param in canon's model, never template content, as `25 warnings` printed bare is. The price is an orphan
+closer in the template. The status KEEP reads through the opener: `exit code (1 retry left)` keeps its `1`. **The
+backtick is the seventh pair** (`DN-163.D2`), paired with itself as the two quotes are, so a code span is a shell:
+`` `42` `` reads `<*>` and `` `<40-hex>` `` reads `` `<*>` `` through embedded-identity. Measured on 32 000 lines of real third-party
 logs across 16 producers, the repair moves **3 templates out of 6712**.
 
 **The hash counter reads a complete shell too.** A token made of a catalog opener at byte 0, a core that the bare
@@ -257,7 +277,7 @@ instance. Tried in order; first match wins.
 |---|---|---|---|
 | **source-location** | `<path-like>:<digits>[:<digits>]` (prefix contains `.` or `/`) | keep the file/path, mask each `:<digit-run>`; an address run inside the token (§3.3) is one masked component, the walk resuming after it | `tokenizer.cpp:4500:30:` → `tokenizer.cpp:<*>:<*>:` · `LPF/eth0/00:00:5e:00:53:01/net` → `LPF/eth0/<*>/net` |
 | **ephemeral-root** | a path (components separated by `/` or a run of `\`) whose components match a declared ephemeral root (§3.1), a `TokenStart` root sitting at the path's start behind an optional declared lead; reached only when no earlier rule claimed the token | keep the root and the separator after it, mask the instance component; **Subtree** collapses the whole remainder, **Instance** keeps the tail | `/tmp/pw-electron-userdata-Kw9v4a` → `/tmp/<*>` (Subtree) · `~/.conan2/p/b/insig247…/lib/x.so` → `~/.conan2/p/b/<*>/lib/x.so` (Instance) · `file:///tmp/run-a1/x.ts` → `file:///tmp/<*>` · `TMPDIR=/tmp/run-a1` → `TMPDIR=/tmp/<*>` · `C:\Users\u\AppData\Local\Temp\run-a1\x.ts` → `C:\Users\u\AppData\Local\Temp\<*>` |
-| **versioned-ref** | `<name>/<numeric-version>` (digit after the last `/`, only punctuation may trail) | keep the name, mask the version | `zlib/1.3` → `zlib/<*>` |
+| **versioned-ref** | `<name>/<numeric-version>` (digit after the last `/`, only punctuation may trail). It **declines** a token whose name — the bytes after its wrapper openers up to the last `/`, each instance-arm span read as `<*>` — begins with a digit and holds no letter, where rules 4 and 5 mask the token whole; the token then reaches no later composite and masks whole (`DN-163.D9`) | keep the name, mask the version | `zlib/1.3` → `zlib/<*>`; `[9/69]` → `<*>`; `((9/69))` → `((9/<*>))` |
 | **bracket-index** | `<word>[<short-alpha?><digits>]` | keep the word + class marker, mask the index | `make[2]:` → `make[<*>]:` · `[gw0]` → `[gw<*>]` |
 | **hash-counter** | `#<digits>` (no alnum may trail), bare or inside a complete wrapper shell (§3.2) | keep `#` and the shell, mask the index; no param | `step #26` → `step #<*>` · `INFO (#9767): watcher` → `INFO (#<*>): watcher` · `[#42]` → `[#<*>]` |
 | **marker-number** | `<currency-marker><digit-core>[.<digits>]` | keep the marker, mask the number | `$463.50` → `$<*>` |

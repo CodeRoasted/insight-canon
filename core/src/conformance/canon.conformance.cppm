@@ -499,6 +499,13 @@ namespace
                         .passed = false,
                         .detail = "stop announcement contains a non-ASCII byte: \"" +
                                   std::string{row.shape} + "\"."};
+        // refs: DN-163.D1, DN-163.D7
+        for (const InstanceValueRow& row : manifest.instance_values)
+            if (!is_ascii(row.bytes) || !all_ascii(row.flags) || !all_ascii(row.keys))
+                return {.name = "ascii.instance_value",
+                        .passed = false,
+                        .detail = "instance value contains a non-ASCII byte: \"" +
+                                  std::string{row.bytes} + "\"."};
         for (const LocationRow& row : manifest.locations)
             if (!all_ascii(row.infixes) || !all_ascii(row.extensions) || !all_ascii(row.prefixes) ||
                 !all_ascii(row.suffixes))
@@ -537,6 +544,17 @@ namespace
                                   "\" cannot be composed: an empty shape, or one with a brace "
                                   "other than a {n} hole, trailing whitespace, or a hole against a "
                                   "digit, a hole or a decimal point leading into either."};
+        // refs: DN-163.D1, DN-163.D7
+        for (const InstanceValueRow& row : manifest.instance_values)
+            if (!instance_value_row_well_formed(row))
+                return {.name = "grammar.instance_value",
+                        .passed = false,
+                        .detail = "instance value \"" + std::string{row.bytes} +
+                                  "\" cannot be composed: a line or argument prefix that is empty, "
+                                  "holds a hole or does not end in a space, an argument with no "
+                                  "flag or an empty flag or key or a key not ending in `=`, or a "
+                                  "shape without exactly one {n} hole, with a space, or with a "
+                                  "digit against its hole."};
         for (const IntentMarkerRow& row : manifest.markers)
             if (row.prefix.empty())
                 return {.name = "grammar.empty_marker",
@@ -1092,6 +1110,27 @@ namespace
         return std::string{value_class_name(cls)};
     }
 
+    // refs: DN-163.D6
+    [[nodiscard]] std::string render_value(DeclaredValueKind kind)
+    {
+        return kind == DeclaredValueKind::Text ? "Text" : "Digits";
+    }
+
+    // refs: DN-163.D1, DN-163.D7
+    [[nodiscard]] std::string render_value(InstanceValueForm form)
+    {
+        switch (form)
+        {
+        case InstanceValueForm::Line:
+            return "Line";
+        case InstanceValueForm::Shape:
+            return "Shape";
+        case InstanceValueForm::Argument:
+            return "Argument";
+        }
+        return "unknown";
+    }
+
     // note: `std::span` has no operator==, so a nine-span manifest has no defaulted equality.
     template <typename Value>
         requires requires(const Value& lhs, const Value& rhs) {
@@ -1289,16 +1328,37 @@ namespace
         return diff.text();
     }
 
-    // refs: DN-133.D2
+    // refs: DN-133.D2, DN-163.D4, DN-163.D6
     [[nodiscard]] std::string row_differences(const DeclaredValueRow& lhs,
                                               const DeclaredValueRow& rhs)
     {
-        const auto& [lhs_key, lhs_markers, lhs_floor, lhs_dialect, lhs_since] = lhs;
-        const auto& [rhs_key, rhs_markers, rhs_floor, rhs_dialect, rhs_since] = rhs;
+        const auto& [lhs_key, lhs_markers, lhs_floor, lhs_value, lhs_prefixes, lhs_dialect,
+                     lhs_extends, lhs_since] = lhs;
+        const auto& [rhs_key, rhs_markers, rhs_floor, rhs_value, rhs_prefixes, rhs_dialect,
+                     rhs_extends, rhs_since] = rhs;
         FieldDiff diff;
         diff.field("key", lhs_key, rhs_key);
         diff.field("markers", lhs_markers, rhs_markers);
         diff.field("min_digits", lhs_floor, rhs_floor);
+        diff.field("value", lhs_value, rhs_value);
+        diff.field("prefixes", lhs_prefixes, rhs_prefixes);
+        diff.field("dialect_gate", lhs_dialect, rhs_dialect);
+        diff.field("extends", std::int64_t{lhs_extends ? 1 : 0}, std::int64_t{rhs_extends ? 1 : 0});
+        diff.field("revision_since", lhs_since, rhs_since);
+        return diff.text();
+    }
+
+    // refs: DN-163.D1, DN-163.D7
+    [[nodiscard]] std::string row_differences(const InstanceValueRow& lhs,
+                                              const InstanceValueRow& rhs)
+    {
+        const auto& [lhs_form, lhs_bytes, lhs_flags, lhs_keys, lhs_dialect, lhs_since] = lhs;
+        const auto& [rhs_form, rhs_bytes, rhs_flags, rhs_keys, rhs_dialect, rhs_since] = rhs;
+        FieldDiff diff;
+        diff.field("form", lhs_form, rhs_form);
+        diff.field("bytes", lhs_bytes, rhs_bytes);
+        diff.field("flags", lhs_flags, rhs_flags);
+        diff.field("keys", lhs_keys, rhs_keys);
         diff.field("dialect_gate", lhs_dialect, rhs_dialect);
         diff.field("revision_since", lhs_since, rhs_since);
         return diff.text();
@@ -1358,6 +1418,10 @@ namespace
     [[nodiscard]] std::string_view row_key(const StopAnnouncementRow& row) noexcept
     {
         return row.shape;
+    }
+    [[nodiscard]] std::string_view row_key(const InstanceValueRow& row) noexcept
+    {
+        return row.bytes;
     }
 
     template <typename Row>
@@ -1492,16 +1556,16 @@ Report manifest_equivalence_report(const SemanticPackageManifest& lhs,
                                    const SemanticPackageManifest& rhs)
 {
     // refs: LSRC-6
-    // assert: sixteen members bound, so a seventeenth is a COMPILE ERROR here and forces the edit
-    // — it does not force the matching check to be pushed.
+    // assert: seventeen members bound, so an eighteenth is a COMPILE ERROR here and forces the
+    // edit — it does not force the matching check to be pushed.
     const auto& [lhs_name, lhs_version, lhs_roles, lhs_markers, lhs_emits, lhs_level_lifts,
                  lhs_locations, lhs_value_classes, lhs_outcome_tokens, lhs_outcome_markers,
                  lhs_channels, lhs_dialect_revisions, lhs_declared_values, lhs_stop_announcements,
-                 lhs_strategy, lhs_echoed_source] = lhs;
+                 lhs_instance_values, lhs_strategy, lhs_echoed_source] = lhs;
     const auto& [rhs_name, rhs_version, rhs_roles, rhs_markers, rhs_emits, rhs_level_lifts,
                  rhs_locations, rhs_value_classes, rhs_outcome_tokens, rhs_outcome_markers,
                  rhs_channels, rhs_dialect_revisions, rhs_declared_values, rhs_stop_announcements,
-                 rhs_strategy, rhs_echoed_source] = rhs;
+                 rhs_instance_values, rhs_strategy, rhs_echoed_source] = rhs;
 
     Report report;
     report.checks.push_back(compare_scalar("equivalence.name", "name", lhs_name, rhs_name));
@@ -1529,6 +1593,8 @@ Report manifest_equivalence_report(const SemanticPackageManifest& lhs,
                                          lhs_declared_values, rhs_declared_values));
     report.checks.push_back(compare_rows("equivalence.stop_announcements", "stop_announcements",
                                          lhs_stop_announcements, rhs_stop_announcements));
+    report.checks.push_back(compare_rows("equivalence.instance_values", "instance_values",
+                                         lhs_instance_values, rhs_instance_values));
     report.checks.push_back(compare_presence("equivalence.strategy_presence_only", "strategy",
                                              lhs_strategy != nullptr, rhs_strategy != nullptr));
     report.checks.push_back(compare_presence("equivalence.echoed_source_presence_only",

@@ -62,18 +62,21 @@ export namespace insight::tokenization
 // invariant: ONE catalog for every reader — a second copy is how two maskers diverge and template
 // identity stops being a pure function of the line.
 // note: only the OPENING byte was ever the defect — a closer leaves byte 0 a digit.
+// invariant: the backtick pairs with itself as the two quotes do: a code span is a shell.
+// refs: DN-163.D2
 struct WrapperPair
 {
     char open;
     char close;
 };
-inline constexpr std::array<WrapperPair, 6> kWrapperPairs{{
+inline constexpr std::array<WrapperPair, 7> kWrapperPairs{{
     {.open = '[', .close = ']'},
     {.open = '(', .close = ')'},
     {.open = '{', .close = '}'},
     {.open = '<', .close = '>'},
     {.open = '"', .close = '"'},
     {.open = '\'', .close = '\''},
+    {.open = '`', .close = '`'},
 }};
 
 [[nodiscard]] constexpr bool is_wrapper_open(char chr) noexcept
@@ -138,12 +141,14 @@ struct TokenShape
     // refs: DN-162.D13
     bool has_separator{false};
 
+    // invariant: a tilde before a digit is an approximation mark, read as a sign is.
+    // refs: DN-163.D3
     explicit constexpr TokenShape(std::string_view tok) noexcept : empty(tok.empty())
     {
         if (empty)
             return;
         std::size_t lead{0};
-        if (tok[0] == '+' || tok[0] == '-')
+        if (tok[0] == '+' || tok[0] == '-' || tok[0] == '~')
             ++lead;
         digit_leading = lead < tok.size() && is_digit(tok[lead]);
         all_digits = true;

@@ -66,15 +66,16 @@ namespace
 // composite layer, which is named by its own catalog instead.
 // invariant: `declared_run` is the one a stream declares, `segment_kv` the non-claiming segment
 // step, `json_member_order` the line's normal form before tokenization.
+// invariant: `instance_arms` is the instance arms on a normal form (DN-163.D8).
 // invariant: this list plus that catalog is the complete rule-id namespace.
 // invariant: it is hand-held because the dispatcher states these as a disjunction chain rather than
 // a table, and a sibling arm is what keeps a typo here from silently minting another id.
 // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate, DN-134.D2, DN-134.D3
-constexpr std::array<std::string_view, 8> kTopLevelRuleIds{
+constexpr std::array<std::string_view, 9> kTopLevelRuleIds{
     {std::string_view{"status_keep"}, std::string_view{"uuid_or_hash"}, std::string_view{"address"},
      std::string_view{"digit_leading"}, std::string_view{"literal_keep"},
      std::string_view{"declared_run"}, std::string_view{"segment_kv"},
-     std::string_view{"json_member_order"}}};
+     std::string_view{"instance_arms"}, std::string_view{"json_member_order"}}};
 
 struct Row
 {
@@ -847,6 +848,36 @@ TEST(MaskRuleGolden, SegmentKvRowsMoveByTheNonClaimingStep)
             << got;
     }
     EXPECT_GT(witnesses, 0U) << "the segment step has no witness row in the golden";
+}
+
+// refs: DN-163.D8
+// invariant: an instance_arms row proves the normal-form arms are the reason: no composite claims
+// the subject, no whole-token rule masks it, and it moves to a form holding the wildcard.
+TEST(MaskRuleGolden, InstanceArmsRowsMoveByTheNormalFormArms)
+{
+    if (!golden_is_readable())
+        return;
+    std::size_t witnesses{0};
+    for (const Row& row : loaded().golden.rows)
+    {
+        if (row.rule_id != "instance_arms")
+            continue;
+        ++witnesses;
+        bool okay{false};
+        const std::string got{masked_subject(row, okay)};
+        if (!okay)
+            continue;
+        EXPECT_EQ(catalog::composite_rule_claiming(row.subject), std::string_view{})
+            << "golden line " << row.line_no
+            << ": a composite claims it, so the row witnesses rule 3.\n  subject: " << row.subject;
+        EXPECT_NE(got, "<*>") << "golden line " << row.line_no
+                              << ": masked WHOLE, so a whole-token rule reached it.\n  subject: "
+                              << row.subject;
+        EXPECT_NE(got.find("<*>"), std::string::npos)
+            << "golden line " << row.line_no
+            << ": the arms must reach the wildcard.\n  masked: " << got;
+    }
+    EXPECT_GT(witnesses, 0U) << "the normal-form instance arms have no witness row in the golden";
 }
 
 // refs: DN-134.D3

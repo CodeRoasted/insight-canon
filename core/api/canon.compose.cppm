@@ -194,9 +194,10 @@ class ComposedSemantics
     {
         return declared_value_keys_;
     }
-    // refs: DN-162.D13
-    // post: the highest digit floor any row under `key` declares, read unfiltered as the keys
-    // are; zero for a key only markers find or a key no package declares.
+    // refs: DN-162.D13, DN-163.D5
+    // post: the highest digit floor any row under `key` declares when no row under it declares a
+    // marker, read unfiltered as the keys are.
+    // post: zero for a key some marker finds, at any length, or a key no package declares.
     // invariant: the highest, because rows under one key in packages of disjoint dialects may
     // differ, and a value refused by none of them is one no stream's row can refuse.
     [[nodiscard]] std::uint32_t declared_value_floor(std::string_view key) const noexcept
@@ -204,8 +205,29 @@ class ComposedSemantics
         std::uint32_t floor{0};
         for (const DeclaredValueRow& row : all_declared_values_)
             if (row.key == key)
+            {
+                if (!row.markers.empty())
+                    return 0;
                 floor = std::max(floor, row.min_digits);
+            }
         return floor;
+    }
+
+    // refs: DN-163.D6
+    // post: the kind any row under `key` declares, read unfiltered as the keys are; Digits for a
+    // key no package declares.
+    // invariant: composition refuses a key declared Digits by one row and Text by another.
+    [[nodiscard]] DeclaredValueKind declared_value_kind(std::string_view key) const noexcept
+    {
+        const auto row{std::ranges::find(all_declared_values_, key, &DeclaredValueRow::key)};
+        return row == all_declared_values_.end() ? DeclaredValueKind::Digits : row->value;
+    }
+
+    // refs: DN-163.D1, DN-163.D7
+    // post: the view's instance-value rows, gated to its dialect.
+    [[nodiscard]] std::span<const InstanceValueRow> instance_values() const noexcept
+    {
+        return instance_values_;
     }
 
     // refs: ADR-22, ADR-22.D4
@@ -302,6 +324,7 @@ class ComposedSemantics
     std::vector<OutcomeMarkerRow> outcome_markers_;
     std::vector<DeclaredValueRow> declared_values_;
     std::vector<StopAnnouncementRow> stop_announcements_;
+    std::vector<InstanceValueRow> instance_values_;
 
     // invariant: THE UNFILTERED TABLES — every row the packages declared, gated or not. They are
     // the SOURCE `for_stream` re-derives each view from, and recognition never walks them.
@@ -315,6 +338,7 @@ class ComposedSemantics
     std::vector<OutcomeMarkerRow> all_outcome_markers_;
     std::vector<DeclaredValueRow> all_declared_values_;
     std::vector<StopAnnouncementRow> all_stop_announcements_;
+    std::vector<InstanceValueRow> all_instance_values_;
 
     // refs: ADR-22
     // invariant: the dialect this view was resolved for; empty means Unspecified.
@@ -367,9 +391,10 @@ struct ResolvedStream
 resolve_stream(const ComposedSemantics& composed,
                const insight::transport::IngestDeclaration& declaration);
 
-// refs: DN-133.D2
+// refs: DN-133.D2, DN-163.D6
 // post: the context checked against a composition — every key declared by some composed package,
-// no key declared twice, every value declarable and at least its key's digit floor long.
+// no key declared twice, a text key's value non-empty.
+// post: a digit key's value declarable, and at least its floor long when no marker finds it.
 // post: a refusal names the declared keys, or the floor.
 // refs: DN-162.D13
 // invariant: an unknown key is a MISTAKE and is refused here; a known key whose dialect a stream
@@ -397,6 +422,16 @@ declared_runs_of(const insight::tokenization::StreamContext&& context,
 std::vector<insight::tokenization::DeclaredRun>
 declared_runs_of(const insight::tokenization::StreamContext& context,
                  const ComposedSemantics&& composed) = delete;
+
+// refs: DN-163.D1, DN-163.D7
+// post: one instance value per row of the composition's instance-value VIEW, in row order.
+// invariant: the view already applied the dialect gate, so a stream declaring no dialect, or
+// another, resolves none.
+// pre: `composed` outlives the returned values, which view its rows.
+[[nodiscard]] std::vector<insight::tokenization::InstanceValue>
+instance_values_of(const ComposedSemantics& composed);
+std::vector<insight::tokenization::InstanceValue>
+instance_values_of(const ComposedSemantics&& composed) = delete;
 
 // refs: ADR-17.D2, ADR-17.D3
 // post: sorts packages by name into canonical order independent of the caller's argument order,
@@ -524,10 +559,10 @@ namespace detail
     }
 } // namespace detail
 
-// refs: DN-133.D2
-// post: the key two declared-value rows share under intersecting gates, or nullopt.
-// invariant: two rows under one key would give one declared value two marker sets, and which
-// applied would be a function of row order.
+// refs: DN-133.D2, DN-163.D4
+// post: the key two BASE declared-value rows share under intersecting gates, or nullopt.
+// invariant: two base rows under one key would give one declared value two marker sets, and which
+// applied would be a function of row order; an extension row is its base's, never a second base.
 namespace detail
 {
     [[nodiscard]] constexpr std::optional<std::string_view>
@@ -542,7 +577,8 @@ namespace detail
                     const std::span<const DeclaredValueRow> rows_b{packages[pkg_b].declared_values};
                     for (std::size_t idx_j{(pkg_b == pkg_a) ? idx_i + 1 : 0}; idx_j < rows_b.size();
                          ++idx_j)
-                        if (rows_a[idx_i].key == rows_b[idx_j].key &&
+                        if (!rows_a[idx_i].extends && !rows_b[idx_j].extends &&
+                            rows_a[idx_i].key == rows_b[idx_j].key &&
                             gates_intersect(rows_a[idx_i].dialect_gate, rows_b[idx_j].dialect_gate))
                             return rows_a[idx_i].key;
                 }

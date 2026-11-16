@@ -1068,9 +1068,10 @@ TEST(StatelessTemplate, TheCompleteShellReaderReturnsTheCoreOrNothing)
             << complete_shell_core(tok).value_or("") << "`";
 }
 
-// refs: DN-134.D1
+// refs: DN-134.D1, DN-163.D3
 // invariant: the rule's boundary, asserted as hard as its reach — the status KEEP reads through
-// the shell, an INCOMPLETE shell is no shell, a core holding its own pair is no number.
+// the shell, a core holding its own pair is no number, a closer in the token is no open shell.
+// invariant: an opener whose closer sits in a LATER token is a shell around a value (DN-163.D3).
 // invariant: a composite rule still wins.
 TEST(StatelessTemplate, TheShellNumberRuleKeepsTheStatusValueAndAnIncompleteShell)
 {
@@ -1088,16 +1089,16 @@ TEST(StatelessTemplate, TheShellNumberRuleKeepsTheStatusValueAndAnIncompleteShel
     }
     EXPECT_EQ(masked("request finished status (2000)", arena), "request finished status <*>")
         << "past the status-digit ceiling the value is an id and masks, as it does bare";
-    // invariant: `(25 warnings)` splits into `(25` and `warnings)` — neither is a complete shell,
-    // so the warning count 5 -> 25 DN-134.D1 measured as a signal survives.
-    EXPECT_EQ(masked("build finished (25 warnings)", arena), "build finished (25 warnings)");
-    EXPECT_NE(masked("build finished (25 warnings)", arena),
+    // invariant: `(25 warnings)` splits into `(25` and `warnings)`, and the opener reads as a shell
+    // around the count, which is a param as `25 warnings` printed bare is (DN-163.D3).
+    EXPECT_EQ(masked("build finished (25 warnings)", arena), "build finished <*> warnings)");
+    EXPECT_EQ(masked("build finished (25 warnings)", arena),
               masked("build finished (5 warnings)", arena));
-    for (const std::string_view tok : {"(1.7s", "[02:16:00", "((5))", "(5))", "(5)x", "(5).,;",
-                                       "(v1.2.3)", "(anonymous)", "(+5)", "()"})
+    for (const std::string_view tok :
+         {"((5))", "(5))", "(5)x", "(5).,;", "(v1.2.3)", "(anonymous)", "(+5)", "()"})
     {
         const std::string got{masked(tok, arena)};
-        EXPECT_EQ(got, tok) << "not a complete shell around a digit-leading core: it must stay "
+        EXPECT_EQ(got, tok) << "not a shell around a digit-leading core: it must stay "
                                "literal.\n  token:  "
                             << tok << "\n  actual: " << got;
     }
@@ -1632,4 +1633,119 @@ TEST(MaskInstanceValues, MasksTheFourInstanceArmsAndKeepsEveryOtherByte)
         << "the value masker must mask something in the kept row, or the row proves nothing about "
            "the instance arms' boundary\n  template : ["
         << templated << "]";
+}
+
+namespace
+{
+// note: a UUID whose first byte is a digit, and one whose first byte is a letter.
+constexpr std::string_view kUuidDigitLed{"0f8fad5b-d9cb-469f-a165-70867728950e"};
+constexpr std::string_view kUuidLetterLed{"af8fad5b-d9cb-469f-a165-70867728950e"};
+
+struct MaskArm
+{
+    std::string_view input;
+    std::string expected;
+};
+
+// post: every arm's input masked equals its expected template, each failure naming the slot.
+void expect_arms(std::string_view slot, std::initializer_list<MaskArm> arms)
+{
+    ArenaAllocator arena{256U * 1024U};
+    for (const MaskArm& arm : arms)
+    {
+        const std::string got{masked(arm.input, arena)};
+        EXPECT_EQ(got, arm.expected) << slot << "\n  input:    " << arm.input
+                                     << "\n  expected: " << arm.expected << "\n  actual:   " << got;
+    }
+}
+} // namespace
+
+// refs: DN-163.D2
+TEST(StatelessTemplate, ABacktickIsAShellPairedWithItself)
+{
+    expect_arms(
+        "DN-163.D2: a backtick is a wrapper shell",
+        {{"Using revision: `0123456789abcdef0123456789abcdef01234567`", "Using revision: `<*>`"},
+         {"counted `42` files", "counted <*> files"},
+         {"run `npm` now", "run `npm` now"},
+         {"call `foo.bar()` now", "call `foo.bar()` now"}});
+}
+
+// refs: DN-163.D3
+TEST(StatelessTemplate, ATildeAndAnOpenerWhoseCloserIsInAnotherTokenHideNoNumber)
+{
+    expect_arms("DN-163.D3: a tilde is a sign, an opener a shell, and the token masks whole",
+                {{"size ~775 now", "size <*> now"},
+                 {"version ~1.2.3 now", "version <*> now"},
+                 {"Cache Size: ~775 MB (812406136 B)", "Cache Size: <*> MB <*> B)"},
+                 {"coords [3, 4] set", "coords <*> <*> set"},
+                 {"step [9/69 done", "step <*> done"},
+                 {"set size=~775 now", "set size=<*> now"},
+                 {"build finished (25 warnings)", "build finished <*> warnings)"},
+                 {"took <1ms total", "took <*> total"},
+                 {"open ~/path now", "open ~/path now"},
+                 {"word (foo bar)", "word (foo bar)"},
+                 {"tag (v1.2.3 rc)", "tag (v1.2.3 rc)"}});
+}
+
+// refs: DN-163.D3
+// invariant: rule 1 is the one collapse masking may never make, so the status KEEP reads through
+// the opener as it reads through a complete shell.
+TEST(StatelessTemplate, TheStatusKeepReadsThroughAnOpener)
+{
+    expect_arms(
+        "DN-163.D3: the status KEEP through the opener",
+        {{"process exited with exit code (1 retry left)",
+          "process exited with exit code (1 retry left)"},
+         {"request finished status (200, retrying)", "request finished status (200, retrying)"},
+         {"request finished status (2000 bytes)", "request finished status <*> bytes)"}});
+}
+
+// refs: DN-163.D8
+TEST(StatelessTemplate, TheInstanceArmsReadEveryNormalForm)
+{
+    expect_arms("DN-163.D8: a composite's claim never leaves an instance literal",
+                {{"GET http://localhost:8080/api/" + std::string{kUuidDigitLed} + "/x",
+                  "GET http://localhost:<*>/api/<*>/x"},
+                 {"net net_0123456789abcdef0123456789abcdef up", "net net_<*> up"},
+                 {"at file.cc:12 here", "at file.cc:<*> here"},
+                 {"GET http://localhost:8080/api/v1", "GET http://localhost:<*>/api/v1"},
+                 {"marker deadbeef seen", "marker deadbeef seen"},
+                 {"enabling VK_KHR_maintenance1 now", "enabling VK_KHR_maintenance1 now"}});
+    for (const std::string_view uuid : {kUuidDigitLed, kUuidLetterLed})
+        expect_arms("DN-163.D8 with DN-163.D9: a UUID-led name keeps versioned-ref's claim",
+                    {{"item " + std::string{uuid} + "/12", "item <*>/<*>"}});
+}
+
+// refs: DN-163.D9
+TEST(StatelessTemplate, VersionedRefDeclinesANumericNameThatRulesFourAndFiveMaskWhole)
+{
+    expect_arms("DN-163.D9: a position counter reads as the number it is",
+                {{"[9/69] Loaded pack", "<*> Loaded pack"},
+                 {"9/69 kB", "<*> kB"},
+                 {"(9/69): ok", "<*> ok"},
+                 {"[9/69 ok", "<*> ok"},
+                 {"[07/30/26 run", "<*> run"},
+                 {"on 2026/08/13 run", "on <*> run"},
+                 {"building zlib/1.3 now", "building zlib/<*> now"},
+                 {"arch x86/64 now", "arch x86/<*> now"},
+                 {"vendor 3rd-party/1.2 now", "vendor 3rd-party/<*> now"},
+                 {"twice ((9/69)) now", "twice ((9/<*>)) now"}});
+    for (const std::string_view uuid : {kUuidDigitLed, kUuidLetterLed})
+        expect_arms("DN-163.D9: a UUID is an instance, not a number, whatever its first byte",
+                    {{"pkg " + std::string{uuid} + "/0.0.0", "pkg <*>/<*>"}});
+    EXPECT_EQ(rule_catalog::composite_rule_claiming("[9/69]"), "")
+        << "a declined token is claimed by no composite: rules 4 and 5 mask it";
+    EXPECT_EQ(rule_catalog::composite_rule_claiming("zlib/1.3"), "versioned_ref")
+        << "a letter-led name is versioned-ref's, as before";
+}
+
+// refs: DN-163.D10
+TEST(StatelessTemplate, PnpmsGlobalDirectoryIsAnInstanceRoot)
+{
+    expect_arms("DN-163.D10: `global/v11` is a floating instance root",
+                {{"linking .../.bin/global/v11/951-19fcbc3a236 done",
+                  "linking .../.bin/global/v11/<*> done"},
+                 {"linking global/v12/x done", "linking global/v12/x done"},
+                 {"linking .../v11/951-19fcbc3a236 done", "linking .../v11/951-19fcbc3a236 done"}});
 }

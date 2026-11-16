@@ -67,7 +67,7 @@ namespace
     // invariant: the row sections whose rows carry a revision_since, in the order the trailing
     // ownership section writes them — the serialization order of their own sections.
     // refs: DN-162.D1
-    constexpr std::uint32_t kOwnerBearingSections{7U};
+    constexpr std::uint32_t kOwnerBearingSections{8U};
 
     template <typename Row> void append_row_owners(std::string& out, std::span<const Row> rows)
     {
@@ -107,6 +107,33 @@ namespace
                                      return packages[lhs].version < packages[rhs].version;
                                  });
         return order;
+    }
+
+    // note: an instance value decides what canon masks, so it is identity.
+    // invariant: written only by a package that declares one, after a zero-length opener, so a
+    // package declaring none keeps the preimage it had before the section existed.
+    // invariant: a package declaring instance values and no stop announcement writes the stop
+    // section's opener and a zero count first, so the two openers never read as one another.
+    // refs: DN-163.D1, DN-163.D7, ADR-2.D5
+    void append_instance_values(std::string& out, const SemanticPackageManifest& pkg)
+    {
+        if (pkg.instance_values.empty())
+            return;
+        if (pkg.stop_announcements.empty())
+        {
+            append_str(out, {});
+            append_u32_le(out, 0U);
+        }
+        append_str(out, {});
+        append_u32_le(out, static_cast<std::uint32_t>(pkg.instance_values.size()));
+        for (const InstanceValueRow& row : pkg.instance_values)
+        {
+            append_u8(out, static_cast<std::uint8_t>(row.form));
+            append_str(out, row.bytes);
+            append_str_span(out, row.flags);
+            append_str_span(out, row.keys);
+            append_str(out, row.dialect_gate);
+        }
     }
 
     // invariant: the field order is fixed per grammar generation; an enum enters as one byte and
@@ -204,15 +231,19 @@ namespace
         // note: byte-identical rows under different declared generations are different claims.
         // refs: ADR-17.D9
         append_str_span(out, pkg.dialect_revisions);
-        // note: a declared key, its markers and its floor decide what canon masks: identity.
-        // refs: DN-133.D2, DN-162.D13
+        // invariant: a declared key, its markers, its floor, its kind, its prefixes and whether a
+        // row extends its base decide what canon masks, so they are identity.
+        // refs: DN-133.D2, DN-162.D13, DN-163.D4, DN-163.D6
         append_u32_le(out, static_cast<std::uint32_t>(pkg.declared_values.size()));
         for (const DeclaredValueRow& row : pkg.declared_values)
         {
             append_str(out, row.key);
             append_str_span(out, row.markers);
             append_u32_le(out, row.min_digits);
+            append_u8(out, static_cast<std::uint8_t>(row.value));
+            append_str_span(out, row.prefixes);
             append_str(out, row.dialect_gate);
+            append_u8(out, row.extends ? 1U : 0U);
         }
         // note: a stop announcement orders a unit's errors against the stop, so it is identity.
         // invariant: written only by a package that declares one, so a package declaring none
@@ -231,6 +262,7 @@ namespace
                 append_str(out, row.dialect_gate);
             }
         }
+        append_instance_values(out, pkg);
         // note: which revision introduced each row is identity: it is what a generation owns.
         // invariant: written only by a package declaring several revisions, so every
         // single-revision package keeps the preimage it had before the section existed.
@@ -247,6 +279,7 @@ namespace
             append_row_owners(out, pkg.emits);
             append_row_owners(out, pkg.declared_values);
             append_row_owners(out, pkg.stop_announcements);
+            append_row_owners(out, pkg.instance_values);
         }
     }
 
@@ -340,12 +373,14 @@ namespace
     {
         std::cerr << "FATAL: insight::semantic::compose — package \"" << pkg.name
                   << "\", declared value \"" << row.key
-                  << "\": a declared value names a key and exactly one way to find its value: "
-                     "markers, every one non-empty and ending in a byte that is not a digit (a "
-                     "marker ending in a digit would make the digit run after it ambiguous), or "
-                     "no marker and a digit floor of at least "
+                  << "\": a digit value is found behind markers, every one non-empty and ending "
+                     "in a byte that is not a digit (a marker ending in a digit would make the "
+                     "digit run after it ambiguous), or from a digit floor of at least "
                   << kMinDeclaredValueFloor
-                  << " (a shorter markerless value would meet ordinary words). Fix the row.\n";
+                  << " (a shorter value would meet ordinary numbers in a word), or both; a text "
+                     "value declares non-empty prefixes and no marker, floor or extension; an "
+                     "extension adds to a digit base row of its key declared before it in the "
+                     "same package, under the same gate. Fix the row.\n";
         std::terminate();
     }
 
@@ -441,14 +476,62 @@ namespace
             }
     }
 
-    // post: returns only when every declared-value row is well formed; otherwise fails closed
-    // naming the row.
+    // post: true when an extension row follows a digit base row of its key in its own package,
+    // under its own gate; true for any base row.
+    // refs: DN-163.D4
+    [[nodiscard]] bool extension_has_base(std::span<const DeclaredValueRow> rows,
+                                          std::size_t index) noexcept
+    {
+        const DeclaredValueRow& row{rows[index]};
+        return !row.extends ||
+               std::ranges::any_of(rows.first(index),
+                                   [&row](const DeclaredValueRow& base) noexcept
+                                   {
+                                       return !base.extends && base.key == row.key &&
+                                              base.value == DeclaredValueKind::Digits &&
+                                              base.dialect_gate == row.dialect_gate;
+                                   });
+    }
+
+    // post: returns only when every declared-value row is well formed, and every extension
+    // extends a base row; otherwise fails closed naming the row.
+    // post: also fails closed when two rows under one key, in any package, declare different
+    // kinds, since one value cannot be a digit run and text at once.
+    // refs: DN-163.D4, DN-163.D6
     void fence_declared_value_rows(std::span<const SemanticPackageManifest> packages)
     {
         for (const SemanticPackageManifest& pkg : packages)
-            for (const DeclaredValueRow& row : pkg.declared_values)
-                if (!declared_value_row_well_formed(row))
+            for (std::size_t index{0}; index < pkg.declared_values.size(); ++index)
+            {
+                const DeclaredValueRow& row{pkg.declared_values[index]};
+                if (!declared_value_row_well_formed(row) ||
+                    !extension_has_base(pkg.declared_values, index))
                     fail_declared_value(pkg, row);
+                for (const SemanticPackageManifest& other : packages)
+                    for (const DeclaredValueRow& peer : other.declared_values)
+                        if (peer.key == row.key && peer.value != row.value)
+                            fail_declared_value(pkg, row);
+            }
+    }
+
+    // post: returns only when every instance-value row is well formed; otherwise fails closed
+    // naming the row.
+    // refs: DN-163.D1, DN-163.D7
+    void fence_instance_value_rows(std::span<const SemanticPackageManifest> packages)
+    {
+        for (const SemanticPackageManifest& pkg : packages)
+            for (const InstanceValueRow& row : pkg.instance_values)
+                if (!instance_value_row_well_formed(row))
+                {
+                    std::cerr << "FATAL: insight::semantic::compose — package \"" << pkg.name
+                              << "\", instance value \"" << row.bytes
+                              << "\": a line row is a whole-line prefix ending in a space; a "
+                                 "shape row is literal bytes with exactly one {n} hole, no space "
+                                 "and no digit against the hole; an argument row is a line prefix "
+                                 "ending in a space with at least one flag, and every flag and "
+                                 "key non-empty, every key ending in `=`. Fix the row.\n";
+                    std::terminate();
+                }
     }
 
     // post: returns only when every structural role row is well formed; otherwise fails closed
@@ -487,6 +570,7 @@ namespace
         fence_declared_value_rows(packages);
         fence_role_rows(packages);
         fence_stop_announcement_rows(packages);
+        fence_instance_value_rows(packages);
     }
 
     // post: appends the transport catalog's row count, then each row's name, kind, extract,
@@ -544,6 +628,14 @@ check_stream_context(const insight::tokenization::StreamContext& context,
             return std::unexpected("context key \"" + entry.key +
                                    "\" is declared twice; a stream declares one value per key.");
         seen.push_back(entry.key);
+        // refs: DN-163.D6
+        if (composed.declared_value_kind(entry.key) == DeclaredValueKind::Text)
+        {
+            if (entry.value.empty())
+                return std::unexpected("context value under key \"" + entry.key +
+                                       "\" is empty; a text key declares a non-empty value.");
+            continue;
+        }
         if (!insight::tokenization::is_declarable_value(entry.value))
             return std::unexpected("context value \"" + entry.value + "\" under key \"" +
                                    entry.key +
@@ -577,10 +669,25 @@ declared_runs_of(const insight::tokenization::StreamContext& context,
         const auto entry{
             std::ranges::find(context.values, row.key, &insight::tokenization::ContextValue::key)};
         if (entry != context.values.end())
-            runs.push_back(
-                {.markers = row.markers, .value = entry->value, .min_digits = row.min_digits});
+            runs.push_back({.markers = row.markers,
+                            .value = entry->value,
+                            .min_digits = row.min_digits,
+                            .kind = row.value,
+                            .prefixes = row.prefixes});
     }
     return runs;
+}
+
+// refs: DN-163.D1, DN-163.D7
+std::vector<insight::tokenization::InstanceValue>
+instance_values_of(const ComposedSemantics& composed)
+{
+    std::vector<insight::tokenization::InstanceValue> values;
+    values.reserve(composed.instance_values().size());
+    for (const InstanceValueRow& row : composed.instance_values())
+        values.push_back(
+            {.form = row.form, .bytes = row.bytes, .flags = row.flags, .keys = row.keys});
+    return values;
 }
 
 std::string ComposedSemantics::identity_hex() const
@@ -653,6 +760,7 @@ ComposedSemantics ComposedSemantics::for_stream(std::string_view declared_dialec
     out.all_outcome_markers_ = all_outcome_markers_;
     out.all_declared_values_ = all_declared_values_;
     out.all_stop_announcements_ = all_stop_announcements_;
+    out.all_instance_values_ = all_instance_values_;
     out.declared_dialect_ = resolved_dialect;
 
     const auto admits{[resolved_dialect](std::string_view dialect_gate) noexcept
@@ -682,6 +790,11 @@ ComposedSemantics ComposedSemantics::for_stream(std::string_view declared_dialec
     out.stop_announcements_.reserve(all_stop_announcements_.size());
     std::ranges::copy_if(all_stop_announcements_, std::back_inserter(out.stop_announcements_),
                          [&admits](const StopAnnouncementRow& row)
+                         { return admits(row.dialect_gate); });
+    // refs: DN-163.D1, DN-163.D7
+    out.instance_values_.reserve(all_instance_values_.size());
+    std::ranges::copy_if(all_instance_values_, std::back_inserter(out.instance_values_),
+                         [&admits](const InstanceValueRow& row)
                          { return admits(row.dialect_gate); });
     // note: the ranks are filtered in lockstep with their rows, so the two stay parallel.
     // refs: ADR-22.D4, DN-162.D1
@@ -751,6 +864,9 @@ ComposedSemantics compose(std::span<const SemanticPackageManifest> packages)
         composed.all_stop_announcements_.insert(composed.all_stop_announcements_.end(),
                                                 pkg.stop_announcements.begin(),
                                                 pkg.stop_announcements.end());
+        composed.all_instance_values_.insert(composed.all_instance_values_.end(),
+                                             pkg.instance_values.begin(),
+                                             pkg.instance_values.end());
         for (const DeclaredValueRow& row : pkg.declared_values)
             if (std::ranges::find(composed.declared_value_keys_, row.key) ==
                 composed.declared_value_keys_.end())

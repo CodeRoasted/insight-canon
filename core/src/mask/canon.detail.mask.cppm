@@ -95,16 +95,23 @@ struct StatelessTemplate
 // post: a `content` that is, whole, one JSON object or array is first given its member-order
 // normal form; every other `content` is tokenized as it is.
 // post: each token's NORMAL FORM — its literal bytes, or the form a composite rule gave it — has
-// each `;`-segment's digit-led value masked, then every claimed declared run replaced.
+// every span the instance arms mask replaced, then each `;`-segment's digit-led value masked.
+// post: then every claimed declared run in that normal form is replaced.
 // post: a whole-token mask wins over both steps.
 // invariant: a run is claimed exactly when `claim_declared_runs` claims it on that normal form.
 // invariant: a claimed run is a normalization inside a token and contributes no param, as a
 // composite rule's normalization does.
 // post: a token whose final normal form is exactly the wildcard is a param, its source token
 // pushed, so a template token that is exactly the wildcard is a param and every param is one.
-[[nodiscard]] StatelessTemplate stateless_template(std::string_view content,
-                                                   ArenaAllocator& out_arena,
-                                                   std::span<const DeclaredRun> declared_runs);
+// post: the instance values apply after every other rule: a line row's quoted value reads one
+// quoted wildcard and pushes no param; a shape row masks its hole in a normal form.
+// post: an argument row masks the token after a flag whole, and a key's value inside a token no
+// rule masked whole.
+// refs: DN-163.D1, DN-163.D7
+[[nodiscard]] StatelessTemplate
+stateless_template(std::string_view content, ArenaAllocator& out_arena,
+                   std::span<const DeclaredRun> declared_runs,
+                   std::span<const InstanceValue> instance_values = {});
 
 // invariant: every accessor returns a view DERIVED from the table the masker itself reads, never a
 // list restated beside it.

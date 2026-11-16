@@ -626,6 +626,39 @@ namespace
                                    { return equals_ascii_lower(tok, keyword); });
     }
 
+    // post: `tok` less at most kMaxShellTrailBytes trailing `,;:.` bytes, never below one byte.
+    [[nodiscard]] constexpr std::string_view without_trailing_punct(std::string_view tok) noexcept
+    {
+        for (std::size_t taken{0};
+             taken < kMaxShellTrailBytes && tok.size() > 1 && is_shell_trailing_punct(tok.back());
+             ++taken)
+            tok.remove_suffix(1);
+        return tok;
+    }
+
+    // post: true for a short status value behind a status keyword, which rule 1 keeps.
+    [[nodiscard]] inline bool is_kept_status(std::string_view value, std::string_view prev) noexcept
+    {
+        return is_status_keyword(prev) && is_all_digits(value) && value.size() <= kMaxStatusDigits;
+    }
+
+    // refs: DN-163.D3, DN-134.D1
+    // post: true for an OPEN shell around a value: a catalog opener at byte 0, a digit after it,
+    // and the opener's closer nowhere in the token.
+    // post: false for a short status value behind a status keyword, its trailing `,;:.` aside, as
+    // rule 1 keeps the bare form.
+    // invariant: the closer sits in a later token, so the opener is punctuation and never part of
+    // the value; the token masks WHOLE, as a complete shell does under rule 5.
+    // pre: reached only for a token no address, composite, hash or digit-leading rule claimed.
+    [[nodiscard]] inline bool is_opener_shelled_numeric(std::string_view tok,
+                                                        std::string_view prev) noexcept
+    {
+        if (tok.size() < 2 || !is_wrapper_open(tok[0]) || !is_digit(tok[1]) ||
+            tok.substr(1).contains(wrapper_closer_of(tok[0])))
+            return false;
+        return !is_kept_status(without_trailing_punct(tok.substr(1)), prev);
+    }
+
     // refs: DN-134.D1, ADR-16.D5, F-SRC-insight-canon:canon.api.cppm:complete_shell_core
     // post: true for a complete shell whose core is digit-led, false for a short status value
     // behind a status keyword, as rule 1 keeps the bare form.
@@ -638,7 +671,7 @@ namespace
         const std::optional<std::string_view> core{complete_shell_core(tok)};
         if (!core.has_value() || !is_digit(core->front()))
             return false;
-        return !is_status_keyword(prev) || !is_all_digits(*core) || core->size() > kMaxStatusDigits;
+        return !is_kept_status(*core, prev);
     }
 
     // invariant: the ROOT is the decidable thing - no length or alphabet rule separates an
@@ -692,10 +725,15 @@ namespace
     // refs: ADR-16.D2
     inline constexpr std::array<std::string_view, 3> kRootWindowsUserTemp{
         {std::string_view{"AppData"}, std::string_view{"Local"}, std::string_view{"Temp"}}};
+    // invariant: pnpm's isolated global directory: the one component under it is `<pid>-<hex
+    // instant>`, a per-run instance; another layout version is another entry, on measurement.
+    // refs: DN-163.D10
+    inline constexpr std::array<std::string_view, 2> kRootPnpmGlobal{
+        {std::string_view{"global"}, std::string_view{"v11"}}};
 
     // invariant: a root whose component is the build CONFIGURATION is deliberately absent - it is
     // stable per config, carries no hash, and masking it would destroy signal to fix nothing.
-    inline constexpr std::array<EphemeralRoot, 8> kEphemeralRoots{{
+    inline constexpr std::array<EphemeralRoot, 9> kEphemeralRoots{{
         {.segments = kRootTmp, .anchor = RootAnchor::TokenStart, .scope = RootScope::Subtree},
         {.segments = kRootVarTmp, .anchor = RootAnchor::TokenStart, .scope = RootScope::Subtree},
         {.segments = kRootVarFolders,
@@ -712,6 +750,7 @@ namespace
         {.segments = kRootWindowsUserTemp,
          .anchor = RootAnchor::Floating,
          .scope = RootScope::Subtree},
+        {.segments = kRootPnpmGlobal, .anchor = RootAnchor::Floating, .scope = RootScope::Instance},
     }};
 
     // invariant: the longest declared root, so this is the look-back window the matcher needs.
@@ -1100,38 +1139,37 @@ namespace
         return true;
     }
 
+    // post: the end of the numeric version after the token's last `/` when versioned-ref accepts
+    // the token - a digit after the slash, digits and dots, then no letter or digit - else nullopt.
+    [[nodiscard]] constexpr std::optional<std::size_t>
+    versioned_ref_version_end(std::string_view tok) noexcept
+    {
+        const std::size_t slash{tok.rfind('/')};
+        if (slash == std::string_view::npos || slash + 1 >= tok.size() || !is_digit(tok[slash + 1]))
+            return std::nullopt;
+        std::size_t cursor{slash + 1};
+        while (cursor < tok.size() && (is_digit(tok[cursor]) || tok[cursor] == '.'))
+            ++cursor;
+        for (std::size_t pos{cursor}; pos < tok.size(); ++pos)
+            if (is_digit(tok[pos]) || is_alpha(tok[pos]))
+                return std::nullopt;
+        return cursor;
+    }
+
     // post: keeps the name and masks the numeric version, so a version bump is not a new template.
     // pre: a separator whose suffix is a numeric version run, then punctuation only - an alphabetic
     // suffix is a path segment and is declined.
     // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
     [[nodiscard]] inline bool normalize_versioned_ref(std::string_view tok, std::string& out)
     {
+        const std::optional<std::size_t> cursor{versioned_ref_version_end(tok)};
+        if (!cursor.has_value())
+            return false;
         const std::size_t slash{tok.rfind('/')};
-        if (slash == std::string_view::npos || slash + 1 >= tok.size())
-            return false;
-        if (!is_digit(tok[slash + 1]))
-            return false;
-
-        std::size_t cursor{slash + 1};
-        bool saw_digit{false};
-        while (cursor < tok.size() && (is_digit(tok[cursor]) || tok[cursor] == '.'))
-        {
-            saw_digit = saw_digit || is_digit(tok[cursor]);
-            ++cursor;
-        }
-        if (!saw_digit)
-            return false;
-        for (std::size_t pos{cursor}; pos < tok.size(); ++pos)
-        {
-            const char chr{tok[pos]};
-            if (is_digit(chr) || is_alpha(chr))
-                return false;
-        }
-
         out.clear();
         out.append(tok.substr(0, slash + 1));
-        out.append("<*>");
-        out.append(tok.substr(cursor));
+        out.append(kWildcard);
+        out.append(tok.substr(*cursor));
         return true;
     }
 
@@ -1193,10 +1231,12 @@ namespace
     // refs: ADR-16.D5, F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
     // refs: F-SRC-insight-canon:mask.cpp:normalize_hash_counter
     // refs: ADR-16.D5
+    // invariant: a tilde is an approximation mark, read as a sign is.
+    // refs: DN-163.D3
     [[nodiscard]] inline bool is_digit_leading(std::string_view tok) noexcept
     {
         std::size_t pos{0};
-        if (pos < tok.size() && (tok[pos] == '+' || tok[pos] == '-'))
+        if (pos < tok.size() && (tok[pos] == '+' || tok[pos] == '-' || tok[pos] == '~'))
             ++pos;
         return pos < tok.size() && is_digit(tok[pos]);
     }
@@ -1377,14 +1417,16 @@ namespace
     // pre: read by the dispatcher on a token no status KEEP, address or composite rule claimed, and
     // by the address arm, on a token holding a run, where the status carve-out cannot fire.
     // invariant: rules 4 and 5 are one decision: both MASK, and neither outranks the other.
-    // refs: ADR-16.D5, DN-134.D1, ADR-16.D17
+    // invariant: a value behind an opener whose closer sits in a later token reads as one behind a
+    // complete shell.
+    // refs: ADR-16.D5, DN-134.D1, ADR-16.D17, DN-163.D3
     [[nodiscard]] inline bool is_masked_value(std::string_view tok, const TokenShape& shape,
                                               std::string_view prev) noexcept
     {
         // assert: a hexadecimal-prefixed token needs no arm: it starts with a digit, so the
         // digit-leading test carries it.
         return shape.empty || is_uuid_or_long_hash(tok) || shape.digit_leading ||
-               is_shelled_numeric(tok, prev);
+               is_shelled_numeric(tok, prev) || is_opener_shelled_numeric(tok, prev);
     }
 
     // invariant: what one pass of the instance arms over a token masked: `masked` by the UUID,
@@ -1472,6 +1514,31 @@ namespace
                (scan.masked_run && !is_masked_value(tok, TokenShape{tok}, std::string_view{}));
     }
 
+    // refs: DN-163.D9
+    // post: true when versioned-ref would claim `tok` but its NAME is a number and rules 4 and 5
+    // mask the token whole.
+    // invariant: the name is the bytes after the wrapper openers up to the last `/`, each span an
+    // instance arm masks read as the wildcard; it is a number when it is digit-led with no letter.
+    // invariant: a declined token reaches no later composite and is masked whole by rules 4 and
+    // 5, so the decline never leaves a byte literal that a claim would mask (ADR-16.D17).
+    // invariant: a UUID, hex run or address leading the name is an instance, not a number, so the
+    // outcome is independent of its first byte and the claim keeps it for the normal-form arms.
+    // note: a token holding `/` is never all digits, so the status KEEP is not read here.
+    [[nodiscard]] inline bool versioned_ref_declines(std::string_view tok)
+    {
+        std::size_t lead{0};
+        while (lead < tok.size() && is_wrapper_open(tok[lead]))
+            ++lead;
+        const std::size_t slash{tok.rfind('/')};
+        if (slash == std::string_view::npos || slash <= lead || !is_hex_char(tok[lead]) ||
+            !versioned_ref_version_end(tok).has_value())
+            return false;
+        std::string name;
+        (void)scan_instance_spans(tok.substr(lead, slash - lead), name);
+        return is_digit(name.front()) && std::ranges::none_of(name, is_alpha) &&
+               is_masked_value(tok, TokenShape{tok}, std::string_view{});
+    }
+
     // invariant: the sanitizer-family process tag - AddressSanitizer, libFuzzer and valgrind open a
     // line with `==<pid>==`, and the pid is a per-process instance by the convention itself.
     constexpr std::string_view kPidTagFence{"=="};
@@ -1517,12 +1584,12 @@ namespace
     }
 
     // post: true for a byte a number's extent runs over: an ASCII letter or digit, `.`, `_`, `+`,
-    // `%` or `-`.
-    // refs: ADR-16.D15
+    // `%`, `-` or `~`.
+    // refs: ADR-16.D15, DN-163.D3
     [[nodiscard]] constexpr bool is_extent_byte(char chr) noexcept
     {
         return is_alpha(chr) || is_digit(chr) || chr == '.' || chr == '_' || chr == '+' ||
-               chr == '%' || chr == '-';
+               chr == '%' || chr == '-' || chr == '~';
     }
 
     // post: true for a byte the extent crosses only when a digit or a wildcard directly follows it,
@@ -1673,10 +1740,14 @@ namespace
     // existing rule in place leaves this array byte-identical and owes the same bump.
     // refs: F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
     // refs: F-SRC-insight-canon:canon.api.cppm:kCanonicalizationVersion
+    // invariant: a rule's `declines`, when set, is read before its `normalize`: a token it
+    // declines reaches no rule after it, and the dispatcher's rules 4 and 5 read it.
+    // refs: DN-163.D9
     struct CompositeRule
     {
         std::string_view name;
         bool (*normalize)(std::string_view tok, std::string& out);
+        bool (*declines)(std::string_view tok){nullptr};
     };
     // invariant: the two bracket rules are ADJACENT, most specific first, and non-overlapping
     // today, so future drift between them has a rule to violate loudly.
@@ -1687,7 +1758,9 @@ namespace
     constexpr std::array<CompositeRule, 10U> kCompositeRules{{
         {.name = "diagnostic_composite", .normalize = normalize_diagnostic_composite},
         {.name = "ephemeral_root", .normalize = normalize_ephemeral_root},
-        {.name = "versioned_ref", .normalize = normalize_versioned_ref},
+        {.name = "versioned_ref",
+         .normalize = normalize_versioned_ref,
+         .declines = versioned_ref_declines},
         {.name = "bracket_timestamp", .normalize = normalize_bracket_timestamp},
         {.name = "bracket_index", .normalize = normalize_bracket_index},
         {.name = "hash_counter", .normalize = normalize_hash_counter},
@@ -1708,12 +1781,16 @@ namespace
         if (marker_prefix_len(tok) == 0 && !shape.has_separator)
             return false;
         for (const CompositeRule& rule : kCompositeRules)
+        {
+            if (rule.declines != nullptr && rule.declines(tok))
+                return false;
             if (rule.normalize(tok, out))
             {
                 if (claimed_by != nullptr)
                     *claimed_by = rule.name;
                 return true;
             }
+        }
         return false;
     }
 
@@ -2126,6 +2203,270 @@ namespace
         return out != content;
     }
 
+    // refs: DN-163.D7
+    // post: true with `out` holding `form` whose every match of a shape row - its literal bytes
+    // around one maximal digit run in the hole - has the run replaced by the wildcard.
+    // post: false when no shape matches, `out` then unspecified.
+    // invariant: a hole never borders a digit (instance_value_row_well_formed), so the run a match
+    // reads is maximal by the shape's own bytes.
+    [[nodiscard]] bool mask_instance_shapes(std::string_view form,
+                                            std::span<const InstanceValue> instance_values,
+                                            std::string& out)
+    {
+        constexpr std::string_view kHole{"{n}"};
+        bool moved{false};
+        std::string current{form};
+        for (const InstanceValue& row : instance_values)
+        {
+            if (row.form != InstanceValueForm::Shape)
+                continue;
+            const std::size_t hole{row.bytes.find(kHole)};
+            const std::string_view before{row.bytes.substr(0, hole)};
+            const std::string_view after{row.bytes.substr(hole + kHole.size())};
+            std::string next;
+            std::size_t copied{0};
+            for (std::size_t found{current.find(before)}; found != std::string::npos;
+                 found = current.find(before, found + 1))
+            {
+                const std::size_t digits{found + before.size()};
+                std::size_t end{digits};
+                while (end < current.size() && is_digit(current[end]))
+                    ++end;
+                if (end == digits || found < copied ||
+                    !std::string_view{current}.substr(end).starts_with(after))
+                    continue;
+                next.append(current, copied, digits - copied);
+                next.append(kWildcard);
+                copied = end;
+                moved = true;
+            }
+            if (copied != 0)
+            {
+                next.append(current, copied);
+                current = std::move(next);
+            }
+        }
+        if (moved)
+            out = std::move(current);
+        return moved;
+    }
+
+    // refs: DN-163.D1
+    // post: the first `Line` row whose prefix opens `line` and is followed by one quoted value that
+    // ends the line, `'` or `"` around a non-empty value without that quote, and the quote byte.
+    // post: nullptr when no row matches.
+    [[nodiscard]] std::pair<const InstanceValue*, char>
+    instance_line_row(std::string_view line,
+                      std::span<const InstanceValue> instance_values) noexcept
+    {
+        for (const InstanceValue& row : instance_values)
+        {
+            if (row.form != InstanceValueForm::Line || !line.starts_with(row.bytes))
+                continue;
+            const std::string_view quoted{slice(line, row.bytes.size())};
+            constexpr std::size_t kMinQuoted{3};
+            if (quoted.size() < kMinQuoted || (quoted.front() != '\'' && quoted.front() != '"') ||
+                quoted.back() != quoted.front() ||
+                slice(quoted, 1, quoted.size() - 2).contains(quoted.front()))
+                continue;
+            return {&row, quoted.front()};
+        }
+        return {nullptr, '\0'};
+    }
+
+    // refs: DN-163.D7
+    // post: the first `Argument` row whose prefix opens `line`, else nullptr.
+    [[nodiscard]] const InstanceValue*
+    instance_argument_row(std::string_view line,
+                          std::span<const InstanceValue> instance_values) noexcept
+    {
+        const auto row{std::ranges::find_if(instance_values,
+                                            [line](const InstanceValue& candidate) noexcept
+                                            {
+                                                return candidate.form ==
+                                                           InstanceValueForm::Argument &&
+                                                       line.starts_with(candidate.bytes);
+                                            })};
+        return row == instance_values.end() ? nullptr : &*row;
+    }
+
+    // refs: DN-163.D7
+    // post: true with `out` holding `tok` with one of `row`'s keys' values masked: the key after
+    // the token's wrapper openers, then a non-empty value up to its trailing closers and `,;:.`.
+    // post: false when no key opens the token.
+    [[nodiscard]] bool mask_argument_key(std::string_view tok, const InstanceValue& row,
+                                         std::string& out)
+    {
+        std::size_t lead{0};
+        while (lead < tok.size() && is_wrapper_open(tok[lead]))
+            ++lead;
+        std::size_t tail{tok.size()};
+        while (tail > lead &&
+               (is_wrapper_close(tok[tail - 1]) || is_shell_trailing_punct(tok[tail - 1])))
+            --tail;
+        for (const std::string_view key : row.keys)
+        {
+            if (!tok.substr(lead).starts_with(key) || lead + key.size() >= tail)
+                continue;
+            out.assign(tok.substr(0, lead + key.size()));
+            out.append(kWildcard);
+            out.append(tok.substr(tail));
+            return true;
+        }
+        return false;
+    }
+
+    // invariant: one line's masking state: the template and params being built, the scratch
+    // buffers every token reuses, and the instance rows the line matched.
+    // invariant: each member function is one step of stateless_template's precedence, so the
+    // dispatch reads in rule order and no step holds another's state.
+    // refs: ADR-16.D5, DN-163.D1, DN-163.D7
+    class TemplateBuilder
+    {
+      public:
+        TemplateBuilder(std::string_view line, std::span<const DeclaredRun> declared_runs,
+                        std::span<const InstanceValue> instance_values)
+            : line_{line}, declared_runs_{declared_runs}, instance_values_{instance_values},
+              argument_row_{instance_argument_row(line, instance_values)}
+        {
+            const auto [row, quote]{instance_line_row(line, instance_values)};
+            line_row_ = row;
+            line_quote_ = quote;
+            tmpl_.reserve(line.size() + kWildcard.size());
+        }
+
+        // post: the bytes the tokens are read from: the line, or a line row's prefix alone.
+        [[nodiscard]] std::string_view tokenized() const noexcept
+        {
+            return line_row_ != nullptr ? slice(line_, 0, line_row_->bytes.size()) : line_;
+        }
+
+        // post: `tok`'s canonical form appended, its source token a param when it masks whole.
+        // assert: an argument row's flag masks the token after it whole, after every other rule.
+        // assert: its key masks a value only inside a token no rule masked whole, so it never
+        // leaves a masked byte literal.
+        // refs: DN-163.D7, ADR-16.D17
+        void token(std::string_view tok)
+        {
+            if (!first_)
+                tmpl_.push_back(' ');
+            first_ = false;
+            if (argument_row_ != nullptr && std::ranges::contains(argument_row_->flags, prev_))
+                mask(tok);
+            else if (const std::string_view form{disposition(tok)};
+                     form != kWildcard && argument_row_ != nullptr &&
+                     mask_argument_key(tok, *argument_row_, argument_form_))
+                tmpl_.append(argument_form_);
+            else
+                append_normal_form(tok, form);
+            prev_ = tok;
+        }
+
+        // assert: a line row's quoted value masks whole, after every other rule, and contributes
+        // no param: the value is the runner instance, and it never leaves its line.
+        // refs: DN-163.D1
+        void close_line_row()
+        {
+            if (line_row_ == nullptr)
+                return;
+            if (!first_)
+                tmpl_.push_back(' ');
+            tmpl_.push_back(line_quote_);
+            tmpl_.append(kWildcard);
+            tmpl_.push_back(line_quote_);
+        }
+
+        [[nodiscard]] const std::string& template_text() const noexcept
+        {
+            return tmpl_;
+        }
+
+        [[nodiscard]] const std::vector<std::string_view>& params() const noexcept
+        {
+            return params_;
+        }
+
+      private:
+        void mask(std::string_view tok)
+        {
+            tmpl_.append(kWildcard);
+            params_.push_back(tok);
+        }
+
+        // post: a normal form that is exactly the wildcard takes the mask path, so its SOURCE
+        // token is the param; any other normal form is appended as is.
+        // refs: DN-128.D6
+        void append_normal_form(std::string_view tok, std::string_view form)
+        {
+            if (form == kWildcard)
+                mask(tok);
+            else
+                tmpl_.append(form);
+        }
+
+        // post: the token's form by every rule but the instance values: the wildcard when a rule
+        // masks it whole.
+        // assert: the declared per-token classification in TOTAL precedence - the KEEP
+        // carve-outs win first, then the masks.
+        // refs: ADR-16.D5, ADR-16.D17, DN-133.D1, DN-134.D2
+        [[nodiscard]] std::string_view disposition(std::string_view tok)
+        {
+            // note: one byte pass yields the shape facts, replacing three scans.
+            const TokenShape shape{tok};
+            if (shape.all_digits && tok.size() <= kMaxStatusDigits && is_status_keyword(prev_))
+                return tok;
+            if (is_address_token(tok, shape.has_separator))
+                return kWildcard;
+            if (try_composite(tok, shape, composite_, nullptr))
+                return normal_form_steps(composite_);
+            if (is_masked_value(tok, shape, prev_))
+                return kWildcard;
+            return normal_form_steps(tok);
+        }
+
+        // post: `form` after the non-claiming steps on a normal form, in order: the instance
+        // arms, the `;`-segment key-value step, the declared runs, then the instance shapes.
+        // invariant: the instance arms read every token's normal form after rules 3 and 6, so a
+        // composite's claim, or no claim, never leaves an instance literal; they only add masks.
+        // refs: DN-134.D2, DN-133.D1, DN-163.D8, DN-163.D7
+        [[nodiscard]] std::string_view normal_form_steps(std::string_view form)
+        {
+            const InstanceScan scan{scan_instance_spans(form, instanced_)};
+            const std::string_view after_instances{
+                scan.masked || scan.masked_run ? std::string_view{instanced_} : form};
+            const std::string_view after_segments{mask_segment_values(after_instances, segmented_)
+                                                      ? std::string_view{segmented_}
+                                                      : after_instances};
+            const std::string_view after_declared{
+                !declared_runs_.empty() && replace_declared_runs(after_segments, declared_runs_,
+                                                                 declared_, declared_claims_)
+                    ? std::string_view{declared_}
+                    : after_segments};
+            return !instance_values_.empty() &&
+                           mask_instance_shapes(after_declared, instance_values_, shaped_)
+                       ? std::string_view{shaped_}
+                       : after_declared;
+        }
+
+        std::string_view line_;
+        std::span<const DeclaredRun> declared_runs_;
+        std::span<const InstanceValue> instance_values_;
+        const InstanceValue* argument_row_;
+        const InstanceValue* line_row_{nullptr};
+        char line_quote_{'\0'};
+        std::string tmpl_;
+        std::vector<std::string_view> params_;
+        std::string composite_;
+        std::string instanced_;
+        std::string segmented_;
+        std::string declared_;
+        std::string shaped_;
+        std::string argument_form_;
+        std::vector<ClaimedRun> declared_claims_;
+        std::string_view prev_;
+        bool first_{true};
+    };
+
 } // namespace
 
 // post: the joined per-token canonical forms; a masked position contributes a param, a kept or
@@ -2136,8 +2477,14 @@ namespace
 // bit-identical across standard libraries and independent of order and stream.
 // refs: ADR-16.D5, DN-128.D6, F-SRC-insight-canon:canon.detail.mask.cppm:StatelessTemplate
 // refs: F-SRC-insight-canon:canon.api.cppm:TemplateId
+// invariant: an instance value is applied after every other rule: a line row replaces its
+// quoted value whole, a shape row masks its hole in a token's final form.
+// invariant: an argument row masks the token after a flag whole, and a key's value inside a token
+// no rule masked whole.
+// refs: DN-163.D1, DN-163.D7
 StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& out_arena,
-                                     std::span<const DeclaredRun> declared_runs)
+                                     std::span<const DeclaredRun> declared_runs,
+                                     std::span<const InstanceValue> instance_values)
 {
     // assert: the JSON member-order normal form runs before tokenization; a rewritten line is
     // stored in the arena, so every param views bytes that live as long as the template.
@@ -2145,93 +2492,14 @@ StatelessTemplate stateless_template(std::string_view content, ArenaAllocator& o
     std::string reordered;
     const std::string_view line{
         json_member_order(content, reordered) ? out_arena.store_string(reordered) : content};
-    std::string tmpl;
-    tmpl.reserve(line.size() + kWildcard.size());
-    std::vector<std::string_view> params;
-    std::string composite;
-    std::string segmented;
-    std::string declared;
-    std::vector<ClaimedRun> declared_claims;
-    // post: `form` after the two non-claiming steps on a normal form, in order: the `;`-segment
-    // key-value step, then the declared runs.
-    // refs: DN-134.D2, DN-133.D1
-    const auto normal_form_steps{
-        [&](std::string_view form)
-        {
-            const std::string_view after_segments{
-                mask_segment_values(form, segmented) ? std::string_view{segmented} : form};
-            return !declared_runs.empty() && replace_declared_runs(after_segments, declared_runs,
-                                                                   declared, declared_claims)
-                       ? std::string_view{declared}
-                       : after_segments;
-        }};
-    std::string_view prev{};
-    bool first{true};
-
+    TemplateBuilder builder{line, declared_runs, instance_values};
     // assert: the declared per-token classification in TOTAL precedence - the KEEP carve-outs win
     // first, then the masks.
     // refs: ADR-16.D5
-    for_each_token(line,
-                   [&](std::string_view tok)
-                   {
-                       if (!first)
-                           tmpl.push_back(' ');
-                       first = false;
-                       // note: one byte pass yields the shape facts, replacing three scans.
-                       const TokenShape shape{tok};
-                       const auto mask{[&]
-                                       {
-                                           tmpl.append(kWildcard);
-                                           params.push_back(tok);
-                                       }};
-                       // post: a normal form that is exactly the wildcard takes the mask path, so
-                       // its SOURCE token is the param; any other normal form is appended as is.
-                       // refs: DN-128.D6
-                       const auto append_normal_form{[&](std::string_view form)
-                                                     {
-                                                         if (form == kWildcard)
-                                                             mask();
-                                                         else
-                                                             tmpl.append(form);
-                                                     }};
-
-                       // assert: the status-value KEEP, so an exit code stays distinct from its
-                       // neighbour.
-                       if (shape.all_digits && tok.size() <= kMaxStatusDigits &&
-                           is_status_keyword(prev))
-                       {
-                           tmpl.append(tok);
-                           prev = tok;
-                           return;
-                       }
-                       // assert: rule 2, the address rule, claims an address whole before any
-                       // composite reads it, so no normalizer shreds one along its own separators.
-                       // refs: ADR-16.D17
-                       if (is_address_token(tok, shape.has_separator))
-                       {
-                           mask();
-                           prev = tok;
-                           return;
-                       }
-                       // assert: the declared rule set AND its precedence are the catalog, tried in
-                       // array order with the first claim winning.
-                       if (try_composite(tok, shape, composite, nullptr))
-                       {
-                           // assert: the non-claiming steps read the composite's NORMAL FORM,
-                           // once, after every claiming rule.
-                           // refs: DN-133.D1, DN-134.D2
-                           append_normal_form(normal_form_steps(composite));
-                           prev = tok;
-                           return;
-                       }
-                       // assert: a token no rule claimed is its own normal form.
-                       // refs: DN-133.D1
-                       if (is_masked_value(tok, shape, prev))
-                           mask();
-                       else
-                           append_normal_form(normal_form_steps(tok));
-                       prev = tok;
-                   });
+    for_each_token(builder.tokenized(), [&builder](std::string_view tok) { builder.token(tok); });
+    builder.close_line_row();
+    const std::string& tmpl{builder.template_text()};
+    const std::vector<std::string_view>& params{builder.params()};
 
     const std::string_view tmpl_view{out_arena.store_string(tmpl)};
     std::span<const std::string_view> params_span{};

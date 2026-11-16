@@ -1208,15 +1208,50 @@ inline constexpr std::string_view kMaskWildcard{"<*>"};
 // shell call it, so the catalog is never copied outside canon.
 [[nodiscard]] std::optional<std::string_view> complete_shell_core(std::string_view token) noexcept;
 
-// refs: DN-133.D1, DN-162.D13
-// invariant: one declared value resolved against its row: the markers it is masked behind, or
-// none and its row's digit floor, and the value itself.
+// refs: DN-163.D6
+// invariant: how a declared value is found: as a digit run (behind markers, beside a floor), or as
+// a whole token of TEXT behind its declared prefixes.
+enum class DeclaredValueKind : std::uint8_t
+{
+    Digits = 0,
+    Text,
+};
+
+// refs: DN-133.D1, DN-162.D13, DN-163.D5, DN-163.D6
+// invariant: one declared value resolved against its key, with the value itself: for a digit key,
+// the markers it is masked behind and the floor at which it also masks with none.
+// invariant: for a text key, the prefixes the value may stand behind.
 // invariant: every view here outlives every call reading it.
 struct DeclaredRun
 {
     std::span<const std::string_view> markers;
     std::string_view value;
     std::uint32_t min_digits{0};
+    DeclaredValueKind kind{DeclaredValueKind::Digits};
+    std::span<const std::string_view> prefixes;
+};
+
+// refs: DN-163.D1, DN-163.D7
+// invariant: where a runner INSTANCE value stands, in one of three closed forms.
+enum class InstanceValueForm : std::uint8_t
+{
+    // note: a whole-line prefix, then one quoted value that ends the line.
+    Line = 0,
+    // note: literal bytes with one `{n}` hole, matched inside any token.
+    Shape,
+    // note: a line prefix; the token after a flag, and a key's value inside a token.
+    Argument,
+};
+
+// refs: DN-163.D1, DN-163.D7
+// invariant: one instance-value row resolved for a stream: the dialect gate already applied.
+// invariant: every view here outlives every call reading it.
+struct InstanceValue
+{
+    InstanceValueForm form{InstanceValueForm::Line};
+    std::string_view bytes;
+    std::span<const std::string_view> flags;
+    std::span<const std::string_view> keys;
 };
 
 // invariant: the byte range [first, last) of one digit run a declared run claims in a form.
@@ -1228,17 +1263,19 @@ struct ClaimedRun
     [[nodiscard]] bool operator==(const ClaimedRun&) const = default;
 };
 
-// refs: DN-133.D1, DN-133.D7, DN-162.D13
-// post: `claims` holds every digit run of `form` some declared run claims, ascending and disjoint.
-// invariant: a run with markers claims the maximal digit run behind one of them equal to its
-// value, the byte after it not a letter.
+// refs: DN-133.D1, DN-133.D7, DN-162.D13, DN-163.D5, DN-163.D6
+// post: `claims` holds every span of `form` some declared run claims, ascending and disjoint, two
+// claims that overlap or touch read as one.
+// invariant: a digit run with markers claims the maximal digit run behind one of them equal to
+// its value, the byte after it not a letter, at any length.
 // invariant: such a marker opens the form or follows a byte that is neither a letter nor a digit.
-// invariant: a run with no marker claims every maximal digit run equal to its value, a digit on
-// neither side, and only when its value is at least its floor long.
+// invariant: a digit run with a floor claims every maximal digit run equal to its value, a digit
+// on neither side, and only when its value is at least its floor long, markers or none.
+// invariant: a text run claims its value when the form, read inside a complete wrapper shell or
+// bare, then after at most one of its prefixes, is exactly the value; the shell and prefix stay.
+// invariant: a text value of letters only claims nothing, since a word coincides with words.
 // invariant: THE declared-run predicate — the masker's normal-form pass and an intent's instance
 // key both call it, so no second marker list and no copy of the rule exists anywhere.
-// invariant: a marker ends in a non-digit, so a claimed run's start is fixed by its marker and two
-// declared runs claiming one run claim the same bytes; each run is reported once.
 void claim_declared_runs(std::string_view form, std::span<const DeclaredRun> runs,
                          std::vector<ClaimedRun>& claims);
 

@@ -470,9 +470,12 @@ namespace detail
 
     // pre: cold path - reached only once contains_failure_cue has returned false.
     // post: true iff the head carries a failure word in count register - a summary, not a per-item
-    // verdict.
+    // verdict - whose count is not exactly `0`.
     // invariant: the caller demotes such a line to Warn; it is never suppressed.
-    // refs: ADR-20.D5
+    // invariant: a zero count summarizes no failure, so its word asserts nothing and the line
+    // goes on to the remaining stages as if the word were absent.
+    // invariant: the count register stays a ceiling, and a zero-count line sits under it.
+    // refs: ADR-20.D5, DN-163.D11
     // note: for_each_token's substr is the only throw path and its bound is checked.
     // NOLINTNEXTLINE(bugprone-exception-escape)
     [[nodiscard]] bool contains_failure_summary_cue(std::string_view text,
@@ -492,7 +495,8 @@ namespace detail
                                       for (const FailureWord& entry : kFailureLexicon)
                                           if (iequals(token, entry.word))
                                           {
-                                              summary = is_count_preceded(prev, prev_prev);
+                                              summary =
+                                                  is_count_preceded(prev, prev_prev) && prev != "0";
                                               break;
                                           }
                                   prev_prev = prev;

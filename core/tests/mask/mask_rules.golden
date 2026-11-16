@@ -13,7 +13,7 @@
 # `rule_id` is the rule the row exists to witness, and it is CHECKED, not merely declared:
 # `test_mask_rule_golden.cpp` routes each composite subject back through the same catalog the
 # dispatcher runs and reds if a different rule claims it. The population's coverage of the declared
-# rule set (the 10 composite rules, the 8 ephemeral roots, the 6 wrapper pairs, the 4 status
+# rule set (the 10 composite rules, the 9 ephemeral roots, the 7 wrapper pairs, the 4 status
 # keywords, the currency markers) is likewise read from those catalogs, so a rule or entry added
 # with no witness reds by NAME.
 #
@@ -34,6 +34,8 @@ status_keep | 2 | worker returned exit 2 | worker returned exit 2
 # DN-134.D1: the KEEP reads through a complete shell, exactly as the bare form.
 status_keep | (1) | process exited with exit code (1) | process exited with exit code (1)
 status_keep | (200), | request finished status (200), retrying | request finished status (200), retrying
+# DN-163.D3: and through an opener whose closer sits in a later token.
+status_keep | (1 | process exited with exit code (1 retry left) | process exited with exit code (1 retry left)
 
 # ── rule 2 — the address rule (ADR-16.D17): IPv4, IPv6 and colon-joined hardware addresses, claimed whole
 # before any composite reads the token, so no normalizer shreds an address along its own separators.
@@ -47,6 +49,7 @@ address | {10.0.0.1} | client {10.0.0.1} connected | client <*> connected
 address | <10.0.0.1> | client <10.0.0.1> connected | client <*> connected
 address | "10.0.0.1" | client "10.0.0.1" connected | client <*> connected
 address | '10.0.0.1' | client '10.0.0.1' connected | client <*> connected
+address | `10.0.0.1` | client `10.0.0.1` connected | client <*> connected
 # IPv6 (ADR-16.D17, documentation addresses, RFC 3849): the `::` form with two or more explicit
 # hextets, the fully expanded form padded and in a shell, a zone, a dotted IPv4 tail whose trailing
 # `:` is shell punctuation, and the bracketed form with its port, `::1` included there.
@@ -99,6 +102,18 @@ digit_leading | (1.7s) | step finished in (1.7s) | step finished in <*>
 digit_leading | (96.4%), | coverage (96.4%), above floor | coverage <*> above floor
 digit_leading | [02:16:00] | [02:16:00] Starting deploy | <*> Starting deploy
 digit_leading | "2220" | orphan pid "2220" killed | orphan pid <*> killed
+# DN-163.D2: the backtick is the seventh pair, paired with itself as the two quotes are.
+digit_leading | `42` | counted `42` files | counted <*> files
+# DN-163.D3: a tilde before a digit is an approximation mark, read as a sign; an opener followed by a digit
+# whose closer sits in a later token is a shell around a value. Both mask the token whole, as rules 4 and 5
+# do, and a count in canon's model is a param, never template content, so `(25 warnings)` and `(5 warnings)`
+# read as one template, as `25 warnings` printed bare does.
+digit_leading | ~775 | size ~775 now | size <*> now
+digit_leading | (812406136 | cache (812406136 B) | cache <*> B)
+digit_leading | (25 | build finished (25 warnings) | build finished <*> warnings)
+# DN-163.D9: versioned-ref declines a name that is a number where rules 4 and 5 mask the token whole, so a
+# position counter reads as the number it is.
+digit_leading | [9/69] | [9/69] Loaded pack | <*> Loaded pack
 
 # ── rule 6 — literal KEEP. The OVER-MASKING boundary: a rule that widened too far shows up here
 # and nowhere else, and over-masking destroys signal irrecoverably.
@@ -109,10 +124,11 @@ literal_keep | deadbeef | marker deadbeef seen | marker deadbeef seen
 literal_keep | bazel-out/k8-fastbuild/bin/app | built bazel-out/k8-fastbuild/bin/app ok | built bazel-out/k8-fastbuild/bin/app ok
 literal_keep | user=alice | login user=alice ok | login user=alice ok
 literal_keep | utf8 | decode utf8 stream | decode utf8 stream
-# DN-134.D1's boundary: an INCOMPLETE shell is no shell, so the count of `(25 warnings)` stays
-# literal, and a letter-led core is a word.
-literal_keep | (25 | build finished (25 warnings) | build finished (25 warnings)
+# DN-134.D1's and DN-163.D3's boundary: a letter-led core is a word, in a complete shell or behind an
+# opener, and a tilde before a path is no approximation mark.
 literal_keep | (v1.2.3) | toolchain (v1.2.3) found | toolchain (v1.2.3) found
+literal_keep | (foo | word (foo bar) | word (foo bar)
+literal_keep | ~/path | open ~/path now | open ~/path now
 # The shape axis is closed for the opaque-identity class (ADR-16.D6): a word followed by a digit run
 # is a stable name as often as an instance, so these stay verbatim and stay DISTINCT from each other.
 # Each is a name the reverted opaque-identity rule collapsed; a shape rule re-entering reds here.
@@ -158,6 +174,8 @@ ephemeral_root | /nix/store/abc123def456-glibc/lib/libc.so | mapping /nix/store/
 ephemeral_root | /private/var/folders/8j/a1/T/x | dir /private/var/folders/8j/a1/T/x ready | dir /private/var/folders/<*> ready
 ephemeral_root | /private/tmp/run-a1/x | dir /private/tmp/run-a1/x ready | dir /private/tmp/<*> ready
 ephemeral_root | C:\Users\u\AppData\Local\Temp\run-a1\x.ts | open C:\Users\u\AppData\Local\Temp\run-a1\x.ts ok | open C:\Users\u\AppData\Local\Temp\<*> ok
+# DN-163.D10: pnpm's isolated global directory, floating, its one component an instance.
+ephemeral_root | /a/.bin/global/v11/951-19fcbc3a236 | linking /a/.bin/global/v11/951-19fcbc3a236 done | linking /a/.bin/global/v11/<*> done
 # ADR-16.D2: a path starts at byte 0 or right after a declared LEAD — a run of wrapper openers, an optional
 # `<key>=`, an optional `file://` — so a TokenStart root is the path's first component behind it, and `\`
 # separates components for the root predicate. A lead moves WHERE a root may sit, never what it matches.
@@ -178,6 +196,8 @@ literal_keep | C:\Users\u\AppData\Local\Templates\x | copied C:\Users\u\AppData\
 
 # versioned_ref — keep the name, mask the version.
 versioned_ref | zlib/1.3 | building zlib/1.3 from source | building zlib/<*> from source
+# DN-163.D9's boundary: a doubled shell is one rule 5 declines, so the claim is kept.
+versioned_ref | ((9/69)) | twice ((9/69)) now | twice ((9/<*>)) now
 
 # bracket_timestamp — the whole-token bracketed datetime; the bracket is the entire difference.
 bracket_timestamp | [2026-06-23T15:11:09.020Z] | [2026-06-23T15:11:09.020Z] + git fetch | [<*>] + git fetch
@@ -220,6 +240,10 @@ literal_keep | pkg@1.2.3 | installing pkg@1.2.3 now | installing pkg@1.2.3 now
 literal_keep | node@20 | using node@20 here | using node@20 here
 literal_keep | user@example.com | mailing user@example.com today | mailing user@example.com today
 embedded_identity | owner/action@0123456789abcdef0123456789abcdef01234567 | uses owner/action@0123456789abcdef0123456789abcdef01234567 | uses owner/action@<*>
+
+# instance_arms — DN-163.D8: the instance arms read every token's normal form after rules 3 and 6, so a token
+# holding no pre-gate byte masks its hex run as one joined by `-` does.
+instance_arms | net_0123456789abcdef0123456789abcdef | net net_0123456789abcdef0123456789abcdef up | net net_<*> up
 
 # sanitizer_pid — the sanitizer-family process tag: keep both fences, mask the pid. A
 # letter-leading tail glued to the closing fence is kept verbatim; a digit after it, or any byte

@@ -303,8 +303,8 @@ namespace
 
     // post: `claims` gains every maximal digit run of `form` equal to `run`'s value, a digit on
     // neither side, when the value is at least `run`'s floor long.
-    // pre: `run` declares no marker.
-    // refs: DN-162.D13
+    // pre: `run` declares a floor, beside markers or with none.
+    // refs: DN-162.D13, DN-163.D5
     void claim_whole_runs(std::string_view form, const DeclaredRun& run,
                           std::vector<ClaimedRun>& claims)
     {
@@ -319,6 +319,29 @@ namespace
                 claims.push_back({.first = first, .last = last});
         }
     }
+    // post: `claims` gains the text value of `run` when `form`, read inside a complete wrapper
+    // shell or bare, then after at most one of `run`'s prefixes, is exactly the value.
+    // invariant: a value of letters only claims nothing: a word coincides with words.
+    // refs: DN-163.D6
+    void claim_text_value(std::string_view form, const DeclaredRun& run,
+                          std::vector<ClaimedRun>& claims)
+    {
+        if (std::ranges::all_of(run.value, is_alpha))
+            return;
+        const std::string_view region{complete_shell_core(form).value_or(form)};
+        const auto offset{static_cast<std::size_t>(region.data() - form.data())};
+        if (region == run.value)
+        {
+            claims.push_back({.first = offset, .last = offset + region.size()});
+            return;
+        }
+        for (const std::string_view prefix : run.prefixes)
+            if (region.starts_with(prefix) && region.substr(prefix.size()) == run.value)
+            {
+                claims.push_back({.first = offset + prefix.size(), .last = offset + region.size()});
+                return;
+            }
+    }
 } // namespace
 
 void claim_declared_runs(std::string_view form, std::span<const DeclaredRun> runs,
@@ -330,11 +353,15 @@ void claim_declared_runs(std::string_view form, std::span<const DeclaredRun> run
         // note: the whole cost of a form naming no declared value is this one search per run.
         if (form.find(run.value) == std::string_view::npos)
             continue;
-        if (run.markers.empty())
+        if (run.kind == DeclaredValueKind::Text)
         {
-            claim_whole_runs(form, run, claims);
+            claim_text_value(form, run, claims);
             continue;
         }
+        if (run.min_digits != 0)
+            claim_whole_runs(form, run, claims);
+        if (run.markers.empty())
+            continue;
         std::size_t pos{0};
         while (pos < form.size())
             pos = pos == 0 || (!is_alpha(form[pos - 1]) && !is_digit(form[pos - 1]))
@@ -342,8 +369,20 @@ void claim_declared_runs(std::string_view form, std::span<const DeclaredRun> run
                       : pos + 1;
     }
     std::ranges::sort(claims, {}, &ClaimedRun::first);
-    const auto [dup_first, dup_last]{std::ranges::unique(claims)};
-    claims.erase(dup_first, dup_last);
+    // assert: two claims that overlap or touch read as one, so a span masks once whatever the
+    // runs that claimed it, and the claims stay ascending and disjoint.
+    // refs: DN-163.D6
+    std::size_t kept{0};
+    for (const ClaimedRun& claim : claims)
+    {
+        if (kept != 0 && claim.first <= claims[kept - 1].last)
+        {
+            claims[kept - 1].last = std::max(claims[kept - 1].last, claim.last);
+            continue;
+        }
+        claims[kept++] = claim;
+    }
+    claims.resize(kept);
 }
 
 } // namespace insight::tokenization

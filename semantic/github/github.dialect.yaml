@@ -583,6 +583,9 @@ dialect:
       - "value is unchanged byte for byte. The rule and its refusals are DN-133.D1's."
       - "A run's own run id is the second such value (DN-162.D13): only the acquirer knows it, and"
       - "a stable digit-named path has its shape, so no per-line rule may mask it either."
+      - "The run's head branch is the third (DN-163.D6), a text value found as a whole token."
+      - "Every row this section gained at v2 is bookkeeping, never an observation (DN-163.D13): a"
+      - "declared value masks in the full and the common reading alike."
     rows:
       - key: pull_request
         since: v1
@@ -592,9 +595,10 @@ dialect:
           - "The six spellings measured on the CI-log views before the build, byte-exact, then"
           - "`PR#` and `pulls/` (DN-133.D7): GitHub's own vocabulary, each collapsing ranked rows"
           - "with 0 coincidences read. The set is closed, and it is extended only on measured"
-          - "evidence: a marker nobody measured is a coincidence nobody read. `pull/`, `issues/`"
-          - "and `prN` were measured and stay out. Tamys masks its job and step instance key behind"
-          - "these same markers."
+          - "evidence: a marker nobody measured is a coincidence nobody read. `issues/` and `prN`"
+          - "were measured and stay out; `pull/` met DN-133.D7's bar later and joins through the"
+          - "v2 extension below, so this row stays byte-equal to its v1 oracle. Tamys masks its job"
+          - "and step instance key behind these same markers."
       - key: run_id
         since: v2
         min_digits: 10
@@ -606,6 +610,33 @@ dialect:
           - "and the floor keeps a declared value off ordinary words; every run id the measured"
           - "bank holds has 11 digits (DN-162.D13). `since: v2` is bookkeeping: a declared"
           - "value is never an observation, so it applies in the full and common readings alike."
+      - extends: pull_request
+        since: v2
+        markers: ["pull/"]
+        min_digits: 5
+        why:
+          - "`pull/` is GitHub's own pull-request ref namespace (`refs/pull/<n>/merge`, the"
+          - "checkout's refspec, `GITHUB_REF`, a workflow ref, the request's `.diff` and `.patch`"
+          - "URLs): the run's own number stands behind it 10 324 times in at least 1 122 of the"
+          - "manifest's 1 738 logs, 193 distinct forms, every one the run's own request; another"
+          - "number stands there 692 times and stays literal under the key (DN-163.D4)."
+          - "With no marker, the number masks as a whole digit run from five digits up: 354"
+          - "occurrences in 122 logs, 23 of 25 forms the run's own request, 0 coincidences, and a"
+          - "random value met nothing at five digits (1 192 logs) or six (318) (DN-163.D5). A request"
+          - "numbered below 10 000 keeps its artifact names literal; its refs mask through `pull/`."
+          - "An extension, so the v1 base row stays byte-equal to its oracle (DN-163.D4)."
+      - key: head_ref
+        since: v2
+        value: Text
+        prefixes: ["refs/heads/", "refs/remotes/origin/", "origin/"]
+        dialect_gate: self
+        why:
+          - "The run's head branch says what its pull-request number says: which request this run"
+          - "is. It masks where it stands as a whole token, inside a complete wrapper shell or"
+          - "bare, behind at most one of these ref prefixes, which stay (DN-163.D6). Read on 472"
+          - "runs: 460 whole-token occurrences in 116 logs. A value of letters only (`master`,"
+          - "`dev`) masks nothing, since a word coincides with words; inside a larger token (a"
+          - "refspec glued with `*`, 165 occurrences) it stays literal, a declared limit."
 
   # ── the whole lines the runner writes into a step it STOPS ──
   stop_announcements:
@@ -645,3 +676,42 @@ dialect:
           - "depot's runner, which runs GitHub's jobs and writes its own line into the step GitHub"
           - "cancelled. Measured in gr-v3 (1 line, run 33441602938) and in the store (17 lines in"
           - "8 logs)."
+
+  # ── the INSTANCE values the runner prints, masked whole after every other rule ──
+  instance_values:
+    why:
+      - "Where GitHub's runner prints a value that IS its instance: the machine a job ran on, the"
+      - "results-storage shard an artifact is served from, a container's per-run name and label."
+      - "Each changes on every run and says nothing about what ran, and no per-line rule may guess"
+      - "an instance from its bytes (masking.md section 6), so the dialect declares where it"
+      - "stands (DN-163.D1, DN-163.D7). Every row is `since: v2` as bookkeeping (DN-163.D13): a"
+      - "masking row is never an observation, so it applies in the full and common reading alike."
+    rows:
+      - line: "Runner name: "
+        since: v2
+        dialect_gate: self
+        why:
+          - "The runner's own name: 637 lines over the manifest's 1 738 logs hold 596 distinct"
+          - "values, a provider's per-machine id glued into a word (DN-163.D1). A change of runner"
+          - "pool still reads through the job's other header lines."
+      - line: "Machine name: "
+        since: v2
+        dialect_gate: self
+        why:
+          - "The machine the runner reports beside its name, the same instance coordinate."
+      - shape: "productionresultssa{n}.blob.core.windows.net"
+        since: v2
+        dialect_gate: self
+        why:
+          - "The results-storage account an artifact is served from: 1 152 tokens in GitHub logs,"
+          - "428 of them in the artifact download's redirect line in 106 logs (DN-163.D7)."
+      - argument: "##[command]/usr/bin/docker "
+        flags: ["--name", "--label"]
+        keys: ["label="]
+        since: v2
+        dialect_gate: self
+        why:
+          - "The runner's own container commands: a container's name ends with a random suffix"
+          - "per run (110 lines in 66 logs, every value distinct), and its label is the runner's"
+          - "instance coordinate (DN-163.D7). The runner prints `##[command]` for its own commands"
+          - "only, so an action's exec and a script's own `docker run` stay literal."

@@ -932,6 +932,42 @@ run-outcome gate; the hub's published determinism golden is re-rendered at the c
   `owner/action@<*>` through its `/`. The markerless value is witnessed beside the GitHub package's declared
   pull-request arms, since only a composition holds a row.
 
+
+**Also in this window: a run's instance values canon left literal (`DN-163`).** `-20` is still open (no tag carries
+it), so this generation rides it (`ADR-2.D9`), for both classes at once; `kSemanticGrammarVersion` (`semantic-grammar-9`,
+open since `v1.10.12`'s `-8`) rides its open value the same way, and the GitHub package's `version:` rides its open
+value.
+
+* *What changed, the identity class.* The backtick joins the wrapper catalog, paired with itself (`DN-163.D2`). A
+  tilde before a digit reads as a sign, and an opener followed by a digit whose closer sits in a later token is a
+  shell around a value, the token masking whole, the status KEEP reading through it (`DN-163.D3`, lifting
+  `DN-134.D1`'s incomplete-shell boundary). The four instance arms run on every token's normal form after rules 3 and
+  6 (`DN-163.D8`). Versioned-ref declines a numeric name that rules 4 and 5 mask whole (`DN-163.D9`). `global/v11` joins
+  the ephemeral roots, floating, instance (`DN-163.D10`). A declared value may be extended by a later revision's row,
+  may declare a floor beside its markers (never below 5), and may be text found as a whole token behind declared
+  prefixes; a dialect may declare where its runner prints its instance values, as a line, a shape or an argument
+  (`DN-163.D1`, `DN-163.D4` to `DN-163.D7`, `DN-163.D13`). The GitHub package declares `pull/` and a floor of 5 for
+  `pull_request`, `head_ref`, the runner and machine name lines, the results-storage shard and its docker argument row.
+* *What changed, the classification class.* A failure word counted by exactly `0` asserts no failure (`DN-163.D11`):
+  `5 passed, 0 failed` reads `Unknown`, where it read `Warn`. The level belongs to the line; a template's level is its
+  `dominant_level`.
+* *Which serialized fields move.* `template_str` and `template_id` of every line holding one of those tokens, its
+  `params` where a token now masks whole (a whole-token wildcard is a param; the instance line row, the shapes, the
+  text value and a key's value inside a token push none); the event `level` of a zero-count summary line and with it a
+  template's `dominant_level`. On a composition holding the GitHub package, its composed identity moves (the
+  declared-value rows serialize their kind, prefixes and extension flag; the instance section is written).
+* *Registration, before the code.* coderoast-corpora `e570bbd`, its re-run under the 2026-11-16 rulings and the gate
+  (`44144a0`, `13c3ffa`, `sift_assessment/n462/rerun/`): on GitHub (1 738 logs), GitLab (627) and Jenkins (113), with
+  the four core rules on, templates 414 299 → 272 500, 1 407 924 → 1 263 632 and 116 235 → 92 387; 0 merges with a
+  non-value difference; 0 tokens unmasked; 2 417, 19 and 8 lines move level. The built masker's template equals the
+  port's on every aligned line (4 024 194, 5 956 516 and 633 087 lines), and two runs are sha256-equal.
+* *Witness inputs.* `core/tests/mask/mask_rules.golden`: the row `(25` moves from `literal_keep` (`build finished (25
+  warnings)`) to `digit_leading` (`build finished <*> warnings)`); new rows for the backtick pair, the ninth root, the
+  tilde, the opener, the KEEP through the opener, the decline, `((9/69))`'s kept claim and the normal-form arms
+  (`net_<32 hex>` gives `net_<*>`), and `literal_keep` rows `(foo` and `~/path`. The level half:
+  `core/tests/utils/test_zero_count_asserts_nothing.cpp`. The package rows are witnessed in the GitHub package's
+  instance-value and declared pull-ref tests, since only a composition holds a row. `core/tests/identity/projection.golden`
+  moves on one row, a test runner's `41/42 ... FAILED (2.31 sec)` line, whose counter and opened duration now mask.
 ---
 
 *See also: [masking.md](masking.md) (what the current generation's rules actually are) ·

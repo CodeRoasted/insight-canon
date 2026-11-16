@@ -899,19 +899,26 @@ struct ValueClassRow
     std::int64_t scale;
 };
 
-// refs: DN-162.D13
-// invariant: the lowest digit floor a markerless declared value may take: with no marker, a
-// shorter value would meet ordinary words.
-inline constexpr std::uint32_t kMinDeclaredValueFloor{10};
+// refs: DN-162.D13, DN-163.D5
+// invariant: the lowest digit floor a declared value's key may take: below it, a random value of
+// the key's length was measured meeting ordinary numbers in a word.
+inline constexpr std::uint32_t kMinDeclaredValueFloor{5};
 
-// refs: DN-133.D1, DN-133.D2, DN-162.D13
-// invariant: a VALUE a stream's acquirer may declare under `key`, and how core finds it: behind
-// one of `markers`, or, with no marker, as a whole digit run behind the floor `min_digits`.
+// refs: DN-163.D6
+using DeclaredValueKind = insight::tokenization::DeclaredValueKind;
+
+// refs: DN-133.D1, DN-133.D2, DN-162.D13, DN-163.D4, DN-163.D5, DN-163.D6
+// invariant: a VALUE a stream's acquirer may declare under `key`, and how core finds it: a digit
+// value behind one of `markers`, or as a whole digit run from the floor `min_digits`, or both.
+// invariant: a text value is found as a whole token behind at most one of `prefixes`.
 // invariant: the package declares the key and the match, never a value; core holds neither.
 // invariant: every marker is non-empty and ends in a byte that is not a digit, or the maximal
 // digit run after it would not be the run the marker introduces; composition refuses any other.
-// invariant: a row declares exactly one of markers and a floor, and a floor is at least
-// kMinDeclaredValueFloor; `min_digits` zero means the row declares none.
+// invariant: a digit row declares markers, a floor of at least kMinDeclaredValueFloor, or both;
+// `min_digits` zero means the row declares none. A text row declares neither, and its prefixes.
+// invariant: an EXTENSION row adds markers or a floor to the base row of its key that an earlier
+// revision declared, and never removes or rewrites one, so a retained oracle's base row stays.
+// invariant: the key composes as its base row plus its extensions.
 // invariant: dialect-gated like every recognition row, so a key applies only on a stream that
 // declares the owning dialect.
 struct DeclaredValueRow
@@ -919,24 +926,95 @@ struct DeclaredValueRow
     std::string_view key;
     std::span<const std::string_view> markers;
     std::uint32_t min_digits{0};
+    DeclaredValueKind value{DeclaredValueKind::Digits};
+    std::span<const std::string_view> prefixes;
+    std::string_view dialect_gate{kAnyDialect};
+    // refs: DN-163.D4
+    bool extends{false};
+    // refs: DN-162.D1
+    std::string_view revision_since;
+};
+
+// post: true when the row names a key and its match is well formed: a digit row's markers (none
+// empty nor ending in a digit) or floor (at least kMinDeclaredValueFloor), at least one of them.
+// post: a text row is well formed with non-empty prefixes and no marker, floor or extension.
+// refs: DN-133.D1, DN-162.D13, DN-163.D4, DN-163.D5, DN-163.D6
+[[nodiscard]] constexpr bool declared_value_row_well_formed(const DeclaredValueRow& row) noexcept
+{
+    if (row.key.empty())
+        return false;
+    if (row.value == DeclaredValueKind::Text)
+        return row.markers.empty() && row.min_digits == 0 && !row.extends &&
+               !row.prefixes.empty() &&
+               std::ranges::none_of(row.prefixes, [](std::string_view prefix) noexcept
+                                    { return prefix.empty(); });
+    if (!row.prefixes.empty() || (row.markers.empty() && row.min_digits == 0))
+        return false;
+    if (row.min_digits != 0 && row.min_digits < kMinDeclaredValueFloor)
+        return false;
+    return std::ranges::all_of(
+        row.markers, [](std::string_view marker) noexcept
+        { return !marker.empty() && (marker.back() < '0' || marker.back() > '9'); });
+}
+
+// refs: DN-163.D1, DN-163.D7
+using InstanceValueForm = insight::tokenization::InstanceValueForm;
+
+// refs: DN-163.D1, DN-163.D7, DN-163.D13
+// invariant: where the dialect's runner prints a value that IS its instance, in one of three forms.
+// invariant: a `Line` row's `bytes` is a whole-line prefix whose quoted value after it masks whole.
+// invariant: a `Shape` row's `bytes` are literal with one `{n}` hole, matched inside any token,
+// the hole masking.
+// invariant: an `Argument` row's `bytes` is a line prefix; the token after each of its `flags`
+// masks whole, and each of its `keys` (spelled with its `=`) masks its value inside a token.
+// invariant: canon applies it after every other rule, in the full and the common reading alike:
+// a masking row is never a recognition, so it never makes a side observe its revision.
+// invariant: gated to its own package, so its reach is that package's lines by construction.
+struct InstanceValueRow
+{
+    InstanceValueForm form{InstanceValueForm::Line};
+    std::string_view bytes;
+    std::span<const std::string_view> flags;
+    std::span<const std::string_view> keys;
     std::string_view dialect_gate{kAnyDialect};
     // refs: DN-162.D1
     std::string_view revision_since;
 };
 
-// post: true when the row names a key and declares exactly one match: non-empty markers, none
-// empty nor ending in a digit, or no marker and a floor of at least kMinDeclaredValueFloor.
-// refs: DN-133.D1, DN-162.D13
-[[nodiscard]] constexpr bool declared_value_row_well_formed(const DeclaredValueRow& row) noexcept
+// post: true when the row is well formed: a `Line` or `Argument` prefix that is non-empty, holds
+// no hole and ends in a space, and no other form than `Argument` carries flags or keys.
+// post: an `Argument` has at least one flag, every flag and key non-empty, every key ending `=`.
+// post: a `Shape` is literal bytes with exactly one `{n}` hole that borders no digit, no space.
+// refs: DN-163.D1, DN-163.D7
+[[nodiscard]] constexpr bool instance_value_row_well_formed(const InstanceValueRow& row) noexcept
 {
-    if (row.key.empty())
+    constexpr std::string_view kHole{"{n}"};
+    const auto non_empty{[](std::span<const std::string_view> words) noexcept
+                         {
+                             return std::ranges::none_of(words, [](std::string_view word) noexcept
+                                                         { return word.empty(); });
+                         }};
+    if (row.bytes.empty())
         return false;
-    if (row.markers.empty())
-        return row.min_digits >= kMinDeclaredValueFloor;
-    return row.min_digits == 0 &&
-           std::ranges::all_of(
-               row.markers, [](std::string_view marker) noexcept
-               { return !marker.empty() && (marker.back() < '0' || marker.back() > '9'); });
+    if (row.form == InstanceValueForm::Shape)
+    {
+        const std::size_t hole{row.bytes.find(kHole)};
+        if (hole == std::string_view::npos ||
+            row.bytes.find(kHole, hole + kHole.size()) != std::string_view::npos ||
+            row.bytes.contains(' ') || !row.flags.empty() || !row.keys.empty())
+            return false;
+        const std::size_t after{hole + kHole.size()};
+        const auto is_digit_byte{[](char chr) noexcept { return chr >= '0' && chr <= '9'; }};
+        return (hole == 0 || !is_digit_byte(row.bytes[hole - 1])) &&
+               (after == row.bytes.size() || !is_digit_byte(row.bytes[after]));
+    }
+    if (row.bytes.contains(kHole) || row.bytes.back() != ' ')
+        return false;
+    if (row.form == InstanceValueForm::Line)
+        return row.flags.empty() && row.keys.empty();
+    return !row.flags.empty() && non_empty(row.flags) && non_empty(row.keys) &&
+           std::ranges::all_of(row.keys,
+                               [](std::string_view key) noexcept { return key.ends_with('='); });
 }
 
 // invariant: a package shipping a dialect format strategy exports a factory; a data-only package
@@ -1017,6 +1095,10 @@ struct SemanticPackageManifest
     // invariant: serialized into semantic_identity only when declared, so none keeps the identity.
     // refs: ADR-17.D15
     std::span<const StopAnnouncementRow> stop_announcements;
+    // invariant: where the dialect's runner prints its own instance values; empty for a package
+    // that declares none, and serialized into semantic_identity only when declared.
+    // refs: DN-163.D1, DN-163.D7
+    std::span<const InstanceValueRow> instance_values;
     // invariant: both code-tier hooks are nullable; a data-only package leaves each null.
     StrategyFactory strategy{nullptr};
     ProvenanceHook echoed_source{nullptr};
@@ -1202,7 +1284,8 @@ all_row_revisions_declared(const SemanticPackageManifest& manifest) noexcept
                           manifest.outcome_markers.empty())) &&
            all_owned(manifest.roles) && all_owned(manifest.markers) && all_owned(manifest.emits) &&
            all_owned(manifest.level_lifts) && all_owned(manifest.outcome_tokens) &&
-           all_owned(manifest.declared_values) && all_owned(manifest.stop_announcements);
+           all_owned(manifest.declared_values) && all_owned(manifest.stop_announcements) &&
+           all_owned(manifest.instance_values);
 }
 
 // invariant: every row's channel_gate is kAnyChannel or one of the package's DECLARED channels, so
@@ -1252,6 +1335,9 @@ all_dialect_gates_owned(const SemanticPackageManifest& manifest) noexcept
                                { return owned(row.dialect_gate); }) &&
            std::ranges::all_of(manifest.stop_announcements,
                                [&owned](const StopAnnouncementRow& row) noexcept
+                               { return owned(row.dialect_gate); }) &&
+           std::ranges::all_of(manifest.instance_values,
+                               [&owned](const InstanceValueRow& row) noexcept
                                { return owned(row.dialect_gate); });
 }
 

@@ -149,7 +149,7 @@ canonicalization_version = stateless-masks-20
 > [2026-05-01T10:00:21.121Z] Test project /home/jenkins/workspace/proof_pipeline_main/build
 =h:d422ae3da6d71f16a193e5b33ff37db3	21		0	Unknown	0	RawText			[<*>] Test project /home/jenkins/workspace/proof_pipeline_main/build	0	None	0,0,0,0,0,0	0	0	0	
 > [2026-05-01T10:00:22.122Z] 41/42 Test #17: engine_replay_roundtrip .......... FAILED (2.31 sec)
-=h:411c510d0ed023f731fd906ffac03850	22		0	Error	0	RawText			[<*>] 41/<*> Test #<*>: engine_replay_roundtrip .......... FAILED (2.31 sec)	0	None	0,0,0,0,0,0	0	0	0	
+=h:4b9a2d933dbcaa695d860e82deef3928	22		0	Error	0	RawText			[<*>] <*> Test #<*>: engine_replay_roundtrip .......... FAILED <*> sec)	2|41/42|(2.31	None	0,0,0,0,0,0	0	0	0	
 > [2026-05-01T10:00:23.123Z] ERROR: expected 128 sealed windows, observed 127
 =h:299f34a87a3eaaf00c7ce76540f482d3	23		0	Error	0	RawText			[<*>] ERROR: expected <*> sealed windows, observed <*>	2|128|127	None	0,0,0,0,0,0	0	0	0	
 > [2026-05-01T10:00:24.124Z] 98% tests passed, 1 tests failed out of 42
