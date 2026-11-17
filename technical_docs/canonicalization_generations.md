@@ -1008,6 +1008,28 @@ identity moves; `kSemanticGrammarVersion` does not move.
   tail, already `<*>`), `2001:db8::1:65536` and `2001:db8::1:123456` (`<*>:db8::<*>:<*>`),
   `2001:db8:0:0:0:0:0:1:51780` (`<*>:<*>`), `:::51780` and `::1:51780` (literal), `fe80:0b8::1:51780`
   (`fe80:<*>::<*>:<*>`) and `[2001:db8::1]:51780` (`<*>`, the bracket arm's).
+
+**Also in this window: a unit's identity reads the run's declared values and its dialect's instance shapes
+(`CR-223`, `ADR-18.D1` as amended).** `-20` is still open (no tag carries it), so this rides it
+(`ADR-2.D9`). No masking rule moves and no package row moves; `kSemanticGrammarVersion` does not move.
+
+* *What changed.* A unit's name is claimed token by token, split on spaces, by the declared-run predicate and the
+  instance-shape predicate, exactly as a line's token is (`claim_identity_spans`; the masker's shape pass now calls
+  the same `claim_instance_shapes`). A claimed span reads as the wildcard in the unit's class
+  (`canonicalize_intent(marker, runs, values)` over `identity_masked_name`) and, inside the undeclared envelope and
+  before the version tail, in its instance key (`declared_discriminant_of`, which now takes the instance values),
+  a claim crossing a bound included. With nothing declared both are byte-identical to before.
+* *Which serialized fields move.* The intent class and the instance key of a unit whose name holds a value its run
+  declares, a head branch behind an opener included, or a span a dialect shape masks; no `CanonicalEvent` member
+  moves (`template_str`, `template_id`, `params`, the level).
+* *Registration, before the code.* coderoast-corpora `1c56853` (`sift_assessment/n465/`): on the 1 628 sides of the
+  bench's 814 pairs, 14 job markers move their key (12 leftover units pair on 6 pairs) and 19 step markers move their
+  class (no pairing moves).
+* *Witness inputs.* `core/tests/identity/test_instance_discriminant.cpp`: `test (fix/a-1, pr)` under head
+  `fix/a-1` keys `(<*>, pr)` (`(fix/a-1, pr)` undeclared); `deploy a-12 now` under `a-12` keys `<*>`; `test
+  (release-1)` and `test (release-2)` under `release-1` keep two keys; a `/runner-{n}/` shape keys
+  `'/home/u/runner-04/fix.sh'` as `<*>` and classes it `'/home/u/runner-<*>/fix.sh'`; `deploy fix/a-1 now` classes
+  `deploy <*> now`. `core/tests/mask/mask_rules.golden` and `core/tests/identity/projection.golden` do not move.
 ---
 
 *See also: [masking.md](masking.md) (what the current generation's rules actually are) ·

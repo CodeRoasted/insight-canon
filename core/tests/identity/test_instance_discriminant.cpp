@@ -144,18 +144,18 @@ TEST(InstanceDiscriminant, ADeclaredRunInsideTheEnvelopeReadsAsTheWildcard)
     const std::array<insight::tokenization::DeclaredRun, 1> other{
         insight::tokenization::DeclaredRun{.markers = kMarkers, .value = "6657"}};
     constexpr std::string_view kFiles{"gh api repos/o/r/pulls/6656/files"};
-    EXPECT_EQ(insight::declared_discriminant_of(kFiles, {}, own), "<*>")
+    EXPECT_EQ(insight::declared_discriminant_of(kFiles, {}, own, {}), "<*>")
         << "the envelope is the claimed run alone, so it reads as the wildcard";
-    EXPECT_EQ(insight::declared_discriminant_of(kFiles, {}, other), "6656")
+    EXPECT_EQ(insight::declared_discriminant_of(kFiles, {}, other, {}), "6656")
         << "another pull request's number stays raw";
-    EXPECT_EQ(insight::declared_discriminant_of(kFiles, {}, {}), discriminant_of(kFiles))
+    EXPECT_EQ(insight::declared_discriminant_of(kFiles, {}, {}, {}), discriminant_of(kFiles))
         << "with no declared run the key is the undeclared discriminant, byte for byte";
     constexpr std::string_view kSpan{"Test (ubuntu-22.04) for PR#6656 shard 12"};
-    EXPECT_EQ(insight::declared_discriminant_of(kSpan, {}, own),
+    EXPECT_EQ(insight::declared_discriminant_of(kSpan, {}, own, {}),
               "(ubuntu-22.04) for PR#<*> shard 12")
         << "the bounds are the undeclared envelope's; only the claimed bytes inside it move";
     constexpr std::string_view kNoSpan{"deploy PR#6656x"};
-    EXPECT_EQ(insight::declared_discriminant_of(kNoSpan, {}, own), "")
+    EXPECT_EQ(insight::declared_discriminant_of(kNoSpan, {}, own, {}), "")
         << "a run followed by a letter is no claim and no span: the key stays empty";
 }
 
@@ -168,9 +168,89 @@ TEST(InstanceDiscriminant, ADeclaredRunInTheVersionTailStaysVerbatim)
     const std::array<insight::tokenization::DeclaredRun, 1> own{
         insight::tokenization::DeclaredRun{.markers = kMarkers, .value = "77"}};
     constexpr std::string_view kTailOnly{"acme/action@pr-77"};
-    EXPECT_EQ(insight::declared_discriminant_of(kTailOnly, "pr-77", own), "pr-77")
+    EXPECT_EQ(insight::declared_discriminant_of(kTailOnly, "pr-77", own, {}), "pr-77")
         << "the run lies in the version tail, so the key keeps it";
     constexpr std::string_view kHeadAndTail{"acme/action-v2/pr-77/x@pr-77"};
-    EXPECT_EQ(insight::declared_discriminant_of(kHeadAndTail, "pr-77", own), "v2/pr-<*>/x@pr-77")
+    EXPECT_EQ(insight::declared_discriminant_of(kHeadAndTail, "pr-77", own, {}),
+              "v2/pr-<*>/x@pr-77")
         << "a run inside the envelope's head masks; the tail's stays";
+}
+
+// refs: ADR-18.D1, DN-163.D6
+// invariant: the declared-run predicate reads a name token by token, as the masker reads a line,
+// so a declared head branch behind an opener whose closer is in another token is claimed.
+TEST(InstanceDiscriminant, AHeadBranchInAMatrixTupleIsClaimedTokenByToken)
+{
+    constexpr std::array<std::string_view, 0> kNoPrefixes{};
+    const std::array<insight::tokenization::DeclaredRun, 1> head{
+        insight::tokenization::DeclaredRun{.value = "fix/a-1",
+                                           .kind = insight::tokenization::DeclaredValueKind::Text,
+                                           .prefixes = kNoPrefixes}};
+    constexpr std::string_view kLeg{"test (fix/a-1, pr)"};
+    EXPECT_EQ(insight::declared_discriminant_of(kLeg, {}, head, {}), "(<*>, pr)")
+        << "the head branch the run declares is no discriminant: one leg on every pull request";
+    EXPECT_EQ(insight::declared_discriminant_of(kLeg, {}, {}, {}), "(fix/a-1, pr)")
+        << "with nothing declared the key is the name's tuple, byte for byte";
+    constexpr std::string_view kStraddle{"deploy a-12 now"};
+    const std::array<insight::tokenization::DeclaredRun, 1> straddling{
+        insight::tokenization::DeclaredRun{.value = "a-12",
+                                           .kind = insight::tokenization::DeclaredValueKind::Text,
+                                           .prefixes = kNoPrefixes}};
+    EXPECT_EQ(insight::declared_discriminant_of(kStraddle, {}, straddling, {}), "<*>")
+        << "the envelope is the run `12`; the declared value `a-12` crosses its start, and none of "
+           "its bytes may stay in the key";
+    const std::array<insight::tokenization::DeclaredRun, 1> release{
+        insight::tokenization::DeclaredRun{.value = "release-1",
+                                           .kind = insight::tokenization::DeclaredValueKind::Text,
+                                           .prefixes = kNoPrefixes}};
+    EXPECT_EQ(insight::declared_discriminant_of("test (release-1)", {}, release, {}), "(<*>)");
+    EXPECT_EQ(insight::declared_discriminant_of("test (release-2)", {}, release, {}), "(release-2)")
+        << "a run's two legs, one named by its head branch, keep two keys: still two legs";
+}
+
+// refs: ADR-18.D1, DN-163.D7
+// invariant: a span a dialect's instance shape masks is no discriminant and no part of the class,
+// whatever else the name holds; the masker's own shape reading is the one read here.
+TEST(InstanceDiscriminant, ADialectInstanceShapeIsNeitherKeyNorClass)
+{
+    const std::array<insight::tokenization::InstanceValue, 1> shapes{
+        insight::tokenization::InstanceValue{
+            .form = insight::tokenization::InstanceValueForm::Shape, .bytes = "/runner-{n}/"}};
+    constexpr std::string_view kBanner{"'/home/u/runner-04/fix.sh'"};
+    constexpr std::string_view kOther{"'/home/u/runner-24/fix.sh'"};
+    EXPECT_EQ(insight::declared_discriminant_of(kBanner, {}, {}, shapes), "<*>")
+        << "the envelope is the runner's number, which the shape claims";
+    EXPECT_EQ(insight::declared_discriminant_of(kBanner, {}, {}, shapes),
+              insight::declared_discriminant_of(kOther, {}, {}, shapes))
+        << "two runners of one bank are one step";
+    EXPECT_EQ(insight::declared_discriminant_of(kBanner, {}, {}, {}), "04")
+        << "with no shape declared the number stays the key, as before";
+    EXPECT_EQ(insight::identity_masked_name(kBanner, {}, {}, shapes),
+              "'/home/u/runner-<*>/fix.sh'");
+    const insight::tokenization::IntentMarker marker{
+        .kind = insight::tokenization::IntentMarkerKind::Step, .name = kBanner};
+    EXPECT_EQ(insight::canonicalize_intent(marker, {}, shapes), "'/home/u/runner-<*>/fix.sh'")
+        << "the class reads the shape's span as the wildcard";
+    EXPECT_EQ(insight::canonicalize_intent(marker, {}, {}), insight::canonicalize_intent(marker))
+        << "with nothing declared the class is canonicalize_intent's, byte for byte";
+}
+
+// refs: ADR-18.D1
+// invariant: a declared value in a unit's name reads as the wildcard in its class, claimed token
+// by token, and the version tail stays verbatim.
+TEST(InstanceDiscriminant, ADeclaredValueInANameIsNoPartOfTheClass)
+{
+    constexpr std::array<std::string_view, 0> kNoPrefixes{};
+    const std::array<insight::tokenization::DeclaredRun, 1> head{
+        insight::tokenization::DeclaredRun{.value = "fix/a-1",
+                                           .kind = insight::tokenization::DeclaredValueKind::Text,
+                                           .prefixes = kNoPrefixes}};
+    const insight::tokenization::IntentMarker marker{
+        .kind = insight::tokenization::IntentMarkerKind::Step, .name = "  deploy fix/a-1 now  "};
+    EXPECT_EQ(insight::identity_masked_name(marker.name, {}, head, {}), "deploy <*> now");
+    EXPECT_EQ(insight::canonicalize_intent(marker, head, {}), "deploy <*> now")
+        << "the run's own branch is no part of the step's class";
+    EXPECT_EQ(insight::identity_masked_name("acme/action@fix/a-1", "fix/a-1", head, {}),
+              "acme/action@fix/a-1")
+        << "a value inside the version tail stays: the version stage reads it as printed";
 }

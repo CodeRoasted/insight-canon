@@ -158,6 +158,18 @@ std::string canonicalize_intent(const tokenization::IntentMarker& marker)
     return out;
 }
 
+std::string canonicalize_intent(const tokenization::IntentMarker& marker,
+                                std::span<const tokenization::DeclaredRun> runs,
+                                std::span<const tokenization::InstanceValue> values)
+{
+    if (runs.empty() && values.empty())
+        return canonicalize_intent(marker);
+    const std::string masked{identity_masked_name(marker.name, marker.version, runs, values)};
+    tokenization::IntentMarker read{marker};
+    read.name = masked;
+    return canonicalize_intent(read);
+}
+
 std::string_view one_token_version_of(std::string_view name, std::string_view introducer) noexcept
 {
     name = trimmed_intent_name(name);
@@ -239,32 +251,70 @@ std::string_view discriminant_of(std::string_view name) noexcept
     return std::string_view{name.data() + first, last - first};
 }
 
+namespace
+{
+    // post: the bytes of `name` before its version tail: the whole name when the version is empty
+    // or longer than the name.
+    [[nodiscard]] std::size_t version_tail_start(std::string_view name,
+                                                 std::string_view version) noexcept
+    {
+        return version.empty() || version.size() > name.size() ? name.size()
+                                                               : name.size() - version.size();
+    }
+} // namespace
+
 std::string declared_discriminant_of(std::string_view name, std::string_view version,
-                                     std::span<const tokenization::DeclaredRun> runs)
+                                     std::span<const tokenization::DeclaredRun> runs,
+                                     std::span<const tokenization::InstanceValue> values)
 {
     name = trimmed_intent_name(name);
     const std::string_view envelope{discriminant_of(name, version)};
-    if (runs.empty() || envelope.empty())
+    if ((runs.empty() && values.empty()) || envelope.empty())
         return std::string{envelope};
     // invariant: the envelope is a view into the trimmed name, so its offsets are the name's.
     const auto first{static_cast<std::size_t>(envelope.data() - name.data())};
     const std::size_t last{first + envelope.size()};
-    const std::size_t tail{
-        version.empty() || version.size() > name.size() ? last : name.size() - version.size()};
+    const std::size_t tail{std::min(last, version_tail_start(name, version))};
     std::vector<tokenization::ClaimedRun> claims;
-    tokenization::claim_declared_runs(name, runs, claims);
+    tokenization::claim_identity_spans(name, runs, values, claims);
     std::string out;
     out.reserve(envelope.size());
     std::size_t copied{first};
     for (const tokenization::ClaimedRun& claim : claims)
     {
-        if (claim.first < first || claim.last > tail)
+        // invariant: a claim crossing a bound gives its inside bytes to the wildcard, so no byte
+        // of it is ever a discriminant.
+        const std::size_t from{std::max(claim.first, first)};
+        const std::size_t stop{std::min(claim.last, tail)};
+        if (from >= stop)
             continue;
-        out.append(name.substr(copied, claim.first - copied));
+        out.append(name.substr(copied, from - copied));
+        out.append(tokenization::kMaskWildcard);
+        copied = stop;
+    }
+    out.append(name.substr(copied, last - copied));
+    return out;
+}
+
+std::string identity_masked_name(std::string_view name, std::string_view version,
+                                 std::span<const tokenization::DeclaredRun> runs,
+                                 std::span<const tokenization::InstanceValue> values)
+{
+    name = trimmed_intent_name(name);
+    const std::string_view head{name.substr(0, version_tail_start(name, version))};
+    std::vector<tokenization::ClaimedRun> claims;
+    if (!runs.empty() || !values.empty())
+        tokenization::claim_identity_spans(head, runs, values, claims);
+    std::string out;
+    out.reserve(name.size());
+    std::size_t copied{0};
+    for (const tokenization::ClaimedRun& claim : claims)
+    {
+        out.append(head.substr(copied, claim.first - copied));
         out.append(tokenization::kMaskWildcard);
         copied = claim.last;
     }
-    out.append(name.substr(copied, last - copied));
+    out.append(name.substr(copied));
     return out;
 }
 
@@ -315,6 +365,26 @@ namespace
                 claims.push_back({.first = first, .last = last});
         }
     }
+    // post: `claims` sorted ascending, two claims that overlap or touch read as one.
+    // assert: a span masks once whatever the claims that cover it, and the claims stay ascending
+    // and disjoint.
+    // refs: DN-163.D6
+    void merge_claims(std::vector<ClaimedRun>& claims)
+    {
+        std::ranges::sort(claims, {}, &ClaimedRun::first);
+        std::size_t kept{0};
+        for (const ClaimedRun& claim : claims)
+        {
+            if (kept != 0 && claim.first <= claims[kept - 1].last)
+            {
+                claims[kept - 1].last = std::max(claims[kept - 1].last, claim.last);
+                continue;
+            }
+            claims[kept++] = claim;
+        }
+        claims.resize(kept);
+    }
+
     // post: true when `rest` is at most kMaxShellTrailBytes bytes, each one of `,;:.`.
     [[nodiscard]] constexpr bool is_value_trail(std::string_view rest) noexcept
     {
@@ -391,21 +461,59 @@ void claim_declared_runs(std::string_view form, std::span<const DeclaredRun> run
                       ? claim_at(form, pos, run, claims)
                       : pos + 1;
     }
-    std::ranges::sort(claims, {}, &ClaimedRun::first);
-    // assert: two claims that overlap or touch read as one, so a span masks once whatever the
-    // runs that claimed it, and the claims stay ascending and disjoint.
-    // refs: DN-163.D6
-    std::size_t kept{0};
-    for (const ClaimedRun& claim : claims)
+    merge_claims(claims);
+}
+
+void claim_instance_shapes(std::string_view form, std::span<const InstanceValue> values,
+                           std::vector<ClaimedRun>& claims)
+{
+    constexpr std::string_view kHole{"{n}"};
+    claims.clear();
+    for (const InstanceValue& row : values)
     {
-        if (kept != 0 && claim.first <= claims[kept - 1].last)
-        {
-            claims[kept - 1].last = std::max(claims[kept - 1].last, claim.last);
+        if (row.form != InstanceValueForm::Shape)
             continue;
+        const std::size_t hole{row.bytes.find(kHole)};
+        const std::string_view before{row.bytes.substr(0, hole)};
+        const std::string_view after{row.bytes.substr(hole + kHole.size())};
+        std::size_t row_end{0};
+        for (std::size_t found{form.find(before)}; found != std::string_view::npos;
+             found = form.find(before, found + 1))
+        {
+            const std::size_t digits{found + before.size()};
+            std::size_t end{digits};
+            while (end < form.size() && is_digit(form[end]))
+                ++end;
+            if (end == digits || found < row_end || !form.substr(end).starts_with(after))
+                continue;
+            claims.push_back({.first = digits, .last = end});
+            row_end = end;
         }
-        claims[kept++] = claim;
     }
-    claims.resize(kept);
+    merge_claims(claims);
+}
+
+void claim_identity_spans(std::string_view name, std::span<const DeclaredRun> runs,
+                          std::span<const InstanceValue> values, std::vector<ClaimedRun>& claims)
+{
+    claims.clear();
+    std::vector<ClaimedRun> token_claims;
+    std::size_t start{0};
+    while (start < name.size())
+    {
+        const std::size_t space{name.find(' ', start)};
+        const std::size_t end{space == std::string_view::npos ? name.size() : space};
+        const std::string_view token{name.substr(start, end - start)};
+        // note: the masker's order on a token: the declared runs, then the instance shapes.
+        claim_declared_runs(token, runs, token_claims);
+        for (const ClaimedRun& claim : token_claims)
+            claims.push_back({.first = start + claim.first, .last = start + claim.last});
+        claim_instance_shapes(token, values, token_claims);
+        for (const ClaimedRun& claim : token_claims)
+            claims.push_back({.first = start + claim.first, .last = start + claim.last});
+        start = end + 1;
+    }
+    merge_claims(claims);
 }
 
 } // namespace insight::tokenization

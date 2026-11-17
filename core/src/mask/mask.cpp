@@ -1853,14 +1853,11 @@ namespace
         }
     }
 
-    // refs: DN-133.D1, DN-133.D7
-    // post: true with `out` holding `form` whose claimed runs read as the wildcard; false when no
-    // declared run claims anything, `out` then unspecified.
-    [[nodiscard]] bool replace_declared_runs(std::string_view form,
-                                             std::span<const DeclaredRun> declared_runs,
-                                             std::string& out, std::vector<ClaimedRun>& claims)
+    // post: true with `out` holding `form` whose `claims`, ascending and disjoint, read as the
+    // wildcard; false when there is none, `out` then unspecified.
+    [[nodiscard]] bool replace_claims(std::string_view form, std::span<const ClaimedRun> claims,
+                                      std::string& out)
     {
-        claim_declared_runs(form, declared_runs, claims);
         if (claims.empty())
             return false;
         out.clear();
@@ -1873,6 +1870,17 @@ namespace
         }
         out.append(form.substr(copied));
         return true;
+    }
+
+    // refs: DN-133.D1, DN-133.D7
+    // post: true with `out` holding `form` whose claimed runs read as the wildcard; false when no
+    // declared run claims anything, `out` then unspecified.
+    [[nodiscard]] bool replace_declared_runs(std::string_view form,
+                                             std::span<const DeclaredRun> declared_runs,
+                                             std::string& out, std::vector<ClaimedRun>& claims)
+    {
+        claim_declared_runs(form, declared_runs, claims);
+        return replace_claims(form, claims, out);
     }
 
     // refs: DN-134.D3
@@ -2247,44 +2255,10 @@ namespace
     // reads is maximal by the shape's own bytes.
     [[nodiscard]] bool mask_instance_shapes(std::string_view form,
                                             std::span<const InstanceValue> instance_values,
-                                            std::string& out)
+                                            std::string& out, std::vector<ClaimedRun>& claims)
     {
-        constexpr std::string_view kHole{"{n}"};
-        bool moved{false};
-        std::string current{form};
-        for (const InstanceValue& row : instance_values)
-        {
-            if (row.form != InstanceValueForm::Shape)
-                continue;
-            const std::size_t hole{row.bytes.find(kHole)};
-            const std::string_view before{row.bytes.substr(0, hole)};
-            const std::string_view after{row.bytes.substr(hole + kHole.size())};
-            std::string next;
-            std::size_t copied{0};
-            for (std::size_t found{current.find(before)}; found != std::string::npos;
-                 found = current.find(before, found + 1))
-            {
-                const std::size_t digits{found + before.size()};
-                std::size_t end{digits};
-                while (end < current.size() && is_digit(current[end]))
-                    ++end;
-                if (end == digits || found < copied ||
-                    !std::string_view{current}.substr(end).starts_with(after))
-                    continue;
-                next.append(current, copied, digits - copied);
-                next.append(kWildcard);
-                copied = end;
-                moved = true;
-            }
-            if (copied != 0)
-            {
-                next.append(current, copied);
-                current = std::move(next);
-            }
-        }
-        if (moved)
-            out = std::move(current);
-        return moved;
+        claim_instance_shapes(form, instance_values, claims);
+        return replace_claims(form, claims, out);
     }
 
     // refs: DN-163.D1
@@ -2523,7 +2497,8 @@ namespace
                     ? std::string_view{declared_}
                     : after_segments};
             return !instance_values_.empty() &&
-                           mask_instance_shapes(after_declared, instance_values_, shaped_)
+                           mask_instance_shapes(after_declared, instance_values_, shaped_,
+                                                shape_claims_)
                        ? std::string_view{shaped_}
                        : after_declared;
         }
@@ -2544,6 +2519,7 @@ namespace
         std::string argument_form_;
         std::vector<std::string_view> argument_values_;
         std::vector<ClaimedRun> declared_claims_;
+        std::vector<ClaimedRun> shape_claims_;
         std::string_view prev_;
         bool first_{true};
     };

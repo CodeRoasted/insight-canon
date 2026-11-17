@@ -135,6 +135,7 @@ parse_template_id(std::string_view rendered) noexcept;
 // the name carries no tuple.
 // invariant: kept RAW rather than masked or ordinal-numbered because matrix axes are stable by
 // DECLARATION, so raw keys pair exactly across runs.
+// note: the per-run bytes a stream declares are read as the wildcard by declared_discriminant_of.
 // invariant: the exact complement of canonicalize_intent — the class masks the tuple, the
 // discriminant keeps it.
 // refs: ADR-18, ADR-18.D1
@@ -1279,6 +1280,24 @@ struct ClaimedRun
 void claim_declared_runs(std::string_view form, std::span<const DeclaredRun> runs,
                          std::vector<ClaimedRun>& claims);
 
+// refs: DN-163.D7, ADR-18.D1
+// post: `claims` holds every digit run a `Shape` row of `values` masks in `form`: the row's literal
+// bytes around one maximal digit run, the run claimed.
+// post: the claims are ascending and disjoint, two that overlap or touch read as one.
+// invariant: within one row a match overlapping the previous one is skipped.
+// invariant: THE instance-shape predicate — the masker's normal-form pass and an intent's identity
+// both call it, so no second reading of a shape row exists anywhere.
+void claim_instance_shapes(std::string_view form, std::span<const InstanceValue> values,
+                           std::vector<ClaimedRun>& claims);
+
+// refs: ADR-18.D1
+// post: `claims` holds every span of `name` the declared runs or the instance shapes claim, read
+// token by token, split on spaces, each token as the masker reads it in a line.
+// post: the claims are ascending and disjoint, two that overlap or touch read as one.
+// invariant: one reading at both seats: a name's token is claimed exactly as a line's token is.
+void claim_identity_spans(std::string_view name, std::span<const DeclaredRun> runs,
+                          std::span<const InstanceValue> values, std::vector<ClaimedRun>& claims);
+
 } // namespace insight::tokenization
 
 // invariant: canon core is semantic-unaware — it owns the recognition ALGORITHM and the semantic
@@ -1390,16 +1409,36 @@ export namespace insight
 // bytes live in the marker's discriminant.
 [[nodiscard]] std::string canonicalize_intent(const tokenization::IntentMarker& marker);
 
+// refs: ADR-18.D1
+// post: a unit's identity CLASS: canonicalize_intent(marker) over identity_masked_name of its name,
+// so a run's declared value and a dialect-declared instance read as the wildcard in the class.
+// post: with `runs` and `values` empty, canonicalize_intent(marker) byte for byte.
+[[nodiscard]] std::string canonicalize_intent(const tokenization::IntentMarker& marker,
+                                              std::span<const tokenization::DeclaredRun> runs,
+                                              std::span<const tokenization::InstanceValue> values);
+
 // refs: DN-133.D7, ADR-18.D1
-// post: discriminant_of(name, version), owned, with every run `claim_declared_runs` claims on the
+// post: discriminant_of(name, version), owned, with every byte `claim_identity_spans` claims on the
 // trimmed name that lies inside that envelope and before the version tail read as the wildcard.
-// post: with `runs` empty, byte-identical to discriminant_of(name, version).
-// invariant: the envelope's bounds are the undeclared ones; only the claimed bytes inside it move,
-// so a run's own declared number is not a discriminant and every other byte still is.
+// post: a claim crossing either bound reads as one wildcard for its bytes inside.
+// post: with `runs` and `values` empty, byte-identical to discriminant_of(name, version).
+// invariant: the envelope's bounds are the undeclared ones; only the claimed bytes inside it move.
+// invariant: a run's declared value or a dialect-declared instance is never a discriminant.
 // invariant: the version tail stays verbatim, because the version stage reads it as printed.
 // pre: `version` is empty, or the trailing bytes of the trimmed name, as a recognizer returns it.
-[[nodiscard]] std::string declared_discriminant_of(std::string_view name, std::string_view version,
-                                                   std::span<const tokenization::DeclaredRun> runs);
+[[nodiscard]] std::string
+declared_discriminant_of(std::string_view name, std::string_view version,
+                         std::span<const tokenization::DeclaredRun> runs,
+                         std::span<const tokenization::InstanceValue> values);
+
+// refs: ADR-18.D1
+// post: the trimmed name with every span `claim_identity_spans` claims before the version tail
+// read as the wildcard, the version tail verbatim: the name a unit's class is canonicalized from.
+// post: with `runs` and `values` empty, the trimmed name byte for byte.
+// pre: `version` is empty, or the trailing bytes of the trimmed name, as a recognizer returns it.
+[[nodiscard]] std::string identity_masked_name(std::string_view name, std::string_view version,
+                                               std::span<const tokenization::DeclaredRun> runs,
+                                               std::span<const tokenization::InstanceValue> values);
 
 } // namespace insight
 
