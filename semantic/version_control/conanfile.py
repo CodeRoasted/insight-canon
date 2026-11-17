@@ -1,0 +1,99 @@
+import os
+import runpy
+from conan import ConanFile
+from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain
+
+
+required_conan_version = ">=2.28"
+
+
+class InsightSemanticVersionControlConan(ConanFile):
+    name = "insight_semantic_version_control"
+    version = "1.10.13"
+    package_type = "library"
+    license = "Apache-2.0"
+    url = "https://github.com/CodeRoasted/insight-canon"
+    description = (
+        "InSight Canon semantic package: the version-control tools' vocabulary (ADR-17.D1, "
+        "ADR-17.D14). Dialect-independent structural-role rows in the closed canon rule grammar "
+        "(git's checkout gauge as Progress shapes), data only, no code tier. "
+        "Statically composed into a binary via insight::semantic::compose()."
+    )
+    settings = "os", "arch", "compiler", "build_type"
+
+    options = {"shared": [True, False], "fPIC": [True, False]}
+    default_options = {"shared": False, "fPIC": True}
+
+    # NAMED, never globbed (DN-17.D31 fence 2). version_control.dialect.yaml IS the ruleset: under
+    # `conan create` the cache source folder is what the build sees, so a declaration that
+    # does not travel with the package is a package whose content cannot be produced. It is
+    # spelled out rather than swept by a glob because zero rows is not a degenerate dialect,
+    # it is a broken one — a row-less manifest still compiles, still composes and still
+    # publishes a `semantic_identity`.
+    exports_sources = "CMakeLists.txt", "src/*", "version_control.dialect.yaml", "tests/*"
+
+    def export_sources(self):
+        # The export is the TRACKED files under exports_sources, never the disk's (DN-142.D4 (b)):
+        # malf's helper, staged in the conan home and named by global.conf, drops every file git
+        # does not track. Without it the export fails; it never falls back to the disk silently.
+        runpy.run_path(self.conf.get("user.malf:recipe_exports"))["narrow_to_tracked"](self)
+
+    def config_options(self):
+        if self.settings.os == "Windows":
+            self.options.rm_safe("fPIC")
+
+    def configure(self):
+        if self.options.get_safe("shared"):
+            self.options.rm_safe("fPIC")
+
+    def layout(self):
+        # Keyed editable build dir (mirrors insight_canon): malf sets MALF_EDITABLE_BUILD_DIR so a
+        # consumer under any profile links THIS dep's matching-profile build.
+        build_dir = (os.environ.get("MALF_EDITABLE_BUILD_DIR")
+                     or self.conf.get("user.malf:editable_build_dir", default="build"))
+        self.cpp.build.libdirs = [build_dir]
+        self.cpp.build.builddirs = [build_dir]
+
+    def requirements(self):
+        # The provider contract (insight.canon.spi) + api types live in insight_canon; the package
+        # imports its modules. transitive_headers/libs so a downstream composing this package resolves
+        # canon's public module surface (fmt/spdlog GMF) through the same graph.
+        self.requires("insight_canon/1.10.13", transitive_headers=True, transitive_libs=True)
+
+    def build_requirements(self):
+        self.test_requires("gtest/1.17.0")
+
+    def generate(self):
+        tc = CMakeToolchain(self)
+        tc.generator = "Ninja"
+        tc.generate()
+        deps = CMakeDeps(self)
+        deps.generate()
+
+    def build(self):
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
+        runpy.run_path(self.conf.get("user.malf:recipe_tests"))["run_tests"](self)
+
+    def package(self):
+        cmake = CMake(self)
+        cmake.install()
+        # Last, the package's third-party notices and its repository's own licence (DN-142.D39): malf's
+        # helper, staged in the conan home and named by global.conf, writes both under licenses/.
+        runpy.run_path(self.conf.get("user.malf:recipe_notices"))["write_notices"](self)
+
+    def package_info(self):
+        self.cpp_info.libs = ["insight_semantic_version_control"]
+        self.cpp_info.set_property("cmake_file_name", "insight_semantic_version_control")
+        self.cpp_info.set_property("cmake_target_name", "insight::semantic_version_control")
+        self.cpp_info.requires = ["insight_canon::insight_canon"]
+        # Cross-package C++ modules (mirrors insight_canon §10.7): defer to the package's OWN cmake
+        # config (it carries FILE_SET CXX_MODULES; conan's generator does not emit it).
+        self.cpp_info.set_property("cmake_find_mode", "none")
+        malf_editable_build_dir = os.environ.get("MALF_EDITABLE_BUILD_DIR")
+        if malf_editable_build_dir:
+            self.cpp_info.builddirs = [malf_editable_build_dir,
+                                       "lib/cmake/insight_semantic_version_control"]
+        else:
+            self.cpp_info.builddirs = ["lib/cmake/insight_semantic_version_control"]

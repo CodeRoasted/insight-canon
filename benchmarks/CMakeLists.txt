@@ -1,7 +1,7 @@
 ###########################################################
 #  insight_canon_bench — the composed benchmark harness (ADR-17.D8 · LSRC-28)
 #
-#  Consumes canon + the FIVE semantic packages as EXTERNAL module libraries (the det_proof /
+#  Consumes canon + the SIX semantic packages as EXTERNAL module libraries (the det_proof /
 #  test_package consumption shape — not a module-member rebuild), so the measured object is the
 #  shipped library build. Four arms in one binary: BM_TokenizationThroughput composes the real
 #  vocabulary set; the Degenerate arm composes {}; the NestedJson arm runs the real set over a
@@ -46,6 +46,9 @@ endif()
 if(NOT TARGET insight::semantic_test_frameworks)
     find_package(insight_semantic_test_frameworks REQUIRED CONFIG)
 endif()
+if(NOT TARGET insight::semantic_version_control)
+    find_package(insight_semantic_version_control REQUIRED CONFIG)
+endif()
 find_package(benchmark REQUIRED CONFIG)
 
 add_executable(insight_canon_bench
@@ -55,16 +58,17 @@ add_executable(insight_canon_bench
 target_link_libraries(insight_canon_bench PRIVATE
     insight::canon insight::semantic_github insight::semantic_gitlab insight::semantic_jenkins
     insight::semantic_package_managers insight::semantic_test_frameworks
-    benchmark::benchmark)
+    insight::semantic_version_control benchmark::benchmark)
 target_compile_features(insight_canon_bench PRIVATE cxx_std_23)
 set_target_properties(insight_canon_bench PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
 
 # The composed template stream, a measurement tool (DN-163.O4 G5): template_stream_measure's stream
-# read through the five packages, a declared dialect and a declared stream context.
+# read through the six packages, a declared dialect and a declared stream context.
 add_executable(composed_stream_measure ${CMAKE_CURRENT_SOURCE_DIR}/tools/composed_stream_measure.cpp)
 target_link_libraries(composed_stream_measure PRIVATE
     insight::canon insight::semantic_github insight::semantic_gitlab insight::semantic_jenkins
-    insight::semantic_package_managers insight::semantic_test_frameworks)
+    insight::semantic_package_managers insight::semantic_test_frameworks
+    insight::semantic_version_control)
 target_compile_features(composed_stream_measure PRIVATE cxx_std_23)
 set_target_properties(composed_stream_measure PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
 

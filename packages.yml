@@ -40,6 +40,14 @@ packages:
     source_public: true
     release: true
     depends: [insight_canon]
+  # The version-control tools' vocabulary (ADR-17.D14): dialect-independent like package_managers,
+  # its rows projected from version_control.dialect.yaml as github's are.
+  insight_semantic_version_control:
+    path: semantic/version_control
+    version: 1.10.13
+    source_public: true
+    release: true
+    depends: [insight_canon]
   insight_semantic_test_frameworks:
     path: semantic/test_frameworks
     version: 1.10.13
@@ -55,7 +63,7 @@ packages:
     version: 1.10.13
     source_public: true
     release: false
-    depends: [insight_canon, insight_semantic_github, insight_semantic_gitlab, insight_semantic_jenkins, insight_semantic_package_managers, insight_semantic_test_frameworks]
+    depends: [insight_canon, insight_semantic_github, insight_semantic_gitlab, insight_semantic_jenkins, insight_semantic_package_managers, insight_semantic_test_frameworks, insight_semantic_version_control]
     # DN-142.D22: every executable this package stores, classed `published` (it ships) or
     # `run-from-cache` (a later step runs it from the cache, so it keeps its runpath).
     executables: {bin/insight_canon_bench: run-from-cache}
@@ -74,7 +82,7 @@ packages:
     version: 1.10.13
     source_public: true
     release: false
-    depends: [insight_canon, insight_semantic_github, insight_semantic_gitlab, insight_semantic_jenkins, insight_semantic_package_managers, insight_semantic_test_frameworks]
+    depends: [insight_canon, insight_semantic_github, insight_semantic_gitlab, insight_semantic_jenkins, insight_semantic_package_managers, insight_semantic_test_frameworks, insight_semantic_version_control]
     # DN-142.D22: every executable this package stores, classed `published` (it ships) or
     # `run-from-cache` (a later step runs it from the cache, so it keeps its runpath).
     executables: {bin/det_proof: run-from-cache}
@@ -166,6 +174,7 @@ determinism:
     - semantic/jenkins/src
     - semantic/package_managers/src
     - semantic/test_frameworks/src
+    - semantic/version_control/src
     - proof
   out_of_scope:
     insight_canon_corpus: "the corpus cut tool (release: false) adds no translation unit of its own: it builds the test executables of core and the jenkins and gitlab dialects, whose library sources the roots above judge, and its stored binaries are gates the cut runs, reaching no consumer of deterministic output"

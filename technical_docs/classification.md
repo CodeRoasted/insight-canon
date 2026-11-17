@@ -175,7 +175,7 @@ not data-tuned exceptions.
 | `GroupBegin` | `##[group]` / `::group::` |
 | `GroupEnd` | `##[endgroup]` / `::endgroup::` |
 | `Terminator` | `##[error]` / `::error::` |
-| `Progress` | the whole line is a declared gauge shape: `Received {n} of {n} ({n}%), {n} MBs/sec` and its `Sent` twin (GitHub, the actions/cache toolkit), `Progress: resolved {n}, reused {n}, downloaded {n}, added {n}` (pnpm, any dialect) |
+| `Progress` | the whole line is a declared gauge shape: `Received {n} of {n} ({n}%), {n} MBs/sec` and its `Sent` twin (GitHub, the actions/cache toolkit), `Progress: resolved {n}, reused {n}, downloaded {n}, added {n}` (pnpm, any dialect), `Updating files: {n}% ({n}/{n})` at each of git's three padded column widths and its `, done.` close (git's checkout gauge, any dialect) |
 | `None` | (the common case) |
 
 A role row matches in one of two closed ways. A **prefix** row matches a line whose content starts with its bytes;
@@ -186,11 +186,12 @@ could border a digit, another hole or a decimal point leading into either, so a 
 line prints and matching never backtracks.
 
 `Progress` names a line a platform, toolkit or tool prints **on a timer** as a sample of a quantity in progress, whose
-event its own content lines carry (`Cache restored from key`, pnpm's `, done` summary). It is declared by an exact
+event its own content lines carry (`Cache restored from key`, pnpm's `, done` summary, the checkout's step). It is declared by an exact
 shape only — never a prefix, because its samples share their opening bytes with lines that are content — in the
 package that owns the producer, and only on measured evidence. Canon emits the line and its template unchanged and
 only names the role; a consumer comparing content (Tamys) leaves the line out, and the MetaLog carries it with its
-count. Work-paced progress (git, docker, pip, curl, apt) is not `Progress`: its count is work done, not time.
+count. Work-paced progress (docker, pip, curl, apt) is not `Progress`: its count is work done, not time. A gauge
+shown only once a delay timer fires is `Progress`, whatever paces its samples once shown: git's checkout gauge.
 
 The role registry is a declared seed catalog; it grows only when a scenario or a measured census surfaces a line
 that earns its place.

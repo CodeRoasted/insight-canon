@@ -9,7 +9,7 @@
 #
 # The vocabulary — GitHub-Actions workflow-command markers, intent-marker prefixes,
 # test-framework file-naming suffixes — lives in the semantic PACKAGES
-# (semantic/github, semantic/package_managers, semantic/test_frameworks). This gate asserts none of it has
+# (semantic/github, semantic/package_managers, semantic/test_frameworks, semantic/version_control). This gate asserts none of it has
 # leaked back into the core mechanism as a BEHAVIORAL string literal.
 #
 # ── Scope ──────────────────────────────────────────────────────────────────────
@@ -58,6 +58,7 @@ SCAN_ROOTS=(core/src core/api)
 #     pytest/vitest/playwright/jenkins/gitlab, the retired `intent-gha` registry tag)
 #   - the declared Progress gauges' vocabulary (the actions/cache `MBs/sec` rate, pnpm's
 #     `Progress: resolved` and the `pnpm` identifier) — semantic/github and semantic/package_managers
+#   - git's checkout gauge (`Updating files:`) — semantic/version_control
 DENY=(
   '##\['                                              # GHA workflow-command bracket
   '::(group|endgroup|error|warning|notice|debug|set-output|save-state|add-mask|echo|add-matcher)::'
@@ -78,6 +79,7 @@ DENY=(
   'section_start:|section_end:'                       # GitLab section-marker prefixes
   'MBs/sec'                                           # actions/cache transfer-gauge rate unit
   'Progress: resolved|\bpnpm\b'                       # pnpm install gauge and its identifier
+  'Updating files:'                                   # git's checkout gauge
 )
 
 # Build one alternation.
@@ -162,7 +164,7 @@ if [ "$violations" -ne 0 ]; then
   printf '%s' "$report"
   echo
   echo "Core is semantic-unaware: the mechanism carries no ecosystem literal. Move the marker/prefix/suffix into semantic/github,"
-  echo "semantic/package_managers or semantic/test_frameworks as a rule row (the closed grammar), or — if it is a documentation"
+  echo "semantic/package_managers, semantic/test_frameworks or semantic/version_control as a rule row (the closed grammar), or — if it is a documentation"
   echo "reference — keep it in a comment, not a code string literal."
   exit 1
 fi

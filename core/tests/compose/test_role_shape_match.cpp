@@ -1,6 +1,7 @@
 // invariant: the SHAPE role-row kind over SYNTHETIC rows, so the mechanism is vocabulary-free:
 // its matcher, its precedence, its fence, its place in the identity and the duplicate check.
-// invariant: the declared shapes are proven in the github and package_managers suites.
+// invariant: the declared shapes are proven in the github, package_managers and version_control
+// suites.
 // refs: ADR-17.D14, ADR-17.D4
 #include <gtest/gtest.h>
 

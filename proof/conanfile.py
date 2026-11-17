@@ -14,7 +14,7 @@ class InsightCanonProofConan(ConanFile):
     url = "https://github.com/CodeRoasted/insight-canon"
     description = (
         "InSight Canon determinism proof, ship-leg step (DN-142.D5 (4)): the det_proof fixture "
-        "linked against the STORED insight_canon and the five semantic packages, the proof "
+        "linked against the STORED insight_canon and the six semantic packages, the proof "
         "driver's reporting gate and the showcase view gate. Never published. The N-ways cell "
         "matrix of scripts/det_public_proof.sh stays the tag-time determinism harness, which "
         "recompiles canon in its own tree from the same proof/CMakeLists.txt."
@@ -54,6 +54,7 @@ class InsightCanonProofConan(ConanFile):
         self.requires("insight_semantic_jenkins/1.10.13")
         self.requires("insight_semantic_package_managers/1.10.13")
         self.requires("insight_semantic_test_frameworks/1.10.13")
+        self.requires("insight_semantic_version_control/1.10.13")
         # `--digest` hashes each member column with canon's own SHA-256; canon links it PRIVATE.
         self.requires("picosha2/1.0.0")
 

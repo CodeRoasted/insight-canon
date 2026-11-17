@@ -45,7 +45,7 @@ if(CANON_PROOF_IN_TREE)
     add_subdirectory(${CANON_ROOT}/core canon_build)
     # The semantic packages (ADR-17.D8) — added AFTER canon so their `if(NOT TARGET insight::canon)`
     # guards see the in-tree target (no find_package). det_proof composes the product's exact
-    # manifest set {github, gitlab, jenkins, package_managers, test_frameworks}, so the proof
+    # manifest set {github, gitlab, jenkins, package_managers, test_frameworks, version_control}, so the proof
     # exercises the composed pipeline (the byte-identity G-SP-1 gate; the grammar-2 composed
     # identity = G-OUT-6).
     add_subdirectory(${CANON_ROOT}/semantic/github github_build)
@@ -53,6 +53,7 @@ if(CANON_PROOF_IN_TREE)
     add_subdirectory(${CANON_ROOT}/semantic/jenkins jenkins_build)
     add_subdirectory(${CANON_ROOT}/semantic/package_managers pkgmgr_build)
     add_subdirectory(${CANON_ROOT}/semantic/test_frameworks testfw_build)
+    add_subdirectory(${CANON_ROOT}/semantic/version_control vcs_build)
 else()
     find_package(insight_canon REQUIRED CONFIG)
     find_package(insight_semantic_github REQUIRED CONFIG)
@@ -60,6 +61,7 @@ else()
     find_package(insight_semantic_jenkins REQUIRED CONFIG)
     find_package(insight_semantic_package_managers REQUIRED CONFIG)
     find_package(insight_semantic_test_frameworks REQUIRED CONFIG)
+    find_package(insight_semantic_version_control REQUIRED CONFIG)
 endif()
 
 # The constant fixture, consuming canon + the packages as external modules. picosha2 is canon's own
@@ -70,7 +72,7 @@ add_executable(det_proof det_proof.cpp)
 target_link_libraries(det_proof PRIVATE
     insight::canon insight::semantic_github insight::semantic_gitlab
     insight::semantic_jenkins insight::semantic_package_managers insight::semantic_test_frameworks
-    picosha2::picosha2)
+    insight::semantic_version_control picosha2::picosha2)
 target_compile_features(det_proof PRIVATE cxx_std_23)
 set_target_properties(det_proof PROPERTIES CXX_SCAN_FOR_MODULES ON CXX_MODULE_STD ON)
 

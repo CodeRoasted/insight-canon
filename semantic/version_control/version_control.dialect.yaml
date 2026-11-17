@@ -1,0 +1,71 @@
+# The version-control tools' vocabulary, declared as DATA.
+#
+# This file IS the package: `dialect_package_codegen.py` (malf-toolchain) projects it into the
+# complete C++ content of the semantic package — the manifest, its rows and the compile-time
+# fences. Nothing about this vocabulary is stated anywhere else.
+#
+# THE `why:` KEY IS NOT DOCUMENTATION. It is where the argument lives, emitted verbatim as comment
+# lines above what it annotates and EXCLUDED from the content hash: editing an argument never moves
+# the identity of what this package recognizes.
+#
+# DECLARED ORDER IS CONTENT. The identity serializer walks every row in declared order, so
+# reordering a row changes the composed comparability hash. Nothing here is sorted, ever.
+
+dialect:
+  name: version_control
+  version: "1.0.0"
+  why:
+    - "A version-control tool prints its own lines under every CI runner, so its vocabulary"
+    - "belongs to the producer's owner and not to whichever runner printed it (ADR-17.D1), as"
+    - "pnpm's belongs to package_managers. This package is therefore dialect-independent: no"
+    - "stream ever declares `version_control`, and every row below fires on any dialect."
+
+  # ── the generation coordinate ──
+  revisions:
+    why:
+      - "This package has no vendor syntax generation: `v1` names OUR first generation of these"
+      - "rows and moves only when what a row family means changes shape. Core requires a"
+      - "non-empty coordinate on every manifest, so a reader comparing two identity digests finds"
+      - "the same field in each — the convention test_frameworks set (ADR-17.D9)."
+    names: [v1]
+
+  # ── structural-role rows ──
+  roles:
+    why:
+      - "git's checkout gauge (ADR-17.D14): git shows `Updating files:` only once a delay timer"
+      - "has fired during a checkout, then samples the running count. So how many samples print,"
+      - "and from which percent, is elapsed time, and the values are instantaneous readings. The"
+      - "checkout itself is carried by its step, its banner and the checkout action's own lines."
+      - "Measured on the GitHub corpus (1 738 logs): 34 058 samples and 965 closing lines in 519"
+      - "logs; on the GitLab corpus 361 samples in 6 traces; on the Jenkins corpus none"
+      - "(coderoast-corpora sift_assessment/n467)."
+      - ""
+      - "SHAPES, never a prefix on `Updating files: `: a shape states the gauge exactly, and a"
+      - "prefix would take any future line git opens that way. git pads the percent to three"
+      - "columns, and the padding is literal bytes, so there is one shape per column width, and"
+      - "the four are disjoint. git's fetch gauges are not declared: no comparison was measured"
+      - "to lose a row on them, and rows are extended only on measured evidence."
+    rows:
+      - shape: "Updating files:   {n}% ({n}/{n})"
+        role: Progress
+        dialect_gate: any
+        why:
+          - "A sample at a one-digit percent: three columns, two of them padding."
+      - shape: "Updating files:  {n}% ({n}/{n})"
+        role: Progress
+        dialect_gate: any
+        why:
+          - "A sample at a two-digit percent: one column of padding."
+      - shape: "Updating files: {n}% ({n}/{n})"
+        role: Progress
+        dialect_gate: any
+        why:
+          - "The sample at 100 %, which fills the three columns."
+      - shape: "Updating files: {n}% ({n}/{n}), done."
+        role: Progress
+        dialect_gate: any
+        why:
+          - "The closing line. It prints only when the gauge did (519 logs with a sample, 519 with"
+          - "a closing line), and canon masks its counts, so it carries nothing but the timer:"
+          - "it is the gauge's. When a runner joins the last sample and this line on one line"
+          - "with a carriage return, the line is content (ADR-21.D6) and takes no role."

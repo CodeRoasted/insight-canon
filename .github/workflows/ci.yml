@@ -1,7 +1,7 @@
 name: CI
 
 # This repository's CI: the preflight (cheap checks) and the build (malf-toolchain's coderoast-build.yml:
-# the clang-21 dev build of canon core, the five semantic packages and the bench harness, with every test; test on clang, ship gcc). With
+# the clang-21 dev build of canon core, the six semantic packages and the bench harness, with every test; test on clang, ship gcc). With
 # postflight, clang-tidy runs over that same build in the build job, because only that job holds it. The
 # two jobs do not wait for each other, so a red preflight never hides the build's or the lint's verdict.
 # PUBLIC repository: every job runs on GitHub-hosted machines.

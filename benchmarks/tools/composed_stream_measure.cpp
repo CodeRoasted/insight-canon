@@ -1,7 +1,7 @@
 // refs: ADR-8.D5, ADR-16.D5, DN-163.O4
 // invariant: the per-line template stream of a population read through the COMPOSED tokenizer: one
 // output line per input line, in input order, its template_str, or nothing when it yields no event.
-// invariant: it is template_stream_measure with the five shipped packages composed, a declared
+// invariant: it is template_stream_measure with the six shipped packages composed, a declared
 // dialect and channel, and a declared stream context, so a declared value or an instance row shows.
 // invariant: a CLI tool and not a test: its population is operator-mounted and third-party, so the
 // stream goes where the operator points it and nothing is asserted here.
@@ -15,6 +15,7 @@ import insight.semantic.gitlab;
 import insight.semantic.jenkins;
 import insight.semantic.package_managers;
 import insight.semantic.test_frameworks;
+import insight.semantic.version_control;
 
 namespace
 {
@@ -38,7 +39,7 @@ void print_usage()
     std::println(stderr, "  writes one line per input line to stdout: its template_str, empty when "
                          "the line yields no event");
     std::println(stderr, "  the files are read in the order named, through one tokenizer over the "
-                         "five shipped packages, viewed for the declared dialect and channel");
+                         "six shipped packages, viewed for the declared dialect and channel");
     std::println(stderr, "  stderr closes with `lines <N>`, the count of input lines streamed");
 }
 
@@ -102,10 +103,13 @@ try
         print_usage();
         return kExitUsage;
     }
-    static const std::array<insight::semantic::SemanticPackageManifest, 5> kManifests{
-        insight::semantic::github::kManifest, insight::semantic::gitlab::kManifest,
-        insight::semantic::jenkins::kManifest, insight::semantic::package_managers::kManifest,
-        insight::semantic::test_frameworks::kManifest};
+    static const std::array<insight::semantic::SemanticPackageManifest, 6> kManifests{
+        insight::semantic::github::kManifest,
+        insight::semantic::gitlab::kManifest,
+        insight::semantic::jenkins::kManifest,
+        insight::semantic::package_managers::kManifest,
+        insight::semantic::test_frameworks::kManifest,
+        insight::semantic::version_control::kManifest};
     // note: `composed` and `view` precede `tokenizer` so they outlive the const-ref it holds.
     const insight::semantic::ComposedSemantics composed{insight::semantic::compose(kManifests)};
     const insight::semantic::ComposedSemantics view{
