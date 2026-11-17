@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   preflight:
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-preflight.yml@c34f2ef15b30406b7d39b70f680ae1e7e659ee28
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-preflight.yml@eb3723bf47a3c346ce2183ad75ede766da4741a0
 
   # canon's own gate scripts, through malf-toolchain's script-gate job (ROADMAP N357). PUBLIC repo: no
   # runs-on passthrough — the reusable workflow's hosted default.
@@ -28,7 +28,7 @@ jobs:
   sp1-semantic-unawareness:
     permissions:
       contents: read
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-script-gate.yml@c34f2ef15b30406b7d39b70f680ae1e7e659ee28
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-script-gate.yml@eb3723bf47a3c346ce2183ad75ede766da4741a0
     with:
       gates: |
         bash scripts/sp1_semantic_unawareness_lint.sh
@@ -44,7 +44,7 @@ jobs:
   disclosure-set:
     permissions:
       contents: read
-    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-script-gate.yml@c34f2ef15b30406b7d39b70f680ae1e7e659ee28
+    uses: CodeRoasted/malf-toolchain/.github/workflows/coderoast-script-gate.yml@eb3723bf47a3c346ce2183ad75ede766da4741a0
     with:
       gates: bash scripts/disclosure_set_lint.sh
       full-history: true
