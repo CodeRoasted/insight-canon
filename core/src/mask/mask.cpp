@@ -101,6 +101,7 @@ namespace
     constexpr unsigned kMaxOctetValue{255U};
     constexpr std::size_t kHardwareGroupDigits{2};
     constexpr std::size_t kMaxPortDigits{5};
+    constexpr unsigned kMaxPortValue{65535U};
     constexpr std::array<std::size_t, 3> kHardwareGroupCounts{6, 8, 12};
     // invariant: the hyphen-joined and dotted hardware forms are not earned, yet a token of either
     // shape ends the shell walk, as it ended the census's.
@@ -297,11 +298,43 @@ namespace
         return slice(tok, 1, close - 1);
     }
 
+    // post: true for a `::` form the grammar admits whole: a dotted IPv4 tail, or at least two
+    // explicit hextets none written with a leading zero.
+    [[nodiscard]] constexpr bool is_admitted_compressed(const Ipv6Text& text) noexcept
+    {
+        return text.compressed &&
+               (text.ipv4_tail || (text.units >= kMinCompressedUnits && !text.leading_zero));
+    }
+
+    // post: true when `core` is `<address>:<port>`, the port exactly five decimal digits at most
+    // 65535 and the address a `::` form the grammar admits whole.
+    // invariant: a port of four digits or fewer is also a hextet, so only five digits read uniquely
+    // as a port; that is why the digit count is exact and not a bound.
+    // invariant: an eight-unit form followed by a port and `:::<port>` stay outside the grammar.
+    // refs: ADR-16.D17, DN-163.D17
+    [[nodiscard]] constexpr bool is_compressed_with_port(std::string_view core) noexcept
+    {
+        const std::size_t colon{core.rfind(':')};
+        if (colon == std::string_view::npos || core.size() - colon - 1 != kMaxPortDigits)
+            return false;
+        unsigned port{0};
+        for (const char chr : slice(core, colon + 1))
+        {
+            if (!is_digit(chr))
+                return false;
+            port = (port * kDecimalBase) + static_cast<unsigned>(chr - '0');
+        }
+        if (port > kMaxPortValue)
+            return false;
+        const std::optional<Ipv6Text> text{ipv6_text(slice(core, 0, colon))};
+        return text.has_value() && is_admitted_compressed(*text);
+    }
+
     // post: true when one shell-stripped `core` writes an address the grammar claims, false when it
     // writes one it does not claim or an unearned hardware form.
     // post: nullopt when it writes none, so the next trail is read.
     // invariant: a `:` stripped after a hextet is the address's own separator and no shell byte;
-    // after a dotted IPv4 tail it is one.
+    // after a dotted IPv4 tail or a five-digit port it is one.
     [[nodiscard]] constexpr std::optional<bool> core_verdict(std::string_view core,
                                                              bool colon_stripped) noexcept
     {
@@ -311,8 +344,10 @@ namespace
                 return true;
             if (colon_stripped)
                 return false;
-            return !text->compressed || (text->units >= kMinCompressedUnits && !text->leading_zero);
+            return !text->compressed || is_admitted_compressed(*text);
         }
+        if (is_compressed_with_port(core))
+            return true;
         if (const std::size_t groups{two_hex_groups(core, ':')}; groups >= kMinColonHardwareGroups)
             return is_hardware_group_count(groups);
         if (two_hex_groups(core, '-') >= kMinDashHardwareGroups || is_cisco_dotted(core))
@@ -322,6 +357,7 @@ namespace
 
     // post: true when the whole token is an IPv6 or colon-joined hardware address the earned
     // grammar admits: bare, bracketed with a port, or inside the IPv4 address's wrapper shell.
+    // post: a `::` form followed by an unbracketed five-digit port is one such address.
     // invariant: the shell's trailing bytes are read shortest first, and the first core that
     // writes address or hardware text decides the token, as the census that earned it did.
     // refs: ADR-16.D17, F-SRC-insight-canon:canon.detail.scan.cppm:kWrapperPairs

@@ -244,13 +244,19 @@ ship (`ADR-16.D17`). The values below are documentation addresses (RFC 5737, RFC
   both RFC 4291 forms (`::ffff:192.0.2.1`, `0:0:0:0:0:ffff:192.0.2.1`), so a dual-stack peer and its IPv4 twin
   are one template; an RFC 4007 zone (`%` and `[A-Za-z0-9._~-]+`); and the bracketed form with its port, any
   address inside the brackets (`[2001:db8::1]:8080`, `[::1]:51780`).
+- **IPv6 with an unbracketed port, whole token** (`DN-163.D17`): a `::` form the line above admits whole, then `:`
+  and a decimal port of **exactly five digits**, at most 65535 (`2001:db8::1:51780`). A port of four digits or
+  fewer is also a hextet, so the token is then an IPv6 text this grammar already reads, or ambiguous; five digits
+  cannot be a hextet, so the reading is unique. Its census: 14 tokens in 2 GitHub logs, every one a pod address
+  read from its line's wording, 0 on GitLab and Jenkins (coderoast-corpora `sift_assessment/n464/`).
 - **Hardware, whole token**: `:`-joined runs of exactly **6, 8 or 12** two-hex-digit groups, any case
   (`00:00:5e:00:53:01`). The declared count set is what keeps a certificate fingerprint (20 to 32 groups)
   literal.
 - **The shell** is the IPv4 rule's: one catalog opener at byte 0 (§3.2), then at most two trailing closers or
   `,;:.`, read shortest first; the first core that writes address or hardware text decides the token. A `:`
   shed after a hextet is the address's own separator, so it is no shell byte there (`2001:db8::1:` is not an
-  address whole); after a dotted IPv4 tail it is (`::ffff:192.0.2.1:` masks).
+  address whole); after a dotted IPv4 tail or a five-digit port it is (`::ffff:192.0.2.1:` and
+  `2001:db8::1:51780:` mask).
 - **An address run inside a larger token** — a fully expanded 8-group IPv6 run, or a 6-, 8- or 12-group
   hardware run, each bounded on both sides by a byte that is no letter or digit, or by the token's edge — is
   one masked component of the composite that reaches it: `v6(en0:2001:db8:0:0:0:0:0:1)` → `v6(en0:<*>)`,
@@ -391,6 +397,11 @@ Each member is named with the reason it stays out, measured over the census that
 - **An embedded `::` form** (`answer=2001:db8::1` keeps its address, `answer=2001:db8::<*>`): 52 of the 139
   embedded `::` claims were C++ scope, a package channel, a location or debris. This is a measured miss: 70 DNS
   answer values in one CI producer and one macOS line are addresses the rule does not mask.
+- **An eight-unit form followed by an unbracketed port** (`2001:db8:0:0:0:0:0:1:51780`): no witness in the five-digit
+  port census (`DN-163.D17`), so an arm would pass vacuously; the address run inside a token still claims its 8
+  groups and leaves the port to the walk (§3.3).
+- **`:::<port>`**, the unspecified address with an unbracketed port: one witness, a server's listen line, and it
+  stays outside the bar of two explicit hextets (`DN-163.D17`).
 - **The `-`-joined and dotted hardware forms** (`00-00-5E-00-53-01`, `0000.5e00.5301`): zero claims in
   39 341 483 lines, so an arm for them would pass vacuously, and a vacuous pass is not a measurement.
 

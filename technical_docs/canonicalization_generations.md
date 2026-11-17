@@ -988,6 +988,26 @@ carries it), so this rides it (`ADR-2.D5`, `ADR-2.D9`), and the GitHub package's
   42 tokens after `-t` and 34 run-line image tokens; GitLab and Jenkins move none.
 * *Witness inputs.* The GitHub package's declared pull-ref and instance-value tests, since only a composition holds a
   row. `core/tests/mask/mask_rules.golden` declares no text value and no instance row, so it does not move.
+
+**Also in this window: an IPv6 address followed by an unbracketed five-digit port masks whole (`DN-163.D17`).**
+`-20` is still open (no tag carries it), so this rides it (`ADR-2.D9`). No package row moves, so no composed
+identity moves; `kSemanticGrammarVersion` does not move.
+
+* *What changed, the identity class.* The address rule (`ADR-16.D17`) gains one arm: a `::` form its grammar admits
+  whole, followed by `:` and a decimal port of exactly five digits no greater than 65535, is one address, masked
+  whole, bare or in its shell. Declared outside: an eight-unit form followed by a port, and `:::<port>`.
+* *Which serialized fields move.* `template_str` and `template_id` of a line holding such a token that no other rule
+  masked whole, and its `params`: the token is now a whole-token wildcard, so a param, where its groups were
+  normalizations.
+* *Registration, before the code.* coderoast-corpora `bdfe8e8` (`sift_assessment/n464/`): on the 1 738 GitHub logs,
+  the arm claims 14 tokens in 2 logs, of which 4 already masked whole and 10 move, on 10 lines; GitLab and Jenkins
+  move none.
+* *Witness inputs.* `core/tests/mask/mask_rules.golden`: the address rows `2001:db8::1:51780`,
+  `(2001:db8::1:51780),`, `2001:db8::1:51780:`, `[2001:db8::1:51780]`, `fe80::200:5eff:fe00:5301%en0:65535` and
+  `::ffff:192.0.2.1:51780`, each `<*>`; the boundary rows keep the reading they had: `2001:db8::1:8080` (a hextet
+  tail, already `<*>`), `2001:db8::1:65536` and `2001:db8::1:123456` (`<*>:db8::<*>:<*>`),
+  `2001:db8:0:0:0:0:0:1:51780` (`<*>:<*>`), `:::51780` and `::1:51780` (literal), `fe80:0b8::1:51780`
+  (`fe80:<*>::<*>:<*>`) and `[2001:db8::1]:51780` (`<*>`, the bracket arm's).
 ---
 
 *See also: [masking.md](masking.md) (what the current generation's rules actually are) ·
